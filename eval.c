@@ -500,7 +500,7 @@ static void doprint(FILE *stream, oop obj, int storing)
   }
 }
 
-//static void print(oop obj)			{ doprint(stdout, obj, 0); }
+static void print(oop obj)			{ doprint(stdout, obj, 0); }
 
 static void fdump(FILE *stream, oop obj)	{ doprint(stream, obj, 1); }
 static void dump(oop obj)			{ fdump(stdout, obj); }

@@ -1,7 +1,7 @@
 (define *backtrace*
   (lambda (stack depth)
     (while (>= (set depth (- depth 1)) 0)
-      (println (array-at stack depth)))
+      (println "  " depth "\t" (array-at stack depth)))
     (exit 0)))
 
 (define <stage> (%allocate-type '<stage>))
@@ -12,7 +12,7 @@
 
 (set-array-at (selector-methods print) <stage>
   (lambda args
-    (print "<stage>") (noodle)))
+    (print "<stage>")))
 
 (define s (allocate <stage> 0))
 

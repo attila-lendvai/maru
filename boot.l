@@ -26,7 +26,7 @@
 
 (define %error
   (lambda args
-    (%print "\n(recursive) error: ")
+    (%print "\nERROR: ")
     (apply %print args)
     (%print "\n")
     (abort)))
@@ -34,7 +34,7 @@
 (define error
   (lambda args
     (set error %error)
-    (%print "\n error: ")
+    (%print "\nerror: ")
     (apply print args)
     (%print "\n")
     (abort)))
