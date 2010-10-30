@@ -1,9 +1,3 @@
-(define *backtrace*
-  (lambda (stack depth)
-    (while (>= (set depth (- depth 1)) 0)
-      (println "  " depth "\t" (array-at stack depth)))
-    (exit 0)))
-
 (define <stage> (%allocate-type '<stage>))
 
 (set-array-at *applicators* <stage>

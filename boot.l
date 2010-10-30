@@ -74,6 +74,12 @@
       (set args (cdr args)))
     (print "\n")))
 
+(define *backtrace*
+  (lambda (stack depth)
+    (while (>= (set depth (- depth 1)) 0)
+      (println "  " depth "\t" (array-at stack depth)))
+    (exit 0)))
+
 (define cadr (lambda (x) (car (cdr x))))
 
 (define concat (lambda (x y)
@@ -113,12 +119,12 @@
       (+ 1 (list-length (cdr list)))
     0))
 
-(define-function %list->array (list index)
-  (if (pair? list)
-      (let ((a (%list->array (cdr list) (+ 1 index))))
-	(set-array-at a index (car list))
-	a)
-    (array index)))
-
 (define-function list->array (list)
-  (%list->array list 0))
+  (let ((%list->array (lambda (list index)
+			(if (pair? list)
+			    (let ((a (%list->array (cdr list) (+ 1 index))))
+			      (set-array-at a index (car list))
+			      a)
+			  (array index)))))
+    (lambda (list)
+      (%list->array list 0))))
