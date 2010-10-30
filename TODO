@@ -1,0 +1,7 @@
+backtrace calls %backtrace via apply, passing traceArray.
+
+implement N-way dispatch via nested arrays.
+
+port streams.
+
+port PEG.
