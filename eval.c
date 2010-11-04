@@ -387,7 +387,7 @@ static oop read(FILE *fp)
 	if (isLetter(c)) {
 	  static struct buffer buf= BUFFER_INITIALISER;
 	  buffer_reset(&buf);
-	  while (isLetter(c)) {
+	  while (isLetter(c) || isDigit(c)) {
 	    buffer_append(&buf, c);
 	    c= getc(fp);
 	  }
@@ -413,11 +413,11 @@ static void doprint(FILE *stream, oop obj, int storing)
     return;
   }
   switch (getType(obj)) {
-    case Undefined:	fprintf(stderr, "UNDEFINED");			break;
-    case Long:		fprintf(stderr, "%ld", get(obj, Long,bits));	break;
+    case Undefined:	fprintf(stream, "UNDEFINED");			break;
+    case Long:		fprintf(stream, "%ld", get(obj, Long,bits));	break;
     case String: {
       if (!storing)
-	fprintf(stderr, "%s", get(obj, String,bits));
+	fprintf(stream, "%s", get(obj, String,bits));
       else {
 	char *p= get(obj, String,bits);
 	int c;
@@ -425,76 +425,76 @@ static void doprint(FILE *stream, oop obj, int storing)
 	while ((c= *p++)) {
 	  if (c >= ' ' && c < 127)
 	    putchar(c);
-	  else fprintf(stderr, "\\%03o", c);
+	  else fprintf(stream, "\\%03o", c);
 	}
 	putchar('"');
       }
       break;
     }
-    case Symbol:	fprintf(stderr, "%s", get(obj, Symbol,bits));	break;
+    case Symbol:	fprintf(stream, "%s", get(obj, Symbol,bits));	break;
     case Pair: {
-      fprintf(stderr, "(");
+      fprintf(stream, "(");
       for (;;) {
 	if (obj == globals) {
-	  fprintf(stderr, "<globals>");
+	  fprintf(stream, "<globals>");
 	  break;
 	}
 	doprint(stream, getHead(obj), storing);
 	obj= getTail(obj);
 	if (!is(Pair, obj)) break;
-	fprintf(stderr, " ");
+	fprintf(stream, " ");
       }
       if (nil != obj) {
-	fprintf(stderr, " . ");
+	fprintf(stream, " . ");
 	doprint(stream, obj, storing);
       }
-      fprintf(stderr, ")");
+      fprintf(stream, ")");
       break;
     }
     case Array: {
       int i, len= arrayLength(obj);
-      fprintf(stderr, "Array(");
+      fprintf(stream, "Array(");
       for (i= 0;  i < len;  ++i) {
-	if (i) fprintf(stderr, " ");
+	if (i) fprintf(stream, " ");
 	doprint(stream, arrayAt(obj, i), storing);
       }
-      fprintf(stderr, ")");
+      fprintf(stream, ")");
       break;
     }
     case Expr: {
-      fprintf(stderr, "Expr(");
+      fprintf(stream, "Expr(");
       doprint(stream, getHead(get(obj, Expr,defn)), storing);
-      fprintf(stderr, ")");
+      fprintf(stream, ")");
       break;
     }
     case Form: {
-      fprintf(stderr, "Form(");
+      fprintf(stream, "Form(");
       doprint(stream, get(obj, Form,function), storing);
-      fprintf(stderr, ")");
+      fprintf(stream, ")");
       break;
     }
     case Fixed: {
       if (isatty(1)) {
-	fprintf(stderr, "[1m");
+	fprintf(stream, "[1m");
 	doprint(stream, get(obj, Fixed,function), storing);
-	fprintf(stderr, "[m");
+	fprintf(stream, "[m");
       }
       else {
-	fprintf(stderr, "Fixed<");
+	fprintf(stream, "Fixed<");
 	doprint(stream, get(obj, Fixed,function), storing);
-	fprintf(stderr, ">");
+	fprintf(stream, ">");
       }
       break;
     }
     case Subr: {
       if (get(obj, Subr,name))
-	fprintf(stderr, "%s", get(obj, Subr,name));
+	fprintf(stream, "%s", get(obj, Subr,name));
       else
-	fprintf(stderr, "Subr<%p>", get(obj, Subr,imp));
+	fprintf(stream, "Subr<%p>", get(obj, Subr,imp));
       break;
     }
     default: {
-      fprintf(stderr, "<type=%i>", getType(obj));
+      fprintf(stream, "<type=%i>", getType(obj));
       break;
     }
   }
@@ -1014,6 +1014,16 @@ static subr(abort)
   return nil;
 }
 
+static subr(eval)
+{
+  oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
+  oop e= car(args);  if (nil == e) e= env;
+  x= expand(x, e);
+  x= encode(x, e);
+  x= eval  (x, e);				GC_UNPROTECT(x);
+  return x;
+}
+
 static subr(apply)
 {
   oop f= car(args);  args= cdr(args);
@@ -1071,9 +1081,9 @@ static subr(cdr)
 
 static subr(array)
 {
-  arity1(args, "array");
-  oop arg= getHead(args);		if (!is(Long, arg)) { fprintf(stderr, "array: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  return newArray(getLong(arg));
+  oop arg= car(args);
+  int num= is(Long, arg) ? getLong(arg) : 0;
+  return newArray(num);
 }
 
 static subr(array_length)
@@ -1146,6 +1156,7 @@ static void replFile(FILE *stream)
     obj= eval(obj, globals);
     if (stream == stdin) {
       printf(" => ");
+      fflush(stdout);
       dumpln(obj);
       fflush(stdout);
     }
@@ -1228,6 +1239,7 @@ int main(int argc, char **argv)
       { ".define",	 subr_define },
       { " exit",	 subr_exit },
       { " abort",	 subr_abort },
+      { " eval",	 subr_eval },
       { " apply",	 subr_apply },
       { " type-of",	 subr_type_of },
       { " print",	 subr_print },

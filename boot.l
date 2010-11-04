@@ -26,6 +26,7 @@
 
 (define %error
   (lambda args
+    (set error abort)
     (%print "\nERROR: ")
     (apply %print args)
     (%print "\n")
@@ -128,3 +129,8 @@
 			  (array index)))))
     (lambda (list)
       (%list->array list 0))))
+
+(define-function map (function list)
+  (if (pair? list)
+      (cons (function (car list))
+	    (map function (cdr list)))))

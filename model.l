@@ -1,3 +1,95 @@
+(define <multimethod> (%allocate-type '<multimethod>))
+
+(define-form multimethod-methods (mm) `(oop-at ,mm 0))
+(define-form multimethod-name    (mm) `(oop-at ,mm 1))
+
+(define-function multimethod (name)
+  (let ((mm (allocate <multimethod> 2)))
+    (set (multimethod-methods mm) (array))
+    (set (multimethod-name    mm) name)
+    mm))
+
+(set-array-at (selector-methods print) <multimethod>
+  (lambda (self)
+    (print "<multimethod:"(multimethod-name self)">")))
+
+(define-function %add-multimethod (mm types method)
+  (let ((methods (or (multimethod-methods mm)
+		     (set (multimethod-methods mm) (array 32)))))
+    (while (cdr types)
+      (let ((type (eval (car types))))
+	(set methods (or (array-at methods type)
+			 (set (array-at methods type) (array 32)))))
+      (set types (cdr types)))
+    (set (array-at methods (eval (car types))) method)))
+
+(define-form add-multimethod (method typed-args . body)
+  (let ((args  (map car  typed-args))
+	(types (map cadr typed-args)))
+    `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
+
+(set-array-at *applicators* <multimethod>
+  (lambda (mm . args)
+    (let ((method (multimethod-methods mm))
+	  (arg     args))
+      (while arg
+	(set method (array-at method (type-of (car arg))))
+	(set arg (cdr arg)))
+      (if method 
+	  (apply method args)
+	(error "no method in "(multimethod-name mm)" corresponding to "args)))))
+
+(define foo (multimethod 'foo1))
+
+(let ((arg1 (array 32)))
+  (set (array-at arg1 <long>)
+       (let ((arg2 (array 32)))
+	 (set (array-at arg2 <long>)
+	      (lambda (self arg) (println "foo on long.long: "self arg)))
+	 arg2))
+  (set (multimethod-methods foo) arg1))
+
+(foo 1 2)
+
+(add-multimethod foo ((self <long>)	(arg <long>))	(println "ANOTHER foo on long.long: "		self " " arg))
+(add-multimethod foo ((self <long>)	(arg <long>))	(println "ANOTHER foo on long.long: "		self " " arg))
+(add-multimethod foo ((self <string>) 	(arg <long>))	(println "ANOTHER foo on string.long: "		self " " arg))
+(add-multimethod foo ((self <long>) 	(arg <string>))	(println "ANOTHER foo on long.string: "		self " " arg))
+(add-multimethod foo ((self <string>) 	(arg <string>))	(println "ANOTHER foo on string.string: "	self " " arg))
+(add-multimethod foo ((self <symbol>))			(println "ANOTHER foo on symbol: "		self))
+
+(foo 3 4)
+(foo "five" 6)
+(foo 7 "eight")
+(foo "nine" "ten")
+(foo 'foo)
+
+(define-function fnfibs (n)
+  (if (< n 2)
+      1
+    (+ 1 (+ (fnfibs (- n 1)) (fnfibs (- n 2))))))
+
+(define nfibs	(multimethod 'nfibs))
+(define add	(multimethod 'add))
+(define sub	(multimethod 'sub))
+(define less	(multimethod 'less))
+
+(add-multimethod add	((self <long>) (arg <long>)) (+ self arg))
+(add-multimethod sub	((self <long>) (arg <long>)) (- self arg))
+(add-multimethod less	((self <long>) (arg <long>)) (< self arg))
+
+(add-multimethod nfibs ((self <long>))
+		 (if (less self 2)
+		     1
+		   (add 1 (add (nfibs (sub self 1)) (nfibs (sub self 2))))))
+
+;(println (fnfibs 28))
+;(println (nfibs 28))
+
+(exit 0)
+
+
+
 (define <stage> (%allocate-type '<stage>))
 
 (set-array-at *applicators* <stage>
