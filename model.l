@@ -18,21 +18,20 @@
       (set types (cdr types)))
     (set (array-at methods (eval (car types))) method)))
 
-(define-form add-multimethod (method typed-args . body)
+(define-form define-multimethod (method typed-args . body)
   (let ((args  (map car  typed-args))
 	(types (map cadr typed-args)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
-(set-array-at *applicators* <multimethod>
-  (lambda (mm . args)
-    (let ((method (<multimethod>-methods mm))
-	  (arg     args))
-      (while arg
-	(set method (array-at method (type-of (car arg))))
-	(set arg (cdr arg)))
-      (if method 
-	  (apply method args)
-	(error "no method in "(<multimethod>-name mm)" corresponding to "args)))))
+(define-apply <multimethod> (self . arguments)
+  (let ((method (<multimethod>-methods self))
+	(arg     arguments))
+    (while arg
+      (set method (array-at method (type-of (car arg))))
+      (set arg (cdr arg)))
+    (if method 
+	(apply method arguments)
+      (error "no method in "(<multimethod>-name self)" corresponding to "arguments))))
 
 (define foo (multimethod 'foo1))
 
@@ -46,12 +45,12 @@
 
 (foo 1 2)
 
-(add-multimethod foo ((self <long>)	(arg <long>))	(println "ANOTHER foo on long.long: "		self " " arg))
-(add-multimethod foo ((self <long>)	(arg <long>))	(println "ANOTHER foo on long.long: "		self " " arg))
-(add-multimethod foo ((self <string>) 	(arg <long>))	(println "ANOTHER foo on string.long: "		self " " arg))
-(add-multimethod foo ((self <long>) 	(arg <string>))	(println "ANOTHER foo on long.string: "		self " " arg))
-(add-multimethod foo ((self <string>) 	(arg <string>))	(println "ANOTHER foo on string.string: "	self " " arg))
-(add-multimethod foo ((self <symbol>))			(println "ANOTHER foo on symbol: "		self))
+(define-multimethod foo ((self <long>)	 (arg <long>))		(println "ANOTHER foo on long.long: "		self " " arg))
+(define-multimethod foo ((self <long>)	 (arg <long>))		(println "ANOTHER foo on long.long: "		self " " arg))
+(define-multimethod foo ((self <string>) (arg <long>))		(println "ANOTHER foo on string.long: "		self " " arg))
+(define-multimethod foo ((self <long>) 	 (arg <string>))	(println "ANOTHER foo on long.string: "		self " " arg))
+(define-multimethod foo ((self <string>) (arg <string>))	(println "ANOTHER foo on string.string: "	self " " arg))
+(define-multimethod foo ((self <symbol>))			(println "ANOTHER foo on symbol: "		self))
 
 (foo 3 4)
 (foo "five" 6)
@@ -69,14 +68,14 @@
 (define sub	(multimethod 'sub))
 (define less	(multimethod 'less))
 
-(add-multimethod add	((self <long>) (arg <long>)) (+ self arg))
-(add-multimethod sub	((self <long>) (arg <long>)) (- self arg))
-(add-multimethod less	((self <long>) (arg <long>)) (< self arg))
+(define-multimethod add	((self <long>) (arg <long>)) (+ self arg))
+(define-multimethod sub	((self <long>) (arg <long>)) (- self arg))
+(define-multimethod less	((self <long>) (arg <long>)) (< self arg))
 
-(add-multimethod nfibs ((self <long>))
-		 (if (less self 2)
-		     1
-		   (add 1 (add (nfibs (sub self 1)) (nfibs (sub self 2))))))
+(define-multimethod nfibs ((self <long>))
+  (if (less self 2)
+      1
+    (add 1 (add (nfibs (sub self 1)) (nfibs (sub self 2))))))
 
 ;(println (fnfibs 28))
 ;(println (nfibs 28))
