@@ -1,21 +1,16 @@
-(define <multimethod> (%allocate-type '<multimethod>))
-
-(define-form multimethod-methods (mm) `(oop-at ,mm 0))
-(define-form multimethod-name    (mm) `(oop-at ,mm 1))
+(define-structure <multimethod> (methods name))
 
 (define-function multimethod (name)
-  (let ((mm (allocate <multimethod> 2)))
-    (set (multimethod-methods mm) (array))
-    (set (multimethod-name    mm) name)
-    mm))
+  (let ((self (new <multimethod>)))
+    (set (<multimethod>-methods self) (array))
+    (set (<multimethod>-name    self) name)
+    self))
 
-(set-array-at (selector-methods print) <multimethod>
-  (lambda (self)
-    (print "<multimethod:"(multimethod-name self)">")))
+(define-method print <multimethod> (self) (print "<multimethod:" (<multimethod>-name self) ">"))
 
 (define-function %add-multimethod (mm types method)
-  (let ((methods (or (multimethod-methods mm)
-		     (set (multimethod-methods mm) (array 32)))))
+  (let ((methods (or (<multimethod>-methods mm)
+		     (set (<multimethod>-methods mm) (array 32)))))
     (while (cdr types)
       (let ((type (eval (car types))))
 	(set methods (or (array-at methods type)
@@ -30,14 +25,14 @@
 
 (set-array-at *applicators* <multimethod>
   (lambda (mm . args)
-    (let ((method (multimethod-methods mm))
+    (let ((method (<multimethod>-methods mm))
 	  (arg     args))
       (while arg
 	(set method (array-at method (type-of (car arg))))
 	(set arg (cdr arg)))
       (if method 
 	  (apply method args)
-	(error "no method in "(multimethod-name mm)" corresponding to "args)))))
+	(error "no method in "(<multimethod>-name mm)" corresponding to "args)))))
 
 (define foo (multimethod 'foo1))
 
@@ -47,7 +42,7 @@
 	 (set (array-at arg2 <long>)
 	      (lambda (self arg) (println "foo on long.long: "self arg)))
 	 arg2))
-  (set (multimethod-methods foo) arg1))
+  (set (<multimethod>-methods foo) arg1))
 
 (foo 1 2)
 
@@ -96,7 +91,7 @@
   (lambda (stage arg)
     (println "you just applied " stage" with "arg)))
 
-(set-array-at (selector-methods print) <stage>
+(set-array-at (<selector>-methods print) <stage>
   (lambda args
     (print "<stage>")))
 
@@ -108,7 +103,7 @@
 
 (define <foo> (%allocate-type '<foo>))
 (define foo (allocate <foo> 0))
-(set-array-at (selector-methods print) <foo> (lambda args (error "trying to print a <foo>: " args)))
+(set-array-at (<selector>-methods print) <foo> (lambda args (error "trying to print a <foo>: " args)))
 
 (error foo)
 

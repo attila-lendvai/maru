@@ -21,7 +21,7 @@ typedef oop (*imp_t)(oop args, oop env);
 enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr };
 
 struct Long	{ long  bits; };
-struct String	{ char *bits; };
+struct String	{ oop   size;  char *bits; };
 struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
 struct Array	{ oop  _array; };
@@ -68,6 +68,8 @@ static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined
 #define getHead(OBJ)	get(OBJ, Pair,head)
 #define getTail(OBJ)	get(OBJ, Pair,tail)
 
+#define getLong(X)	get((X), Long,bits)
+
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
 #define newOops(TYPE)	_newOops(TYPE, sizeof(struct TYPE))
 
@@ -84,14 +86,26 @@ static int opt_b= 0, opt_v= 0;
 
 static oop newLong(long bits)		{ oop obj= newBits(Long);	set(obj, Long,bits, bits);				return obj; }
 
-static oop newString(char *cstr)
+static oop _newString(size_t len)
 {
-  size_t len= strlen(cstr) + 1;
-  char *gstr= GC_malloc_atomic(len);
-  memcpy(gstr, cstr, len);			GC_PROTECT(gstr);
-  oop obj= newOops(String);
+  char *gstr= GC_malloc_atomic(len + 1);	GC_PROTECT(gstr);	/* + 1 to ensure null terminator */
+  oop   obj=  newOops(String);			GC_PROTECT(obj);
+  set(obj, String,size, newLong(len));		GC_UNPROTECT(obj);
   set(obj, String,bits, gstr);			GC_UNPROTECT(gstr);
   return obj;
+}
+
+static oop newString(char *cstr)
+{
+  size_t len= strlen(cstr);
+  oop obj= _newString(len);
+  memcpy(get(obj, String,bits), cstr, len);
+  return obj;
+}
+
+static int stringLength(oop string)
+{
+  return getLong(get(string, String,size));
 }
 
 static oop newSymbol(char *cstr)	{ oop obj= newBits(Symbol);	set(obj, Symbol,bits, strdup(cstr));			return obj; }
@@ -550,8 +564,6 @@ static oop define(oop name, oop value, oop env)
   }
   return ass;
 }
-
-#define getLong(X)	get((X), Long,bits)
 
 static oop apply(oop fun, oop args, oop env);
 
@@ -1079,6 +1091,56 @@ static subr(cdr)
   return cdr(getHead(args));
 }
 
+static subr(string)
+{
+  oop arg= car(args);
+  int num= is(Long, arg) ? getLong(arg) : 0;
+  return _newString(num);
+}
+
+static subr(string_length)
+{
+  arity1(args, "string-length");
+  oop arg= getHead(args);		if (!is(String, arg)) { fprintf(stderr, "string-length: non-String argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  return newLong(stringLength(arg));
+}
+
+static subr(string_at)
+{
+  arity2(args, "string-at");
+  oop arr= getHead(args);		if (!is(String, arr)) { fprintf(stderr, "string-at: non-String argument: ");  fdumpln(stderr, arr);  fatal(0); }
+  oop arg= getHead(getTail(args));	if (!is(Long, arg)) return nil;
+  int idx= getLong(arg);
+  if (0 <= idx && idx < stringLength(arr)) return newLong(get(arr, String,bits)[idx]);
+  return nil;
+}
+
+static subr(set_string_at)
+{
+  arity3(args, "set-string-at");
+  oop arr= getHead(args);			if (!is(String, arr)) { fprintf(stderr, "set-string-at: non-string argument: ");  fdumpln(stderr, arr);  fatal(0); }
+  oop arg= getHead(getTail(args));		if (!is(Long, arg)) { fprintf(stderr, "set-string-at: non-integer index: ");  fdumpln(stderr, arg);  fatal(0); }
+  oop val= getHead(getTail(getTail(args)));	if (!is(Long, val)) { fprintf(stderr, "set-string-at: non-integer value: ");  fdumpln(stderr, val);  fatal(0); }
+  int idx= getLong(arg);
+  if (0 <= idx && idx < stringLength(arr)) {
+    get(arr, String,bits)[idx]= getLong(val);
+    return val;
+  }
+  return nil;
+}
+
+static subr(string_symbol)
+{
+  oop arg= car(args);				if (is(Symbol, arg)) return arg;  if (!is(String, arg)) return nil;
+  return intern(get(arg, String,bits));
+}
+
+static subr(symbol_string)
+{
+  oop arg= car(args);				if (is(String, arg)) return arg;  if (!is(Symbol, arg)) return nil;
+  return newString(get(arg, Symbol,bits));
+}
+
 static subr(array)
 {
   oop arg= car(args);
@@ -1228,52 +1290,58 @@ int main(int argc, char **argv)
 
   {
     struct { char *name;  imp_t imp; } *ptr, subrs[]= {
-      { ".if",		 subr_if },
-      { ".and",		 subr_and },
-      { ".or",		 subr_or },
-      { ".set",		 subr_set },
-      { ".let",		 subr_let },
-      { ".while",	 subr_while },
-      { ".quote",	 subr_quote },
-      { ".lambda",	 subr_lambda },
-      { ".define",	 subr_define },
-      { " exit",	 subr_exit },
-      { " abort",	 subr_abort },
-      { " eval",	 subr_eval },
-      { " apply",	 subr_apply },
-      { " type-of",	 subr_type_of },
-      { " print",	 subr_print },
-      { " form",	 subr_form },
-      { " cons",	 subr_cons },
-      { " pair?",	 subr_pairP },
-      { " car",		 subr_car },
-      { " cdr",		 subr_cdr },
-      { " array",	 subr_array },
-      { " array-length", subr_array_length },
-      { " array-at",	 subr_array_at },
-      { " set-array-at", subr_set_array_at },
-      { " allocate",	 subr_allocate },
-      { " oop-at",	 subr_oop_at },
-      { " set-oop-at",	 subr_set_oop_at },
-      { " ~",		 subr_com },
-      { " !",		 subr_not },
-      { " +",		 subr_add },
-      { " -",		 subr_sub },
-      { " *",		 subr_mul },
-      { " /",		 subr_div },
-      { " %",		 subr_mod },
-      { " &",		 subr_bitand },
-      { " |",		 subr_bitor },
-      { " ^",		 subr_bitxor },
-      { " <<",		 subr_shl },
-      { " >>",		 subr_shr },
-      { " <",		 subr_lt },
-      { " <=",		 subr_le },
-      { " =",		 subr_eq },
-      { " !=",		 subr_ne },
-      { " >=",		 subr_ge },
-      { " >",		 subr_gt },
-      { 0,		0 }
+      { ".if",		   subr_if },
+      { ".and",		   subr_and },
+      { ".or",		   subr_or },
+      { ".set",		   subr_set },
+      { ".let",		   subr_let },
+      { ".while",	   subr_while },
+      { ".quote",	   subr_quote },
+      { ".lambda",	   subr_lambda },
+      { ".define",	   subr_define },
+      { " exit",	   subr_exit },
+      { " abort",	   subr_abort },
+      { " eval",	   subr_eval },
+      { " apply",	   subr_apply },
+      { " type-of",	   subr_type_of },
+      { " print",	   subr_print },
+      { " form",	   subr_form },
+      { " cons",	   subr_cons },
+      { " pair?",	   subr_pairP },
+      { " car",		   subr_car },
+      { " cdr",		   subr_cdr },
+      { " string", 	   subr_string },
+      { " string-length",  subr_string_length },
+      { " string-at",	   subr_string_at },
+      { " set-string-at",  subr_set_string_at },
+      { " symbol->string", subr_symbol_string },
+      { " string->symbol", subr_string_symbol },
+      { " array",	   subr_array },
+      { " array-length",   subr_array_length },
+      { " array-at",	   subr_array_at },
+      { " set-array-at",   subr_set_array_at },
+      { " allocate",	   subr_allocate },
+      { " oop-at",	   subr_oop_at },
+      { " set-oop-at",	   subr_set_oop_at },
+      { " ~",		   subr_com },
+      { " !",		   subr_not },
+      { " +",		   subr_add },
+      { " -",		   subr_sub },
+      { " *",		   subr_mul },
+      { " /",		   subr_div },
+      { " %",		   subr_mod },
+      { " &",		   subr_bitand },
+      { " |",		   subr_bitor },
+      { " ^",		   subr_bitxor },
+      { " <<",		   subr_shl },
+      { " >>",		   subr_shr },
+      { " <",		   subr_lt },
+      { " <=",		   subr_le },
+      { " =",		   subr_eq },
+      { " !=",		   subr_ne },
+      { " >=",		   subr_ge },
+      { " >",		   subr_gt },
+      { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
       tmp= newSubr(ptr->imp, ptr->name + 1);

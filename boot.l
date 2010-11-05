@@ -42,51 +42,35 @@
 
 (set *applicators* (array 16))
 
-(define <selector> (%allocate-type '<selector>))
-
-(define selector-name		(form (lambda (self) (list 'oop-at self 0))))
-(define selector-methods	(form (lambda (self) (list 'oop-at self 1))))
-
-(define selector
-  (lambda (name)
-    (let ((self (allocate <selector> 2)))
-      (set (selector-name    self) name)
-      (set (selector-methods self) (array 16))
-      self)))
-
-(set-array-at *applicators* <selector>
-  (lambda (selector . arguments)
-    (let ((method (array-at (selector-methods selector) (type-of (car arguments)))))
-      (if method
-	  (apply method arguments)
-	(error "cannot apply selector "(selector-name selector)" to "arguments)))))
-
-(define print (selector 'print))
-
-(let ((i 0))
-  (while (<= i <subr>)
-    (set-array-at (selector-methods print) i %print)
-    (set i (+ 1 i))))
-
-(define println
-  (lambda args
-    (while (pair? args)
-      (print (car args))
-      (set args (cdr args)))
-    (print "\n")))
-
-(define *backtrace*
-  (lambda (stack depth)
-    (while (>= (set depth (- depth 1)) 0)
-      (println "  " depth "\t" (array-at stack depth)))
-    (exit 0)))
-
 (define cadr (lambda (x) (car (cdr x))))
 
-(define concat (lambda (x y)
-		 (if (pair? x)
-		     (cons (car x) (concat (cdr x) y))
-		   y)))
+(define concat-list
+  (lambda (x y)
+    (if (pair? x)
+	(cons (car x) (concat-list (cdr x) y))
+      y)))
+
+(define concat-string
+  (lambda (x y)
+    (let ((a (string-length x))
+	  (b (string-length y)))
+      (let ((s (string (+ 1 (+ a b))))
+	    (i 0)
+	    (j 0))
+	(while (< i a)
+	  (set-string-at s j (string-at x i))
+	  (set i (+ i 1))
+	  (set j (+ j 1)))
+	(set i 0)
+	(while (< i b)
+	  (set-string-at s j (string-at y i))
+	  (set i (+ i 1))
+	  (set j (+ j 1)))
+	s))))
+
+(define concat-symbol
+  (lambda (x y)
+    (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
 
 (define quasiquote
   (form
@@ -95,8 +79,8 @@
 		     (if (pair? l)
 			 (let ((obj (car l)))
 			   (if (and (pair? obj) (= (car obj) 'unquote-splicing))
-			       (list 'concat (cadr obj)      (qq-list (cdr l)))
-			     (list   'cons   (qq-object obj) (qq-list (cdr l))))))))
+			       (list 'concat-list (cadr obj)      (qq-list (cdr l)))
+			     (list   'cons        (qq-object obj) (qq-list (cdr l))))))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
 			  (if (= head 'unquote)
@@ -134,3 +118,95 @@
   (if (pair? list)
       (cons (function (car list))
 	    (map function (cdr list)))))
+
+(define-form define-apply (type args . body)
+  `(set-array-at *applicators* ,type (lambda ,args ,@body)))
+
+;;; structure
+
+(define %structure-sizes	(array))
+(define %structure-fields	(array))
+
+(define-function %make-accessor (name fields offset)
+  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self) (list 'oop-at self ,offset))
+		   (%make-accessor name (cdr fields) (+ 1 offset)))))
+
+(define-function %make-accessors (name fields)
+  (%make-accessor name fields 0))
+
+(define-form define-structure (name fields)
+  (let ((type (%allocate-type name))
+	(size (list-length fields)))
+    (set-array-at %structure-sizes  type size)
+    (set-array-at %structure-fields type fields)
+    `(let ()
+       (define ,name ,type)
+       ,@(%make-accessors name fields))))
+
+(define-structure foo (a b c))
+
+(define-function new (type)
+  (allocate type (array-at %structure-sizes type)))
+
+;;; <selector>
+
+(define-structure <selector> (name methods default))
+
+(define-apply <selector> (self . arguments)
+  (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
+	     (<selector>-default self))
+	 arguments))
+
+(define selector
+  (lambda (name default)
+    (let ((self (new <selector>)))
+      (set (<selector>-name    self) name)
+      (set (<selector>-methods self) (array))
+      (set (<selector>-default self) default)
+      self)))
+
+(define-function <selector>-add-method (self type method)
+  (set-array-at (<selector>-methods self) type method))
+
+(define-form define-selector (name . default)
+  (or default (set default `(args (error "cannot apply selector "',name" to: "args))))
+  `(define ,name (selector ',name (lambda ,@default))))
+
+(define-selector add-method)
+
+(<selector>-add-method add-method <selector>
+  (lambda (self type args body)
+    (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
+
+(define-form define-method (selector type args . body)
+  `(add-method ,selector ',type ',args ',body))
+
+;;; print
+
+(define-selector print args (apply %print args))
+
+;(let ((i 0))
+;  (while (<= i <subr>)
+;    (set-array-at (<selector>-methods print) i %print)
+;    (set i (+ 1 i))))
+
+(define-method print <selector> (self)
+  (print "<selector "(<selector>-name self)">"))
+
+(define println
+  (lambda args
+    (while (pair? args)
+      (print (car args))
+      (set args (cdr args)))
+    (print "\n")))
+
+(define *backtrace*
+  (lambda (stack depth)
+    (while (>= (set depth (- depth 1)) 0)
+      (println "  " depth "\t" (array-at stack depth)))
+    (exit 0)))
+
+(println print)
+
+(define-selector concat)
+
