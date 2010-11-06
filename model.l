@@ -33,7 +33,7 @@
 	(apply method arguments)
       (error "no method in "(<multimethod>-name self)" corresponding to "arguments))))
 
-(define foo (multimethod 'foo1))
+(define foo (multimethod 'foo))
 
 (let ((arg1 (array 32)))
   (set (array-at arg1 <long>)
