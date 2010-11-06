@@ -435,13 +435,13 @@ static void doprint(FILE *stream, oop obj, int storing)
       else {
 	char *p= get(obj, String,bits);
 	int c;
-	putchar('"');
+	putc('"', stream);
 	while ((c= *p++)) {
 	  if (c >= ' ' && c < 127)
-	    putchar(c);
+	    putc(c, stream);
 	  else fprintf(stream, "\\%03o", c);
 	}
-	putchar('"');
+	putc('"', stream);
       }
       break;
     }
@@ -953,8 +953,14 @@ _do_unary()
     arity2(args, #OP);								\
     oop lhs= getHead(args);							\
     oop rhs= getHead(getTail(args));						\
-    return newLong(getLong(lhs) OP getLong(rhs));				\
-  }
+    if (is(Long, lhs) && is(Long, rhs))						\
+      return newLong(getLong(lhs) OP getLong(rhs));				\
+    fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
+    if (!is(Long, lhs))	fdumpln(stderr, lhs);					\
+    else		fdumpln(stderr, rhs);					\
+    fatal(0);									\
+    return nil;									\
+    }
 
 _do_binary()
 
@@ -979,7 +985,13 @@ static subr(sub)
     arity2(args, #OP);								\
     oop lhs= getHead(args);							\
     oop rhs= getHead(getTail(args));						\
-    return newBool(getLong(lhs) OP getLong(rhs));				\
+    if (is(Long, lhs) && is(Long, rhs))						\
+      return newBool(getLong(lhs) OP getLong(rhs));				\
+    fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
+    if (!is(Long, lhs))	fdumpln(stderr, lhs);					\
+    else		fdumpln(stderr, rhs);					\
+    fatal(0);									\
+    return nil;									\
   }
 
 _do_relation()
