@@ -200,10 +200,31 @@
       (set args (cdr args)))
     (print "\n")))
 
+(define-selector print-until (target arg)
+  (let ((found (= target arg)))
+    (if (pair? arg)
+	(let ()
+	  (print "(")
+	  (while arg
+	    (if (print-until target (car arg))
+		(let ()
+		  (if (cdr arg) (print " ..."))
+		  (set found 't)
+		  (set arg ())))
+	    (if (set arg (cdr arg)) (print " ")))
+	  (print ")"))
+      (print arg))
+    found))
+
 (define *backtrace*
   (lambda (stack depth)
-    (while (>= (set depth (- depth 1)) 0)
-      (println "  " depth "\t" (array-at stack depth)))
+    (let ((posn (array)))
+      (while (>= (set depth (- depth 1)) 0)
+	(let ((here (array-at stack depth)))
+	  (print "  " depth "\t")
+	  (print-until posn here)
+	  (print "\n")
+	  (set posn here))))
     (exit 0)))
 
 (println print)
