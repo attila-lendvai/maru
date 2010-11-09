@@ -640,7 +640,8 @@ static oop encode(oop expr, oop env)
   else {
     oop fn= arrayAt(getTail(encoders), getType(expr));
     if (nil != fn) {
-      oop args= newPair(expr, nil);		GC_PROTECT(args);
+      oop args= newPair(env, nil);		GC_PROTECT(args);
+      args= newPair(expr, args);
       expr= apply(fn, args, env);		GC_UNPROTECT(args);
     }
   }
