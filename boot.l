@@ -40,9 +40,21 @@
     (%print "\n")
     (abort)))
 
-(set *applicators* (array 16))
-
+(define caar (lambda (x) (car (car x))))
 (define cadr (lambda (x) (car (cdr x))))
+(define caddr (lambda (x) (car (cdr (cdr x)))))
+(define cdddr (lambda (x) (cdr (cdr (cdr x)))))
+
+(define assq
+  (lambda (object list)
+    (let ((result ()))
+      (while (pair? list)
+	(if (= object (caar list))
+	    (let ()
+	      (set result (car list))
+	      (set list ())))
+	(set list (cdr list)))
+      result)))
 
 (define concat-list
   (lambda (x y)
@@ -119,8 +131,13 @@
       (cons (function (car list))
 	    (map function (cdr list)))))
 
-(define-form define-apply (type args . body)
-  `(set-array-at *applicators* ,type (lambda ,args ,@body)))
+(set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
+(set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
+(set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
+
+;;; built-in types
+
+(define-form <form>-function	(expr) `(oop-at ,expr 0))
 
 ;;; structure
 
@@ -148,6 +165,22 @@
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
 
+;;; active symbols
+
+;; (define-structure <variable> (name encoder))
+
+;; (define-function variable (name encoder)
+;;   (let ((self (new <variable>)))
+;;     (set (<variable>-name    self) name)
+;;     (set (<variable>-encoder self) encoder)
+;;     self))
+
+;; (define-encode <symbol> (sym env)
+;;   (let ((val (cdr (assq sym env))))
+;;     (if (= <variable> (type-of val))
+;; 	((<variable>-encoder val) val env)
+;;       sym)))
+
 ;;; <selector>
 
 (define-structure <selector> (name methods default))
@@ -157,13 +190,12 @@
 	     (<selector>-default self))
 	 arguments))
 
-(define selector
-  (lambda (name default)
-    (let ((self (new <selector>)))
-      (set (<selector>-name    self) name)
-      (set (<selector>-methods self) (array))
-      (set (<selector>-default self) default)
-      self)))
+(define-function selector (name default)
+  (let ((self (new <selector>)))
+    (set (<selector>-name    self) name)
+    (set (<selector>-methods self) (array))
+    (set (<selector>-default self) default)
+    self))
 
 (define-function <selector>-add-method (self type method)
   (set-array-at (<selector>-methods self) type method))
@@ -179,28 +211,27 @@
     (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
 
 (define-form define-method (selector type args . body)
-  `(add-method ,selector ',type ',args ',body))
+  `(add-method ,selector ',type '(self ,@args) ',body))
 
 ;;; print
 
-(define-selector print args (apply %print args))
+(define-selector do-print (arg) (%print arg))
 
-;(let ((i 0))
-;  (while (<= i <subr>)
-;    (set-array-at (<selector>-methods print) i %print)
-;    (set i (+ 1 i))))
-
-(define-method print <selector> (self)
+(define-method do-print <selector> ()
   (print "<selector "(<selector>-name self)">"))
+
+(define print
+  (lambda args
+    (while (pair? args)
+      (do-print (car args))
+      (set args (cdr args)))))
 
 (define println
   (lambda args
-    (while (pair? args)
-      (print (car args))
-      (set args (cdr args)))
-    (print "\n")))
+    (apply print args)
+    (%print "\n")))
 
-(define-selector print-until (target arg)
+(define-function print-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
 	(let ()
@@ -227,7 +258,46 @@
 	  (set posn here))))
     (exit 0)))
 
-(println print)
+;(println print)
 
-(define-selector concat)
+;;; multimethod
 
+(define-structure <generic> (name methods default))
+
+(define-function generic (name default)
+  (let ((self (new <generic>)))
+    (set (<generic>-name    self) name)
+    (set (<generic>-methods self) (array))
+    (set (<generic>-default self) default)
+    self))
+
+(define-method do-print <generic> () (print "<multimethod:" (<generic>-name self) ">"))
+
+(define-form define-generic (name . default)
+  (or default (set default `(args (error "no method in  "',name" corresponding to: "args))))
+  `(define ,name (generic ',name (lambda ,@default))))
+
+(define-function %add-multimethod (mm types method)
+  (let ((methods (or (<generic>-methods mm)
+		     (set (<generic>-methods mm) (array 32)))))
+    (while (cdr types)
+      (let ((type (eval (car types))))
+	(set methods (or (array-at methods type)
+			 (set (array-at methods type) (array 32)))))
+      (set types (cdr types)))
+    (set (array-at methods (eval (car types))) method)))
+
+(define-form define-multimethod (method typed-args . body)
+  (let ((args  (map car  typed-args))
+	(types (map cadr typed-args)))
+    `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
+
+(define-apply <generic> (self . arguments)
+  (let ((method (<generic>-methods self))
+	(arg     arguments))
+    (while arg
+      (set method (array-at method (type-of (car arg))))
+      (set arg (cdr arg)))
+    (if method 
+	(apply method arguments)
+      (error "no method in "(<generic>-name self)" corresponding to "arguments))))

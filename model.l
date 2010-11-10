@@ -1,39 +1,4 @@
-(define-structure <multimethod> (methods name))
-
-(define-function multimethod (name)
-  (let ((self (new <multimethod>)))
-    (set (<multimethod>-methods self) (array))
-    (set (<multimethod>-name    self) name)
-    self))
-
-(define-method print <multimethod> (self) (print "<multimethod:" (<multimethod>-name self) ">"))
-
-(define-function %add-multimethod (mm types method)
-  (let ((methods (or (<multimethod>-methods mm)
-		     (set (<multimethod>-methods mm) (array 32)))))
-    (while (cdr types)
-      (let ((type (eval (car types))))
-	(set methods (or (array-at methods type)
-			 (set (array-at methods type) (array 32)))))
-      (set types (cdr types)))
-    (set (array-at methods (eval (car types))) method)))
-
-(define-form define-multimethod (method typed-args . body)
-  (let ((args  (map car  typed-args))
-	(types (map cadr typed-args)))
-    `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
-
-(define-apply <multimethod> (self . arguments)
-  (let ((method (<multimethod>-methods self))
-	(arg     arguments))
-    (while arg
-      (set method (array-at method (type-of (car arg))))
-      (set arg (cdr arg)))
-    (if method 
-	(apply method arguments)
-      (error "no method in "(<multimethod>-name self)" corresponding to "arguments))))
-
-(define foo (multimethod 'foo))
+(define-generic foo)
 
 (let ((arg1 (array 32)))
   (set (array-at arg1 <long>)
@@ -41,7 +6,7 @@
 	 (set (array-at arg2 <long>)
 	      (lambda (self arg) (println "foo on long.long: "self arg)))
 	 arg2))
-  (set (<multimethod>-methods foo) arg1))
+  (set (<generic>-methods foo) arg1))
 
 (foo 1 2)
 
@@ -63,13 +28,13 @@
       1
     (+ 1 (+ (fnfibs (- n 1)) (fnfibs (- n 2))))))
 
-(define nfibs	(multimethod 'nfibs))
-(define add	(multimethod 'add))
-(define sub	(multimethod 'sub))
-(define less	(multimethod 'less))
+(define-generic nfibs)
+(define-generic add)
+(define-generic sub)
+(define-generic less)
 
-(define-multimethod add	((self <long>) (arg <long>)) (+ self arg))
-(define-multimethod sub	((self <long>) (arg <long>)) (- self arg))
+(define-multimethod add		((self <long>) (arg <long>)) (+ self arg))
+(define-multimethod sub		((self <long>) (arg <long>)) (- self arg))
 (define-multimethod less	((self <long>) (arg <long>)) (< self arg))
 
 (define-multimethod nfibs ((self <long>))
@@ -79,6 +44,23 @@
 
 ;(println (fnfibs 28))
 ;(println (nfibs 28))
+
+(define-structure PTR (value))
+
+(define-structure I32 (value))
+
+(define-structure M32 (base index))
+
+(define-generic plus)
+
+(define-multimethod plus ((base PTR) (index I32))
+  (new M32))
+
+(println (new PTR))
+(println (new I32))
+(println (new M32))
+
+(println (plus (new PTR) (new I32)))
 
 (exit 0)
 
