@@ -1039,6 +1039,26 @@ static subr(abort)
   return nil;
 }
 
+static subr(read)
+{
+  FILE *stream= stdin;
+  if (nil == args) return read(stdin);
+  oop arg= car(args);			if (!is(String, arg)) { fprintf(stderr, "read: non-String argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  stream= fopen(get(arg, String,bits), "r");
+  if (!stream) return nil;
+  oop head= newPair(nil, nil), tail= head;	GC_PROTECT(head);
+  oop obj= nil;					GC_PROTECT(obj);
+  for (;;) {
+    obj= read(stream);
+    if (obj == (oop)EOF) break;
+    tail= setTail(tail, newPair(obj, nil));
+    if (stdin == stream) break;
+  }
+  head= getTail(head);				GC_UNPROTECT(obj);
+  fclose(stream);				GC_UNPROTECT(head);
+  return head;
+}
+
 static subr(eval)
 {
   oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
@@ -1098,10 +1118,36 @@ static subr(car)
   return car(getHead(args));
 }
 
+static subr(set_car)
+{
+  arity2(args, "set-car");
+  oop arg= getHead(args);				if (!is(Pair, arg)) return nil;
+  return setHead(arg, getHead(getTail(args)));
+}
+
 static subr(cdr)
 {
   arity1(args, "cdr");
   return cdr(getHead(args));
+}
+
+static subr(set_cdr)
+{
+  arity2(args, "set-cdr");
+  oop arg= getHead(args);				if (!is(Pair, arg)) return nil;
+  return setTail(arg, getHead(getTail(args)));
+}
+
+static subr(formP)
+{
+  arity1(args, "form?");
+  return newBool(is(Form, getHead(args)));
+}
+
+static subr(symbolP)
+{
+  arity1(args, "symbol?");
+  return newBool(is(Symbol, getHead(args)));
 }
 
 static subr(string)
@@ -1314,6 +1360,7 @@ int main(int argc, char **argv)
       { ".define",	   subr_define },
       { " exit",	   subr_exit },
       { " abort",	   subr_abort },
+      { " read",	   subr_read },
       { " eval",	   subr_eval },
       { " apply",	   subr_apply },
       { " type-of",	   subr_type_of },
@@ -1322,7 +1369,11 @@ int main(int argc, char **argv)
       { " cons",	   subr_cons },
       { " pair?",	   subr_pairP },
       { " car",		   subr_car },
+      { " set-car",	   subr_set_car },
       { " cdr",		   subr_cdr },
+      { " set-cdr",	   subr_set_cdr },
+      { " form?",	   subr_formP },
+      { " symbol?",	   subr_symbolP },
       { " string", 	   subr_string },
       { " string-length",  subr_string_length },
       { " string-at",	   subr_string_at },
