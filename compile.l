@@ -1,3 +1,6 @@
+(define *top-level* (cons () ()))
+(set (car *top-level* (cons '*top-level* *top-level*)))
+
 (define-structure <extern> (type name args))
 
 (define-method do-print <extern> ()
@@ -9,9 +12,6 @@
     (set (<extern>-name self) name)
     (set (<extern>-args self) args)
     self))
-
-(define *top-level* (cons () ()))
-(set (car *top-level* (cons '*top-level* *top-level*)))
 
 (define-function define-in (env name value)
   (set-cdr env (cons (cons name value) (cdr env)))
@@ -25,8 +25,7 @@
 	    (define-in *top-level* name (extern type name args)))
 	  ())))
   
-(define-selector compile-expr (expr env)
-  (error "cannot compile-expr: " expr))
+(define-selector compile-expr (expr env)	(error "cannot compile-expr: " expr))
 
 (define-function compile-args (args env)
   (if (pair? args)
@@ -34,17 +33,11 @@
 	(compile-args (cdr args) env)
 	(compile-expr (car args) env))))
 
-(define-method compile-expr <extern> (env) self)
-
-(define-method compile-expr <symbol> (env)
-  (emit 'lookup self))
-
-(define-method compile-expr <undefined> (env))
-
-(define-method compile-expr <long> (env)
-  (emit 'load self))
-
-(define-method compile-expr <string> (env) self)
+(define-method compile-expr <extern> (env)	(emit 'define self))
+(define-method compile-expr <symbol> (env)	(emit 'lookup self))
+(define-method compile-expr <undefined> (env)	)
+(define-method compile-expr <long> (env)	(emit 'load self))
+(define-method compile-expr <string> (env)	(emit 'load self))
 
 (define-function emit args (println "EMIT "args))
 
