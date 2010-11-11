@@ -23,6 +23,7 @@
 (define <subr>		(%allocate-type '<subr>))
 
 (define %print print)
+(define %store store)
 
 (define %error
   (lambda args
@@ -216,9 +217,9 @@
 ;;; print
 
 (define-selector do-print (arg) (%print arg))
+(define-selector do-store (arg) (%store arg))
 
-(define-method do-print <selector> ()
-  (print "<selector "(<selector>-name self)">"))
+(define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
 
 (define print
   (lambda args
@@ -226,18 +227,29 @@
       (do-print (car args))
       (set args (cdr args)))))
 
+(define store
+  (lambda args
+    (while (pair? args)
+      (do-store (car args))
+      (set args (cdr args)))))
+
 (define println
   (lambda args
     (apply print args)
     (%print "\n")))
 
-(define-function print-until (target arg)
+(define storeln
+  (lambda args
+    (apply store args)
+    (%print "\n")))
+
+(define-function store-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
 	(let ()
 	  (print "(")
 	  (while arg
-	    (if (print-until target (car arg))
+	    (if (store-until target (car arg))
 		(let ()
 		  (if (cdr arg) (print " ..."))
 		  (set found 't)
@@ -253,7 +265,7 @@
       (while (>= (set depth (- depth 1)) 0)
 	(let ((here (array-at stack depth)))
 	  (print "  " depth "\t")
-	  (print-until posn here)
+	  (store-until posn here)
 	  (print "\n")
 	  (set posn here))))
     (exit 0)))
