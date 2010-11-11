@@ -430,6 +430,7 @@ static void doprint(FILE *stream, oop obj, int storing)
     case Undefined:	fprintf(stream, "UNDEFINED");			break;
     case Long:		fprintf(stream, "%ld", get(obj, Long,bits));	break;
     case String: {
+      fprintf(stream, "{%d}", storing);
       if (!storing)
 	fprintf(stream, "%s", get(obj, String,bits));
       else {
@@ -1092,6 +1093,15 @@ static subr(print)
   return nil;
 }
 
+static subr(store)
+{
+  while (is(Pair, args)) {
+    dump(getHead(args));
+    args= getTail(args);
+  }
+  return nil;
+}
+
 static subr(form)
 {
   arity1(args, "form");
@@ -1365,6 +1375,7 @@ int main(int argc, char **argv)
       { " apply",	   subr_apply },
       { " type-of",	   subr_type_of },
       { " print",	   subr_print },
+      { " store",	   subr_store },
       { " form",	   subr_form },
       { " cons",	   subr_cons },
       { " pair?",	   subr_pairP },
