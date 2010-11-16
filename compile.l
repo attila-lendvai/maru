@@ -1,4 +1,5 @@
 (define *top-level* (cons () ()))
+
 (set (car *top-level* (cons '*top-level* *top-level*)))
 
 (define-structure <extern> (type name args))
@@ -39,7 +40,7 @@
 (define-method compile-expr <long> (env)	(emit 'load self))
 (define-method compile-expr <string> (env)	(emit 'load self))
 
-(define-function emit args (println "EMIT "args))
+(define-function emit args (print "EMIT ") (dumpln args))
 
 (define-method compile-expr <pair> (env)
   (let ((head  (car self))
@@ -54,7 +55,8 @@
 (define-function compile (program)
   (while program
     (let ((expr (car program)))
-      (println "COMPILE "expr)
+      (print "COMPILE ")
+      (dumpln expr)
       (compile-expr expr *top-level*)
       )
     (set program (cdr program))))

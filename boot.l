@@ -23,7 +23,7 @@
 (define <subr>		(%allocate-type '<subr>))
 
 (define %print print)
-(define %store store)
+(define %dump  dump)
 
 (define %error
   (lambda args
@@ -217,9 +217,7 @@
 ;;; print
 
 (define-selector do-print (arg) (%print arg))
-(define-selector do-store (arg) (%store arg))
-
-(define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
+(define-selector do-dump  (arg) (do-print arg))
 
 (define print
   (lambda args
@@ -227,10 +225,10 @@
       (do-print (car args))
       (set args (cdr args)))))
 
-(define store
+(define dump
   (lambda args
     (while (pair? args)
-      (do-store (car args))
+      (do-dump (car args))
       (set args (cdr args)))))
 
 (define println
@@ -238,18 +236,21 @@
     (apply print args)
     (%print "\n")))
 
-(define storeln
+(define dumpln
   (lambda args
-    (apply store args)
+    (apply dump args)
     (%print "\n")))
 
-(define-function store-until (target arg)
+(define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
+(define-method do-dump  <string> ()	(%dump self))
+
+(define-function dump-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
 	(let ()
 	  (print "(")
 	  (while arg
-	    (if (store-until target (car arg))
+	    (if (dump-until target (car arg))
 		(let ()
 		  (if (cdr arg) (print " ..."))
 		  (set found 't)
@@ -265,7 +266,7 @@
       (while (>= (set depth (- depth 1)) 0)
 	(let ((here (array-at stack depth)))
 	  (print "  " depth "\t")
-	  (store-until posn here)
+	  (dump-until posn here)
 	  (print "\n")
 	  (set posn here))))
     (exit 0)))
