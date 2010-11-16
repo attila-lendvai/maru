@@ -1,3 +1,57 @@
+(define-structure <variable> (name value level offset next))
+
+(define-method do-print <variable> ()
+  (print "<variable="(<variable>-name self)":"(<variable>-level self)"."(<variable>-offset self)">"))
+
+(define-function variable (name value level offset next)
+  (let ((self (new <variable>)))
+    (set (<variable>-name	self) name)
+    (set (<variable>-value	self) value)
+    (set (<variable>-level	self) level)
+    (set (<variable>-offset	self) offset)
+    (set (<variable>-next	self) next)
+    self))
+
+(define-structure <compiler> (scope level next-local max-local program))
+
+(define-method do-print <compiler> ()
+  (print "<compiler:"(<compiler>-level self)"."(<compiler>-max-local self)","(<compiler>-scope self)">"))
+
+(define-function compiler (scope level)
+  (let ((self (new <compiler>)))
+    (set (<compiler>-scope	self) scope)
+    (set (<compiler>-level	self) level)
+    (set (<compiler>-next-local self) 0)
+    (set (<compiler>-max-local  self) 0)
+    self))
+
+(define-function push-local (compiler name)
+  (let ((index (<compiler>-next-local compiler)))
+    (set (<compiler>-next-local compiler) (+ index 1))
+    (let ((local (variable name () (<compiler>-level compiler) index (<compiler>-scope compiler))))
+      (set (<compiler>-scope compiler) local))))
+
+(define-function pop-local (compiler)
+  (let ((index (<compiler>-next-local compiler)))
+    (set (<compiler>-next-local compiler) (- index 1))
+    (let ((local (<compiler>-scope compiler)))
+      (set (<compiler>-scope compiler) (<variable>-next local)))))
+
+(define-function define-variable (compiler name value)
+  (let ((variable (variable name value (<compiler>-level compiler) () (<compiler>-scope compiler))))
+    (println compiler" --> "variable)
+    (set (<compiler>-scope compiler) variable)))
+
+(let ((c (compiler () ())))
+  (println c)
+  (println (define-variable c 'foo 1))
+  (println (define-variable c 'bar 2))
+  (println (define-variable c 'baz 3)))
+
+
+
+(exit 0)
+
 (define *top-level* (cons () ()))
 
 (set (car *top-level* (cons '*top-level* *top-level*)))
