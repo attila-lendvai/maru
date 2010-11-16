@@ -68,7 +68,21 @@ static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined
 #define getHead(OBJ)	get(OBJ, Pair,head)
 #define getTail(OBJ)	get(OBJ, Pair,tail)
 
+#define setHead(OBJ, VAL)	set(OBJ, Pair,head, VAL)
+#define setTail(OBJ, VAL)	set(OBJ, Pair,tail, VAL)
+
 #define getLong(X)	get((X), Long,bits)
+
+static oop car(oop obj)			{ return is(Pair, obj) ? getHead(obj) : nil; }
+static oop cdr(oop obj)			{ return is(Pair, obj) ? getTail(obj) : nil; }
+
+static oop caar(oop obj)		{ return car(car(obj)); }
+static oop cadr(oop obj)		{ return car(cdr(obj)); }
+//static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
+//static oop caaar(oop obj)		{ return car(car(car(obj))); }
+//static oop cadar(oop obj)		{ return car(cdr(car(obj))); }
+static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
+//static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
 #define newOops(TYPE)	_newOops(TYPE, sizeof(struct TYPE))
@@ -477,7 +491,7 @@ static void doprint(FILE *stream, oop obj, int storing)
     }
     case Expr: {
       fprintf(stream, "Expr(");
-      doprint(stream, getHead(get(obj, Expr,defn)), storing);
+      doprint(stream, car(get(obj, Expr,defn)), storing);
       fprintf(stream, ")");
       break;
     }
@@ -537,20 +551,6 @@ static oop assq(oop key, oop alist)
   }
   return nil;
 }
-
-static oop car(oop obj)			{ return is(Pair, obj) ? getHead(obj) : nil; }
-static oop cdr(oop obj)			{ return is(Pair, obj) ? getTail(obj) : nil; }
-
-static oop caar(oop obj)		{ return car(car(obj)); }
-static oop cadr(oop obj)		{ return car(cdr(obj)); }
-//static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
-//static oop caaar(oop obj)		{ return car(car(car(obj))); }
-//static oop cadar(oop obj)		{ return car(cdr(car(obj))); }
-static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
-//static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
-
-#define setHead(OBJ, VAL)	set(OBJ, Pair,head, VAL)
-#define setTail(OBJ, VAL)	set(OBJ, Pair,tail, VAL)
 
 static oop define(oop name, oop value, oop env)
 {
