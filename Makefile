@@ -1,6 +1,6 @@
 CFLAGS = -Wall -g # -Os
 
-all : main eval
+all : eval
 
 % : %.c gc.c gc.h buffer.c chartab.h
 
