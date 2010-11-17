@@ -1,7 +1,27 @@
-(define-structure <variable> (name value level offset next))
+;;; literal
+
+(define-structure <literal> (value))
+
+(define-method do-print <literal> ()
+  (print "<literal ")
+  (dump (<literal>-value self))
+  (print ">"))
+
+(define-function literal (value)
+  (let ((self (new <literal>)))
+    (set (<literal>-value	self) value)
+    self))
+
+;;; variable
+
+(define-structure <variable> (location name value level offset next))
 
 (define-method do-print <variable> ()
-  (print "<variable="(<variable>-name self)":"(<variable>-level self)"."(<variable>-offset self)">"))
+  (print "["(<variable>-name self))
+  (print ":"(<variable>-level self))
+  (print "."(<variable>-offset self))
+  (print "="(<variable>-location self))
+  (print "]"))
 
 (define-function variable (name value level offset next)
   (let ((self (new <variable>)))
@@ -11,6 +31,23 @@
     (set (<variable>-offset	self) offset)
     (set (<variable>-next	self) next)
     self))
+
+;;; operator
+
+(define-structure <operator> (operation arguments))
+
+(define-method do-print <operator> ()
+  (print "{"(<operator>-operation self))
+  (print " "(<operator>-arguments self))
+  (print "}"))
+
+(define-function operator (operation arguments)
+  (let ((self (new <operator>)))
+    (set (<operator>-operation	self) operation)
+    (set (<operator>-arguments	self) arguments)
+    self))
+
+;;; compiler
 
 (define-structure <compiler> (scope level next-local max-local program))
 
@@ -42,15 +79,38 @@
     (println compiler" --> "variable)
     (set (<compiler>-scope compiler) variable)))
 
-(let ((c (compiler () ())))
-  (println c)
-  (println (define-variable c 'foo 1))
-  (println (define-variable c 'bar 2))
-  (println (define-variable c 'baz 3)))
+(define-selector encode-expr)
 
+(define-method encode-expr <symbol> (compiler)	(variable self 'VALUE 'LEVEL 'INDEX 'NEXT))
 
+(define-method encode-expr <long>   (compiler)	(literal self))
+(define-method encode-expr <string> (compiler)	(literal self))
 
+(define-method encode-expr <pair>   (compiler)
+  (let ((head (car self))
+	(args (cdr self)))
+    (cond
+     ((= head 'define)	(do-define head args))
+     (else		(operator (encode-expr (car self) compiler)
+				  (map-with encode-expr (cdr self) compiler))))))
 
+(define-function compile (source)
+  (let* ((c       (compiler () ()))
+	 (encoded (map-with encode-expr source compiler)))
+    (println source)
+    (println "=======>")
+    (println encoded)))
+
+(compile '(42))
+(compile '(a))
+(compile '((+ 1 2)))
+(compile '((define a 42)))
+
+(exit 0)
+
+(compile '
+ ((define printf (extern int "printf" (char *) ...))
+  (printf "Hello, world\n")))
 
 (exit 0)
 
