@@ -76,10 +76,15 @@
 
 (define-function define-variable (compiler name value)
   (let ((variable (variable name value (<compiler>-level compiler) () (<compiler>-scope compiler))))
-    (println compiler" --> "variable)
     (set (<compiler>-scope compiler) variable)))
 
 (define-selector encode-expr)
+
+(define-function do-define (expr compiler)
+  (let ((name (cadr expr))
+	(init (caddr expr)))
+    (define-variable compiler name ())
+    (list 'set (encode-expr name compiler) (encode-expr init compiler))))
 
 (define-method encode-expr <symbol> (compiler)	(variable self 'VALUE 'LEVEL 'INDEX 'NEXT))
 
@@ -90,7 +95,7 @@
   (let ((head (car self))
 	(args (cdr self)))
     (cond
-     ((= head 'define)	(do-define head args))
+     ((= head 'define)	(do-define self compiler))
      (else		(operator (encode-expr (car self) compiler)
 				  (map-with encode-expr (cdr self) compiler))))))
 
@@ -101,10 +106,7 @@
     (println "=======>")
     (println encoded)))
 
-(compile '(42))
-(compile '(a))
-(compile '((+ 1 2)))
-(compile '((define a 42)))
+(compile '((define a (+ 3 4))))
 
 (exit 0)
 
