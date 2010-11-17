@@ -132,6 +132,11 @@
       (cons (function (car list))
 	    (map function (cdr list)))))
 
+(define-function map-with (function list a)
+  (if (pair? list)
+      (cons (function (car list) a)
+	    (map-with function (cdr list) a))))
+
 (set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
@@ -139,6 +144,30 @@
 ;;; built-in types
 
 (define-form <form>-function	(expr) `(oop-at ,expr 0))
+
+;;; let*
+
+(define-function %let* (bindings body)
+  (if (pair? (cdr bindings))
+      `(let (,(car bindings)) ,(%let* (cdr bindings) body))
+    `(let ,bindings ,@body)))
+
+(define-form let* bindings-body
+  (%let* (car bindings-body) (cdr bindings-body)))
+
+;;; cond
+
+(define-function %cond (clauses)
+  (if (pair? clauses)
+      (let* ((clause (car clauses))
+	     (test   (car clause))
+	     (value  (cadr clause)))
+	(if (= 'else test)
+	    value
+	  `(if ,test ,value ,(%cond (cdr clauses)))))))
+
+(define-form cond clauses
+  (%cond clauses))
 
 ;;; structure
 
@@ -155,6 +184,7 @@
 (define-form define-structure (name fields)
   (let ((type (%allocate-type name))
 	(size (list-length fields)))
+    (%print type" "name"\n")
     (set-array-at %structure-sizes  type size)
     (set-array-at %structure-fields type fields)
     `(let ()
@@ -202,7 +232,9 @@
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
-  (or default (set default `(args (error "cannot apply selector "',name" to: "args))))
+  (or default (set default `(args (error "cannot apply selector "',name
+					 " to "(array-at %type-names (type-of (car args)))
+					 ": "args))))
   `(define ,name (selector ',name (lambda ,@default))))
 
 (define-selector add-method)
@@ -241,8 +273,15 @@
     (apply dump args)
     (%print "\n")))
 
-(define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
 (define-method do-dump  <string> ()	(%dump self))
+(define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
+
+(define-method do-print <pair> ()
+  (print "(")
+  (while self
+    (print (car self))
+    (if (set self (cdr self)) (print " ")))
+  (print ")"))
 
 (define-function dump-until (target arg)
   (let ((found (= target arg)))
