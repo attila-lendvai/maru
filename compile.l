@@ -49,30 +49,16 @@
 
 ;;; compiler
 
-(define-structure <compiler> (scope level next-local max-local program))
+(define-structure <compiler> (scope level program))
 
 (define-method do-print <compiler> ()
-  (print "<compiler:"(<compiler>-level self)"."(<compiler>-max-local self)","(<compiler>-scope self)">"))
+  (print "<compiler "(<compiler>-level self)" "(<compiler>-scope self)">"))
 
 (define-function compiler (scope level)
   (let ((self (new <compiler>)))
     (set (<compiler>-scope	self) scope)
     (set (<compiler>-level	self) level)
-    (set (<compiler>-next-local self) 0)
-    (set (<compiler>-max-local  self) 0)
     self))
-
-(define-function push-local (compiler name)
-  (let ((index (<compiler>-next-local compiler)))
-    (set (<compiler>-next-local compiler) (+ index 1))
-    (let ((local (variable name () (<compiler>-scope compiler))))
-      (set (<compiler>-scope compiler) local))))
-
-(define-function pop-local (compiler)
-  (let ((index (<compiler>-next-local compiler)))
-    (set (<compiler>-next-local compiler) (- index 1))
-    (let ((local (<compiler>-scope compiler)))
-      (set (<compiler>-scope compiler) (<variable>-next local)))))
 
 (define-function define-variable (compiler name value)
   (let ((variable (variable name value (<compiler>-scope compiler))))
@@ -98,20 +84,28 @@
 	(args (cdr self)))
     (cond
      ((= head 'define)	(encode-define self compiler))
-     (else		(operator (encode-expr (car self) compiler)
-				  (map-with encode-expr (cdr self) compiler))))))
+     (else
+       (operator (encode-expr (car self) compiler)
+		 (map-with encode-expr (cdr self) compiler))))))
 
 (define-function encode-top-level-expr (expr compiler)
   (let ((e (encode-expr expr compiler)))
     (if e
 	(set (<compiler>-program compiler) (cons e (<compiler>-program compiler))))))
 
+;;; compiling
+
+(define-selector compile-node)
+
 (define-function compile (source)
   (let ((c (compiler 0 ())))
     (println source)
     (println "=======>")
     (map-with encode-top-level-expr source c)
-    (println (<compiler>-program c))))
+    (set (<compiler>-program c) (reverse (<compiler>-program c)))
+    (println (<compiler>-program c))
+    (map-with compile-node (<compiler>-program c) c)
+    ))
 
 (compile '((define a (+ 3 4))))
 
