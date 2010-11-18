@@ -1,34 +1,32 @@
 ;;; literal
 
-(define-structure <literal> (value))
+(define-structure <literal> (location value))
 
 (define-method do-print <literal> ()
   (print "<literal ")
-  (dump (<literal>-value self))
+  (dump  (<literal>-value    self))
+  (print (<literal>-location self))
   (print ">"))
 
 (define-function literal (value)
   (let ((self (new <literal>)))
-    (set (<literal>-value	self) value)
+    (set (<literal>-value self) value)
     self))
 
 ;;; variable
 
-(define-structure <variable> (location name value level offset next))
+(define-structure <variable> (location name value next))
 
 (define-method do-print <variable> ()
-  (print "["(<variable>-name self))
-  (print ":"(<variable>-level self))
-  (print "."(<variable>-offset self))
-  (print "="(<variable>-location self))
+  (print "<variable ")
+  (print (<variable>-name self))
+  (print (<variable>-location self))
   (print "]"))
 
-(define-function variable (name value level offset next)
+(define-function variable (name value next)
   (let ((self (new <variable>)))
     (set (<variable>-name	self) name)
     (set (<variable>-value	self) value)
-    (set (<variable>-level	self) level)
-    (set (<variable>-offset	self) offset)
     (set (<variable>-next	self) next)
     self))
 
@@ -65,7 +63,7 @@
 (define-function push-local (compiler name)
   (let ((index (<compiler>-next-local compiler)))
     (set (<compiler>-next-local compiler) (+ index 1))
-    (let ((local (variable name () (<compiler>-level compiler) index (<compiler>-scope compiler))))
+    (let ((local (variable name () (<compiler>-scope compiler))))
       (set (<compiler>-scope compiler) local))))
 
 (define-function pop-local (compiler)
@@ -75,8 +73,10 @@
       (set (<compiler>-scope compiler) (<variable>-next local)))))
 
 (define-function define-variable (compiler name value)
-  (let ((variable (variable name value (<compiler>-level compiler) () (<compiler>-scope compiler))))
+  (let ((variable (variable name value (<compiler>-scope compiler))))
     (set (<compiler>-scope compiler) variable)))
+
+;;; encoding
 
 (define-selector encode-expr)
 
@@ -86,7 +86,7 @@
     (define-variable compiler name ())
     (list 'set (encode-expr name compiler) (encode-expr init compiler))))
 
-(define-method encode-expr <symbol> (compiler)	(variable self 'VALUE 'LEVEL 'INDEX 'NEXT))
+(define-method encode-expr <symbol> (compiler)	(variable self 'VALUE 'NEXT))
 
 (define-method encode-expr <long>   (compiler)	(literal self))
 (define-method encode-expr <string> (compiler)	(literal self))
@@ -100,7 +100,7 @@
 				  (map-with encode-expr (cdr self) compiler))))))
 
 (define-function compile (source)
-  (let* ((c       (compiler () ()))
+  (let* ((e       (compiler 0 ()))
 	 (encoded (map-with encode-expr source compiler)))
     (println source)
     (println "=======>")
