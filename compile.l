@@ -72,7 +72,7 @@
   (let ((name (cadr expr))
 	(init (caddr expr)))
     (define-variable compiler name ())
-    (list 'set (encode-expr name compiler) (encode-expr init compiler))))
+    (operator 'set (list (encode-expr name compiler) (encode-expr init compiler)))))
 
 (define-method encode-expr <symbol> (compiler)	(variable self 'VALUE 'NEXT))
 
@@ -96,6 +96,16 @@
 ;;; compiling
 
 (define-selector compile-node)
+
+(define-function compile-set (compiler)
+  xxx
+
+(define-method compile-node <operator> (compiler)
+  (let ((op (<operator>-operation self)))
+    (cond
+     ((= op 'set)	(compile-set self compiler))
+     (else
+       (error "cannot compile-node operator " self)))))
 
 (define-function compile (source)
   (let ((c (compiler 0 ())))
