@@ -191,8 +191,6 @@
        (define ,name ,type)
        ,@(%make-accessors name fields))))
 
-(define-structure foo (a b c))
-
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
 
@@ -353,3 +351,12 @@
     (if method 
 	(apply method arguments)
       (error "no method in "(<generic>-name self)" corresponding to "arguments))))
+
+;;; list
+
+(define-function reverse (list)
+  (let ((result ()))
+    (while (pair? list)
+      (set result (cons (car list) result))
+      (set list (cdr list)))
+    result))
