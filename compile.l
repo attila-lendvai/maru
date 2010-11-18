@@ -5,6 +5,7 @@
 (define-method do-print <literal> ()
   (print "<literal ")
   (dump  (<literal>-value    self))
+  (print " ")
   (print (<literal>-location self))
   (print ">"))
 
@@ -20,8 +21,9 @@
 (define-method do-print <variable> ()
   (print "<variable ")
   (print (<variable>-name self))
+  (print " ")
   (print (<variable>-location self))
-  (print "]"))
+  (print ">"))
 
 (define-function variable (name value next)
   (let ((self (new <variable>)))
@@ -80,7 +82,7 @@
 
 (define-selector encode-expr)
 
-(define-function do-define (expr compiler)
+(define-function encode-define (expr compiler)
   (let ((name (cadr expr))
 	(init (caddr expr)))
     (define-variable compiler name ())
@@ -95,16 +97,21 @@
   (let ((head (car self))
 	(args (cdr self)))
     (cond
-     ((= head 'define)	(do-define self compiler))
+     ((= head 'define)	(encode-define self compiler))
      (else		(operator (encode-expr (car self) compiler)
 				  (map-with encode-expr (cdr self) compiler))))))
 
+(define-function encode-top-level-expr (expr compiler)
+  (let ((e (encode-expr expr compiler)))
+    (if e
+	(set (<compiler>-program compiler) (cons e (<compiler>-program compiler))))))
+
 (define-function compile (source)
-  (let* ((e       (compiler 0 ()))
-	 (encoded (map-with encode-expr source compiler)))
+  (let ((c (compiler 0 ())))
     (println source)
     (println "=======>")
-    (println encoded)))
+    (map-with encode-top-level-expr source c)
+    (println (<compiler>-program c))))
 
 (compile '((define a (+ 3 4))))
 
