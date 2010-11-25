@@ -119,15 +119,17 @@
       (+ 1 (list-length (cdr list)))
     0))
 
+(define %list->array
+  (lambda (list index)
+    (println "---" list index)
+    (if (pair? list)
+	(let ((a (%list->array (cdr list) (+ 1 index))))
+	  (set-array-at a index (car list))
+	  a)
+      (array index))))
+
 (define-function list->array (list)
-  (let ((%list->array (lambda (list index)
-			(if (pair? list)
-			    (let ((a (%list->array (cdr list) (+ 1 index))))
-			      (set-array-at a index (car list))
-			      a)
-			  (array index)))))
-    (lambda (list)
-      (%list->array list 0))))
+  (%list->array list 0))
 
 (define-function map (function list)
   (if (pair? list)
