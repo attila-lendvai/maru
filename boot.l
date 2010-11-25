@@ -139,6 +139,11 @@
       (cons (function (car list) a)
 	    (map-with function (cdr list) a))))
 
+(define-function map2-with (function alist blist a)
+  (if (pair? alist)
+      (cons (function (car alist) (car blist) a)
+	    (map2-with function (cdr alist) (cdr blist) a))))
+
 (set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
@@ -244,7 +249,9 @@
     (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
 
 (define-form define-method (selector type args . body)
-  `(add-method ,selector ',type '(self ,@args) ',body))
+  (if (symbol? args)
+      `(add-method ,selector ',type ',(cons 'self args) ',body)
+      `(add-method ,selector ',type '(self ,@args) ',body)))
 
 ;;; print
 
