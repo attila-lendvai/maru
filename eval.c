@@ -91,8 +91,8 @@ static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	se
 static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  return obj; }
 
 static oop symbols= nil;
-static oop s_set= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil;
-static oop f_quote= nil, f_set= nil;
+static oop s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil;
+static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
 static oop backtrace= nil;
 
@@ -433,7 +433,7 @@ static oop read(FILE *fp)
 static void doprint(FILE *stream, oop obj, int storing)
 {
   if (!obj) {
-    fprintf(stream, "nil");
+    fprintf(stream, "()");
     return;
   }
   if (obj == globals) {
@@ -634,7 +634,33 @@ static oop encode(oop expr, oop env)
 	head= val;
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
-    if (f_quote != head) tail= enlist(tail, env);
+    if      (f_let == head) {
+      oop args= cadr(expr);					GC_PROTECT(env);
+      oop tmp= nil;						GC_PROTECT(tmp);
+      while (is(Pair, args)) {
+	oop var= getHead(args);
+	if (is(Pair, var)) var= getHead(var);
+	tmp= newPair(var, nil);
+	env= newPair(tmp, env);
+	args= getTail(args);
+      }
+      tail= enlist(tail, env);					GC_UNPROTECT(tmp);  GC_UNPROTECT(env);
+    }
+    if      (f_lambda == head) {
+      oop args= cadr(expr);					GC_PROTECT(env);
+      oop tmp= nil;						GC_PROTECT(tmp);
+      while (is(Pair, args)) {
+	tmp= newPair(getHead(args), nil);
+	env= newPair(tmp, env);
+	args= getTail(args);
+      }
+      if (nil != args) {
+	tmp= newPair(args, nil);
+	env= newPair(tmp, env);
+      }
+      tail= enlist(tail, env);					GC_UNPROTECT(tmp);  GC_UNPROTECT(env);
+    }
+    else if (f_quote != head) tail= enlist(tail, env);
     expr= newPair(head, tail);					GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   }
   else {
@@ -930,7 +956,7 @@ static subr(define)
 }
 
 #define _do_unary()				\
-  _do(com, ~)  _do(not, !)
+  _do(com, ~)
 
 #define _do(NAME, OP)								\
   static subr(NAME)								\
@@ -1039,6 +1065,11 @@ static subr(abort)
   return nil;
 }
 
+static subr(current_environment)
+{
+  return env;
+}
+
 static subr(read)
 {
   FILE *stream= stdin;
@@ -1105,6 +1136,12 @@ static subr(form)
 {
   arity1(args, "form");
   return newForm(getHead(args));
+}
+
+static subr(fixedP)
+{
+  arity1(args, "fixed?");
+  return newBool(is(Fixed, getHead(args)));
 }
 
 static subr(cons)
@@ -1209,11 +1246,24 @@ static subr(symbol_string)
   return newString(get(arg, Symbol,bits));
 }
 
+static subr(long_string)
+{
+  oop arg= car(args);				if (is(String, arg)) return arg;  if (!is(Long, arg)) return nil;
+  char buf[32];
+  sprintf(buf, "%ld", getLong(arg));
+  return newString(buf);
+}
+
 static subr(array)
 {
   oop arg= car(args);
   int num= is(Long, arg) ? getLong(arg) : 0;
   return newArray(num);
+}
+
+static subr(arrayP)
+{
+  return is(Array, car(args)) ? s_t : nil;
 }
 
 static subr(array_length)
@@ -1263,6 +1313,13 @@ static subr(set_oop_at)
   oop arg= getHead(getTail(args));		if (!is(Long, arg)) return nil;
   oop val= getHead(getTail(getTail(args)));
   return oopAtPut(obj, getLong(arg), val);
+}
+
+static subr(not)
+{
+  arity1(args, "not");
+  oop obj= getHead(args);
+  return (nil == obj) ? s_t : nil;
 }
 
 #undef subr
@@ -1330,6 +1387,8 @@ int main(int argc, char **argv)
   GC_add_root(&backtrace);
 
   s_set			= intern("set");
+  s_let			= intern("let");
+  s_lambda		= intern("lambda");
   s_quote		= intern("quote");
   s_quasiquote		= intern("quasiquote");
   s_unquote		= intern("unquote");
@@ -1369,6 +1428,7 @@ int main(int argc, char **argv)
       { ".define",	   subr_define },
       { " exit",	   subr_exit },
       { " abort",	   subr_abort },
+      { " current-environment",	   subr_current_environment },
       { " read",	   subr_read },
       { " eval",	   subr_eval },
       { " apply",	   subr_apply },
@@ -1376,6 +1436,7 @@ int main(int argc, char **argv)
       { " print",	   subr_print },
       { " dump",	   subr_dump },
       { " form",	   subr_form },
+      { " fixed?",	   subr_fixedP },
       { " cons",	   subr_cons },
       { " pair?",	   subr_pairP },
       { " car",		   subr_car },
@@ -1390,15 +1451,17 @@ int main(int argc, char **argv)
       { " set-string-at",  subr_set_string_at },
       { " symbol->string", subr_symbol_string },
       { " string->symbol", subr_string_symbol },
+      { " long->string",   subr_long_string },
       { " array",	   subr_array },
+      { " array?",	   subr_arrayP },
       { " array-length",   subr_array_length },
       { " array-at",	   subr_array_at },
       { " set-array-at",   subr_set_array_at },
       { " allocate",	   subr_allocate },
       { " oop-at",	   subr_oop_at },
       { " set-oop-at",	   subr_set_oop_at },
+      { " not",		   subr_not },
       { " ~",		   subr_com },
-      { " !",		   subr_not },
       { " +",		   subr_add },
       { " -",		   subr_sub },
       { " *",		   subr_mul },
@@ -1426,8 +1489,10 @@ int main(int argc, char **argv)
 
   tmp= nil;		GC_UNPROTECT(tmp);
 
-  f_set=   cdr(assq(s_set,   globals));		GC_add_root(&f_set);
-  f_quote= cdr(assq(s_quote, globals));		GC_add_root(&f_quote);
+  f_set=    cdr(assq(s_set,    globals));		GC_add_root(&f_set);
+  f_quote=  cdr(assq(s_quote,  globals));		GC_add_root(&f_quote);
+  f_lambda= cdr(assq(s_lambda, globals));		GC_add_root(&f_lambda);
+  f_let=    cdr(assq(s_let,    globals));		GC_add_root(&f_let);
 
   int repled= 0;
 

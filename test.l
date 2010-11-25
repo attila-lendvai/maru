@@ -13,7 +13,20 @@
 	1
       (+ (+ (nfibs (- n 1)) (nfibs (- n 2))) 1))))
 
-(println (nfibs 30))
+(define-selector sfibs)
+
+(define-selector less)	(define-method less <long> (other) (< self other))
+(define-selector add)	(define-method add  <long> (other) (+ self other))
+(define-selector sub)	(define-method sub  <long> (other) (- self other))
+
+(define-method sfibs <long> ()
+  (if (less self 2)
+      1
+    (add (add (sfibs (sub self 1)) (sfibs (sub self 2))) 1)))
+
+(println (sfibs 28))
+
+(exit 0)
 
 (define list (lambda args args))
 
