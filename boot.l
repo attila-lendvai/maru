@@ -43,6 +43,7 @@
 
 (define caar (lambda (x) (car (car x))))
 (define cadr (lambda (x) (car (cdr x))))
+(define cddr (lambda (x) (cdr (cdr x))))
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
 
@@ -93,7 +94,8 @@
 			 (let ((obj (car l)))
 			   (if (and (pair? obj) (= (car obj) 'unquote-splicing))
 			       (list 'concat-list (cadr obj)      (qq-list (cdr l)))
-			     (list   'cons        (qq-object obj) (qq-list (cdr l))))))))
+			     (list   'cons        (qq-object obj) (qq-list (cdr l)))))
+		       (list 'quote l))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
 			  (if (= head 'unquote)
@@ -184,7 +186,7 @@
 (define-form define-structure (name fields)
   (let ((type (%allocate-type name))
 	(size (list-length fields)))
-    (%print type" "name"\n")
+    ;;;(%print type" "name"\n")
     (set-array-at %structure-sizes  type size)
     (set-array-at %structure-fields type fields)
     `(let ()
@@ -275,11 +277,19 @@
 (define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
 
 (define-method do-print <pair> ()
-  (print "(")
-  (while self
-    (print (car self))
-    (if (set self (cdr self)) (print " ")))
-  (print ")"))
+  (if (= *globals* (cdr self))
+      (print "*globals*")
+    (let ()
+      (print "(")
+      (while self
+	(if (pair? self)
+	    (print (car self))
+	  (let ()
+	    (print ". ")
+	    (print self)))
+	(if (set self (cdr self))
+	    (print " ")))
+      (print ")"))))
 
 (define-function dump-until (target arg)
   (let ((found (= target arg)))
@@ -287,17 +297,22 @@
 	(let ()
 	  (print "(")
 	  (while arg
-	    (if (dump-until target (car arg))
-		(let ()
-		  (if (cdr arg) (print " ..."))
-		  (set found 't)
-		  (set arg ())))
-	    (if (set arg (cdr arg)) (print " ")))
+	    (if (pair? arg)
+		(if (dump-until target (car arg))
+		    (let ()
+		      (if (cdr arg) (print " ..."))
+		      (set found 't)
+		      (set arg ())))
+	      (let ()
+		(print ". ")
+		(dump-until target arg)))
+	    (if (set arg (cdr arg))
+		(print "_")))
 	  (print ")"))
       (print arg))
     found))
 
-(define *backtrace*
+(define *backtrace*-
   (lambda (stack depth)
     (let ((posn (array)))
       (while (>= (set depth (- depth 1)) 0)
@@ -338,8 +353,8 @@
     (set (array-at methods (eval (car types))) method)))
 
 (define-form define-multimethod (method typed-args . body)
-  (let ((args  (map car  typed-args))
-	(types (map cadr typed-args)))
+  (let ((args  (map cadr typed-args))
+	(types (map car  typed-args)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
 (define-apply <generic> (self . arguments)
@@ -348,9 +363,12 @@
     (while arg
       (set method (array-at method (type-of (car arg))))
       (set arg (cdr arg)))
-    (if method 
+    (if (and method (not (array? method)))
 	(apply method arguments)
-      (error "no method in "(<generic>-name self)" corresponding to "arguments))))
+      (let ((default (<generic>-default self)))
+	(if default
+	    (apply default arguments)
+	  (error "no method in "(<generic>-name self)" corresponding to "arguments))))))
 
 ;;; list
 
@@ -360,3 +378,5 @@
       (set result (cons (car list) result))
       (set list (cdr list)))
     result))
+
+
