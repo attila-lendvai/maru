@@ -62,7 +62,7 @@
   (define-function temp-label-name ()
     (concat-string "_L_" (long->string (set counter (+ counter 1))))))
 
-(define-operand LABEL (name) "_"(<LABEL>-name self))
+(define-operand LABEL (name) 	(<LABEL>-name self))
 (define-operand GI32 (name)	(<GI32>-name self))
 (define-operand LI32 (value)	(<LI32>-value self))
 (define-operand TI32 (offset)	(<TI32>-offset self)"(%esp)")
@@ -105,14 +105,14 @@
 (define-instruction CALL)	(define-emit (CALL LABEL)	(println "	call "$1))
 
 (define-instruction LOAD)	(define-emit (LOAD LI32)	(println "	movl $"$1",%eax"))
-(define-instruction LOAD)	(define-emit (LOAD LABEL)	(println "	movl $0,%eax"))
+(define-instruction LOAD)	(define-emit (LOAD LABEL)	(println "	movl $"$1",%eax"))
 
 (define-instruction STORE)	(define-emit (STORE TI32)	(println "	movl %eax,"$1))
 
 (define-instruction MOVE)	(define-emit (MOVE TI32 TI32)	(println "	movl "$1",%ecx")
 								(println "	movl %ecx,"$2))
 
-(define-instruction CALL)	(define-emit (CALL long)	(println "	call _printf"))
+(define-instruction CALL)	(define-emit (CALL long)	(println "	call printf"))
 
 ;;; 
 
@@ -223,8 +223,16 @@
 (define-function gen-move (a b comp)
   (gen comp MOVE a b))
 
+(define operators (list->array '(() () ((+ ADD)))))
+
 (define-method gen <pair> (comp)
-  (let ((op (car self)))
+  (let* ((head  (car self))
+	 (arity (- (list-length self) 1))
+	 (op    (cdr (assq head (array-at operators arity)))))
+    (if op (error "GOT AN OP"))
+    (println head)
+    (println arity)
+    (println op)
     (cond
      ((= op '+)		(let ((a (gen (caddr self) comp))
 			      (t (alloc-temp comp))
@@ -245,7 +253,7 @@
      )))
 
 (let* ((comp (compiler)))
-  (gen '(printf "hello, world\n") comp)
+  (gen '(+ 3 4) comp)
   (let ((arg-size (& -16 (+ 15 (<compiler>-arg-limit comp)))))
     (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
 	 (<compiler>-temps comp)))
