@@ -142,9 +142,11 @@ static int arrayLength(oop obj)
 
 static oop oopAt(oop obj, int index)
 {
-  if (!GC_atomic(obj)) {
-    int size= GC_size(obj) / sizeof(oop);
-    if ((unsigned)index < (unsigned)size) return ((oop *)obj)[index];
+  if (obj) {
+    if (!GC_atomic(obj)) {
+      int size= GC_size(obj) / sizeof(oop);
+      if ((unsigned)index < (unsigned)size) return ((oop *)obj)[index];
+    }
   }
   return nil;
 }
@@ -634,7 +636,7 @@ static oop encode(oop expr, oop env)
 	head= val;
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
-    if      (f_let == head) {
+    if (f_let == head) {
       oop args= cadr(expr);					GC_PROTECT(env);
       oop tmp= nil;						GC_PROTECT(tmp);
       while (is(Pair, args)) {
@@ -646,7 +648,7 @@ static oop encode(oop expr, oop env)
       }
       tail= enlist(tail, env);					GC_UNPROTECT(tmp);  GC_UNPROTECT(env);
     }
-    if      (f_lambda == head) {
+    else if (f_lambda == head) {
       oop args= cadr(expr);					GC_PROTECT(env);
       oop tmp= nil;						GC_PROTECT(tmp);
       while (is(Pair, args)) {
@@ -660,7 +662,8 @@ static oop encode(oop expr, oop env)
       }
       tail= enlist(tail, env);					GC_UNPROTECT(tmp);  GC_UNPROTECT(env);
     }
-    else if (f_quote != head) tail= enlist(tail, env);
+    else if (f_quote != head)
+      tail= enlist(tail, env);
     expr= newPair(head, tail);					GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   }
   else {
