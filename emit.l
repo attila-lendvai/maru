@@ -123,38 +123,13 @@
 
 ;;; 
 
-(define-function emit-program (program)
-  (while program
-    (apply emit (car program))
-    (set program (cdr program))))
-
 (define-function emit-main (body)
   (let ((main   (LABEL "main")))
-    (emit-program
-     `((,GLOBAL ,main)
-       (,DEFLABEL ,main)
-       (,ENTER	24)))
-    (let ((i 0) (j (array-length body)))
-      (while (< i j)
-	(apply emit (array-at body i))
-	(set i (+ i 1))))
-    (emit-program
-     `((,RETURN	24)))))
-
-;; (let ((hw     (LABEL (temp-label-name)))
-;;       (main   (LABEL "main"))
-;;       (printf (LABEL "printf")))
-;;   (emit-program
-;;    `((,PROG ((,DATA)
-;; 	     (,DEFLABEL ,hw)
-;; 	     (,ASCIZ	"hello, world\n")
-;; 	     (,TEXT)))
-;;      (,GLOBAL ,main)
-;;      (,DEFLABEL ,main)
-;;      (,ENTER	4)
-;;      (,MOVEA	,hw ,(TI32 0))
-;;      (,CALL	,printf)
-;;      (,RETURN	4))))
+    (emit GLOBAL main)
+    (emit DEFLABEL main)
+    (emit ENTER	24)
+    (array-do insn body (apply emit insn))
+    (emit RETURN 24)))
 
 ;;; 
 
@@ -165,8 +140,6 @@
     (set (<compiler>-arg-counter self) 0)
     (set (<compiler>-arg-limit self) 0)
     (set (<compiler>-temp-counter self) 0)
-    (set (<compiler>-temps self) ())
-    (set (<compiler>-stubs self) ())
     (set (<compiler>-asm self) (array))
     self))
 
@@ -177,31 +150,22 @@
     t))
 
 (define-function free-args (comp args)
-  (set (<compiler>-arg-limit comp) (<compiler>-arg-counter comp))
+  (and (< (<compiler>-arg-limit comp) (<compiler>-arg-counter comp))
+       (set (<compiler>-arg-limit comp) (<compiler>-arg-counter comp)))
   (set (<compiler>-arg-counter comp) 0))
 
 (define-function new-temp (comp)
-  (let* ((i (<compiler>-temp-counter comp))
-	 (t (TI32 i)))
-    (set (<compiler>-temp-counter comp) (+ i 4))
-    t))
+  (TI32 (post-incr (<compiler>-temp-counter comp) 4)))
 
 (define-function alloc-temp (comp)
-  (let ((temps (<compiler>-temps comp)))
-    (if temps
-	(let ((temp (car temps)))
-	  (set (<compiler>-temps comp) (cdr temps))
-	  temp)
-      (new-temp comp))))
+  (or (pop (<compiler>-temps comp))
+      (new-temp comp)))
 
 (define-function free-temp (comp temp)
-  (let ((temps (<compiler>-temps comp)))
-    (set (<compiler>-temps comp) (cons temp temps))))
+  (push (<compiler>-temps comp) temp))
 
 (define-function free-temps (comp temps)
-  (while temps
-    (free-temp comp (car temps))
-    (set temps (cdr temps))))
+  (list-do temp temps (free-temp comp temp)))
 
 (define-selector gen)
 
@@ -288,4 +252,4 @@
 
 (gen-main (list (extern 'printf) "%d\n" '(+ 3 4)))
 
-;(EAX ADD (LI32:3 LOAD LI32:3) (LI32:3 LOAD LI32:4))
+; (EAX ADD (LI32:3 LOAD LI32:3) (LI32:3 LOAD LI32:4))
