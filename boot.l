@@ -46,6 +46,7 @@
 (define cddr (lambda (x) (cdr (cdr x))))
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
+(define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
 
 (define assq
   (lambda (object list)
@@ -202,23 +203,7 @@
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
 
-;;; active symbols
-
-;; (define-structure <variable> (name encoder))
-
-;; (define-function variable (name encoder)
-;;   (let ((self (new <variable>)))
-;;     (set (<variable>-name    self) name)
-;;     (set (<variable>-encoder self) encoder)
-;;     self))
-
-;; (define-encode <symbol> (sym env)
-;;   (let ((val (cdr (assq sym env))))
-;;     (if (= <variable> (type-of val))
-;; 	((<variable>-encoder val) val env)
-;;       sym)))
-
-;;; <selector>
+;;; selector
 
 (define-structure <selector> (name methods default))
 
@@ -320,7 +305,7 @@
       (print arg))
     found))
 
-(define *backtrace*-
+(define *backtrace*
   (lambda (stack depth)
     (let ((posn (array)))
       (while (>= (set depth (- depth 1)) 0)
@@ -330,8 +315,6 @@
 	  (print "\n")
 	  (set posn here))))
     (exit 0)))
-
-;(println print)
 
 ;;; multimethod
 
@@ -387,10 +370,59 @@
       (set list (cdr list)))
     result))
 
-;;; list-do
+(define-form push (list element)
+  `(set ,list (cons ,element ,list)))
+
+(define-form pop (list)
+  `(let* ((_list_ ,list)
+	  (_head_ (car _list_)))
+     (set ,list (cdr _list_))
+     _head_))
+
+;;; incr decr
+
+(define-form incr (var . opt-step)
+  (let ((step (or opt-step 1)))
+    `(set ,var (+ ,var ,step))))
+
+(define-form decr (var . opt-step)
+  (let ((step (or opt-step 1)))
+    `(set ,var (- ,var ,step))))
+
+(define-form post-incr (var . opt-step)
+  (let ((step (or (car opt-step) 1)))
+    `(let ((_value_ ,var))
+       (set ,var (+ _value_ ,step))
+       _value_)))
+
+(define-form post-decr (var . opt-step)
+  (let ((step (or (car opt-step) 1)))
+    `(let ((_value_ ,var))
+       (set ,var (- _value_ ,step))
+       _value_)))
+
+;;; iteration
+
+(define-form for (var-init-limit-step . body)
+  (let ((var   (car var-init-limit-step))
+	(init  (cadr var-init-limit-step))
+	(limit (caddr var-init-limit-step))
+	(step  (or (cadddr var-init-limit-step) 1)))
+    `(let ((,var ,init) (_limit_ ,limit))
+       (while (< ,var _limit_)
+	 ,@body
+	 (set ,var (+ ,var ,step))))))
 
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
        (let ((,var (car _list_))) ,@body)
        (set _list_ (cdr _list_)))))
+
+;;; array-do
+
+(define-form array-do (var array . body)
+  `(let ((_array_ ,array))
+     (for (_index_ 0 (array-length _array_))
+       (let ((,var (array-at _array_ _index_)))
+	 ,@body))))
