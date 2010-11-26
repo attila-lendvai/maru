@@ -1370,6 +1370,7 @@ static void replPath(char *path)
     perror(path);
     fatal(0);
   }
+  fscanf(stream, "#!%*[^\012\015]");
   replFile(stream);
   fclose(stream);
 }
