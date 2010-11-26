@@ -121,7 +121,6 @@
 
 (define %list->array
   (lambda (list index)
-    (println "---" list index)
     (if (pair? list)
 	(let ((a (%list->array (cdr list) (+ 1 index))))
 	  (set-array-at a index (car list))
@@ -388,4 +387,10 @@
       (set list (cdr list)))
     result))
 
+;;; list-do
 
+(define-form list-do (var list . body)
+  `(let ((_list_ ,list))
+     (while _list_
+       (let ((,var (car _list_))) ,@body)
+       (set _list_ (cdr _list_)))))
