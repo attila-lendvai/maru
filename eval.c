@@ -78,10 +78,10 @@ static oop cdr(oop obj)			{ return is(Pair, obj) ? getTail(obj) : nil; }
 
 static oop caar(oop obj)		{ return car(car(obj)); }
 static oop cadr(oop obj)		{ return car(cdr(obj)); }
-//static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
+static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
 //static oop caaar(oop obj)		{ return car(car(car(obj))); }
 //static oop cadar(oop obj)		{ return car(cdr(car(obj))); }
-static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
+//static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
 //static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
@@ -865,7 +865,15 @@ static void arity3(oop args, char *name)
 
 static subr(if)
 {
-  return eval(((nil != eval(car(args), env)) ? cadr : caddr)(args), env);
+  if (nil != eval(car(args), env))
+    return eval(cadr(args), env);
+  oop ans= nil;
+  args= cddr(args);
+  while (is(Pair, args)) {
+    ans= eval(getHead(args), env);
+    args= cdr(args);
+  }
+  return ans;
 }
 
 static subr(and)
