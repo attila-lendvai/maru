@@ -154,6 +154,9 @@
 
 (define-form <form>-function	(expr) `(oop-at ,expr 0))
 
+(define-form <expr>-defn	(expr) `(oop-at ,expr 0))
+(define-form <expr>-env		(expr) `(oop-at ,expr 1))
+
 ;;; let*
 
 (define-function %let* (bindings body)
@@ -300,7 +303,7 @@
 		(print ". ")
 		(dump-until target arg)))
 	    (if (set arg (cdr arg))
-		(print "_")))
+		(print " ")))
 	  (print ")"))
       (print arg))
     found))
