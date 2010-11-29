@@ -31,7 +31,7 @@
 	       ,@(define-operand-make-setters tname fields)
 	       self)))
     `(define-method do-print ,tname () (print ,@printing))))
-  
+
 ;;; DEFINE-INSTRUCTION
 
 (define-form define-instruction (name)
@@ -79,11 +79,6 @@
 
 ;;; IA32 -- INSTRUCTIONS
 
-(define-instruction PROG)	(define-emit (PROG pair)
-				  (while $1
-				    (apply emit (car $1))
-				    (set $1 (cdr $1))))
-
 (define-instruction GLOBAL)	(define-emit (GLOBAL LABEL)	(println "	.globl "$1))
 (define-instruction SECTION)	(define-emit (SECTION string)	(println "	.section "$1))
 (define-instruction INDIRECT)	(define-emit (INDIRECT LABEL)	(println "	.indirect_symbol "$1))
@@ -105,8 +100,6 @@
 				    (println "	leave")
 				    (println "	ret")))
 
-(define-instruction MOVEA)	(define-emit (MOVEA LABEL TI32)	(println "	movl $"$1","$2))
-
 (define-instruction ADD)	(define-emit (ADD TI32)		(println "	addl "$1",%eax"))
 
 (define-instruction CALL)	(define-emit (CALL LABEL)	(println "	call "$1))
@@ -123,8 +116,9 @@
 
 ;;; 
 
-(define-function emit-main (body)
+(define-function emit-main (frame-size body)
   (let ((main   (LABEL "main")))
+    (emit TEXT)
     (emit GLOBAL main)
     (emit DEFLABEL main)
     (emit ENTER	24)
@@ -133,13 +127,15 @@
 
 ;;; 
 
-(define-structure <compiler> (arg-counter arg-limit temp-counter temps stubs asm))
+(define-structure <compiler> (env arg-counter arg-limit tmp-counter tmp-limit temps stubs asm))
 
-(define-function compiler ()
+(define-function compiler (env)
   (let ((self (new <compiler>)))
+    (set (<compiler>-env self) env)
     (set (<compiler>-arg-counter self) 0)
     (set (<compiler>-arg-limit self) 0)
-    (set (<compiler>-temp-counter self) 0)
+    (set (<compiler>-tmp-counter self) 0)
+    (set (<compiler>-tmp-limit self) 0)
     (set (<compiler>-asm self) (array))
     self))
 
@@ -155,7 +151,10 @@
   (set (<compiler>-arg-counter comp) 0))
 
 (define-function new-temp (comp)
-  (TI32 (post-incr (<compiler>-temp-counter comp) 4)))
+  (let* ((i (<compiler>-tmp-counter comp))
+	 (t (TI32 i)))
+    (set (<compiler>-tmp-counter comp) (+ i 4))
+    t))
 
 (define-function alloc-temp (comp)
   (or (pop (<compiler>-temps comp))
@@ -223,13 +222,13 @@
     (free-temp comp tmp)
     (gen comp op tmp)))
 
-(define operators	(list->array (list () () (list (cons '+ ADD)))))
+(define operators	(list->array `(() () ((+ ,ADD)))))
 (define generators	(list->array (list generate-nullary generate-unary generate-binary)))
 
 (define-method gen <pair> (comp)
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
-	 (op    (cdr (assq head (array-at operators arity)))))
+	 (op    (cadr (assq head (array-at operators arity)))))
     (if op
 	((array-at generators arity) op (cdr self) comp)
       (let ((tmps (map-with gen-tmp (cdr self) comp))
@@ -241,15 +240,27 @@
 	(free-args  comp args)
 	(gen comp CALL narg)))
     ))
-  
-(define-function gen-main (expr)
-  (let* ((comp (compiler)))
-    (gen expr comp)
-    (let ((arg-size (& -16 (+ 15 (<compiler>-arg-limit comp)))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
-	   (<compiler>-temps comp)))
-    (emit-main (<compiler>-asm comp))))
 
-(gen-main (list (extern 'printf) "%d\n" '(+ 3 4)))
+(define-function align (alignment value)	(& (- alignment) (+ (- alignment 1) value )))
+
+(define-function gen-main (env exprs)
+  (let* ((comp (compiler env)))
+    (list-do expr exprs (gen expr comp))
+    (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
+	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp)))))
+      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
+	   (<compiler>-temps comp))
+      (emit-main tmp-size (<compiler>-asm comp)))))
+
+(define env
+  `((printf . ,(extern 'printf))))
+
+(define printf (extern 'printf))
+
+(gen-main env
+ `((,printf "hello, world\n")
+   (,printf "%d\n" (+ 3 4))
+   (,printf "bye\n")
+   ))
 
 ; (EAX ADD (LI32:3 LOAD LI32:3) (LI32:3 LOAD LI32:4))
