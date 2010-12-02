@@ -12,5 +12,6 @@ debuggc : .force
 
 clean : .force
 	rm -f *~ *.o main eval
+	rm -rf *.dSYM
 
 .force :
