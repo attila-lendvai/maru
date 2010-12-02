@@ -193,6 +193,9 @@
 
 (define-selector gen)
 
+(define-method gen <undefined> (comp)
+  (gen comp LOAD (LI32 0)))
+
 (define-method gen <symbol> (comp)
   (let ((value (cdr (assq self (<compiler>-env comp)))))
     (or value (error "gen: undefined variable: " self))
@@ -296,7 +299,7 @@
     (gen (caddr expr) comp)
     (gen comp BR b)
     (gen comp DEFLABEL a)
-    (gen (cadddr expr) comp)
+    (list-do stmt (cdddr expr) (gen stmt comp))
     (gen comp DEFLABEL b)))
 
 (define forms		(list
@@ -405,7 +408,12 @@
   (list
     (cons 'printf	(extern 'printf))
     (cons 'fibs		(lambda (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2)))))))
-    (cons 'main		(lambda () (let ((a 3) (b 4)) (printf "%d\n" (+ a b)))))
+    (cons 'main		(lambda ()
+			  (let ((a 3) (b 4))
+			    (printf "%d\n" (+ a b)))
+			  (printf "%d %d %d %d %d\n" (if) (if  1) (if  1 2) (if  1 2 3) (if  1 2 3 4))
+			  (printf "%d %d %d %d %d\n" (if) (if ()) (if () 5) (if () 5 6) (if () 5 6 7))
+			  ))
 ;;  (cons 'main		(lambda ()
 ;; 			  (printf "%d\n" (fibs 33))
 ;; 			  (printf "%d\n" (fibs 33))
