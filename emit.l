@@ -277,6 +277,17 @@
       (emit LEAVE tmp-size))
     (gen ocomp LOAD (LI32 name))))
 
+(define-function gen-let-binding (binding comp)
+  (let ((name (car binding))
+	(temp (gen-tmp (cadr binding) comp)))
+    (set (<compiler>-env comp) (cons (cons name temp) (<compiler>-env comp)))
+    temp))
+
+(define-function gen-let (expr comp)
+  (let ((temps (map-with gen-let-binding (cadr expr) comp)))
+    (list-do stmt (cddr expr) (gen stmt comp))
+    (list-do temp temps (free-temp comp temp))))
+
 (define-function gen-if (expr comp)
   (let ((a (LABEL (temp-label-name)))
 	(b (LABEL (temp-label-name))))
@@ -288,7 +299,11 @@
     (gen (cadddr expr) comp)
     (gen comp DEFLABEL b)))
 
-(define forms		(list (cons 'lambda gen-lambda) (cons if gen-if)))
+(define forms		(list
+			  (cons 'lambda gen-lambda)
+			  (cons let gen-let)
+			  (cons if gen-if)
+			  ))
 
 (define-method gen <pair> (comp)
   (let* ((head  (car self))
@@ -377,12 +392,12 @@
       (array-do insn (<compiler>-asm comp) (apply emit insn))
       (emit LEAVE (- frm-size 8)))
     (or main
-	(let ()
-	  (gen ocomp DATA)
-	  (gen ocomp GLOBAL vnam)
-	  (gen ocomp DEFLABEL vnam)
-	  (gen ocomp LONG tnam)
-	  (gen ocomp TEXT)))))
+      (let ()
+	(gen ocomp DATA)
+	(gen ocomp GLOBAL vnam)
+	(gen ocomp DEFLABEL vnam)
+	(gen ocomp LONG tnam)
+	(gen ocomp TEXT)))))
 
 ;;; 
 
@@ -390,7 +405,19 @@
   (list
     (cons 'printf	(extern 'printf))
     (cons 'fibs		(lambda (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2)))))))
-    (cons 'main		(lambda () (printf "%d\n" (fibs 38))))
+    (cons 'main		(lambda () (let ((a 3) (b 4)) (printf "%d\n" (+ a b)))))
+;;  (cons 'main		(lambda ()
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  (printf "%d\n" (fibs 33))
+;; 			  ))
     ))
 
 (define-function gen-env (env)
