@@ -6,6 +6,8 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
+(define-function align (alignment value)	(& (- alignment) (+ (- alignment 1) value )))
+
 ;;; EXTERN
 
 (define-structure <extern> (name stub))
@@ -115,6 +117,9 @@
 (define-instruction BF)		(define-emit (BF LABEL)		(println "	cmpl $0,%eax")
 								(println "	je "$1))
 
+(define-instruction BT)		(define-emit (BT LABEL)		(println "	cmpl $0,%eax")
+								(println "	jne "$1))
+
 (define-instruction CALL)	(define-emit (CALL LABEL)	(println "	call "$1))
 				(define-emit (CALL long)	(println "	call *%eax"))
 
@@ -132,18 +137,7 @@
 
 ;;; 
 
-(define-function emit-main (frame-size body)
-  (let ((main   (LABEL "main")))
-    (emit TEXT)
-    (emit GLOBAL main)
-    (emit DEFLABEL main)
-    (emit ENTER	frame-size)
-    (array-do insn body (apply emit insn))
-    (emit LEAVE frame-size)))
-
-;;; 
-
-(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps stubs asm))
+(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm))
 
 (define-function compiler (env)
   (let ((self (new <compiler>)))
@@ -191,6 +185,8 @@
 (define-function free-temps (comp temps)
   (list-do temp temps (free-temp comp temp)))
 
+;;; GEN
+
 (define-selector gen)
 
 (define-method gen <undefined> (comp)
@@ -206,22 +202,6 @@
 	(gen comp LOAD (GI32 (LABEL self)))))))
 
 (define-method gen <long>   (comp)	(gen comp LOAD (LI32 self)))
-
-;; (define-function new-stub (comp name)
-;;   (let ((nlabel (LABEL                name        ))
-;; 	(slabel (LABEL (concat-symbol name '$stub))))
-;;     (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-;;     (gen comp DEFLABEL slabel)
-;;     (gen comp INDIRECT nlabel)
-;;     (gen comp LONG 0)
-;;     (gen comp TEXT)
-;;     (GI32 slabel)))
-
-;; (define-method gen <extern> (comp)
-;;   (let ((stub (or (<extern>-stub self)
-;; 		  (set (<extern>-stub self)
-;; 		       (new-stub comp (<extern>-name self))))))
-;;     (gen comp LOAD stub)))
 
 (define-method gen <string> (comp)
   (let ((label (LABEL (temp-label-name))))
@@ -261,24 +241,24 @@
 (define operators	(list->array `(() () ((,+ ,ADD) (,- ,SUB) (,< ,LESS)))))
 (define generators	(list->array (list generate-nullary generate-unary generate-binary)))
 
-(define-function gen-lambda (expr ocomp)
-  (let ((args (cadr expr))
-	(body (cddr expr))
-	(comp (compiler (<compiler>-env ocomp)))
-	(name (LABEL (temp-label-name))))
-    (list-do e body (cddr expr) (gen e comp))
-    (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
-	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp)))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
-	   (<compiler>-temps comp))
-      (emit TEXT)
-      (emit GLOBAL name)
-      (emit DEFLABEL name)
-      (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size))
-      (emit ENTER tmp-size)
-      (array-do insn (<compiler>-asm comp) (apply emit insn))
-      (emit LEAVE tmp-size))
-    (gen ocomp LOAD (LI32 name))))
+;; (define-function gen-lambda (expr ocomp)
+;;   (let ((args (cadr expr))
+;; 	(body (cddr expr))
+;; 	(comp (compiler (<compiler>-env ocomp)))
+;; 	(name (LABEL (temp-label-name))))
+;;     (list-do e body (cddr expr) (gen e comp))
+;;     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
+;; 	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp)))))
+;;       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
+;; 	   (<compiler>-temps comp))
+;;       (emit TEXT)
+;;       (emit GLOBAL name)
+;;       (emit DEFLABEL name)
+;;       (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size))
+;;       (emit ENTER tmp-size)
+;;       (array-do insn (<compiler>-asm comp) (apply emit insn))
+;;       (emit LEAVE tmp-size))
+;;     (gen ocomp LOAD (LI32 name))))
 
 (define-function gen-let-binding (binding comp)
   (let ((name (car binding))
@@ -302,10 +282,35 @@
     (list-do stmt (cdddr expr) (gen stmt comp))
     (gen comp DEFLABEL b)))
 
+(define-function gen-while (expr comp)
+  (let ((body (LABEL (temp-label-name)))
+	(test (LABEL (temp-label-name))))
+    (gen comp BR test)
+    (gen comp DEFLABEL body)
+    (list-do stmt (cddr expr) (gen stmt comp))
+    (gen comp DEFLABEL test)
+    (gen (cadr expr) comp)
+    (gen comp BT body)))
+
+(define-function gen-set (expr comp)
+  (let ((name (cadr  expr))
+	(valu (caddr expr)))
+    (gen valu comp)
+    (let ((var (cdr (assq name (<compiler>-env comp)))))
+      (or var (error "set: undefined variable: "name))
+      (gen comp STORE var))))
+
+(define-function gen-return (expr comp)
+  (list-do stmt (cdr expr) (gen stmt comp))
+  (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
+
 (define forms		(list
-			  (cons 'lambda gen-lambda)
-			  (cons let gen-let)
-			  (cons if gen-if)
+			  (cons  let gen-let)
+			  (cons  if gen-if)
+			  (cons  while gen-while)
+			  (cons  set gen-set)
+			  (cons 'return gen-return)
+			 ;(cons 'lambda gen-lambda)
 			  ))
 
 (define-method gen <pair> (comp)
@@ -326,18 +331,6 @@
 	  (free-args  comp args)
 	  (gen comp CALL narg)))
       )))
-
-(define-function align (alignment value)	(& (- alignment) (+ (- alignment 1) value )))
-
-(define-function gen-main (env exprs)
-  (let ((comp (compiler env)))
-    (list-do expr exprs (gen expr comp))
-    (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
-	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp)))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp))))
-	   (<compiler>-temps comp))
-      (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size))
-      (emit-main (align 16 (+ tmp-size 8)) (<compiler>-asm comp)))))
 
 ;;; GEN-DEFINITION
 
@@ -390,9 +383,11 @@
       (emit TEXT)
       (and main (emit GLOBAL tnam))
       (emit DEFLABEL tnam)
-      (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size))
+      (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
       (array-do insn (<compiler>-asm comp) (apply emit insn))
+      (and (<compiler>-epilogue comp)
+	   (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
     (or main
       (let ()
@@ -404,45 +399,26 @@
 
 ;;; 
 
-(define env
-  (list
-    (cons 'printf	(extern 'printf))
-    (cons 'fibs		(lambda (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2)))))))
-    (cons 'main		(lambda ()
-			  (let ((a 3) (b 4))
-			    (printf "%d\n" (+ a b)))
-			  (printf "%d %d %d %d %d\n" (if) (if  1) (if  1 2) (if  1 2 3) (if  1 2 3 4))
-			  (printf "%d %d %d %d %d\n" (if) (if ()) (if () 5) (if () 5 6) (if () 5 6 7))
-			  ))
-;;  (cons 'main		(lambda ()
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  (printf "%d\n" (fibs 33))
-;; 			  ))
-    ))
-
-(define-function gen-env (env)
+(define-function gen-env-to (env limit)
   (let ((comp (compiler env)))
-    (list-do defn env (gen-definition (cdr defn) (car defn) comp))
-    (array-do insn (<compiler>-asm comp) (apply emit insn))
-    ))
+    (while (not (= (caar env) limit))
+      (gen-definition (cdar env) (caar env) comp)
+      (set env (cdr env)))
+    (array-do insn (<compiler>-asm comp) (apply emit insn))))
 
-(gen-env env)
+(define-function compile-environment ()
+  (gen-env-to (cdr (current-environment)) 'compile-environment))
 
-(exit 0)
+;;; ----------------------------------------------------------------
 
-(gen-main env
- `((printf "hello, world\n")
-   (printf "%d\n" (+ 3 4))
-   (printf "bye\n")
-   (printf "%d %d %d\n" 21 ((lambda () 42)) 84)
-   ))
+(define printf	(extern 'printf))
 
-; (EAX ADD (LI32:3 LOAD LI32:3) (LI32:3 LOAD LI32:4))
+(define-function fibs (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2))))))
+
+(define-function main ()
+  (for (i 0 10) (printf "%d\n" i))
+  (printf "%d %d %d %d %d\n" (if) (if  1) (if  1 2) (if  1 2 3) (if  1 2 3 4))
+  (printf "%d %d %d %d %d\n" (if) (if ()) (if () 5) (if () 5 6) (if () 5 6 7))
+  (printf "%d\n" (fibs 5)))
+
+(compile-environment)

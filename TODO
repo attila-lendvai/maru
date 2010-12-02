@@ -1,6 +1,4 @@
-backtrace calls %backtrace via apply, passing traceArray.
-
-implement N-way dispatch via nested arrays.
+split <ptr> type from <long>.
 
 port streams.
 
