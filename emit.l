@@ -271,6 +271,22 @@
     (list-do stmt (cddr expr) (gen stmt comp))
     (list-do temp temps (free-temp comp temp))))
 
+(define-function gen-and (expr comp)
+  (let ((done (LABEL (temp-label-name))))
+    (set expr (cdr expr))
+    (while expr
+      (gen (car expr) comp)
+      (and (set expr (cdr expr)) (gen comp BF done)))
+    (gen comp DEFLABEL done)))
+
+(define-function gen-or (expr comp)
+  (let ((done (LABEL (temp-label-name))))
+    (set expr (cdr expr))
+    (while expr
+      (gen (car expr) comp)
+      (and (set expr (cdr expr)) (gen comp BT done)))
+    (gen comp DEFLABEL done)))
+
 (define-function gen-if (expr comp)
   (let ((a (LABEL (temp-label-name)))
 	(b (LABEL (temp-label-name))))
@@ -304,14 +320,23 @@
   (list-do stmt (cdr expr) (gen stmt comp))
   (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
 
-(define forms		(list
-			  (cons  let gen-let)
-			  (cons  if gen-if)
-			  (cons  while gen-while)
-			  (cons  set gen-set)
-			  (cons 'return gen-return)
-			 ;(cons 'lambda gen-lambda)
-			  ))
+(define-function gen-quote  (expr comp)	(error "quoted object in compiled code: " expr))
+(define-function gen-define (expr comp)	(error "definition in compiled code: " expr))
+(define-function gen-lambda (expr comp)	(error "unevaluated lambda in compiled code: " expr))
+
+(define forms
+  (list
+   (cons  let	 gen-let)
+   (cons  and	 gen-and)
+   (cons  or	 gen-or)
+   (cons  if	 gen-if)
+   (cons  while	 gen-while)
+   (cons  set	 gen-set)
+   (cons 'return gen-return)
+   (cons  quote	 gen-quote)
+   (cons  define gen-define)
+   (cons 'lambda gen-lambda)
+   ))
 
 (define-method gen <pair> (comp)
   (let* ((head  (car self))
@@ -419,6 +444,9 @@
   (for (i 0 10) (printf "%d\n" i))
   (printf "%d %d %d %d %d\n" (if) (if  1) (if  1 2) (if  1 2 3) (if  1 2 3 4))
   (printf "%d %d %d %d %d\n" (if) (if ()) (if () 5) (if () 5 6) (if () 5 6 7))
-  (printf "%d\n" (fibs 5)))
+  (printf "%d\n" (fibs 5))
+  (printf "%d\n" (or  1 2 3))
+  (printf "%d\n" (and 1 2 3))
+  )
 
 (compile-environment)
