@@ -391,6 +391,9 @@
     (set (<compiler>-env comp) (cons (cons name param) (<compiler>-env comp)))
     param))
 
+(define-method gen-definition <form> (name comp)
+  (gen comp COMMENT (list "no code generated for form: "name)))
+
 (define-method gen-definition <expr> (name ocomp)
   (let* ((main (= 'main name))
 	 (defn (<expr>-defn self))
@@ -439,6 +442,8 @@
 (define printf	(extern 'printf))
 
 (define-function fibs (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2))))))
+
+(define-form foo ())
 
 (define-function main ()
   (for (i 0 10) (printf "%d\n" i))
