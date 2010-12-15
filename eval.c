@@ -217,9 +217,10 @@ static oop intern(char *cstr)
 
 #include "chartab.h"
 
-static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT  & chartab[c]); }
-static int isDigit(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT  & chartab[c]); }
-static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER & chartab[c]); }
+static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT    & chartab[c]); }
+static int isDigit10(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT10  & chartab[c]); }
+static int isDigit16(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c]); }
+static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c]); }
 
 static oop read(FILE *fp);
 
@@ -398,7 +399,12 @@ static oop read(FILE *fp)
 	do {
 	  buffer_append(&buf, c);
 	  c= getc(fp);
-	} while (isDigit(c));
+	} while (isDigit10(c));
+	if (('x' == c) && (1 == buf.position))
+	  do {
+	    buffer_append(&buf, c);
+	    c= getc(fp);
+	  } while (isDigit16(c));
 	ungetc(c, fp);
 	oop obj= newLong(strtoul(buffer_contents(&buf), 0, 0));
 	//buffer_free(&buf);
@@ -410,14 +416,14 @@ static oop read(FILE *fp)
       case '-': {
 	int d= getc(fp);
 	ungetc(d, fp);
-	if (isDigit(d)) goto doDigits;
+	if (isDigit10(d)) goto doDigits;
 	/* fall through... */
       }
       default: {
 	if (isLetter(c)) {
 	  static struct buffer buf= BUFFER_INITIALISER;
 	  buffer_reset(&buf);
-	  while (isLetter(c) || isDigit(c)) {
+	  while (isLetter(c) || isDigit10(c)) {
 	    buffer_append(&buf, c);
 	    c= getc(fp);
 	  }
@@ -556,14 +562,18 @@ static oop assq(oop key, oop alist)
 
 static oop define(oop name, oop value, oop env)
 {
-  oop ass= assq(name, env);
+  oop ass;
+#if 0
+  ass= assq(name, env);
   if (nil != ass)
     setTail(ass, value);
-  else {
-    ass= newPair(name, value);			GC_PROTECT(ass);
-    oop ent= newPair(ass, getTail(env));	GC_UNPROTECT(ass);
-    setTail(env, ent);
-  }
+  else
+#endif
+    {
+      ass= newPair(name, value);		GC_PROTECT(ass);
+      oop ent= newPair(ass, getTail(env));	GC_UNPROTECT(ass);
+      setTail(env, ent);
+    }
   return ass;
 }
 
@@ -1515,7 +1525,10 @@ int main(int argc, char **argv)
     if 	    (!strcmp(*argv, "-v"))	++opt_v;
     else if (!strcmp(*argv, "-b"))	++opt_b;
     else {
-      if (!opt_b) replPath("boot.l");
+      if (!opt_b) {
+	replPath("boot.l");
+	opt_b= 1;
+      }
       replPath(*argv);
       repled= 1;
     }
