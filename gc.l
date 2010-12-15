@@ -15,6 +15,8 @@
 (define-form size-of-structure (type)	(* 4 (array-at %structure-sizes (eval type))))
 
 (define-form <header>-flags-used ()	1)
+(define-form <header>-flags-atom ()	2)
+(define-form <header>-flags-mark ()	4)	(define-form <header>-flags-mark-mask ()	-5)
 
 (define-function max (a b)	(if (> a b) a b))
 
@@ -66,23 +68,33 @@
 	    (memset obj 0 size)
 	    obj)))))
 
+(define gc_root 0)
+
+(define-function gc_sweep (obj)
+  (printf "SWEEP\n")
+  (let ((ptr gc_memory_base))
+    (while ptr
+      (set (<header>-flags ptr) (& (<header>-flags ptr) (<header>-flags-mark-mask)))
+      (if (= gc_memory_base (set ptr (<header>-next ptr)))
+	  (set ptr 0)))))
+
+(define-function gc_mark_and_trace (obj)
+  (and obj
+       (let* ((ptr   (- obj (size-of-structure <header>)))
+	      (flags (<header>-flags ptr)))
+	 (or (& flags (<header>-flags-mark))
+	     (let ((size (>> (<header>-size ptr) 2)))
+	       (printf "mark %p %d\n" ptr size)
+	       (while size
+		 (set size (- size 1))
+		 (printf "@%d %p\n" size (oop-at obj size))
+		 (gc_mark_and_trace (oop-at obj size)))
+	       (set (<header>-flags ptr) (| flags (<header>-flags-mark))))))))
+
 (define-function gc_gcollect ()
-  (let ((ptr gc_memory_base))
-    (while ptr
-      (gc_mark_and_trace ptr)
-      (set ptr (<header>-next ptr))
-      (if (= gc_memory_base ptr) (set ptr 0))))
-  (let ((ptr gc_memory_base))
-    (while ptr
-      (if (= 0 (& (<header>-flags ptr) (<header>-flags-mark)))
-	  (gc_free ptr)
-	    
-	    (while (and (= 0 (& (<header>-flags ptr) (<header>-flags-mark)))
-      (gc_mark_and_trace ptr)
-      (set ptr (<header>-next ptr))
-      (if (= gc_memory_base ptr) (set ptr 0))))
-  
-  (printf "GC\n"))
+  (printf "GC\n")
+  (gc_mark_and_trace gc_root)
+  (gc_sweep))
 
 (define-function gc_malloc (size)
   (set size (& -4 (+ 3 size)))
@@ -104,7 +116,7 @@
   (printf "%x\n" (<header>-size  gc_memory_base))
   (printf "%x\n" (<header>-flags gc_memory_base))
   (printf "%p\n" (<header>-next  gc_memory_base))
-  (printf "%p\n" (gc_malloc 8))
+  (printf "%p\n" (set gc_root (gc_malloc 8)))
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
