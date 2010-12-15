@@ -1,5 +1,7 @@
 ;;; ----------------------------------------------------------------
 
+(compile-begin)
+
 (define printf	(extern 'printf))
 
 (define-function fibs (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2))))))
@@ -13,6 +15,7 @@
   (printf "%d\n" (fibs 5))
   (printf "%d\n" (or  1 2 3))
   (printf "%d\n" (and 1 2 3))
+  0
   )
 
-(compile-environment)
+(compile-end)
