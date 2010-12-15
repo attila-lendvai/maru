@@ -1,7 +1,8 @@
 #!./eval
 
-(define __MACH__ ())
-(define __PREFIX__ "")
+(define __MACH__ 't)
+
+(define __PREFIX__ (if __MACH__ "_" ""))
 
 (define-function array-append (array element)
   (set-array-at array (array-length array) element))
