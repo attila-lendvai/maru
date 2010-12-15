@@ -1,5 +1,8 @@
 #!./eval
 
+(define __MACH__ ())
+(define __PREFIX__ "")
+
 (define-function array-append (array element)
   (set-array-at array (array-length array) element))
 
@@ -76,7 +79,7 @@
   (define-function temp-label-name ()
     (concat-string "_L_" (long->string (set counter (+ counter 1))))))
 
-(define-operand LABEL (name) 	"_"(<LABEL>-name self))
+(define-operand LABEL (name) 	__PREFIX__(<LABEL>-name self))
 (define-operand GI32 (name)	(<GI32>-name self))
 (define-operand LI32 (value)	(<LI32>-value self))
 (define-operand TI32 (offset)	(<TI32>-offset self)"(%esp)")
@@ -112,6 +115,8 @@
 
 (define-instruction AND)	(define-emit (AND TI32)		(println "	andl "$1",%eax"))
 
+(define-instruction OR)		(define-emit (OR TI32)		(println "	orl "$1",%eax"))
+
 (define-instruction NOT)	(define-emit (NOT)		(println "	cmpl $0,%eax")
 								(println "	sete %al")
 								(println "	movzbl %al,%eax"))
@@ -131,6 +136,9 @@
 (define-instruction GREATER)	(define-emit (GREATER TI32)	(println "	cmpl "$1",%eax")
 								(println "	setg %al")
 								(println "	movzbl %al,%eax"))
+
+(define-instruction SHR)	(define-emit (SHR TI32)		(println "	movl "$1",%ecx")
+								(println "	shrl %cl,%eax"))
 
 (define-instruction BR)		(define-emit (BR LABEL)		(println "	jmp "$1))
 
@@ -154,7 +162,7 @@
 (define-instruction MOVE)	(define-emit (MOVE TI32 TI32)	(println "	movl "$1",%ecx")
 								(println "	movl %ecx,"$2))
 
-(define-instruction COMMENT)	(define-emit (COMMENT pair)	(print "# ") (apply println $1))
+(define-instruction COMMENT)	(define-emit (COMMENT pair)	(print "## ") (apply println $1))
 
 (define-instruction OOP-AT)	(define-emit (OOP-AT TI32)	(println "	movl "$1",%ecx")
 								(println "	leal (%eax,%ecx,4),%ecx")
@@ -285,8 +293,9 @@
    `(()
      ((,not ,NOT))
      ((,+ ,ADD) (,- ,SUB)
-      (,& ,AND)
+      (,& ,AND) (,| ,OR)
       (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,> ,GREATER)
+      (,>> ,SHR)
       (,oop-at ,OOP-AT))
      ((,set-oop-at ,SET-OOP-AT))
      )))
@@ -433,11 +442,17 @@
 (define-method gen-definition <extern> (name comp)
   (let ((nlabel (LABEL                name        ))
 	(slabel (LABEL (concat-symbol name '$stub))))
-    (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-    (gen comp DEFLABEL slabel)
-    (gen comp INDIRECT nlabel)
-    (gen comp LONG 0)
-    (gen comp TEXT)))
+    (if __MACH__
+	(let ()
+	  (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
+	  (gen comp DEFLABEL slabel)
+	  (gen comp INDIRECT nlabel)
+	  (gen comp LONG 0)
+	  (gen comp TEXT))
+      (gen comp DATA)
+      (gen comp DEFLABEL slabel)
+      (gen comp LONG nlabel)
+      (gen comp TEXT))))
 
 (define-function gen-param (name comp)
   (let ((param (new-param comp)))
