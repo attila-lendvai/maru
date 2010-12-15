@@ -7,16 +7,22 @@
 (define memset	(extern 'memset))
 (define printf	(extern 'printf))
 
-(define gc_quantum 2048)
+(define gc_quantum	2048)
+(define gc_frequency	8)
+
+(define gc_root 0)
 
 (define gc_memory_base 0)
 (define gc_memory_last 0)
+(define gc_alloc_count 0)
 
 (define-form size-of-structure (type)	(* 4 (array-at %structure-sizes (eval type))))
 
 (define-form <header>-flags-used ()	1)
 (define-form <header>-flags-atom ()	2)
 (define-form <header>-flags-mark ()	4)	(define-form <header>-flags-mark-mask ()	-5)
+
+(define-form <header>-flags-used+atom ()	(+ (<header>-flags-used) (<header>-flags-atom)))
 
 (define-function max (a b)	(if (> a b) a b))
 
@@ -75,9 +81,8 @@
 	  ;;(printf "ALLOC CHUNK %p\n" chunk)
 	  (let ((obj (+ chunk (size-of-structure <header>))))
 	    (memset obj 0 size)
+	    (set gc_alloc_count (+ gc_alloc_count 1))
 	    obj)))))
-
-(define gc_root 0)
 
 (define-function gc_sweep (obj)
   ;;(printf "SWEEP\n")
@@ -106,7 +111,7 @@
 	  (set (<header>-flags ptr) 0)))
       (and (= gc_memory_base (set ptr (<header>-next ptr)))
 	   (set ptr 0)))
-    (printf "%d used, %d free\n" nused nfree)
+    (printf "%d used, %d free, %d allocations\n" nused nfree gc_alloc_count)
     (and (< nfree nused)
 	 (gc_grow_memory gc_quantum))
     ))
@@ -127,18 +132,13 @@
 (define-function gc_gcollect ()
   (printf "GC\n")
   (gc_mark_and_trace gc_root)
-  (gc_sweep))
+  (gc_sweep)
+  (set gc_alloc_count 0))
 
 (define-function gc_malloc (size)
-  ;; CHECK FOR --NALLOCS HERE
-  ;; IF ZERO, FORCE A GC
   (set size (& -4 (+ 3 size)))
+  (and (= gc_alloc_count gc_frequency) (gc_gcollect))
   (or (gc_malloc_chunk size)
-      (let ()
-	(gc_gcollect)
-	;; CHECK FOR ALLOCS BETWEEN GCS HERE
-	;; IF NON-ZERO THEN GROW MEMORY
-	(gc_malloc_chunk size))
       (let ()
 	(gc_grow_memory (max (+ (size-of-structure <header>) size) gc_quantum))
 	(gc_malloc_chunk size))
@@ -146,7 +146,12 @@
 	(printf "internal error: failed to allocate object after growing memory\n")
 	(exit 1))))
 
-(define-function main ()
+(define-function gc_malloc_atomic (size)
+  (let* ((obj (gc_malloc size)))
+    (set (<header>-flags (- obj (size-of-structure <header>))) (<header>-flags-used+atom))
+    obj))
+
+(define-function main (argc argv)
   (init_memory gc_quantum)
   (printf "%p\n" gc_memory_base)
   (printf "%x\n" (<header>-size  gc_memory_base))
@@ -156,22 +161,10 @@
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
-  (printf "%p\n" (gc_malloc 1012))
+  (let ((i 10000))
+    (while (< i 1000)
+      (printf "%p\n" (gc_malloc 1012))
+      (set i (+ i 1))))
   0
   )
 
