@@ -158,6 +158,8 @@
 (define-form <expr>-defn	(expr) `(oop-at ,expr 0))
 (define-form <expr>-env		(expr) `(oop-at ,expr 1))
 
+(define-function name-of-type (type)	(array-at %type-names type))
+
 ;;; let*
 
 (define-function %let* (bindings body)
@@ -229,7 +231,7 @@
 (define-form define-selector (name . default)
   (or default (set default `(args (error "cannot apply selector "',name
 					 " to "(array-at %type-names (type-of (car args)))
-					 ": "args))))
+					 ": "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
   `(define ,name (selector ',name (lambda ,@default))))
 
 (define-selector add-method)
@@ -338,14 +340,16 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
-  (let ((methods (or (<generic>-methods mm)
-		     (set (<generic>-methods mm) (array 32)))))
-    (while (cdr types)
-      (let ((type (eval (car types))))
-	(set methods (or (array-at methods type)
-			 (set (array-at methods type) (array 32)))))
-      (set types (cdr types)))
-    (set (array-at methods (eval (car types))) method)))
+  (if types
+      (let ((methods (or (<generic>-methods mm)
+			 (set (<generic>-methods mm) (array 32)))))
+	(while (cdr types)
+	  (let ((type (eval (car types))))
+	    (set methods (or (array-at methods type)
+			     (set (array-at methods type) (array 32)))))
+	  (set types (cdr types)))
+	(set (array-at methods (eval (car types))) method))
+    (set (<generic>-methods mm) method)))
 
 (define-form define-multimethod (method typed-args . body)
   (let ((args  (map cadr typed-args))
