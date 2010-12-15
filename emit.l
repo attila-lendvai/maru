@@ -107,13 +107,33 @@
 				  (println "	ret"))
 
 (define-instruction ADD)	(define-emit (ADD TI32)		(println "	addl "$1",%eax"))
+
 (define-instruction SUB)	(define-emit (SUB TI32)		(println "	subl "$1",%eax"))
+
+(define-instruction AND)	(define-emit (AND TI32)		(println "	andl "$1",%eax"))
+
+(define-instruction NOT)	(define-emit (NOT)		(println "	cmpl $0,%eax")
+								(println "	sete %al")
+								(println "	movzbl %al,%eax"))
 
 (define-instruction LESS)	(define-emit (LESS TI32)	(println "	cmpl "$1",%eax")
 								(println "	setl %al")
 								(println "	movzbl %al,%eax"))
 
+(define-instruction LESSEQ)	(define-emit (LESSEQ TI32)	(println "	cmpl "$1",%eax")
+								(println "	setle %al")
+								(println "	movzbl %al,%eax"))
+
+(define-instruction EQUAL)	(define-emit (EQUAL TI32)	(println "	cmpl "$1",%eax")
+								(println "	sete %al")
+								(println "	movzbl %al,%eax"))
+
+(define-instruction GREATER)	(define-emit (GREATER TI32)	(println "	cmpl "$1",%eax")
+								(println "	setg %al")
+								(println "	movzbl %al,%eax"))
+
 (define-instruction BR)		(define-emit (BR LABEL)		(println "	jmp "$1))
+
 (define-instruction BF)		(define-emit (BF LABEL)		(println "	cmpl $0,%eax")
 								(println "	je "$1))
 
@@ -129,11 +149,21 @@
 				(define-emit (LOAD TI32)	(println "	movl " $1",%eax"))
 
 (define-instruction STORE)	(define-emit (STORE TI32)	(println "	movl %eax,"$1))
+				(define-emit (STORE GI32)	(println "	movl %eax,"$1))
 
 (define-instruction MOVE)	(define-emit (MOVE TI32 TI32)	(println "	movl "$1",%ecx")
 								(println "	movl %ecx,"$2))
 
 (define-instruction COMMENT)	(define-emit (COMMENT pair)	(print "# ") (apply println $1))
+
+(define-instruction OOP-AT)	(define-emit (OOP-AT TI32)	(println "	movl "$1",%ecx")
+								(println "	leal (%eax,%ecx,4),%ecx")
+								(println "	movl (%ecx),%eax"))
+
+(define-instruction SET-OOP-AT)	(define-emit (SET-OOP-AT TI32 TI32)	(println "	movl "$1",%ecx")
+									(println "	leal (%eax,%ecx,4),%ecx")
+									(println "	movl "$2",%eax")
+									(println "	movl %eax,(%ecx)"))
 
 ;;; 
 
@@ -212,6 +242,7 @@
     (gen comp LOAD label)))
 
 (define-method gen <compiler> args
+  ;;(println "# insn " args)
   (array-append (<compiler>-asm self) args))
 
 (define-function gen-tmp (expr comp)
@@ -230,7 +261,8 @@
   (error "no generate-nullary implementation"))
 
 (define-function generate-unary (op args comp)
-  (error "no generate-unary implementation"))
+  (gen (car args) comp)
+  (gen comp op))
 
 (define-function generate-binary (op args comp)
   (let ((tmp (gen-tmp (cadr args) comp)))
@@ -238,8 +270,26 @@
     (free-temp comp tmp)
     (gen comp op tmp)))
 
-(define operators	(list->array `(() () ((,+ ,ADD) (,- ,SUB) (,< ,LESS)))))
-(define generators	(list->array (list generate-nullary generate-unary generate-binary)))
+(define-function generate-tertiary (op args comp)
+  (let ((tmp2 (gen-tmp (caddr args) comp))
+	(tmp1 (gen-tmp (cadr  args) comp)))
+    (gen (car  args) comp)
+    (free-temp comp tmp1)
+    (free-temp comp tmp2)
+    (gen comp op tmp1 tmp2)))
+
+(define generators (list->array (list generate-nullary generate-unary generate-binary generate-tertiary)))
+
+(define operators
+  (list->array
+   `(()
+     ((,not ,NOT))
+     ((,+ ,ADD) (,- ,SUB)
+      (,& ,AND)
+      (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,> ,GREATER)
+      (,oop-at ,OOP-AT))
+     ((,set-oop-at ,SET-OOP-AT))
+     )))
 
 ;; (define-function gen-lambda (expr ocomp)
 ;;   (let ((args (cadr expr))
@@ -314,7 +364,9 @@
     (gen valu comp)
     (let ((var (cdr (assq name (<compiler>-env comp)))))
       (or var (error "set: undefined variable: "name))
-      (gen comp STORE var))))
+      (if (temp? var)
+	  (gen comp STORE var)
+	(gen comp STORE (GI32 (LABEL name)))))))
 
 (define-function gen-return (expr comp)
   (list-do stmt (cdr expr) (gen stmt comp))
@@ -339,6 +391,7 @@
    ))
 
 (define-method gen <pair> (comp)
+  ;;(println "GEN "self)
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
 	 (op    (cadr (assq head (array-at operators arity)))))
@@ -392,7 +445,7 @@
     param))
 
 (define-method gen-definition <form> (name comp)
-  (gen comp COMMENT (list "no code generated for form: "name)))
+  (gen comp COMMENT (list "form "name)))
 
 (define-method gen-definition <expr> (name ocomp)
   (let* ((main (= 'main name))
@@ -411,7 +464,7 @@
       (emit TEXT)
       (and main (emit GLOBAL tnam))
       (emit DEFLABEL tnam)
-      (emit COMMENT (list arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
+      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
       (array-do insn (<compiler>-asm comp) (apply emit insn))
       (and (<compiler>-epilogue comp)
@@ -430,28 +483,12 @@
 (define-function gen-env-to (env limit)
   (let ((comp (compiler env)))
     (while (not (= (caar env) limit))
+      (println "# defn " (caar env))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
     (array-do insn (<compiler>-asm comp) (apply emit insn))))
 
-(define-function compile-environment ()
-  (gen-env-to (cdr (current-environment)) 'compile-environment))
+(define-form compile-begin () `(define compile-environment-marker ()))
 
-;;; ----------------------------------------------------------------
-
-(define printf	(extern 'printf))
-
-(define-function fibs (n) (if (< n 2) 1 (+ 1 (+ (fibs (- n 1)) (fibs (- n 2))))))
-
-(define-form foo ())
-
-(define-function main ()
-  (for (i 0 10) (printf "%d\n" i))
-  (printf "%d %d %d %d %d\n" (if) (if  1) (if  1 2) (if  1 2 3) (if  1 2 3 4))
-  (printf "%d %d %d %d %d\n" (if) (if ()) (if () 5) (if () 5 6) (if () 5 6 7))
-  (printf "%d\n" (fibs 5))
-  (printf "%d\n" (or  1 2 3))
-  (printf "%d\n" (and 1 2 3))
-  )
-
-(compile-environment)
+(define-function compile-end ()
+  (gen-env-to (cdr (current-environment)) 'compile-environment-marker))
