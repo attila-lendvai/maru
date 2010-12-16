@@ -48,7 +48,7 @@
   (lambda (x y)
     (let ((a (string-length x))
 	  (b (string-length y)))
-      (let ((s (string (+ 1 (+ a b))))
+      (let ((s (string (+ a b)))
 	    (i 0)
 	    (j 0))
 	(while (< i a)
