@@ -1,6 +1,6 @@
 #!./eval
 
-(define __MACH__ ())
+(define __MACH__ 't)
 
 (define __PREFIX__ (if __MACH__ "_" ""))
 
@@ -89,13 +89,14 @@
 	(cond
 	  ((or (and (<= 0x61 c) (<= c 0x7a))
 	       (and (<= 0x41 c) (<= c 0x5a))
-	       (and (<= 0x30 c) (<= c 0x39)))
-	   (array-append mangled c))
-	  (else
-	   (let ()
-	     (array-append mangled 0x5f)
-	     (array-append mangled (digit-for (>> c  4)))
-	     (array-append mangled (digit-for (&  c 15)))))))
+	       (and (<= 0x30 c) (<= c 0x39)))	(array-append mangled c))
+	  ((= ?_ c)				(let ()
+						  (array-append mangled c)
+						  (array-append mangled c)))
+	  (else					(let ()
+						  (array-append mangled 0x5f)
+						  (array-append mangled (digit-for (>> c  4)))
+						  (array-append mangled (digit-for (&  c 15)))))))
       (set index (+ 1 index)))
     (array->string mangled)))
       
@@ -204,12 +205,13 @@
 
 (define-instruction CHR-AT)	(define-emit (CHR-AT TI32)	(println "	movl "$1",%ecx")
 								(println "	leal (%eax,%ecx),%ecx")
-								(println "	movl (%ecx),%eax"))
+								(println "	xorl %eax,%eax")
+								(println "	movb (%ecx),%al"))
 
 (define-instruction SET-CHR-AT)	(define-emit (SET-CHR-AT TI32 TI32)	(println "	movl "$1",%ecx")
 									(println "	leal (%eax,%ecx),%ecx")
 									(println "	movl "$2",%eax")
-									(println "	movl %eax,(%ecx)"))
+									(println "	movb %al,(%ecx)"))
 
 (define-instruction OOP-AT)	(define-emit (OOP-AT TI32)	(println "	movl "$1",%ecx")
 								(println "	leal (%eax,%ecx,4),%ecx")
@@ -381,9 +383,11 @@
     temp))
 
 (define-function gen-let (expr comp)
-  (let ((temps (map-with gen-let-binding (cadr expr) comp)))
+  (let ((outer (<compiler>-env comp))
+	(temps (map-with gen-let-binding (cadr expr) comp)))
     (list-do stmt (cddr expr) (gen stmt comp))
-    (list-do temp temps (free-temp comp temp))))
+    (list-do temp temps (free-temp comp temp))
+    (set (<compiler>-env comp) outer)))
 
 (define-function gen-and (expr comp)
   (let ((done (LABEL (temp-label-name))))
