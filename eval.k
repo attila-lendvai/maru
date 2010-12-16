@@ -361,14 +361,24 @@
 			    (set result (+ (* 10 result) (- c 48))))
 			  (ungetc c stream)
 			  (return (new-<long> result))))
+	((= 0x3b c)	
+      case ';': {
+	for (;;) {
+	  c= getc(fp);
+	  if ('\n' == c || '\r' == c || EOF == c) break;
+	}
+	continue;
+      }
+
 	((< c 0)	(return EOF))
 	(else		(fatal1 "illegal character: %c" c))))))
 
 (define-function k_print (obj)
-  (printf "#%p\n" obj)
+  (debug (printf "{%p}" obj))
   (let ((type (get-type obj)))
     (cond
       ((= type <undefined>)	(printf "nil"))
+      ((= type <long>)		(printf "%d" (get <long> _bits obj)))
       ((= type <symbol>)	(printf "%s" (get <symbol> _bits obj)))
       (else			(printf "<type:%d>" type)))))
 

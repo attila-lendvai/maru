@@ -1,6 +1,6 @@
 #!./eval
 
-(define __MACH__ 't)
+(define __MACH__ ())
 
 (define __PREFIX__ (if __MACH__ "_" ""))
 
@@ -89,12 +89,11 @@
 	(cond
 	  ((or (and (<= 0x61 c) (<= c 0x7a))
 	       (and (<= 0x41 c) (<= c 0x5a))
-	       (and (<= 0x30 c) (<= c 0x39))
-	       ( = 0x5f c))
+	       (and (<= 0x30 c) (<= c 0x39)))
 	   (array-append mangled c))
 	  (else
 	   (let ()
-	     (array-append mangled 0x24)
+	     (array-append mangled 0x5f)
 	     (array-append mangled (digit-for (>> c  4)))
 	     (array-append mangled (digit-for (&  c 15)))))))
       (set index (+ 1 index)))
