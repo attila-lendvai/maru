@@ -1,20 +1,42 @@
 (define-structure <header> (size flags next))
 
+(define-function make-gc-protectors (vars)
+  (map (lambda (v) (list 'gc_push_root (list 'address-of (car vars))))
+       vars))
+
+(define-function make-gc-unprotectors (vars)
+  (let ((result ()))
+    (while (pair? vars)
+      (set result (cons (list 'gc_pop_root (list 'address-of (car vars))) result))
+      (set vars (cdr vars)))
+    result))
+
+(define-form gc-protect (vars . prog)
+  `(let ()
+     ,@(make-gc-protectors vars)
+     (let ((__answer__ ,@prog))
+       ,@(make-gc-unprotectors vars)
+       __answer__)))
+
 (compile-begin)
+
+(define gc_quantum	65504)
+(define gc_frequency	32768)
 
 (define exit	(extern 'exit))
 (define malloc	(extern 'malloc))
+(define free	(extern 'free))
 (define memset	(extern 'memset))
+(define memcpy	(extern 'memcpy))
 (define printf	(extern 'printf))
 
-(define gc_quantum	2048)
-(define gc_frequency	8)
+(define gc_roots	0)
+(define gc_root_count	0)
+(define gc_root_max	0)
 
-(define gc_root 0)
-
-(define gc_memory_base 0)
-(define gc_memory_last 0)
-(define gc_alloc_count 0)
+(define gc_memory_base	0)
+(define gc_memory_last	0)
+(define gc_alloc_count	0)
 
 (define-form size-of-structure (type)	(* 4 (array-at %structure-sizes (eval type))))
 
@@ -26,22 +48,39 @@
 
 (define-function max (a b)	(if (> a b) a b))
 
+(define-function fatal (reason)
+  (printf "\n%s\n" reason)
+  (exit 1))
+
 (define-function new_memory_block (size)
   (let ((ptr (malloc size)))
-    (or ptr
-	(let ()
-	  (printf "out of memory\n")
-	  (exit 1)))
+    (or ptr (fatal "out of memory"))
     (set (<header>-size  ptr) (- size (size-of-structure <header>)))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
-    (printf "BRK %p %d\n" ptr size)
+    (printf "BRK %p %d %d/%d\n" ptr size gc_alloc_count gc_frequency)
     ptr))
 
-(define-function init_memory (size)
-  (let ((ptr (new_memory_block size)))
+(define-function gc_initialise ()
+  (let ((ptr (new_memory_block gc_quantum)))
     (set gc_memory_base ptr)
     (set gc_memory_last ptr)))
+
+(define-function gc_push_root (ptr)
+  (and (= gc_root_count gc_root_max)
+       (let ((roots (malloc (* 4 (set gc_root_max (* 2 gc_root_max))))))
+	 (memcpy roots gc_roots (* 4 gc_root_count))
+	 (and gc_roots (free gc_roots))
+	 (set gc_roots roots)))
+  (set-oop-at gc_roots gc_root_count ptr)
+  ;;(printf "gc add root %d at %p\n" gc_root_count ptr)
+  (set gc_root_count (+ 1 gc_root_count)))
+
+(define-function gc_pop_root (ptr)
+  (or gc_root_count (fatal "root table underflow"))
+  (set gc_root_count (- gc_root_count 1))
+  ;;(printf "gc del root %d at %p\n" gc_root_count ptr)
+  (or (= ptr (oop-at gc_roots gc_root_count)) (fatal "non-lifo root")))
 
 (define-function gc_grow_memory (size)
   (let ((brk (new_memory_block size)))
@@ -117,7 +156,9 @@
     ))
 
 (define-function gc_mark_and_trace (obj)
+  ;;(printf "mark and trace %p\n" obj)
   (and obj
+       (not (& obj 1))
        (let* ((ptr   (- obj (size-of-structure <header>)))
 	      (flags (<header>-flags ptr)))
 	 (or (& flags (<header>-flags-mark))
@@ -130,8 +171,11 @@
 	       (set (<header>-flags ptr) (| flags (<header>-flags-mark))))))))
 
 (define-function gc_gcollect ()
-  (printf "GC\n")
-  (gc_mark_and_trace gc_root)
+  (let ((i 0))
+    (while (< i gc_root_count)
+      ;;(let ((ptr (oop-at gc_roots i))) (printf "mark gc root at %p -> %p\n" ptr (oop-at ptr 0)))
+      (gc_mark_and_trace (oop-at (oop-at gc_roots i) 0))
+      (set i (+ 1 i))))
   (gc_sweep)
   (set gc_alloc_count 0))
 
@@ -142,29 +186,55 @@
       (let ()
 	(gc_grow_memory (max (+ (size-of-structure <header>) size) gc_quantum))
 	(gc_malloc_chunk size))
-      (let ()
-	(printf "internal error: failed to allocate object after growing memory\n")
-	(exit 1))))
+      (fatal "internal error: failed to allocate object after growing memory")))
 
 (define-function gc_malloc_atomic (size)
   (let* ((obj (gc_malloc size)))
     (set (<header>-flags (- obj (size-of-structure <header>))) (<header>-flags-used+atom))
     obj))
 
+(define-function make_pair (head tail)
+  (let ((cell (gc_malloc 8)))
+    (set-oop-at cell 0 head)
+    (set-oop-at cell 1 tail)
+    ;;(printf "pair %p (%p %p) (%p %p)\n" cell head tail (oop-at cell 0) (oop-at cell 1))
+    cell))
+
+(define-function make_list (size)
+  (if size
+      (let ((list (make_list (- size 1))))
+	(gc_push_root (address-of list))
+	(set list (make_pair (| 1 (<< size 1)) list))
+	(gc_pop_root (address-of list))
+	list)))
+
+(define-function print_list (list)
+  (if 0 
+  (if list
+      (let ()
+	(printf "%p " list (oop-at list 0))
+	(print_list (oop-at list 1)))
+    (printf "\n"))))
+
 (define-function main (argc argv)
-  (init_memory gc_quantum)
+  (gc_initialise)
   (printf "%p\n" gc_memory_base)
   (printf "%x\n" (<header>-size  gc_memory_base))
   (printf "%x\n" (<header>-flags gc_memory_base))
   (printf "%p\n" (<header>-next  gc_memory_base))
-  (printf "%p\n" (set gc_root (gc_malloc 8)))
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
   (printf "%p\n" (gc_malloc 8))
-  (let ((i 10000))
-    (while (< i 1000)
-      (printf "%p\n" (gc_malloc 1012))
-      (set i (+ i 1))))
+  (printf "%p\n" (gc_malloc 8))
+  (let ((i   0))
+    (let ((obj 0))
+      (gc-protect (obj)
+	(while (< i 1000)
+	  (print_list (set obj (make_list 256)))
+	  (set i (+ i 1)))
+	(gc_gcollect))
+      (gc_gcollect)
+      ))
   0
   )
 

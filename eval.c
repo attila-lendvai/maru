@@ -925,8 +925,12 @@ static subr(let)
     oop binding= getHead(bindings);
     if (is(Pair, binding)) {
       oop symbol= getHead(binding);
-      oop value=  car(getTail(binding));
-      tmp= eval(value, env);
+      oop prog=   getTail(binding);
+      while (is(Pair, prog)) {
+	oop value= getHead(prog);
+	tmp= eval(value, env);
+	prog= getTail(prog);
+      }
       tmp= newPair(symbol, tmp);
       env2= newPair(tmp, env2);
     }

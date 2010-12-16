@@ -1,27 +1,5 @@
 (define list (lambda args args))
 
-(define %type-names	(array 16))
-
-(define %last-type	-1)
-
-(define %allocate-type
-  (lambda (name)
-    (set %last-type (+ 1 %last-type))
-    (set-array-at %type-names %last-type name)
-    %last-type))
-
-(define <undefined>	(%allocate-type '<undefined>))
-(define <long>		(%allocate-type '<long>))
-(define <string>	(%allocate-type '<string>))
-(define <symbol>	(%allocate-type '<symbol>))
-(define <pair>		(%allocate-type '<pair>))
-(define <_array>	(%allocate-type '<_array>))
-(define <array>		(%allocate-type '<array>))
-(define <expr>		(%allocate-type '<expr>))
-(define <form>		(%allocate-type '<form>))
-(define <fixed>		(%allocate-type '<fixed>))
-(define <subr>		(%allocate-type '<subr>))
-
 (define %print print)
 (define %dump  dump)
 
@@ -134,31 +112,22 @@
 
 (define-function map (function list)
   (if (pair? list)
-      (cons (function (car list))
-	    (map function (cdr list)))))
+      (let ((head (function (car list))))
+	(cons head (map function (cdr list))))))
 
 (define-function map-with (function list a)
   (if (pair? list)
-      (cons (function (car list) a)
-	    (map-with function (cdr list) a))))
+      (let ((head (function (car list) a)))
+	(cons head (map-with function (cdr list) a)))))
 
 (define-function map2-with (function alist blist a)
   (if (pair? alist)
-      (cons (function (car alist) (car blist) a)
-	    (map2-with function (cdr alist) (cdr blist) a))))
+      (let ((head (function (car alist) (car blist) a)))
+	(cons head (map2-with function (cdr alist) (cdr blist) a)))))
 
 (set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
-
-;;; built-in types
-
-(define-form <form>-function	(expr) `(oop-at ,expr 0))
-
-(define-form <expr>-defn	(expr) `(oop-at ,expr 0))
-(define-form <expr>-env		(expr) `(oop-at ,expr 1))
-
-(define-function name-of-type (type)	(array-at %type-names type))
 
 ;;; let*
 
@@ -184,6 +153,20 @@
 (define-form cond clauses
   (%cond clauses))
 
+;;; type information
+
+(define %type-names	(array 16))
+(define %last-type	-1)
+
+(define %allocate-type
+  (lambda (name)
+    (set %last-type (+ 1 %last-type))
+    (set-array-at %type-names %last-type name)
+    %last-type))
+
+(define-function name-of-type (type)
+  (array-at %type-names type))
+
 ;;; structure
 
 (define %structure-sizes	(array))
@@ -208,6 +191,20 @@
 
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
+
+;;; built-in types
+
+(define-structure <undefined>	())
+(define-structure <long>	(_bits))
+(define-structure <string>	(size _bits))
+(define-structure <symbol>	(_bits))
+(define-structure <pair>	(head tail))
+(define-structure <_array>	())
+(define-structure <array>	(_array))
+(define-structure <expr>	(defn env))
+(define-structure <form>	(function))
+(define-structure <fixed>	(function))
+(define-structure <subr>	(_imp _name))
 
 ;;; selector
 
@@ -434,3 +431,14 @@
      (for (_index_ 0 (array-length _array_))
        (let ((,var (array-at _array_ _index_)))
 	 ,@body))))
+
+;;; conversion
+
+(define-function array->string (arr)
+  (let* ((ind 0)
+	 (lim (array-length arr))
+	 (str (string lim)))
+    (while (< ind lim)
+      (set-string-at str ind (array-at arr ind))
+      (set ind (+ 1 ind)))
+    str))

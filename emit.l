@@ -74,13 +74,39 @@
 	 (tname (string->type-name sname)))
     `(define-multimethod emit ((,tname op) ,@(%define-emit-params 1 (cdr op-args))) ,@body)))
 
+(define-function digit-for (c)
+  (if (< c 10)
+      (+ c 0x30)
+    (+ c 0x37)))
+
+(define-function mangle-label (name)
+  (let* ((plain  (symbol->string name))
+	 (mangled (array))
+	 (index   0)
+	 (size    (string-length plain)))
+    (while (< index size)
+      (let ((c (string-at plain index)))
+	(cond
+	  ((or (and (<= 0x61 c) (<= c 0x7a))
+	       (and (<= 0x41 c) (<= c 0x5a))
+	       (and (<= 0x30 c) (<= c 0x39))
+	       ( = 0x5f c))
+	   (array-append mangled c))
+	  (else
+	   (let ()
+	     (array-append mangled 0x24)
+	     (array-append mangled (digit-for (>> c  4)))
+	     (array-append mangled (digit-for (&  c 15)))))))
+      (set index (+ 1 index)))
+    (array->string mangled)))
+      
 ;;; IA32 -- OPERANDS
 
 (let ((counter 0))
   (define-function temp-label-name ()
     (concat-string "_L_" (long->string (set counter (+ counter 1))))))
 
-(define-operand LABEL (name) 	__PREFIX__(<LABEL>-name self))
+(define-operand LABEL (name) 	__PREFIX__(mangle-label (<LABEL>-name self)))
 (define-operand GI32 (name)	(<GI32>-name self))
 (define-operand LI32 (value)	(<LI32>-value self))
 (define-operand TI32 (offset)	(<TI32>-offset self)"(%esp)")
@@ -114,6 +140,8 @@
 
 (define-instruction SUB)	(define-emit (SUB TI32)		(println "	subl "$1",%eax"))
 
+(define-instruction MUL)	(define-emit (MUL TI32)		(println "	mull "$1))
+
 (define-instruction AND)	(define-emit (AND TI32)		(println "	andl "$1",%eax"))
 
 (define-instruction OR)		(define-emit (OR TI32)		(println "	orl "$1",%eax"))
@@ -134,9 +162,16 @@
 								(println "	sete %al")
 								(println "	movzbl %al,%eax"))
 
+(define-instruction NOTEQ)	(define-emit (NOTEQ TI32)	(println "	cmpl "$1",%eax")
+								(println "	setne %al")
+								(println "	movzbl %al,%eax"))
+
 (define-instruction GREATER)	(define-emit (GREATER TI32)	(println "	cmpl "$1",%eax")
 								(println "	setg %al")
 								(println "	movzbl %al,%eax"))
+
+(define-instruction SHL)	(define-emit (SHL TI32)		(println "	movl "$1",%ecx")
+								(println "	shll %cl,%eax"))
 
 (define-instruction SHR)	(define-emit (SHR TI32)		(println "	movl "$1",%ecx")
 								(println "	shrl %cl,%eax"))
@@ -160,10 +195,22 @@
 (define-instruction STORE)	(define-emit (STORE TI32)	(println "	movl %eax,"$1))
 				(define-emit (STORE GI32)	(println "	movl %eax,"$1))
 
+(define-instruction ADDR)	(define-emit (ADDR GI32)	(println "	movl $"$1",%eax"))
+				(define-emit (ADDR TI32)	(println "	leal "$1",%eax"))
+
 (define-instruction MOVE)	(define-emit (MOVE TI32 TI32)	(println "	movl "$1",%ecx")
 								(println "	movl %ecx,"$2))
 
 (define-instruction COMMENT)	(define-emit (COMMENT pair)	(print "## ") (apply println $1))
+
+(define-instruction CHR-AT)	(define-emit (CHR-AT TI32)	(println "	movl "$1",%ecx")
+								(println "	leal (%eax,%ecx),%ecx")
+								(println "	movl (%ecx),%eax"))
+
+(define-instruction SET-CHR-AT)	(define-emit (SET-CHR-AT TI32 TI32)	(println "	movl "$1",%ecx")
+									(println "	leal (%eax,%ecx),%ecx")
+									(println "	movl "$2",%eax")
+									(println "	movl %eax,(%ecx)"))
 
 (define-instruction OOP-AT)	(define-emit (OOP-AT TI32)	(println "	movl "$1",%ecx")
 								(println "	leal (%eax,%ecx,4),%ecx")
@@ -251,12 +298,20 @@
     (gen comp LOAD label)))
 
 (define-method gen <compiler> args
-  ;;(println "# insn " args)
+  ;;(println "## insn " args)
   (array-append (<compiler>-asm self) args))
 
+(define-function gen-tmp-prog (prog comp)
+  (while (pair? prog)
+    (gen (car prog) comp)
+    (set prog (cdr prog)))
+  (let ((t (alloc-temp comp)))
+    (gen comp STORE t)
+    t))
+
 (define-function gen-tmp (expr comp)
-  (let ((x (gen expr comp))
-	(t (alloc-temp comp)))
+  (gen expr comp)
+  (let ((t (alloc-temp comp)))
     (gen comp STORE t)
     t))
 
@@ -293,12 +348,12 @@
   (list->array
    `(()
      ((,not ,NOT))
-     ((,+ ,ADD) (,- ,SUB)
+     ((,+ ,ADD) (,- ,SUB) (,* ,MUL)
       (,& ,AND) (,| ,OR)
-      (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,> ,GREATER)
-      (,>> ,SHR)
-      (,oop-at ,OOP-AT))
-     ((,set-oop-at ,SET-OOP-AT))
+      (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,!= ,NOTEQ) (,> ,GREATER)
+      (,<< ,SHL) (,>> ,SHR)
+      (,oop-at ,OOP-AT) (char-at ,CHR-AT))
+     ((,set-oop-at ,SET-OOP-AT) (set-char-at ,SET-CHR-AT))
      )))
 
 ;; (define-function gen-lambda (expr ocomp)
@@ -322,7 +377,7 @@
 
 (define-function gen-let-binding (binding comp)
   (let ((name (car binding))
-	(temp (gen-tmp (cadr binding) comp)))
+	(temp (gen-tmp-prog (cdr binding) comp)))
     (set (<compiler>-env comp) (cons (cons name temp) (<compiler>-env comp)))
     temp))
 
@@ -386,18 +441,27 @@
 (define-function gen-define (expr comp)	(error "definition in compiled code: " expr))
 (define-function gen-lambda (expr comp)	(error "unevaluated lambda in compiled code: " expr))
 
+(define-function gen-address-of (expr comp)
+  (let ((name (cadr expr)))
+    (or (symbol? name) (error "address-of: non-identifier argument: "name))
+    (let ((var (cdr (assq name (<compiler>-env comp)))))
+      (if (temp? var)
+	  (gen comp ADDR var)
+	(gen comp ADDR (GI32 (LABEL name)))))))
+
 (define forms
   (list
-   (cons  let	 gen-let)
-   (cons  and	 gen-and)
-   (cons  or	 gen-or)
-   (cons  if	 gen-if)
-   (cons  while	 gen-while)
-   (cons  set	 gen-set)
-   (cons 'return gen-return)
-   (cons  quote	 gen-quote)
-   (cons  define gen-define)
-   (cons 'lambda gen-lambda)
+   (cons  let		gen-let)
+   (cons  and	 	gen-and)
+   (cons  or	 	gen-or)
+   (cons  if	 	gen-if)
+   (cons  while	 	gen-while)
+   (cons  set	 	gen-set)
+   (cons 'return 	gen-return)
+   (cons  quote	 	gen-quote)
+   (cons  define 	gen-define)
+   (cons 'lambda 	gen-lambda)
+   (cons 'address-of	gen-address-of)
    ))
 
 (define-method gen <pair> (comp)
@@ -499,7 +563,7 @@
 (define-function gen-env-to (env limit)
   (let ((comp (compiler env)))
     (while (not (= (caar env) limit))
-      (println "# defn " (caar env))
+      (println "## defn " (caar env))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
     (array-do insn (<compiler>-asm comp) (apply emit insn))))
