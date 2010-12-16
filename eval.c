@@ -281,9 +281,8 @@ static int isOctal(int c)
   return '0' <= c && c <= '7';
 }
 
-static int readChar(FILE *fp)
+static int readChar(int c, FILE *fp)
 {
-  int c= getc(fp);
   if ('\\' == c) {
     c= getc(fp);
     switch (c) {
@@ -297,27 +296,32 @@ static int readChar(FILE *fp)
       case '\'':  return '\'';
       case '"':   return '"';
       case '\\':  return '\\';
+      case '(':   return '(';
+      case ')':   return ')';
+      case ';':   return ';';
       case 'u': {
 	int a= getc(fp), b= getc(fp), c= getc(fp), d= getc(fp);
 	return (digitValue(a) << 24) + (digitValue(b) << 16) + (digitValue(c) << 8) + digitValue(d);
       }
       case 'x': {
 	int x= 0;
-	while (isHexadecimal(c= getc(fp)))
-	  x= x * 16 + digitValue(c);
+	if (isHexadecimal(c= getc(fp))) {
+	  x= digitValue(c);
+	  if (isHexadecimal(c= getc(fp))) {
+	    x= x * 16 + digitValue(c);
+	    c= getc(fp);
+	  }
+	}
 	ungetc(c, fp);
 	return x;
       }
       case '0' ... '7': {
-	int x= 0;
+	int x= digitValue(c);
 	if (isOctal(c= getc(fp))) {
 	  x= x * 8 + digitValue(c);
 	  if (isOctal(c= getc(fp))) {
 	    x= x * 8 + digitValue(c);
-	    if (isOctal(c= getc(fp))) {
-	      x= x * 8 + digitValue(c);
-	      c= getc(fp);
-	    }
+	    c= getc(fp);
 	  }
 	}
 	ungetc(c, fp);
@@ -355,14 +359,16 @@ static oop read(FILE *fp)
 	for (;;) {
 	  c= getc(fp);
 	  if ('"' == c) break;
-	  ungetc(c, fp);
-	  c= readChar(fp);
+	  c= readChar(c, fp);
 	  if (EOF == c)			fatal("EOF in string literal");
 	  buffer_append(&buf, c);
 	}
 	oop obj= newString(buffer_contents(&buf));
 	//buffer_free(&buf);
 	return obj;
+      }
+      case '?': {
+	return newLong(readChar(getc(fp), fp));
       }
       case '\'': {
 	oop obj= read(fp);
@@ -460,7 +466,11 @@ static void doprint(FILE *stream, oop obj, int storing)
 	putc('"', stream);
 	while ((c= *p++)) {
 	  if (c >= ' ' && c < 127)
-	    putc(c, stream);
+	    switch (c) {
+	      case '"':  printf("\\\"");  break;
+	      case '\\': printf("\\\\");  break;
+	      default:	 putc(c, stream);  break;
+	    }
 	  else fprintf(stream, "\\%03o", c);
 	}
 	putc('"', stream);
