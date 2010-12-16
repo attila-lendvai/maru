@@ -239,6 +239,11 @@
     (set (oop-at obj -1) type)
     obj))
 
+(define-function new-<long> (bits)
+  (let ((obj (new-bits <long> (size-of-structure <long>))))
+    (set (<long>-_bits obj) bits)
+    obj))
+
 (define-function new-<symbol> (cstr)
   (let ((obj (new-bits <symbol> (size-of-structure <symbol>))))
     (set (<symbol>-_bits obj) (strdup cstr))
@@ -355,12 +360,21 @@
 			  (while (is_digit10 (set c (getc stream)))
 			    (set result (+ (* 10 result) (- c 48))))
 			  (ungetc c stream)
-			  (return result)))
+			  (return (new-<long> result))))
 	((< c 0)	(return EOF))
 	(else		(fatal1 "illegal character: %c" c))))))
 
+(define-function k_print (obj)
+  (printf "#%p\n" obj)
+  (let ((type (get-type obj)))
+    (cond
+      ((= type <undefined>)	(printf "nil"))
+      ((= type <symbol>)	(printf "%s" (get <symbol> _bits obj)))
+      (else			(printf "<type:%d>" type)))))
+
 (define-function k_println (obj)
-  (printf "println %d %p\n" obj obj))
+  (k_print obj)
+  (printf "\n"))
 
 (define-function main (argc argv)
   (set stdin  (fdopen 0 "r"))
@@ -368,6 +382,7 @@
   (set stderr (fdopen 2 "a"))
   (gc_initialise)
   (gc_push_root (address-of symbols))
+  (k_println (new-<long> 42))
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
     (printf "%s\n" (oop-at argv 0)))
