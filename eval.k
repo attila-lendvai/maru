@@ -201,6 +201,7 @@
 
 ;;; ----------------------------------------------------------------
 
+(define strlen	(extern 'strlen))
 (define strcmp	(extern 'strcmp))
 (define strdup	(extern 'strdup))
 (define getc	(extern 'getc))
@@ -244,6 +245,21 @@
     (set (<long>-_bits obj) bits)
     obj))
 
+(define-function _new-<string> (len)
+  (let ((bits (gc_malloc_atomic (+ len 1))))
+    (gc-protect (bits)
+      (let ((obj (new-oops <string> (size-of-structure <string>))))
+	(gc-protect (obj)
+	  (set (<string>-size  obj) (new-<long> len))
+	  (set (<string>-_bits obj) bits)
+	  obj)))))
+
+(define-function new-<string> (cstr)
+  (let ((len (strlen cstr)))
+    (let ((obj (_new-<string> len)))
+      (memcpy (<string>-_bits obj) cstr len)
+      obj)))
+
 (define-function new-<symbol> (cstr)
   (let ((obj (new-bits <symbol> (size-of-structure <symbol>))))
     (set (<symbol>-_bits obj) (strdup cstr))
@@ -283,26 +299,26 @@
 (define-form get_head (obj)	`(oop-at ,obj 0))
 (define-form get_tail (obj)	`(oop-at ,obj 1))
 
-(define-function is_blank (c)	(or 	 ( = 0x20 c)			; sp
-				    	 ( = 0x09 c)			; ht
-				    	 ( = 0x0a c)			; nl
-				    	 ( = 0x0b c)			; vt
-				    	 ( = 0x0c c)			; ff
-				    	 ( = 0x0d c)))			; cr
+(define-function is_blank (c)	(or 	 ( = ?   c)		; sp
+				    	 ( = ?\t c)		; ht
+				    	 ( = ?\n c)		; nl
+				    	 ( = ?\v c)		; vt
+				    	 ( = ?\f c)		; ff
+				    	 ( = ?\r c)))		; cr
 
-(define-function is_digit10 (c)	    (and (<= 0x30 c) (<= c 0x39)))	; 0 1 2 3 4 5 6 7 8 9
+(define-function is_digit10 (c)	    (and (<= ?0  c) (<= c ?9)))	; 0 1 2 3 4 5 6 7 8 9
 
-(define-function is_letter (c)	(or      ( = 0x21 c)			; !
-				    (and (<= 0x23 c) (<= c 0x26))	; # $ % &
-				    (and (<= 0x2a c) (<= c 0x2f))	; * + , - . /
-					 ( = 0x3a c)			; :
-				    (and (<= 0x3c c) (<= c 0x5a))	; < = > ?  @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-					 ( = 0x5c c)			; \
-					 ( = 0x5e c)			; ^
-					 ( = 0x5f c)			; _
-				    (and (<= 0x61 c) (<= c 0x7a))	; a b c d e f g h i j k l m n o p q r s t u v w x y z
-					 ( = 0x7c c)			; |
-					 ( = 0x7e c)))			; ~
+(define-function is_letter (c)	(or      ( = ?!  c)		; !
+				    (and (<= ?#  c) (<= c ?&))	; # $ % &
+				    (and (<= ?*  c) (<= c ?/))	; * + , - . /
+					 ( = ?:  c)		; :
+				    (and (<= ?<  c) (<= c ?Z))	; < = > ?  @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+					 ( = ?\\ c)		; \
+					 ( = ?^  c)		; ^
+					 ( = ?_  c)		; _
+				    (and (<= ?a  c) (<= c ?z))	; a b c d e f g h i j k l m n o p q r s t u v w x y z
+					 ( = ?|  c)		; |
+					 ( = ?~  c)))		; ~
 
 (define-function new_buffer ()
   (let ((buf (malloc (size-of-structure <buffer>))))
@@ -342,11 +358,74 @@
       (set symbols (new-<pair> sym symbols))
       sym)))
 
+(define-function is_octal (c)		(and (<= ?0 c) (<= c ?7)))
+
+(define-function is_hexadecimal (c)	(or (and (<= ?0 c) (<= c ?9))
+					    (and (<= ?a c) (<= c ?f))
+					    (and (<= ?A c) (<= c ?F))))
+
+(define-function digit_value (c)
+  (cond
+    ((and (<= ?0 c) (<= c ?9))	(- c ?0))
+    ((and (<= ?a c) (<= c ?z))	(- c (- ?a 10)))
+    ((and (<= ?A c) (<= c ?Z))	(- c (- ?A 10)))
+    (else			(fatal "illegal digit in character escape"))))
+
+(define-function read_char (c stream)
+  (if (= ?\\ c)
+      (let ()
+	(set c (getc stream))
+	(cond
+	  ((= c ?a)			?\a)
+	  ((= c ?b)			?\b)
+	  ((= c ?f)			?\f)
+	  ((= c ?n)			?\n)
+	  ((= c ?r)			?\r)
+	  ((= c ?t)			?\t)
+	  ((= c ?v)			?\v)
+	  ((= c ?\')			?\')
+	  ((= c ?\")			?\")
+	  ((= c ?\\)			?\\)
+	  ((= c ?\()			?\()
+	  ((= c ?\))			?\))
+	  ((= c ?\;)			?\;)
+	  ((= c ?u)			(let ((a (getc stream))
+					      (b (getc stream))
+					      (c (getc stream))
+					      (d (getc stream)))
+					  (+ (<< (digit_value a) 24)
+					  (+ (<< (digit_value b) 16)
+					  (+ (<< (digit_value c)  8)
+					         (digit_value d)    )))))
+	  ((= c ?x)			(let ((x 0))
+					  (if (is_hexadecimal (set c (getc stream)))
+					      (let ()
+						(set x (digit_value c))
+						(if (is_hexadecimal (set c (getc stream)))
+						    (let ()
+						      (set x (+ (* x 16) (digit_value c)))
+						      (set c (getc stream))))))
+					  (ungetc c stream)
+					  x))
+	  ((and (<= ?0 c) (<= c ?7))	(let ((x (digit_value c)))
+					  (if (is_octal (set c (getc stream)))
+					      (let ()
+						(set x (+ (* x 8) (digit_value c)))
+						(if (is_octal (set c (getc stream)))
+						    (let ()
+						      (set x (+ (* x 8) (digit_value c)))
+						      (set c (getc stream))))))
+					  (ungetc c stream)
+					  x))
+	  (else				(fatal1 "illegal character escape: \\%c" c))))
+    c))
+
 (define-function read (stream)
   (while 1
     (let ((c (getc stream)))
       (cond
 	((is_blank c)	())
+	((= ?? c)	(return (new-<long> (read_char (getc stream) stream))))
 	((is_letter c)	(let ((buf (new_buffer)))
 			  (while (or (is_letter c) (is_digit10 c))
 			    (buffer_append buf c)
@@ -361,30 +440,50 @@
 			    (set result (+ (* 10 result) (- c 48))))
 			  (ungetc c stream)
 			  (return (new-<long> result))))
-	((= 0x3b c)	
-      case ';': {
-	for (;;) {
-	  c= getc(fp);
-	  if ('\n' == c || '\r' == c || EOF == c) break;
-	}
-	continue;
-      }
-
+	((= ?\; c)	(while (and (!= ?\n (set c (getc stream)))
+				    (!= ?\r c)
+				    (!= EOF c))))
+	((= ?\" c)	(let ((buf (new_buffer)))
+			  (while (!= ?\" (set c (getc stream)))
+			    (printf "IN %c\n" c)
+			    (set c (read_char c stream))
+			    (printf "OUT %c\n" c)
+			    (and (= EOF c) (fatal "unterminated string literal"))
+			    (buffer_append buf c))
+			  (buffer_append buf 0)
+			  (let ((result (new-<string> (<buffer>-contents buf))))
+			    (buffer_delete buf)
+			    (return result))))
 	((< c 0)	(return EOF))
 	(else		(fatal1 "illegal character: %c" c))))))
 
-(define-function k_print (obj)
+(define-function do_print (obj storing)
   (debug (printf "{%p}" obj))
   (let ((type (get-type obj)))
     (cond
       ((= type <undefined>)	(printf "nil"))
       ((= type <long>)		(printf "%d" (get <long> _bits obj)))
+      ((= type <string>)	(let ((bits (get <string> _bits obj)))
+				  (if (not storing)
+				      (printf "%s" bits)
+				    (let ((i 0)
+					  (c 0))
+				      (printf "\"")
+				      (while (set c (char-at bits i))
+					(if (and (<= 32 c) (<= c 126))
+					    (cond
+					      ((= c ?\")	(printf "\\\""))
+					      ((= c ?\\)	(printf "\\\\"))
+					      (else		(printf "%c" c)))
+					  (printf "\\%03o" c))
+					(set i (+ 1 i)))
+				      (printf "\"")))))
       ((= type <symbol>)	(printf "%s" (get <symbol> _bits obj)))
       (else			(printf "<type:%d>" type)))))
 
-(define-function k_println (obj)
-  (k_print obj)
-  (printf "\n"))
+(define-function k_print (obj)		(do_print obj 1))
+
+(define-function k_println (obj)	(k_print obj) (printf "\n"))
 
 (define-function main (argc argv)
   (set stdin  (fdopen 0 "r"))
