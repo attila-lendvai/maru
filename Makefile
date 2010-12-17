@@ -10,8 +10,9 @@ opt : .force
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
 
-test : *.l *.k eval
+test : *.l *.k eval .force
 	time ./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
+	time ./test tmp.l
 
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && cc -c -o test.o test.s && size test.o && cc -o test test.o && ./test
