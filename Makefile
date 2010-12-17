@@ -16,6 +16,9 @@ test : eval .force
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && cc -c -o test.o test.s && size test.o && cc -o test test.o && ./test
 
+stats : .force
+	cat boot.l emit.l eval.k | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+
 clean : .force
 	rm -f *~ *.o main eval
 	rm -rf *.dSYM
