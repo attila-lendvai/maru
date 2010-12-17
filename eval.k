@@ -1,9 +1,7 @@
 ;;; -*- coke -*-
 
-;;(define-form debug prog ())
+(define-form debug prog ())
 ;;(define-form debug prog `(let () ,@prog))
-
-(define-form debug prog `(if do_debug (let () ,@prog)))
 
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
@@ -28,10 +26,8 @@
 
 (compile-begin)
 
-(define do_debug 0)
-
 (define gc_quantum	65504)
-(define gc_frequency	1);32768)
+(define gc_frequency	32768)
 
 (define exit	(extern 'exit))
 (define malloc	(extern 'malloc))
@@ -292,13 +288,9 @@
     obj))
 
 (define-function new-<array> (size)
-(printf "A\n")
   (let ((arr (new-oops <array> (size-of-structure <array>))))
-(printf "B\n")
     (gc-protect (arr)
-(printf "C\n")
       (set (<array>-_array arr) (new-oops <_array> (* 4 size)))
-(printf "D\n")
       arr)))
 
 (define-form is (type arg)
@@ -686,11 +678,12 @@
     (fscanf stream "#!%*[^\012\015]")
     (while (!= EOF (set res (k_read stream)))
       (gc-protect (res)
-	(printf "===>>> ") (k_println res)
+	;(printf "===>>> ") (k_println res)
 	(set res (expand res globals))
 	;(set obj (encode obj globals))
 	;(set obj (eval   obj globals))
-	(k_println res)))))
+	;(k_println res)
+	))))
 
 (define-function main (argc argv)
   (set stdin  (fdopen 0 "r"))
@@ -706,7 +699,6 @@
   (set s_unquote_splicing	(intern "unquote-splicing"))
   (set s_expanders		(intern "*expanders*"))
   (gc_push_root (address-of expanders))		(set expanders (new-<array> 0))		(set expanders (new-<pair> s_expanders expanders))
-  (k_println (new-<array> 3))
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
     (let ((stream (fopen (oop-at argv 0) "r")))
