@@ -144,6 +144,9 @@
 
 (define-instruction MUL)	(define-emit (MUL TI32)		(println "	mull "$1))
 
+(define-instruction DIV)	(define-emit (DIV TI32)		(println "	movl $0,%edx")
+								(println "	divl "$1))
+
 (define-instruction AND)	(define-emit (AND TI32)		(println "	andl "$1",%eax"))
 
 (define-instruction OR)		(define-emit (OR TI32)		(println "	orl "$1",%eax"))
@@ -353,7 +356,7 @@
   (list->array
    `(()
      ((,not ,NOT) (,- ,NEG))
-     ((,+ ,ADD) (,- ,SUB) (,* ,MUL)
+     ((,+ ,ADD) (,- ,SUB) (,* ,MUL) (,/ ,DIV)
       (,& ,AND) (,| ,OR) (,^ ,XOR)
       (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,!= ,NOTEQ) (,> ,GREATER)
       (,<< ,SHL) (,>> ,SHR)

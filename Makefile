@@ -10,8 +10,8 @@ opt : .force
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
 
-test : eval .force
-	time ./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o && ./test
+test : *.l *.k eval
+	time ./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
 
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && cc -c -o test.o test.s && size test.o && cc -o test test.o && ./test
@@ -20,7 +20,7 @@ stats : .force
 	cat boot.l emit.l eval.k | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f *~ *.o main eval
+	rm -f *~ *.o main eval test
 	rm -rf *.dSYM
 
 .force :
