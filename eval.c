@@ -218,6 +218,7 @@ static oop intern(char *cstr)
 #include "chartab.h"
 
 static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT    & chartab[c]); }
+static int isAlpha(int c)	{ return 0 <= c && c <= 127 && (CHAR_ALPHA    & chartab[c]); }
 static int isDigit10(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT10  & chartab[c]); }
 static int isDigit16(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c]); }
 static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c]); }
@@ -294,11 +295,6 @@ static int readChar(int c, FILE *fp)
       case 't':   return '\t';
       case 'v':   return '\v';
       case '\'':  return '\'';
-      case '"': case '\\': case ';':
-      case '(': case ')':
-      case '[': case ']':
-      case '{': case '}':
-		  return c;
       case 'u': {
 	int a= getc(fp), b= getc(fp), c= getc(fp), d= getc(fp);
 	return (digitValue(a) << 24) + (digitValue(b) << 16) + (digitValue(c) << 8) + digitValue(d);
@@ -328,8 +324,8 @@ static int readChar(int c, FILE *fp)
 	return x;
       }
       default:
-	fatal("illegal character escape: \\%c", c);
-	break;
+	if (isAlpha(c) || isDigit10(c)) fatal("illegal character escape: \\%c", c);
+	return c;
     }
   }
   return c;
