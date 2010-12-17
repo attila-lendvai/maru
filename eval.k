@@ -27,7 +27,7 @@
 (compile-begin)
 
 (define gc_quantum	65504)
-(define gc_frequency	100);32768)
+(define gc_frequency	32768)
 
 (define exit	(extern 'exit))
 (define malloc	(extern 'malloc))
@@ -228,7 +228,11 @@
 (define <fixed>		 9)
 (define <subr>		10)
 
-(define symbols	0)
+(define symbols			0)
+(define s_quote			0)
+(define s_quasiquote		0)
+(define s_unquote		0)
+(define s_unquote_splicing	0)
 
 (define-function new-bits (type size)
   (let ((obj (gc_malloc_atomic size)))
@@ -313,6 +317,9 @@
 				    (and (<= ?a  c) (<= c ?f))		; a b c d e f
 				    (and (<= ?A  c) (<= c ?F))))	; A B C D E F
 
+(define-function is_alpha (c)	(or (and (<= ?a  c) (<= c ?z))		; a b c d e f g h i j k l m n o p q r s t u v w x y z
+				    (and (<= ?A  c) (<= c ?Z))))	; A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+
 (define-function is_letter (c)	(or      ( = ?!  c)			; !
 				    (and (<= ?#  c) (<= c ?&))		; # $ % &
 				    (and (<= ?*  c) (<= c ?/))		; * + , - . /
@@ -377,32 +384,26 @@
     (else			(fatal "illegal digit in character escape"))))
 
 (define-function read_char (c stream)
-  (if (= ?\\ c)
-      (let ()
-	(set c (getc stream))
-	(cond
-	  ((= c ?a)			?\a)
-	  ((= c ?b)			?\b)
-	  ((= c ?f)			?\f)
-	  ((= c ?n)			?\n)
-	  ((= c ?r)			?\r)
-	  ((= c ?t)			?\t)
-	  ((= c ?v)			?\v)
-	  ((= c ?\')			?\')
-	  ((= c ?\")			?\")
-	  ((= c ?\\)			?\\)
-	  ((= c ?\()			?\()
-	  ((= c ?\))			?\))
-	  ((= c ?\;)			?\;)
-	  ((= c ?u)			(let ((a (getc stream))
+  (and (= ?\\ c)
+       (let ()
+	 (set c (getc stream))
+	 (cond
+	   ((= c ?a)			?\a)
+	   ((= c ?b)			?\b)
+	   ((= c ?f)			?\f)
+	   ((= c ?n)			?\n)
+	   ((= c ?r)			?\r)
+	   ((= c ?t)			?\t)
+	   ((= c ?v)			?\v)
+	   ((= c ?u)			(let ((a (getc stream))
 					      (b (getc stream))
 					      (c (getc stream))
 					      (d (getc stream)))
 					  (+ (<< (digit_value a) 24)
-					  (+ (<< (digit_value b) 16)
-					  (+ (<< (digit_value c)  8)
-					         (digit_value d)    )))))
-	  ((= c ?x)			(let ((x 0))
+					     (+ (<< (digit_value b) 16)
+						(+ (<< (digit_value c)  8)
+						   (digit_value d)    )))))
+	   ((= c ?x)			(let ((x 0))
 					  (if (is_hexadecimal (set c (getc stream)))
 					      (let ()
 						(set x (digit_value c))
@@ -412,7 +413,7 @@
 						      (set c (getc stream))))))
 					  (ungetc c stream)
 					  x))
-	  ((and (<= ?0 c) (<= c ?7))	(let ((x (digit_value c)))
+	   ((and (<= ?0 c) (<= c ?7))	(let ((x (digit_value c)))
 					  (if (is_octal (set c (getc stream)))
 					      (let ()
 						(set x (+ (* x 8) (digit_value c)))
@@ -422,8 +423,9 @@
 						      (set c (getc stream))))))
 					  (ungetc c stream)
 					  x))
-	  (else				(fatal1 "illegal character escape: \\%c" c))))
-    c))
+	   (else				(if (or (is_alpha c) (is_digit10 c))
+						    (fatal1 "illegal character escape: \\%c" c))))))
+  c)
 
 (define-function read_number (c stream)
   (let ((buf (new_buffer))
@@ -475,6 +477,14 @@
 	  (get_tail head)
 	(fatal1 "missing closing '%c' delimiter while reading list" delim)))))
 
+(define-function read_quote (prefix stream)
+  (let ((obj (k_read stream)))
+    (and (= EOF obj) (fatal "EOF while reading quoted literal"))
+    (gc-protect (obj)
+      (set obj (new-<pair> obj ()))
+      (set obj (new-<pair> prefix obj))
+      obj)))
+
 (define-function k_read (stream)
   (while 1
     (let ((c (getc stream)))
@@ -484,6 +494,13 @@
 	((= ?- c)	(return (if (is_digit10 (ungetc (getc stream) stream))
 				    (read_number c stream)
 				    (read_symbol c stream))))
+	((= ?\' c)	(return (read_quote s_quote stream)))
+	((= ?\` c)	(return (read_quote s_quasiquote stream)))
+	((= ?\, c)	(return (let ((d (getc stream)))
+				  (if (= ?@ d)
+				      (read_quote s_unquote_splicing stream)
+				    (ungetc d stream)
+				    (read_quote s_unquote)))))
 	((is_letter c)	(return (read_symbol c stream)))
 	((= ?\( c)	(return (read_list ?\) stream)))	((= ?\) c)	(return (let () (ungetc c stream) EOF)))
 	((= ?\[ c)	(return (read_list ?\] stream)))	((= ?\] c)	(return (let () (ungetc c stream) EOF)))
@@ -541,6 +558,10 @@
   (set stderr (fdopen 2 "a"))
   (gc_initialise)
   (gc_push_root (address-of symbols) "symbols")
+  (set s_quote			(intern "quote"))
+  (set s_quasiquote		(intern "quasiquote"))
+  (set s_unquote		(intern "unquote"))
+  (set s_unquote_splicing	(intern "unquote-splicing"))
   (k_println (new-<long> 42))
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
