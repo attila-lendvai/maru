@@ -11,7 +11,7 @@ debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
 
 test : eval .force
-	./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o && ./test
+	time ./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o && ./test
 
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && cc -c -o test.o test.s && size test.o && cc -o test test.o && ./test

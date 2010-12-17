@@ -7,13 +7,13 @@
 (define-structure <buffer> (contents size position))
 
 (define-function make-gc-protectors (vars)
-  (map (lambda (v) (list 'gc_push_root (list 'address-of (car vars))))
+  (map (lambda (v) (list 'gc_push_root (list 'address-of v) (symbol->string v)))
        vars))
 
 (define-function make-gc-unprotectors (vars)
   (let ((result ()))
     (while (pair? vars)
-      (set result (cons (list 'gc_pop_root (list 'address-of (car vars))) result))
+      (set result (cons (list 'gc_pop_root (list 'address-of (car vars)) (symbol->string (car vars))) result))
       (set vars (cdr vars)))
     result))
 
@@ -27,7 +27,7 @@
 (compile-begin)
 
 (define gc_quantum	65504)
-(define gc_frequency	10);32768)
+(define gc_frequency	100);32768)
 
 (define exit	(extern 'exit))
 (define malloc	(extern 'malloc))
@@ -48,7 +48,7 @@
 
 (define-form <header>-flags-used ()	1)
 (define-form <header>-flags-atom ()	2)
-(define-form <header>-flags-mark ()	4)	(define-form <header>-flags-mark-mask ()	-5)
+(define-form <header>-flags-mark ()	4)
 
 (define-form <header>-flags-used+atom ()	(+ (<header>-flags-used) (<header>-flags-atom)))
 
@@ -73,9 +73,9 @@
     (set gc_memory_base ptr)
     (set gc_memory_last ptr)))
 
-(define-function gc_push_root (ptr)
+(define-function gc_push_root (ptr name)
   (and (= gc_root_count gc_root_max)
-       (let ((roots (malloc (* 4 (set gc_root_max (* 2 gc_root_max))))))
+       (let ((roots (malloc (* 4 (set gc_root_max (max 32 (* 2 gc_root_max)))))))
 	 (memcpy roots gc_roots (* 4 gc_root_count))
 	 (and gc_roots (free gc_roots))
 	 (set gc_roots roots)))
@@ -83,7 +83,7 @@
   (debug (printf "gc add root %d at %p\n" gc_root_count ptr))
   (set gc_root_count (+ 1 gc_root_count)))
 
-(define-function gc_pop_root (ptr)
+(define-function gc_pop_root (ptr name)
   (or gc_root_count (fatal "root table underflow"))
   (set gc_root_count (- gc_root_count 1))
   (debug (printf "gc del root %d at %p\n" gc_root_count ptr))
@@ -127,7 +127,7 @@
 	    (set gc_alloc_count (+ gc_alloc_count 1))
 	    obj)))))
 
-(define-function gc_sweep (obj)
+(define-function gc_sweep ()
   (debug (printf "sweep\n"))
   (let ((ptr gc_memory_base)
 	(nused 0)
@@ -138,7 +138,7 @@
 	(if (& flags (<header>-flags-mark))
 	    (let ()
 	      (set nused (+ nused (<header>-size ptr)))
-	      (set (<header>-flags ptr) (& flags (<header>-flags-mark-mask))))
+	      (set (<header>-flags ptr) (^ flags (<header>-flags-mark))))
 	  (debug (printf "collect %p %d\n" ptr (<header>-size ptr)))
 ;; 	  (while (and (= 0 (& (<header>-flags-mark) (<header>-flags (<header>-next ptr))))
 ;; 		      (printf "%p + %d + %d = %p ? %p\n"
@@ -154,9 +154,8 @@
 	  (set (<header>-flags ptr) 0)))
       (and (= gc_memory_base (set ptr (<header>-next ptr)))
 	   (set ptr 0)))
-    (printf "%d used, %d free, %d allocations\n" nused nfree gc_alloc_count)
-    (and (< nfree nused)
-	 (gc_grow_memory gc_quantum))
+    (printf "GC: %d used, %d free, %d allocations\n" nused nfree gc_alloc_count)
+    ;;(and (< nfree nused) (gc_grow_memory gc_quantum))
     ))
 
 (define-function gc_mark_and_trace (obj)
@@ -167,19 +166,19 @@
 	      (flags (<header>-flags ptr)))
 	 (and (not (& flags (<header>-flags-mark)))
 	      (let ()
-		(and (not (& flags (<header>-flags-atom)))
-		     (let ((size (>> (<header>-size ptr) 2)))
-		       (debug (printf "mark %p %d\n" ptr size))
-		       (while size
-			 (set size (- size 1))
-			 (debug (printf "@%d %p\n" size (oop-at obj size)))
-			 (gc_mark_and_trace (oop-at obj size)))))
+		(or (& flags (<header>-flags-atom))
+		    (let ((size (>> (<header>-size ptr) 2)))
+		      (debug (printf "mark %p %d\n" ptr size))
+		      (while size
+			(set size (- size 1))
+			(debug (printf "@%d %p\n" size (oop-at obj size)))
+			(gc_mark_and_trace (oop-at obj size)))))
 		(set (<header>-flags ptr) (| flags (<header>-flags-mark))))))))
 
 (define-function gc_gcollect ()
   (let ((i 0))
     (while (< i gc_root_count)
-      (debug (let ((ptr (oop-at gc_roots i))) (printf "mark gc root at %p -> %p\n" ptr (oop-at ptr 0))))
+      (debug (let ((ptr (oop-at gc_roots i))) (printf "mark gc root %d: %p -> %p\n" i ptr (oop-at ptr 0))))
       (gc_mark_and_trace (oop-at (oop-at gc_roots i) 0))
       (set i (+ 1 i))))
   (gc_sweep)
@@ -204,6 +203,7 @@
 (define strlen	(extern 'strlen))
 (define strcmp	(extern 'strcmp))
 (define strdup	(extern 'strdup))
+(define strtoul	(extern 'strtoul))
 (define getc	(extern 'getc))
 (define putc	(extern 'putc))
 (define ungetc	(extern 'ungetc))
@@ -298,27 +298,32 @@
 
 (define-form get_head (obj)	`(oop-at ,obj 0))
 (define-form get_tail (obj)	`(oop-at ,obj 1))
+(define-form set_tail (obj val)	`(set-oop-at ,obj 1 ,val))
 
-(define-function is_blank (c)	(or 	 ( = ?   c)		; sp
-				    	 ( = ?\t c)		; ht
-				    	 ( = ?\n c)		; nl
-				    	 ( = ?\v c)		; vt
-				    	 ( = ?\f c)		; ff
-				    	 ( = ?\r c)))		; cr
+(define-function is_blank (c)	(or 	 ( = ?   c)			; sp
+				    	 ( = ?\t c)			; ht
+				    	 ( = ?\n c)			; nl
+				    	 ( = ?\v c)			; vt
+				    	 ( = ?\f c)			; ff
+				    	 ( = ?\r c)))			; cr
 
-(define-function is_digit10 (c)	    (and (<= ?0  c) (<= c ?9)))	; 0 1 2 3 4 5 6 7 8 9
+(define-function is_digit10 (c)	    (and (<= ?0  c) (<= c ?9)))		; 0 1 2 3 4 5 6 7 8 9
 
-(define-function is_letter (c)	(or      ( = ?!  c)		; !
-				    (and (<= ?#  c) (<= c ?&))	; # $ % &
-				    (and (<= ?*  c) (<= c ?/))	; * + , - . /
-					 ( = ?:  c)		; :
-				    (and (<= ?<  c) (<= c ?Z))	; < = > ?  @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-					 ( = ?\\ c)		; \
-					 ( = ?^  c)		; ^
-					 ( = ?_  c)		; _
-				    (and (<= ?a  c) (<= c ?z))	; a b c d e f g h i j k l m n o p q r s t u v w x y z
-					 ( = ?|  c)		; |
-					 ( = ?~  c)))		; ~
+(define-function is_digit16 (c)	(or (and (<= ?0  c) (<= c ?9))		; 0 1 2 3 4 5 6 7 8 9
+				    (and (<= ?a  c) (<= c ?f))		; a b c d e f
+				    (and (<= ?A  c) (<= c ?F))))	; A B C D E F
+
+(define-function is_letter (c)	(or      ( = ?!  c)			; !
+				    (and (<= ?#  c) (<= c ?&))		; # $ % &
+				    (and (<= ?*  c) (<= c ?/))		; * + , - . /
+					 ( = ?:  c)			; :
+				    (and (<= ?<  c) (<= c ?Z))		; < = > ?  @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+					 ( = ?\\ c)			; \
+					 ( = ?^  c)			; ^
+					 ( = ?_  c)			; _
+				    (and (<= ?a  c) (<= c ?z))		; a b c d e f g h i j k l m n o p q r s t u v w x y z
+					 ( = ?|  c)			; |
+					 ( = ?~  c)))			; ~
 
 (define-function new_buffer ()
   (let ((buf (malloc (size-of-structure <buffer>))))
@@ -420,40 +425,74 @@
 	  (else				(fatal1 "illegal character escape: \\%c" c))))
     c))
 
-(define-function read (stream)
+(define-function read_number (c stream)
+  (let ((buf (new_buffer))
+	(neg (= ?- c)))
+    (or neg (buffer_append buf c))
+    (while (is_digit10 (set c (getc stream))) (buffer_append buf c))
+    (and (= ?x c) (= 1 (<buffer>-position buf))
+	 (let ()
+	   (buffer_append buf c)
+	   (while (is_digit16 (set c (getc stream))) (buffer_append buf c))))
+    (ungetc c stream)
+    (buffer_append buf 0)
+    (let ((result (strtoul (<buffer>-contents buf) 0 0)))
+      (buffer_delete buf)
+      (new-<long> (if neg (- result) result)))))
+
+(define-function read_symbol (c stream)
+  (let ((buf (new_buffer)))
+    (while (or (is_letter c) (is_digit10 c))
+      (buffer_append buf c)
+      (set c (getc stream)))
+    (ungetc c stream)
+    (buffer_append buf 0)
+    (let ((result (intern (<buffer>-contents buf))))
+      (buffer_delete buf)
+      result)))
+
+(define-function read_string (c stream)
+  (let ((buf (new_buffer)))
+    (while (!= ?\" (set c (getc stream)))
+      (set c (read_char c stream))
+      (and (= EOF c) (fatal "unterminated string literal"))
+      (buffer_append buf c))
+    (buffer_append buf 0)
+    (let ((result (new-<string> (<buffer>-contents buf))))
+      (buffer_delete buf)
+      result)))
+
+(define-function read_list (delim stream)
+  (let* ((head (new-<pair> () ()))
+	 (tail head)
+	 (obj  0))
+    (gc-protect (head obj)
+      (while (and (!= EOF (set obj (k_read stream))))
+	(set obj (new-<pair> obj ()))
+	(set tail (set_tail tail obj))))
+    (let ((c (getc stream)))
+      (if (= delim c)
+	  (get_tail head)
+	(fatal1 "missing closing '%c' delimiter while reading list" delim)))))
+
+(define-function k_read (stream)
   (while 1
     (let ((c (getc stream)))
       (cond
 	((is_blank c)	())
 	((= ?? c)	(return (new-<long> (read_char (getc stream) stream))))
-	((is_letter c)	(let ((buf (new_buffer)))
-			  (while (or (is_letter c) (is_digit10 c))
-			    (buffer_append buf c)
-			    (set c (getc stream)))
-			  (ungetc c stream)
-			  (buffer_append buf 0)
-			  (let ((result (intern (<buffer>-contents buf))))
-			    (buffer_delete buf)
-			    (return result))))
-	((is_digit10 c)	(let ((result (- c 48)))
-			  (while (is_digit10 (set c (getc stream)))
-			    (set result (+ (* 10 result) (- c 48))))
-			  (ungetc c stream)
-			  (return (new-<long> result))))
+	((= ?- c)	(return (if (is_digit10 (ungetc (getc stream) stream))
+				    (read_number c stream)
+				    (read_symbol c stream))))
+	((is_letter c)	(return (read_symbol c stream)))
+	((= ?\( c)	(return (read_list ?\) stream)))	((= ?\) c)	(return (let () (ungetc c stream) EOF)))
+	((= ?\[ c)	(return (read_list ?\] stream)))	((= ?\] c)	(return (let () (ungetc c stream) EOF)))
+	((= ?\{ c)	(return (read_list ?\} stream)))	((= ?\} c)	(return (let () (ungetc c stream) EOF)))
+	((is_digit10 c)	(return (read_number c stream)))
 	((= ?\; c)	(while (and (!= ?\n (set c (getc stream)))
 				    (!= ?\r c)
 				    (!= EOF c))))
-	((= ?\" c)	(let ((buf (new_buffer)))
-			  (while (!= ?\" (set c (getc stream)))
-			    (printf "IN %c\n" c)
-			    (set c (read_char c stream))
-			    (printf "OUT %c\n" c)
-			    (and (= EOF c) (fatal "unterminated string literal"))
-			    (buffer_append buf c))
-			  (buffer_append buf 0)
-			  (let ((result (new-<string> (<buffer>-contents buf))))
-			    (buffer_delete buf)
-			    (return result))))
+	((= ?\" c)	(return (read_string c stream)))
 	((< c 0)	(return EOF))
 	(else		(fatal1 "illegal character: %c" c))))))
 
@@ -479,6 +518,17 @@
 					(set i (+ 1 i)))
 				      (printf "\"")))))
       ((= type <symbol>)	(printf "%s" (get <symbol> _bits obj)))
+      ((= type <pair>)		(let ()
+				  (printf "(")
+				  (while (and (is <pair> obj)) ;; (not (= globals obj))
+				    (do_print (get_head obj) storing)
+				    (and (is <pair> (set obj (get_tail obj))) (printf " ")))
+				  ;; (and (= globals obj) (printf "<globals>"))
+				  (and obj
+				       (let ()
+					 (printf " . ")
+					 (do_print obj storing)))
+				  (printf ")")))
       (else			(printf "<type:%d>" type)))))
 
 (define-function k_print (obj)		(do_print obj 1))
@@ -490,13 +540,13 @@
   (set stdout (fdopen 1 "a"))
   (set stderr (fdopen 2 "a"))
   (gc_initialise)
-  (gc_push_root (address-of symbols))
+  (gc_push_root (address-of symbols) "symbols")
   (k_println (new-<long> 42))
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
     (printf "%s\n" (oop-at argv 0)))
   (let ((obj 0))
-    (while (!= EOF (set obj (read stdin)))
+    (while (!= EOF (set obj (k_read stdin)))
       (k_println obj)))
   (gc_gcollect)
   0)

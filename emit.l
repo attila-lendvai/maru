@@ -136,6 +136,8 @@
 				  (println "	leave")
 				  (println "	ret"))
 
+(define-instruction NEG)	(define-emit (NEG)		(println "	negl %eax"))
+
 (define-instruction ADD)	(define-emit (ADD TI32)		(println "	addl "$1",%eax"))
 
 (define-instruction SUB)	(define-emit (SUB TI32)		(println "	subl "$1",%eax"))
@@ -145,6 +147,8 @@
 (define-instruction AND)	(define-emit (AND TI32)		(println "	andl "$1",%eax"))
 
 (define-instruction OR)		(define-emit (OR TI32)		(println "	orl "$1",%eax"))
+
+(define-instruction XOR)	(define-emit (XOR TI32)		(println "	xorl "$1",%eax"))
 
 (define-instruction NOT)	(define-emit (NOT)		(println "	cmpl $0,%eax")
 								(println "	sete %al")
@@ -348,9 +352,9 @@
 (define operators
   (list->array
    `(()
-     ((,not ,NOT))
+     ((,not ,NOT) (,- ,NEG))
      ((,+ ,ADD) (,- ,SUB) (,* ,MUL)
-      (,& ,AND) (,| ,OR)
+      (,& ,AND) (,| ,OR) (,^ ,XOR)
       (,< ,LESS) (,<= ,LESSEQ) (,= ,EQUAL) (,!= ,NOTEQ) (,> ,GREATER)
       (,<< ,SHL) (,>> ,SHR)
       (,oop-at ,OOP-AT) (char-at ,CHR-AT))

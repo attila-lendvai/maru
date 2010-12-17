@@ -294,11 +294,11 @@ static int readChar(int c, FILE *fp)
       case 't':   return '\t';
       case 'v':   return '\v';
       case '\'':  return '\'';
-      case '"':   return '"';
-      case '\\':  return '\\';
-      case '(':   return '(';
-      case ')':   return ')';
-      case ';':   return ';';
+      case '"': case '\\': case ';':
+      case '(': case ')':
+      case '[': case ']':
+      case '{': case '}':
+		  return c;
       case 'u': {
 	int a= getc(fp), b= getc(fp), c= getc(fp), d= getc(fp);
 	return (digitValue(a) << 24) + (digitValue(b) << 16) + (digitValue(c) << 8) + digitValue(d);
