@@ -17,6 +17,9 @@ test : *.l *.k eval
 test-eval : test .force
 	time ./test test-eval.l
 
+test-boot : test .force
+	time ./test boot-emit.l
+
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && cc -c -o test.o test.s && size test.o && cc -o test test.o && ./test
 

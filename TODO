@@ -1,3 +1,12 @@
+coalesce free chunks in GC.
+
+fix stupid array situation.
+	array should grow by doubling in size
+	logical size should be independent of physical size
+	array->string should not break
+
+make NDEBUG option to eliminate typechecks.
+
 split <ptr> type from <long>.
 
 port streams.

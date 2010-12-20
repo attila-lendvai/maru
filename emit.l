@@ -4,9 +4,6 @@
 
 (define __PREFIX__ (if __MACH__ "_" ""))
 
-(define-function array-append (array element)
-  (set-array-at array (array-length array) element))
-
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
@@ -83,20 +80,22 @@
   (let* ((plain  (symbol->string name))
 	 (mangled (array))
 	 (index   0)
+	 (outdex  0)
 	 (size    (string-length plain)))
     (while (< index size)
       (let ((c (string-at plain index)))
 	(cond
 	  ((or (and (<= 0x61 c) (<= c 0x7a))
 	       (and (<= 0x41 c) (<= c 0x5a))
-	       (and (<= 0x30 c) (<= c 0x39)))	(array-append mangled c))
+	       (and (<= 0x30 c) (<= c 0x39)))	(let ()
+						  (set-array-at mangled outdex c)			(set outdex (+ outdex 1))))
 	  ((= ?_ c)				(let ()
-						  (array-append mangled c)
-						  (array-append mangled c)))
+						  (set-array-at mangled outdex c)			(set outdex (+ outdex 1))
+						  (set-array-at mangled outdex c)			(set outdex (+ outdex 1))))
 	  (else					(let ()
-						  (array-append mangled 0x5f)
-						  (array-append mangled (digit-for (>> c  4)))
-						  (array-append mangled (digit-for (&  c 15)))))))
+						  (set-array-at mangled outdex 0x5f)			(set outdex (+ outdex 1))
+						  (set-array-at mangled outdex (digit-for (>> c  4)))	(set outdex (+ outdex 1))
+						  (set-array-at mangled outdex (digit-for (&  c 15)))	(set outdex (+ outdex 1))))))
       (set index (+ 1 index)))
     (array->string mangled)))
       
@@ -231,7 +230,7 @@
 
 ;;; 
 
-(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm))
+(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc))
 
 (define-function compiler (env)
   (let ((self (new <compiler>)))
@@ -242,6 +241,7 @@
     (set (<compiler>-tmp-counter self) 0)
     (set (<compiler>-tmp-limit self) 0)
     (set (<compiler>-asm self) (array))
+    (set (<compiler>-pc self) 0)
     self))
 
 (define-function new-param (comp)
@@ -306,8 +306,9 @@
     (gen comp LOAD label)))
 
 (define-method gen <compiler> args
-  ;;(println "## insn " args)
-  (array-append (<compiler>-asm self) args))
+  ;;(print "## insn ") (dumpln args)
+  (set-array-at (<compiler>-asm self) (<compiler>-pc self) args)
+  (set (<compiler>-pc self) (+ 1 (<compiler>-pc self))))
 
 (define-function gen-tmp-prog (prog comp)
   (while (pair? prog)
@@ -386,7 +387,9 @@
 (define-function gen-let-binding (binding comp)
   (let ((name (car binding))
 	(temp (gen-tmp-prog (cdr binding) comp)))
+    ;x;(print "COMPILER ENV " (<compiler>-env comp))
     (set (<compiler>-env comp) (cons (cons name temp) (<compiler>-env comp)))
+    ;x;(println " -> " (<compiler>-env comp))
     temp))
 
 (define-function gen-let (expr comp)
@@ -475,13 +478,15 @@
    ))
 
 (define-method gen <pair> (comp)
-  ;;(println "GEN "self)
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
 	 (op    (cadr (assq head (array-at operators arity)))))
+    ;x;(println "GEN "self" "head" "arity" "op)
     (if op
 	((array-at generators arity) op (cdr self) comp)
       (set op (cdr (assq head forms)))
+      ;x;(println forms)
+      ;x;(println "FORM "self" "op)
       (if op
 	  (op self comp)
 	(let ((tmps (map-with gen-tmp (cdr self) comp))
@@ -556,7 +561,7 @@
       (emit DEFLABEL tnam)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
-      (array-do insn (<compiler>-asm comp) (apply emit insn))
+      (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
       (and (<compiler>-epilogue comp)
 	   (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
@@ -574,9 +579,10 @@
   (let ((comp (compiler env)))
     (while (not (= (caar env) limit))
       (println "## defn " (caar env))
+      ;x;(println (<expr>-defn (cdar env)))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
-    (array-do insn (<compiler>-asm comp) (apply emit insn))))
+    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
 (define-form compile-begin () `(define compile-environment-marker ()))
 

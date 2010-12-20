@@ -1227,6 +1227,12 @@ static subr(symbolP)
   return newBool(is(Symbol, getHead(args)));
 }
 
+static subr(stringP)
+{
+  arity1(args, "string?");
+  return newBool(is(String, getHead(args)));
+}
+
 static subr(string)
 {
   oop arg= car(args);
@@ -1477,6 +1483,7 @@ int main(int argc, char **argv)
       { " set-cdr",	   subr_set_cdr },
       { " form?",	   subr_formP },
       { " symbol?",	   subr_symbolP },
+      { " string?",	   subr_stringP },
       { " string", 	   subr_string },
       { " string-length",  subr_string_length },
       { " string-at",	   subr_string_at },
