@@ -1145,6 +1145,15 @@ static subr(type_of)
   return newLong(getType(getHead(args)));
 }
 
+static subr(warn)
+{
+  while (is(Pair, args)) {
+    doprint(stderr, getHead(args), 0);
+    args= getTail(args);
+  }
+  return nil;
+}
+
 static subr(print)
 {
   while (is(Pair, args)) {
@@ -1471,6 +1480,7 @@ int main(int argc, char **argv)
       { " eval",	   subr_eval },
       { " apply",	   subr_apply },
       { " type-of",	   subr_type_of },
+      { " warn",	   subr_warn },
       { " print",	   subr_print },
       { " dump",	   subr_dump },
       { " form",	   subr_form },

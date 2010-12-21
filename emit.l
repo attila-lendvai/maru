@@ -579,6 +579,7 @@
   (let ((comp (compiler env)))
     (while (not (= (caar env) limit))
       (println "## defn " (caar env))
+      (warn (caar env) "\n")
       ;x;(println (<expr>-defn (cdar env)))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
