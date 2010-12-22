@@ -1,5 +1,7 @@
 CFLAGS = -Wall -g # -Os
 
+.SUFFIXES :
+
 all : eval
 
 eval : eval.c gc.c gc.h buffer.c chartab.h
@@ -11,8 +13,12 @@ opt : .force
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
 
-test : *.l *.k eval
-	time ./emit.l eval.k > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
+test : *.l eval
+	time ./emit.l eval.l > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
+
+test2 : test .force
+	time ./test boot.l emit.l eval.l > test2.s
+	diff test.s test2.s
 
 test-eval : test .force
 	time ./test test-eval.l
@@ -25,8 +31,8 @@ test-emit : eval .force
 
 stats : .force
 	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.k | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l emit.l eval.k | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
 	rm -f *~ *.o main eval test
