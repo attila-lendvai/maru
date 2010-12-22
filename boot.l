@@ -125,9 +125,10 @@
       (let ((head (function (car alist) (car blist) a)))
 	(cons head (map2-with function (cdr alist) (cdr blist) a)))))
 
-(set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
+(set *expanders*   (array))	(define-form define-expand (type args . body)	`(set-array-at *expanders*   ,type (lambda ,args ,@body)))
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
+(set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 
 ;;; let*
 
@@ -150,8 +151,7 @@
 	    value
 	  `(if ,test ,value ,(%cond (cdr clauses)))))))
 
-(define-form cond clauses
-  (%cond clauses))
+(define-form cond clauses (%cond clauses))
 
 ;;; type information
 
@@ -182,7 +182,6 @@
 (define-form define-structure (name fields)
   (let ((type (%allocate-type name))
 	(size (list-length fields)))
-    ;;;(%print type" "name"\n")
     (set-array-at %structure-sizes  type size)
     (set-array-at %structure-fields type fields)
     `(let ()
@@ -368,50 +367,20 @@
 
 ;;; list
 
-(define-function reverse (list)
-  (let ((result ()))
-    (while (pair? list)
-      (set result (cons (car list) result))
-      (set list (cdr list)))
-    result))
-
 (define-form push (list element)
   `(set ,list (cons ,element ,list)))
 
 (define-form pop (list)
-  `(let* ((_list_ ,list)
-	  (_head_ (car _list_)))
+  `(let* ((_list_ ,list) (_head_ (car _list_)))
      (set ,list (cdr _list_))
      _head_))
-
-;;; incr decr
-
-(define-form incr (var . opt-step)
-  (let ((step (or opt-step 1)))
-    `(set ,var (+ ,var ,step))))
-
-(define-form decr (var . opt-step)
-  (let ((step (or opt-step 1)))
-    `(set ,var (- ,var ,step))))
-
-(define-form post-incr (var . opt-step)
-  (let ((step (or (car opt-step) 1)))
-    `(let ((_value_ ,var))
-       (set ,var (+ _value_ ,step))
-       _value_)))
-
-(define-form post-decr (var . opt-step)
-  (let ((step (or (car opt-step) 1)))
-    `(let ((_value_ ,var))
-       (set ,var (- _value_ ,step))
-       _value_)))
 
 ;;; iteration
 
 (define-form for (var-init-limit-step . body)
-  (let ((var   (car var-init-limit-step))
-	(init  (cadr var-init-limit-step))
-	(limit (caddr var-init-limit-step))
+  (let ((var   	   (car    var-init-limit-step)	   )
+	(init  	   (cadr   var-init-limit-step)	   )
+	(limit 	   (caddr  var-init-limit-step)	   )
 	(step  (or (cadddr var-init-limit-step) 1)))
     `(let ((,var ,init) (_limit_ ,limit))
        (while (< ,var _limit_)
@@ -423,14 +392,6 @@
      (while _list_
        (let ((,var (car _list_))) ,@body)
        (set _list_ (cdr _list_)))))
-
-;;; array-do
-
-(define-form array-do (var array . body)
-  `(let ((_array_ ,array))
-     (for (_index_ 0 (array-length _array_))
-       (let ((,var (array-at _array_ _index_)))
-	 ,@body))))
 
 ;;; conversion
 
