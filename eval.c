@@ -151,23 +151,29 @@ static oop arrayAt(oop array, int index)
   return nil;
 }
 
+static oop arrayGrow(oop array, int index)
+{
+  int size= arrayLength(array);
+  oop elts= get(array, Array,_array);
+  if ((unsigned)index >= (unsigned)size) {
+    GC_PROTECT(array);
+    int cap= GC_size(elts) / sizeof(oop);
+    if (index >= cap) {
+      while (cap <= index) cap *= 2;
+      oop oops= _newOops(_Array, sizeof(oop) * cap);
+      memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
+      elts= set(array, Array,_array, oops);
+    }
+    set(get(array, Array,size), Long,bits, index + 1);
+    GC_UNPROTECT(array);
+  }
+  return elts;
+}
+
 static oop arrayAtPut(oop array, int index, oop val)
 {
   if (is(Array, array)) {
-    oop elts= get(array, Array,_array);
-    int size= arrayLength(array);
-    if ((unsigned)index >= (unsigned)size) {
-      GC_PROTECT(array);
-      int cap= GC_size(elts) / sizeof(oop);
-      if (index >= cap) {
-	while (cap <= index) cap *= 2;
-	oop oops= _newOops(_Array, sizeof(oop) * cap);
-	memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
-	elts= set(array, Array,_array, oops);
-      }
-      set(get(array, Array,size), Long,bits, index + 1);
-      GC_UNPROTECT(array);
-    }
+    oop elts= arrayGrow(array, index);
     return ((oop *)elts)[index]= val;
   }
   return nil;
@@ -176,6 +182,19 @@ static oop arrayAtPut(oop array, int index, oop val)
 static oop arrayAppend(oop array, oop val)
 {
   return arrayAtPut(array, arrayLength(array), val);
+}
+
+static oop arrayInsert(oop obj, size_t index, oop value)
+{
+  size_t len= arrayLength(obj);
+  arrayAppend(obj, value);
+  if (index < len) {
+    oop  elts= get(obj, Array,_array);
+    oop *oops= (oop *)elts + index;
+    memmove(oops + 1, oops, sizeof(oop) * (len - index));
+  }
+  arrayAtPut(obj, index, value);
+  return value;
 }
 
 static oop oopAt(oop obj, int index)
@@ -212,19 +231,23 @@ static oop newSubr(imp_t imp, char *name)
 
 static oop newBool(int b)		{ return b ? s_t : nil; }
 
-static oop intern(char *cstr)
+static oop intern(char *string)
 {
-  oop list= nil;
-  for (list= symbols;  is(Pair, list);  list= getTail(list)) {
-    oop sym= getHead(list);
-    if (!strcmp(cstr, get(sym, Symbol,bits))) return sym;
+  ssize_t lo= 0, hi= arrayLength(symbols) - 1, c= 0;
+  oop s= nil;
+  while (lo <= hi) {
+    size_t m= (lo + hi) / 2;
+    s= arrayAt(symbols, m);
+    c= strcmp(string, get(s, Symbol,bits));
+    if      (c < 0)	hi= m - 1;
+    else if (c > 0)	lo= m + 1;
+    else		return s;
   }
-  oop sym= nil;
-  GC_PROTECT(sym);
-  sym= newSymbol(cstr);
-  symbols= newPair(sym, symbols);
-  GC_UNPROTECT(sym);
-  return sym;
+  GC_PROTECT(s);
+  s= newSymbol(string);
+  arrayInsert(symbols, lo, s);
+  GC_UNPROTECT(s);
+  return s;
 }
 
 #include "chartab.h"
@@ -580,18 +603,9 @@ static oop assq(oop key, oop alist)
 
 static oop define(oop name, oop value, oop env)
 {
-  oop ass;
-#if 0
-  ass= assq(name, env);
-  if (nil != ass)
-    setTail(ass, value);
-  else
-#endif
-    {
-      ass= newPair(name, value);		GC_PROTECT(ass);
-      oop ent= newPair(ass, getTail(env));	GC_UNPROTECT(ass);
-      setTail(env, ent);
-    }
+  oop ass= newPair(name, value);		GC_PROTECT(ass);
+  oop ent= newPair(ass, getTail(env));	GC_UNPROTECT(ass);
+  setTail(env, ent);
   return ass;
 }
 
@@ -1444,6 +1458,8 @@ int main(int argc, char **argv)
   GC_add_root(&evaluators);
   GC_add_root(&applicators);
   GC_add_root(&backtrace);
+
+  symbols= newArray(0);
 
   s_set			= intern("set");
   s_let			= intern("let");

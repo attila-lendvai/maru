@@ -36,6 +36,6 @@ stats : .force
 
 clean : .force
 	rm -f *~ *.o main eval test
-	rm -rf *.dSYM
+	rm -rf *.dSYM *.mshark
 
 .force :
