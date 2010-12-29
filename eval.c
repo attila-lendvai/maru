@@ -24,7 +24,7 @@ struct Long	{ long  bits; };
 struct String	{ oop   size;  char *bits; };
 struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
-struct Array	{ oop  _array; };
+struct Array	{ oop   size, _array; };
 struct Expr	{ oop 	defn, env; };
 struct Form	{ oop 	function; };
 struct Fixed	{ oop   function; };
@@ -125,19 +125,57 @@ static int stringLength(oop string)
 static oop newSymbol(char *cstr)	{ oop obj= newBits(Symbol);	set(obj, Symbol,bits, strdup(cstr));			return obj; }
 static oop newPair(oop head, oop tail)	{ oop obj= newOops(Pair);	set(obj, Pair,head, head);  set(obj, Pair,tail, tail);	return obj; }
 
-static oop newArray(int tally)
+static oop newArray(int size)
 {
-  oop elts= _newOops(_Array, sizeof(oop) * tally);	GC_PROTECT(elts);
-  oop obj=   newOops( Array);				GC_UNPROTECT(elts);
+  int cap=  size ? size : 1;
+  oop elts= _newOops(_Array, sizeof(oop) * cap);	GC_PROTECT(elts);
+  oop obj=   newOops( Array);				GC_PROTECT(obj);
   set(obj, Array,_array, elts);
+  set(obj, Array,size, newLong(size));			GC_UNPROTECT(obj);  GC_UNPROTECT(elts);
   return obj;
 }
 
 static int arrayLength(oop obj)
 {
-  if (is(Array, obj))
-    return GC_size(get(obj, Array,_array)) / sizeof(oop);
-  return 0;
+  return is(Array, obj) ? getLong(get(obj, Array,size)) : 0;
+}
+
+static oop arrayAt(oop array, int index)
+{
+  if (is(Array, array)) {
+    oop elts= get(array, Array,_array);
+    int size= arrayLength(array);
+    if ((unsigned)index < (unsigned)size)
+      return ((oop *)elts)[index];
+  }
+  return nil;
+}
+
+static oop arrayAtPut(oop array, int index, oop val)
+{
+  if (is(Array, array)) {
+    oop elts= get(array, Array,_array);
+    int size= arrayLength(array);
+    if ((unsigned)index >= (unsigned)size) {
+      GC_PROTECT(array);
+      int cap= GC_size(elts) / sizeof(oop);
+      if (index >= cap) {
+	while (cap <= index) cap *= 2;
+	oop oops= _newOops(_Array, sizeof(oop) * cap);
+	memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
+	elts= set(array, Array,_array, oops);
+      }
+      set(get(array, Array,size), Long,bits, index + 1);
+      GC_UNPROTECT(array);
+    }
+    return ((oop *)elts)[index]= val;
+  }
+  return nil;
+}
+
+static oop arrayAppend(oop array, oop val)
+{
+  return arrayAtPut(array, arrayLength(array), val);
 }
 
 static oop oopAt(oop obj, int index)
@@ -156,32 +194,6 @@ static oop oopAtPut(oop obj, int index, oop value)
   if (!GC_atomic(obj)) {
     int size= GC_size(obj) / sizeof(oop);
     if ((unsigned)index < (unsigned)size) return ((oop *)obj)[index]= value;
-  }
-  return nil;
-}
-
-static oop arrayAt(oop array, int index)
-{
-  if (is(Array, array)) {
-    oop elts= get(array, Array,_array);
-    int size= GC_size(elts) / sizeof(oop);
-    if ((unsigned)index < (unsigned)size)
-      return ((oop *)elts)[index];
-  }
-  return nil;
-}
-
-static oop arrayAtPut(oop array, int index, oop val)
-{
-  if (is(Array, array)) {
-    oop elts= get(array, Array,_array);
-    int size= GC_size(elts) / sizeof(oop);
-    if ((unsigned)index >= (unsigned)size) {
-      oop oops= _newOops(_Array, sizeof(oop) * (index + 1));
-      memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
-      elts= set(array, Array,_array, oops);
-    }
-    return ((oop *)elts)[index]= val;
   }
   return nil;
 }
