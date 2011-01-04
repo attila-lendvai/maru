@@ -151,29 +151,23 @@ static oop arrayAt(oop array, int index)
   return nil;
 }
 
-static oop arrayGrow(oop array, int index)
-{
-  int size= arrayLength(array);
-  oop elts= get(array, Array,_array);
-  if ((unsigned)index >= (unsigned)size) {
-    GC_PROTECT(array);
-    int cap= GC_size(elts) / sizeof(oop);
-    if (index >= cap) {
-      while (cap <= index) cap *= 2;
-      oop oops= _newOops(_Array, sizeof(oop) * cap);
-      memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
-      elts= set(array, Array,_array, oops);
-    }
-    set(get(array, Array,size), Long,bits, index + 1);
-    GC_UNPROTECT(array);
-  }
-  return elts;
-}
-
 static oop arrayAtPut(oop array, int index, oop val)
 {
   if (is(Array, array)) {
-    oop elts= arrayGrow(array, index);
+    int size= arrayLength(array);
+    oop elts= get(array, Array,_array);
+    if ((unsigned)index >= (unsigned)size) {
+      GC_PROTECT(array);
+      int cap= GC_size(elts) / sizeof(oop);
+      if (index >= cap) {
+	while (cap <= index) cap *= 2;
+	oop oops= _newOops(_Array, sizeof(oop) * cap);
+	memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
+	elts= set(array, Array,_array, oops);
+      }
+      set(get(array, Array,size), Long,bits, index + 1);
+      GC_UNPROTECT(array);
+    }
     return ((oop *)elts)[index]= val;
   }
   return nil;

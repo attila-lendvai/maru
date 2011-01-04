@@ -45,6 +45,7 @@
 (define free	(extern	'free))
 (define memset	(extern	'memset))
 (define memcpy	(extern	'memcpy))
+(define memmove	(extern	'memmove))
 (define printf	(extern	'printf))
 (define fprintf	(extern	'frintf))
 (define sprintf	(extern	'sprintf))
@@ -461,17 +462,19 @@
   (set (<buffer>-position buf) (- (<buffer>-position buf) 1))
   (<buffer>-contents buf))
 
-(define-function intern (cstr)
-  (let ((list symbols))
-    (while (is <pair> list)
-      (let ((sym (get_head list)))
-	(or (strcmp cstr (get <symbol> _bits sym))
-	    (return sym)))
-      (set list (get_tail list))))
-  (let ((sym (new-<symbol> cstr)))
-    (gc-protect (sym)
-      (set symbols (new-<pair> sym symbols))
-      sym)))
+(define-function intern (string)
+  (let ((lo 0)
+	(hi (- (k_array_length symbols) 1)))
+    (while (<= lo hi)
+      (let* ((m (/ (+ lo hi) 2))
+	     (s (k_array_at symbols m))
+	     (c (strcmp string (get <symbol> _bits s))))
+	(cond
+	  ((< c 0)	(set hi (- m 1)))
+	  ((> c 0)	(set lo (+ m 1)))
+	  (else		(return s)))))
+    (gc-let* ((s (new-<symbol> string)))
+      (k_array_insert symbols lo s))))
 
 (define-function is_octal (c)		(and (<= ?0 c) (<= c ?7)))
 
@@ -728,6 +731,18 @@
 			(set elts (put <array> _array obj oops)))
 		      (put <long> _bits (get <array> size obj) (+ 1 idx))))
 		(set-oop-at elts idx val))))))
+
+(define-function k_array_append (array val)
+  (k_set_array_at array (k_array_length array) val))
+
+(define-function k_array_insert (obj index value)
+  (let ((len (k_array_length obj)))
+    (k_array_append obj value)
+    (and (< index len) 
+	 (let ((elts (get <array> _array obj))
+	       (oops (+ elts (* 4 index))))
+	   (memmove (+ 4 oops) oops (* 4 (- len index))))))
+  (k_set_array_at obj index value))
 
 (define-function k_concat (head tail)
   (if (is <pair> head)
@@ -1239,9 +1254,9 @@
 (define-function main (argc argv)
   (set stderr (fdopen 2 "a"))
 
-  (gc_initialise)		(gcdebug (set gc_frequency 1))
+  (gc_initialise)							(gcdebug (set gc_frequency 1))
 
-  (gc_push_root (address-of symbols))
+  (set symbols (new-<array> 0))						(gc_push_root (address-of symbols))
 
   (set s_t			(intern "t"))
   (set s_dot			(intern "."))
