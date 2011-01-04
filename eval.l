@@ -204,7 +204,6 @@
     (set gc_bytes_used nused)
     (set gc_bytes_free nfree)
     (debug (printf "GC: %d used, %d free, %d allocations\n" nused nfree gc_alloc_count))
-    ;;(and (< nfree nused) (gc_grow_memory gc_quantum))
     ))
 
 (define-function gc_mark_and_trace (obj)
