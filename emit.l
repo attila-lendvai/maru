@@ -33,11 +33,9 @@
     (<variable>-value var)))
 
 (define-function env-define (env name value)
-  (let ((var (defined? name env)))
-    (if (and var (= env (<variable>-env var)))
-	(set (<variable>-value var) value)
-      (let ((bindings (<env>-bindings env)))
-	(array-append bindings (variable name value env (+ 1 (array-length bindings))))))
+  (let ((var (defined? name env))
+	(bindings (<env>-bindings env)))
+    (array-append bindings (variable name value env (+ 1 (array-length bindings))))
     var))
 
 ;;; EXTERN

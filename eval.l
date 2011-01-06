@@ -6,8 +6,8 @@
 (define-form debug prog ())
 ;;(define-form debug prog `(let () ,@prog))
 
-;;(define-form safe prog ())
-(define-form safe prog `(let () ,@prog))
+(define-form safe prog ())
+;;(define-form safe prog `(let () ,@prog))
 
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
@@ -372,7 +372,7 @@
       (set (<variable>-name  obj) name)
       (set (<variable>-value obj) value)
       (set (<variable>-env   obj) env)
-      (set (<variable>-index obj) index)
+      (set (<variable>-index obj) (new-<long> index))
       obj)))
 
 (define-form is (type arg)
@@ -703,15 +703,16 @@
 (define-function k_env_find_variable (env name)
   (while env
     (let* ((bindings (get <env> bindings env))
-	   (index    (k_array_length bindings)))
+	   (index    (k_array_length bindings))
+	   (vars     (get <array> _array bindings)))
       (while (<= 0 (set index (- index 1)))
-	(let ((var (k_array_at bindings index)))
+	(let ((var (oop-at vars index)))
 	  (and (= name (get <variable> name var))
 	       (return var)))))
     (set env (get <env> parent env))))
 
 (define-function k_env_lookup (env name)
-  (let ((var k_env_find_variable env name))
+  (let ((var (k_env_find_variable env name)))
     (if var
 	(get <variable> value var)
       (fatal1 "undefined variable: %s" (get <symbol> _bits name)))))
@@ -726,21 +727,6 @@
 	  (set var (new-<variable> name value env (+ 1 (k_array_length bindings))))
 	  (k_array_append bindings var))))
     var))
-
-;; (define-function k_define (name value env)
-;;   (let ((ass (new-<pair> name value)))
-;;     (gc-protect (ass)
-;;       (let ((ent (new-<pair> ass (get_tail env))))
-;; 	(set_tail env ent)
-;; 	ass))))
-
-;; (define-function k_assq (key list)
-;;   (while (is <pair> list)
-;;     (let ((head (get_head list)))
-;;       (and (is <pair> head)
-;; 	   (= key (get_head head))
-;; 	   (return head)))
-;;     (set list (get_tail list))))
 
 (define-function k_car (list)	(and (is <pair> list) (get_head list)))
 (define-function k_cdr (list)	(and (is <pair> list) (get_tail list)))
@@ -826,7 +812,7 @@
       ((= type <expr>)		(k_apply_expr fun arguments env))
       ((= type <fixed>)		(k_apply (get <fixed> function fun) arguments env))
       ((= type <subr>)		((get <subr> _imp fun) arguments env))
-      (else			(let ((ap (k_array_at (get_tail applicators) (get-type fun))))
+      (else			(let ((ap (k_array_at (get <variable> value applicators) (get-type fun))))
 				  (if ap
 				      (let ((args arguments))
 					(gc-protect (args)
@@ -872,7 +858,7 @@
 	  (set exp (new-<pair> head tail))
 	  (gc_pop_root (address-of tail))
 	  (gc_pop_root (address-of head))))
-    (let ((fn (k_array_at (get_tail expanders) (get-type exp))))
+    (let ((fn (k_array_at (get <variable> value expanders) (get-type exp))))
       (and fn
 	   (let ((args (new-<pair> exp ())))
 	     (gc-protect (args)
@@ -920,7 +906,7 @@
 					    (set tail (enlist tail env)))))
 	    ((!= head f_quote)		(set tail (enlist tail env))))
 	  (set exp (new-<pair> head tail))))
-    (let ((fn (k_array_at (get_tail encoders) (get-type exp))))
+    (let ((fn (k_array_at (get <variable> value encoders) (get-type exp))))
       (and fn (let () (printf "APPLY GOT ENCODER\n... " (k_println fn) 1)))
       (and fn
 	   (let ((args (new-<pair> env ())))
@@ -957,7 +943,7 @@
 						    (k_apply head args env)))))
 				    (set trace_depth (- trace_depth 1))
 				    head)))
-      (else			(let ((ev (k_array_at (get_tail evaluators) (get-type exp))))
+      (else			(let ((ev (k_array_at (get <variable> value evaluators) (get-type exp))))
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
 					 (gc-protect (args)
@@ -975,6 +961,11 @@
       (gc-protect (val)
         (k_env_define (get <variable> value globals) sym val)
 	val))))
+
+(define-function subr_definedP (args env)
+  (let ((s (k_car args))
+	(e (or (k_cadr args) (get <variable> value globals))))
+    (k_env_find_variable e s)))
 
 (define-function subr_lambda (args env)
   (new-<expr> args env))
@@ -1274,9 +1265,9 @@
     (while (!= EOF (set res (k_read stream)))
       (gc-protect (res)
 	(and (> opt_verbose 0) (printf ";;; ") (k_dumpln res))
-	(set res (k_expand res globals))	(and (> opt_verbose 2) (printf "expd--> ") (k_dumpln res))
-	(set res (k_encode res globals))	(and (> opt_verbose 2) (printf "encd--> ") (k_dumpln res))
-	(set res (k_eval   res globals))	(and (> opt_verbose 1) (printf "eval--> ") (k_dumpln res))
+	(set res (k_expand res (get <variable> value globals)))	(and (> opt_verbose 2) (printf "expd--> ") (k_dumpln res))
+	(set res (k_encode res (get <variable> value globals)))	(and (> opt_verbose 2) (printf "encd--> ") (k_dumpln res))
+	(set res (k_eval   res (get <variable> value globals)))	(and (> opt_verbose 1) (printf "eval--> ") (k_dumpln res))
 	))))
 
 (define-function define-subr (name imp)
@@ -1326,6 +1317,7 @@
   (define-fsubr "or"			subr_or)
   (define-fsubr "and"			subr_and)
   (define-fsubr "quote"			subr_quote)
+  (define-subr  "defined?"		subr_definedP)
   (define-subr  "not"			subr_not)
   (define-subr  "&"			subr_bitand)
   (define-subr  "|"			subr_bitor)
