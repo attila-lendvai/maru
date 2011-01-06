@@ -1,5 +1,33 @@
+encode variables as direct read/write on GLOBAL var object or LOCAL level + offset
+
 context-based local variables
 	context-like global indexed namespace???
+
+encoding:	var name -> level & offset | value-cell
+runtime:	<array> of values				level & offset | value-cell
+
+Env = {
+  level		-> long
+  keys		-> <array> { vars... }
+  values	-> <array>
+  parent
+  child
+}
+
+Variable = {
+  name
+  env
+  offset
+}
+
+Context = {
+  parent
+  child
+  keys
+  values
+}
+
+----------------------------------------------------------------
 
 split <ptr> type from <long>.
 

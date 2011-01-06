@@ -204,6 +204,8 @@
 (define-structure <form>	(function))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
+(define-structure <variable>	(name value env index))
+(define-structure <env>		(parent level bindings))
 
 ;;; selector
 
