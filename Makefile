@@ -13,6 +13,10 @@ opt : .force
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
 
+profile : .force
+	$(MAKE) clean eval CFLAGS="$(CFLAGS) -O3 -DNDEBUG"
+	shark -q -1 -i ./eval emit.l eval.l > test.s
+
 test : *.l eval
 	time ./emit.l eval.l > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
 

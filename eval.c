@@ -273,15 +273,9 @@ static oop lookup(oop env, oop name)
 
 static oop define(oop env, oop name, oop value)
 {
-  oop var= findVariable(env, name);
-  if (is(Variable, var) && (get(var, Variable,env) == env)) {
-    set(var, Variable,value, value);
-  }
-  else {
-    oop bindings= get(env, Env,bindings);
-    var= newVariable(name, value, env, arrayLength(bindings) + 1);	GC_PROTECT(var);
-    arrayAppend(bindings, var);						GC_UNPROTECT(var);
-  }
+  oop bindings= get(env, Env,bindings);
+  oop var= newVariable(name, value, env, arrayLength(bindings) + 1);	GC_PROTECT(var);
+  arrayAppend(bindings, var);						GC_UNPROTECT(var);
   return var;
 }
 
