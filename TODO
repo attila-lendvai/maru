@@ -1,4 +1,6 @@
-encode variables as direct read/write on GLOBAL var object or LOCAL level + offset
+encode variables as
+	direct read/write on GLOBAL var object, or
+	indirect read/write on LOCAL var object as level + offset
 
 context-based local variables
 	context-like global indexed namespace???
