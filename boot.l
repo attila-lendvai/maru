@@ -3,6 +3,8 @@
 (define %print print)
 (define %dump  dump)
 
+(define error)
+
 (define %error
   (lambda args
     (set error abort)
@@ -11,7 +13,7 @@
     (%print "\n")
     (abort)))
 
-(define error
+(set error
   (lambda args
     (set error %error)
     (%print "\nerror: ")
