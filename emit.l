@@ -1,6 +1,6 @@
 #!./eval
 
-(define __MACH__ ());;'t)
+(define __MACH__ 't)
 
 (define __PREFIX__ (if __MACH__ "_" ""))
 
