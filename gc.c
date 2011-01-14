@@ -15,7 +15,7 @@
 **
 ** THE SOFTWARE IS PROVIDED 'AS IS'.  USE ENTIRELY AT YOUR OWN RISK.
 **
-** Last edited: 2010-04-05 15:50:34 by piumarta on emilia-2.local
+** Last edited: 2011-01-13 10:51:29 by piumarta on emilia.ipe.media.kyoto-u.ac.jp
 */
 
 #include <stdio.h>
@@ -356,7 +356,7 @@ GC_API void GC_gcollect(void)
 #  undef static
     static char *cursors= "-/|\\";
     static int cursor= 0;
-    if (GC_collections % 100 == 0) {
+    if (GC_collections % 1000 == 0) {
       if (0 == cursors[cursor]) cursor= 0;
       fprintf(stderr, "%c\010", cursors[cursor]);
       ++cursor;

@@ -209,6 +209,11 @@
 (define-structure <variable>	(name value env index))
 (define-structure <env>		(parent level bindings))
 
+(define-function fixed (fun)
+  (let ((self (new <fixed>)))
+    (set (<fixed>-function self) fun)
+    self))
+
 ;;; selector
 
 (define-structure <selector> (name methods default))
