@@ -209,7 +209,8 @@
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
 (define-structure <variable>	(name value env index))
-(define-structure <env>		(parent level offset bindings))
+(define-structure <env>		(parent level offset bindings stable))
+(define-structure <context>	(home env bindings callee))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))

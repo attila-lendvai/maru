@@ -30,8 +30,8 @@ struct Form	{ oop 	function; };
 struct Fixed	{ oop   function; };
 struct Subr	{ imp_t imp;  char *name; };
 struct Variable	{ oop 	name, value, env, index; };
-struct Env	{ oop 	parent, level, offset, bindings; };
-struct Context	{ oop 	home, env, bindings; };
+struct Env	{ oop 	parent, level, offset, bindings, stable; };
+struct Context	{ oop 	home, env, bindings, callee; };
 
 union Object {
   struct Long		Long;
@@ -256,12 +256,25 @@ static oop newEnv(oop parent, int level, int offset)
   return obj;
 }
 
-static oop newContext(oop home, oop env)
+static oop newBaseContext(oop home, oop caller, oop env)
 {
   oop obj= newOops(Context);			GC_PROTECT(obj);
   set(obj, Context,home,     home);
   set(obj, Context,env,      env);
   set(obj, Context,bindings, newArray(0));	GC_UNPROTECT(obj);
+  return obj;
+}
+
+static oop newContext(oop home, oop caller, oop env)
+{
+  oop obj= nil;
+  if ((nil != caller) && (nil != (obj= get(caller, Context,callee)))) {
+    set(obj, Context,home,     home);
+    set(obj, Context,env,      env);
+    return obj;
+  }
+  obj= newBaseContext(home, caller, env);
+  if (nil != caller) set(caller, Context,callee, obj);
   return obj;
 }
 
@@ -292,10 +305,6 @@ static oop lookup(oop env, oop name)
 
 static oop define(oop env, oop name, oop value)
 {
-  if (opt_v && getLong(get(env, Env,level)) == 0) {
-    printf("define ");  dumpln(name);
-    if (!strcmp("fn", get(name, Symbol,bits))) fatal("oops");
-  }
   oop bindings= get(env, Env,bindings);
   int off= getLong(get(env, Env,offset));
   oop var= newVariable(name, value, env, off);	GC_PROTECT(var);
@@ -655,7 +664,8 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     case Env: {
-      fprintf(stream, "Env%s<%ld+%ld:", ((nil == get(obj, Env,parent)) ? "*" : ""), getLong(get(obj, Env,level)), getLong(get(obj, Env,offset)));
+      fprintf(stream, "Env%s%s<%ld+%ld:", ((nil == get(obj, Env,parent)) ? "*" : ""), ((nil == get(obj, Env,stable)) ? "=" : ""),
+	      getLong(get(obj, Env,level)), getLong(get(obj, Env,offset)));
       oop bnd= get(obj, Env,bindings);
       int idx= arrayLength(bnd);
       while (--idx >= 0) {
@@ -805,9 +815,14 @@ static oop encode(oop expr, oop env)
     if (nil == val) fatal("undefined variable: %s", get(expr, Symbol,bits));
     expr= val;
     if (isGlobal(expr)) {
-      oop val= get(expr, Variable,value);
+      val= get(expr, Variable,value);
       if (is(Form, val) || is(Fixed, val))
 	expr= val;
+    }
+    else {
+      oop venv= get(val, Variable,env);
+      if (getLong(get(venv, Env,level)) != getLong(get(env, Env,level)))
+	set(venv, Env,stable, s_t);
     }
   }
   else {
@@ -923,7 +938,7 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop defn=    get(fun, Expr,defn);				GC_PROTECT(defn);
       oop env=     car(defn);
       oop formals= cadr(defn);
-      oop ctx=     newContext(get(fun, Expr,ctx), env);		GC_PROTECT(ctx);
+      ctx=         newContext(get(fun, Expr,ctx), ctx, env);	GC_PROTECT(ctx);
       oop locals=  get(ctx, Context,bindings);
       oop tmp=     nil;						GC_PROTECT(tmp);
       while (is(Pair, formals)) {
@@ -958,6 +973,7 @@ static oop apply(oop fun, oop arguments, oop ctx)
       GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
+      if (nil != get(env, Env,stable)) set(ctx, Context,callee, nil);
       return ans;
     }
     case Fixed: {
@@ -1530,7 +1546,7 @@ static void replFile(FILE *stream)
     oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
     obj= expand(obj, env);
     obj= encode(obj, env);
-    oop ctx= newContext(nil, env);				GC_PROTECT(ctx);
+    oop ctx= newBaseContext(nil, nil, env);			GC_PROTECT(ctx);
     obj= eval  (obj, ctx);					GC_UNPROTECT(ctx);  GC_UNPROTECT(env);
     if ((stream == stdin) || (opt_v > 0)) {
       printf(" => ");

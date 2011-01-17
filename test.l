@@ -1,19 +1,13 @@
-42
-(define x 99)
-x
-(let ((y 1 2 3)) y)
-((lambda (x) (+ x x)) 21)
-(define f
-  (let (a b c)
-    (set a 1)
-    (set b 2)
-    (set c 3)
-    (lambda ()
-      (print a" "b" "c"\n"))))
-(f)
+(define mkcounter (lambda () (let ((x 0)) (lambda () (set x (+ x 1))))))
 
-(let ((y 99))
-  (define z 123)
-  (print z "\n"))
+(define a (mkcounter))
+(define b (mkcounter))
 
-(print(print z "\n") a" "b" "c"\n"))
+(print (a)"\n")
+(print (b)" "(b)"\n")
+(print (a)"\n")
+(print (b)" "(b)"\n")
+(print (a)"\n")
+(print (b)" "(b)"\n")
+(print (a)"\n")
+(print (b)" "(b)"\n")

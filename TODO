@@ -1,16 +1,7 @@
-make lambda() and let() construct and save a new env to their encoded form
-	lambda increments the env level
-	let does not increment the env level
+make local variables store level delta not absolute level
 
-add Context to eval.c
-	newContext
-	doprint
-
-make eval/apply use it
-
-propagate type changes to boot.l, eval.l
-
-change eval.l to use contexts
+add stable flag to environments - non-nil if free variable exists in context
+	on return, stable => kill parent's child pointer to protect context from reactivation
 
 optimise eval.c for
 	size check on invocation
