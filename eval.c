@@ -18,19 +18,20 @@ typedef oop (*imp_t)(oop args, oop env);
 
 #define nil ((oop)0)
 
-enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env };
+enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
 
 struct Long	{ long  bits; };
 struct String	{ oop   size;  char *bits; };
 struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
 struct Array	{ oop   size, _array; };
-struct Expr	{ oop 	defn, env; };
+struct Expr	{ oop 	defn, ctx; };
 struct Form	{ oop 	function; };
 struct Fixed	{ oop   function; };
 struct Subr	{ imp_t imp;  char *name; };
 struct Variable	{ oop 	name, value, env, index; };
-struct Env	{ oop 	parent, level, bindings; };
+struct Env	{ oop 	parent, level, offset, bindings; };
+struct Context	{ oop 	home, env, bindings; };
 
 union Object {
   struct Long		Long;
@@ -44,6 +45,7 @@ union Object {
   struct Subr		Subr;
   struct Variable	Variable;
   struct Env		Env;
+  struct Context	Context;
 };
 
 static void fatal(char *reason, ...);
@@ -215,9 +217,16 @@ static oop oopAtPut(oop obj, int index, oop value)
   return nil;
 }
 
-static oop newExpr(oop defn, oop env)	{ oop obj= newOops(Expr);	set(obj, Expr,defn, defn);  set(obj, Expr,env, env);	return obj; }
-static oop newForm(oop function)	{ oop obj= newOops(Form);	set(obj, Form,function, function);			return obj; }
-static oop newFixed(oop function)	{ oop obj= newOops(Fixed);	set(obj, Fixed,function, function);			return obj; }
+static oop newExpr(oop defn, oop ctx)
+{
+  oop obj= newOops(Expr);
+  set(obj, Expr,defn, defn);
+  set(obj, Expr,ctx, ctx);
+  return obj;
+}
+
+static oop newForm(oop function)	{ oop obj= newOops(Form);	set(obj, Form,function, function);	return obj; }
+static oop newFixed(oop function)	{ oop obj= newOops(Fixed);	set(obj, Fixed,function, function);	return obj; }
 
 static oop newSubr(imp_t imp, char *name)
 {
@@ -237,12 +246,22 @@ static oop newVariable(oop name, oop value, oop env, int index)
   return obj;
 }
 
-static oop newEnv(oop parent)
+static oop newEnv(oop parent, int level, int offset)
 {
   oop obj= newOops(Env);			GC_PROTECT(obj);
   set(obj, Env,parent,   parent);
-  set(obj, Env,level,    newLong((nil == parent) ? 0 : 1 + getLong(get(parent, Env,level))));
+  set(obj, Env,level,    newLong((nil == parent) ? 0 : getLong(get(parent, Env,level)) + level));
+  set(obj, Env,offset,   newLong(offset));
   set(obj, Env,bindings, newArray(0));		GC_UNPROTECT(obj);
+  return obj;
+}
+
+static oop newContext(oop home, oop env)
+{
+  oop obj= newOops(Context);			GC_PROTECT(obj);
+  set(obj, Context,home,     home);
+  set(obj, Context,env,      env);
+  set(obj, Context,bindings, newArray(0));	GC_UNPROTECT(obj);
   return obj;
 }
 
@@ -273,15 +292,22 @@ static oop lookup(oop env, oop name)
 
 static oop define(oop env, oop name, oop value)
 {
+  if (opt_v && getLong(get(env, Env,level)) == 0) {
+    printf("define ");  dumpln(name);
+    if (!strcmp("fn", get(name, Symbol,bits))) fatal("oops");
+  }
   oop bindings= get(env, Env,bindings);
-  oop var= newVariable(name, value, env, arrayLength(bindings) + 1);	GC_PROTECT(var);
-  arrayAppend(bindings, var);						GC_UNPROTECT(var);
+  int off= getLong(get(env, Env,offset));
+  oop var= newVariable(name, value, env, off);	GC_PROTECT(var);
+  arrayAppend(bindings, var);			GC_UNPROTECT(var);
+  set(env, Env,offset, newLong(off + 1));
   return var;
 }
 
 static int isGlobal(oop var)
 {
-  return getLong(get(get(var, Variable,env), Env,level)) == 0;
+  return 0 == getLong(get(get(var, Variable,env), Env,level));
+//  return nil == get(get(var, Variable,env), Env,parent);
 }
 
 static oop newBool(int b)		{ return b ? s_t : nil; }
@@ -581,7 +607,7 @@ static void doprint(FILE *stream, oop obj, int storing)
     }
     case Array: {
       int i, len= arrayLength(obj);
-      fprintf(stream, "Array(");
+      fprintf(stream, "Array<%d>(", arrayLength(obj));
       for (i= 0;  i < len;  ++i) {
 	if (i) fprintf(stream, " ");
 	doprint(stream, arrayAt(obj, i), storing);
@@ -622,18 +648,28 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     case Variable: {
+      if (isGlobal(obj) && isatty(1)) fprintf(stream, "[4m");
       doprint(stream, get(obj, Variable,name), 0);
+      if (isGlobal(obj) && isatty(1)) fprintf(stream, "[m");
       fprintf(stream, ";%ld+%ld", getLong(get(get(obj, Variable,env), Env,level)), getLong(get(obj, Variable,index)));
       break;
     }
     case Env: {
-      fprintf(stream, "Env<%ld:", getLong(get(obj, Env,level)));
+      fprintf(stream, "Env%s<%ld+%ld:", ((nil == get(obj, Env,parent)) ? "*" : ""), getLong(get(obj, Env,level)), getLong(get(obj, Env,offset)));
       oop bnd= get(obj, Env,bindings);
       int idx= arrayLength(bnd);
       while (--idx >= 0) {
 	doprint(stream, arrayAt(bnd, idx), storing);
 	if (idx) fprintf(stream, " ");
       }
+      fprintf(stream, ">");
+      break;
+    }
+    case Context: {
+      fprintf(stream, "Context<");
+      doprint(stream, get(obj, Context,env), storing);
+      fprintf(stream, "=");
+      doprint(stream, get(obj, Context,bindings), storing);
       fprintf(stream, ">");
       break;
     }
@@ -657,7 +693,7 @@ static void fdumpln(FILE *stream, oop obj)
 
 static void dumpln(oop obj)			{ fdumpln(stdout, obj); }
 
-static oop apply(oop fun, oop args, oop env);
+static oop apply(oop fun, oop args, oop ctx);
 
 static oop concat(oop head, oop tail)
 {
@@ -678,8 +714,9 @@ static oop expand(oop expr, oop env)
       oop val= findVariable(env, head);
       if (is(Variable, val)) val= get(val, Variable,value);
       if (is(Form, val)) {
-	head= apply(get(val, Form,function), getTail(expr), env);
+	head= apply(get(val, Form,function), getTail(expr), nil);
 	head= expand(head, env);				GC_UNPROTECT(head);
+	if (opt_v > 1) { printf("EXPAND => ");  dumpln(head); }
 	return head;
       }
     }
@@ -699,9 +736,10 @@ static oop expand(oop expr, oop env)
     oop fn= arrayAt(get(expanders, Variable,value), getType(expr));
     if (nil != fn) {
       oop args= newPair(expr, nil);		GC_PROTECT(args);
-      expr= apply(fn, args, env);		GC_UNPROTECT(args);
+      expr= apply(fn, args, nil);		GC_UNPROTECT(args);
     }
   }
+  if (opt_v > 1) { printf("EXPAND => ");  dumpln(expr); }
   return expr;
 }
 
@@ -722,20 +760,21 @@ static oop encode(oop expr, oop env)
   if (is(Pair, expr)) {
     oop head= encode(getHead(expr), env);			GC_PROTECT(head);
     oop tail= getTail(expr);					GC_PROTECT(tail);
-    if (f_let == head) {
-      oop args= cadr(expr);					GC_PROTECT(env);
-      env= newEnv(env);
+    if (f_let == head) { // (let ENV (bindings...) . body)
+      oop args= cadr(expr);
+      env= newEnv(env, 0, getLong(get(env, Env,offset)));	GC_PROTECT(env);
       while (is(Pair, args)) {
 	oop var= getHead(args);
 	if (is(Pair, var)) var= getHead(var);
 	define(env, var, nil);
 	args= getTail(args);
       }
-      tail= enlist(tail, env);					GC_UNPROTECT(env);
+      tail= enlist(tail, env);
+      tail= newPair(env, tail);					GC_UNPROTECT(env);
     }
-    else if (f_lambda == head) {
-      oop args= cadr(expr);					GC_PROTECT(env);
-      env= newEnv(env);
+    else if (f_lambda == head) { // (lambda ENV params . body)
+      oop args= car(tail);
+      env= newEnv(env, 1, 0);					GC_PROTECT(env);
       while (is(Pair, args)) {
 	define(env, getHead(args), nil);
 	args= getTail(args);
@@ -743,11 +782,13 @@ static oop encode(oop expr, oop env)
       if (nil != args) {
 	define(env, args, nil);
       }
-      tail= enlist(tail, env);					GC_UNPROTECT(env);
+      tail= enlist(tail, env);
+      tail= newPair(env, tail);					GC_UNPROTECT(env);
     }
     else if (f_define == head) {
-      define(get(globals, Variable,value), cadr(expr), nil);
-      tail= enlist(tail, env);
+      oop var= define(get(globals, Variable,value), car(tail), nil);
+      tail= enlist(cdr(tail), env);
+      tail= newPair(var, tail);
     }
     else if (f_set == head) {
       oop var= findVariable(env, car(tail));
@@ -774,7 +815,7 @@ static oop encode(oop expr, oop env)
     if (nil != fn) {
       oop args= newPair(env, nil);		GC_PROTECT(args);
       args= newPair(expr, args);
-      expr= apply(fn, args, env);		GC_UNPROTECT(args);
+      expr= apply(fn, args, nil);		GC_UNPROTECT(args);
     }
   }
   if (opt_v > 1) { printf("ENCODE => ");  dumpln(expr); }
@@ -810,7 +851,7 @@ static void fatal(char *reason, ...)
     oop args= newLong(traceDepth);		GC_PROTECT(args);
     args= newPair(args, nil);
     args= newPair(traceStack, args);
-    apply(cdr(backtrace), args, get(globals, Variable,value));	GC_UNPROTECT(args);
+    apply(cdr(backtrace), args, nil);		GC_UNPROTECT(args);
   }
   else {
     int i= traceDepth;
@@ -822,9 +863,9 @@ static void fatal(char *reason, ...)
   exit(1);
 }
 
-static oop eval(oop obj, oop env)
+static oop eval(oop obj, oop ctx)
 {
-  if (opt_v > 2) { printf("EVAL ");  dump(obj); printf(" IN ");  dumpln(env); }
+  if (opt_v > 2) { printf("EVAL ");  dump(obj); printf(" IN ");  dumpln(ctx); }
   switch (getType(obj)) {
     case Undefined:
     case Long:
@@ -833,25 +874,29 @@ static oop eval(oop obj, oop env)
     }
     case Pair: {
       arrayAtPut(traceStack, traceDepth++, obj);
-      oop head= eval(getHead(obj), env);	GC_PROTECT(head);
+      oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
       if (is(Fixed, head))
-	head= apply(get(head, Fixed,function), getTail(obj), env);
+	head= apply(get(head, Fixed,function), getTail(obj), ctx);
       else  {
-	oop args= evlist(getTail(obj), env);		GC_PROTECT(args);
-	head= apply(head, args, env);			GC_UNPROTECT(args);
+	oop args= evlist(getTail(obj), ctx);		GC_PROTECT(args);
+	head= apply(head, args, ctx);			GC_UNPROTECT(args);
       }							GC_UNPROTECT(head);
       --traceDepth;
       return head;
     }
     case Variable: {
-      return isGlobal(obj) ? get(obj, Variable,value) : lookup(env, get(obj, Variable,name));
+      if (isGlobal(obj)) return get(obj, Variable,value);
+      int delta= getLong(get(get(ctx, Context,env), Env,level)) - getLong(get(get(obj, Variable,env), Env,level));
+      oop cx= ctx;
+      while (delta--) cx= get(cx, Context,home);
+      return arrayAt(get(cx, Context,bindings), getLong(get(obj, Variable,index)));
     }
     default: {
       arrayAtPut(traceStack, traceDepth++, obj);
       oop ev= arrayAt(get(evaluators, Variable,value), getType(obj));
       if (nil != ev) {
 	oop args= newPair(obj, nil);			GC_PROTECT(args);
-	obj= apply(ev, obj, env);			GC_UNPROTECT(args);
+	obj= apply(ev, obj, ctx);			GC_UNPROTECT(args);
       }
       --traceDepth;
       return obj;
@@ -860,26 +905,27 @@ static oop eval(oop obj, oop env)
   return nil;
 }
 
-static oop evlist(oop obj, oop env)
+static oop evlist(oop obj, oop ctx)
 {
   if (!is(Pair, obj)) return obj;
-  oop head= eval(getHead(obj), env);		GC_PROTECT(head);
-  oop tail= evlist(getTail(obj), env);		GC_PROTECT(tail);
+  oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
+  oop tail= evlist(getTail(obj), ctx);		GC_PROTECT(tail);
   head= newPair(head, tail);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   return head;
 }
 
-static oop apply(oop fun, oop arguments, oop env)
+static oop apply(oop fun, oop arguments, oop ctx)
 {
-  if (opt_v > 2) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(env); }
+  if (opt_v > 2) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(ctx); }
   switch (getType(fun)) {
     case Expr: {
-      oop args= arguments;
-      oop defn= get(fun, Expr,defn);	GC_PROTECT(defn);
-      oop formals= car(defn);
-      env= get(fun, Expr,env);		GC_PROTECT(env);
-      oop tmp= nil;			GC_PROTECT(tmp);
-      env= newEnv(env);
+      oop args=    arguments;
+      oop defn=    get(fun, Expr,defn);				GC_PROTECT(defn);
+      oop env=     car(defn);
+      oop formals= cadr(defn);
+      oop ctx=     newContext(get(fun, Expr,ctx), env);		GC_PROTECT(ctx);
+      oop locals=  get(ctx, Context,bindings);
+      oop tmp=     nil;						GC_PROTECT(tmp);
       while (is(Pair, formals)) {
 	if (!is(Pair, args)) {
 	  fprintf(stderr, "\nerror: too few arguments applying ");
@@ -888,12 +934,12 @@ static oop apply(oop fun, oop arguments, oop env)
 	  fdumpln(stderr, arguments);
 	  fatal(0);
 	}
-	define(env, get(getHead(formals), Variable,name), getHead(args));
-	formals= getTail(formals);
-	args= getTail(args);
+	arrayAtPut(locals, getLong(get(getHead(formals), Variable,index)), getHead(args));
+	formals= getTail(formals); // xxx formals should be in env with fixed argument arity in defn
+	args= getTail(args); // xxx args should be set up in the callee context
       }
       if (is(Variable, formals)) {
-	define(env, get(formals, Variable,name), args);
+	arrayAtPut(locals, getLong(get(formals, Variable,index)), args);
 	args= nil;
       }
       if (nil != args) {
@@ -904,28 +950,28 @@ static oop apply(oop fun, oop arguments, oop env)
 	fatal(0);
       }
       oop ans= nil;
-      oop body= getTail(defn);
+      oop body= cddr(defn);
       while (is(Pair, body)) {
-	ans= eval(getHead(body), env);
+	ans= eval(getHead(body), ctx);
 	body= getTail(body);
       }
       GC_UNPROTECT(tmp);
-      GC_UNPROTECT(env);
+      GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
       return ans;
     }
     case Fixed: {
-      return apply(get(fun, Fixed,function), arguments, env);
+      return apply(get(fun, Fixed,function), arguments, ctx);
     }
     case Subr: {
-      return get(fun, Subr,imp)(arguments, env);
+      return get(fun, Subr,imp)(arguments, ctx);
     }
     default: {
       oop args= arguments;
       oop ap= arrayAt(get(applicators, Variable,value), getType(fun));
       if (nil != ap) {						GC_PROTECT(args);
 	args= newPair(fun, args);
-	args= apply(ap, args, env);				GC_UNPROTECT(args);
+	args= apply(ap, args, ctx);				GC_UNPROTECT(args);
 	return args;
       }
       fprintf(stderr, "\nerror: cannot apply: ");
@@ -962,16 +1008,16 @@ static void arity3(oop args, char *name)
   if (!is(Pair, args) || !is(Pair, getTail(args)) || !is(Pair, getTail(getTail(args))) || is(Pair, getTail(getTail(getTail(args))))) arity(args, name);
 }
 
-#define subr(NAME)	oop subr_##NAME(oop args, oop env)
+#define subr(NAME)	oop subr_##NAME(oop args, oop ctx)
 
 static subr(if)
 {
-  if (nil != eval(car(args), env))
-    return eval(cadr(args), env);
+  if (nil != eval(car(args), ctx))
+    return eval(cadr(args), ctx);
   oop ans= nil;
   args= cddr(args);
   while (is(Pair, args)) {
-    ans= eval(getHead(args), env);
+    ans= eval(getHead(args), ctx);
     args= cdr(args);
   }
   return ans;
@@ -981,7 +1027,7 @@ static subr(and)
 {
   oop ans= s_t;
   for (;  is(Pair, args);  args= getTail(args))
-    if (nil == (ans= eval(getHead(args), env)))
+    if (nil == (ans= eval(getHead(args), ctx)))
       break;
   return ans;
 }
@@ -990,7 +1036,7 @@ static subr(or)
 {
   oop ans= nil;
   for (;  is(Pair, args);  args= getTail(args))
-    if (nil != (ans= eval(getHead(args), env)))
+    if (nil != (ans= eval(getHead(args), ctx)))
       break;
   return ans;
 }
@@ -1003,46 +1049,49 @@ static subr(set)
     fdumpln(stderr, var);
     fatal(0);
   }
-  oop val= eval(cadr(args), env);
-  if (!isGlobal(var)) var= findVariable(env, get(var, Variable,name));
-  return set(var, Variable,value, val);
+  oop val= eval(cadr(args), ctx);
+  if (isGlobal(var)) return set(var, Variable,value, val);
+  int delta= getLong(get(get(ctx, Context,env), Env,level)) - getLong(get(get(var, Variable,env), Env,level));
+  oop cx= ctx;
+  while (delta--) cx= get(cx, Context,home);
+  return arrayAtPut(get(cx, Context,bindings), getLong(get(var, Variable,index)), val);
 }
 
 static subr(let)
 {
-  oop env2= newEnv(env);	GC_PROTECT(env2);
   oop tmp=  nil;		GC_PROTECT(tmp);
-  oop bindings= car(args);
-  oop body= cdr(args);
+  oop bindings= cadr(args);
+  oop body= cddr(args);
+  oop locals= get(ctx, Context,bindings);
   while (is(Pair, bindings)) {
     oop binding= getHead(bindings);
     if (is(Pair, binding)) {
-      oop symbol= get(getHead(binding), Variable,name);
+      oop var=    getHead(binding);
       oop prog=   getTail(binding);
       while (is(Pair, prog)) {
 	oop value= getHead(prog);
-	tmp= eval(value, env);
+	tmp= eval(value, ctx);
 	prog= getTail(prog);
       }
-      define(env2, symbol, tmp);
+      arrayAtPut(locals, getLong(get(var, Variable,index)), tmp);
     }
     bindings= getTail(bindings);
   }
   oop ans= nil;			GC_UNPROTECT(tmp);
   while (is(Pair, body)) {
-    ans= eval(getHead(body), env2);
+    ans= eval(getHead(body), ctx);
     body= getTail(body);
-  }				GC_UNPROTECT(env2);
+  }
   return ans;
 }
 
 static subr(while)
 {
   oop tst= car(args);
-  while (nil != eval(tst, env)) {
+  while (nil != eval(tst, ctx)) {
     oop body= cdr(args);
     while (is(Pair, body)) {
-      eval(getHead(body), env);
+      eval(getHead(body), ctx);
       body= getTail(body);
     }
   }
@@ -1056,7 +1105,7 @@ static subr(quote)
 
 static subr(lambda)
 {
-  return newExpr(args, env);
+  return newExpr(args, ctx);
 }
 
 static subr(define)
@@ -1067,7 +1116,7 @@ static subr(define)
     fdumpln(stderr, var);
     fatal(0);
   }
-  oop value= eval(cadr(args), env);
+  oop value= eval(cadr(args), ctx);
   set(var, Variable,value, value);
   return value;
 }
@@ -1190,10 +1239,10 @@ static subr(abort)
   return nil;
 }
 
-static subr(current_environment)
-{
-  return env;
-}
+// static subr(current_environment)
+// {
+//   return env;
+// }
 
 static subr(read)
 {
@@ -1218,10 +1267,11 @@ static subr(read)
 static subr(eval)
 {
   oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
-  oop e= car(args);  if (nil == e) e= env;
+  oop e= car(args);
+  if (nil == e) e= get(ctx, Context,env);
   x= expand(x, e);
   x= encode(x, e);
-  x= eval  (x, e);				GC_UNPROTECT(x);
+  x= eval  (x, ctx);				GC_UNPROTECT(x);
   return x;
 }
 
@@ -1229,8 +1279,7 @@ static subr(apply)
 {
   oop f= car(args);  args= cdr(args);
   oop a= car(args);  args= cdr(args);
-  oop e= car(args);  if (nil == e) e= env;
-  return apply(f, a, e);
+  return apply(f, a, ctx);
 }
 
 static subr(type_of)
@@ -1478,9 +1527,11 @@ static void replFile(FILE *stream)
       dumpln(obj);
       fflush(stdout);
     }
-    obj= expand(obj, (get(globals, Variable,value)));
-    obj= encode(obj, (get(globals, Variable,value)));
-    obj= eval  (obj, (get(globals, Variable,value)));
+    oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
+    obj= expand(obj, env);
+    obj= encode(obj, env);
+    oop ctx= newContext(nil, env);				GC_PROTECT(ctx);
+    obj= eval  (obj, ctx);					GC_UNPROTECT(ctx);  GC_UNPROTECT(env);
     if ((stream == stdin) || (opt_v > 0)) {
       printf(" => ");
       fflush(stdout);
@@ -1542,7 +1593,7 @@ int main(int argc, char **argv)
 
   oop tmp= nil;		GC_PROTECT(tmp);
 
-  globals= newEnv(nil);
+  globals= newEnv(nil, 0, 0);
   globals= define(globals, intern("*globals*"), globals);
 
   expanders=   define(get(globals, Variable,value), intern("*expanders*"),   nil);
@@ -1572,7 +1623,7 @@ int main(int argc, char **argv)
       { " defined?",	   subr_definedP },
       { " exit",	   subr_exit },
       { " abort",	   subr_abort },
-      { " current-environment",	   subr_current_environment },
+//    { " current-environment",	   subr_current_environment },
       { " read",	   subr_read },
       { " eval",	   subr_eval },
       { " apply",	   subr_apply },

@@ -15,6 +15,7 @@
   (printf "more %d\n" x)
   x)
   
+(define foo (lambda () (let ((z 42)) z)))
 
 (define main
   (lambda (argc argv)
@@ -24,10 +25,10 @@
     ;;(printf "%d\n" (fibs 5))
     (printf "%d\n" (or  1 2 3))
     (printf "%d\n" (and 1 2 3))
-    (let ((x 1 2 3 42))
-      (printf "a%d\n" x)
-      (set x (+ 1 x))
-      (printf "b%d\n" x)
+    (let ((y 1 2 3 42))
+      (printf "a%d\n" y)
+      (set y (+ 1 y))
+      (printf "b%d\n" y)
       )
     (printf "doit %d\n" (doit 42))
     0

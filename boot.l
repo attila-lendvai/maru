@@ -90,6 +90,8 @@
       (lambda (expr)
 	(qq-object expr)))))
 
+;;(exit (print `(1 2 3)))
+
 (define define-form (form (lambda (name args . body)
 			    `(define ,name (form (lambda ,args ,@body))))))
 
@@ -207,7 +209,7 @@
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
 (define-structure <variable>	(name value env index))
-(define-structure <env>		(parent level bindings))
+(define-structure <env>		(parent level offset bindings))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))

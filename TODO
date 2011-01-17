@@ -1,37 +1,35 @@
-sync emit.l/eval.l with eval.c algorithms
-	eval.l needs to expand and encode like eval.c before emit.l will work
+make lambda() and let() construct and save a new env to their encoded form
+	lambda increments the env level
+	let does not increment the env level
 
-make encode rewrite r-value variables as the value when value is subr
+add Context to eval.c
+	newContext
+	doprint
+
+make eval/apply use it
+
+propagate type changes to boot.l, eval.l
+
+change eval.l to use contexts
+
+optimise eval.c for
+	size check on invocation
+	cached allocation behavior - dlist
+
+propagate type changes to boot.l, eval.l
+
+optimise eval.l
+
+----------------------------------------------------------------
 
 use Context instead of Env to store locals in eval
+	then re-sync eval.l
+
+make encode rewrite r-value variables as the value when value is subr
 
 encode variables as
 	direct read/write on GLOBAL var object, or
 	indirect read/write on LOCAL var object as level + offset
-
-encoding:	var name -> level & offset | value-cell
-runtime:	<array> of values				level & offset | value-cell
-
-Env = {
-  level		-> long
-  keys		-> <array> { vars... }
-  values	-> <array>
-  parent
-  child
-}
-
-Variable = {
-  name
-  env
-  offset
-}
-
-Context = {
-  parent
-  child
-  keys
-  values
-}
 
 ----------------------------------------------------------------
 
