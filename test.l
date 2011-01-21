@@ -11,3 +11,7 @@
 (print (b)" "(b)"\n")
 (print (a)"\n")
 (print (b)" "(b)"\n")
+
+(define list (lambda args args))
+
+(list 1 2 3)

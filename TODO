@@ -1,26 +1,13 @@
 make local variables store level delta not absolute level
-
-add stable flag to environments - non-nil if free variable exists in context
-	on return, stable => kill parent's child pointer to protect context from reactivation
+	-> new <variable> object for each delta of free reference
 
 optimise eval.c for
 	size check on invocation
 	cached allocation behavior - dlist
 
-propagate type changes to boot.l, eval.l
-
-optimise eval.l
-
 ----------------------------------------------------------------
 
-use Context instead of Env to store locals in eval
-	then re-sync eval.l
-
 make encode rewrite r-value variables as the value when value is subr
-
-encode variables as
-	direct read/write on GLOBAL var object, or
-	indirect read/write on LOCAL var object as level + offset
 
 ----------------------------------------------------------------
 

@@ -269,8 +269,8 @@ static oop newContext(oop home, oop caller, oop env)
 {
   oop obj= nil;
   if ((nil != caller) && (nil != (obj= get(caller, Context,callee)))) {
-    set(obj, Context,home,     home);
-    set(obj, Context,env,      env);
+    set(obj, Context,home, home);
+    set(obj, Context,env,  env);
     return obj;
   }
   obj= newBaseContext(home, caller, env);
@@ -973,7 +973,7 @@ static oop apply(oop fun, oop arguments, oop ctx)
       GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
-      if (nil != get(env, Env,stable)) set(ctx, Context,callee, nil);
+      if (nil != get(env, Env,stable))	set(ctx, Context,callee, nil);
       return ans;
     }
     case Fixed: {

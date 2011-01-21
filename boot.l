@@ -204,7 +204,7 @@
 (define-structure <pair>	(head tail))
 (define-structure <_array>	())
 (define-structure <array>	(size _array))
-(define-structure <expr>	(defn env))
+(define-structure <expr>	(defn ctx))
 (define-structure <form>	(function))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))

@@ -20,9 +20,15 @@ profile : .force
 test : *.l eval
 	time ./emit.l eval.l > test.s && cc -c -o test.o test.s && size test.o && gcc -o test test.o
 
+time : .force
+	time ./eval emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
+
 test2 : test .force
 	time ./test boot.l emit.l eval.l > test2.s
 	diff test.s test2.s
+
+time2 : .force
+	time ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test-eval : test .force
 	time ./test test-eval.l
