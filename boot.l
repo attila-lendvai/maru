@@ -25,8 +25,10 @@
 (define cadr (lambda (x) (car (cdr x))))
 (define cdar (lambda (x) (cdr (car x))))
 (define cddr (lambda (x) (cdr (cdr x))))
+(define cadar (lambda (x) (car (cdr (car x)))))
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
+(define caddar (lambda (x) (car (cdr (cdr (car x))))))
 (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
 
 (define assq
@@ -75,8 +77,10 @@
 		     (if (pair? l)
 			 (let ((obj (car l)))
 			   (if (and (pair? obj) (= (car obj) 'unquote-splicing))
-			       (list 'concat-list (cadr obj)      (qq-list (cdr l)))
-			     (list   'cons        (qq-object obj) (qq-list (cdr l)))))
+			       (if (cdr l)
+				   (list 'concat-list (cadr obj) (qq-list (cdr l)))
+				 (cadr obj))
+			     (list 'cons (qq-object obj) (qq-list (cdr l)))))
 		       (list 'quote l))))
       (set qq-element (lambda (l)
 			(let ((head (car l)))
@@ -87,13 +91,11 @@
 		       (if (pair? object)
 			   (qq-element object)
 			 (list 'quote object))))
-      (lambda (expr)
+      (lambda (env expr)
 	(qq-object expr)))))
 
-;;(exit (print `(1 2 3)))
-
-(define define-form (form (lambda (name args . body)
-			    `(define ,name (form (lambda ,args ,@body))))))
+(define define-form (form (lambda (env name args . body)
+			    `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -133,6 +135,8 @@
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
 (set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
+
+(define-function array-append (array value) (set-array-at array (array-length array) value))
 
 ;;; let*
 
@@ -205,7 +209,7 @@
 (define-structure <_array>	())
 (define-structure <array>	(size _array))
 (define-structure <expr>	(defn ctx))
-(define-structure <form>	(function))
+(define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
 (define-structure <variable>	(name value env index))
@@ -216,6 +220,57 @@
   (let ((self (new <fixed>)))
     (set (<fixed>-function self) fun)
     self))
+
+(define-function variable (name value env index)
+  (let ((self (new <variable>)))
+    (set (<variable>-name  self) name)
+    (set (<variable>-value self) value)
+    (set (<variable>-env   self) env)
+    (set (<variable>-index self) index)
+    self))
+
+(define-function environment (parent)
+  (let ((self (new <env>)))
+    (set (<env>-parent 	 self) parent)
+    (set (<env>-level  	 self) (<env>-level  parent))
+    (set (<env>-offset 	 self) (<env>-offset parent))
+    (set (<env>-bindings self) (array))
+    self))
+
+(define-function environment-define (env name value)
+  (let ((bindings (<env>-bindings env))
+	(offset   (<env>-offset   env))
+	(var      (variable name value env offset)))
+    (set (<env>-offset env) (+ offset 1))
+    (array-append bindings var)))
+
+;;; local syntax
+
+(define-function make-with-form (args-body)
+  (and args-body `(lambda (*env* ,@(car args-body)) ,@(cdr args-body))))
+
+(define-form with-forms (bindings . body)
+  (let ((env (environment *env*)))
+    (while bindings
+      (let* ((binding (car   bindings))
+	     (name    (car   binding))
+	     (fun     (cadr  binding))
+	     (var     (caddr binding))
+	     (exp     (list 'form (make-with-form fun) (make-with-form var))))
+	(environment-define env (caar bindings) (eval exp *env*))
+	(set bindings (cdr bindings))))
+    (cons 'let (cons () (map-with expand body env)))))
+
+;;; field accesors
+
+(define-function make-instance-accessors (name fields i)
+  (and (pair? fields)
+       (cons `(,(concat-symbol 'self. (car fields)) () ((name) (list 'oop-at 'self ,i)))
+	     (make-instance-accessors name (cdr fields) (+ i 1)))))
+  
+(define-form with-instance-accessors (type . body)
+  `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
+    (let () ,@body)))
 
 ;;; selector
 
@@ -246,7 +301,8 @@
 
 (<selector>-add-method add-method <selector>
   (lambda (self type args body)
-    (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
+    (let ((typeid (eval type)))
+      (<selector>-add-method self typeid (eval `(lambda ,args (with-instance-accessors ,type ,@body)))))))
 
 (define-form define-method (selector type args . body)
   (if (symbol? args)
