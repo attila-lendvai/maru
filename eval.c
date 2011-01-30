@@ -26,7 +26,7 @@ struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
 struct Array	{ oop   size, _array; };
 struct Expr	{ oop 	defn, ctx; };
-struct Form	{ oop 	function; };
+struct Form	{ oop 	function, symbol; };
 struct Fixed	{ oop   function; };
 struct Subr	{ imp_t imp;  char *name; };
 struct Variable	{ oop 	name, value, env, index; };
@@ -225,8 +225,8 @@ static oop newExpr(oop defn, oop ctx)
   return obj;
 }
 
-static oop newForm(oop function)	{ oop obj= newOops(Form);	set(obj, Form,function, function);	return obj; }
-static oop newFixed(oop function)	{ oop obj= newOops(Fixed);	set(obj, Fixed,function, function);	return obj; }
+static oop newForm(oop fn, oop sym)	{ oop obj= newOops(Form);	set(obj, Form,function, fn);	set(obj, Form,symbol, sym);	return obj; }
+static oop newFixed(oop function)	{ oop obj= newOops(Fixed);	set(obj, Fixed,function, function);				return obj; }
 
 static oop newSubr(imp_t imp, char *name)
 {
@@ -633,6 +633,8 @@ static void doprint(FILE *stream, oop obj, int storing)
     case Form: {
       fprintf(stream, "Form(");
       doprint(stream, get(obj, Form,function), storing);
+      fprintf(stream, ", ");
+      doprint(stream, get(obj, Form,symbol), storing);
       fprintf(stream, ")");
       break;
     }
@@ -723,8 +725,9 @@ static oop expand(oop expr, oop env)
     if (is(Symbol, head)) {
       oop val= findVariable(env, head);
       if (is(Variable, val)) val= get(val, Variable,value);
-      if (is(Form, val)) {
-	head= apply(get(val, Form,function), getTail(expr), nil);
+      if (is(Form, val) && (nil != get(val, Form,function))) {
+	oop args= newPair(env, getTail(expr));			GC_PROTECT(args);
+	head= apply(get(val, Form,function), args, nil);	GC_UNPROTECT(args);
 	head= expand(head, env);				GC_UNPROTECT(head);
 	if (opt_v > 1) { printf("EXPAND => ");  dumpln(head); }
 	return head;
@@ -741,6 +744,16 @@ static oop expand(oop expr, oop env)
       tail= concat(getTail(getHead(tail)), getTail(tail));
     }
     expr= newPair(head, tail);					GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+  }
+  else if (is(Symbol, expr)) {
+    oop val= findVariable(env, expr);
+    if (is(Variable, val)) val= get(val, Variable,value);
+    if (is(Form, val) && (nil != get(val, Form,symbol))) {
+      oop args= newPair(expr, nil);			GC_PROTECT(args);
+      args= newPair(env, args);
+      args= apply(get(val, Form,symbol), args, nil);
+      expr= expand(args, env);				GC_UNPROTECT(args);
+    }
   }
   else {
     oop fn= arrayAt(get(expanders, Variable,value), getType(expr));
@@ -1280,6 +1293,24 @@ static subr(read)
   return head;
 }
 
+static subr(expand)
+{
+  oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
+  oop e= car(args);
+  if (nil == e) e= get(ctx, Context,env);
+  x= expand(x, e);				GC_UNPROTECT(x);
+  return x;
+}
+
+static subr(encode)
+{
+  oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
+  oop e= car(args);
+  if (nil == e) e= get(ctx, Context,env);
+  x= encode(x, e);				GC_UNPROTECT(x);
+  return x;
+}
+
 static subr(eval)
 {
   oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
@@ -1333,8 +1364,7 @@ static subr(dump)
 
 static subr(form)
 {
-  arity1(args, "form");
-  return newForm(getHead(args));
+  return newForm(car(args), cadr(args));
 }
 
 static subr(fixedP)
@@ -1641,6 +1671,8 @@ int main(int argc, char **argv)
       { " abort",	   subr_abort },
 //    { " current-environment",	   subr_current_environment },
       { " read",	   subr_read },
+      { " expand",	   subr_expand },
+      { " encode",	   subr_encode },
       { " eval",	   subr_eval },
       { " apply",	   subr_apply },
       { " type-of",	   subr_type_of },
