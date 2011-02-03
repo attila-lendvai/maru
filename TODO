@@ -1,3 +1,17 @@
+make eval.c eval.l use WIDE CHARACTERS
+
+propagate changes eval.c -> eval.l
+
+inheritance between structures
+
+active variables
+	implement inst var access by name
+
+split emit.l into
+	emit-common.l	the stuff that does not depend on the target language
+	emit-386.l	static x86 code
+	emit-c.l	static C code
+
 make local variables store level delta not absolute level
 	-> new <variable> object for each delta of free reference
 
@@ -16,3 +30,10 @@ split <ptr> type from <long>.
 port streams.
 
 port PEG.
+
+----------------------------------------------------------------
+
+The crux of the biscuit is: If it entertains you, fine.  Enjoy it.  If
+it doesn't, then blow it out your ass.  I do it to amuse myself.  If I
+like it, I release it.  If somebody else likes it, that's a bonus.
+-- Frank Zappa
