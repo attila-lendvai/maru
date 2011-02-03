@@ -49,7 +49,10 @@
 (define printf	(extern	'printf))
 (define fprintf	(extern	'frintf))
 (define sprintf	(extern	'sprintf))
+(define isatty	(extern	'isatty))
 
+(define stdin			0)
+(define stdout			0)
 (define stderr			0)
 
 (define gc_quantum		65504)
@@ -416,7 +419,7 @@
       obj)))
 
 (define-function new-base-<context> (home caller env)
-  (let ((obj (new-oops <env> (size-of-structure <context>))))
+  (let ((obj (new-oops <context> (size-of-structure <context>))))
     (gc-protect (obj)
       (set (<context>-home     obj) home)
       (set (<context>-env      obj) env)
@@ -839,6 +842,7 @@
 (define k_eval) ;; forward
 
 (define-function k_apply_expr (fun arguments ctx)
+  (and (< 2 opt_verbose) (let () (printf "  A  ")  (k_dump fun)  (printf " ")  (k_dump arguments) (printf " ")  (k_dumpln ctx) (fflush stdout)))
   (let* ((args    arguments)
 	 (defn    (get <expr> defn fun))
 	 (env     (k_car defn))
@@ -1015,6 +1019,7 @@
     obj))
 
 (set k_eval (lambda (exp ctx)
+  (and (< 2 opt_verbose) (let () (printf "  E  ")  (k_dump exp)  (printf " ") (k_dumpln ctx)  (fflush stdout)))
   (let ((type (get-type exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -1294,6 +1299,11 @@
 (define-function subr_car	(args env)	(k_car (k_car args)))
 (define-function subr_cdr	(args env)	(k_cdr (k_car args)))
 
+(define-function subr_set_cdr (args ctx)
+  (let ((arg (k_car args)))
+    (and (is <pair> arg)
+	 (put <pair> tail arg (k_cadr args)))))
+
 (define-function subr_oop_at (args ctx)
   (arity2 "oop-at" args)
   (let ((obj (get_head args))
@@ -1391,8 +1401,10 @@
 
 (define-function repl_stream (stream)
   (let ((res ()))
-    (fscanf stream "#!%*[^\012\015]")
-    (while (!= EOF (set res (k_read stream)))
+    (or (= stdin stream) (fscanf stream "#!%*[^\012\015]"))
+    (while (let ()
+	     (and (= stdin stream) (fprintf stdout ".") (fflush stdout))
+	     (!= EOF (set res (k_read stream))))
       (let ((env (new-<env> (get <variable> value globals) 1 0)))
         (gc-protect (res env)
 	  (and (> opt_verbose 0) (printf ";;; ") (k_dumpln res))
@@ -1401,8 +1413,12 @@
 	  (let ((ctx (new-base-<context> () () env)))
 	    (gc-protect (ctx)
 	      (set res (k_eval res ctx))				(and (> opt_verbose 1) (printf "eval--> ") (k_dumpln res))
-	      (and (> opt_verbose 0) (printf ";;; => ") (k_dumpln res))
-	      res)))))))
+	      (if (= stdin stream)
+		  (k_dumpln res)
+		(and (> opt_verbose 0) (printf ";;; => ") (k_dumpln res)))
+	      res)))))
+    (and (= stdin stream)
+	 (printf "\nmorituri te salutant\n"))))
 
 (define-function define-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
@@ -1416,6 +1432,8 @@
       (k_env_define (get <variable> value globals) (intern name) tmp))))
 
 (define-function main (argc argv)
+  (set stdin  (fdopen 0 "r"))
+  (set stdout (fdopen 1 "a"))
   (set stderr (fdopen 2 "a"))
 
   (gc_initialise)							(gcdebug (set gc_frequency 1))
@@ -1490,6 +1508,7 @@
   (define-subr  "array?"		subr_arrayP)
   (define-subr  "car"			subr_car)
   (define-subr  "cdr"			subr_cdr)
+  (define-subr  "set-cdr"		subr_set_cdr)
   (define-subr  "oop-at"		subr_oop_at)
   (define-subr  "set-oop-at"		subr_set_oop_at)
   (define-subr  "array-length"		subr_array_length)
@@ -1510,15 +1529,19 @@
 
   (set trace_stack (new-<array> 32))				(gc_push_root (address-of trace_stack))
 
+  (k_env_define (get <variable> value globals) (intern "*backtrace*") ())
+
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
     (let ((arg (oop-at argv 0)))
       (cond
 	((not (strcmp arg "-v"))	(set opt_verbose (+ 1 opt_verbose)))
+	((not (strcmp arg "-"))		(repl_stream stdin))
 	(else				(let ((stream (fopen (oop-at argv 0) "r")))
 					  (or stream (fatal1 "no such file: %s" (oop-at argv 0)))
 					  (repl_stream stream)
 					  (fclose stream))))))
+
   (and (> opt_verbose 0)
        (let ()
 	 (gc_gcollect)
