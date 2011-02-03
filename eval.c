@@ -25,7 +25,7 @@ struct String	{ oop   size;  char *bits; };
 struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
 struct Array	{ oop   size, _array; };
-struct Expr	{ oop 	defn, ctx; };
+struct Expr	{ oop 	name, defn, ctx; };
 struct Form	{ oop 	function, symbol; };
 struct Fixed	{ oop   function; };
 struct Subr	{ imp_t imp;  char *name; };
@@ -100,7 +100,7 @@ static oop symbols= nil;
 static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil;
 static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
-static oop backtrace= nil;
+static oop backtrace= nil, input= nil;
 
 static int opt_b= 0, opt_v= 0;
 
@@ -310,6 +310,8 @@ static oop define(oop env, oop name, oop value)
   oop var= newVariable(name, value, env, off);	GC_PROTECT(var);
   arrayAppend(bindings, var);			GC_UNPROTECT(var);
   set(env, Env,offset, newLong(off + 1));
+  if (is(Expr, value) && (nil == get(value, Expr,name)))
+    set(value, Expr,name, name);
   return var;
 }
 
@@ -419,7 +421,6 @@ static int readChar(int c, FILE *fp)
       case 'r':   return '\r';
       case 't':   return '\t';
       case 'v':   return '\v';
-      case '\'':  return '\'';
       case 'u': {
 	int a= getc(fp), b= getc(fp), c= getc(fp), d= getc(fp);
 	return (digitValue(a) << 24) + (digitValue(b) << 16) + (digitValue(c) << 8) + digitValue(d);
@@ -625,9 +626,12 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     case Expr: {
-      fprintf(stream, "Expr(");
-      doprint(stream, car(get(obj, Expr,defn)), storing);
-      fprintf(stream, ")");
+      fprintf(stream, "Expr");
+      if (nil != (get(obj, Expr,name))) {
+	fprintf(stream, ".");
+	doprint(stream, get(obj, Expr,name), storing);
+      }
+      doprint(stream, cadr(get(obj, Expr,defn)), storing);
       break;
     }
     case Form: {
@@ -875,11 +879,13 @@ static void fatal(char *reason, ...)
     va_end(ap);
   }
 
-  if (nil != cdr(backtrace)) {
+  oop tracer= get(backtrace, Variable,value);
+
+  if (nil != tracer) {
     oop args= newLong(traceDepth);		GC_PROTECT(args);
     args= newPair(args, nil);
     args= newPair(traceStack, args);
-    apply(cdr(backtrace), args, nil);		GC_UNPROTECT(args);
+    apply(tracer, args, nil);			GC_UNPROTECT(args);
   }
   else {
     int i= traceDepth;
@@ -999,8 +1005,10 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop args= arguments;
       oop ap= arrayAt(get(applicators, Variable,value), getType(fun));
       if (nil != ap) {						GC_PROTECT(args);
+	arrayAtPut(traceStack, traceDepth++, fun);
 	args= newPair(fun, args);
 	args= apply(ap, args, ctx);				GC_UNPROTECT(args);
+	--traceDepth;
 	return args;
       }
       fprintf(stderr, "\nerror: cannot apply: ");
@@ -1079,6 +1087,7 @@ static subr(set)
     fatal(0);
   }
   oop val= eval(cadr(args), ctx);
+  if (is(Expr, val) && (nil == get(val, Expr,name))) set(val, Expr,name, get(var, Variable,name));
   if (isGlobal(var)) return set(var, Variable,value, val);
   int delta= getLong(get(get(ctx, Context,env), Env,level)) - getLong(get(get(var, Variable,env), Env,level));
   oop cx= ctx;
@@ -1146,6 +1155,7 @@ static subr(define)
     fatal(0);
   }
   oop value= eval(cadr(args), ctx);
+  if (is(Expr, value) && (nil == get(value, Expr,name))) set(value, Expr,name, get(var, Variable,name));
   set(var, Variable,value, value);
   return value;
 }
@@ -1268,10 +1278,14 @@ static subr(abort)
   return nil;
 }
 
-// static subr(current_environment)
-// {
-//   return env;
-// }
+static subr(getc)
+{
+  oop arg= car(args);
+  if (nil == arg) arg= get(input, Variable,value);
+  if (!is(Long, arg)) { fprintf(stderr, "getc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  FILE *stream= (FILE *)getLong(arg);
+  return newLong(getc(stream));
+}
 
 static subr(read)
 {
@@ -1360,6 +1374,42 @@ static subr(dump)
     args= getTail(args);
   }
   return nil;
+}
+
+static subr(format)
+{
+  arity2(args, "format");
+  oop ofmt= car(args);		if (!is(String, ofmt)) fatal("format is not a string");
+  oop oarg= cadr(args);
+  char *fmt= get(ofmt, String,bits);
+  void *arg= 0;
+  switch (getType(oarg)) {
+    case Undefined:						break;
+    case Long:		arg= (void *)getLong(oarg);		break;
+    case String:	arg= (void *)get(oarg, String,bits);	break;
+    case Symbol:	arg= (void *)get(oarg, Symbol,bits);	break;
+    default:		arg= (void *)oarg;			break;
+  }
+  size_t size= 100;
+  char *p, *np;
+  oop ans= nil;
+  if (!(p= malloc(size))) return nil;
+  for (;;) {
+    int n= snprintf (p, size, fmt, arg);
+    if (0 <= n && n < size) {
+      ans= newString(p);
+      free(p);
+      break;
+    }
+    if (n >= 0)	size= n + 1;
+    else	size *= 2;
+    if (!(np= realloc (p, size))) {
+      free(p);
+      break;
+    }
+    p= np;
+  }
+  return ans;
 }
 
 static subr(form)
@@ -1451,7 +1501,7 @@ static subr(string_at)
   oop arr= getHead(args);		if (!is(String, arr)) { fprintf(stderr, "string-at: non-String argument: ");  fdumpln(stderr, arr);  fatal(0); }
   oop arg= getHead(getTail(args));	if (!is(Long, arg)) return nil;
   int idx= getLong(arg);
-  if (0 <= idx && idx < stringLength(arr)) return newLong(get(arr, String,bits)[idx]);
+  if (0 <= idx && idx < stringLength(arr)) return newLong(255 & get(arr, String,bits)[idx]);
   return nil;
 }
 
@@ -1561,6 +1611,7 @@ static subr(not)
 
 static void replFile(FILE *stream)
 {
+  set(input, Variable,value, newLong((long)stream));
   for (;;) {
     if (stream == stdin) {
       printf(".");
@@ -1642,14 +1693,15 @@ int main(int argc, char **argv)
   globals= newEnv(nil, 0, 0);
   globals= define(globals, intern("*globals*"), globals);
 
-  expanders=   define(get(globals, Variable,value), intern("*expanders*"),   nil);
-  encoders=    define(get(globals, Variable,value), intern("*encoders*"),    nil);
-  evaluators=  define(get(globals, Variable,value), intern("*evaluators*"),  nil);
-  applicators= define(get(globals, Variable,value), intern("*applicators*"), nil);
+  expanders=	define(get(globals, Variable,value), intern("*expanders*"),   nil);
+  encoders=	define(get(globals, Variable,value), intern("*encoders*"),    nil);
+  evaluators=	define(get(globals, Variable,value), intern("*evaluators*"),  nil);
+  applicators=	define(get(globals, Variable,value), intern("*applicators*"), nil);
 
-  traceStack=  newArray(32);					GC_add_root(&traceStack);
+  traceStack=	newArray(32);					GC_add_root(&traceStack);
 
-  backtrace=   define(get(globals, Variable,value), intern("*backtrace*"), nil);
+  backtrace=	define(get(globals, Variable,value), intern("*backtrace*"), nil);
+  input=	define(get(globals, Variable,value), intern("*input*"), nil);
 
 #define _do(NAME, OP)	tmp= newSubr(subr_##NAME, #OP);  define(get(globals, Variable,value), intern(#OP), tmp);
   _do_unary();  _do_binary();  _do(sub, -);  _do_relation();  _do(eq, =);  _do(ne, !=);
@@ -1670,6 +1722,7 @@ int main(int argc, char **argv)
       { " exit",	   subr_exit },
       { " abort",	   subr_abort },
 //    { " current-environment",	   subr_current_environment },
+      { " getc",	   subr_getc },
       { " read",	   subr_read },
       { " expand",	   subr_expand },
       { " encode",	   subr_encode },
@@ -1679,6 +1732,7 @@ int main(int argc, char **argv)
       { " warn",	   subr_warn },
       { " print",	   subr_print },
       { " dump",	   subr_dump },
+      { " format",	   subr_format },
       { " form",	   subr_form },
       { " fixed?",	   subr_fixedP },
       { " cons",	   subr_cons },
