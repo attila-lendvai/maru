@@ -26,6 +26,8 @@
 (define cdar (lambda (x) (cdr (car x))))
 (define cddr (lambda (x) (cdr (cdr x))))
 (define cadar (lambda (x) (car (cdr (car x)))))
+(define caadr (lambda (x) (car (car (cdr x)))))
+(define cdadr (lambda (x) (cdr (car (cdr x)))))
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
 (define caddar (lambda (x) (car (cdr (cdr (car x))))))
@@ -136,8 +138,6 @@
 (set *evaluators*  (array))	(define-form define-eval   (type args . body)	`(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
 (set *applicators* (array))	(define-form define-apply  (type args . body)	`(set-array-at *applicators* ,type (lambda ,args ,@body)))
 
-(define-function array-append (array value) (set-array-at array (array-length array) value))
-
 ;;; let*
 
 (define-function %let* (bindings body)
@@ -180,8 +180,16 @@
 (define %structure-sizes	(array))
 (define %structure-fields	(array))
 
+(define-function %typecheck (type object)
+  (or (= type (type-of object))
+      (error "type check failed for field accessor: expected "(array-at %type-names type)" got "(array-at %type-names (type-of object))))
+  object)
+
 (define-function %make-accessor (name fields offset)
-  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self) (list 'oop-at self ,offset))
+  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
+		      (list 'oop-at
+			    self ; (list '%typecheck ',name self) ; self
+			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define-function %make-accessors (name fields)
@@ -208,13 +216,16 @@
 (define-structure <pair>	(head tail))
 (define-structure <_array>	())
 (define-structure <array>	(size _array))
-(define-structure <expr>	(defn ctx))
+(define-structure <expr>	(name defn ctx))
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
 (define-structure <variable>	(name value env index))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee))
+
+(define-function array-append (arr val)
+  (set-array-at arr (array-length arr) val))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
@@ -289,6 +300,7 @@
     self))
 
 (define-function <selector>-add-method (self type method)
+  (or (<expr>-name method) (set (<expr>-name method) (<selector>-name self)))
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
@@ -375,16 +387,18 @@
       (print arg))
     found))
 
-(define *backtrace*
-  (lambda (stack depth)
-    (let ((posn (array)))
-      (while (>= (set depth (- depth 1)) 0)
-	(let ((here (array-at stack depth)))
-	  (print "  " depth "\t")
-	  (dump-until posn here)
-	  (print "\n")
-	  (set posn here))))
-    (exit 0)))
+(if 't;;()
+    (set *backtrace*
+	 (lambda (stack depth)
+	   (println "\n")
+	   (let ((posn (array)))
+	     (while (>= (set depth (- depth 1)) 0)
+	       (let ((here (array-at stack depth)))
+		 (print "  " depth "\t")
+		 (dump-until posn here)
+		 (print "\n")
+		 (set posn here))))
+	   (exit 0))))
 
 ;;; multimethod
 
@@ -404,6 +418,7 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
+  (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm)))
   (if types
       (let ((methods (or (<generic>-methods mm)
 			 (set (<generic>-methods mm) (array 32)))))
@@ -471,3 +486,17 @@
       (set-string-at str ind (array-at arr ind))
       (set ind (+ 1 ind)))
     str))
+
+;;; structural equality
+
+(define equal ()) ;; forward
+
+(define-function equal-lists (a b)
+  (and (equal (car a) (car b))
+       (equal (cdr a) (cdr b))))
+
+(set equal (lambda (a b)
+  (or (= a b)
+      (and (pair? a)
+	   (pair? b)
+	   (equal-lists a b)))))
