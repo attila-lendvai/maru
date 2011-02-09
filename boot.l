@@ -1,3 +1,5 @@
+(define unit-testing? '(t))
+
 (define list (lambda args args))
 
 (define %print print)
@@ -31,6 +33,7 @@
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
 (define caddar (lambda (x) (car (cdr (cdr (car x))))))
+(define caaddr (lambda (x) (car (car (cdr (cdr x))))))
 (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
 
 (define assq
@@ -118,6 +121,9 @@
 (define-function list->array (list)
   (%list->array list 0))
 
+(define-function array-append (arr val)
+  (set-array-at arr (array-length arr) val))
+
 (define-function map (function list)
   (if (pair? list)
       (let ((head (function (car list))))
@@ -127,6 +133,11 @@
   (if (pair? list)
       (let ((head (function (car list) a)))
 	(cons head (map-with function (cdr list) a)))))
+
+(define-function with-map (function a list)
+  (if (pair? list)
+      (let ((head (function a (car list))))
+	(cons head (with-map function a (cdr list))))))
 
 (define-function map2-with (function alist blist a)
   (if (pair? alist)
@@ -154,10 +165,10 @@
   (if (pair? clauses)
       (let* ((clause (car clauses))
 	     (test   (car clause))
-	     (value  (cadr clause)))
+	     (value  (cdr clause)))
 	(if (= 'else test)
-	    value
-	  `(if ,test ,value ,(%cond (cdr clauses)))))))
+	    `(let () ,@value)
+	  `(if ,test (let () ,@value) ,(%cond (cdr clauses)))))))
 
 (define-form cond clauses (%cond clauses))
 
@@ -179,6 +190,8 @@
 
 (define %structure-sizes	(array))
 (define %structure-fields	(array))
+(define %structure-bases	(array))
+(define %structure-derivatives	(array))
 
 (define-function %typecheck (type object)
   (or (= type (type-of object))
@@ -207,6 +220,22 @@
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
 
+(define-form define-class (name basis fields)
+  (let ((base (eval basis)))
+    (set fields (concat-list (array-at %structure-fields base) fields))
+    (let ((type   (%allocate-type name))
+	  (offset (list-length (array-at %structure-fields base)))
+	  (size   (list-length fields)))
+      (set-array-at %structure-sizes  type size)
+      (set-array-at %structure-fields type fields)
+      (set-array-at %structure-bases  type base)
+      (let ((derived (or (array-at %structure-derivatives base)
+			 (set-array-at %structure-derivatives base (array)))))
+	(array-append derived type))
+      `(let ()
+	 (define ,name ,type)
+	 ,@(%make-accessors name fields)))))
+
 ;;; built-in types
 
 (define-structure <undefined>	())
@@ -223,9 +252,6 @@
 (define-structure <variable>	(name value env index))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee))
-
-(define-function array-append (arr val)
-  (set-array-at arr (array-length arr) val))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
@@ -287,8 +313,17 @@
 
 (define-structure <selector> (name methods default))
 
+(define-function selector? (obj) (= <selector> (type-of obj)))
+
+(define-function <selector>-inherit (methods type)
+  (let ((method ()))
+    (while (and (set type (array-at %structure-bases type))
+		(not (set method (array-at methods type)))))
+    method))
+
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
+	     (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
 	     (<selector>-default self))
 	 arguments))
 
@@ -304,22 +339,24 @@
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
-  (or default (set default `(args (error "cannot apply selector "',name
-					 " to "(array-at %type-names (type-of (car args)))
-					 ": "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
-  `(define ,name (selector ',name (lambda ,@default))))
+  (let ((def (defined? name)))
+    (if def
+	(or (selector? def)
+	    (error name" already defined as non-selector"))
+      (let ()
+	(or default (set default `(args (error "cannot apply selector "',name
+					       " to "(array-at %type-names (type-of (car args)))
+					       ": "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
+	`(define ,name (selector ',name (lambda ,@default)))))))
 
 (define-selector add-method)
 
 (<selector>-add-method add-method <selector>
   (lambda (self type args body)
-    (let ((typeid (eval type)))
-      (<selector>-add-method self typeid (eval `(lambda ,args (with-instance-accessors ,type ,@body)))))))
+    (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors ,type ,@body))))))
 
 (define-form define-method (selector type args . body)
-  (if (symbol? args)
-      `(add-method ,selector ',type ',(cons 'self args) ',body)
-      `(add-method ,selector ',type '(self ,@args) ',body)))
+  `(add-method ,selector ,type ',(cons 'self args) ',body))
 
 ;;; print
 
@@ -487,6 +524,13 @@
       (set ind (+ 1 ind)))
     str))
 
+;; (define-function array->list (arr)
+;;   (let* ((ind (array-length arr))
+;; 	 (lst ()))
+;;     (while (<= 0 (set ind (- ind 1)))
+;;       (set lst (cons (array-at arr ind) lst)))
+;;     lst))
+
 ;;; structural equality
 
 (define equal ()) ;; forward
@@ -500,3 +544,24 @@
       (and (pair? a)
 	   (pair? b)
 	   (equal-lists a b)))))
+
+;;; unit testing
+
+(define-form unit-fail (expr)
+  `(error "UNIT FAIL "unit-name": "',expr))
+
+(define-form unit-assert (expr)
+  `(or ,expr (unit-fail ,expr)))
+
+(define-form unit-test (name . body)
+  (and unit-testing?
+       `(let ((unit-name ,name))
+	  ,@body)))
+
+;;; namespace
+
+(define *global* *globals*)
+
+(define-form define-namespace (name parent)	`(define ,name (environment ,parent)))
+
+(define-form namespace (name)			`(set *globals* ,name))
