@@ -204,11 +204,11 @@
 					(println "	setg %al")
 					(println "	movzbl %al,%eax"))
 
-(define-emit	(SHL TI32)		(println "	movl "$1",%ecx")
+(define-emit	(SLA TI32)		(println "	movl "$1",%ecx")
 					(println "	shll %cl,%eax"))
 
-(define-emit	(SHR TI32)		(println "	movl "$1",%ecx")
-					(println "	shrl %cl,%eax"))
+(define-emit	(SRA TI32)		(println "	movl "$1",%ecx")
+					(println "	sarl %cl,%eax"))
 
 (define-emit	(BR LABEL)		(println "	jmp "$1))
 
@@ -381,7 +381,7 @@
     ((,+  ,ADD) (,-   ,SUB) (,* ,MUL) (,/ ,DIV)			; binary
      (,&  ,AND) (,|   ,OR ) (,^ ,XOR)
      (,<  ,LT ) (,<=  ,LE)  (,= ,EQ ) (,!= ,NE ) (,>= ,GE ) (,> ,GT )
-     (,<< ,SHL) (,>>  ,SHR)
+     (,<< ,SLA) (,>>  ,SRA)
      (,oop-at         ,OOP-AT) (,string-at         ,CHR-AT))
     ((,set-oop-at ,SET-OOP-AT) (,set-string-at ,SET-CHR-AT))	; ternary
     )))
