@@ -5,6 +5,8 @@
 
 extern int isatty(int);
 
+#define	TAG_INT	1
+
 #define GC_APP_HEADER	int type;
 
 #include "gc.c"
@@ -20,8 +22,13 @@ typedef oop (*imp_t)(oop args, oop env);
 
 enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
 
-struct Long	{ long  bits; };
-struct String	{ oop   size;  char *bits; };
+#if (TAG_INT)
+  struct Long	{};
+#else
+  struct Long	{ long  bits; };
+#endif
+
+struct String	{ oop   size;  char *bits; };	/* bits is in managed memory */
 struct Symbol	{ char *bits; };
 struct Pair	{ oop 	head, tail; };
 struct Array	{ oop   size, _array; };
@@ -52,7 +59,11 @@ static void fatal(char *reason, ...);
 
 #define setType(OBJ, TYPE)		(ptr2hdr(OBJ)->type= (TYPE))
 
-static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined; }
+#if (TAG_INT)
+  static inline int getType(oop obj)	{ return obj ? (((long)obj & 1) ? Long : ptr2hdr(obj)->type) : Undefined; }
+#else
+  static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined; }
+#endif
 
 #define is(TYPE, OBJ)			((OBJ) && (TYPE == getType(OBJ)))
 
@@ -62,8 +73,8 @@ static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined
 # define checkType(OBJ, TYPE) _checkType(OBJ, TYPE, #TYPE, __FILE__, __LINE__)
   static inline oop _checkType(oop obj, int type, char *name, char *file, int line)
   {
-    if (obj && !ptr2hdr(obj)->used)	fatal("%s:%i: attempt to access dead object %s\n", file, line, name);
-    if (!is(type, obj))			fatal("%s:%i: typecheck failed for %s (%i != %i)\n", file, line, name, type, getType(obj));
+    if (obj && !((long)obj & 1) && !ptr2hdr(obj)->used)	fatal("%s:%i: attempt to access dead object %s\n", file, line, name);
+    if (!is(type, obj))					fatal("%s:%i: typecheck failed for %s (%i != %i)\n", file, line, name, type, getType(obj));
     return obj;
   }
 #endif
@@ -76,8 +87,6 @@ static inline int getType(oop obj)	{ return obj ? ptr2hdr(obj)->type : Undefined
 
 #define setHead(OBJ, VAL)	set(OBJ, Pair,head, VAL)
 #define setTail(OBJ, VAL)	set(OBJ, Pair,tail, VAL)
-
-#define getLong(X)	get((X), Long,bits)
 
 static oop car(oop obj)			{ return is(Pair, obj) ? getHead(obj) : nil; }
 static oop cdr(oop obj)			{ return is(Pair, obj) ? getTail(obj) : nil; }
@@ -104,7 +113,15 @@ static oop backtrace= nil, input= nil;
 
 static int opt_b= 0, opt_v= 0;
 
-static oop newLong(long bits)		{ oop obj= newBits(Long);	set(obj, Long,bits, bits);				return obj; }
+#if (TAG_INT)
+# define     isLong(X)			((long)(X) & 1)
+# define     newLong(X)			((oop)(((X) << 1) | 1))
+# define     getLong(X)			((long)(X) >> 1)
+#else
+# define     isLong(X)			is(Long, (X))
+  static oop newLong(long bits)		{ oop obj= newBits(Long);  set(obj, Long,bits, bits);  return obj; }
+# define     getLong(X)			get((X), Long,bits)
+#endif
 
 static oop _newString(size_t len)
 {
@@ -129,6 +146,7 @@ static int stringLength(oop string)
 }
 
 static oop newSymbol(char *cstr)	{ oop obj= newBits(Symbol);	set(obj, Symbol,bits, strdup(cstr));			return obj; }
+
 static oop newPair(oop head, oop tail)	{ oop obj= newOops(Pair);	set(obj, Pair,head, head);  set(obj, Pair,tail, tail);	return obj; }
 
 static oop newArray(int size)
@@ -171,7 +189,7 @@ static oop arrayAtPut(oop array, int index, oop val)
 	memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
 	elts= set(array, Array,_array, oops);
       }
-      set(get(array, Array,size), Long,bits, index + 1);
+      set(array, Array,size, newLong(index + 1));
       GC_UNPROTECT(array);
     }
     return ((oop *)elts)[index]= val;
@@ -350,6 +368,8 @@ static int isDigit10(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT10  & char
 static int isDigit16(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c]); }
 static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c]); }
 
+#define DONE	((oop)-4)	/* cannot be a tagger immediate */
+
 static oop read(FILE *fp);
 
 static oop readList(FILE *fp, int delim)
@@ -358,17 +378,17 @@ static oop readList(FILE *fp, int delim)
   GC_PROTECT(head);
   GC_PROTECT(obj);
   obj= read(fp);
-  if (obj == (oop)EOF) goto eof;
+  if (obj == DONE) goto eof;
   head= tail= newPair(obj, nil);
   for (;;) {
     obj= read(fp);
-    if (obj == (oop)EOF) goto eof;
+    if (obj == DONE) goto eof;
     if (obj == s_dot) {
       obj= read(fp);
-      if (obj == (oop)EOF)		fatal("missing item after .");
+      if (obj == DONE)		fatal("missing item after .");
       tail= set(tail, Pair,tail, obj);
       obj= read(fp);
-      if (obj != (oop)EOF)		fatal("extra item after .");
+      if (obj != DONE)		fatal("extra item after .");
       goto eof;
     }
     obj= newPair(obj, nil);
@@ -463,7 +483,7 @@ static oop read(FILE *fp)
     int c= getc(fp);
     switch (c) {
       case EOF: {
-	return (oop)EOF;
+	return DONE;
       }
       case '\t':  case '\n':  case '\r':  case ' ' : {
 	continue;
@@ -538,9 +558,9 @@ static oop read(FILE *fp)
 	//buffer_free(&buf);
 	return obj;
       }
-      case '(': return readList(fp, ')');      case ')': ungetc(c, fp);  return (oop)EOF;
-      case '[': return readList(fp, ']');      case ']': ungetc(c, fp);  return (oop)EOF;
-      case '{': return readList(fp, '}');      case '}': ungetc(c, fp);  return (oop)EOF;
+      case '(': return readList(fp, ')');      case ')': ungetc(c, fp);  return DONE;
+      case '[': return readList(fp, ']');      case ']': ungetc(c, fp);  return DONE;
+      case '{': return readList(fp, '}');      case '}': ungetc(c, fp);  return DONE;
       case '-': {
 	int d= getc(fp);
 	ungetc(d, fp);
@@ -577,8 +597,8 @@ static void doprint(FILE *stream, oop obj, int storing)
     return;
   }
   switch (getType(obj)) {
-    case Undefined:	fprintf(stream, "UNDEFINED");			break;
-    case Long:		fprintf(stream, "%ld", get(obj, Long,bits));	break;
+    case Undefined:	fprintf(stream, "UNDEFINED");		break;
+    case Long:		fprintf(stream, "%ld", getLong(obj));	break;
     case String: {
       if (!storing)
 	fprintf(stream, "%s", get(obj, String,bits));
@@ -1193,10 +1213,10 @@ _do_unary()
     arity2(args, #OP);								\
     oop lhs= getHead(args);							\
     oop rhs= getHead(getTail(args));						\
-    if (is(Long, lhs) && is(Long, rhs))						\
+    if (isLong(lhs) && isLong(rhs))						\
       return newLong(getLong(lhs) OP getLong(rhs));				\
     fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
-    if (!is(Long, lhs))	fdumpln(stderr, lhs);					\
+    if (!isLong(lhs))	fdumpln(stderr, lhs);					\
     else		fdumpln(stderr, rhs);					\
     fatal(0);									\
     return nil;									\
@@ -1225,10 +1245,10 @@ static subr(sub)
     arity2(args, #OP);								\
     oop lhs= getHead(args);							\
     oop rhs= getHead(getTail(args));						\
-    if (is(Long, lhs) && is(Long, rhs))						\
+    if (isLong(lhs) && isLong(rhs))						\
       return newBool(getLong(lhs) OP getLong(rhs));				\
     fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
-    if (!is(Long, lhs))	fdumpln(stderr, lhs);					\
+    if (!isLong(lhs))	fdumpln(stderr, lhs);					\
     else		fdumpln(stderr, rhs);					\
     fatal(0);									\
     return nil;									\
@@ -1245,7 +1265,7 @@ static subr(eq)
   oop rhs= getHead(getTail(args));						\
   int ans= 0;
   switch (getType(lhs)) {
-    case Long:		ans= (is(Long, rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
+    case Long:		ans= (isLong(rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
     case String:	ans= (is(String, rhs) 	&& !strcmp(get(lhs, String,bits), get(rhs, String,bits)));	break;
     default:		ans= (lhs == rhs);									break;
   }
@@ -1259,7 +1279,7 @@ static subr(ne)
   oop rhs= getHead(getTail(args));						\
   int ans= 0;
   switch (getType(lhs)) {
-    case Long:		ans= (is(Long, rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
+    case Long:		ans= (isLong(rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
     case String:	ans= (is(String, rhs) 	&& !strcmp(get(lhs, String,bits), get(rhs, String,bits)));	break;
     default:		ans= (lhs == rhs);									break;
   }
@@ -1269,7 +1289,7 @@ static subr(ne)
 static subr(exit)
 {
   oop n= car(args);
-  exit(is(Long, n) ? getLong(n) : 0);
+  exit(isLong(n) ? getLong(n) : 0);
 }
 
 static subr(abort)
@@ -1282,7 +1302,7 @@ static subr(getc)
 {
   oop arg= car(args);
   if (nil == arg) arg= get(input, Variable,value);
-  if (!is(Long, arg)) { fprintf(stderr, "getc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  if (!isLong(arg)) { fprintf(stderr, "getc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
   return newLong(getc(stream));
 }
@@ -1298,7 +1318,7 @@ static subr(read)
   oop obj= nil;					GC_PROTECT(obj);
   for (;;) {
     obj= read(stream);
-    if (obj == (oop)EOF) break;
+    if (obj == DONE) break;
     tail= setTail(tail, newPair(obj, nil));
     if (stdin == stream) break;
   }
@@ -1484,7 +1504,7 @@ static subr(stringP)
 static subr(string)
 {
   oop arg= car(args);
-  int num= is(Long, arg) ? getLong(arg) : 0;
+  int num= isLong(arg) ? getLong(arg) : 0;
   return _newString(num);
 }
 
@@ -1499,7 +1519,7 @@ static subr(string_at)
 {
   arity2(args, "string-at");
   oop arr= getHead(args);		if (!is(String, arr)) { fprintf(stderr, "string-at: non-String argument: ");  fdumpln(stderr, arr);  fatal(0); }
-  oop arg= getHead(getTail(args));	if (!is(Long, arg)) return nil;
+  oop arg= getHead(getTail(args));	if (!isLong(arg)) return nil;
   int idx= getLong(arg);
   if (0 <= idx && idx < stringLength(arr)) return newLong(255 & get(arr, String,bits)[idx]);
   return nil;
@@ -1509,8 +1529,8 @@ static subr(set_string_at)
 {
   arity3(args, "set-string-at");
   oop arr= getHead(args);			if (!is(String, arr)) { fprintf(stderr, "set-string-at: non-string argument: ");  fdumpln(stderr, arr);  fatal(0); }
-  oop arg= getHead(getTail(args));		if (!is(Long, arg)) { fprintf(stderr, "set-string-at: non-integer index: ");  fdumpln(stderr, arg);  fatal(0); }
-  oop val= getHead(getTail(getTail(args)));	if (!is(Long, val)) { fprintf(stderr, "set-string-at: non-integer value: ");  fdumpln(stderr, val);  fatal(0); }
+  oop arg= getHead(getTail(args));		if (!isLong(arg)) { fprintf(stderr, "set-string-at: non-integer index: ");  fdumpln(stderr, arg);  fatal(0); }
+  oop val= getHead(getTail(getTail(args)));	if (!isLong(val)) { fprintf(stderr, "set-string-at: non-integer value: ");  fdumpln(stderr, val);  fatal(0); }
   int idx= getLong(arg);
   if (0 <= idx && idx < stringLength(arr)) {
     get(arr, String,bits)[idx]= getLong(val);
@@ -1533,7 +1553,7 @@ static subr(symbol_string)
 
 static subr(long_string)
 {
-  oop arg= car(args);				if (is(String, arg)) return arg;  if (!is(Long, arg)) return nil;
+  oop arg= car(args);				if (is(String, arg)) return arg;  if (!isLong(arg)) return nil;
   char buf[32];
   sprintf(buf, "%ld", getLong(arg));
   return newString(buf);
@@ -1542,7 +1562,7 @@ static subr(long_string)
 static subr(array)
 {
   oop arg= car(args);
-  int num= is(Long, arg) ? getLong(arg) : 0;
+  int num= isLong(arg) ? getLong(arg) : 0;
   return newArray(num);
 }
 
@@ -1562,7 +1582,7 @@ static subr(array_at)
 {
   arity2(args, "array-at");
   oop arr= getHead(args);
-  oop arg= getHead(getTail(args));	if (!is(Long, arg)) return nil;
+  oop arg= getHead(getTail(args));	if (!isLong(arg)) return nil;
   return arrayAt(arr, getLong(arg));
 }
 
@@ -1570,7 +1590,7 @@ static subr(set_array_at)
 {
   arity3(args, "set-array-at");
   oop arr= getHead(args);
-  oop arg= getHead(getTail(args));		if (!is(Long, arg)) return nil;
+  oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;
   oop val= getHead(getTail(getTail(args)));
   return arrayAtPut(arr, getLong(arg), val);
 }
@@ -1578,8 +1598,8 @@ static subr(set_array_at)
 static subr(allocate)
 {
   arity2(args, "allocate");
-  oop type= getHead(args);			if (!is(Long, type)) return nil;
-  oop size= getHead(getTail(args));		if (!is(Long, size)) return nil;
+  oop type= getHead(args);			if (!isLong(type)) return nil;
+  oop size= getHead(getTail(args));		if (!isLong(size)) return nil;
   return _newOops(getLong(type), sizeof(oop) * getLong(size));
 }
 
@@ -1587,7 +1607,7 @@ static subr(oop_at)
 {
   arity2(args, "oop-at");
   oop obj= getHead(args);
-  oop arg= getHead(getTail(args));	if (!is(Long, arg)) return nil;
+  oop arg= getHead(getTail(args));	if (!isLong(arg)) return nil;
   return oopAt(obj, getLong(arg));
 }
 
@@ -1595,7 +1615,7 @@ static subr(set_oop_at)
 {
   arity3(args, "set-oop-at");
   oop obj= getHead(args);
-  oop arg= getHead(getTail(args));		if (!is(Long, arg)) return nil;
+  oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;
   oop val= getHead(getTail(getTail(args)));
   return oopAtPut(obj, getLong(arg), val);
 }
@@ -1618,7 +1638,7 @@ static void replFile(FILE *stream)
       fflush(stdout);
     }
     oop obj= read(stream);
-    if (obj == (oop)EOF) break;
+    if (obj == DONE) break;
     GC_PROTECT(obj);
     if (opt_v) {
       dumpln(obj);

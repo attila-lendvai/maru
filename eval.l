@@ -9,6 +9,8 @@
 (define-form safe prog ())
 ;;(define-form safe prog `(let () ,@prog))
 
+(define-form if-tagged-int (a b) b)
+
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
 
@@ -254,6 +256,7 @@
 (define fscanf	(extern 'fscanf))
 
 (define EOF	-1)
+(define DONE	-4)	;; cannot be the same as a tagged immediate
 
 (define <undefined>	 0)
 (define <long>		 1)
@@ -309,9 +312,11 @@
     obj))
 
 (define-function new-<long> (bits)
-  (let ((obj (new-bits <long> (size-of-structure <long>))))
-    (set (<long>-_bits obj) bits)
-    obj))
+  (if-tagged-int
+    (| (<< bits 1) 1)
+    (let ((obj (new-bits <long> (size-of-structure <long>))))
+      (set (<long>-_bits obj) bits)
+      obj)))
 
 (define-function _new-<string> (len)
   (let ((str (new-oops <string> (size-of-structure <string>))))
@@ -388,9 +393,13 @@
 
 (define-form get-type (arg)
   `(let ((__arg__ ,arg))
-     (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>)))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
+     (safe (and __arg__ (not (& __arg__ 1))
+		(or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>))))
+		    (fatal1 "attempt to access dead object %p type %d" __arg__))))
      (if __arg__
-	 (oop-at __arg__ -1)
+	 (if (& __arg__ 1)
+	     <long>
+	   (oop-at __arg__ -1))
        <undefined>)))
 
 (define-function type_check_fail (exp act)
@@ -406,7 +415,8 @@
      (safe (let ((t (get-type __obj__))) (or (= ,type t) (type_check_fail ,type t))))
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
-(define-form get_long (obj)	`(oop-at ,obj 0))
+(define-form is_long(obj)	(if-tagged-int	`(&  ,obj 1)	`(is <long> ,obj)))
+(define-form get_long (obj)	(if-tagged-int	`(>> ,obj 1)	`(get <long> _bits ,obj)))
 
 (define-form get_head (obj)	`(oop-at ,obj 0))
 (define-form get_tail (obj)	`(oop-at ,obj 1))
@@ -490,10 +500,11 @@
 		(or (< idx size)
 		    (let ((cap (/ (gc_size elts) 4)))
 		      (while (<= cap idx) (set cap (* cap 2)))
-		      (let ((oops (new-oops <_array> (* 4 cap))))
-			(memcpy oops elts (* size 4))
-			(set elts (put <array> _array obj oops)))
-		      (put <long> _bits (get <array> size obj) (+ 1 idx))))
+		      (gc-protect (obj)
+		        (let ((oops (new-oops <_array> (* 4 cap))))
+			  (memcpy oops elts (* size 4))
+			  (set elts (put <array> _array obj oops)))
+			(put <array> size obj (new-<long> (+ 1 idx))))))
 		(set-oop-at elts idx val))))))
 
 (define-function k_array_append (array val)
@@ -513,7 +524,7 @@
   (let ((type (get-type obj)))
     (cond
       ((= type <undefined>)	(printf "nil"))
-      ((= type <long>)		(printf "%d" (get <long> _bits obj)))
+      ((= type <long>)		(printf "%d" (get_long obj)))
       ((= type <string>)	(let ((bits (get <string> _bits obj)))
 				  (if (not storing)
 				      (printf "%s" bits)
@@ -768,7 +779,7 @@
 	 (tail head)
 	 (elt  ()))
     (gc-protect (head elt)
-      (while (and (!= EOF (set elt (k_read stream))) (!= s_dot elt))
+      (while (and (!= DONE (set elt (k_read stream))) (!= s_dot elt))
 	(set elt (new-<pair> elt ()))
 	(set tail (set_tail tail elt)))
       (and (= s_dot elt) (set_tail tail (k_read stream))))
@@ -779,7 +790,7 @@
 
 (define-function read_quote (prefix stream)
   (let ((qobj (k_read stream)))
-    (and (= EOF qobj) (fatal "EOF while reading quoted literal"))
+    (and (= DONE qobj) (fatal "EOF while reading quoted literal"))
     (gc-protect (qobj)
       (set qobj (new-<pair> qobj ()))
       (set qobj (new-<pair> prefix qobj))
@@ -802,15 +813,15 @@
 				    (ungetc d stream)
 				    (read_quote s_unquote)))))
 	((is_letter c)	(return (read_symbol c stream)))
-	((= ?\( c)	(return (read_list ?\) stream)))	((= ?\) c)	(return (let () (ungetc c stream) EOF)))
-	((= ?\[ c)	(return (read_list ?\] stream)))	((= ?\] c)	(return (let () (ungetc c stream) EOF)))
-	((= ?\{ c)	(return (read_list ?\} stream)))	((= ?\} c)	(return (let () (ungetc c stream) EOF)))
+	((= ?\( c)	(return (read_list ?\) stream)))	((= ?\) c)	(return (let () (ungetc c stream) DONE)))
+	((= ?\[ c)	(return (read_list ?\] stream)))	((= ?\] c)	(return (let () (ungetc c stream) DONE)))
+	((= ?\{ c)	(return (read_list ?\} stream)))	((= ?\} c)	(return (let () (ungetc c stream) DONE)))
 	((is_digit10 c)	(return (read_number c stream)))
 	((= ?\; c)	(while (and (!= ?\n (set c (getc stream)))
 				    (!= ?\r c)
 				    (!= EOF c))))
 	((= ?\" c)	(return (read_string c stream)))
-	((< c 0)	(return EOF))
+	((< c 0)	(return DONE))
 	(else		(fatal1 "illegal character: %c" c)))))))
 
 ;;; ----------------------------------------------------------------
@@ -869,6 +880,8 @@
 	  (set defn (get_tail defn)))
 	(and (get <env> stable env) (put <context> callee ctx ()))
 	args))))
+
+(define counter 0)
 
 (define-function k_apply (fun arguments ctx)
   ;;(printf "  %02d " trace_depth) (k_dumpln fun)
@@ -1176,10 +1189,10 @@
     (if (and (is <pair> rhs))
 	(let ()
 	  (set rhs (get_head rhs))
-	  (if (and (is <long> lhs) (is <long> rhs))
+	  (if (and (is_long lhs) (is_long rhs))
 	      (new-<long> (- (get_long lhs) (get_long rhs)))
 	    (k_error "non-numeric argument: (- "lhs" "rhs")")))
-      (if (and (is <long> lhs))
+      (if (and (is_long lhs))
 	  (new-<long> (- (get_long lhs)))
 	(k_error "non-numeric argument: (- "lhs")")))))
 
@@ -1188,8 +1201,9 @@
      (arity2 ,name args)
      (let ((lhs (get_head args))
 	   (rhs (get_head (get_tail args))))
-       (if (and (is <long> lhs) (is <long> rhs))
+       (if (and (is_long lhs) (is_long rhs))
 	   (new-<long> (,op (get_long lhs) (get_long rhs)))
+	 (printf "%p %p\n" lhs rhs)
 	 (k_error "non-numeric argument: (",name" "lhs" "rhs")")))))
 
 (define-binary &  "bitand")
@@ -1206,7 +1220,7 @@
      (arity2 ,name args)
      (let ((lhs (get_head args))
 	   (rhs (get_head (get_tail args))))
-       (if (and (is <long> lhs) (is <long> rhs))
+       (if (and (is_long lhs) (is_long rhs))
 	   (and (,op (get_long lhs) (get_long rhs)) s_t)
 	 (k_error "non-numeric argument: (",name" "lhs" "rhs")")))))
 
@@ -1221,7 +1235,7 @@
 	 (rhs  (get_head (get_tail args)))
 	 (type (get-type lhs)))
     (cond
-      ((= type <long>)		(and (is <long> rhs) (= (get_long lhs) (get_long rhs)) s_t))
+      ((= type <long>)		(and (is_long rhs) (= (get_long lhs) (get_long rhs)) s_t))
       ((= type <string>)	(and (is <string> rhs) (not (strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t))
       (else			(and (= lhs rhs) s_t)))))
 
@@ -1231,7 +1245,7 @@
 	 (rhs  (get_head (get_tail args)))
 	 (type (get-type lhs)))
     (cond
-      ((= type <long>)		(and (is <long> rhs) (!= (get_long lhs) (get_long rhs)) s_t))
+      ((= type <long>)		(and (is_long rhs) (!= (get_long lhs) (get_long rhs)) s_t))
       ((= type <string>)	(and (is <string> rhs) (strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t)
       (else			(and (!= lhs rhs) s_t)))))
 
@@ -1239,13 +1253,13 @@
   (abort))
 
 (define-function subr_exit (args ctx)
-  (let ((status (and (is <long> (k_car args)) (get_long (k_car args)))))
+  (let ((status (and (is_long (k_car args)) (get_long (k_car args)))))
     (exit status)))
 
 (define-function subr_getc (args ctx)
   (let ((arg (k_car args)))
     (or arg (set arg (get <variable> value input)))
-    (or (is <long> arg) fatal("non-integer stream id in getc"))
+    (or (is_long arg) fatal("non-integer stream id in getc"))
     (new-<long> (getc (get_long arg)))))
 
 (define-function subr_format (args ctx)
@@ -1318,15 +1332,15 @@
 		(get <context> env ctx))))
 
 (define-function subr_cons	(args ctx)	(new-<pair> (k_car args) (k_cadr args)))
-(define-function subr_string	(args ctx)	(_new-<string> (and (is <long> (k_car args)) (get_long (get_head args)))))
-(define-function subr_array	(args ctx)	(new-<array> (and (is <long> (k_car args)) (get_long (get_head args)))))
+(define-function subr_string	(args ctx)	(_new-<string> (and (is_long (k_car args)) (get_long (get_head args)))))
+(define-function subr_array	(args ctx)	(new-<array> (and (is_long (k_car args)) (get_long (get_head args)))))
 (define-function subr_form	(args ctx)	(new-<form> (k_car args) (k_cadr args)))
 
 (define-function subr_allocate (args ctx)
   (arity2 "allocate" args)
   (let ((type (get_head args))
 	(size (get_head (get_tail args))))
-    (and (is <long> type) (is <long> size)
+    (and (is_long type) (is_long size)
 	 (new-oops (get_long type) (* (get_long size) 4)))))
 
 (define-function subr_type_of	(args ctx)	(and args (new-<long> (get-type (k_car args)))))
@@ -1346,7 +1360,7 @@
   (arity2 "oop-at" args)
   (let ((obj (get_head args))
 	(arg (get_head (get_tail args))))
-    (and (is <long> arg)
+    (and (is_long arg)
 	 (oop-at obj (get_long arg)))))
 
 (define-function subr_set_oop_at (args ctx)
@@ -1355,7 +1369,7 @@
 	(arg (get_head (get_tail args)))
 	(val (get_head (get_tail (get_tail args)))))
     (or (< (gc_size (get <array> _array symbols)) 8192) (fatal1 "D: symbols is wrong size %d\n" (gc_size (get <array> _array symbols))))
-    (and (is <long> arg) (set-oop-at obj (get_long arg) val))
+    (and (is_long arg) (set-oop-at obj (get_long arg) val))
     (or (< (gc_size (get <array> _array symbols)) 8192)
 	(let ()
 	  (printf "symbols at %p %p\n" symbols (get <array> _array symbols))
@@ -1373,7 +1387,7 @@
   (arity2 "array-at" args)
   (let ((arr (get_head args))
 	(arg (get_head (get_tail args))))
-    (and (is <long> arg)
+    (and (is_long arg)
 	 (k_array_at arr (get_long arg)))))
 
 (define-function subr_set_array_at (args ctx)
@@ -1381,7 +1395,7 @@
   (let ((arr (get_head args))
 	(arg (get_head (get_tail args)))
 	(val (get_head (get_tail (get_tail args)))))
-    (and (is <long> arg)
+    (and (is_long arg)
 	 (k_set_array_at arr (get_long arg) val))))
 
 (define-function subr_string_length (args ctx)
@@ -1393,7 +1407,7 @@
   (arity2 "string-at" args)
   (let ((arr (get_head args))
 	(arg (get_head (get_tail args))))
-    (and (is <long> arg)
+    (and (is_long arg)
 	 (let ((idx (get_long arg)))
 	   (and (<= 0 idx) (< idx (k_string_length arr))
 		(new-<long> (string-at (get <string> _bits arr) idx)))))))
@@ -1403,7 +1417,7 @@
   (let ((arr (get_head args))
 	(arg (get_head (get_tail args)))
 	(val (get_head (get_tail (get_tail args)))))
-    (and (is <long> arg) (is <long> val)
+    (and (is_long arg) (is_long val)
 	 (let ((idx (get_long arg)))
 	   (and (<= 0 idx) (< idx (k_string_length arr))
 		(let ()
@@ -1428,7 +1442,7 @@
   (let ((arg (k_car args)))
     (if (is <string> arg)
 	arg
-      (and (is <long> arg)
+      (and (is_long arg)
 	   (let ((buf (malloc 32)))
 	     (sprintf buf "%ld" (get_long arg))
 	     (let ((result (new-<string> buf)))
@@ -1443,7 +1457,7 @@
     (or (= stdin stream) (fscanf stream "#!%*[^\012\015]"))
     (while (let ()
 	     (and (= stdin stream) (fprintf stdout ".") (fflush stdout))
-	     (!= EOF (set res (k_read stream))))
+	     (!= DONE (set res (k_read stream))))
       (let ((env (new-<env> (get <variable> value globals) 1 0)))
         (gc-protect (res env)
 	  (and (> opt_verbose 0) (printf ";;; ") (k_dumpln res))
