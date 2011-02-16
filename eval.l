@@ -124,13 +124,13 @@
 	 (and gc_roots (free gc_roots))
 	 (set gc_roots roots)))
   (set-oop-at gc_roots gc_root_count ptr)
-  (debug (printf "gc add root %d at %p\n" gc_root_count ptr))
+  (debug (printf "gc PUSH root %d at %p\n" gc_root_count ptr))
   (set gc_root_count (+ 1 gc_root_count)))
 
 (define-function gc_pop_root (ptr)
   (or gc_root_count (fatal "root table underflow"))
   (set gc_root_count (- gc_root_count 1))
-  (debug (printf "gc del root %d at %p %s\n" gc_root_count ptr))
+  (debug (printf "gc POP  root %d at %p\n" gc_root_count ptr))
   (or (= ptr (oop-at gc_roots gc_root_count)) (fatal "non-lifo root")))
 
 (define-function gc_grow_memory (size)
@@ -385,12 +385,6 @@
       (set (<variable>-index obj) (new-<long> index))
       obj)))
 
-(define-form is (type arg)
-  `(let ((__arg__ ,arg))
-     (and __arg__
-	  (not (& 1 __arg__))
-	  (= ,type (oop-at __arg__ -1)))))
-
 (define-form get-type (arg)
   `(let ((__arg__ ,arg))
      (safe (and __arg__ (not (& __arg__ 1))
@@ -401,6 +395,9 @@
 	     <long>
 	   (oop-at __arg__ -1))
        <undefined>)))
+
+(define-form is (type arg)
+  `(= ,type (get-type ,arg)))
 
 (define-function type_check_fail (exp act)
   (fatal2 "illegal type: expected %d got %d" exp act))
@@ -458,7 +455,8 @@
     obj))
 
 (define-function is_global (var)
-  (= 0 (get_long (get <env> level (get <variable> env var)))))
+  (let ((env (get <variable> env var)))
+    (and env (= 0 (get_long (get <env> level env))))))
 
 ;;; ----------------------------------------------------------------
 
@@ -574,11 +572,12 @@
 				  (do_print (get <fixed> function obj) storing)
 				  (printf ")")))
       ((= type <subr>)		(printf "Subr(%s)" (get <subr> _name obj)))
-      ((= type <variable>)	(let ()
+      ((= type <variable>)	(let ((env (get <variable> env obj)))
  				  (do_print (get <variable> name obj))
- 				  (printf ".%d+%d"
- 					  (get_long (get <env> level (get <variable> env obj)))
- 					  (get_long (get <variable> index obj)))))
+				  (and env
+				       (printf ".%d+%d"
+					       (get_long (get <env> level (get <variable> env obj)))
+					       (get_long (get <variable> index obj))))))
       ((= type <env>)		(let ()
  				  (printf "Env<%d>" (get_long (get <env> level obj)))))
       ((= type <context>)	(let ()
@@ -623,7 +622,8 @@
 					 ( = ?_  c)			; _
 				    (and (<= ?a  c) (<= c ?z))		; a b c d e f g h i j k l m n o p q r s t u v w x y z
 					 ( = ?|  c)			; |
-					 ( = ?~  c)))			; ~
+					 ( = ?~  c)			; ~
+					 (<= 128 c)))			; utf-8 multibyte character
 
 (define-function new_buffer ()
   (let ((buf (malloc (size-of-structure <buffer>))))
@@ -1256,11 +1256,25 @@
   (let ((status (and (is_long (k_car args)) (get_long (k_car args)))))
     (exit status)))
 
+(define-function subr_open (args ctx)
+  (let ((arg (k_car args)))
+    (or (is <string> arg) (fatal "non-string argument in open"))
+    (let ((stream (fopen (get <string> _bits arg) "rb")))
+      (and stream (new-<long> stream)))))
+
+(define-function subr_close (args ctx)
+  (let ((arg (k_car args)))
+    (or (is <long> arg) (fatal "non-integer argument in close"))
+    (fclose (get_long arg))
+    arg))
+
 (define-function subr_getc (args ctx)
   (let ((arg (k_car args)))
     (or arg (set arg (get <variable> value input)))
-    (or (is_long arg) fatal("non-integer stream id in getc"))
-    (new-<long> (getc (get_long arg)))))
+    (or (is_long arg) (fatal "non-integer stream id in getc"))
+    (let ((c (getc (get_long arg))))
+      (and (>= c 0)
+	   (new-<long> c)))))
 
 (define-function subr_format (args ctx)
   (arity2 "format" args)
@@ -1315,11 +1329,13 @@
 
 (define-function subr_eval (args ctx)
   (let ((x (k_car args))
-	(e (or (k_cadr args) (get <context> env ctx))))
-    (gc-protect (x)
-      (set x (k_expand x e))
-      (set x (k_encode x e))
-      (k_eval x ctx))))
+	(e (or (k_cadr args) (new-<env> (get <variable> value globals) 1 0))))
+    (gc-protect (x e)
+      (let ((c (new-base-<context> () () e)))
+        (gc-protect (c)
+	  (set x (k_expand x e))
+	  (set x (k_encode x e))
+	  (k_eval x c))))))
 
 (define-function subr_encode (args ctx)
   (k_encode (k_car args)
@@ -1449,29 +1465,36 @@
 	       (free buf)
 	       result))))))
 
+(define-function subr_verbose (args ctx)
+  (let ((arg (k_car args)))
+    (if (is_long arg)
+	(set opt_verbose (get_long arg)))
+    arg))
+
 ;;; ----------------------------------------------------------------
 
 (define-function repl_stream (stream)
   (put <variable> value input (new-<long> stream))
   (let ((res ()))
-    (or (= stdin stream) (fscanf stream "#!%*[^\012\015]"))
-    (while (let ()
-	     (and (= stdin stream) (fprintf stdout ".") (fflush stdout))
-	     (!= DONE (set res (k_read stream))))
-      (let ((env (new-<env> (get <variable> value globals) 1 0)))
-        (gc-protect (res env)
-	  (and (> opt_verbose 0) (printf ";;; ") (k_dumpln res))
-	  (set res (k_expand res env))					(and (> opt_verbose 2) (printf "expd--> ") (k_dumpln res))
-	  (set res (k_encode res env))					(and (> opt_verbose 2) (printf "encd--> ") (k_dumpln res))
-	  (let ((ctx (new-base-<context> () () env)))
-	    (gc-protect (ctx)
-	      (set res (k_eval res ctx))				(and (> opt_verbose 1) (printf "eval--> ") (k_dumpln res))
-	      (if (= stdin stream)
-		  (k_dumpln res)
-		(and (> opt_verbose 0) (printf ";;; => ") (k_dumpln res)))
-	      res)))))
-    (and (= stdin stream)
-	 (printf "\nmorituri te salutant\n"))))
+    (gc-protect (res)
+      (or (= stdin stream) (fscanf stream "#!%*[^\012\015]"))
+      (while (let ()
+  	     (and (= stdin stream) (fprintf stdout ".") (fflush stdout))
+  	     (!= DONE (set res (k_read stream))))
+        (let ((env (new-<env> (get <variable> value globals) 1 0)))
+          (gc-protect (env)
+  	  (and (> opt_verbose 0) (printf ";;; ") (k_dumpln res))
+  	  (set res (k_expand res env))					(and (> opt_verbose 2) (printf "expd--> ") (k_dumpln res))
+  	  (set res (k_encode res env))					(and (> opt_verbose 2) (printf "encd--> ") (k_dumpln res))
+  	  (let ((ctx (new-base-<context> () () env)))
+  	    (gc-protect (ctx)
+  	      (set res (k_eval res ctx))				(and (> opt_verbose 1) (printf "eval--> ") (k_dumpln res))
+  	      (if (= stdin stream)
+  		  (k_dumpln res)
+  		(and (> opt_verbose 0) (printf ";;; => ") (k_dumpln res))))))))
+      (and (= stdin stream)
+	   (printf "\nmorituri te salutant\n")))
+    res))
 
 (define-function define-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
@@ -1555,6 +1578,8 @@
   (define-subr  "string"		subr_string)
   (define-subr  "array"			subr_array)
   (define-subr  "form"			subr_form)
+  (define-subr  "open"			subr_open)
+  (define-subr  "close"			subr_close)
   (define-subr  "getc"			subr_getc)
   (define-subr  "allocate"		subr_allocate)
   (define-subr  "type-of"		subr_type_of)
@@ -1576,6 +1601,7 @@
   (define-subr  "string->symbol"	subr_string_symbol)
   (define-subr  "symbol->string"	subr_symbol_string)
   (define-subr  "long->string"		subr_long_string)
+  (define-subr  "verbose"		subr_verbose)
 
   (set f_set	(k_env_lookup (get <variable> value globals) s_set   ))		(gc_push_root (address-of f_set   ))
   (set f_quote	(k_env_lookup (get <variable> value globals) s_quote ))		(gc_push_root (address-of f_quote ))
