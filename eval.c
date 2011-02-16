@@ -5,7 +5,7 @@
 
 extern int isatty(int);
 
-#define	TAG_INT	1
+//#define	TAG_INT	0
 
 #define GC_APP_HEADER	int type;
 
@@ -106,7 +106,7 @@ static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	se
 static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  return obj; }
 
 static oop symbols= nil;
-static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil;
+static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil; //, s_in= nil;
 static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
 static oop backtrace= nil, input= nil;
@@ -217,11 +217,9 @@ static oop arrayInsert(oop obj, size_t index, oop value)
 
 static oop oopAt(oop obj, int index)
 {
-  if (obj) {
-    if (!GC_atomic(obj)) {
-      int size= GC_size(obj) / sizeof(oop);
-      if ((unsigned)index < (unsigned)size) return ((oop *)obj)[index];
-    }
+  if (obj && !isLong(obj) && !GC_atomic(obj)) {
+    int size= GC_size(obj) / sizeof(oop);
+    if ((unsigned)index < (unsigned)size) return ((oop *)obj)[index];
   }
   return nil;
 }
@@ -301,6 +299,12 @@ static void dumpln(oop);
 
 static oop findVariable(oop env, oop name)
 {
+//  if (is(Pair, name) && s_in == getHead(name)) {
+//    env= findVariable(env, cadr(name));
+//    if (nil == env) fatal("undefined namespace: %s", get(cadr(name), Symbol,bits));
+//    if (!is(Env, env)) fatal("not a namespace: %s", get(cadr(name), Symbol,bits));
+//    return findVariable(env, caddr(name));
+//  }
   while (nil != env) {
     oop bindings= get(env, Env,bindings);
     int index= arrayLength(bindings);
@@ -335,8 +339,8 @@ static oop define(oop env, oop name, oop value)
 
 static int isGlobal(oop var)
 {
-  return 0 == getLong(get(get(var, Variable,env), Env,level));
-//  return nil == get(get(var, Variable,env), Env,parent);
+  oop env= get(var, Variable,env);
+  return (nil != env) && (0 == getLong(get(env, Env,level)));
 }
 
 static oop newBool(int b)		{ return b ? s_t : nil; }
@@ -362,11 +366,11 @@ static oop intern(char *string)
 
 #include "chartab.h"
 
-static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT    & chartab[c]); }
-static int isAlpha(int c)	{ return 0 <= c && c <= 127 && (CHAR_ALPHA    & chartab[c]); }
-static int isDigit10(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT10  & chartab[c]); }
-static int isDigit16(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c]); }
-static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c]); }
+static int isPrint(int c)	{ return (0 <= c && c <= 127 && (CHAR_PRINT    & chartab[c])); }
+static int isAlpha(int c)	{ return (0 <= c && c <= 127 && (CHAR_ALPHA    & chartab[c])); }
+static int isDigit10(int c)	{ return (0 <= c && c <= 127 && (CHAR_DIGIT10  & chartab[c])); }
+static int isDigit16(int c)	{ return (0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c])); }
+static int isLetter(int c)	{ return (0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c])) || (c >= 128); }
 
 #define DONE	((oop)-4)	/* cannot be a tagger immediate */
 
@@ -555,7 +559,6 @@ static oop read(FILE *fp)
 	  } while (isDigit16(c));
 	ungetc(c, fp);
 	oop obj= newLong(strtoul(buffer_contents(&buf), 0, 0));
-	//buffer_free(&buf);
 	return obj;
       }
       case '(': return readList(fp, ')');      case ')': ungetc(c, fp);  return DONE;
@@ -570,14 +573,35 @@ static oop read(FILE *fp)
       default: {
 	if (isLetter(c)) {
 	  static struct buffer buf= BUFFER_INITIALISER;
+	  oop obj= nil;						GC_PROTECT(obj);
+	  oop in= nil;						GC_PROTECT(in);
 	  buffer_reset(&buf);
 	  while (isLetter(c) || isDigit10(c)) {
+//	    if (('.' == c) && buf.position) {
+//	      c= getc(fp);
+//	      if (!isLetter(c) && !isDigit10(c)) {
+//		ungetc(c, fp);
+//		c= '.';
+//	      }
+//	      else {
+//		obj= intern(buffer_contents(&buf));
+//		in=  newPair(obj, in);
+//		buffer_reset(&buf);
+//	      }
+//	    }
 	    buffer_append(&buf, c);
 	    c= getc(fp);
 	  }
 	  ungetc(c, fp);
-	  oop obj= intern(buffer_contents(&buf));
-	  //buffer_free(&buf);
+	  obj= intern(buffer_contents(&buf));
+//	  while (nil != in) {
+//	    obj= newPair(obj, nil);
+//	    obj= newPair(getHead(in), obj);
+//	    obj= newPair(s_in, obj);
+//	    in= getTail(in);
+//	  }
+	  GC_UNPROTECT(in);
+	  GC_UNPROTECT(obj);
 	  return obj;
 	}
 	fatal(isPrint(c) ? "illegal character: 0x%02x '%c'" : "illegal character: 0x%02x", c, c);
@@ -683,21 +707,26 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     case Variable: {
-      if (isGlobal(obj) && isatty(1)) fprintf(stream, "[4m");
+      if (!isGlobal(obj) && isatty(1)) fprintf(stream, "[4m");
       doprint(stream, get(obj, Variable,name), 0);
-      if (isGlobal(obj) && isatty(1)) fprintf(stream, "[m");
-      fprintf(stream, ";%ld+%ld", getLong(get(get(obj, Variable,env), Env,level)), getLong(get(obj, Variable,index)));
+      if (!isGlobal(obj) && isatty(1)) fprintf(stream, "[m");
+#if 0
+      oop env= get(obj, Variable,env);
+      if (nil != env) fprintf(stream, ";%ld+%ld", getLong(get(env, Env,level)), getLong(get(obj, Variable,index)));
+#endif
       break;
     }
     case Env: {
       fprintf(stream, "Env%s%s<%ld+%ld:", ((nil == get(obj, Env,parent)) ? "*" : ""), ((nil == get(obj, Env,stable)) ? "=" : ""),
 	      getLong(get(obj, Env,level)), getLong(get(obj, Env,offset)));
+#if 0
       oop bnd= get(obj, Env,bindings);
       int idx= arrayLength(bnd);
       while (--idx >= 0) {
 	doprint(stream, arrayAt(bnd, idx), storing);
 	if (idx) fprintf(stream, " ");
       }
+#endif
       fprintf(stream, ">");
       break;
     }
@@ -759,7 +788,7 @@ static oop expand(oop expr, oop env)
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
     if (s_quote != head) tail= exlist(tail, env);
-    if (s_set == head && is(Pair, car(tail)) && is(Symbol, caar(tail))) {
+    if (s_set == head && is(Pair, car(tail)) && is(Symbol, caar(tail)) /*&& s_in != caar(tail)*/) {
       static struct buffer buf= BUFFER_INITIALISER;
       buffer_reset(&buf);
       buffer_appendAll(&buf, "set-");
@@ -1298,13 +1327,30 @@ static subr(abort)
   return nil;
 }
 
+static subr(open)
+{
+  oop arg= car(args);
+  if (!is(String, arg)) { fprintf(stderr, "open: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  FILE *stream= (FILE *)fopen(get(arg, String,bits), "rb");
+  return stream ? newLong((long)stream) : nil;
+}
+
+static subr(close)
+{
+  oop arg= car(args);
+  if (!isLong(arg)) { fprintf(stderr, "close: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  fclose((FILE *)getLong(arg));
+  return arg;
+}
+
 static subr(getc)
 {
   oop arg= car(args);
   if (nil == arg) arg= get(input, Variable,value);
   if (!isLong(arg)) { fprintf(stderr, "getc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
-  return newLong(getc(stream));
+  int c= getc(stream);
+  return (EOF == c) ? nil : newLong(c & 255);
 }
 
 static subr(read)
@@ -1347,12 +1393,13 @@ static subr(encode)
 
 static subr(eval)
 {
-  oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
+  oop x= car(args);  args= cdr(args);				GC_PROTECT(x);
   oop e= car(args);
-  if (nil == e) e= get(ctx, Context,env);
+  if (nil == e) e= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(e);
   x= expand(x, e);
   x= encode(x, e);
-  x= eval  (x, ctx);				GC_UNPROTECT(x);
+  oop c= newBaseContext(nil, nil, e);				GC_PROTECT(c);
+  x= eval  (x, c);						GC_UNPROTECT(c);  GC_UNPROTECT(e);  GC_UNPROTECT(x);
   return x;
 }
 
@@ -1445,9 +1492,8 @@ static subr(fixedP)
 
 static subr(cons)
 {
-  arity2(args, "cons");
-  oop lhs= getHead(args);
-  oop rhs= getHead(getTail(args));
+  oop lhs= car(args);
+  oop rhs= cadr(args);
   return newPair(lhs, rhs);
 }
 
@@ -1627,6 +1673,13 @@ static subr(not)
   return (nil == obj) ? s_t : nil;
 }
 
+static subr(verbose)
+{
+  oop obj= getHead(args);
+  if (isLong(obj)) opt_v= getLong(obj);
+  return obj;
+}
+
 #undef subr
 
 static void replFile(FILE *stream)
@@ -1707,6 +1760,7 @@ int main(int argc, char **argv)
   s_unquote_splicing	= intern("unquote-splicing");
   s_t			= intern("t");
   s_dot			= intern(".");
+//s_in			= intern("in");
 
   oop tmp= nil;		GC_PROTECT(tmp);
 
@@ -1742,6 +1796,8 @@ int main(int argc, char **argv)
       { " exit",	   subr_exit },
       { " abort",	   subr_abort },
 //    { " current-environment",	   subr_current_environment },
+      { " open",	   subr_open },
+      { " close",	   subr_close },
       { " getc",	   subr_getc },
       { " read",	   subr_read },
       { " expand",	   subr_expand },
@@ -1780,6 +1836,7 @@ int main(int argc, char **argv)
       { " oop-at",	   subr_oop_at },
       { " set-oop-at",	   subr_set_oop_at },
       { " not",		   subr_not },
+      { " verbose",	   subr_verbose },
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
