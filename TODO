@@ -1,3 +1,48 @@
+TALK FOR ReGIS - slides sent by Feb 22nd
+
+TALK FOR KITA - talk on Feb 24th
+
+----------------------------------------------------------------
+
+Syntax for namespaces.
+
+reader:
+	Foo.bar.baz -> (in (in Foo bar) baz)
+
+expand:
+	(in x y) ->	spc = findVariable(env, x)->value;
+			var = findVariable(spc, y);
+
+----------------------------------------------------------------
+
+strings are arrays of ucs4
+symbols are ucs4
+read converts utf8 to ucs4
+write converts ucs4 to utf8
+
+tokens should contain the FILE name and the LINE number and maybe character COLUMNs for debugging
+
+put support only in peg.l, boot only in peg-boot.l
+
+make experimental/demo syntax for stdin
+	m-expr like?
+	Smalltalk like?
+		make selectors be:
+			.*: = keyword
+			<bin>.*<bin> = binary
+			anything else is unary
+
+put peg IR -> s-exp compiler in peg-boot and generate peg-compile.l (grammar in PEG -> compiled parser)
+	add mechanism to instantiate in-place
+
+PEG grammar should look like structure:
+	$> = output stream
+	$< = input stream
+	$* = current list result
+	$@ = current result
+	rules are methods defined on the structure, prefixed with $
+	structures inherit dynamically
+
 make eval.c eval.l use WIDE CHARACTERS
 
 propagate changes eval.c -> eval.l
