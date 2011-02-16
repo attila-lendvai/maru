@@ -1,8 +1,8 @@
 struct buffer
 {
-  char	*buffer;
-  int	 size;
-  int	 position;
+  unsigned char	*buffer;
+  int		 size;
+  int		 position;
 };
 
 #define BUFFER_INITIALISER { 0, 0, 0 }
@@ -16,6 +16,13 @@ static int  buffer_position(struct buffer *b)		{ return b->position; }
 #if 0
 static int  buffer_last(struct buffer *b)		{ return (b->position > 0) ? b->buffer[b->position - 1] : -1; }
 #endif
+
+static int buffer_read(struct buffer *b)
+{
+  int c= b->buffer[b->position++];
+  if (!c) b->position--;
+  return c;
+}
 
 static void buffer_append(struct buffer *b, int c)
 {
@@ -43,5 +50,5 @@ static char *buffer_contents(struct buffer *b)
 {
   buffer_append(b, 0);
   b->position--;
-  return b->buffer;
+  return (char *)b->buffer;
 }
