@@ -195,13 +195,13 @@
 
 (define-function %typecheck (type object)
   (or (= type (type-of object))
-      (error "type check failed for field accessor: expected "(array-at %type-names type)" got "(array-at %type-names (type-of object))))
+      (error "type check failed for field accessor: expected "type":"(array-at %type-names type)" got "(type-of object)":"(array-at %type-names (type-of object))))
   object)
 
 (define-function %make-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
-			    self ; (list '%typecheck ',name self) ; self
+			    self ; (list '%typecheck ',name self)
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
@@ -245,7 +245,7 @@
 (define-structure <pair>	(head tail))
 (define-structure <_array>	())
 (define-structure <array>	(size _array))
-(define-structure <expr>	(name defn ctx))
+(define-structure <expr>	(name defn ctx))			(define-function expr? (obj) (= <expr> (type-of obj)))
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name))
@@ -335,14 +335,17 @@
     self))
 
 (define-function <selector>-add-method (self type method)
-  (or (<expr>-name method) (set (<expr>-name method) (<selector>-name self)))
+  (and (expr? method)
+       (or (<expr>-name method)
+	   (set (<expr>-name method) (<selector>-name self))))
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
   (let ((def (defined? name)))
     (if def
-	(or (selector? def)
-	    (error name" already defined as non-selector"))
+	(if (selector? (<variable>-value def))
+	    (list 'quote <variable>-value def)
+	  (error name" already defined as non-selector: " (<variable>-value def)))
       (let ()
 	(or default (set default `(args (error "cannot apply selector "',name
 					       " to "(array-at %type-names (type-of (car args)))
@@ -524,12 +527,12 @@
       (set ind (+ 1 ind)))
     str))
 
-;; (define-function array->list (arr)
-;;   (let* ((ind (array-length arr))
-;; 	 (lst ()))
-;;     (while (<= 0 (set ind (- ind 1)))
-;;       (set lst (cons (array-at arr ind) lst)))
-;;     lst))
+(define-function array->list (arr)
+  (let* ((ind (array-length arr))
+	 (lst ()))
+    (while (<= 0 (set ind (- ind 1)))
+      (set lst (cons (array-at arr ind) lst)))
+    lst))
 
 ;;; structural equality
 
