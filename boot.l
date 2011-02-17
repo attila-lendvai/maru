@@ -201,7 +201,7 @@
 (define-function %make-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
-			    self ; (list '%typecheck ',name self)
+			    self ; (list '%typecheck ',name self) ; self ; xxx
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
@@ -424,7 +424,7 @@
 	    (if (set arg (cdr arg))
 		(print " ")))
 	  (print ")"))
-      (print arg))
+      (dump arg))
     found))
 
 (if 't;;()
@@ -438,7 +438,7 @@
 		 (dump-until posn here)
 		 (print "\n")
 		 (set posn here))))
-	   (exit 0))))
+	   (exit 1))))
 
 ;;; multimethod
 
