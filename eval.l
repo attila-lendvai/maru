@@ -1041,7 +1041,6 @@
       ((= type <undefined>)	exp)
       ((= type <long>)		exp)
       ((= type <string>)	exp)
-      ((= type <symbol>)	(k_error "symbol in eval?")) ;; xxx
       ((= type <variable>)	(if (is_global exp)
 				    (get <variable> value exp)
 				  (let ((delta (- (get_long (get <env> level (get <context>  env ctx)))
@@ -1061,6 +1060,7 @@
 						    (k_apply head args ctx)))))
 				    (set trace_depth (- trace_depth 1))
 				    head)))
+      ((= type <symbol>)	(k_error "symbol in eval?")) ;; xxx
       (else			(let ((ev (k_array_at (get <variable> value evaluators) (get-type exp))))
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
@@ -1367,6 +1367,11 @@
 (define-function subr_car	(args ctx)	(k_car (k_car args)))
 (define-function subr_cdr	(args ctx)	(k_cdr (k_car args)))
 
+(define-function subr_set_car (args ctx)
+  (let ((arg (k_car args)))
+    (and (is <pair> arg)
+	 (put <pair> head arg (k_cadr args)))))
+
 (define-function subr_set_cdr (args ctx)
   (let ((arg (k_car args)))
     (and (is <pair> arg)
@@ -1589,6 +1594,7 @@
   (define-subr  "array?"		subr_arrayP)
   (define-subr  "car"			subr_car)
   (define-subr  "cdr"			subr_cdr)
+  (define-subr  "set-car"		subr_set_car)
   (define-subr  "set-cdr"		subr_set_cdr)
   (define-subr  "oop-at"		subr_oop_at)
   (define-subr  "set-oop-at"		subr_set_oop_at)
