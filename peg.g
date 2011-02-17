@@ -1,44 +1,42 @@
 # -*- fundamental -*-
 
-equals    	= '=' space ;
+equals    	= "=" space ;
 blank		= [\t ] ;
-eol		= { '\n' '\r'* } | { '\r' '\n'* } ;
-comment		= '#' { !eol . }* ;
+eol		= { "\n" "\r"* } | { "\r" "\n"* } ;
+comment		= "#" { !eol . }* ;
 space		= { blank | eol | comment }* ;
-bar       	= '|'  space ;
-pling     	= '!'  space ;
-ampersand 	= '&'  space ;
-colon     	= ':'  space ;
+bar       	= "|"  space ;
+pling     	= "!"  space ;
+ampersand 	= "&"  space ;
+colon     	= ":"  space ;
 colondbl     	= "::" space ;
 arrow     	= "->" space ;
-quotesgl     	= '\'' space ;
+quotesgl     	= "\'" space ;
+dollarhash	= "$#" space ;
 dollardbl	= "$$" space ;
-dollar		= '$'  space ;
-at		= '@'  space ;
-query     	= '?'  space ;
-plus      	= '+'  space ;
-star      	= '*'  space ;
-lparen      	= '('  space ;
-rparen     	= ')'  space ;
-lbrace      	= '{'  space ;
-rbrace     	= '}'  space ;
-dot       	= '.'  space ;
+dollar		= "$"  space ;
+at		= "@"  space ;
+query     	= "?"  space ;
+plus      	= "+"  space ;
+star      	= "*"  space ;
+lparen      	= "("  space ;
+rparen     	= ")"  space ;
+lbrace      	= "{"  space ;
+rbrace     	= "}"  space ;
+dot       	= "."  space ;
 digit		= [0123456789] ;
+number		= digit+ $#:n space -> n ;
 letter		= [ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz] ;
 
 identifier	= { letter { letter | digit }* } @$$:id space	-> id ;
-char		= '\\'	{ 't'	-> '\t'
-			| 'n'	-> '\n'
-			| 'r'	-> '\r'
-			| '\"'	-> '\"'
-			| '\''	-> '\''
-			| '\\'	-> '\\'
+char		= "\\"	{ "t"	->  9
+			| "n"	-> 10
+			| "r"	-> 13
 			| .
                         }
 		| . ;
-character	= '\'' char :c '\'' space			-> c ;
-string		= '\"'  {!'\"'  char}* $:s '\"'  space		-> s ;
-class		= '['   {!']'   char}* $:s ']'   space		-> s ;
+string		= "\""  {!"\""  char}* $:s "\""  space		-> s ;
+class		= "["   {!"]"   char}* $:s "]"   space		-> s ;
 symchar		= [!#$%&*+,-/<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
 symbol		= {symchar {symchar | digit}*} @$$:id space	-> id ;
 variable2	= colondbl identifier ;
@@ -50,13 +48,13 @@ relement	= symbol:e					-> (result-list-symbol :e)
 rlist		= lparen relement*:e rparen			-> e ;
 llist		= lparen expression:e rparen			-> e ;
 atom		= lbrace expression :e rbrace			-> e
-		| character:e					-> (match-object :e)
+		| quotesgl symbol:e				-> (match-object :e)
 		| string:e					-> (match-string :e)
 		| class:e					-> (match-class :e)
 		| identifier:e					-> (match-rule :e)
 		| dot						-> (match-any)
 		| arrow { identifier:e				-> (result-variable :e)
-			| character:e				-> (result-object :e)
+			| number:e				-> (result-object :e)
 			| string:e				-> (result-string :e)
 			| rlist:e				-> (result-list ::e)
 			}
@@ -68,6 +66,7 @@ repetition	= atom :e { query				-> (match-zero-one :e)  :e
 			  | plus				-> (match-one-more :e)  :e
 			  }?					-> e ;
 conversion	= repetition :e { at				-> (make-span   :e) :e
+				| dollarhash			-> (make-number :e) :e
 				| dollardbl			-> (make-symbol :e) :e
 				| dollar			-> (make-string :e) :e
 				}*				-> e ;
@@ -78,10 +77,11 @@ sequence	= predicate :p	{ sequence:e			-> (match-both :p :e) :p
 				}?				-> p ;
 expression	= sequence :s   { bar expression:e		-> (match-first :s :e) :s
 				}?				-> s ;
-definition	= space identifier:id equals expression:e ';'	-> (rule :id :e) ;
+definition	= space identifier:id equals expression:e ";"	-> (rule :id :e) ;
 
 start = definition ;
 
 #----------------------------------------------------------------
 
-gen_cola	= .:e						-> e ;
+gen_cola_declaration	= ( 'rule .:id )			-> (define-selector :id) ;
+gen_cola		= .:e					-> e ;

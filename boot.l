@@ -406,6 +406,21 @@
 	    (print " ")))
       (print ")"))))
 
+(define-method do-dump <pair> ()
+  (if (= *globals* (cdr self))
+      (print "*globals*")
+    (let ()
+      (print "(")
+      (while self
+	(if (pair? self)
+	    (dump (car self))
+	  (let ()
+	    (print ". ")
+	    (print self)))
+	(if (set self (cdr self))
+	    (print " ")))
+      (print ")"))))
+
 (define-function dump-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
@@ -517,6 +532,20 @@
        (set _list_ (cdr _list_)))))
 
 ;;; conversion
+
+(define-function string->number (str)
+  (let ((n 0)
+	(i 0)
+	(l (string-length str)))
+    (while (< i l)
+      (let ((c (string-at str i)))
+	(set n (+ (* 10 n)
+		  (cond
+		    ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
+		    ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
+		    (else			(- c ?0))))))
+      (set i (+ i 1)))
+    n))
 
 (define-function array->string (arr)
   (let* ((ind 0)

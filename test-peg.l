@@ -1,9 +1,15 @@
 ;; (require "parser.l")
 ;; (require "peg.l")
 
-(define peg-grammar-string (input-stream-up-to (input-stream (open "peg.g")) ()))
-
-(map println (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
+(let* ((g (input-stream-up-to (input-stream (open "peg.g")) ()))
+       (s (string-stream g))
+       (p (new <peg-parser>))
+       (r (array->list (parse-all p s))))
+  (map println r)
+  (map println (array->list (parse-all-from p (list-stream r) $gen_cola_declaration)))
+  )
+  
+; (map println (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
 
 ;(define peg-ir (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
 

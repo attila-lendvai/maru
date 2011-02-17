@@ -86,6 +86,9 @@
       (set pos (<token>-tail pos))))
   (print "}"))
 
+(define-function group-empty? (self)
+  (= (<group>-first self) (<group>-last  self)))
+
 (define-function group-length (self)
   (let ((tok (<group>-first self))
 	(lim (<group>-last  self))
@@ -164,6 +167,11 @@
 
 ;;;----------------------------------------------------------------
 
+(define-selector $peek)
+(define-selector $next)
+
+;;;----------------------------------------------------------------
+
 (define-structure <string-stream> (string size position))
 
 (define-function string-stream (string)
@@ -173,28 +181,45 @@
     (set (<string-stream>-position self) 0)
     self))
 
-(define-function string-stream-peek (self)
-  (let ((pos (<string-stream>-position self)))
-    (and (< pos (<string-stream>-size self))
-	 (string-at (<string-stream>-string self) pos))))
+(define-method $peek <string-stream> ()
+  (let ((pos self.position))
+    (and (< pos self.size)
+	 (string-at self.string pos))))
 
-(define-function string-stream-next (self)
-  (let ((pos (<string-stream>-position self)))
-    (and (< pos (<string-stream>-size self))
-	 (let ((value (string-at (<string-stream>-string self) pos)))
-	   (set (<string-stream>-position self) (+ pos 1))
-	   ;;(print "<") (putchar value) (print ">")
+(define-method $next <string-stream> ()
+  (let ((pos self.position))
+    (and (< pos self.size)
+	 (let ((value (string-at self.string pos)))
+	   (set self.position (+ pos 1))
+	   ;;(print (format "%c" value))
 	   value))))
 
 (unit-test "<string-stream>"
   (let ((s (string-stream "xhello"))
 	(c 0)
-	(a (array)))						(unit-assert (= ?x (string-stream-peek s)))
-								(unit-assert (= ?x (string-stream-next s)))
-								(unit-assert (= ?h (string-stream-peek s)))
-    (while (set c (string-stream-next s)) (array-append a c))	(unit-assert (= "hello" (array->string a)))
-								(unit-assert (not (string-stream-peek s)))
-								(unit-assert (not (string-stream-next s)))))
+	(a (array)))					(unit-assert (= ?x ($peek s)))
+							(unit-assert (= ?x ($next s)))
+							(unit-assert (= ?h ($peek s)))
+    (while (set c ($next s)) (array-append a c))	(unit-assert (= "hello" (array->string a)))
+							(unit-assert (not ($peek s)))
+							(unit-assert (not ($next s)))))
+
+;;;----------------------------------------------------------------
+
+(define-structure <list-stream> (source))
+
+(define-function list-stream (source)
+  (let ((self (new <list-stream>)))
+    (set (<list-stream>-source self) source)
+    self))
+
+(define-method $peek <list-stream> ()
+  (car self.source))
+
+(define-method $next <list-stream> ()
+  (let ((value (car self.source)))
+    (set self.source (cdr self.source))
+    value))
 
 ;;;----------------------------------------------------------------
 
@@ -248,7 +273,7 @@
 (define-function parser-stream-peek-token (self)
   (let ((here (<parser-stream>-position self)))
     (or (<token>-value here)
-	(let ((c (string-stream-next (<parser-stream>-source self))))
+	(let ((c ($next (<parser-stream>-source self))))
 	  ;;(print "<"(format "%c" c)">")
 	  (set (<token>-value here) c)))
     here))
@@ -258,7 +283,7 @@
 
 (define-function parser-stream-next-token (self)
   (let ((here (<parser-stream>-position self)))
-    (or (<token>-value here) (set (<token>-value here) (string-stream-next (<parser-stream>-source self))))
+    (or (<token>-value here) (set (<token>-value here) ($next (<parser-stream>-source self))))
     (and (<token>-value here)
 	 (let ((tail (<token>-tail here)))
 	   (or tail (set tail (set (<token>-tail here) (new-<token>))))
@@ -300,7 +325,7 @@
 
 (define-function parser-stream-context (self)
   (let ((a (array)))
-    (for (i 0 32) (let ((c (string-stream-next (<parser-stream>-source self)))) (and c (array-append a ))))
+    (for (i 0 32) (let ((c ($next (<parser-stream>-source self)))) (and c (array-append a ))))
     (array->string a)))
 
 ;;;----------------
@@ -361,17 +386,25 @@
 
 (define-selector $start)
 
+(define-selector parse-from)
+
+(define-method parse-from <parser> (source rule)
+  (set self.source (parser-stream source))
+  (rule self))
+
 (define-selector parse)
 
-(define-method parse <parser> (source)
-  (set self.source (parser-stream source))
-  ($start self))
+(define-function parse (self source)
+  (parse-from self source $start))
 
-(define-selector parse-all)
+(define-selector parse-all-from)
 
-(define-method parse-all <parser> (source)
+(define-method parse-all-from <parser> (source rule)
   (set self.source (parser-stream source))
   (let ((results (array)))
-    (while ($start self)
+    (while (rule self)
       (array-append results self.result))
     results))
+
+(define-function parse-all (self source)
+  (parse-all-from self source $start))

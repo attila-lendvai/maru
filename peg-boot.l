@@ -55,6 +55,12 @@
 					(RULE space)
 				      (FAIL pos)))))
 
+(define-rule dollarhash	(let ((pos (<parser-stream>-position _)))
+			  (and (OBJECT ?$)
+				    (if (OBJECT ?#)
+					(RULE space)
+				      (FAIL pos)))))
+
 (define-rule dollardbl	(let ((pos (<parser-stream>-position _)))
 			  (and (OBJECT ?$)
 				    (if (OBJECT ?$)
@@ -62,6 +68,7 @@
 				      (FAIL pos)))))
 
 (define-rule dollar	(and (OBJECT ?$) (RULE space)))
+(define-rule quotesgl	(and (OBJECT ?') (RULE space)))
 (define-rule at		(and (OBJECT ?@) (RULE space)))
 (define-rule query    	(and (OBJECT ??) (RULE space)))
 (define-rule plus     	(and (OBJECT ?+) (RULE space)))
@@ -90,25 +97,23 @@
 	   (RULE space)
 	   (set (<begpeg>-result self) (string->symbol (group->string ans)))))))
 
+(define-rule number
+  (let ((pos (<parser-stream>-position _)))
+    (and (RULE digit)
+	 (let ((ans (group)))
+	   (group-append ans (<begpeg>-result self))
+	   (while (RULE digit) (group-append ans (<begpeg>-result self)))
+	   (RULE space)
+	   (set (<begpeg>-result self) (string->number (group->string ans)))))))
+
 (define-rule char
   (if (OBJECT ?\\)
       (or
-        (and (OBJECT ?\\)	(set (<begpeg>-result self) ?\\))
 	(and (OBJECT ?t)	(set (<begpeg>-result self) ?\t))
 	(and (OBJECT ?n)	(set (<begpeg>-result self) ?\n))
 	(and (OBJECT ?r)	(set (<begpeg>-result self) ?\r))
-	(and (OBJECT ?\")	(set (<begpeg>-result self) ?\"))
-	(and (OBJECT ?\')	(set (<begpeg>-result self) ?\'))
 	(set (<begpeg>-result self) (parser-stream-next _)))
     (set (<begpeg>-result self) (parser-stream-next _))))
-
-(define-rule character
-  (and (OBJECT ?\')
-       (or (RULE char) (error "char expected"))
-       (let ((c (<begpeg>-result self)))
-	 (or (OBJECT ?\') (error "closing ' expected in character constant"))
-	 (RULE space)
-	 (set (<begpeg>-result self) c))))
 
 (define-rule string
   (and (OBJECT ?\")
@@ -169,6 +174,14 @@
 	 (RULE space)
 	 (set (<begpeg>-result self) (group->list! ans)))))
 
+(define-rule llist
+  (and (RULE lparen)
+       (or (RULE expression) (error "expression expected after ("))
+       (let ((ans (<begpeg>-result self)))
+	 (or (RULE rparen) (error ") expected"))
+	 (RULE space)
+	 (set (<begpeg>-result self) ans))))
+
 (define-rule atom
   (cond 
     ((RULE lbrace)	(let ((ans))
@@ -176,17 +189,20 @@
 			  (set ans (<begpeg>-result self))
 			  (or (RULE rbrace) (error "} expected"))
 			  (set (<begpeg>-result self) ans)))
-    ((RULE character)	(set (<begpeg>-result self) (list 'match-object (<begpeg>-result self))))
+    ((and (RULE quotesgl)
+	  (RULE symbol))
+			(set (<begpeg>-result self) (list 'match-object (<begpeg>-result self))))
     ((RULE string)	(set (<begpeg>-result self) (list 'match-string (<begpeg>-result self))))
     ((RULE class)	(set (<begpeg>-result self) (list 'match-class  (<begpeg>-result self))))
     ((RULE identifier)	(set (<begpeg>-result self) (list 'match-rule   (<begpeg>-result self))))
+    ((RULE llist)	(set (<begpeg>-result self) (list 'match-list   (<begpeg>-result self))))
     ((RULE dot)		(set (<begpeg>-result self) (list 'match-any)))
     ((RULE arrow)	(cond
 			  ((RULE identifier)	(set (<begpeg>-result self) (list 'result-variable (<begpeg>-result self))))
-			  ((RULE character)	(set (<begpeg>-result self) (list 'result-object (<begpeg>-result self))))
-			  ((RULE string)		(set (<begpeg>-result self) (list 'result-string (<begpeg>-result self))))
+			  ((RULE number)	(set (<begpeg>-result self) (list 'result-object (<begpeg>-result self))))
+			  ((RULE string)	(set (<begpeg>-result self) (list 'result-string (<begpeg>-result self))))
 			  ((RULE list)		(set (<begpeg>-result self) (cons 'result-list (<begpeg>-result self))))
-			  (else				(error "identifier/string/list expected after ->"))))
+			  (else			(error "identifier/number/string/list expected after ->"))))
     ((RULE colon)	(if (RULE identifier)
 			    (set (<begpeg>-result self) (list 'assign-result (<begpeg>-result self)))
 			  (error "identifier expected after :")))
@@ -206,6 +222,7 @@
        (let ((exp (<begpeg>-result self)))
 	 (while (cond
 		  ((RULE at)		(set exp (list 'make-span exp)))
+		  ((RULE dollarhash)	(set exp (list 'make-number exp)))
 		  ((RULE dollardbl)	(set exp (list 'make-symbol exp)))
 		  ((RULE dollar)	(set exp (list 'make-string exp)))
 		  (else			())))
@@ -251,7 +268,7 @@
   (let ((self (new <begpeg>))
         (_    (parser-stream (string-stream "= | ! & : :: -> $ ? + * ( ) { } .
   					q6ident1f1er
-  					a\nb'x'\"multi\n\tline\n\tstring\"
+  					a\nb\"multi\n\tline\n\tstring\"
   					[character-class]
   					\"string\" [class] identifier .
   					foo? bar* baz+
@@ -285,7 +302,6 @@
     (unit-assert (RULE char		))	(unit-assert (= (<begpeg>-result self) ?a ))
     (unit-assert (RULE char		))	(unit-assert (= (<begpeg>-result self) ?\n))
     (unit-assert (RULE char		))	(unit-assert (= (<begpeg>-result self) ?b ))
-    (unit-assert (RULE character	))	(unit-assert (= (<begpeg>-result self) ?x ))
     (unit-assert (RULE string		))	(unit-assert (= (<begpeg>-result self) "multi\n	line\n	string"))
     (unit-assert (RULE class		))	(unit-assert (= (<begpeg>-result self) "character-class"))
     (unit-assert (RULE atom		))	(unit-assert (equal (<begpeg>-result self) '(match-string "string")))
@@ -402,6 +418,11 @@
        (set (<peg-interpreter>-result self)
 	    (list->string (<peg-interpreter>-result self)))))
 
+(define-function peg-interpreter-make-number (self tree)
+  (and (peg-interpret self (cadr tree))
+       (set (<peg-interpreter>-result self)
+	    (string->number (list->string (<peg-interpreter>-result self))))))
+
 (define-function peg-interpreter-make-span (self tree)
   (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
     (and (peg-interpret self (cadr tree))
@@ -450,6 +471,14 @@
     (set (<peg-interpreter>-result self) (group->list! grp))
     't))
 
+(define-function peg-interpreter-match-one-more (self tree)
+  (let ((grp (group)))
+    (while (peg-interpret self (cadr tree)) (group-append grp (<peg-interpreter>-result self)))
+    (and (not (group-empty? grp))
+	 (let ()
+	   (set (<peg-interpreter>-result self) (group->list! grp))
+	   't))))
+
 (define-function peg-interpreter-peek-for (self tree)
   (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
     (and (peg-interpret self (cadr tree))
@@ -471,6 +500,7 @@
 	   ((= op 'match-class)				(peg-interpreter-match-class self tree))
 	   ((= op 'assign-result)			(peg-interpreter-assign-result self tree))
 	   ((= op 'match-zero-more)			(peg-interpreter-match-zero-more self tree))
+	   ((= op 'match-one-more)			(peg-interpreter-match-one-more self tree))
 	   ((= op 'result-variable)			(peg-interpreter-result-variable self tree))
 	   ((= op 'result-list-variable)		(peg-interpreter-result-list-variable self tree))
 	   ((= op 'match-zero-one)			(peg-interpreter-match-zero-one self tree))
@@ -478,6 +508,7 @@
 	   ((= op 'result-list)				(peg-interpreter-result-list self tree))
 	   ((= op 'make-symbol)				(peg-interpreter-make-symbol self tree))
 	   ((= op 'make-string)				(peg-interpreter-make-string self tree))
+	   ((= op 'make-number)				(peg-interpreter-make-number self tree))
 	   ((= op 'make-span)				(peg-interpreter-make-span self tree))
 	   ((= op 'match-string)			(peg-interpreter-match-string self tree))
 	   ((= op 'match-any)				(peg-interpreter-match-any self tree))
@@ -505,7 +536,7 @@
 (let ((p (new <begpeg>))
       (_ (parser-stream (string-stream peg-grammar-string))))
   (while ($definition p _)
-    ;;(println "BEG: " (<begpeg>-result p) " ")
+    ;;(println "\nBEG: " (<begpeg>-result p) " ")
     (grammar-add-rule BEG (<begpeg>-result p)))
   ;;(println)
   ($space p _)
@@ -524,8 +555,13 @@
   (and (parser-stream-peek _) (error "syntax error in PEG near: " (parser-stream-context _)))
   )
 
-(or (equal (<grammar>-rules BEG) (<grammar>-rules PEG))
-    (error "grammars are not identical"))
+(let ((beg (<grammar>-rules BEG))
+      (peg (<grammar>-rules PEG)))
+  (while (pair? beg)
+    (or (equal (car peg) (car beg))
+	(error "grammars are not identical: "(car beg)" != "(car peg)))
+    (set beg (cdr beg))
+    (set peg (cdr peg))))
 
 ;; (map println profiles)
 
@@ -536,4 +572,4 @@
 ;;;----------------------------------------------------------------
 
 (let ((p (peg-compiler PEG)))
-  ($compile p))
+  (map dumpln ($compile p)))
