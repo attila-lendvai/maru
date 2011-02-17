@@ -44,7 +44,7 @@ test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
 
 peg.l : eval parser.l peg-compiler.l peg-boot.l peg.g
-	./eval parser.l peg-compiler.l peg-boot.l | tee peg.l.new
+	./eval parser.l peg-compiler.l peg-boot.l > peg.l.new
 	mv peg.l peg.l.bak
 	mv peg.l.new peg.l
 
