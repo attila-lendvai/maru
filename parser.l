@@ -55,6 +55,21 @@
     (set (<group>-last  self) token)
     self))
 
+(define-function list-from-to (start stop)
+  (and (pair? start)
+       (!= start stop)
+       (cons (car start) (list-from-to (cdr start) stop))))
+
+(define-function list->string (list)
+  (let* ((len (list-length list))
+	 (str (string len))
+	 (idx 0))
+    (while (< idx len)
+      (set-string-at str idx (car list))
+      (set idx (+ idx 1))
+      (set list (cdr list)))
+    str))
+
 (define-function group-from-to (first last)
   (let ((self  (new <group>)))
     (set (<group>-first self) first)
@@ -87,12 +102,12 @@
     (set (<token>-tail  last) tok)
     (set (<group>-last  self) tok)))
 
-(define-function group-append-all (self value)
-  (let ((tok (<group>-first value))
-	(lim (<group>-last value)))
-    (while (!= tok lim)
-      (group-append self (<token>-value tok))
-      (set tok (<token>-tail tok)))))
+;; (define-function group-append-all (self value)
+;;   (let ((tok (<group>-first value))
+;; 	(lim (<group>-last value)))
+;;     (while (!= tok lim)
+;;       (group-append self (<token>-value tok))
+;;       (set tok (<token>-tail tok)))))
 
 (define-function group-append-list (self list)
   (while (pair? list)
@@ -119,6 +134,15 @@
 
 (define-method group->list <group> ()
   (make-group->list (<group>-first self) (<group>-last self)))
+
+(define-function group->list! (self)
+  (let ((start (<group>-first self))
+	(stop  (<group>-last self)))
+    (and (!= start stop)
+	 (let ((pos start))
+	   (while (!= (cdr pos) stop) (set pos (cdr pos)))
+	   (set-cdr pos ())
+	   start))))
 
 ;; (define-function group->list (self)
 ;;   ;;(println "\n\n\n === " self)

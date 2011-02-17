@@ -3,9 +3,11 @@
 
 (define peg-grammar-string (input-stream-up-to (input-stream (open "peg.g")) ()))
 
-(define peg-ir (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
+(map println (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
 
-(map println peg-ir)
+;(define peg-ir (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
+
+;(map println peg-ir)
 
 ;; (define-selector $repl)
 

@@ -145,14 +145,15 @@
   ($begin self "(while")
   ($gen   self (cadr tree))
   ($end   self "(group-append _list_ self.result))")
-  ($end   self "(set self.result _list_))"))
+  ($emit  self "(set self.result (group->list! _list_))")
+  ($end   self "'t)"))
 
 (define-method $match-one-more <peg-compiler> (tree)
   ($begin self "(let ((_list_ (group)))")
   ($begin self "(while")
   ($gen   self (cadr tree))
   ($end   self "(group-append _list_ self.result))")
-  ($end   self "(and (not (group-empty _list_)) (set self.result _list_)))"))
+  ($end   self "(and (not (group-empty _list_)) (let () (set self.result (group->list! _list_)) 't)))"))
 
 (define-method $result-variable <peg-compiler> (tree)
   ($emit self "(let () (set self.result "(cadr tree)") 't)"))
@@ -165,7 +166,8 @@
   ($begin self "(and")
   ($gen   self (cadr tree))
   ($end   self "(group-append _list_ self.result))")
-  ($end   self "(set self.result _list_))"))
+  ($emit  self "(set self.result (group->list! _list_))")
+  ($end   self "'t)"))
 
 (define-method $result-list-symbol <peg-compiler> (tree)
   ($emit self "(group-append _list_ '"(cadr tree)")"))
@@ -173,23 +175,24 @@
 (define-method $result-list <peg-compiler> (tree)
   ($begin self "(let ((_list_ (group)))")
   (with-map $gen self (cdr tree))
-  ($end self "(set self.result _list_))"))
+  ($emit self "(set self.result (group->list! _list_))")
+  ($end  self "'t)"))
 
 (define-method $make-symbol <peg-compiler> (tree)
   ($begin self "(and")
   ($gen   self (cadr tree))
-  ($end   self "(set self.result (string->symbol (group->string self.result))))"))
+  ($end   self "(set self.result (string->symbol (list->string self.result))))"))
 
 (define-method $make-string <peg-compiler> (tree)
   ($begin self "(and")
   ($gen   self (cadr tree))
-  ($end   self "(set self.result (group->string self.result)))"))
+  ($end   self "(set self.result (list->string self.result)))"))
 
 (define-method $make-span <peg-compiler> (tree)
   ($begin self "(let ((pos (<parser-stream>-position self.source)))")
   ($begin self "(and")
   ($gen   self (cadr tree))
-  ($end   self "(set self.result (group-from-to pos (<parser-stream>-position self.source))))")
+  ($end   self "(set self.result (list-from-to pos (<parser-stream>-position self.source))))")
   ($end   self ")"))
 
 (define-method $match-string <peg-compiler> (tree)
@@ -207,7 +210,7 @@
   ($end   self ")"))
 
 (define-method $result-list-variable-splicing <peg-compiler> (tree)
-  ($emit self "(group-append-all _list_ "(cadr tree)")"))
+  ($emit self "(group-append-list _list_ "(cadr tree)")"))
 
 (define-method $result-object <peg-compiler> (tree)
   ($emit self "(let () (set self.result "(cadr tree)") 't)"))

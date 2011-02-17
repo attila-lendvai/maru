@@ -167,7 +167,7 @@
 	     (else			())))
 	 (or (RULE rparen) (error ") expected"))
 	 (RULE space)
-	 (set (<begpeg>-result self) (group->list ans)))))
+	 (set (<begpeg>-result self) (group->list! ans)))))
 
 (define-rule atom
   (cond 
@@ -352,12 +352,12 @@
   (group-append (<peg-interpreter>-list self) value))
 
 (define-function peg-interpreter-list-append-all (self value)
-  (group-append-all (<peg-interpreter>-list self) value))
+  (group-append-list (<peg-interpreter>-list self) value))
 
 (define-function peg-interpreter-pop-list (self list)
   (let ((grp (<peg-interpreter>-list self)))
     (set (<peg-interpreter>-list self) list)
-    (group->list grp)))
+    (group->list! grp)))
 
 (define-selector match-rule)
 
@@ -395,18 +395,18 @@
 (define-function peg-interpreter-make-symbol (self tree)
   (and (peg-interpret self (cadr tree))
        (set (<peg-interpreter>-result self)
-	    (string->symbol (group->string (<peg-interpreter>-result self))))))
+	    (string->symbol (list->string (<peg-interpreter>-result self))))))
 
 (define-function peg-interpreter-make-string (self tree)
   (and (peg-interpret self (cadr tree))
        (set (<peg-interpreter>-result self)
-	    (group->string (<peg-interpreter>-result self)))))
+	    (list->string (<peg-interpreter>-result self)))))
 
 (define-function peg-interpreter-make-span (self tree)
   (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
     (and (peg-interpret self (cadr tree))
 	 (set (<peg-interpreter>-result self)
-	      (group-from-to pos (<parser-stream>-position (<peg-interpreter>-stream self)))))))
+	      (list-from-to pos (<parser-stream>-position (<peg-interpreter>-stream self)))))))
 
 (define-function peg-interpreter-assign-result (self tree)
   (let () (peg-interpreter-define self (cadr tree) (<peg-interpreter>-result self)) 't))
@@ -439,15 +439,15 @@
       't)))
 
 (define-function peg-interpreter-match-zero-one (self tree)
-  (let ((grp (group)))
-    (and (peg-interpret self (cadr tree)) (group-append grp (<peg-interpreter>-result self)))
-    (set (<peg-interpreter>-result self) grp)
-    't))
+  (set (<peg-interpreter>-result self)
+       (and (peg-interpret self (cadr tree))
+	    (list (<peg-interpreter>-result self))))
+  't)
 
 (define-function peg-interpreter-match-zero-more (self tree)
   (let ((grp (group)))
     (while (peg-interpret self (cadr tree)) (group-append grp (<peg-interpreter>-result self)))
-    (set (<peg-interpreter>-result self) grp)
+    (set (<peg-interpreter>-result self) (group->list! grp))
     't))
 
 (define-function peg-interpreter-peek-for (self tree)
@@ -518,7 +518,7 @@
        (p (peg-interpreter BEG _)))
   (while (match-rule p 'definition)
     (let* ((result (<peg-interpreter>-result p)))
-      ;; (println result)
+      ;;(println "PEG: " result)
       (grammar-add-rule PEG result)))
   (match-rule p 'space)
   (and (parser-stream-peek _) (error "syntax error in PEG near: " (parser-stream-context _)))

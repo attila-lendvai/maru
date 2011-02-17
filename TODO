@@ -4,6 +4,10 @@ TALK FOR KITA - talk on Feb 24th
 
 ----------------------------------------------------------------
 
+Add source field to <pair> and use for error reporting.
+
+----------------------------------------------------------------
+
 Syntax for namespaces.
 
 reader:
