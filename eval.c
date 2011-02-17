@@ -372,7 +372,7 @@ static int isDigit10(int c)	{ return (0 <= c && c <= 127 && (CHAR_DIGIT10  & cha
 static int isDigit16(int c)	{ return (0 <= c && c <= 127 && (CHAR_DIGIT16  & chartab[c])); }
 static int isLetter(int c)	{ return (0 <= c && c <= 127 && (CHAR_LETTER   & chartab[c])) || (c >= 128); }
 
-#define DONE	((oop)-4)	/* cannot be a tagger immediate */
+#define DONE	((oop)-4)	/* cannot be a tagged immediate */
 
 static oop read(FILE *fp);
 
