@@ -1,5 +1,7 @@
 (define-function progress args (apply println (cons "; " args)))
 
+(progress "defining bootstrap parser")
+
 (define-structure <begpeg> (result))
 
 (define-form define-rule (rule . body)
@@ -334,209 +336,9 @@
 
 ;;;----------------
 
-(define-structure <peg-interpreter> (grammar stream variables result list))
-
-(define-function peg-interpreter (grammar stream)
-  (let ((self (new <peg-interpreter>)))
-    (set (<peg-interpreter>-grammar self) grammar)
-    (set (<peg-interpreter>-stream  self) stream)
-    self))
-
-(define-function peg-interpreter-define (self name value)
-  (let ((cell (or (assq name (<peg-interpreter>-variables self))
-		  (car (set (<peg-interpreter>-variables self)
-			    (cons (cons name value)
-				  (<peg-interpreter>-variables self)))))))
-    (set-cdr cell value)))
-
-(define-function peg-interpreter-lookup (self name)
-  (let ((cell (assq name (<peg-interpreter>-variables self))))
-    (or cell (error "undefined rule variable: "name))
-    (cdr cell)))
-
-(define-function peg-interpreter-push-variables (self)
-  (let ((vars (<peg-interpreter>-variables self)))
-    (set (<peg-interpreter>-variables self) ())
-    vars))
-
-(define-function peg-interpreter-pop-variables (self vars)
-  (set (<peg-interpreter>-variables self) vars))
-
-(define-function peg-interpreter-push-list (self)
-  (let ((list (<peg-interpreter>-list self)))
-    (set (<peg-interpreter>-list self) (group))
-    list))
-
-(define-function peg-interpreter-list-append (self value)
-  (group-append (<peg-interpreter>-list self) value))
-
-(define-function peg-interpreter-list-append-all (self value)
-  (group-append-list (<peg-interpreter>-list self) value))
-
-(define-function peg-interpreter-pop-list (self list)
-  (let ((grp (<peg-interpreter>-list self)))
-    (set (<peg-interpreter>-list self) list)
-    (group->list! grp)))
-
-(define-selector match-rule)
-
-(define peg-interpret ()) ;; forward
-
-(define-function peg-interpreter-match-both (self tree)
-  (and (peg-interpret self (cadr tree))
-       (peg-interpret self (caddr tree))))
-
-(define-function peg-interpreter-match-first (self tree)
-  (or  (peg-interpret self (cadr tree))
-       (peg-interpret self (caddr tree))))
-
-(define-function peg-interpreter-match-any (self tree)
-  (set (<peg-interpreter>-result self) (parser-stream-next (<peg-interpreter>-stream self))))
-
-(define-function peg-interpreter-match-rule (self tree)
-  (match-rule self (cadr tree)))
-
-(define-function peg-interpreter-match-object (self tree)
-  (set (<peg-interpreter>-result self)
-       (parser-stream-match-object (<peg-interpreter>-stream self)
-				   (cadr tree))))
-
-(define-function peg-interpreter-match-class (self tree)
-  (set (<peg-interpreter>-result self)
-       (parser-stream-match-class (<peg-interpreter>-stream self)
-				  (cadr tree))))
-
-(define-function peg-interpreter-match-string (self tree)
-  (set (<peg-interpreter>-result self)
-       (parser-stream-match-string (<peg-interpreter>-stream self)
-				   (cadr tree))))
-
-(define-function peg-interpreter-make-symbol (self tree)
-  (and (peg-interpret self (cadr tree))
-       (set (<peg-interpreter>-result self)
-	    (string->symbol (list->string (<peg-interpreter>-result self))))))
-
-(define-function peg-interpreter-make-string (self tree)
-  (and (peg-interpret self (cadr tree))
-       (set (<peg-interpreter>-result self)
-	    (list->string (<peg-interpreter>-result self)))))
-
-(define-function peg-interpreter-make-number (self tree)
-  (and (peg-interpret self (cadr tree))
-       (set (<peg-interpreter>-result self)
-	    (string->number (list->string (<peg-interpreter>-result self))))))
-
-(define-function peg-interpreter-make-span (self tree)
-  (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
-    (and (peg-interpret self (cadr tree))
-	 (set (<peg-interpreter>-result self)
-	      (list-from-to pos (<parser-stream>-position (<peg-interpreter>-stream self)))))))
-
-(define-function peg-interpreter-assign-result (self tree)
-  (let () (peg-interpreter-define self (cadr tree) (<peg-interpreter>-result self)) 't))
-
-(define-function peg-interpreter-result-variable (self tree)
-  (let () (set (<peg-interpreter>-result self) (peg-interpreter-lookup self (cadr tree))) 't))
-
-(define-function peg-interpreter-result-object (self tree)
-  (let () (set (<peg-interpreter>-result self) (cadr tree)) 't))
-
-(define-function peg-interpreter-result-list (self tree)
-  (let ((list (peg-interpreter-push-list self)))
-    (list-do rule (cdr tree) (peg-interpret self rule))
-    (set (<peg-interpreter>-result self)
-	 (peg-interpreter-pop-list self list))))
-
-(define-function peg-interpreter-result-list-symbol (self tree)
-  (peg-interpreter-list-append self (string->symbol (cadr tree))))
-
-(define-function peg-interpreter-result-list-variable (self tree)
-  (peg-interpreter-list-append self (peg-interpreter-lookup self (cadr tree))))
-
-(define-function peg-interpreter-result-list-variable-splicing (self tree)
-  (peg-interpreter-list-append-all self (peg-interpreter-lookup self (cadr tree))))
-
-(define-function peg-interpreter-peek-not (self tree)
-  (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
-    (if (peg-interpret self (cadr tree))
-	(parser-stream-fail (<peg-interpreter>-stream self) pos)
-      't)))
-
-(define-function peg-interpreter-match-zero-one (self tree)
-  (set (<peg-interpreter>-result self)
-       (and (peg-interpret self (cadr tree))
-	    (list (<peg-interpreter>-result self))))
-  't)
-
-(define-function peg-interpreter-match-zero-more (self tree)
-  (let ((grp (group)))
-    (while (peg-interpret self (cadr tree)) (group-append grp (<peg-interpreter>-result self)))
-    (set (<peg-interpreter>-result self) (group->list! grp))
-    't))
-
-(define-function peg-interpreter-match-one-more (self tree)
-  (let ((grp (group)))
-    (while (peg-interpret self (cadr tree)) (group-append grp (<peg-interpreter>-result self)))
-    (and (not (group-empty? grp))
-	 (let ()
-	   (set (<peg-interpreter>-result self) (group->list! grp))
-	   't))))
-
-(define-function peg-interpreter-peek-for (self tree)
-  (let ((pos (<parser-stream>-position (<peg-interpreter>-stream self))))
-    (and (peg-interpret self (cadr tree))
-	 (set (<parser-stream>-position (<peg-interpreter>-stream self)) pos))))
-
-;;(define profiles ())
-
-(set peg-interpret
-     (lambda (self tree)
-       (let ((op (car tree)))
-;; 	 (let ((cell (or (assq op profiles)
-;; 			 (car (set profiles (cons (cons op 0) profiles))))))
-;; 	   (set-cdr cell (+ (cdr cell) 1)))
-	 (cond
-	   ((= op 'match-both)				(peg-interpreter-match-both self tree))
-	   ((= op 'match-rule)				(peg-interpreter-match-rule self tree))
-	   ((= op 'match-first)				(peg-interpreter-match-first self tree))
-	   ((= op 'match-object)			(peg-interpreter-match-object self tree))
-	   ((= op 'match-class)				(peg-interpreter-match-class self tree))
-	   ((= op 'assign-result)			(peg-interpreter-assign-result self tree))
-	   ((= op 'match-zero-more)			(peg-interpreter-match-zero-more self tree))
-	   ((= op 'match-one-more)			(peg-interpreter-match-one-more self tree))
-	   ((= op 'result-variable)			(peg-interpreter-result-variable self tree))
-	   ((= op 'result-list-variable)		(peg-interpreter-result-list-variable self tree))
-	   ((= op 'match-zero-one)			(peg-interpreter-match-zero-one self tree))
-	   ((= op 'result-list-symbol)			(peg-interpreter-result-list-symbol self tree))
-	   ((= op 'result-list)				(peg-interpreter-result-list self tree))
-	   ((= op 'make-symbol)				(peg-interpreter-make-symbol self tree))
-	   ((= op 'make-string)				(peg-interpreter-make-string self tree))
-	   ((= op 'make-number)				(peg-interpreter-make-number self tree))
-	   ((= op 'make-span)				(peg-interpreter-make-span self tree))
-	   ((= op 'match-string)			(peg-interpreter-match-string self tree))
-	   ((= op 'match-any)				(peg-interpreter-match-any self tree))
-	   ((= op 'peek-not)				(peg-interpreter-peek-not self tree))
-	   ((= op 'result-list-variable-splicing)	(peg-interpreter-result-list-variable-splicing self tree))
-	   ((= op 'result-object)			(peg-interpreter-result-object self tree))
-	   ((= op 'peek-for)				(peg-interpreter-peek-for self tree))
-	   (else					(error "peg-interpret does not understand "op))))))
-
-;;(define indent 0)
-
-(define-method match-rule <peg-interpreter> (name)
-  ;;(print (format "%3d" indent))  (for (i 0 indent) (print " | "))  (println name " @ " (format "%c" (parser-stream-peek (<peg-interpreter>-stream self))))  (set indent (+ indent 1))
-  (let* ((rule (grammar-find-rule (<peg-interpreter>-grammar self) name))
-	 (vars (peg-interpreter-push-variables self))
-	 (ok   (peg-interpret self (cadr rule))))
-    (peg-interpreter-pop-variables self vars)
-    ;;(set indent (- indent 1))  (print (format "%3d" indent))  (for (i 0 indent) (print " | "))  (println name " => "ok" "(<peg-interpreter>-result self))
-    ok))
-
-;;;----------------
-
 (progress "parsing peg grammar definition")
 
-(define BEG (grammar 'BEG () ()))
+(define BEG (grammar '<peg-parser> '<parser> ()))
 
 (let ((p (new <begpeg>))
       (_ (parser-stream (string-stream peg-grammar-string))))
@@ -548,66 +350,33 @@
   (and (parser-stream-peek _) (error "syntax error in BEG"))
   )
 
-(progress "interpreting grammar to reparse grammar definition")
+(progress "generating compiled parser")
 
-(define PEG (grammar '<peg-parser> '<parser> ()))
-
-(let* ((_ (parser-stream (string-stream peg-grammar-string)))
-       (p (peg-interpreter BEG _)))
-  (while (match-rule p 'definition)
-    (let* ((result (<peg-interpreter>-result p)))
-      ;;(println "PEG: " result)
-      (grammar-add-rule PEG result)))
-  (match-rule p 'space)
-  (and (parser-stream-peek _) (error "syntax error in PEG near: " (parser-stream-context _)))
-  )
-
-(progress "comparing output")
-
-(let ((beg (<grammar>-rules BEG))
-      (peg (<grammar>-rules PEG)))
-  (while (pair? beg)
-    (or (equal (car peg) (car beg))
-	(error "grammars are not identical: "(car beg)" != "(car peg)))
-    (set beg (cdr beg))
-    (set peg (cdr peg))))
-
-;; (map println profiles)
-
-;; (println PEG)
-
-;; (define peg-to-cola-string (input-stream-up-to (input-stream (open "peg-to-cola.g")) ()))
-
-;;;----------------------------------------------------------------
-
-(progress "generating parser definition")
-
-(define PEGC (peg-compiler PEG))
-(define GEN0 ($compile PEGC))
+(define GEN ($compile (peg-compiler BEG)))
 
 (progress "compiling generated parser")
 
-(map eval GEN0)
+(map eval GEN)
 
-(progress "running compiled parser to reparse grammar definition")
+(progress "reparsing grammar definition")
 
-(define FEG (grammar '<peg-parser> '<parser> ()))
+(define PEG (grammar '<peg-parser> '<parser> ()))
 
 (let ((r (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string)))))
-  (with-map grammar-add-rule FEG r))
+  (with-map grammar-add-rule PEG r))
 
 (progress "comparing output")
 
-(let ((a (<grammar>-rules PEG))
-      (b (<grammar>-rules FEG)))
+(let ((a (<grammar>-rules BEG))
+      (b (<grammar>-rules PEG)))
   (while (pair? a)
     (or (equal (car a) (car b))
 	(error "grammars are not identical: "(car a)" != "(car b)))
     (set a (cdr a))
     (set b (cdr b))))
 
-(progress "writing compiled parser definition")
+(progress "dumping generated parser")
 
-(map dumpln GEN0)
+(map dumpln GEN)
 
 (progress "parser bootstrap complete")

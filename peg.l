@@ -1,11 +1,10 @@
+; defining bootstrap parser
 ; parsing peg grammar definition
-; interpreting grammar to reparse grammar definition
-; comparing output
-; generating parser definition
+; generating compiled parser
 ; compiling generated parser
-; running compiled parser to reparse grammar definition
+; reparsing grammar definition
 ; comparing output
-; writing compiled parser definition
+; dumping generated parser
 (define-class <peg-parser> <parser> ())
 (define-selector $gen_cola)
 (define-selector $gen_cola_definitions)
