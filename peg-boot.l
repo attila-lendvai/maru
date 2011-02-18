@@ -1,3 +1,5 @@
+(define-function progress args (apply println (cons "; " args)))
+
 (define-structure <begpeg> (result))
 
 (define-form define-rule (rule . body)
@@ -161,7 +163,7 @@
 	   (RULE space)
 	   (set (<begpeg>-result self) (string->symbol (group->string ans)))))))
 
-(define-rule list
+(define-rule rlist
   (and (RULE lparen)
        (let ((ans (group)))
 	 (while
@@ -169,6 +171,7 @@
 	     ((RULE symbol)	(group-append ans (list 'result-list-symbol (<begpeg>-result self))))
 	     ((RULE variable2)	(group-append ans (list 'result-list-variable-splicing (<begpeg>-result self))))
 	     ((RULE variable)	(group-append ans (list 'result-list-variable (<begpeg>-result self))))
+;	     ((RULE rlist)	(group-append ans (list 'result-list-list (<begpeg>-result self))))
 	     (else			())))
 	 (or (RULE rparen) (error ") expected"))
 	 (RULE space)
@@ -201,7 +204,7 @@
 			  ((RULE identifier)	(set (<begpeg>-result self) (list 'result-variable (<begpeg>-result self))))
 			  ((RULE number)	(set (<begpeg>-result self) (list 'result-object (<begpeg>-result self))))
 			  ((RULE string)	(set (<begpeg>-result self) (list 'result-string (<begpeg>-result self))))
-			  ((RULE list)		(set (<begpeg>-result self) (cons 'result-list (<begpeg>-result self))))
+			  ((RULE rlist)		(set (<begpeg>-result self) (cons 'result-list (<begpeg>-result self))))
 			  (else			(error "identifier/number/string/list expected after ->"))))
     ((RULE colon)	(if (RULE identifier)
 			    (set (<begpeg>-result self) (list 'assign-result (<begpeg>-result self)))
@@ -313,7 +316,7 @@
     (unit-assert (RULE repetition	))	(unit-assert (equal (<begpeg>-result self) '(match-one-more (match-rule baz))))
     (unit-assert (RULE conversion	))	(unit-assert (equal (<begpeg>-result self) '(make-string (match-one-more (match-rule letter)))))
     (unit-assert (RULE variable		))	(unit-assert (= (<begpeg>-result self) 'id))
-    (unit-assert (RULE list		))	(unit-assert (equal (<begpeg>-result self) '((result-list-symbol this) (result-list-variable is) (result-list-variable-splicing a) (result-list-symbol list))))
+    (unit-assert (RULE rlist		))	(unit-assert (equal (<begpeg>-result self) '((result-list-symbol this) (result-list-variable is) (result-list-variable-splicing a) (result-list-symbol list))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-for (match-rule foo))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-not (match-rule bar))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-variable baz)))
@@ -531,6 +534,8 @@
 
 ;;;----------------
 
+(progress "parsing peg grammar definition")
+
 (define BEG (grammar 'BEG () ()))
 
 (let ((p (new <begpeg>))
@@ -543,6 +548,8 @@
   (and (parser-stream-peek _) (error "syntax error in BEG"))
   )
 
+(progress "interpreting grammar to reparse grammar definition")
+
 (define PEG (grammar '<peg-parser> '<parser> ()))
 
 (let* ((_ (parser-stream (string-stream peg-grammar-string)))
@@ -554,6 +561,8 @@
   (match-rule p 'space)
   (and (parser-stream-peek _) (error "syntax error in PEG near: " (parser-stream-context _)))
   )
+
+(progress "comparing output")
 
 (let ((beg (<grammar>-rules BEG))
       (peg (<grammar>-rules PEG)))
@@ -571,5 +580,34 @@
 
 ;;;----------------------------------------------------------------
 
-(let ((p (peg-compiler PEG)))
-  (map dumpln ($compile p)))
+(progress "generating parser definition")
+
+(define PEGC (peg-compiler PEG))
+(define GEN0 ($compile PEGC))
+
+(progress "compiling generated parser")
+
+(map eval GEN0)
+
+(progress "running compiled parser to reparse grammar definition")
+
+(define FEG (grammar '<peg-parser> '<parser> ()))
+
+(let ((r (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string)))))
+  (with-map grammar-add-rule FEG r))
+
+(progress "comparing output")
+
+(let ((a (<grammar>-rules PEG))
+      (b (<grammar>-rules FEG)))
+  (while (pair? a)
+    (or (equal (car a) (car b))
+	(error "grammars are not identical: "(car a)" != "(car b)))
+    (set a (cdr a))
+    (set b (cdr b))))
+
+(progress "writing compiled parser definition")
+
+(map dumpln GEN0)
+
+(progress "parser bootstrap complete")

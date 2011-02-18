@@ -44,6 +44,7 @@ variable	= colon identifier ;
 relement	= symbol:e					-> (result-list-symbol :e)
 		| variable2:e					-> (result-list-variable-splicing :e)
 		| variable:e					-> (result-list-variable :e)
+		| rlist:e					-> (result-list-list :e)
 		;
 rlist		= lparen relement*:e rparen			-> e ;
 llist		= lparen expression:e rparen			-> e ;
@@ -84,4 +85,10 @@ start = definition ;
 #----------------------------------------------------------------
 
 gen_cola_declaration	= ( 'rule .:id )			-> (define-selector :id) ;
-gen_cola		= .:e					-> e ;
+gen_cola_declarations	= gen_cola_declaration* ;
+
+gen_cola_definition	= ( 'rule .:id )			-> (define-method :id <peg-parser>) ;
+gen_cola_definitions	= gen_cola_definition* ;
+
+gen_cola		= &gen_cola_declarations:a
+			   gen_cola_definitions:b		-> ( ::a ::b ) ;

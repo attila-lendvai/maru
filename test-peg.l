@@ -6,7 +6,8 @@
        (p (new <peg-parser>))
        (r (array->list (parse-all p s))))
   (map println r)
-  (map println (array->list (parse-all-from p (list-stream r) $gen_cola_declaration)))
+  (parse-from p (list-stream r) $gen_cola)
+  (println "\n\n\n" (<parser>-result p))
   )
   
 ; (map println (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
