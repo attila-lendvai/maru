@@ -9,7 +9,6 @@ bar       	= "|"  space ;
 pling     	= "!"  space ;
 ampersand 	= "&"  space ;
 colon     	= ":"  space ;
-colondbl     	= "::" space ;
 arrow     	= "->" space ;
 quotesgl     	= "\'" space ;
 backquote     	= "`" space ;
@@ -24,8 +23,6 @@ plus      	= "+"  space ;
 star      	= "*"  space ;
 lparen      	= "("  space ;
 rparen     	= ")"  space ;
-langle      	= "<"  space ;
-rangle     	= ">"  space ;
 lbrace      	= "{"  space ;
 rbrace     	= "}"  space ;
 dot       	= "."  space ;
@@ -44,14 +41,6 @@ string		= "\""  (!"\""  char)* $:s "\""  space		-> s ;
 class		= "["   (!"]"   char)* $:s "]"   space		-> s ;
 symchar		= [!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
 symbol		= (symchar (symchar | digit)*) @$$:id space	-> id ;
-variable2	= colondbl identifier ;
-variable	= colon identifier ;
-relement	= symbol:e					-> `(result-list-symbol ,e)
-		| variable2:e					-> `(result-list-variable-splicing ,e)
-		| variable:e					-> `(result-list-variable ,e)
-		| rlist:e					-> `(result-list-list ,e)
-		;
-rlist		= lparen relement*:e rparen			-> e ;
 sexpr		= symbol | number | string
 		| lparen sexpr*:e rparen			-> e
 		| quotesgl sexpr:e				-> (list 'quote e)
