@@ -47,12 +47,6 @@
 (define-rule semicolon	(and (OBJECT ?\;) (RULE space)))
 (define-rule colon	(and (OBJECT ?:) (RULE space)))
 
-(define-rule colondbl	(let ((pos (<parser-stream>-position _)))
-			  (and (OBJECT ?:)
-				    (if (OBJECT ?:)
-					(RULE space)
-				      (FAIL pos)))))
-
 (define-rule arrow	(let ((pos (<parser-stream>-position _)))
 			  (and (OBJECT ?-)
 				    (if (OBJECT ?>)
@@ -87,8 +81,6 @@
 (define-rule star     	(and (OBJECT ?*) (RULE space)))
 (define-rule lparen    	(and (OBJECT ?() (RULE space)))
 (define-rule rparen    	(and (OBJECT ?)) (RULE space)))
-(define-rule langle    	(and (OBJECT ?<) (RULE space)))
-(define-rule rangle    	(and (OBJECT ?>) (RULE space)))
 (define-rule lbrace   	(and (OBJECT ?{) (RULE space)))
 (define-rule rbrace   	(and (OBJECT ?}) (RULE space)))
 (define-rule dot      	(and (OBJECT ?.) (RULE space)))
@@ -151,16 +143,6 @@
 
 (define-selector $expression) ;; forward
 
-(define-rule variable2
-  (and (RULE colondbl)
-       (or (RULE identifier)
-	   (error "identifier expected after ::"))))
-
-(define-rule variable
-  (and (RULE colon)
-       (or (RULE identifier)
-	   (error "identifier expected after :"))))
-
 (define-rule symchar
   (set self.result
        (CLASS "!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~")))
@@ -174,20 +156,6 @@
 	     (group-append ans self.result))
 	   (RULE space)
 	   (set self.result (string->symbol (group->string ans)))))))
-
-(define-rule rlist
-  (and (RULE lparen)
-       (let ((ans (group)))
-	 (while
-	   (cond
-	     ((RULE symbol)	(group-append ans (list 'result-list-symbol self.result)))
-	     ((RULE variable2)	(group-append ans (list 'result-list-variable-splicing self.result)))
-	     ((RULE variable)	(group-append ans (list 'result-list-variable self.result)))
-;	     ((RULE rlist)	(group-append ans (list 'result-list-list self.result)))
-	     (else			())))
-	 (or (RULE rparen) (error ") expected"))
-	 (RULE space)
-	 (set self.result (group->list! ans)))))
 
 (define-rule llist
   (and (RULE lparen)
@@ -295,15 +263,13 @@
 
 (unit-test "<begpeg>"
   (let ((self (new <begpeg>))
-        (_    (parser-stream (string-stream "= | ! & : :: -> $ ? + * ( ) { } .
+        (_    (parser-stream (string-stream "= | ! & : -> $ ? + * ( ) { } .
   					q6ident1f1er
   					a\nb\"multi\n\tline\n\tstring\"
   					[character-class]
   					\"string\" [class] identifier .
   					foo? bar* baz+
   					letter+$
-  					:id
-  					( this :is ::a list )
   					&foo !bar -> baz -> \"string\" -> ( a list )
   					this is a sequence of stuffs ;
   					and this | is an | expression ;
@@ -314,7 +280,6 @@
     (unit-assert (RULE pling		))
     (unit-assert (RULE ampersand	))
     (unit-assert (RULE colon		))
-    (unit-assert (RULE colondbl		))
     (unit-assert (RULE arrow		))
     (unit-assert (RULE dollar		))
     (unit-assert (RULE query		))
@@ -341,8 +306,6 @@
     (unit-assert (RULE repetition	))	(unit-assert (equal (<begpeg>-result self) '(match-zero-more (match-rule bar))))
     (unit-assert (RULE repetition	))	(unit-assert (equal (<begpeg>-result self) '(match-one-more (match-rule baz))))
     (unit-assert (RULE conversion	))	(unit-assert (equal (<begpeg>-result self) '(make-string (match-one-more (match-rule letter)))))
-    (unit-assert (RULE variable		))	(unit-assert (= (<begpeg>-result self) 'id))
-    (unit-assert (RULE rlist		))	(unit-assert (equal (<begpeg>-result self) '((result-list-symbol this) (result-list-variable is) (result-list-variable-splicing a) (result-list-symbol list))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-for (match-rule foo))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-not (match-rule bar))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr baz)))
@@ -408,3 +371,5 @@
 (map dumpln GEN)
 
 (progress "parser bootstrap complete")
+
+($sanity-check PEG)
