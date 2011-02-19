@@ -380,6 +380,30 @@
     (or rule (error "rule '"name"' not found in grammar "(<grammar>-name self)))
     rule))
 
+;;;----------------
+
+
+
+(define-method $reachable-from <grammar> (exp reached)
+  (and (pair? exp)
+       (let ((op (car exp)))
+	 (and (!= op 'quasiquote)
+	      (!= op 'quote)
+	      (if (= 'match-rule (car exp))
+		  (let ((name (cadr exp)))
+		    (or (member? name reached)
+			(set reached ($reachable-from self (cadr (grammar-find-rule self name)) (cons name reached)))))
+		(set reached ($reachable-from self (cadr  exp) reached))
+		(set reached ($reachable-from self (caddr exp) reached))))))
+  reached)
+
+(define-method $sanity-check <grammar> ()
+  (let* ((start   (grammar-find-rule self 'start))
+	 (reached ($reachable-from self (cadr start) '(start))))
+    (list-do rule self.rules
+      (or (member? (car rule) reached)
+	  (println "; WARNING: unreachable from start: "(car rule))))))
+
 ;;;----------------------------------------------------------------
 
 (define-structure <parser> (source result))
