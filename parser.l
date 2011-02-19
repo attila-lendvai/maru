@@ -382,8 +382,6 @@
 
 ;;;----------------
 
-
-
 (define-method $reachable-from <grammar> (exp reached)
   (and (pair? exp)
        (let ((op (car exp)))
