@@ -359,6 +359,7 @@
     (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors ,type ,@body))))))
 
 (define-form define-method (selector type args . body)
+  (or (defined? selector) (eval (list 'define-selector selector)))
   `(add-method ,selector ,type ',(cons 'self args) ',body))
 
 ;;; print
@@ -512,6 +513,11 @@
   `(let* ((_list_ ,list) (_head_ (car _list_)))
      (set ,list (cdr _list_))
      _head_))
+
+(define-function member? (key list)
+  (while (and (pair? list) (!= key (car list)))
+    (set list (cdr list)))
+  (car list))
 
 ;;; iteration
 
