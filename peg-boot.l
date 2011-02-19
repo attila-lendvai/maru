@@ -219,7 +219,7 @@
 						  (set ans self.result)
 						  (or (RULE rparen) (error ") expected"))
 						  (set self.result ans)))
-    ((and (RULE quotesgl) (RULE symbol))	(set self.result (list 'match-object self.result)))
+    ((and (RULE quotesgl) (RULE sexpr))		(set self.result (list 'match-object self.result)))
     ((RULE string)				(set self.result (list 'match-string self.result)))
     ((RULE class)				(set self.result (list 'match-class  self.result)))
     ((RULE identifier)				(set self.result (list 'match-rule   self.result)))

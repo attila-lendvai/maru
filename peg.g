@@ -61,7 +61,7 @@ sexpr		= symbol | number | string
 		;
 llist		= lparen expression:e rparen			-> e ;
 atom		= lparen expression:e rparen			-> e
-		| quotesgl symbol:e				-> `(match-object ,e)
+		| quotesgl sexpr:e				-> `(match-object ,e)
 		| string:e					-> `(match-string ,e)
 		| class:e					-> `(match-class ,e)
 		| identifier:e					-> `(match-rule ,e)
