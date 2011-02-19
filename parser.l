@@ -325,7 +325,7 @@
 
 (define-function parser-stream-context (self)
   (let ((a (array)))
-    (for (i 0 32) (let ((c ($next (<parser-stream>-source self)))) (and c (array-append a ))))
+    (for (i 0 32) (let ((c ($next (<parser-stream>-source self)))) (and c (array-append a c))))
     (array->string a)))
 
 ;;;----------------

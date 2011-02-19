@@ -71,73 +71,83 @@
 					(RULE space)
 				      (FAIL pos)))))
 
+(define-rule commaat	(let ((pos (<parser-stream>-position _)))
+			  (and (OBJECT ?,)
+				    (if (OBJECT ?@)
+					(RULE space)
+				      (FAIL pos)))))
+
 (define-rule dollar	(and (OBJECT ?$) (RULE space)))
 (define-rule quotesgl	(and (OBJECT ?') (RULE space)))
+(define-rule backquote	(and (OBJECT ?`) (RULE space)))
+(define-rule comma	(and (OBJECT ?,) (RULE space)))
 (define-rule at		(and (OBJECT ?@) (RULE space)))
 (define-rule query    	(and (OBJECT ??) (RULE space)))
 (define-rule plus     	(and (OBJECT ?+) (RULE space)))
 (define-rule star     	(and (OBJECT ?*) (RULE space)))
 (define-rule lparen    	(and (OBJECT ?() (RULE space)))
 (define-rule rparen    	(and (OBJECT ?)) (RULE space)))
+(define-rule langle    	(and (OBJECT ?<) (RULE space)))
+(define-rule rangle    	(and (OBJECT ?>) (RULE space)))
 (define-rule lbrace   	(and (OBJECT ?{) (RULE space)))
 (define-rule rbrace   	(and (OBJECT ?}) (RULE space)))
 (define-rule dot      	(and (OBJECT ?.) (RULE space)))
 
 (define-rule letter
-  (set (<begpeg>-result self)
+  (set self.result
        (CLASS "ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz")))
 
 (define-rule digit
-  (set (<begpeg>-result self)
+  (set self.result
        (CLASS "0123456789")))
 
 (define-rule identifier
   (let ((pos (<parser-stream>-position _)))
     (and (RULE letter)
 	 (let ((ans (group)))
-	   (group-append ans (<begpeg>-result self))
+	   (group-append ans self.result)
 	   (while (or (RULE letter) (RULE digit))
-	     (group-append ans (<begpeg>-result self)))
+	     (group-append ans self.result))
 	   (RULE space)
-	   (set (<begpeg>-result self) (string->symbol (group->string ans)))))))
+	   (set self.result (string->symbol (group->string ans)))))))
 
 (define-rule number
   (let ((pos (<parser-stream>-position _)))
     (and (RULE digit)
 	 (let ((ans (group)))
-	   (group-append ans (<begpeg>-result self))
-	   (while (RULE digit) (group-append ans (<begpeg>-result self)))
+	   (group-append ans self.result)
+	   (while (RULE digit) (group-append ans self.result))
 	   (RULE space)
-	   (set (<begpeg>-result self) (string->number (group->string ans)))))))
+	   (set self.result (string->number (group->string ans)))))))
 
 (define-rule char
   (if (OBJECT ?\\)
       (or
-	(and (OBJECT ?t)	(set (<begpeg>-result self) ?\t))
-	(and (OBJECT ?n)	(set (<begpeg>-result self) ?\n))
-	(and (OBJECT ?r)	(set (<begpeg>-result self) ?\r))
-	(set (<begpeg>-result self) (parser-stream-next _)))
-    (set (<begpeg>-result self) (parser-stream-next _))))
+	(and (OBJECT ?t)	(set self.result ?\t))
+	(and (OBJECT ?n)	(set self.result ?\n))
+	(and (OBJECT ?r)	(set self.result ?\r))
+	(set self.result (parser-stream-next _)))
+    (set self.result (parser-stream-next _))))
 
 (define-rule string
   (and (OBJECT ?\")
        (let ((ans (group)))
 	 (while (not (OBJECT ?\"))
 	   (if (RULE char)
-	       (group-append ans (<begpeg>-result self))
+	       (group-append ans self.result)
 	     (error "char expected")))
 	 (RULE space)
-	 (set (<begpeg>-result self) (group->string ans)))))
+	 (set self.result (group->string ans)))))
 
 (define-rule class
   (and (OBJECT ?\[)
        (let ((ans (group)))
 	 (while (not (OBJECT ?\]))
 	   (if (RULE char)
-	       (group-append ans (<begpeg>-result self))
+	       (group-append ans self.result)
 	     (error "char expected")))
 	 (RULE space)
-	 (set (<begpeg>-result self) (group->string ans)))))
+	 (set self.result (group->string ans)))))
 
 (define-selector $expression) ;; forward
 
@@ -152,122 +162,136 @@
 	   (error "identifier expected after :"))))
 
 (define-rule symchar
-  (set (<begpeg>-result self)
-       (CLASS "!#$%&*+,-/<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~")))
+  (set self.result
+       (CLASS "!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~")))
 
 (define-rule symbol
   (let ((pos (<parser-stream>-position _)))
     (and (RULE symchar)
 	 (let ((ans (group)))
-	   (group-append ans (<begpeg>-result self))
+	   (group-append ans self.result)
 	   (while (or (RULE symchar) (RULE digit))
-	     (group-append ans (<begpeg>-result self)))
+	     (group-append ans self.result))
 	   (RULE space)
-	   (set (<begpeg>-result self) (string->symbol (group->string ans)))))))
+	   (set self.result (string->symbol (group->string ans)))))))
 
 (define-rule rlist
   (and (RULE lparen)
        (let ((ans (group)))
 	 (while
 	   (cond
-	     ((RULE symbol)	(group-append ans (list 'result-list-symbol (<begpeg>-result self))))
-	     ((RULE variable2)	(group-append ans (list 'result-list-variable-splicing (<begpeg>-result self))))
-	     ((RULE variable)	(group-append ans (list 'result-list-variable (<begpeg>-result self))))
-;	     ((RULE rlist)	(group-append ans (list 'result-list-list (<begpeg>-result self))))
+	     ((RULE symbol)	(group-append ans (list 'result-list-symbol self.result)))
+	     ((RULE variable2)	(group-append ans (list 'result-list-variable-splicing self.result)))
+	     ((RULE variable)	(group-append ans (list 'result-list-variable self.result)))
+;	     ((RULE rlist)	(group-append ans (list 'result-list-list self.result)))
 	     (else			())))
 	 (or (RULE rparen) (error ") expected"))
 	 (RULE space)
-	 (set (<begpeg>-result self) (group->list! ans)))))
+	 (set self.result (group->list! ans)))))
 
 (define-rule llist
   (and (RULE lparen)
        (or (RULE expression) (error "expression expected after ("))
-       (let ((ans (<begpeg>-result self)))
+       (let ((ans self.result))
 	 (or (RULE rparen) (error ") expected"))
 	 (RULE space)
-	 (set (<begpeg>-result self) ans))))
+	 (set self.result ans))))
+
+(define-rule sexpr
+  (or (RULE symbol)
+      (RULE number)
+      (RULE string)
+      (and (RULE lparen)
+	   (let ((ans (group)))
+	     (while (RULE sexpr) (group-append ans self.result))
+	     (or (RULE rparen) (error ") expected in list"))
+	     (set self.result (group->list! ans))
+	     't))
+      (and (RULE quotesgl)  (RULE sexpr)	(set self.result (list 'quote		 self.result)))
+      (and (RULE backquote) (RULE sexpr)	(set self.result (list 'quasiquote	 self.result)))
+      (and (RULE commaat)   (RULE sexpr)	(set self.result (list 'unquote-splicing self.result)))
+      (and (RULE comma)	    (RULE sexpr)	(set self.result (list 'unquote		 self.result)))))
 
 (define-rule atom
   (cond 
-    ((RULE lbrace)	(let ((ans))
-			  (or (RULE expression) (error "expression expected after {"))
-			  (set ans (<begpeg>-result self))
-			  (or (RULE rbrace) (error "} expected"))
-			  (set (<begpeg>-result self) ans)))
-    ((and (RULE quotesgl)
-	  (RULE symbol))
-			(set (<begpeg>-result self) (list 'match-object (<begpeg>-result self))))
-    ((RULE string)	(set (<begpeg>-result self) (list 'match-string (<begpeg>-result self))))
-    ((RULE class)	(set (<begpeg>-result self) (list 'match-class  (<begpeg>-result self))))
-    ((RULE identifier)	(set (<begpeg>-result self) (list 'match-rule   (<begpeg>-result self))))
-    ((RULE llist)	(set (<begpeg>-result self) (list 'match-list   (<begpeg>-result self))))
-    ((RULE dot)		(set (<begpeg>-result self) (list 'match-any)))
-    ((RULE arrow)	(cond
-			  ((RULE identifier)	(set (<begpeg>-result self) (list 'result-variable (<begpeg>-result self))))
-			  ((RULE number)	(set (<begpeg>-result self) (list 'result-object (<begpeg>-result self))))
-			  ((RULE string)	(set (<begpeg>-result self) (list 'result-string (<begpeg>-result self))))
-			  ((RULE rlist)		(set (<begpeg>-result self) (cons 'result-list (<begpeg>-result self))))
-			  (else			(error "identifier/number/string/list expected after ->"))))
-    ((RULE colon)	(if (RULE identifier)
-			    (set (<begpeg>-result self) (list 'assign-result (<begpeg>-result self)))
-			  (error "identifier expected after :")))
-    (else		())))
+    ((RULE lparen)				(let ((ans))
+						  (or (RULE expression) (error "expression expected after ("))
+						  (set ans self.result)
+						  (or (RULE rparen) (error ") expected"))
+						  (set self.result ans)))
+    ((and (RULE quotesgl) (RULE symbol))	(set self.result (list 'match-object self.result)))
+    ((RULE string)				(set self.result (list 'match-string self.result)))
+    ((RULE class)				(set self.result (list 'match-class  self.result)))
+    ((RULE identifier)				(set self.result (list 'match-rule   self.result)))
+    ((RULE lbrace)				(let ((ans (group)))
+						  (while (and (not (= ?> (parser-stream-peek _)))
+							      (RULE sexpr))
+						    (group-append ans self.result))
+						  (or (RULE rbrace) (error "} expected in rule invocation"))
+						  (set self.result (cons 'match-rule (group->list! ans)))))
+    ((and (RULE backquote) (RULE llist))	(set self.result (list 'match-list self.result)))
+    ((RULE dot)					(set self.result (list 'match-any)))
+    ((and (RULE arrow) (RULE sexpr))		(set self.result (list 'result-expr self.result)))
+    ((RULE colon)				(if (RULE identifier)
+						    (set self.result (list 'assign-result self.result))
+						  (error "identifier expected after :")))
+    (else					())))
 
 (define-rule repetition
   (and (RULE atom)
-       (let ((exp (<begpeg>-result self)))
+       (let ((exp self.result))
 	 (cond
 	   ((RULE query)	(set exp (list 'match-zero-one  exp)))
 	   ((RULE star)		(set exp (list 'match-zero-more exp)))
 	   ((RULE plus)		(set exp (list 'match-one-more  exp))))
-	 (set (<begpeg>-result self) exp))))
+	 (set self.result exp))))
 
 (define-rule conversion
   (and (RULE repetition)
-       (let ((exp (<begpeg>-result self)))
+       (let ((exp self.result))
 	 (while (cond
 		  ((RULE at)		(set exp (list 'make-span exp)))
 		  ((RULE dollarhash)	(set exp (list 'make-number exp)))
 		  ((RULE dollardbl)	(set exp (list 'make-symbol exp)))
 		  ((RULE dollar)	(set exp (list 'make-string exp)))
 		  (else			())))
-	 (set (<begpeg>-result self) exp))))
+	 (set self.result exp))))
 
 (define-rule predicate
   (let ((pos (<parser-stream>-position _)))
     (if (and (RULE pling) (RULE conversion))
-	(set (<begpeg>-result self) (list 'peek-not (<begpeg>-result self)))
+	(set self.result (list 'peek-not self.result))
       (set (<parser-stream>-position _) pos)
       (if (and (RULE ampersand) (RULE conversion))
-	  (set (<begpeg>-result self) (list 'peek-for (<begpeg>-result self)))
+	  (set self.result (list 'peek-for self.result))
 	(RULE conversion)))))
 
 (define-rule sequence
   (and (RULE predicate)
-       (let ((lhs (<begpeg>-result self)))
+       (let ((lhs self.result))
 	 (and (RULE sequence)
-	      (set lhs (list 'match-both lhs (<begpeg>-result self))))
-	 (set (<begpeg>-result self) lhs))))
+	      (set lhs (list 'match-both lhs self.result)))
+	 (set self.result lhs))))
 
 (define-rule expression
   (let ((lhs))
     (and (RULE sequence)
-	 (set lhs (<begpeg>-result self))
+	 (set lhs self.result)
 	 (and (RULE bar)
 	      (or (RULE expression) (error "expression expected after |"))
-	      (set lhs (list 'match-first lhs (<begpeg>-result self)))))
-    (set (<begpeg>-result self) lhs)))
+	      (set lhs (list 'match-first lhs self.result))))
+    (set self.result lhs)))
 
 (define-rule definition
   (let ((id) (exp))
     (RULE space)
     (and (RULE identifier)
-	 (set id (<begpeg>-result self))
+	 (set id self.result)
 	 (RULE equals)
 	 (or (RULE expression) (error "expression expected after ="))
-	 (set exp (<begpeg>-result self))
+	 (set exp self.result)
 	 (or (OBJECT ?\;) (error "; expected"))
-	 (set (<begpeg>-result self) (list 'rule id exp)))))
+	 (set self.result (list 'rule id exp)))))
 
 (unit-test "<begpeg>"
   (let ((self (new <begpeg>))
@@ -321,9 +345,9 @@
     (unit-assert (RULE rlist		))	(unit-assert (equal (<begpeg>-result self) '((result-list-symbol this) (result-list-variable is) (result-list-variable-splicing a) (result-list-symbol list))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-for (match-rule foo))))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(peek-not (match-rule bar))))
-    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-variable baz)))
-    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-string "string")))
-    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-list (result-list-symbol a) (result-list-symbol list))))
+    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr baz)))
+    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr "string")))
+    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr (a list))))
     (unit-assert (RULE sequence		))	(unit-assert (equal (<begpeg>-result self) '(match-both (match-rule this) (match-both (match-rule is) (match-both (match-rule a) (match-both (match-rule sequence) (match-both (match-rule of) (match-rule stuffs))))))))
     (unit-assert (RULE semicolon	))
     (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-both (match-rule and) (match-rule this)) (match-first (match-both (match-rule is) (match-rule an)) (match-rule expression)))))
@@ -352,11 +376,13 @@
 
 (progress "generating compiled parser")
 
-(define GEN ($compile (peg-compiler BEG)))
+;;(define GEN ($compile (peg-compiler BEG)))
 
 (progress "compiling generated parser")
 
-(map eval GEN)
+;; (map eval GEN)
+
+(define GEN (peg-compile-grammar BEG))
 
 (progress "reparsing grammar definition")
 
@@ -371,7 +397,9 @@
       (b (<grammar>-rules PEG)))
   (while (pair? a)
     (or (equal (car a) (car b))
-	(error "grammars are not identical: "(car a)" != "(car b)))
+	(let ()
+	  (println "\n\n"(car a)"\n!=\n"(car b))
+	  (error "grammars are not identical")))
     (set a (cdr a))
     (set b (cdr b))))
 

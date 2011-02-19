@@ -1,4 +1,5 @@
-CFLAGS = -Wall -g # -Os
+OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
+CFLAGS = -Wall -g $(OFLAGS)
 CC32 = $(CC) -m32
 
 .SUFFIXES :
@@ -11,8 +12,8 @@ run : eval
 eval : eval.c gc.c gc.h buffer.c chartab.h
 	$(CC) -g $(CFLAGS) -o eval eval.c
 
-opt : .force
-	$(MAKE) CFLAGS="$(CFLAGS) -O3 -fomit-frame-pointer -DNDEBUG"
+debug : .force
+	$(MAKE) OFLAGS="-O0"
 
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1"
@@ -43,9 +44,9 @@ test-boot : test .force
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
 
-peg.l : eval parser.l peg-compiler.l peg-boot.l peg.g
+peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
 	-rm peg.l.new
-	./eval parser.l peg-compiler.l peg-boot.l | tee peg.l.new
+	./eval parser.l peg-compile.l peg-boot.l | tee peg.l.new
 	-mv peg.l peg.l.bak
 	mv peg.l.new peg.l
 
@@ -69,7 +70,7 @@ clean : .force
 FILES = Makefile \
 	buffer.c chartab.h eval.c gc.c gc.h \
 	boot.l emit.l eval.l test-emit.l \
-	parser.l peg-compiler.l peg-boot.l peg.l test-peg.l \
+	parser.l peg-compile.l peg-boot.l peg.l test-peg.l \
 	peg.g
 
 NOW = $(shell date '+%Y%m%d.%H%M')
