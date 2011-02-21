@@ -11,9 +11,9 @@ ampersand 	= "&"  space ;
 colon     	= ":"  space ;
 arrow     	= "->" space ;
 quotesgl     	= "\'" space ;
-backquote     	= "`" space ;
+backquote     	= "`"  space ;
 commaat     	= ",@" space ;
-comma     	= "," space ;
+comma     	= ","  space ;
 dollarhash	= "$#" space ;
 dollardbl	= "$$" space ;
 dollar		= "$"  space ;
@@ -27,9 +27,7 @@ lbrace      	= "{"  space ;
 rbrace     	= "}"  space ;
 dot       	= "."  space ;
 digit		= [0123456789] ;
-number		= digit+ $#:n space -> n ;
 letter		= [ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz] ;
-
 identifier	= (letter (letter | digit)*) @$$:id space	-> id ;
 char		= "\\"	( "t"	->  9
 			| "n"	-> 10
@@ -39,24 +37,29 @@ char		= "\\"	( "t"	->  9
 		| . ;
 string		= "\""  (!"\""  char)* $:s "\""  space		-> s ;
 class		= "["   (!"]"   char)* $:s "]"   space		-> s ;
+
 symchar		= [!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
-symbol		= (symchar (symchar | digit)*) @$$:id space	-> id ;
-sexpr		= symbol | number | string
-		| lparen sexpr*:e rparen			-> e
-		| quotesgl sexpr:e				-> (list 'quote e)
-		| backquote sexpr:e				-> (list 'quasiquote e)
-		| commaat sexpr:e				-> (list 'unquote-splicing e)
-		| comma sexpr:e					-> (list 'unquote e)
+sexpr		= (symchar (symchar | digit)*) @$$
+		| digit+ $#
+		| "\""  (!"\""  char)* $:e "\""			-> e
+		| "(" (space sexpr)*:e space ")"		-> e
+		| "'"  space sexpr:e				-> (list 'quote e)
+		| "`"  space sexpr:e				-> (list 'quasiquote e)
+		| ",@" space sexpr:e				-> (list 'unquote-splicing e)
+		| ","  space sexpr:e				-> (list 'unquote e)
+		| "{"  (space definition)*:e space "}"		-> (list 'simple-grammar (list quote e))
 		;
+sexpression	= space sexpr ;
+
 llist		= lparen expression:e rparen			-> e ;
 atom		= lparen expression:e rparen			-> e
-		| quotesgl sexpr:e				-> `(match-object ,e)
+		| quotesgl sexpression:e space			-> `(match-object ,e)
 		| string:e					-> `(match-string ,e)
 		| class:e					-> `(match-class ,e)
 		| identifier:e					-> `(match-rule ,e)
-		| lbrace sexpr*:e rbrace			-> `(match-rule ,@e)
+		| lbrace sexpression*:e space rbrace		-> `(match-rule ,@e)
 		| dot						-> `(match-any)
-		| arrow sexpr:e					-> `(result-expr ,e)
+		| arrow sexpression:e space			-> `(result-expr ,e)
 		| backquote llist:e				-> `(match-list ,e)
 		| colon identifier :i				-> `(assign-result ,i)
 		;
