@@ -230,7 +230,7 @@
     (set (<input-stream>-source self) source)
     self))
 
-(define-function input-stream-peek (self)
+(define-method $peek <input-stream> ()
   (or (<input-stream>-pending self)
       (set (<input-stream>-pending self)
 	   (and (<input-stream>-source self)
@@ -239,24 +239,24 @@
 		      (close (<input-stream>-source self))
 		      (set (<input-stream>-source self) ())))))))
 
-(define-function input-stream-next (self)
-  (let ((c (input-stream-peek self)))
+(define-method $next <input-stream> ()
+  (let ((c ($peek self)))
     (set (<input-stream>-pending self) ())
     c))
 
 (define-function input-stream-up-to (self delimiter)
   (let ((a (array)))
-    (while (!= delimiter (input-stream-peek self))
-      (array-append a (input-stream-next self)))
+    (while (!= delimiter ($peek self))
+      (array-append a ($next self)))
     (array->string a)))
 
 (unit-test "<input-stream>"
   (let ((s (input-stream *input*))
 	(c 0)
-	(a (array)))						(unit-assert (= ?; (input-stream-peek s)))
-								(unit-assert (= ?; (input-stream-next s)))
-								(unit-assert (= ?h (input-stream-peek s)))
-    (while (!= ?! (set c (input-stream-next s)))
+	(a (array)))						(unit-assert (= ?; ($peek s)))
+								(unit-assert (= ?; ($next s)))
+								(unit-assert (= ?h ($peek s)))
+    (while (!= ?! (set c ($next s)))
       (array-append a c))					(unit-assert (= "hello" (array->string a)))
 								(unit-assert (= "goodbye" (input-stream-up-to s ?!)))));hello!goodbye!
 
