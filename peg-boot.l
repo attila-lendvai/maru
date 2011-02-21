@@ -334,7 +334,7 @@
     (grammar-add-rule BEG (<begpeg>-result p)))
   ;;(println)
   ($space p _)
-  (and (parser-stream-peek _) (error "syntax error in BEG"))
+  (and (parser-stream-peek _) (error "syntax error in BEG near: "(parser-stream-context _)))
   )
 
 (progress "generating compiled parser")
@@ -351,8 +351,17 @@
 
 (define PEG (grammar '<peg-parser> '<parser> ()))
 
-(let ((r (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string)))))
-  (with-map grammar-add-rule PEG r))
+(define-function peg-parser (stream)
+  (let ((self (new <peg-parser>)))
+    (set (<peg-parser>-source self) stream)
+    self))
+
+(let* ((s (parser-stream (string-stream peg-grammar-string)))
+       (p (peg-parser s)))
+  (while ($definition p)
+    (grammar-add-rule PEG (<peg-parser>-result p)))
+  ($space p)
+  (and (parser-stream-peek s) (error "syntax error in PEG near: "(parser-stream-context s))))
 
 (progress "comparing output")
 
