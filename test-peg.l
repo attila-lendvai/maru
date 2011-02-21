@@ -1,5 +1,6 @@
 ;; (require "parser.l")
 ;; (require "peg.l")
+;; (require "peg-compile.l")
 
 (let* ((g (input-stream-up-to (input-stream (open "peg.g")) ()))
        (s (string-stream g))
