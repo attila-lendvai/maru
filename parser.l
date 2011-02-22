@@ -231,13 +231,13 @@
     self))
 
 (define-method $peek <input-stream> ()
-  (or (<input-stream>-pending self)
-      (set (<input-stream>-pending self)
-	   (and (<input-stream>-source self)
-		(or (getc (<input-stream>-source self))
+  (or self.pending
+      (set self.pending
+	   (and self.source
+		(or (getc self.source)
 		    (let ()
-		      (close (<input-stream>-source self))
-		      (set (<input-stream>-source self) ())))))))
+		      (or (= self.source *input*) (close self.source))
+		      (set self.source ())))))))
 
 (define-method $next <input-stream> ()
   (let ((c ($peek self)))
