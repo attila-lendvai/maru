@@ -50,8 +50,8 @@ peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
 	-mv peg.l peg.l.bak
 	mv peg.l.new peg.l
 
-tee : tee.c
-	$(CC) -o $@ $<
+test-repl : eval peg.l .force
+	./eval parser.l peg.l peg-compile.l test-repl.l
 
 test-peg : eval peg.l .force
 	./eval parser.l peg.l test-peg.l
@@ -70,7 +70,7 @@ clean : .force
 FILES = Makefile \
 	buffer.c chartab.h eval.c gc.c gc.h \
 	boot.l emit.l eval.l test-emit.l \
-	parser.l peg-compile.l peg-boot.l peg.l test-peg.l \
+	parser.l peg-compile.l peg-boot.l peg.l test-peg.l test-repl.l \
 	peg.g
 
 NOW = $(shell date '+%Y%m%d.%H%M')
