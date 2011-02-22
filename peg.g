@@ -19,6 +19,7 @@ dollardbl	= "$$" space ;
 dollar		= "$"  space ;
 at		= "@"  space ;
 query     	= "?"  space ;
+minus      	= "-"  space ;
 plus      	= "+"  space ;
 star      	= "*"  space ;
 lparen      	= "("  space ;
@@ -28,7 +29,8 @@ rbrace     	= "}"  space ;
 dot       	= "."  space ;
 digit		= [0123456789] ;
 letter		= [ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz] ;
-identifier	= (letter (letter | digit)*) @$$:id space	-> id ;
+idpart		= (letter (letter | digit)*) @$$ ;
+identifier	= idpart:id space				-> id ;
 char		= "\\"	( "t"	->  9
 			| "n"	-> 10
 			| "r"	-> 13
@@ -38,24 +40,33 @@ char		= "\\"	( "t"	->  9
 string		= "\""  (!"\""  char)* $:s "\""  space		-> s ;
 class		= "["   (!"]"   char)* $:s "]"   space		-> s ;
 
+grammar         = symbol:name space plus                definition*:rules     -> `(grammar-extend ,name         ,@rules)
+                | symbol:name space colon symbol:parent definition*:rules     -> `(grammar-define ,name ,parent ,@rules)
+                | definition*:d space expression?:e                           -> `(grammar-eval ,d ,(car e))
+                ;
 symchar		= [!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
-sexpr		= (symchar (symchar | digit)*) @$$
+symbol		= (symchar (symchar | digit)*) @$$ ;
+sexpr		= symbol
 		| digit+ $#
 		| "\""  (!"\""  char)* $:e "\""			-> e
-		| "(" (space sexpr)*:e space ")"		-> e
-		| "'"  space sexpr:e				-> (list 'quote e)
-		| "`"  space sexpr:e				-> (list 'quasiquote e)
-		| ",@" space sexpr:e				-> (list 'unquote-splicing e)
-		| ","  space sexpr:e				-> (list 'unquote e)
-		| "{"  (space definition)*:e space "}"		-> (list 'simple-grammar (list quote e))
+		| "("  sexpression*:e sspace ")"		-> e
+		| "'"  sexpression:e				-> (list 'quote e)
+		| "`"  sexpression:e				-> (list 'quasiquote e)
+		| ",@" sexpression:e				-> (list 'unquote-splicing e)
+		| ","  sexpression:e				-> (list 'unquote e)
+		| "{"  space grammar:e "}"			-> e
+		| ";" (![\n\r] .)*
 		;
-sexpression	= space sexpr ;
+scomment	= ";" (!eol .)* ;
+sspace		= (blank | eol | scomment)* ;
+sexpression	= sspace sexpr ;
 
 llist		= lparen expression:e rparen			-> e ;
 atom		= lparen expression:e rparen			-> e
 		| quotesgl sexpression:e space			-> `(match-object ,e)
 		| string:e					-> `(match-string ,e)
 		| class:e					-> `(match-class ,e)
+		| idpart:p "-" identifier:e			-> `(match-rule-in ,p ,e)
 		| identifier:e					-> `(match-rule ,e)
 		| lbrace sexpression*:e space rbrace		-> `(match-rule ,@e)
 		| dot						-> `(match-any)
