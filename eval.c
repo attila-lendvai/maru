@@ -979,7 +979,7 @@ static oop eval(oop obj, oop ctx)
       oop ev= arrayAt(get(evaluators, Variable,value), getType(obj));
       if (nil != ev) {
 	oop args= newPair(obj, nil);			GC_PROTECT(args);
-	obj= apply(ev, obj, ctx);			GC_UNPROTECT(args);
+	obj= apply(ev, args, ctx);			GC_UNPROTECT(args);
       }
       --traceDepth;
       return obj;

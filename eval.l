@@ -50,7 +50,7 @@
 (define memcpy		(extern	'memcpy))
 (define memmove		(extern	'memmove))
 (define printf		(extern	'printf))
-(define fprintf		(extern	'frintf))
+(define fprintf		(extern	'fprintf))
 (define sprintf		(extern	'sprintf))
 (define snprintf	(extern	'snprintf))
 (define isatty		(extern	'isatty))
@@ -1068,7 +1068,7 @@
 					   (printf "consing args then ignoring them\n")
 					   (k_set_array_at trace_stack trace_depth exp)
 					   (set trace_depth (+ trace_depth 1))
-					   (set exp (k_apply ev exp ctx))
+					   (set exp (k_apply ev args ctx))
 					   (set trace_depth (- trace_depth 1)))))
 				  exp))))))
 
