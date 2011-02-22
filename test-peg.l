@@ -4,16 +4,16 @@
 
 (let* ((g (input-stream-up-to (input-stream (open "peg.g")) ()))
        (s (string-stream g))
-       (p (new <peg-parser>))
+       (p (new <peg>))
        (r (array->list (parse-all p s))))
   (map println r)
   (parse-from p (list-stream r) $gen_cola)
   (map dumpln (<parser>-result p))
   )
   
-; (map println (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
+; (map println (array->list (parse-all (new <peg>) (string-stream peg-grammar-string))))
 
-;(define peg-ir (array->list (parse-all (new <peg-parser>) (string-stream peg-grammar-string))))
+;(define peg-ir (array->list (parse-all (new <peg>) (string-stream peg-grammar-string))))
 
 ;(map println peg-ir)
 
