@@ -193,8 +193,14 @@
 (define %structure-bases	(array))
 (define %structure-derivatives	(array))
 
+(define-function inherits-from (base type)
+  (and type
+       (or (= base type)
+	   (inherits-from base (array-at %structure-bases type)))))
+
 (define-function %typecheck (type object)
   (or (= type (type-of object))
+      (inherits-from type (type-of object))
       (error "type check failed for field accessor: expected "type":"(array-at %type-names type)" got "(type-of object)":"(array-at %type-names (type-of object))))
   object)
 
@@ -215,7 +221,8 @@
     (set-array-at %structure-fields type fields)
     `(let ()
        (define ,name ,type)
-       ,@(%make-accessors name fields))))
+       ,@(%make-accessors name fields)
+       ,type)))
 
 (define-function new (type)
   (allocate type (array-at %structure-sizes type)))
@@ -234,7 +241,8 @@
 	(array-append derived type))
       `(let ()
 	 (define ,name ,type)
-	 ,@(%make-accessors name fields)))))
+	 ,@(%make-accessors name fields)
+	 ,type))))
 
 ;;; built-in types
 
