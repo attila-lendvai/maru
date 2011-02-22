@@ -325,7 +325,7 @@
 
 (progress "parsing peg grammar definition")
 
-(define BEG (grammar '<peg-parser> '<parser> ()))
+(define BEG (grammar '<peg> '<parser> ()))
 
 (let ((p (new <begpeg>))
       (_ (parser-stream (string-stream peg-grammar-string))))
@@ -349,17 +349,17 @@
 
 (progress "reparsing grammar definition")
 
-(define PEG (grammar '<peg-parser> '<parser> ()))
+(define PEG (grammar '<peg> '<parser> ()))
 
-(define-function peg-parser (stream)
-  (let ((self (new <peg-parser>)))
-    (set (<peg-parser>-source self) stream)
+(define-function peg (stream)
+  (let ((self (new <peg>)))
+    (set (<peg>-source self) stream)
     self))
 
 (let* ((s (parser-stream (string-stream peg-grammar-string)))
-       (p (peg-parser s)))
+       (p (peg s)))
   (while ($definition p)
-    (grammar-add-rule PEG (<peg-parser>-result p)))
+    (grammar-add-rule PEG (<peg>-result p)))
   ($space p)
   (and (parser-stream-peek s) (error "syntax error in PEG near: "(parser-stream-context s))))
 
