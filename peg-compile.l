@@ -11,6 +11,16 @@
 	       (match-ko))))
     `(,(concat-symbol '$ name) self)))
 
+(define-form match-rule-in (type name . args)
+  (let ((tname (concat-symbol '< (concat-symbol type '>)))
+	(rname (concat-symbol '$ name)))
+    (if args
+     `(match-save
+        (let ()
+	  ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
+	  (or (,rname (parser ,tname self.source)) (match-ko))))
+     `(,rname (parser ,tname self.source)))))
+
 (define-form match-first (lhs rhs)	`(or ,lhs ,rhs))
 (define-form match-both (lhs rhs)	`(match-save (or (and ,lhs ,rhs) (match-ko))))
 
@@ -90,15 +100,15 @@
      (let ,(peg-find-variables (cadr rule) ())
        ,(expand (cadr rule)))))
 
-(define-function pval (expr)
-  (dumpln expr)
-  (eval expr))
+;; (define-function pval (expr)
+;;   (dumpln expr)
+;;   (eval expr))
 
 (define-function peg-compile-grammar (grammar)
   (let ((class (list 'define-class (<grammar>-name grammar) (<grammar>-base grammar) (<grammar>-fields grammar)))
 	(decls (with-map peg-make-declaration (<grammar>-name grammar) (<grammar>-rules grammar)))
 	(defns (with-map peg-make-definition  (<grammar>-name grammar) (<grammar>-rules grammar))))
-    (eval class)
+    (set (<grammar>-type grammar) (eval class))
     (map eval decls)
     (map eval defns)
     (cons class (concat-list decls defns))))
