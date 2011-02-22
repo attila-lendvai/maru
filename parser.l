@@ -357,7 +357,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <grammar> (name base fields rules))
+(define-structure <grammar> (name base fields rules type))
 
 (define-function grammar (name base fields)
   (let ((self (new <grammar>)))
@@ -405,6 +405,11 @@
 ;;;----------------------------------------------------------------
 
 (define-structure <parser> (source result))
+
+(define-function parser (type stream)
+  (let ((self (new type)))
+    (set (<parser>-source self) stream)
+    self))
 
 (define-selector $start)
 
