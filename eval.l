@@ -1065,7 +1065,6 @@
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
 					 (gc-protect (args)
-					   (printf "consing args then ignoring them\n")
 					   (k_set_array_at trace_stack trace_depth exp)
 					   (set trace_depth (+ trace_depth 1))
 					   (set exp (k_apply ev args ctx))
