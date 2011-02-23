@@ -67,7 +67,6 @@
 
   factor	= value:a ( "*" _ factor:b	-> (* a b)
 			  | "/" _ factor:b	-> (/ a b)
-			  | "%" _ factor:b	-> (% a b)
 			  |			-> a
 			  )
 		;
