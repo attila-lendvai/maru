@@ -325,7 +325,7 @@
 
 (define-function parser-stream-context (self)
   (let ((a (array)))
-    (for (i 0 32) (let ((c ($next (<parser-stream>-source self)))) (and c (array-append a c))))
+    (for (i 0 32) (let ((c (parser-stream-next self))) (and c (array-append a c))))
     (array->string a)))
 
 ;;;----------------
@@ -372,8 +372,12 @@
   (print " }"))
 
 (define-function grammar-add-rule (self rule)
-  (set (<grammar>-rules self)
-       (cons (cons (cadr rule) (cddr rule)) (<grammar>-rules self))))
+  (let* ((name  (cadr rule))
+	 (rules (<grammar>-rules self))
+	 (pair  (or (assq name rules)
+		    (car (set (<grammar>-rules self)
+			      (cons (cdr rule) rules))))))
+    (set-cdr pair (cddr rule))))
 
 (define-function grammar-find-rule (self name)
   (let ((rule (assq name (<grammar>-rules self))))
