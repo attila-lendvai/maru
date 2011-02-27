@@ -54,7 +54,9 @@ test-repl : eval peg.l .force
 	./eval parser.l peg.l peg-compile.l test-repl.l
 
 test-peg : eval peg.l .force
-	./eval parser.l peg.l test-peg.l
+	./eval parser.l peg.l test-peg.l | tee peg.n
+	./eval parser.l peg.n test-peg.l | tee peg.m
+	diff peg.n peg.m
 
 stats : .force
 	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
