@@ -109,7 +109,7 @@ static oop symbols= nil;
 static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil; //, s_in= nil;
 static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
-static oop backtrace= nil, input= nil;
+static oop arguments= nil, backtrace= nil, input= nil;
 
 static int opt_b= 0, opt_v= 0;
 
@@ -328,6 +328,16 @@ static oop lookup(oop env, oop name)
 static oop define(oop env, oop name, oop value)
 {
   oop bindings= get(env, Env,bindings);
+  {
+    int index= arrayLength(bindings);
+    while (--index >= 0) {
+      oop var= arrayAt(bindings, index);
+      if (get(var, Variable,name) == name) {
+	set(var, Variable,value, value);
+	return var;
+      }
+    }
+  }
   int off= getLong(get(env, Env,offset));
   oop var= newVariable(name, value, env, off);	GC_PROTECT(var);
   arrayAppend(bindings, var);			GC_UNPROTECT(var);
@@ -1846,6 +1856,13 @@ int main(int argc, char **argv)
     }
   }
 
+  tmp= nil;
+  while (--argc) {
+    tmp= newPair(nil, tmp);
+    setHead(tmp, newString(argv[argc]));
+  }	    
+  arguments= define(get(globals, Variable,value), intern("*arguments*"), tmp);
+
   tmp= nil;		GC_UNPROTECT(tmp);
 
   f_set=    lookup(get(globals, Variable,value), s_set   );		GC_add_root(&f_set);
@@ -1858,18 +1875,21 @@ int main(int argc, char **argv)
 
   signal(SIGINT, sigint);
 
-  while (argc-- > 1) {
-    ++argv;
-    if 	    (!strcmp(*argv, "-v"))	++opt_v;
-    else if (!strcmp(*argv, "-b"))	++opt_b;
+  while (is(Pair, get(arguments, Variable,value))) {
+    oop argl= get(arguments, Variable,value);
+    oop args= getHead(argl);				GC_PROTECT(args);
+    set(arguments, Variable,value, getTail(argl));
+    char *arg= get(args, String,bits);
+    if 	    (!strcmp(arg, "-v"))	++opt_v;
+    else if (!strcmp(arg, "-b"))	++opt_b;
     else {
       if (!opt_b) {
 	replPath("boot.l");
 	opt_b= 1;
       }
-      replPath(*argv);
+      replPath(arg);
       repled= 1;
-    }
+    }							GC_UNPROTECT(args);
   }
 
   if (opt_v) {
