@@ -2,6 +2,18 @@ TALK FOR KITA - talk on Feb 24th
 
 ----------------------------------------------------------------
 
+char classes should support range syntax and not depend on order
+
+arguments should not be consed
+	push them in the caller's context
+	refer to them as locals with negative offsets in callee
+	need to store actual arg count somewhere?
+		in the caller context is more flexible
+
+----------------------------------------------------------------
+
+Simplify define() to avoid replicating the search loop of findVariable.
+
 Add source field to <pair> and use for error reporting.
 
 ----------------------------------------------------------------
