@@ -143,17 +143,20 @@
 
 (define-selector $expression) ;; forward
 
-(define-rule symchar
+(define-rule symfirst
   (set self.result
        (CLASS "!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~")))
 
+(define-rule symrest
+  (set self.result
+       (CLASS "!#$%&*+-./0123456789<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~")))
+
 (define-rule symbol
   (let ((pos (<parser-stream>-position _)))
-    (and (RULE symchar)
+    (and (RULE symfirst)
 	 (let ((ans (group)))
 	   (group-append ans self.result)
-	   (while (or (RULE symchar) (RULE digit))
-	     (group-append ans self.result))
+	   (while (RULE symrest) (group-append ans self.result))
 	   (RULE space)
 	   (set self.result (string->symbol (group->string ans)))))))
 
@@ -172,7 +175,7 @@
       (and (RULE lparen)
 	   (let ((ans (group)))
 	     (while (RULE sexpr) (group-append ans self.result))
-	     (or (RULE rparen) (error ") expected in list"))
+	     (or (RULE rparen) (error ") expected in list near: "(parser-stream-context _)))
 	     (set self.result (group->list! ans))
 	     't))
       (and (RULE quotesgl)  (RULE sexpr)	(set self.result (list 'quote		 self.result)))
@@ -259,7 +262,7 @@
 	 (or (RULE expression) (error "expression expected after ="))
 	 (set exp self.result)
 	 (or (OBJECT ?\;) (error "; expected"))
-	 (set self.result (list 'rule id exp)))))
+	 (set self.result (list id exp)))))
 
 (unit-test "<begpeg>"
   (let ((self (new <begpeg>))
@@ -315,7 +318,7 @@
     (unit-assert (RULE semicolon	))
     (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-both (match-rule and) (match-rule this)) (match-first (match-both (match-rule is) (match-rule an)) (match-rule expression)))))
     (unit-assert (RULE semicolon	))
-    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(rule definition (match-first (match-both (match-rule lots) (match-rule of)) (match-both (match-rule rules) (match-both (match-rule here) (match-any)))))))))
+    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-both (match-rule lots) (match-rule of)) (match-both (match-rule rules) (match-both (match-rule here) (match-any)))))))))
 
 ;;;----------------------------------------------------------------
 
@@ -325,16 +328,18 @@
 
 (progress "parsing peg grammar definition")
 
-(define BEG (grammar '<peg> '<parser> ()))
+;;(define BEG (grammar '<peg> '<parser> ()))
+
+(define BEG)
 
 (let ((p (new <begpeg>))
       (_ (parser-stream (string-stream peg-grammar-string))))
   (while ($definition p _)
     ;;(println "\nBEG: " (<begpeg>-result p) " ")
-    (grammar-add-rule BEG (<begpeg>-result p)))
+    (set BEG (cons (<begpeg>-result p) BEG)))
   ;;(println)
   ($space p _)
-  (and (parser-stream-peek _) (error "syntax error in BEG near: "(parser-stream-context _)))
+  (and (!= *end* (parser-stream-peek _)) (error "syntax error in BEG near: "(parser-stream-context _)))
   )
 
 (progress "generating compiled parser")
@@ -345,11 +350,13 @@
 
 ;; (map eval GEN)
 
-(define GEN (peg-compile-grammar BEG))
+(define-class <peg> <parser> ())
+
+(define GEN (peg-compile-rules '<peg> BEG))
 
 (progress "reparsing grammar definition")
 
-(define PEG (grammar '<peg> '<parser> ()))
+(define PEG)
 
 (define-function peg (stream)
   (let ((self (new <peg>)))
@@ -359,14 +366,14 @@
 (let* ((s (parser-stream (string-stream peg-grammar-string)))
        (p (peg s)))
   (while ($definition p)
-    (grammar-add-rule PEG (<peg>-result p)))
+    (set PEG (cons (<peg>-result p) PEG)))
   ($space p)
-  (and (parser-stream-peek s) (error "syntax error in PEG near: "(parser-stream-context s))))
+  (and (!= *end* (parser-stream-peek s)) (error "syntax error in PEG near: "(parser-stream-context s))))
 
 (progress "comparing output")
 
-(let ((a (<grammar>-rules BEG))
-      (b (<grammar>-rules PEG)))
+(let ((a BEG)
+      (b PEG))
   (while (pair? a)
     (or (equal (car a) (car b))
 	(let ()
@@ -377,8 +384,9 @@
 
 (progress "dumping generated parser")
 
+(println "(define-class <peg> <parser> ())")
 (map dumpln GEN)
 
 (progress "parser bootstrap complete")
 
-($sanity-check PEG)
+($sanity-check (grammar '<peg> '<parser> () PEG))

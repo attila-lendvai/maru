@@ -21,8 +21,16 @@
 	  (or (,rname (parser ,tname self.source)) (match-ko))))
      `(,rname (parser ,tname self.source)))))
 
-(define-form match-first (lhs rhs)	`(or ,lhs ,rhs))
-(define-form match-both (lhs rhs)	`(match-save (or (and ,lhs ,rhs) (match-ko))))
+;;(define-form match-first (lhs rhs)	`(or ,lhs ,rhs))
+;;(define-form match-both (lhs rhs)	`(match-save (or (and ,lhs ,rhs) (match-ko))))
+
+(define-function make-match-flatten (type lhs rhs)
+  (if (= type (car rhs))
+      (cons lhs (make-match-flatten type (cadr rhs) (caddr rhs)))
+    (list lhs rhs)))
+
+(define-form match-first (lhs rhs)	`(or ,@(make-match-flatten 'match-first lhs rhs)))
+(define-form match-both (lhs rhs)	`(match-save (or (and ,@(make-match-flatten 'match-both lhs rhs)) (match-ko))))
 
 (define-form match-zero-one (exp)
   `(let ((_list_ (group)))
@@ -58,7 +66,8 @@
 (define-form match-class (str)	`(set self.result (parser-stream-match-class self.source ,str)))
 (define-form match-string (str)	`(set self.result (parser-stream-match-string self.source ,str)))
 (define-form match-object (obj)	`(and (= ',obj (parser-stream-peek self.source)) (set self.result (parser-stream-next self.source))))
-(define-form match-any ()	'(set self.result (parser-stream-next self.source)))
+;;(define-form match-any ()	'(set self.result (parser-stream-next self.source)))
+(define-form match-any ()	'(and (!= *end* (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 't)))
 
 (define-form make-span (exp)
   `(let ((pos (<parser-stream>-position self.source)))
@@ -112,3 +121,10 @@
     (map eval decls)
     (map eval defns)
     (cons class (concat-list decls defns))))
+
+(define-function peg-compile-rules (name rules)
+  (let ((decls (with-map peg-make-declaration name rules))
+	(defns (with-map peg-make-definition  name rules)))
+    (map eval decls)
+    (map eval defns)
+    (concat-list decls defns)))
