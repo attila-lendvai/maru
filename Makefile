@@ -54,8 +54,8 @@ test-repl : eval peg.l .force
 	./eval parser.l peg.l peg-compile.l test-repl.l
 
 test-peg : eval peg.l .force
-	./eval parser.l peg.l test-peg.l | tee peg.n
-	./eval parser.l peg.n test-peg.l | tee peg.m
+	time ./eval parser.l peg.l test-peg.l | tee peg.n
+	time ./eval parser.l peg.n test-peg.l | tee peg.m
 	diff peg.n peg.m
 
 stats : .force
