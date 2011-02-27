@@ -12,17 +12,17 @@
   (println "GRAMMAR DEFINE" rules)
   ())
 
-(define *temp-grammar* (grammar '<temp-grammar> '<parser> ()))
+(define-class <temp-grammar> <parser> ())
 
 (define-form grammar-eval (rules expr)
   ;;(println "GRAMMAR EVAL "rules" -> "expr)
-  (with-map grammar-add-rule *temp-grammar* rules)
-  (and expr (grammar-add-rule *temp-grammar* (list 'rule 'start expr)))
+  (peg-compile-rules '<temp-grammar> rules)
+  (and expr (peg-compile-rules '<temp-grammar> (list (list 'start expr))))
   ;;(println "GRAMMAR "*temp-grammar*)
-  (peg-compile-grammar *temp-grammar*)
-  (and expr *temp-grammar*))
+  (and expr ($start (parser <temp-grammar> *parser-stream*)))
+  ())
 
-(define-eval <grammar> (self) ($start (parser (<grammar>-type self) *parser-stream*)))
+;;(define-eval <temp-grammar> (self) ($start self *parser-stream*))
 
 (define-function repl-parser-stream (stream prompt)
   (let ((p (parser <peg> stream))
@@ -57,7 +57,9 @@
 { error		=				-> (error "parse error near: "(parser-stream-context self.source)) ; }
 
 {
-  _		= [\t\n\r ]* ;
+  blank		= [\t\n\r ] ;
+  comment	= "//"(![\n\r].)* ;
+  _		= (blank | comment)* ;
 
   digit		= [0123456789] ;
 
@@ -84,16 +86,6 @@
 3*3
 3* 3+4 *4
 .
-
-(define-function pval (x)
-  (println "EVAL: "x)
-  (let ((result (eval x)))
-    (println "=> "result)
-    result))
-
-(define-form with-forward (name expr)
-  (eval `(define name ()))
-  expr)
 
 {
   letter	= [ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz] ;
@@ -204,6 +196,7 @@ println(factorial(5))
 
 .
 
+
 {
   for		= "for" _ name:n "=" _ expression:a "to" _ expression:b "do" statement:c	-> `(let ((,n ,a))
 												      (while (<= ,n ,b)
@@ -228,3 +221,10 @@ nfibs(n) =
   else nfibs(n - 1) + nfibs(n - 2) + 1
 
 println("nfibs(15) is ", nfibs(15))
+
+
+
+// Local Variables:
+// mode: outline-minor
+// outline-regexp: ";;;----------------------------------------------------------------"
+// End:
