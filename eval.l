@@ -845,11 +845,18 @@
 
 (define-function k_env_define (env name value)
   (let* ((bindings (get <env> bindings env))
-	 (off      (get_long (get <env> offset env)))
-	 (var      (new-<variable> name value env off)))
-    (gc-protect (var)
-      (put <env> offset env (new-<long> (+ off 1)))
-      (k_array_append bindings var))))
+	 (index (k_array_length bindings)))
+    (while (>= (set index (- index 1)) 0)
+      (let ((var (k_array_at bindings index)))
+	(and (= name (get <variable> value var))
+	     (let ()
+	       (set <variable> value var value)
+	       (return var)))))
+    (let ((off      (get_long (get <env> offset env)))
+	  (var      (new-<variable> name value env off)))
+      (gc-protect (var)
+	(put <env> offset env (new-<long> (+ off 1)))
+	(k_array_append bindings var)))))
 
 ;;; ----------------------------------------------------------------
 
