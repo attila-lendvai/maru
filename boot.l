@@ -247,7 +247,7 @@
 ;;; built-in types
 
 (define-structure <undefined>	())
-(define-structure <long>	(_bits))
+(define-structure <long>	(_bits))				(define-function long? (self) (= <long> (type-of self)))
 (define-structure <string>	(size _bits))
 (define-structure <symbol>	(_bits))
 (define-structure <pair>	(head tail))
@@ -355,8 +355,8 @@
 	    (list 'quote <variable>-value def)
 	  (error name" already defined as non-selector: " (<variable>-value def)))
       (let ()
-	(or default (set default `(args (error "cannot apply selector "',name
-					       " to "(array-at %type-names (type-of (car args)))
+	(or default (set default `(args (error "selector "',name
+					       " has no method for "(array-at %type-names (type-of (car args)))
 					       ": "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
 	`(define ,name (selector ',name (lambda ,@default)))))))
 
@@ -576,6 +576,16 @@
     (while (<= 0 (set ind (- ind 1)))
       (set lst (cons (array-at arr ind) lst)))
     lst))
+
+(define-function list->string (list)
+  (let* ((len (list-length list))
+	 (str (string len))
+	 (idx 0))
+    (while (< idx len)
+      (set-string-at str idx (car list))
+      (set idx (+ idx 1))
+      (set list (cdr list)))
+    str))
 
 ;;; structural equality
 
