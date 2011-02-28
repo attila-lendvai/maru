@@ -308,6 +308,10 @@
   (and (= value (parser-stream-peek self))
        (parser-stream-next self)))
 
+(define-function parser-stream-match-any (self)
+  (and (!= *end* (parser-stream-peek self))
+       (parser-stream-next self)))
+
 (define-function parser-stream-match-class (self class)
   (let ((obj (parser-stream-peek self)))
     (and (long? obj) (<= 0 (binary-search class obj <))
@@ -403,8 +407,7 @@
 		  (let ((name (cadr exp)))
 		    (or (member? name reached)
 			(set reached ($reachable-from self (cadr (grammar-find-rule self name)) (cons name reached)))))
-		(set reached ($reachable-from self (cadr  exp) reached))
-		(set reached ($reachable-from self (caddr exp) reached))))))
+		(map (lambda (exp) (set reached ($reachable-from self exp reached))) (cdr exp))))))
   reached)
 
 (define-method $sanity-check <grammar> ()

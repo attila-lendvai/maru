@@ -21,16 +21,8 @@
 	  (or (,rname (parser ,tname self.source)) (match-ko))))
      `(,rname (parser ,tname self.source)))))
 
-;;(define-form match-first (lhs rhs)	`(or ,lhs ,rhs))
-;;(define-form match-both (lhs rhs)	`(match-save (or (and ,lhs ,rhs) (match-ko))))
-
-(define-function make-match-flatten (type lhs rhs)
-  (if (= type (car rhs))
-      (cons lhs (make-match-flatten type (cadr rhs) (caddr rhs)))
-    (list lhs rhs)))
-
-(define-form match-first (lhs rhs)	`(or ,@(make-match-flatten 'match-first lhs rhs)))
-(define-form match-both (lhs rhs)	`(match-save (or (and ,@(make-match-flatten 'match-both lhs rhs)) (match-ko))))
+(define-form match-first exprs		`(or ,@exprs))
+(define-form match-all exprs		`(match-save (or (and ,@exprs) (match-ko))))
 
 (define-form match-zero-one (exp)
   `(let ((_list_ (group)))
@@ -80,7 +72,7 @@
 (define-form make-symbol (exp)	`(and ,exp (set self.result (string->symbol (list->string self.result)))))
 (define-form make-number (exp)	`(and ,exp (set self.result (string->number (list->string self.result)))))
 
-(define-form assign-result (name)	`(let () (set ,name self.result) 't))
+(define-form assign-result (name exp)	`(and ,exp (let () (set ,name self.result) 't)))
 (define-form result-object (obj)	`(let () (set self.result ',obj) 't))
 (define-form result-expr (exp)		`(let () (set self.result ,exp) 't))
 
@@ -93,12 +85,9 @@
   (and (pair? tree)
        (if (= (car tree) 'assign-result)
 	   (or (assq (cadr tree) vars)
-	       (set vars (cons (cons (cadr tree)) vars)))
+	       (set vars (peg-find-variables (caddr tree) (cons (cons (cadr tree)) vars))))
 	 (and (!= (car tree) 'result-expr)
-	      (let ((e1 (cadr tree))
-		    (e2 (caddr tree)))
-		(set vars (peg-find-variables e1 vars))
-		(set vars (peg-find-variables e2 vars))))))
+	      (map (lambda (exp) (set vars (peg-find-variables exp vars))) (cdr tree)))))
   vars)
 
 (define-function peg-make-declaration (type rule)

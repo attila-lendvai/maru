@@ -203,9 +203,6 @@
     ((and (RULE backquote) (RULE llist))	(set self.result (list 'match-list self.result)))
     ((RULE dot)					(set self.result (list 'match-any)))
     ((and (RULE arrow) (RULE sexpr))		(set self.result (list 'result-expr self.result)))
-    ((RULE colon)				(if (RULE identifier)
-						    (set self.result (list 'assign-result self.result))
-						  (error "identifier expected after :")))
     (else					())))
 
 (define-rule repetition
@@ -225,6 +222,9 @@
 		  ((RULE dollarhash)	(set exp (list 'make-number exp)))
 		  ((RULE dollardbl)	(set exp (list 'make-symbol exp)))
 		  ((RULE dollar)	(set exp (list 'make-string exp)))
+		  ((RULE colon)		(if (RULE identifier)
+					    (set exp (list 'assign-result self.result exp))
+					  (error "identifier expected after :")))
 		  (else			())))
 	 (set self.result exp))))
 
@@ -239,19 +239,23 @@
 
 (define-rule sequence
   (and (RULE predicate)
-       (let ((lhs self.result))
-	 (and (RULE sequence)
-	      (set lhs (list 'match-both lhs self.result)))
-	 (set self.result lhs))))
+       (let ((p self.result)
+	     (q (group)))
+	 (while (RULE predicate) (group-append q self.result))
+	 (set self.result
+	      (if (group-empty? q)
+		  p
+		`(match-all ,p ,@(group->list! q)))))))
 
 (define-rule expression
-  (let ((lhs))
-    (and (RULE sequence)
-	 (set lhs self.result)
-	 (and (RULE bar)
-	      (or (RULE expression) (error "expression expected after |"))
-	      (set lhs (list 'match-first lhs self.result))))
-    (set self.result lhs)))
+  (and (RULE sequence)
+       (let ((p self.result)
+	     (q (group)))
+	 (while (and (RULE bar) (RULE sequence)) (group-append q self.result))
+	 (set self.result
+	      (if (group-empty? q)
+		  p
+		`(match-first ,p ,@(group->list! q)))))))
 
 (define-rule definition
   (let ((id) (exp))
@@ -274,6 +278,7 @@
   					foo? bar* baz+
   					letter+$
   					&foo !bar -> baz -> \"string\" -> ( a list )
+  					atom
   					this is a sequence of stuffs ;
   					and this | is an | expression ;
   					definition = lots of | rules here . ;
@@ -314,11 +319,12 @@
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr baz)))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr "string")))
     (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(result-expr (a list))))
-    (unit-assert (RULE sequence		))	(unit-assert (equal (<begpeg>-result self) '(match-both (match-rule this) (match-both (match-rule is) (match-both (match-rule a) (match-both (match-rule sequence) (match-both (match-rule of) (match-rule stuffs))))))))
+    (unit-assert (RULE predicate	))	(unit-assert (equal (<begpeg>-result self) '(match-rule atom)))
+    (unit-assert (RULE sequence		))	(unit-assert (equal (<begpeg>-result self) '(match-all (match-rule this) (match-rule is) (match-rule a) (match-rule sequence) (match-rule of) (match-rule stuffs))))
     (unit-assert (RULE semicolon	))
-    (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-both (match-rule and) (match-rule this)) (match-first (match-both (match-rule is) (match-rule an)) (match-rule expression)))))
+    (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-all (match-rule and) (match-rule this)) (match-all (match-rule is) (match-rule an)) (match-rule expression))))
     (unit-assert (RULE semicolon	))
-    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-both (match-rule lots) (match-rule of)) (match-both (match-rule rules) (match-both (match-rule here) (match-any)))))))))
+    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-all (match-rule lots) (match-rule of)) (match-all (match-rule rules) (match-rule here) (match-any))))))))
 
 ;;;----------------------------------------------------------------
 

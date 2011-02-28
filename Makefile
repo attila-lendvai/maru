@@ -46,7 +46,7 @@ test-emit : eval .force
 
 peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
 	-rm peg.l.new
-	./eval parser.l peg-compile.l peg-boot.l | tee peg.l.new
+	./eval parser.l peg-compile.l peg-boot.l > peg.l.new
 	-mv peg.l peg.l.bak
 	mv peg.l.new peg.l
 
@@ -54,8 +54,8 @@ test-repl : eval peg.l .force
 	./eval parser.l peg.l peg-compile.l test-repl.l
 
 test-peg : eval peg.l .force
-	time ./eval parser.l peg.l test-peg.l | tee peg.n
-	time ./eval parser.l peg.n test-peg.l | tee peg.m
+	time ./eval parser.l peg.l test-peg.l > peg.n
+	time ./eval parser.l peg.n test-peg.l > peg.m
 	diff peg.n peg.m
 
 stats : .force
