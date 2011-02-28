@@ -60,8 +60,8 @@
 (define stdout			0)
 (define stderr			0)
 
-(define gc_quantum		65504)
-(define gc_frequency		65536)
+(define gc_quantum		(* 50 1024))
+(define gc_frequency		32768)
 
 (define gc_objects_live		0)
 (define gc_bytes_used		0)
