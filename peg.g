@@ -107,18 +107,18 @@ start		= definition ;
 gen_cola		= &gen_cola_value_declarations:a
 			  &gen_cola_effect_declarations:b
 			  &gen_cola_value_definitions:c
-			   gen_cola_effect_definitions:d		   -> `( ,@a ,@b ,@c ,@d ) ;
+			   gen_cola_effect_definitions:d	-> `( ,@a ,@b ,@c ,@d ) ;
 
 gen_cola_value_declarations	= gen_cola_value_declaration* ;
-gen_cola_value_declaration	= `( .:id )				   -> `(define-selector ,(concat-symbol '$ id)) ;
+gen_cola_effect_declarations	= gen_cola_effect_declaration* ;
+
+gen_cola_value_declaration	= `( .:id )			-> `(define-selector ,(concat-symbol '$ id)) ;
+gen_cola_effect_declaration	= `( .:id )			-> `(define-selector ,(concat-symbol '$$ id)) ;
 
 gen_cola_value_definitions	= gen_cola_value_definition* ;
-gen_cola_value_definition	= `( .:id &{findvars ()}:vars value:exp )  -> `(define-method ,(concat-symbol '$ id) <peg> () (let ,vars ,exp)) ;
-
-gen_cola_effect_declarations	= gen_cola_effect_declaration* ;
-gen_cola_effect_declaration	= `( .:id )				   -> `(define-selector ,(concat-symbol '$$ id)) ;
-
 gen_cola_effect_definitions	= gen_cola_effect_definition* ;
+
+gen_cola_value_definition	= `( .:id &{findvars ()}:vars value:exp )  -> `(define-method ,(concat-symbol '$ id) <peg> () (let ,vars ,exp)) ;
 gen_cola_effect_definition	= `( .:id &{findvars ()}:vars effect:exp ) -> `(define-method ,(concat-symbol '$$ id) <peg> () (let ,vars ,exp)) ;
 
 findvars = .:vars `( 'assign-result .:name {findvars vars}:vars		   -> (if (assq name vars) vars (cons (cons name) vars))
@@ -147,17 +147,17 @@ value =
  | 'match-zero-one value:exp		-> `(let ((_list_ (group)))
    		   			      (and ,exp (group-append _list_ self.result))
  					      (set self.result (group->list! _list_))
- 					      't)
+ 					      1)
  | 'match-zero-more value:exp		-> `(let ((_list_ (group)))
    		    			      (while ,exp (group-append _list_ self.result))
  					      (set self.result (group->list! _list_))
- 					      't)
+ 					      1)
  | 'match-one-more value:exp		-> `(let ((_list_ (group)))
      		   			      (while ,exp (group-append _list_ self.result))
  					      (and (not (group-empty? _list_))
  					      	   (let ()
  						     (set self.result (group->list! _list_))
- 						     't)))
+ 						     1)))
  | 'peek-for value:exp			-> `(let ((pos (<parser-stream>-position self.source)))
 					      (and ,exp (set (<parser-stream>-position self.source) pos)))
  | 'peek-not value:exp			-> `(not (let ((pos (<parser-stream>-position self.source)))
@@ -173,17 +173,17 @@ value =
  | 'match-object .:obj			-> `(and (= ',obj (parser-stream-peek self.source))
  					         (set self.result (parser-stream-next self.source)))
  | 'match-any				-> '(and (!= *end* (parser-stream-peek self.source))
-					      (let () (set self.result (parser-stream-next self.source)) 't))
+					      (let () (set self.result (parser-stream-next self.source)) 1))
  | 'make-span effect:exp		-> `(let ((pos (<parser-stream>-position self.source)))
  					      (and ,exp
  					           (let ()
  						     (set self.result (list-from-to pos (<parser-stream>-position self.source)))
- 						     't)))
+ 						     1)))
  | 'make-string value:exp		-> `(and ,exp (set self.result (list->string self.result)))
  | 'make-symbol value:exp		-> `(and ,exp (set self.result (string->symbol (list->string self.result))))
  | 'make-number value:exp		-> `(and ,exp (set self.result (string->number (list->string self.result))))
- | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 't))
- | 'result-expr .:exp			-> `(let () (set self.result ,exp) 't)
+ | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
+ | 'result-expr .:exp			-> `(let () (set self.result ,exp) 1)
  | .:op					->  (error "cannot generate value for "op)
  |					->  (error "cannot generate value for nil")
  ) ;
@@ -205,9 +205,9 @@ effect =
  | 'match-first     effect+:exps	-> `(or ,@exps)
  | 'match-all       effect*:e		-> `(let ((pos (<parser-stream>-position self.source)))
 					      (or (and ,@e) (let () (set (<parser-stream>-position self.source) pos) ())))
- | 'match-zero-one  effect:exp		-> `(let () ,exp 't)
- | 'match-zero-more effect:exp		-> `(let () (while ,exp) 't)
- | 'match-one-more  effect:exp		-> `(and ,exp (let () (while ,exp) 't))
+ | 'match-zero-one  effect:exp		-> `(let () ,exp 1)
+ | 'match-zero-more effect:exp		-> `(let () (while ,exp) 1)
+ | 'match-one-more  effect:exp		-> `(and ,exp (let () (while ,exp) 1))
  | 'peek-for        effect:exp		-> `(let ((pos (<parser-stream>-position self.source)))
 					      (and ,exp (set (<parser-stream>-position self.source) pos)))
  | 'peek-not	    effect:exp		-> `(not (let ((pos (<parser-stream>-position self.source)))
@@ -226,8 +226,8 @@ effect =
  | 'make-string   effect:exp		->  exp
  | 'make-symbol   effect:exp		->  exp
  | 'make-number   effect:exp		->  exp
- | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 't))
- | 'result-expr   .:exp			-> `(let () ,exp 't)
+ | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
+ | 'result-expr   .:exp			-> `(let () ,exp 1)
  | .:op					->  (error "cannot generate value for "op)
  |					->  (error "cannot generate value for nil")
  ) ;

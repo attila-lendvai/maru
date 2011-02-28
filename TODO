@@ -1,4 +1,9 @@
-TALK FOR KITA - talk on Feb 24th
+optimise the PEG for 'select':
+	(match-first
+		(match-all (match-object .:a) .*:aa
+		(match-all (match-object .:b) .*:bb
+		(match-all (match-object .:c) .*:cc
+		(match-all (match-object .)+:d	-> (match-select (,a ,b ,c ,@d) (,aa ,bb ,cc ,@dd))
 
 ----------------------------------------------------------------
 

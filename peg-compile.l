@@ -28,13 +28,13 @@
   `(let ((_list_ (group)))
      (and ,exp (group-append _list_ self.result))
      (set self.result (group->list! _list_))
-     't))
+     1))
 
 (define-form match-zero-more (exp)
   `(let ((_list_ (group)))
      (while ,exp (group-append _list_ self.result))
      (set self.result (group->list! _list_))
-     't))
+     1))
 
 (define-form match-one-more (exp)
   `(let ((_list_ (group)))
@@ -42,7 +42,7 @@
      (and (not (group-empty? _list_))
 	  (let ()
 	    (set self.result (group->list! _list_))
-	    't))))
+	    1))))
 
 (define-form peek-for (exp)	`(match-save (and ,exp (match-ok))))
 (define-form peek-not (exp)	`(not (peek-for ,exp)))
@@ -59,27 +59,21 @@
 (define-form match-string (str)	`(set self.result (parser-stream-match-string self.source ,str)))
 (define-form match-object (obj)	`(and (= ',obj (parser-stream-peek self.source)) (set self.result (parser-stream-next self.source))))
 ;;(define-form match-any ()	'(set self.result (parser-stream-next self.source)))
-(define-form match-any ()	'(and (!= *end* (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 't)))
+(define-form match-any ()	'(and (!= *end* (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 1)))
 
 (define-form make-span (exp)
   `(let ((pos (<parser-stream>-position self.source)))
      (and ,exp
 	  (let ()
 	    (set self.result (list-from-to pos (<parser-stream>-position self.source)))
-	    't))))
+	    1))))
 
 (define-form make-string (exp)	`(and ,exp (set self.result (list->string self.result))))
 (define-form make-symbol (exp)	`(and ,exp (set self.result (string->symbol (list->string self.result)))))
 (define-form make-number (exp)	`(and ,exp (set self.result (string->number (list->string self.result)))))
 
-(define-form assign-result (name exp)	`(and ,exp (let () (set ,name self.result) 't)))
-(define-form result-object (obj)	`(let () (set self.result ',obj) 't))
-(define-form result-expr (exp)		`(let () (set self.result ,exp) 't))
-
-(define-form result-list exps				`(let ((_list_ (group))) ,@exps (set self.result (group->list! _list_)) 't))
-(define-form result-list-symbol (sym)			`(group-append _list_ ',sym))
-(define-form result-list-variable (var)			`(group-append _list_ ,var))
-(define-form result-list-variable-splicing (var)	`(group-append-list _list_ ,var))
+(define-form assign-result (name exp)	`(and ,exp (let () (set ,name self.result) 1)))
+(define-form result-expr (exp)		`(let () (set self.result ,exp) 1))
 
 (define-function peg-find-variables (tree vars)
   (and (pair? tree)
