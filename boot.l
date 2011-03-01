@@ -379,23 +379,27 @@
   (lambda args
     (while (pair? args)
       (do-print (car args))
-      (set args (cdr args)))))
+      (set args (cdr args)))
+    (car args)))
 
 (define dump
   (lambda args
     (while (pair? args)
       (do-dump (car args))
-      (set args (cdr args)))))
+      (set args (cdr args)))
+    (car args)))
 
 (define println
   (lambda args
     (apply print args)
-    (%print "\n")))
+    (%print "\n")
+    (car args)))
 
 (define dumpln
   (lambda args
     (apply dump args)
-    (%print "\n")))
+    (%print "\n")
+    (car args)))
 
 (define-method do-dump  <string> ()	(%dump self))
 (define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
