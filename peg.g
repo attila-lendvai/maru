@@ -50,13 +50,16 @@ symrest		= [!#$%&*+-./0123456789<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmno
 symbol		= (symfirst symrest*) @$$ ;
 sexpr		= symbol
 		| digit+ $#
+		| "?".
 		| "\""  (!"\""  char)* $:e "\""			-> e
 		| "("  sexpression*:e sspace ")"		-> e
 		| "'"  sexpression:e				-> (list 'quote e)
 		| "`"  sexpression:e				-> (list 'quasiquote e)
 		| ",@" sexpression:e				-> (list 'unquote-splicing e)
 		| ","  sexpression:e				-> (list 'unquote e)
-		| "{"  space grammar:e "}"			-> e
+		| "{"  space grammar:e	( "}"			-> e
+					|			-> (error "error in grammar near: "(parser-stream-context self.source))
+					)
 		| ";" (![\n\r] .)*
 		;
 scomment	= ";" (!eol .)* ;
