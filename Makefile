@@ -58,6 +58,10 @@ test-peg : eval peg.l .force
 	time ./eval parser.l peg.n test-peg.l > peg.m
 	diff peg.n peg.m
 
+profile-peg : .force
+	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
+	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
+
 stats : .force
 	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
