@@ -1,4 +1,4 @@
-;; (require "parser.l")
+; (require "parser.l")
 ;; (require "peg-compile.l")
 ;; (require "peg.l")
 
@@ -70,17 +70,15 @@
   (println "GRAMMAR DEFINE" rules)
   ())
 
-(define-class <minigol> <parser> ())
+(define-class <reader> <parser> ())
 
 (define-form grammar-eval (rules expr)
-  ;;(println "GRAMMAR EVAL "rules" -> "expr)
-  (peg-compile-rules '<minigol> rules)
-  (and expr (peg-compile-rules '<minigol> (list (list 'start expr))))
-  ;;(println "GRAMMAR "*minigol*)
-  (and expr ($start (parser <minigol> *parser-stream*)))
+  (println "GRAMMAR EVAL "rules" -> "expr)
+  (peg-compile-rules '<reader> rules)
+  (and expr (peg-compile-rules '<reader> (list (list 'start expr))))
+  ;;(println "GRAMMAR "*reader*)
+  (and expr ($start (parser <reader> *parser-stream*)))
   ())
-
-;;(define-eval <minigol> (self) ($start self *parser-stream*))
 
 (define-function repl-parser-stream (stream prompt)
   (let ((p (parser <peg> stream))
