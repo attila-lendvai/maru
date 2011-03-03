@@ -55,6 +55,7 @@
 (define snprintf	(extern	'snprintf))
 (define isatty		(extern	'isatty))
 
+(define arguments		0)
 (define input			0)
 (define stdin			0)
 (define stdout			0)
@@ -417,6 +418,7 @@
 
 (define-form get_head (obj)	`(oop-at ,obj 0))
 (define-form get_tail (obj)	`(oop-at ,obj 1))
+(define-form set_head (obj val)	`(set-oop-at ,obj 0 ,val))
 (define-form set_tail (obj val)	`(set-oop-at ,obj 1 ,val))
 
 (define-function new-<env> (parent level offset)
@@ -1615,6 +1617,13 @@
   (define-subr  "long->string"		subr_long_string)
   (define-subr  "verbose"		subr_verbose)
 
+  (let ((tmp ()))
+    (gc-protect (tmp)
+      (while (< 0 (set argc (- argc 1)))
+	(set tmp (new-<pair> () tmp))
+	(set_head tmp (new-<string> (oop-at argv argc))))
+      (set arguments (k_env_define (get <variable> value globals) (intern "*arguments*") tmp))))
+
   (set f_set	(k_env_lookup (get <variable> value globals) s_set   ))		(gc_push_root (address-of f_set   ))
   (set f_quote	(k_env_lookup (get <variable> value globals) s_quote ))		(gc_push_root (address-of f_quote ))
   (set f_lambda	(k_env_lookup (get <variable> value globals) s_lambda))		(gc_push_root (address-of f_lambda))
@@ -1625,16 +1634,19 @@
 
   (k_env_define (get <variable> value globals) (intern "*backtrace*") ())
 
-  (while (set argc (- argc 1))
-    (set argv (+ argv 4))
-    (let ((arg (oop-at argv 0)))
-      (cond
-	((not (strcmp arg "-v"))	(set opt_verbose (+ 1 opt_verbose)))
-	((not (strcmp arg "-"))		(repl_stream stdin))
-	(else				(let ((stream (fopen (oop-at argv 0) "r")))
-					  (or stream (fatal1 "no such file: %s" (oop-at argv 0)))
+  (while (is <pair> (get <variable> value arguments))
+    (let* ((argl (get <variable> value arguments))
+	   (args (get_head argl))
+	   (arg  (get <string> _bits args)))
+      (gc-protect (args)
+        (put <variable> value arguments (get_tail argl))
+	(cond
+	  ((not (strcmp arg "-v"))	(set opt_verbose (+ 1 opt_verbose)))
+	  ((not (strcmp arg "-"))		(repl_stream stdin))
+	  (else				(let ((stream (fopen arg "r")))
+					  (or stream (fatal1 "no such file: %s" arg))
 					  (repl_stream stream)
-					  (fclose stream))))))
+					  (fclose stream)))))))
 
   (and (> opt_verbose 0)
        (let ()
