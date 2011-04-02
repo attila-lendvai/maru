@@ -1447,8 +1447,6 @@ static oop enlist(oop list, oop env)
   return head;
 }
 
-static oop evlist(oop obj, oop env);
-
 static oop traceStack= nil;
 static int traceDepth= 0;
 
@@ -1482,117 +1480,29 @@ static void fatal(char *reason, ...)
 static oop eval(oop obj, oop env)
 {
   if (opt_v > 1) { printf("EVAL ");  dumpln(obj); }
-  switch (getType(obj)) {
-    case Undefined:
-    case Long:
-    case String: {
-      return obj;
-    }
-    case Symbol: {
-      oop val= assq(obj, env);
-      if (!is(Pair, val))		fatal("undefined variable: %s", get(obj, Symbol,bits));
-      return getTail(val);
-    }
-    case Pair: {
-      arrayAtPut(traceStack, traceDepth++, obj);
-      oop head= eval(getHead(obj), env);	GC_PROTECT(head);
-      if (is(Fixed, head))
-	head= apply(get(head, Fixed,function), getTail(obj), env);
-      else  {
-	oop args= evlist(getTail(obj), env);		GC_PROTECT(args);
-	head= apply(head, args, env);			GC_UNPROTECT(args);
-      }						GC_UNPROTECT(head);
-      --traceDepth;
-      return head;
-    }
-    default: {
-      arrayAtPut(traceStack, traceDepth++, obj);
-      oop ev= arrayAt(getTail(evaluators), getType(obj));
-      if (nil != ev) {
-	oop args= newPair(obj, nil);			GC_PROTECT(args);
-	obj= apply(ev, obj, env);			GC_UNPROTECT(args);
-      }
-      --traceDepth;
-      return obj;
-    }
+  arrayAtPut(traceStack, traceDepth++, obj);
+  oop ev= arrayAt(getTail(evaluators), getType(obj));
+  if (nil != ev) {
+    oop args= newPair(obj, nil);		GC_PROTECT(args);
+    obj= apply(ev, args, env);			GC_UNPROTECT(args);
   }
-  return nil;
-}
-
-static oop evlist(oop obj, oop env)
-{
-  if (!is(Pair, obj)) return obj;
-  oop head= eval(getHead(obj), env);		GC_PROTECT(head);
-  oop tail= evlist(getTail(obj), env);		GC_PROTECT(tail);
-  head= newPair(head, tail);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
-  return head;
+  --traceDepth;
+  return obj;
 }
 
 static oop apply(oop fun, oop arguments, oop env)
 {
   if (opt_v > 1) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(env); }
-  switch (getType(fun)) {
-    case Expr: {
-      oop args= arguments;
-      oop defn= get(fun, Expr,defn);	GC_PROTECT(defn);
-      oop formals= car(defn);
-      env= get(fun, Expr,env);		GC_PROTECT(env);
-      oop tmp= nil;			GC_PROTECT(tmp);
-      while (is(Pair, formals)) {
-	if (!is(Pair, args)) {
-	  fprintf(stderr, "\nerror: too few arguments applying ");
-	  fdump(stderr, fun);
-	  fprintf(stderr, " to ");
-	  fdumpln(stderr, arguments);
-	  fatal(0);
-	}
-	tmp= newPair(getHead(formals), getHead(args));
-	env= newPair(tmp, env);
-	formals= getTail(formals);
-	args= getTail(args);
-      }
-      if (is(Symbol, formals)) {
-	tmp= newPair(formals, args);
-	env= newPair(tmp, env);
-	args= nil;
-      }
-      if (nil != args) {
-	fprintf(stderr, "\nerror: too many arguments applying ");
-	fdump(stderr, fun);
-	fprintf(stderr, " to ");
-	fdumpln(stderr, arguments);
-	fatal(0);
-      }
-      oop ans= nil;
-      oop body= getTail(defn);
-      while (is(Pair, body)) {
-	ans= eval(getHead(body), env);
-	body= getTail(body);
-      }
-      GC_UNPROTECT(tmp);
-      GC_UNPROTECT(env);
-      GC_UNPROTECT(defn);
-      return ans;
-    }
-    case Fixed: {
-      return apply(get(fun, Fixed,function), arguments, env);
-    }
-    case Subr: {
-      return get(fun, Subr,imp)(arguments, env);
-    }
-    default: {
-      oop args= arguments;
-      oop ap= arrayAt(getTail(applicators), getType(fun));
-      if (nil != ap) {						GC_PROTECT(args);
-	args= newPair(fun, args);
-	args= apply(ap, args, env);				GC_UNPROTECT(args);
-	return args;
-      }
-      fprintf(stderr, "\nerror: cannot apply: ");
-      fdumpln(stderr, fun);
-      fatal(0);
-    }
+  if (Subr == getType(fun)) return get(fun, Subr,imp)(arguments, env);
+  oop ap= arrayAt(getTail(applicators), getType(fun));
+  if (nil != ap) {
+    oop args= newPair(fun, arguments);		GC_PROTECT(args);
+    args= apply(ap, args, env);			GC_UNPROTECT(args);
+    return args;
   }
+  fprintf(stderr, "\nerror: cannot apply: ");
+  fdumpln(stderr, fun);
+  fatal(0);
   return nil;
 }
 
@@ -1866,6 +1776,38 @@ static subr(read)
   return head;
 }
 
+static subr(eval_symbol)
+{
+  oop obj= car(args);
+  oop val= assq(obj, env);
+  if (!is(Pair, val))		fatal("undefined variable: %s", is(Symbol, obj) ? get(obj, Symbol,bits) : "<non-symbol>");
+  return getTail(val);
+}
+
+static oop evlist(oop obj, oop env)
+{
+  if (!is(Pair, obj)) return obj;
+  oop head= eval(getHead(obj), env);		GC_PROTECT(head);
+  oop tail= evlist(getTail(obj), env);		GC_PROTECT(tail);
+  head= newPair(head, tail);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+  return head;
+}
+
+static subr(eval_pair)
+{
+  oop obj= car(args);
+  arrayAtPut(traceStack, traceDepth++, obj);
+  oop head= eval(getHead(obj), env);			GC_PROTECT(head);
+  if (is(Fixed, head))
+    head= apply(get(head, Fixed,function), getTail(obj), env);
+  else  {
+    oop argl= evlist(getTail(obj), env);		GC_PROTECT(argl);
+    head= apply(head, argl, env);			GC_UNPROTECT(argl);
+  }							GC_UNPROTECT(head);
+  --traceDepth;
+  return head;
+}
+
 static subr(eval)
 {
   oop x= car(args);  args= cdr(args);		GC_PROTECT(x);
@@ -1874,6 +1816,59 @@ static subr(eval)
   x= encode(x, e);
   x= eval  (x, e);				GC_UNPROTECT(x);
   return x;
+}
+
+static subr(apply_expr)
+{
+  oop fun= car(args);
+  oop arguments= cdr(args);
+  oop argl= arguments;
+  oop defn= get(fun, Expr,defn);	GC_PROTECT(defn);
+  oop formals= car(defn);
+  env= get(fun, Expr,env);		GC_PROTECT(env);
+  oop tmp= nil;				GC_PROTECT(tmp);
+  while (is(Pair, formals)) {
+    if (!is(Pair, argl)) {
+      fprintf(stderr, "\nerror: too few arguments applying ");
+      fdump(stderr, fun);
+      fprintf(stderr, " to ");
+      fdumpln(stderr, arguments);
+      fatal(0);
+    }
+    tmp= newPair(getHead(formals), getHead(argl));
+    env= newPair(tmp, env);
+    formals= getTail(formals);
+    argl= getTail(argl);
+  }
+  if (is(Symbol, formals)) {
+    tmp= newPair(formals, argl);
+    env= newPair(tmp, env);
+    argl= nil;
+  }
+  if (nil != argl) {
+    fprintf(stderr, "\nerror: too many arguments applying ");
+    fdump(stderr, fun);
+    fprintf(stderr, " to ");
+    fdumpln(stderr, arguments);
+    fatal(0);
+  }
+  oop ans= nil;
+  oop body= getTail(defn);
+  while (is(Pair, body)) {
+    ans= eval(getHead(body), env);
+    body= getTail(body);
+  }
+  GC_UNPROTECT(tmp);
+  GC_UNPROTECT(env);
+  GC_UNPROTECT(defn);
+  return ans;
+}
+
+static subr(apply_fixed)
+{
+  oop fun= car(args);
+  oop arguments= cadr(args);
+  return apply(get(fun, Fixed,function), arguments, env);
 }
 
 static subr(apply)
@@ -2194,10 +2189,16 @@ int main(int argc, char **argv)
   globals= newPair(tmp, globals);
   set(tmp, Pair,tail, globals);
 
-  expanders=   define(intern("*expanders*"),   nil, globals);
-  encoders=    define(intern("*encoders*"),    nil, globals);
-  evaluators=  define(intern("*evaluators*"),  nil, globals);
-  applicators= define(intern("*applicators*"), nil, globals);
+  tmp= newArray(32);  expanders=   define(intern("*expanders*"),   tmp, globals);
+  tmp= newArray(32);  encoders=    define(intern("*encoders*"),    tmp, globals);
+  tmp= newArray(32);  evaluators=  define(intern("*evaluators*"),  tmp, globals);
+  tmp= newArray(32);  applicators= define(intern("*applicators*"), tmp, globals);
+
+  arrayAtPut(getTail(evaluators),  Symbol, newSubr(subr_eval_symbol, "eval-symbol"));
+  arrayAtPut(getTail(evaluators),  Pair,   newSubr(subr_eval_pair,   "eval-pair"  ));
+
+  arrayAtPut(getTail(applicators), Fixed,  newSubr(subr_apply_fixed, "apply-fixed"));
+  arrayAtPut(getTail(applicators), Expr,   newSubr(subr_apply_expr,  "apply-expr" ));
 
   traceStack=  newArray(32);	GC_add_root(&traceStack);
 
