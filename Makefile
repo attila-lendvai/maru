@@ -14,7 +14,7 @@ debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1" boot-eval
 
 eval : *.l boot-eval
-	time ./boot-eval boot.l emit.l eval.l > eval.s && cc -c -o eval.o eval.s && size eval.o && gcc -m32 -o eval eval.o
+	time ./boot-eval boot.l emit.l eval.l > eval.s && gcc -m32 -c -o eval.o eval.s && size eval.o && gcc -m32 -o eval eval.o
 
 eval2 : eval .force
 	time ./eval boot.l emit.l eval.l > eval2.s
