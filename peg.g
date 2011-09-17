@@ -27,38 +27,46 @@ rparen     	= ")"  space ;
 lbrace      	= "{"  space ;
 rbrace     	= "}"  space ;
 dot       	= "."  space ;
-digit		= [0123456789] ;
-letter		= [ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz] ;
+digit		= [0-9] ;
+higit		= [0-9A-Fa-f] ;
+number		= ("-"? digit+) @$#:n space -> n ;
+letter		= [A-Z_a-z] ;
 idpart		= (letter (letter | digit)*) @$$ ;
 identifier	= idpart:id space				-> id ;
-char		= "\\"	( "t"	->  9
-			| "n"	-> 10
-			| "r"	-> 13
+
+char		= "\\"	( "t"					->  9
+			| "n"					-> 10
+			| "r"					-> 13
+			| "x" (higit higit) @$#16
+			| "u" (higit higit higit higit) @$#16
 			| .
                         )
 		| . ;
 string		= "\""  (!"\""  char)* $:s "\""  space		-> s ;
 class		= "["   (!"]"   char)* $:s "]"   space		-> s ;
 
-grammar         = symbol:name space plus                definition*:rules     -> `(grammar-extend ,name         ,@rules)
-                | symbol:name space colon symbol:parent definition*:rules     -> `(grammar-define ,name ,parent ,@rules)
-                | definition*:d space expression?:e                           -> `(grammar-eval ,d ,(car e))
+grammar         = symbol:name space plus
+                  definition*:rules space                       -> `(grammar-extend ,name                 ,@rules)
+                | symbol:name space colon symbol:parent space
+                  (lparen identifier*:fields rparen)?
+                  definition*:rules space                       -> `(grammar-define ,name ,parent ,fields ,@rules)
+                | definition*:d space expression?:e             -> `(grammar-eval ,d ,(car e))
                 ;
 
-symfirst	= [!#$%&*+-./<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
-symrest		= [!#$%&*+-./0123456789<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz|~] ;
+symfirst	= [-!#$%&*+/<=>@A-Z^_a-z|~] ;
+symrest		= [-!#$%&*+./0-9<=>?@A-Z^_a-z|~] ;
 symbol		= (symfirst symrest*) @$$ ;
-sexpr		= symbol
-		| digit+ $#
+sexpr		= ("-"? digit+) @$#
+		| symbol
 		| "?".
-		| "\""  (!"\""  char)* $:e "\""			-> e
-		| "("  sexpression*:e sspace ")"		-> e
-		| "'"  sexpression:e				-> (list 'quote e)
-		| "`"  sexpression:e				-> (list 'quasiquote e)
-		| ",@" sexpression:e				-> (list 'unquote-splicing e)
-		| ","  sexpression:e				-> (list 'unquote e)
-		| "{"  space grammar:e	( "}"			-> e
-					|			-> (error "error in grammar near: "(parser-stream-context self.source))
+		| "\""  (!"\""  char)* $:e "\""					-> e
+		| "("  sexpression*:e (space dot sexpression:f)? space ")"	-> `(,@e ,@f)
+		| "'"  sexpression:e						-> (list 'quote e)
+		| "`"  sexpression:e						-> (list 'quasiquote e)
+		| ",@" sexpression:e						-> (list 'unquote-splicing e)
+		| ","  sexpression:e						-> (list 'unquote e)
+		| "{"  space grammar:e	( "}"					-> e
+					|					-> (error "error in grammar near: "(parser-stream-context self.source))
 					)
 		| ";" (![\n\r] .)*
 		;
@@ -82,11 +90,13 @@ repetition	= atom :e ( query				-> `(match-zero-one ,e)  :e
 			  | star				-> `(match-zero-more ,e) :e
 			  | plus				-> `(match-one-more ,e)  :e
 			  )?					-> e ;
-conversion	= repetition :e ( at				-> `(make-span        ,e) :e
-				| dollarhash			-> `(make-number      ,e) :e
-				| dollardbl			-> `(make-symbol      ,e) :e
-				| dollar			-> `(make-string      ,e) :e
-				| colon identifier :i		-> `(assign-result ,i ,e) :e
+conversion	= repetition :e ( at				-> `(make-span	    ,e) :e
+				| dollarhash ( number:n		-> `(make-number ,n ,e) :e
+					     |			-> `(make-number 10 ,e) :e
+					     )
+				| dollardbl			-> `(make-symbol      ,e   ) :e
+				| dollar			-> `(make-string      ,e   ) :e
+				| colon identifier :i		-> `(assign-result ,i ,e   ) :e
 				)*				-> e ;
 predicate	= pling     conversion:e			-> `(peek-not ,e)
 		| ampersand conversion:e			-> `(peek-for ,e)
@@ -136,14 +146,15 @@ value =
 					      (or (,(concat-symbol '$ name) self)
 					      (let () (set (<parser-stream>-position self.source) pos) ())))
  | 'match-rule .:name			-> `(,(concat-symbol '$ name) self)
- | 'match-rule-in .:type .:name .+:args	-> `(let ((pos (<parser-stream>-position self.source)))
-         				      (let ()
+ | 'match-rule-in .:type .:name .+:args	-> `(let ((pos (<parser-stream>-position self.source))
+						  (_p  (parser ,(concat-symbol '< (concat-symbol type '>)) self.source)))
   					        ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
-  						(or (,(concat-symbol '$ name)
-						      (parser ,(concat-symbol '< (concat-symbol type '>)) self.source))
-						    (let () (set (<parser-stream>-position self.source) pos) ()))))
- | 'match-rule-in .:type .:name		-> `(,(concat-symbol '$ name)
-					      (parser ,(concat-symbol '< (concat-symbol type '>)) self.source))
+  						(if (,(concat-symbol '$ name) _p)
+						    (let () (set self.result (<parser>-result _p)) 1)
+						  (let () (set (<parser-stream>-position self.source) pos) ())))
+ | 'match-rule-in .:type .:name		-> `(let ((_p  (parser ,(concat-symbol '< (concat-symbol type '>)) self.source)))
+					      (and (,(concat-symbol '$ name) _p)
+						   (let () (set self.result (<parser>-result _p)) 1)))
  | 'match-first value+:exps		-> `(or ,@exps)
  | 'match-all (&(..) effect)*:e value:v	-> `(let ((pos (<parser-stream>-position self.source)))
 					      (or (and ,@e ,v) (let () (set (<parser-stream>-position self.source) pos) ())))
@@ -171,7 +182,7 @@ value =
  						(let ((ok ,exp))
  						  (set self.source src)
  						  (and ok (parser-stream-next src)))))
- | 'match-class  .:str			-> `(set self.result (parser-stream-match-class self.source ,str))
+ | 'match-class  .:str			-> `(set self.result (parser-stream-match-class self.source ,(make-class str)))
  | 'match-string .:str			-> `(set self.result (parser-stream-match-string self.source ,str))
  | 'match-object .:obj			-> `(and (= ',obj (parser-stream-peek self.source))
  					         (set self.result (parser-stream-next self.source)))
@@ -184,7 +195,7 @@ value =
  						     1)))
  | 'make-string value:exp		-> `(and ,exp (set self.result (list->string self.result)))
  | 'make-symbol value:exp		-> `(and ,exp (set self.result (string->symbol (list->string self.result))))
- | 'make-number value:exp		-> `(and ,exp (set self.result (string->number (list->string self.result))))
+ | 'make-number .:r value:exp		-> `(and ,exp (set self.result (string->number-base (list->string self.result) ,r)))
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
  | 'result-expr .:exp			-> `(let () (set self.result ,exp) 1)
  | .:op					->  (error "cannot generate value for "op)
@@ -221,14 +232,14 @@ effect =
  						(let ((ok ,exp))
  						  (set self.source src)
  						  (and ok (parser-stream-next src)))))
- | 'match-class   .:str			-> `(parser-stream-match-class  self.source ,str)
+ | 'match-class   .:str			-> `(parser-stream-match-class  self.source ,(make-class str))
  | 'match-string  .:str			-> `(parser-stream-match-string self.source ,str)
  | 'match-object  .:obj			-> `(parser-stream-match-object self.source ',obj)
  | 'match-any				-> '(parser-stream-match-any    self.source)
  | 'make-span     effect:exp		->  exp
  | 'make-string   effect:exp		->  exp
  | 'make-symbol   effect:exp		->  exp
- | 'make-number   effect:exp		->  exp
+ | 'make-number .:r effect:exp		->  exp
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
  | 'result-expr   .:exp			-> `(let () ,exp 1)
  | .:op					->  (error "cannot generate value for "op)

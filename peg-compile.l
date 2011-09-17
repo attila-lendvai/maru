@@ -16,10 +16,15 @@
 	(rname (concat-symbol '$ name)))
     (if args
      `(match-save
-        (let ()
+        (let ((_p (parser ,tname self.source)))
 	  ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
-	  (or (,rname (parser ,tname self.source)) (match-ko))))
-     `(,rname (parser ,tname self.source)))))
+	  (if (,rname _p)
+	      (let () (set self.result (<parser>-result _p)) 1)
+	    (match-ko))))
+     `(let ((_p (parser ,tname self.source)))
+	,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
+	(and (,rname _p)
+	     (let () (set self.result (<parser>-result _p)) 1))))))
 
 (define-form match-first exprs		`(or ,@exprs))
 (define-form match-all exprs		`(match-save (or (and ,@exprs) (match-ko))))
@@ -55,10 +60,9 @@
 	    (set self.source src)
 	    (and ok (parser-stream-next src))))))
 
-(define-form match-class (str)	`(set self.result (parser-stream-match-class self.source ,str)))
+(define-form match-class (str)	`(set self.result (parser-stream-match-class self.source ,(make-class str))))
 (define-form match-string (str)	`(set self.result (parser-stream-match-string self.source ,str)))
 (define-form match-object (obj)	`(and (= ',obj (parser-stream-peek self.source)) (set self.result (parser-stream-next self.source))))
-;;(define-form match-any ()	'(set self.result (parser-stream-next self.source)))
 (define-form match-any ()	'(and (!= *end* (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 1)))
 
 (define-form make-span (exp)
@@ -68,9 +72,9 @@
 	    (set self.result (list-from-to pos (<parser-stream>-position self.source)))
 	    1))))
 
-(define-form make-string (exp)	`(and ,exp (set self.result (list->string self.result))))
-(define-form make-symbol (exp)	`(and ,exp (set self.result (string->symbol (list->string self.result)))))
-(define-form make-number (exp)	`(and ,exp (set self.result (string->number (list->string self.result)))))
+(define-form make-string	(exp)		`(and ,exp (set self.result (list->string self.result))))
+(define-form make-symbol	(exp)		`(and ,exp (set self.result (string->symbol (list->string self.result)))))
+(define-form make-number	(base exp)	`(and ,exp (set self.result (string->number-base (list->string self.result) ,base))))
 
 (define-form assign-result (name exp)	`(and ,exp (let () (set ,name self.result) 1)))
 (define-form result-expr (exp)		`(let () (set self.result ,exp) 1))
