@@ -7,14 +7,14 @@ int fibs(int n)
 
 int main()
 {
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
-  printf("%d\n", fibs(33));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
+  printf("%d\n", fibs(35));
 }
