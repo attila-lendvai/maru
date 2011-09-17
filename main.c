@@ -85,9 +85,9 @@ static oop intern(char *cstr)
 
 #include "chartab.h"
 
-static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT  & chartab[c]); }
-static int isDigit(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT  & chartab[c]); }
-static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER & chartab[c]); }
+static int isPrint(int c)	{ return 0 <= c && c <= 127 && (CHAR_PRINT   & chartab[c]); }
+static int isDigit(int c)	{ return 0 <= c && c <= 127 && (CHAR_DIGIT10 & chartab[c]); }
+static int isLetter(int c)	{ return 0 <= c && c <= 127 && (CHAR_LETTER  & chartab[c]); }
 
 static oop read(FILE *fp);
 
