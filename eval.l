@@ -1389,7 +1389,8 @@
   (arity2 "oop-at" args)
   (let ((obj (get_head args))
 	(arg (get_head (get_tail args))))
-    (and (is_long arg)
+    (and obj (not (is_long obj))
+	 (is_long arg)
 	 (oop-at obj (get_long arg)))))
 
 (define-function subr_set_oop_at (args ctx)
@@ -1398,15 +1399,9 @@
 	(arg (get_head (get_tail args)))
 	(val (get_head (get_tail (get_tail args)))))
     (or (< (gc_size (get <array> _array symbols)) 8192) (fatal1 "D: symbols is wrong size %d\n" (gc_size (get <array> _array symbols))))
-    (and (is_long arg) (set-oop-at obj (get_long arg) val))
-    (or (< (gc_size (get <array> _array symbols)) 8192)
-	(let ()
-	  (printf "symbols at %p %p\n" symbols (get <array> _array symbols))
-	  (printf "obj has type %d\n" (get-type obj))
-	  (fatal2 "E: symbols is wrong size %p %d\n"
-		  obj
-		  (get_long arg)
-		  )))
+    (and obj (not (is_long obj))
+	 (is_long arg)
+	 (set-oop-at obj (get_long arg) val))
     val))
 
 (define-function subr_array_length (args ctx)
