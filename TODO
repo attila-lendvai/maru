@@ -1,3 +1,7 @@
+node args should be array not list
+
+----------------------------------------------------------------
+
 ARGUMENTS SHOULD NOT BE CONSed
 
 	push them in the caller's context
