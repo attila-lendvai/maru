@@ -467,7 +467,15 @@
   (cons  return		gen-return)
   (cons  address-of	gen-address-of)))
 
+(define *prev-source* ())
+
 (define-method gen <pair> (comp)
+  (let ((source (oop-at self 2)))
+    (and (!= *prev-source* source)
+	 (car source)
+	 (let ()
+	   (gen comp COMMENT (list (car source) " " (cdr source)))
+	   (set *prev-source* source))))
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
 	 (op    (and (variable? head) (cadr (assq (<variable>-value head) (array-at operators arity))))))
