@@ -139,10 +139,30 @@
       (let ((head (function a (car list))))
 	(cons head (with-map function a (cdr list))))))
 
+(define-function with2-map (function a b list)
+  (if (pair? list)
+      (let ((head (function a b (car list))))
+	(cons head (with2-map function a b (cdr list))))))
+
+(define-function with-map2 (function a alist blist)
+  (if (pair? alist)
+      (let ((head (function a (car alist) (car blist))))
+	(cons head (with-map2 function a (cdr alist) (cdr blist))))))
+
 (define-function map2-with (function alist blist a)
   (if (pair? alist)
       (let ((head (function (car alist) (car blist) a)))
 	(cons head (map2-with function (cdr alist) (cdr blist) a)))))
+
+(define-function map* (function . lists)
+  (if (pair? (car lists))
+      (let ((head (apply function (map car lists))))
+	(cons head (apply map* (cons function (map cdr lists)))))))
+
+(define-function inject (op value list)
+  (if (pair? list)
+      (op (car list) (inject op value (cdr list)))
+    value))
 
 (set *expanders*   (array))	(define-form define-expand (type args . body)	`(set-array-at *expanders*   ,type (lambda ,args ,@body)))
 (set *encoders*    (array))	(define-form define-encode (type args . body)	`(set-array-at *encoders*    ,type (lambda ,args ,@body)))
@@ -193,21 +213,21 @@
 (define %structure-bases	(array))
 (define %structure-derivatives	(array))
 
-(define-function inherits-from (base type)
+(define-function inherits-from (type base)
   (and type
-       (or (= base type)
-	   (inherits-from base (array-at %structure-bases type)))))
+       (or (= type base)
+	   (inherits-from (array-at %structure-bases type) base))))
 
 (define-function %typecheck (type object)
   (or (= type (type-of object))
-      (inherits-from type (type-of object))
-      (error "type check failed for field accessor: expected "type":"(array-at %type-names type)" got "(type-of object)":"(array-at %type-names (type-of object))))
+      (inherits-from (type-of object) type)
+      (error "type check failed for field accessor: expected "type" "(array-at %type-names type)" got "(type-of object)" "(array-at %type-names (type-of object))))
   object)
 
 (define-function %make-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
-			    self ; (list '%typecheck ',name self) ; self ; xxx
+			    (list '%typecheck ',name self) ; self ; xxx
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
@@ -231,7 +251,7 @@
   (let ((base (eval basis)))
     (set fields (concat-list (array-at %structure-fields base) fields))
     (let ((type   (%allocate-type name))
-	  (offset (list-length (array-at %structure-fields base)))
+;	  (offset (list-length (array-at %structure-fields base)))
 	  (size   (list-length fields)))
       (set-array-at %structure-sizes  type size)
       (set-array-at %structure-fields type fields)
@@ -250,7 +270,7 @@
 (define-structure <long>	(_bits))				(define-function long? (self) (= <long> (type-of self)))
 (define-structure <string>	(size _bits))
 (define-structure <symbol>	(_bits))
-(define-structure <pair>	(head tail))
+(define-structure <pair>	(head tail source))
 (define-structure <_array>	())
 (define-structure <array>	(size _array))
 (define-structure <expr>	(name defn ctx))			(define-function expr? (obj) (= <expr> (type-of obj)))
@@ -327,7 +347,7 @@
   (let ((method ()))
     (while (and (set type (array-at %structure-bases type))
 		(not (set method (array-at methods type)))))
-    method))
+    method)) ;; xxx THIS SHOULD COPY DOWN THE METHOD FOR PERFORMANCE xxx
 
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
@@ -455,7 +475,7 @@
       (dump arg))
     found))
 
-(if 't;;()
+(if '()
     (set *backtrace*
 	 (lambda (stack depth)
 	   (println "\n")
@@ -466,7 +486,8 @@
 		 (dump-until posn here)
 		 (print "\n")
 		 (set posn here))))
-	   (exit 1))))
+	   (exit 1)))
+  (println "; backtrace disabled"))
 
 ;;; multimethod
 
@@ -551,19 +572,30 @@
 
 ;;; conversion
 
-(define-function string->number (str)
+(define-function string->number-base (str radix)
   (let ((n 0)
 	(i 0)
-	(l (string-length str)))
-    (while (< i l)
-      (let ((c (string-at str i)))
-	(set n (+ (* 10 n)
-		  (cond
-		    ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
-		    ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
-		    (else			(- c ?0))))))
+	(l (string-length str))
+	(s 1))
+    (while (and (< i l) (= ?- (string-at str i)))
+      (set s (- s))
       (set i (+ i 1)))
-    n))
+    (while (< i l)
+      (let* ((c (string-at str i))
+	     (d (cond
+		  ((and (<= ?0 c) (<= c ?9))	      (- c ?0) )
+		  ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
+		  ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
+		  (else				      radix    ))))
+	(if (< d radix)
+	    (let ()
+	      (set n (+ (* radix n) d))
+	      (set i (+ i 1)))
+	  (set l i))))
+    (* s n)))
+
+(define-function string->number (str)
+  (string->number-base str 10))
 
 (define-function array->string (arr)
   (let* ((ind 0)
@@ -590,6 +622,39 @@
       (set idx (+ idx 1))
       (set list (cdr list)))
     str))
+
+;;; sorting and searching
+
+(define-function %partition (items at set-at left pivot right)
+  (let ((index left)
+	(value (at items pivot)))
+    (set-at items pivot (at items right))
+    (set-at items right value)
+    (for (i left right)
+      (and (< (at items i) value)
+	   (let ((item (at items i)))
+	     (set-at items i (at items index))
+	     (set-at items index item)
+	     (set index (+ index 1)))))
+    (set value (at items index))
+    (set-at items index (at items right))
+    (set-at items right value)
+    index))
+
+(define-function %sort (items at set-at left right)
+  (and (< left right)
+       (let* ((pivot (/ (+ left right) 2))
+	      (index (%partition items at set-at left pivot right)))
+	 (%sort items at set-at left (- index 1))
+	 (%sort items at set-at (+ index 1) right))))
+
+(define-function array-sort (items)
+  (%sort items array-at set-array-at 0 (- (array-length items) 1))
+  items)
+
+(define-function string-sort (items)
+  (%sort items string-at set-string-at 0 (- (string-length items) 1))
+  items)
 
 ;;; structural equality
 
