@@ -9,7 +9,7 @@ all : eval
 run : eval
 	rlwrap ./eval
 
-eval : eval.c gc.c gc.h buffer.c chartab.h
+eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c
 
 debug : .force
@@ -47,11 +47,11 @@ test-emit : eval .force
 peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
 	-rm peg.l.new
 	./eval parser.l peg-compile.l peg-boot.l > peg.l.new
-	-mv peg.l peg.l.bak
+	-mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
 	mv peg.l.new peg.l
 
 test-repl : eval peg.l .force
-	./eval parser.l peg.l peg-compile.l test-repl.l
+	./eval repl.l test-repl.l
 
 test-peg : eval peg.l .force
 	time ./eval parser.l peg.l test-peg.l > peg.n
@@ -74,9 +74,10 @@ clean : .force
 #----------------------------------------------------------------
 
 FILES = Makefile \
-	buffer.c chartab.h eval.c gc.c gc.h \
+	wcs.c buffer.c chartab.h eval.c gc.c gc.h \
 	boot.l emit.l eval.l test-emit.l \
-	parser.l peg-compile.l peg-boot.l peg.l test-peg.l test-repl.l \
+	parser.l peg-compile.l peg-compile-2.l peg-boot.l peg.l test-peg.l test-repl.l \
+	repl.l repl-2.l mpl.l sim.l \
 	peg.g
 
 NOW = $(shell date '+%Y%m%d.%H%M')
