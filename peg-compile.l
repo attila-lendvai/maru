@@ -49,8 +49,9 @@
 	    (set self.result (group->list! _list_))
 	    1))))
 
-(define-form peek-for (exp)	`(match-save (and ,exp (match-ok))))
-(define-form peek-not (exp)	`(not (peek-for ,exp)))
+(define-form peek-for  (exp)	`(match-save (and ,exp (match-ok))))
+(define-form peek-expr (exp)	exp)
+(define-form peek-not  (exp)	`(not (peek-for ,exp)))
 
 (define-form match-list (exp)
   `(and (pair? (parser-stream-peek self.source))
