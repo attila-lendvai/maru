@@ -117,12 +117,14 @@
 
 (define-method $peek <input-stream> ()
   (or self.pending
-      (set self.pending
-	   (and self.source
-		(or (getc self.source)
-		    (let ()
-		      (or (= self.source *input*) (close self.source))
-		      (set self.source ())))))))
+      (if self.source
+	  (let ((c (getc self.source)))
+	    (if c
+		(set self.pending c)
+	      (or (= self.source *input*) (close self.source))
+	      (set self.source ())
+	      (set self.pending *end*)))
+	(set self.pending *end*))))
 
 (define-method $next <input-stream> ()
   (let ((c ($peek self)))
@@ -371,7 +373,16 @@
 
 (define-function parser-stream-context (self)
   (let ((a (array)))
-    (for (i 0 32) (let ((c (parser-stream-next self))) (and (!= *end* c) (array-append a c))))
+    (while (and (<token>-tail (parser-stream-peek-token self)) (parser-stream-peek self))
+      (array-append a (parser-stream-next self)))
+    (and (> (array-length a) 0)
+	 (array-append-all a ?< ?- ?H ?E ?R ?E ? ))
+    (for (i 0 32)
+      (if (parser-stream-peek self)
+	  (array-append a (parser-stream-next self))
+	(array-append-all a ?< ?E ?O ?F ?>)
+	(set i 999)))
+    (println a)
     (array->string a)))
 
 ;;;----------------
