@@ -2,6 +2,8 @@
 
 (define *end* (new <*end-of-stream-marker*>))
 
+(define-method do-print <*end-of-stream-marker*> () (print "<*end-of-stream-marker*>"))
+
 (define-selector $at-end)
 (define-selector $peek)
 (define-selector $next)
@@ -373,16 +375,16 @@
 
 (define-function parser-stream-context (self)
   (let ((a (array)))
-    (while (and (<token>-tail (parser-stream-peek-token self)) (parser-stream-peek self))
+    (while (and (<token>-tail (parser-stream-peek-token self)) (!= *end* (parser-stream-peek self)))
       (array-append a (parser-stream-next self)))
     (and (> (array-length a) 0)
-	 (array-append-all a ?< ?- ?H ?E ?R ?E ? ))
+	 (string-do c "[31;1m<!>[30;0m" (array-append a c)))
     (for (i 0 32)
-      (if (parser-stream-peek self)
-	  (array-append a (parser-stream-next self))
-	(array-append-all a ?< ?E ?O ?F ?>)
-	(set i 999)))
-    (println a)
+	 (if (!= *end* (parser-stream-peek self))
+	     (array-append a (parser-stream-next self))
+	   (string-do c "[34;1m<EOF>[30;0m" (array-append a c))
+	   (set i 999)))
+    ;;(array-do x a (println x))
     (array->string a)))
 
 ;;;----------------
