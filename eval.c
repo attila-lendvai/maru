@@ -1,4 +1,4 @@
-// last edited: 2011-09-17 05:01:53 by piumarta on emilia
+// last edited: 2011-09-28 03:13:06 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1985,7 +1985,7 @@ int main(int argc, char **argv)
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
-      wchar_t *name= mbs2wcs(ptr->name + 1);
+      wchar_t *name= wcsdup(mbs2wcs(ptr->name + 1));
       tmp= newSubr(ptr->imp, name);
       if ('.' == ptr->name[0]) tmp= newFixed(tmp);
       define(get(globals, Variable,value), intern(name), tmp);
