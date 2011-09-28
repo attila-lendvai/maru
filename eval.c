@@ -1,4 +1,4 @@
-// last edited: 2011-09-28 03:13:06 by piumarta on emilia
+// last edited: 2011-09-28 10:58:46 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <wchar.h>
 #include <locale.h>
+#include <math.h>
 
 extern int isatty(int);
 
@@ -28,28 +29,30 @@ typedef oop (*imp_t)(oop args, oop env);
 
 #define nil ((oop)0)
 
-enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
+enum { Undefined, Long, Double, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
 
 #if (TAG_INT)
   struct Long	{};
 #else
-  struct Long	{ long  bits; };
+  struct Long	{ long	   bits; };
 #endif
 
-struct String	{ oop   size;  wchar_t *bits; };	/* bits is in managed memory */
+struct Double	{ double   bits; };
+struct String	{ oop      size;  wchar_t *bits; };	/* bits is in managed memory */
 struct Symbol	{ wchar_t *bits; };
-struct Pair	{ oop 	head, tail, source; };
-struct Array	{ oop   size, _array; };
-struct Expr	{ oop 	name, defn, ctx; };
-struct Form	{ oop 	function, symbol; };
-struct Fixed	{ oop   function; };
-struct Subr	{ imp_t imp;  wchar_t *name; };
-struct Variable	{ oop 	name, value, env, index; };
-struct Env	{ oop 	parent, level, offset, bindings, stable; };
-struct Context	{ oop 	home, env, bindings, callee; };
+struct Pair	{ oop 	   head, tail, source; };
+struct Array	{ oop      size, _array; };
+struct Expr	{ oop 	   name, defn, ctx; };
+struct Form	{ oop 	   function, symbol; };
+struct Fixed	{ oop      function; };
+struct Subr	{ imp_t    imp;  wchar_t *name; };
+struct Variable	{ oop 	   name, value, env, index; };
+struct Env	{ oop 	   parent, level, offset, bindings, stable; };
+struct Context	{ oop 	   home, env, bindings, callee; };
 
 union Object {
   struct Long		Long;
+  struct Double		Double;
   struct String		String;
   struct Symbol		Symbol;
   struct Pair		Pair;
@@ -130,6 +133,15 @@ static int opt_b= 0, opt_v= 0;
   static oop newLong(long bits)		{ oop obj= newBits(Long);  set(obj, Long,bits, bits);  return obj; }
 # define     getLong(X)			get((X), Long,bits)
 #endif
+
+static void   setDouble(oop obj, double bits)	{		memcpy(&obj->Double.bits, &bits, sizeof(bits)); }
+static double getDouble(oop obj)		{ double bits;  memcpy(&bits, &obj->Double.bits, sizeof(bits));  return bits; }
+
+#define isDouble(X)			is(Double, (X))
+
+static inline int isNumeric(oop obj)	{ return isLong(obj) || isDouble(obj); }
+
+static oop newDouble(double bits)	{ oop obj= newBits(Double);  setDouble(obj, bits);  return obj; }
 
 static oop _newString(size_t len)
 {
@@ -633,6 +645,29 @@ static oop read(FILE *fp)
 	  buffer_append(&buf, c);
 	  c= getwc(fp);
 	} while (isDigit10(c));
+	if (('.' == c) || ('e' == c)) {
+	    if ('.' == c) {
+		do {
+		    buffer_append(&buf, c);
+		    c= getwc(fp);
+		} while (isDigit10(c));
+	    }
+	    if ('e' == c) {
+		buffer_append(&buf, c);
+		c= getwc(fp);
+		if ('-' == c) {
+		    buffer_append(&buf, c);
+		    c= getwc(fp);
+		}
+		while (isDigit10(c)) {
+		    buffer_append(&buf, c);
+		    c= getwc(fp);
+		}
+	    }
+	    ungetwc(c, fp);
+	    oop obj=  newDouble(wcstod(buffer_contents(&buf), 0));
+	    return obj;
+	}
 	if (('x' == c) && (1 == buf.position))
 	  do {
 	    buffer_append(&buf, c);
@@ -704,6 +739,7 @@ static void doprint(FILE *stream, oop obj, int storing)
   switch (getType(obj)) {
     case Undefined:	fprintf(stream, "UNDEFINED");		break;
     case Long:		fprintf(stream, "%ld", getLong(obj));	break;
+    case Double:	fprintf(stream, "%lf", getDouble(obj));	break;
     case String: {
       if (!storing)
 	fprintf(stream, "%ls", get(obj, String,bits));
@@ -1063,6 +1099,7 @@ static oop eval(oop obj, oop ctx)
   switch (getType(obj)) {
     case Undefined:
     case Long:
+    case Double:
     case String: {
       return obj;
     }
@@ -1337,7 +1374,7 @@ static subr(definedP)
     arity1(args, #OP);								\
     oop rhs= getHead(args);							\
     if isLong(rhs) return newLong(OP getLong(rhs));				\
-    fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
+    fprintf(stderr, "%s: non-integer argument: ", #OP);				\
     fdumpln(stderr, rhs);							\
     fatal(0);									\
     return nil;									\
@@ -1347,8 +1384,7 @@ _do_unary()
 
 #undef _do
 
-#define _do_binary()									\
-  _do(add,     +)  _do(mul,     *)  _do(div,     /)  _do(mod,  %)			\
+#define _do_ibinary()								\
   _do(bitand,  &)  _do(bitor,   |)  _do(bitxor,  ^)  _do(shl, <<)  _do(shr, >>)
 
 #define _do(NAME, OP)								\
@@ -1359,11 +1395,39 @@ _do_unary()
     oop rhs= getHead(getTail(args));						\
     if (isLong(lhs) && isLong(rhs))						\
       return newLong(getLong(lhs) OP getLong(rhs));				\
-    fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
+    fprintf(stderr, "%s: non-integer argument: ", #OP);				\
     if (!isLong(lhs))	fdumpln(stderr, lhs);					\
     else		fdumpln(stderr, rhs);					\
     fatal(0);									\
     return nil;									\
+    }
+
+_do_ibinary()
+
+#undef _do
+
+#define _do_binary()								\
+  _do(add,     +)  _do(mul,     *)  _do(div,     /)
+
+#define _do(NAME, OP)										\
+    static subr(NAME)										\
+    {												\
+	arity2(args, #OP);									\
+	oop lhs= getHead(args);									\
+	oop rhs= getHead(getTail(args));							\
+	if (isLong(lhs)) {									\
+	    if (isLong(rhs))	return newLong(getLong(lhs) OP getLong(rhs));			\
+	    if (isDouble(rhs))	return newDouble((double)getLong(lhs) OP getDouble(rhs));	\
+	}											\
+	else if (isDouble(lhs)) {								\
+	    if (isDouble(rhs))	return newDouble(getDouble(lhs) OP getDouble(rhs));		\
+	    if (isLong(rhs))	return newDouble(getDouble(lhs) OP (double)getLong(rhs));	\
+	}											\
+	fprintf(stderr, "%s: non-numeric argument: ", #OP);					\
+	if (!isNumeric(lhs))	fdumpln(stderr, lhs);						\
+	else			fdumpln(stderr, rhs);						\
+	fatal(0);										\
+	return nil;										\
     }
 
 _do_binary()
@@ -1372,62 +1436,118 @@ _do_binary()
 
 static subr(sub)
 {
-  if (!is(Pair, args)) arity(args, "-");
-  oop lhs= getHead(args);  args= getTail(args);
-  if (!is(Pair, args)) return newLong(- getLong(lhs));
-  oop rhs= getHead(args);  args= getTail(args);
-  if (is(Pair, args)) arity(args, "-");
-  return newLong(getLong(lhs) - getLong(rhs));
+    if (!is(Pair, args)) arity(args, "-");
+    oop lhs= getHead(args);  args= getTail(args);
+    if (!is(Pair, args)) {
+	if (isLong  (lhs))	return newLong  (- getLong  (lhs));
+	if (isDouble(lhs))	return newDouble(- getDouble(lhs));
+	fprintf(stderr, "-: non-numeric argument: ");
+	fdumpln(stderr, lhs);
+	fatal(0);
+    }
+    oop rhs= getHead(args);  args= getTail(args);
+    if (is(Pair, args)) arity(args, "-");
+    if (isLong(lhs)) {
+	if (isLong(rhs))	return newLong(getLong(lhs) - getLong(rhs));
+	if (isDouble(rhs))	return newDouble((double)getLong(lhs) - getDouble(rhs));
+    }
+    if (isDouble(lhs)) {
+	if (isDouble(rhs))	return newDouble(getDouble(lhs) - getDouble(rhs));
+	if (isLong(rhs))	return newDouble(getDouble(lhs) - (double)getLong(rhs));
+	lhs= rhs; // for error msg
+    }
+    fprintf(stderr, "-: non-numeric argument: ");
+    fdumpln(stderr, lhs);
+    fatal(0);
+    return nil;
+}
+
+static subr(mod)
+{
+    if (!is(Pair, args)) arity(args, "%");
+    oop lhs= getHead(args);  args= getTail(args);
+    if (!is(Pair, args)) arity(args, "%");
+    oop rhs= getHead(args);  args= getTail(args);
+    if (is(Pair, args)) arity(args, "%");
+    if (isLong(lhs)) {
+	if (isLong(rhs))	return newLong(getLong(lhs) % getLong(rhs));
+	if (isDouble(rhs))	return newDouble(fmod((double)getLong(lhs), getDouble(rhs)));
+    }
+    else if (isDouble(lhs)) {
+	if (isDouble(rhs))	return newDouble(fmod(getDouble(lhs), getDouble(rhs)));
+	if (isLong(rhs))	return newDouble(fmod(getDouble(lhs), (double)getLong(rhs)));
+    }
+    fprintf(stderr, "%%: non-numeric argument: ");
+    if (!isNumeric(lhs))	fdumpln(stderr, lhs);
+    else			fdumpln(stderr, rhs);
+    fatal(0);
+    return nil;
 }
 
 #define _do_relation()									\
   _do(lt,   <)  _do(le,  <=)  _do(ge,  >=)  _do(gt,   >)
 
-#define _do(NAME, OP)								\
-  static subr(NAME)								\
-  {										\
-    arity2(args, #OP);								\
-    oop lhs= getHead(args);							\
-    oop rhs= getHead(getTail(args));						\
-    if (isLong(lhs) && isLong(rhs))						\
-      return newBool(getLong(lhs) OP getLong(rhs));				\
-    fprintf(stderr, "%s: non-numeric argument: ", #OP);				\
-    if (!isLong(lhs))	fdumpln(stderr, lhs);					\
-    else		fdumpln(stderr, rhs);					\
-    fatal(0);									\
-    return nil;									\
-  }
+#define _do(NAME, OP)										\
+    static subr(NAME)										\
+    {												\
+	arity2(args, #OP);									\
+	oop lhs= getHead(args);									\
+	oop rhs= getHead(getTail(args));							\
+	if (isLong(lhs)) {									\
+	    if (isLong(rhs))	return newBool(getLong(lhs) OP getLong(rhs));			\
+	    if (isDouble(rhs))	return newBool((double)getLong(lhs) OP getDouble(rhs));		\
+	}											\
+	else if (isDouble(lhs)) {								\
+	    if (isDouble(rhs))	return newBool(getDouble(lhs) OP getDouble(rhs));		\
+	    if (isLong(rhs))	return newBool(getDouble(lhs) OP (double)getLong(rhs));		\
+	    rhs= lhs;										\
+	}											\
+	fprintf(stderr, "%s: non-numeric argument: ", #OP);					\
+	fdumpln(stderr, lhs);									\
+	fatal(0);										\
+	return nil;										\
+    }
 
 _do_relation()
 
 #undef _do
 
+static int equal(oop lhs, oop rhs)
+{
+    int ans= 0;
+    switch (getType(lhs)) {
+	case Long:
+	    switch (getType(rhs)) {
+		case Long:	ans= (        getLong  (lhs) ==         getLong  (rhs));	break;
+		case Double:	ans= ((double)getLong  (lhs) ==         getDouble(rhs));	break;
+	    }
+	    break;
+	case Double:
+	    switch (getType(rhs)) {
+		case Long:	ans= (        getDouble(lhs) == (double)getLong  (rhs));	break;
+		case Double:	ans= (        getDouble(lhs) ==         getDouble(rhs));	break;
+	    }
+	    break;
+	case String:		ans= (is(String, rhs) 	&& !wcscmp(get(lhs, String,bits), get(rhs, String,bits)));	break;
+	default:		ans= (lhs == rhs);									break;
+    }
+    return ans;
+}
+
 static subr(eq)
 {
-  arity2(args, "=");
-  oop lhs= getHead(args);							\
-  oop rhs= getHead(getTail(args));						\
-  int ans= 0;
-  switch (getType(lhs)) {
-    case Long:		ans= (isLong(rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
-    case String:	ans= (is(String, rhs) 	&& !wcscmp(get(lhs, String,bits), get(rhs, String,bits)));	break;
-    default:		ans= (lhs == rhs);									break;
-  }
-  return newBool(ans);
+    arity2(args, "=");
+    oop lhs= getHead(args);
+    oop rhs= getHead(getTail(args));
+    return newBool(equal(lhs, rhs));
 }
 
 static subr(ne)
 {
-  arity2(args, "!=");
-  oop lhs= getHead(args);							\
-  oop rhs= getHead(getTail(args));						\
-  int ans= 0;
-  switch (getType(lhs)) {
-    case Long:		ans= (isLong(rhs)	&& (getLong(lhs) == getLong(rhs)));				break;
-    case String:	ans= (is(String, rhs) 	&& !wcscmp(get(lhs, String,bits), get(rhs, String,bits)));	break;
-    default:		ans= (lhs == rhs);									break;
-  }
-  return newBool(!ans);
+    arity2(args, "!=");
+    oop lhs= getHead(args);
+    oop rhs= getHead(getTail(args));
+    return newBool(!equal(lhs, rhs));
 }
 
 static subr(exit)
@@ -1579,6 +1699,7 @@ static subr(format)
   switch (getType(oarg)) {
     case Undefined:						break;
     case Long:		arg= (void *)getLong(oarg);		break;
+	//case Double:	arg= (void *)getDouble(oarg);		break;
     case String:	arg= (void *)get(oarg, String,bits);	break;
     case Symbol:	arg= (void *)get(oarg, Symbol,bits);	break;
     default:		arg= (void *)oarg;			break;
@@ -1704,11 +1825,16 @@ static subr(set_string_at)
   oop arg= getHead(getTail(args));		if (!isLong(arg)) { fprintf(stderr, "set-string-at: non-integer index: ");  fdumpln(stderr, arg);  fatal(0); }
   oop val= getHead(getTail(getTail(args)));	if (!isLong(val)) { fprintf(stderr, "set-string-at: non-integer value: ");  fdumpln(stderr, val);  fatal(0); }
   int idx= getLong(arg);
-  if (0 <= idx && idx < stringLength(arr)) {
-    get(arr, String,bits)[idx]= getLong(val);
-    return val;
+  if (idx < 0) return nil;
+  int len= stringLength(arr);
+  if (len <= idx) {
+    if (len < 2) len= 2;
+    while (len <= idx) len *= 2;
+    set(arr, String,bits, (wchar_t *)GC_realloc(get(arr, String,bits), sizeof(wchar_t) * (len + 1)));
+    set(arr, String,size, newLong(len));
   }
-  return nil;
+  get(arr, String,bits)[idx]= getLong(val);
+  return val;
 }
 
 static subr(string_symbol)
@@ -1923,7 +2049,7 @@ int main(int argc, char **argv)
   currentSource= newPair(nil, nil);	GC_add_root(&currentSource);
 
 #define _do(NAME, OP)	tmp= newSubr(subr_##NAME, WIDEN(#OP));  define(get(globals, Variable,value), intern(WIDEN(#OP)), tmp);
-  _do_unary();  _do_binary();  _do(sub, -);  _do_relation();  _do(eq, =);  _do(ne, !=);
+  _do_unary();  _do_ibinary();  _do_binary();  _do(sub, -);  _do(mod, %);  _do_relation();  _do(eq, =);  _do(ne, !=);
 #undef _do
 
   {
