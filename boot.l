@@ -213,6 +213,9 @@
 (define %structure-bases	(array))
 (define %structure-derivatives	(array))
 
+(define-function fields-of-type (type)
+  (array-at %structure-fields type))
+
 (define-function inherits-from (type base)
   (and type
        (or (= type base)
@@ -268,6 +271,7 @@
 
 (define-structure <undefined>	())
 (define-structure <long>	(_bits))				(define-function long? (self) (= <long> (type-of self)))
+(define-structure <float>	(_bits))				(define-function float? (self) (= <float> (type-of self)))
 (define-structure <string>	(size _bits))
 (define-structure <symbol>	(_bits))
 (define-structure <pair>	(head tail source))
@@ -569,6 +573,18 @@
      (while _list_
        (let ((,var (car _list_))) ,@body)
        (set _list_ (cdr _list_)))))
+
+(define-function %generic-do (get len var col body)
+  `(let* ((_col_ ,col)
+	  (_idx_ 0)
+	  (_end_ (,len _col_)))
+     (while (< _idx_ _end_)
+       (let ((,var (,get _col_ _idx_))) ,@body)
+       (set _idx_ (+ _idx_ 1)))))
+
+(define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
+
+(define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
 
 ;;; conversion
 
