@@ -564,7 +564,7 @@ Array testFFT
     self graphFrom: -2 to: 2 labeled: ''.
     self fftForwardRealPower.
     '\ncorrelated power spectrum:\n' println.
-    self from: 0 to: isize // 2 graphFrom: 0 to: 1.2 by: [:x :l :h | x > l] labeled: ' \u0192s/2N Hz'.
+    self from: 0 to: isize // 2 graphFrom: 0 to: 1.2 by: [:x :l :h | x > l] labeled: ' \u0192s/N Hz'.
 ]
 
 Array testFFT.
