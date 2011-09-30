@@ -125,9 +125,12 @@
   (set-array-at arr (array-length arr) val))
 
 (define-function map (function list)
-  (if (pair? list)
-      (let ((head (function (car list))))
-	(cons head (map function (cdr list))))))
+  (let ((head (cons)))
+    (let ((tail head))
+      (while (pair? list)
+	(set tail (set (cdr tail) (cons (function (car list)) ())))
+	(set list (cdr list))))
+    (cdr head)))
 
 (define-function map-with (function list a)
   (if (pair? list)
@@ -271,7 +274,7 @@
 
 (define-structure <undefined>	())
 (define-structure <long>	(_bits))				(define-function long? (self) (= <long> (type-of self)))
-(define-structure <float>	(_bits))				(define-function float? (self) (= <float> (type-of self)))
+(define-structure <double>	(_bits))				(define-function double? (self) (= <double> (type-of self)))
 (define-structure <string>	(size _bits))
 (define-structure <symbol>	(_bits))
 (define-structure <pair>	(head tail source))
