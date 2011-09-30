@@ -1,4 +1,4 @@
-// last edited: 2011-09-28 10:58:46 by piumarta on emilia
+// last edited: 2011-09-30 00:28:59 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -1496,11 +1496,12 @@ static subr(mod)
 	if (isLong(lhs)) {									\
 	    if (isLong(rhs))	return newBool(getLong(lhs) OP getLong(rhs));			\
 	    if (isDouble(rhs))	return newBool((double)getLong(lhs) OP getDouble(rhs));		\
+            lhs= rhs;										\
 	}											\
 	else if (isDouble(lhs)) {								\
 	    if (isDouble(rhs))	return newBool(getDouble(lhs) OP getDouble(rhs));		\
 	    if (isLong(rhs))	return newBool(getDouble(lhs) OP (double)getLong(rhs));		\
-	    rhs= lhs;										\
+	    lhs= rhs;										\
 	}											\
 	fprintf(stderr, "%s: non-numeric argument: ", #OP);					\
 	fdumpln(stderr, lhs);									\
@@ -1849,12 +1850,44 @@ static subr(symbol_string)
   return newString(get(arg, Symbol,bits));
 }
 
+static subr(long_double)
+{
+  oop arg= car(args);				if (is(Double, arg)) return arg;  if (!isLong(arg)) return nil;
+  return newDouble(getLong(arg));
+}
+
 static subr(long_string)
 {
   oop arg= car(args);				if (is(String, arg)) return arg;  if (!isLong(arg)) return nil;
   wchar_t buf[32];
   swprintf(buf, 32, L"%ld", getLong(arg));
   return newString(buf);
+}
+
+static subr(string_long)
+{
+    oop arg= car(args);				if (isLong(arg)) return arg;  if (!is(String, arg)) return nil;
+    return newLong(wcstol(get(arg, String,bits), 0, 0));
+}
+
+static subr(double_long)
+{
+  oop arg= car(args);				if (isLong(arg)) return arg;  if (!isDouble(arg)) return nil;
+  return newLong(getDouble(arg));
+}
+
+static subr(double_string)
+{
+    oop arg= car(args);				if (is(String, arg)) return arg;  if (!isDouble(arg)) return nil;
+    wchar_t buf[32];
+    swprintf(buf, 32, L"%f", getDouble(arg));
+    return newString(buf);
+}
+
+static subr(string_double)
+{
+    oop arg= car(args);				if (is(Double, arg)) return arg;  if (!is(String, arg)) return nil;
+    return newDouble(wcstod(get(arg, String,bits), 0));
 }
 
 static subr(array)
@@ -1930,6 +1963,48 @@ static subr(verbose)
   oop obj= getHead(args);
   if (isLong(obj)) opt_v= getLong(obj);
   return obj;
+}
+
+static subr(sin)
+{
+  oop obj= getHead(args);
+  double arg= 0.0;
+  if	  (isDouble(obj)) arg=         getDouble(obj);
+  else if (isLong  (obj)) arg= (double)getLong  (obj);
+  else {
+    fprintf(stderr, "sin: non-numeric argument: ");
+    fdumpln(stderr, obj);
+    fatal(0);
+  }
+  return newDouble(sin(arg));
+}
+
+static subr(cos)
+{
+  oop obj= getHead(args);
+  double arg= 0.0;
+  if	  (isDouble(obj)) arg=         getDouble(obj);
+  else if (isLong  (obj)) arg= (double)getLong  (obj);
+  else {
+    fprintf(stderr, "cos: non-numeric argument: ");
+    fdumpln(stderr, obj);
+    fatal(0);
+  }
+  return newDouble(cos(arg));
+}
+
+static subr(log)
+{
+  oop obj= getHead(args);
+  double arg= 0.0;
+  if	  (isDouble(obj)) arg=         getDouble(obj);
+  else if (isLong  (obj)) arg= (double)getLong  (obj);
+  else {
+    fprintf(stderr, "log: non-numeric argument: ");
+    fdumpln(stderr, obj);
+    fatal(0);
+  }
+  return newDouble(log(arg));
 }
 
 #undef subr
@@ -2097,7 +2172,12 @@ int main(int argc, char **argv)
       { " set-string-at",  subr_set_string_at },
       { " symbol->string", subr_symbol_string },
       { " string->symbol", subr_string_symbol },
+      { " long->double",   subr_long_double },
       { " long->string",   subr_long_string },
+      { " string->long",   subr_string_long },
+      { " double->long",   subr_double_long },
+      { " double->string", subr_double_string },
+      { " string->double", subr_string_double },
       { " array",	   subr_array },
       { " array?",	   subr_arrayP },
       { " array-length",   subr_array_length },
@@ -2108,6 +2188,9 @@ int main(int argc, char **argv)
       { " set-oop-at",	   subr_set_oop_at },
       { " not",		   subr_not },
       { " verbose",	   subr_verbose },
+      { " sin",		   subr_sin },
+      { " cos",		   subr_cos },
+      { " log",		   subr_log },
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
