@@ -53,8 +53,8 @@ grammar         = symbol:name space plus
                 | definition*:d space expression?:e             -> `(grammar-eval ,d ,(car e))
                 ;
 
-symfirst	= [-!#$%&*+/<=>@A-Z^_a-z|~] ;
-symrest		= [-!#$%&*+./0-9<=>?@A-Z^_a-z|~] ;
+symfirst	= [-!#$%&*+/:<=>@A-Z^_a-z|~] ;
+symrest		= [-!#$%&*+./:0-9<=>?@A-Z^_a-z|~] ;
 symbol		= (symfirst symrest*) @$$ ;
 sexpr		= ("-"? digit+) @$#
 		| symbol
