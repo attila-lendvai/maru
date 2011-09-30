@@ -3,7 +3,7 @@
 
 (define-function peval (expr) (println "### "expr) (eval expr))
 
-(define-function load (name) (map eval (read name)))
+(define-function load (name) (list-do expr (read name) (eval expr)))
 
 (load "parser.l")
 (load "peg-compile.l")
@@ -43,7 +43,7 @@
 	     (and prompt (print prompt))
 	     ($sexpression p))
       (set v (<parser>-result p))
-      ;;;(println "*** " v)
+      ;;(println "*** " v)
       (set v (eval v))
       ;;(println " => "v)
       )
