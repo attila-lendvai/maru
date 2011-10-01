@@ -63,13 +63,13 @@
        (cons `(set-oop-at self ,index ,(car args))
 	      (make-inits (cdr args) (+ index 1)))))
 
-(define-function define-sysclass (old name base)
-  (println "subclass "name" "base" ()")
+(define-function define-sysclass (field name base)
+  (println "subclass "name" "base" ("field")")
   (let ((type  (type-name name))
 	(super (type-name base)))
-    (pval `(define ,type ,old))
-    (pval `(set-array-at %structure-bases ,old ,super))
-    (pval `(set-array-at %type-names ,old ',type))
+    (pval `(define ,type ,field))
+    (pval `(set-array-at %structure-bases ,field ,super))
+    (pval `(set-array-at %type-names ,field ',type))
     (pval `(define ,name (new ,type)))))
 
 {
