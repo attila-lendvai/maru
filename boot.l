@@ -250,8 +250,12 @@
        ,@(%make-accessors name fields)
        ,type)))
 
-(define-function new (type)
-  (allocate type (array-at %structure-sizes type)))
+(define-form new (type . inits)
+  (let ((i -1))
+    `(let* ((_type_ ,type)
+	    (_self_ (allocate _type_ (array-at %structure-sizes _type_))))
+       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+       _self_)))
 
 (define-form define-class (name basis fields)
   (let ((base (eval basis)))
@@ -589,6 +593,13 @@
 
 (define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
 
+(define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
+(define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
+(define-method for-each <string> (function)	(string-do _elt_ self (function _elt_)))
+
+(define-function for-each-with (collection function value)
+  (for-each collection (lambda (x) (function x value))))
+
 ;;; conversion
 
 (define-function string->number-base (str radix)
@@ -644,13 +655,13 @@
 
 ;;; sorting and searching
 
-(define-function %partition (items at set-at left pivot right)
+(define-function %partition (items at set-at compare left pivot right)
   (let ((index left)
 	(value (at items pivot)))
     (set-at items pivot (at items right))
     (set-at items right value)
     (for (i left right)
-      (and (< (at items i) value)
+      (and (compare (at items i) value)
 	   (let ((item (at items i)))
 	     (set-at items i (at items index))
 	     (set-at items index item)
@@ -660,19 +671,19 @@
     (set-at items right value)
     index))
 
-(define-function %sort (items at set-at left right)
+(define-function %sort (items at set-at compare left right)
   (and (< left right)
        (let* ((pivot (/ (+ left right) 2))
-	      (index (%partition items at set-at left pivot right)))
-	 (%sort items at set-at left (- index 1))
-	 (%sort items at set-at (+ index 1) right))))
+	      (index (%partition items at set-at compare left pivot right)))
+	 (%sort items at set-at compare left (- index 1))
+	 (%sort items at set-at compare (+ index 1) right))))
 
-(define-function array-sort (items)
-  (%sort items array-at set-array-at 0 (- (array-length items) 1))
+(define-function array-sort (items . options)
+  (%sort items array-at set-array-at (or (car options) <) 0 (- (array-length items) 1))
   items)
 
-(define-function string-sort (items)
-  (%sort items string-at set-string-at 0 (- (string-length items) 1))
+(define-function string-sort (items . options)
+  (%sort items string-at set-string-at (or (car options) <) 0 (- (string-length items) 1))
   items)
 
 ;;; structural equality
