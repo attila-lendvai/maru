@@ -1,4 +1,4 @@
-// last edited: 2011-09-30 00:28:59 by piumarta on debian.piumarta.com
+// last edited: 2011-10-03 17:42:52 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -1080,12 +1080,14 @@ static void fatal(char *reason, ...)
     while (i--) {
       printf("%3d: ", i);
       oop exp= arrayAt(traceStack, i);
-      oop src= get(exp, Pair,source);
-      if (nil != src) {
-	oop path= car(src);
-	oop line= cdr(src);
-	if (is(String, path) && is(Long, line))
-	  printf("[7m %ls %ld [0m ", get(path, String,bits), getLong(line));
+      if (is(Pair, exp)) {
+	  oop src= get(exp, Pair,source);
+	  if (nil != src) {
+	      oop path= car(src);
+	      oop line= cdr(src);
+	      if (is(String, path) && is(Long, line))
+		  printf("[7m %ls %ld [0m ", get(path, String,bits), getLong(line));
+	  }
       }
       dumpln(arrayAt(traceStack, i));
     }
