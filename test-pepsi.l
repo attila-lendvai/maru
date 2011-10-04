@@ -554,7 +554,7 @@ Pepsi statistics
     '\nPepsi methods:\n' println.
     Object withAllSubclassesDo: [:sub |
 	sub className print.
-	22 - sub className asString size timesRepeat: [' ' print].
+	24 - sub className asString size timesRepeat: [' ' print].
         sub methodNames println].
 ]
 
