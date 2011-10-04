@@ -142,6 +142,11 @@
       (let ((head (function a (car list))))
 	(cons head (with-map function a (cdr list))))))
 
+(define-function map-with2 (function list a b)
+  (if (pair? list)
+      (let ((head (function (car list) a b)))
+	(cons head (map-with2 function (cdr list) a b)))))
+
 (define-function with2-map (function a b list)
   (if (pair? list)
       (let ((head (function a b (car list))))
