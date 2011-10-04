@@ -21,7 +21,7 @@
 
 (define-form block-arity (b n)
   `(or (= (<block>-arity ,b) ,n)
-       (error "this block expects ",n" arguments")))
+       (error "this block expects ",n" argument(s)")))
 
 (define-function make-message-accessors (name fields i)
   (and (pair? fields)
@@ -32,10 +32,13 @@
   `(with-forms ,(make-message-accessors type (array-at %structure-fields (eval type)) 0)
     (let () ,@body)))
 
+(define %pepsi-methods)
+
 (define-form define-message (type selector args . body)
   (set type (type-name type))
   (set selector (concat-symbol '# selector))
   (or (defined? selector) (eval (list 'define-selector selector)))
+  (or (assq selector %pepsi-methods) (push %pepsi-methods (cons selector (eval selector))))
   `(<selector>-add-method ,selector ,type (lambda ,(cons 'self args) (with-message-accessors ,type ,@body))))
 
 (define-form send (selector receiver . args)
@@ -45,18 +48,27 @@
   ;;(println "; "x)
   (eval x))
 
+(define %pepsi-classes (array))
+(define %pepsi-topclasses)
+(define %pepsi-subclasses (array))
+
 (define-function define-topclass (name fields)
   (println "topclass "name" "fields)
   (let ((type (type-name name)))
     (pval `(define-structure ,type ,fields))
-    (pval `(define ,name (new ,type)))))
+    (pval `(define ,name (new ,type)))
+    (pval `(push %pepsi-topclasses ,name))
+    (pval `(set-array-at %pepsi-subclasses ,type (array)))
+    (pval `(set-array-at %pepsi-classes ,type ,name))))
 
 (define-function define-subclass (name base fields)
   (println "subclass "name" "base" "fields)
   (let ((type  (type-name name))
 	(super (type-name base)))
     (pval `(define-class ,type ,super ,fields))
-    (pval `(define ,name (new ,type)))))
+    (pval `(define ,name (new ,type)))
+    (pval `(push (array-at %pepsi-subclasses ,super) ,name))
+    (pval `(set-array-at %pepsi-classes ,type ,name))))
 
 (define-function make-inits (args index)
   (and (pair? args)
@@ -70,7 +82,9 @@
     (pval `(define ,type ,field))
     (pval `(set-array-at %structure-bases ,field ,super))
     (pval `(set-array-at %type-names ,field ',type))
-    (pval `(define ,name (new ,type)))))
+    (pval `(define ,name (new ,type)))
+    (pval `(push (array-at %pepsi-subclasses ,super) ,name))
+    (pval `(set-array-at %pepsi-classes ,type ,name))))
 
 {
   expected	= .:what -> (error what " expected near: "(parser-stream-context self.source)) ;
@@ -210,6 +224,7 @@ Object : ()
   UndefinedObject : Object (<undefined>)
   BlockClosure : Object (<block>)
   Symbol : Object (<symbol>)
+  MessageSelector : Object (<selector>)
   Magnitude : Object ()
     Number : Magnitude ()
       Float  : Number (<double>)
@@ -242,12 +257,11 @@ true := #true.
 Object new			{ (new (type-of self)) }
 
 Object print			{ (print self) }
-Object println			{ (println self) }
-
-Pepsi print			{ (print) }
-Pepsi println			{ (println) }
+Pepsi  newline			[ '\n' print ]
+Object println			[ self print.  Pepsi newline.  self ]
 
 Object = other			{ (= self other) }
+Object ~= other			{ (not (= self other)) }
 
 Object		not		[ false ]
 UndefinedObject not		[ true ]
@@ -283,6 +297,7 @@ UndefinedObject ifFalse: aBlock ifTrue: bBlock	[ aBlock value ]
 Magnitude <   other		[ self subclassResponsibility ]
 Magnitude =   other		[ self subclassResponsibility ]
 Magnitude <=  other		[ (other < self ) not ]
+Magnitude ~=  other		[ (self = other) not ]
 Magnitude >   other		[ (other < self )     ]
 Magnitude >=  other		[ (self  < other) not ]
 
@@ -354,6 +369,7 @@ Number to: a do: b		[ | i | i := self.  [i <= a] whileTrue: [b value: i.  i := i
 Number by: d to: a do: b	[ | i | i := self.  [i <= a] whileTrue: [b value: i.  i := i + d] ]
 Number downTo: a do: b		[ | i | i := self.  [i >= a] whileTrue: [b value: i.  i := i - 1] ]
 Number by: d downTo: a do: b	[ | i | i := self.  [i >= a] whileTrue: [b value: i.  i := i - d] ]
+Number timesRepeat: aBlock	[ [self > 0] whileTrue: [aBlock value.  self := self - 1] ]
 
 1 to: 10 do: [:i | i print].
 0.10 by: 0.01 downTo: 0.01 do: [:i | ' ' print.  i print].
@@ -394,6 +410,8 @@ String new: n			{ (string n) }
 String at: n			{ (string-at self n) }
 String at: n put: c		{ (set-string-at self n c) }
 
+Collection append: anObject	[ self subclassResponsibility ]
+
 IndexableCollection atAllPut: element
 [
     0 to: self size - 1 do: [:i | self at: i put: element]
@@ -414,6 +432,22 @@ IndexableCollection from: start to: stop do: aBlock
 IndexableCollection do: aBlock
 [
     self from: 0 to: self size - 1 do: aBlock
+]
+
+IndexableCollection do: aBlock separatedBy: bBlock
+[
+    self size > 0
+        ifTrue:
+           [aBlock value: (self at: 0).
+            self from: 1 to: self size - 1 do: [:elt | bBlock value.  aBlock value: elt]].
+]
+
+IndexableCollection select: aBlock
+[
+    | answer |
+    answer := self new: 0.
+    self do: [:e | (aBlock value: e) ifTrue: [answer append: e]].
+    answer
 ]
 
 IndexableCollection collect: aBlock
@@ -444,6 +478,85 @@ Array new: n			{ (array n) }
 Array size			{ (array-length self) }
 Array at: n			{ (array-at self n) }
 Array at: n put: e		{ (set-array-at self n e) }
+
+Array print
+[
+    '#(' print.
+    self do: [:elt | elt print] separatedBy: [' ' print].
+    ')' print.
+]
+
+Array append: e			[ self at: self size put: e ]
+
+
+ArrayedCollection copyFrom: start to: stop
+[
+    | end new newSize |
+    end := (stop < 0) ifTrue: [self size + stop] ifFalse: [stop].
+    newSize := end - start + 1.
+    new := self new: newSize.
+    start to: end do: [:i | new at: i - start put: (self at: i)].
+    new
+]
+
+Symbol asString			{ (symbol->string self) }
+String asSymbol			{ (string->symbol self) }
+
+Symbol copyFrom: start to: stop	[ (self asString copyFrom: start to: stop) asSymbol ]
+
+
+
+Object class			{ (type-of self) }
+Object typeName			{ (name-of-type (type-of self)) }
+Object className		[ self typeName copyFrom: 1 to: -2 ]
+Object subclasses		{ (list->array (array-at %pepsi-subclasses (type-of self))) }
+Object instanceVariableNames	{ (list->array (array-at %structure-fields (type-of self))) }
+
+MessageSelector allSelectors	{ (list->array (map cdr %pepsi-methods)) }
+
+MessageSelector selector	[ name ]
+MessageSelector methods		[ methods ]
+
+MessageSelector isImplementedFor: anObject
+[
+    nil ~= (methods at: anObject class)
+]
+
+Object methodNames
+[
+    (MessageSelector allSelectors select: [:m | m isImplementedFor: self]) collect: [:m | m selector]
+]
+
+Object printAllSubclasses: indent
+[
+    indent * 2 timesRepeat: [' ' print].
+    self className print.
+    ' ' print.
+    self instanceVariableNames println.
+    self subclasses do: [:sub | sub printAllSubclasses: indent + 1].
+]
+
+Object printAllSubclasses
+[
+    self printAllSubclasses: 0
+]
+
+Object withAllSubclassesDo: aBlock
+[
+    aBlock value: self.
+    self subclasses do: [:sub | sub withAllSubclassesDo: aBlock].
+]
+
+Pepsi statistics
+[
+    '\nPepsi class hierarchy:\n' println.
+    Object printAllSubclasses.
+    '\nPepsi methods:\n' println.
+    Object withAllSubclassesDo: [:sub |
+	sub className print.
+	22 - sub className asString size timesRepeat: [' ' print].
+        sub methodNames println].
+]
 
 Array fftForwardReal
 [
@@ -566,6 +679,8 @@ Array testFFT
     '\ncorrelated power spectrum:\n' println.
     self from: 0 to: isize // 2 graphFrom: 0 to: 1.2 by: [:x :l :h | x > l] labeled: ' \u0192s/N Hz'.
 ]
+
+Pepsi statistics.
 
 Array testFFT.
 
