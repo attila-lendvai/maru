@@ -35,6 +35,7 @@
 (define caddar (lambda (x) (car (cdr (cdr (car x))))))
 (define caaddr (lambda (x) (car (car (cdr (cdr x))))))
 (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
+(define cddddr (lambda (x) (cdr (cdr (cdr (cdr x))))))
 
 (define assq
   (lambda (object list)
@@ -503,7 +504,8 @@
 		 (print "\n")
 		 (set posn here))))
 	   (exit 1)))
-  (println "; backtrace disabled"))
+  ;(println "; backtrace disabled")
+  )
 
 ;;; multimethod
 
@@ -604,6 +606,8 @@
 
 (define-function for-each-with (collection function value)
   (for-each collection (lambda (x) (function x value))))
+
+(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
 
 ;;; conversion
 
