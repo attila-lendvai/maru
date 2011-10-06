@@ -83,4 +83,4 @@
 (define-function pretty-print (obj)
   (println (pretty-string obj)))
 
-(pretty-print (read "pretty-print.l"))
+;;(pretty-print (read "pretty-print.l"))
