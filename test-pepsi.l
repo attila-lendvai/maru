@@ -39,6 +39,7 @@
   (set selector (concat-symbol '# selector))
   (or (defined? selector) (eval (list 'define-selector selector)))
   (or (assq selector %pepsi-methods) (push %pepsi-methods (cons selector (eval selector))))
+  ;;; xxx BOGUS
   `(set (<expr>-name (<selector>-add-method ,selector ,type (lambda ,(cons 'self args) (with-message-accessors ,type ,@body)))) ,src))
 
 (define-form send (selector receiver . args)
