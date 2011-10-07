@@ -1,4 +1,4 @@
-// last edited: 2011-10-03 17:42:52 by piumarta on debian.piumarta.com
+// last edited: 2011-10-07 16:34:46 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -6,6 +6,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <sys/types.h>
 #include <errno.h>
 #include <wchar.h>
 #include <locale.h>
@@ -13,11 +14,16 @@
 
 extern int isatty(int);
 
-//#define	TAG_INT	0
+#define	TAG_INT	1
+//#define	LIB_GC	1
 
 #define GC_APP_HEADER	int type;
 
-#include "gc.c"
+#if (LIB_GC)
+# include "libgc.c"
+#else
+# include "gc.c"
+#endif
 #include "wcs.c"
 #include "buffer.c"
 
@@ -31,12 +37,7 @@ typedef oop (*imp_t)(oop args, oop env);
 
 enum { Undefined, Long, Double, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
 
-#if (TAG_INT)
-  struct Long	{};
-#else
-  struct Long	{ long	   bits; };
-#endif
-
+struct Long	{ long	   bits; };
 struct Double	{ double   bits; };
 struct String	{ oop      size;  wchar_t *bits; };	/* bits is in managed memory */
 struct Symbol	{ wchar_t *bits; };
@@ -48,7 +49,7 @@ struct Fixed	{ oop      function; };
 struct Subr	{ imp_t    imp;  wchar_t *name; };
 struct Variable	{ oop 	   name, value, env, index; };
 struct Env	{ oop 	   parent, level, offset, bindings, stable; };
-struct Context	{ oop 	   home, env, bindings, callee; };
+struct Context	{ oop 	   home, env, bindings, callee, pc; };
 
 union Object {
   struct Long		Long;
@@ -125,9 +126,9 @@ static oop arguments= nil, backtrace= nil, input= nil;
 static int opt_b= 0, opt_v= 0;
 
 #if (TAG_INT)
-# define     isLong(X)			((long)(X) & 1)
-# define     newLong(X)			((oop)(((X) << 1) | 1))
-# define     getLong(X)			((long)(X) >> 1)
+  static inline int  isLong(oop x)	{ return (((long)x & 1) || Long == getType(x)); }
+  static inline oop  newLong(long x)	{ if ((x ^ (x << 1)) < 0) { oop obj= newBits(Long);  set(obj, Long,bits, x);  return obj; }  return ((oop)((x << 1) | 1)); }
+  static inline long getLong(oop x)	{ if ((long)x & 1) return (long)x >> 1;  return get(x, Long,bits); }
 #else
 # define     isLong(X)			is(Long, (X))
   static oop newLong(long bits)		{ oop obj= newBits(Long);  set(obj, Long,bits, bits);  return obj; }
@@ -145,7 +146,7 @@ static oop newDouble(double bits)	{ oop obj= newBits(Double);  setDouble(obj, bi
 
 static oop _newString(size_t len)
 {
-  wchar_t *gstr= GC_malloc_atomic(sizeof(wchar_t) * (len + 1));	GC_PROTECT(gstr);	/* + 1 to ensure null terminator */
+  wchar_t *gstr= (wchar_t *)GC_malloc_atomic(sizeof(wchar_t) * (len + 1));	GC_PROTECT(gstr);	/* + 1 to ensure null terminator */
   oop       obj= newOops(String);				GC_PROTECT(obj);
   set(obj, String,size, newLong(len));				GC_UNPROTECT(obj);
   set(obj, String,bits, gstr);					GC_UNPROTECT(gstr);
@@ -215,7 +216,7 @@ static oop arrayAtPut(oop array, int index, oop val)
       if (index >= cap) {
 	while (cap <= index) cap *= 2;
 	oop oops= _newOops(_Array, sizeof(oop) * cap);
-	memcpy((oop *)oops, (oop *)elts, size * sizeof(oop));
+	memcpy((oop *)oops, (oop *)elts, sizeof(oop) * size);
 	elts= set(array, Array,_array, oops);
       }
       set(array, Array,size, newLong(index + 1));
@@ -690,7 +691,7 @@ static oop read(FILE *fp)
 	if (isLetter(c)) {
 	  static struct buffer buf= BUFFER_INITIALISER;
 	  oop obj= nil;						GC_PROTECT(obj);
-	  oop in= nil;						GC_PROTECT(in);
+	  //oop in= nil;					GC_PROTECT(in);
 	  buffer_reset(&buf);
 	  while (isLetter(c) || isDigit10(c)) {
 //	    if (('.' == c) && buf.position) {
@@ -716,7 +717,7 @@ static oop read(FILE *fp)
 //	    obj= newPair(s_in, obj);
 //	    in= getTail(in);
 //	  }
-	  GC_UNPROTECT(in);
+	  //GC_UNPROTECT(in);
 	  GC_UNPROTECT(obj);
 	  return obj;
 	}
@@ -772,6 +773,10 @@ static void doprint(FILE *stream, oop obj, int storing)
 #endif
       fprintf(stream, "(");
       for (;;) {
+	if (is(Env, getHead(obj))) {
+	  obj= getTail(obj);
+	  continue;
+	}
 	doprint(stream, getHead(obj), storing);
 	obj= getTail(obj);
 	if (!is(Pair, obj)) break;
@@ -1158,7 +1163,7 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop formals= cadr(defn);
       ctx=         newContext(get(fun, Expr,ctx), ctx, env);	GC_PROTECT(ctx);
       oop locals=  get(ctx, Context,bindings);
-      oop tmp=     nil;						GC_PROTECT(tmp);
+      //oop tmp=     nil;					GC_PROTECT(tmp);
       while (is(Pair, formals)) {
 	if (!is(Pair, args)) {
 	  fprintf(stderr, "\nerror: too few arguments applying ");
@@ -1185,10 +1190,11 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop ans= nil;
       oop body= cddr(defn);
       while (is(Pair, body)) {
+	set(ctx, Context,pc, body);
 	ans= eval(getHead(body), ctx);
 	body= getTail(body);
       }
-      GC_UNPROTECT(tmp);
+      //GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
       if (nil != get(env, Env,stable))	set(ctx, Context,callee, nil);
@@ -1375,7 +1381,7 @@ static subr(definedP)
   {										\
     arity1(args, #OP);								\
     oop rhs= getHead(args);							\
-    if isLong(rhs) return newLong(OP getLong(rhs));				\
+    if (isLong(rhs)) return newLong(OP getLong(rhs));				\
     fprintf(stderr, "%s: non-integer argument: ", #OP);				\
     fdumpln(stderr, rhs);							\
     fatal(0);									\
@@ -1840,6 +1846,22 @@ static subr(set_string_at)
   return val;
 }
 
+static subr(string_compare)
+{
+  arity2(args, "string-compare");
+  oop str= getHead(args);			if (!is(String, str)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, str);  fatal(0); }
+  oop arg= getHead(getTail(args));		if (!is(String, arg)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  return newLong(wcscmp(get(str, String,bits), get(arg, String,bits)));
+}
+
+static subr(symbol_compare)
+{
+  arity2(args, "symbol-compare");
+  oop str= getHead(args);			if (!is(Symbol, str)) { fprintf(stderr, "symbol-compare: non-symbol argument: ");  fdumpln(stderr, str);  fatal(0); }
+  oop arg= getHead(getTail(args));		if (!is(Symbol, arg)) { fprintf(stderr, "symbol-compare: non-symbol argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  return newLong(wcscmp(get(str, Symbol,bits), get(arg, Symbol,bits)));
+}
+
 static subr(string_symbol)
 {
   oop arg= car(args);				if (is(Symbol, arg)) return arg;  if (!is(String, arg)) return nil;
@@ -1875,7 +1897,7 @@ static subr(string_long)
 static subr(double_long)
 {
   oop arg= car(args);				if (isLong(arg)) return arg;  if (!isDouble(arg)) return nil;
-  return newLong(getDouble(arg));
+  return newLong((long)getDouble(arg));
 }
 
 static subr(double_string)
@@ -2040,10 +2062,12 @@ static void replFile(FILE *stream, wchar_t *path)
     }
     GC_UNPROTECT(obj);
     if (opt_v) {
+#if (!LIB_GC)
       GC_gcollect();
       printf("%ld collections, %ld objects, %ld bytes, %4.1f%% fragmentation\n",
 	     (long)GC_collections, (long)GC_count_objects(), (long)GC_count_bytes(),
 	     GC_count_fragments() * 100.0);
+#endif
     }
   }
   int c= getwc(stream);
@@ -2083,6 +2107,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Cannot set the locale.  Verify your LANG, LC_CTYPE, LC_ALL.\n");
     return 1;
   }
+
+  GC_INIT();
 
   GC_add_root(&symbols);
   GC_add_root(&globals);
@@ -2172,8 +2198,10 @@ int main(int argc, char **argv)
       { " string-length",  subr_string_length },
       { " string-at",	   subr_string_at },
       { " set-string-at",  subr_set_string_at },
+      { " string-compare", subr_string_compare },
       { " symbol->string", subr_symbol_string },
       { " string->symbol", subr_string_symbol },
+      { " symbol-compare", subr_symbol_compare },
       { " long->double",   subr_long_double },
       { " long->string",   subr_long_string },
       { " string->long",   subr_string_long },
@@ -2240,10 +2268,12 @@ int main(int argc, char **argv)
   }
 
   if (opt_v) {
+#if (!LIB_GC)
     GC_gcollect();
     printf("%ld collections, %ld objects, %ld bytes, %4.1f%% fragmentation\n",
 	   (long)GC_collections, (long)GC_count_objects(), (long)GC_count_bytes(),
 	   GC_count_fragments() * 100.0);
+#endif
   }
 
   if (!repled) {
