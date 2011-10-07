@@ -236,12 +236,23 @@
       (error "type check failed for field accessor: expected "type" "(array-at %type-names type)" got "(type-of object)" "(array-at %type-names (type-of object))))
   object)
 
-(define-function %make-accessor (name fields offset)
+(define %make-accessor) ;; forward
+
+(define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
 			    (list '%typecheck ',name self) ; self ; xxx
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
+
+(define-function %make-unsafe-accessor (name fields offset)
+  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
+		      (list 'oop-at
+			    self;(list '%typecheck ',name self) ; self ; xxx
+			    ,offset))
+		   (%make-accessor name (cdr fields) (+ 1 offset)))))
+
+(define %make-accessor %make-safe-accessor)
 
 (define-function %make-accessors (name fields)
   (%make-accessor name fields 0))
@@ -296,7 +307,7 @@
 (define-structure <subr>	(_imp _name))
 (define-structure <variable>	(name value env index))
 (define-structure <env>		(parent level offset bindings stable))
-(define-structure <context>	(home env bindings callee))
+(define-structure <context>	(home env bindings callee pc))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
@@ -382,7 +393,8 @@
 (define-function <selector>-add-method (self type method)
   (and (expr? method)
        (or (<expr>-name method)
-	   (set (<expr>-name method) (<selector>-name self))))
+	   (set (<expr>-name method)
+		(concat-symbol (array-at %type-names type) (concat-symbol '. (<selector>-name self))))))
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
@@ -504,7 +516,7 @@
 		 (print "\n")
 		 (set posn here))))
 	   (exit 1)))
-  ;(println "; backtrace disabled")
+  ;;(println "; backtrace disabled")
   )
 
 ;;; multimethod
@@ -694,6 +706,20 @@
 (define-function string-sort (items . options)
   (%sort items string-at set-string-at (or (car options) <) 0 (- (string-length items) 1))
   items)
+
+(define-function array-search (arr obj compare)
+  (let ((lo 0)
+	(hi (- (array-length arr) 1))
+	(ix ()))
+    (while (and (not ix) (<= lo hi))
+      (let* ((m (/ (+ lo hi) 2))
+	     (s (array-at arr m))
+	     (c (compare obj s)))
+	(cond
+	 ((< c 0)	(set hi (- m 1)))
+	 ((> c 0)	(set lo (+ m 1)))
+	 (else		(set ix m)))))
+    ix))
 
 ;;; structural equality
 
