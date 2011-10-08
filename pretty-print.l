@@ -81,6 +81,7 @@
     (array->string (<port>-buffer p))))
 
 (define-function pretty-print (obj)
-  (println (pretty-string obj)))
+  (println (pretty-string obj))
+  obj)
 
 ;;(pretty-print (read "pretty-print.l"))
