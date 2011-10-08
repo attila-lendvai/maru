@@ -13,7 +13,7 @@ eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c -lm
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
-	$(CC) -g $(CFLAGS) -o gceval eval.c -lm -lgc
+	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c -lm -lgc
 
 debug : .force
 	$(MAKE) OFLAGS="-O0"
