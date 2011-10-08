@@ -72,7 +72,7 @@
 (define-method do-pretty <context>	(port col)	(port-write port "<context>"))
 
 (define-function pretty-on (obj p col)
-  (and (> (<port>-column p) col) (port-put p ? ))
+  (and (>= (<port>-column p) col) (port-put p ? ))
   (do-pretty obj p col))
 
 (define-function pretty-string (obj)
