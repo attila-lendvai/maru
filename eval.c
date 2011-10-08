@@ -1,4 +1,4 @@
-// last edited: 2011-10-07 16:34:46 by piumarta on debian.piumarta.com
+// last edited: 2011-10-08 01:13:52 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -123,7 +123,7 @@ static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
 static oop arguments= nil, backtrace= nil, input= nil;
 
-static int opt_b= 0, opt_v= 0;
+static int opt_b= 0, opt_g= 0, opt_v= 0;
 
 #if (TAG_INT)
   static inline int  isLong(oop x)	{ return (((long)x & 1) || Long == getType(x)); }
@@ -996,10 +996,20 @@ static oop encode(oop expr, oop env)
       oop args= car(tail);
       env= newEnv(env, 1, 0);					GC_PROTECT(env);
       while (is(Pair, args)) {
+	if (!is(Symbol, getHead(args))) {
+	  fprintf(stderr, "\nerror: non-symbol parameter name: ");
+	  fdumpln(stderr, getHead(args));
+	  fatal(0);
+	}
 	define(env, getHead(args), nil);
 	args= getTail(args);
       }
       if (nil != args) {
+	if (!is(Symbol, args)) {
+	  fprintf(stderr, "\nerror: non-symbol parameter name: ");
+	  fdumpln(stderr, args);
+	  fatal(0);
+	}
 	define(env, args, nil);
       }
       tail= enlist(tail, env);
@@ -1082,18 +1092,25 @@ static void fatal(char *reason, ...)
   }
   else {
     int i= traceDepth;
+    int j= 12;
     while (i--) {
-      printf("%3d: ", i);
+      //printf("%3d: ", i);
       oop exp= arrayAt(traceStack, i);
+      int l= 0;
+      printf("[7m");
       if (is(Pair, exp)) {
 	  oop src= get(exp, Pair,source);
 	  if (nil != src) {
 	      oop path= car(src);
 	      oop line= cdr(src);
-	      if (is(String, path) && is(Long, line))
-		  printf("[7m %ls %ld [0m ", get(path, String,bits), getLong(line));
+	      if (is(String, path) && is(Long, line)) {
+		  l= printf(" %ls:%ld", get(path, String,bits), getLong(line));
+		  if (l >= j) j= l + 1;
+	      }
 	  }
       }
+      while (l++ < j) putchar(' ');
+      printf("[0m ");
       dumpln(arrayAt(traceStack, i));
     }
   }
@@ -1117,7 +1134,9 @@ static oop eval(oop obj, oop ctx)
 	head= apply(get(head, Fixed,function), getTail(obj), ctx);
       else  {
 	oop args= evlist(getTail(obj), ctx);		GC_PROTECT(args);
+	if (opt_g) arrayAtPut(traceStack, traceDepth++, newPair(head, args));
 	head= apply(head, args, ctx);			GC_UNPROTECT(args);
+	if (opt_g) --traceDepth;
       }							GC_UNPROTECT(head);
       --traceDepth;
       return head;
@@ -1130,13 +1149,13 @@ static oop eval(oop obj, oop ctx)
       return arrayAt(get(cx, Context,bindings), getLong(get(obj, Variable,index)));
     }
     default: {
-      arrayAtPut(traceStack, traceDepth++, obj);
+      if (opt_g) arrayAtPut(traceStack, traceDepth++, obj);
       oop ev= arrayAt(get(evaluators, Variable,value), getType(obj));
       if (nil != ev) {
 	oop args= newPair(obj, nil);			GC_PROTECT(args);
 	obj= apply(ev, args, ctx);			GC_UNPROTECT(args);
       }
-      --traceDepth;
+      if (opt_g) --traceDepth;
       return obj;
     }
   }
@@ -1189,11 +1208,14 @@ static oop apply(oop fun, oop arguments, oop ctx)
       }
       oop ans= nil;
       oop body= cddr(defn);
+      if (opt_g) arrayAtPut(traceStack, traceDepth++, body);
       while (is(Pair, body)) {
+	if (opt_g) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
 	set(ctx, Context,pc, body);
 	ans= eval(getHead(body), ctx);
 	body= getTail(body);
       }
+      if (opt_g) --traceDepth;
       //GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
@@ -1210,10 +1232,10 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop args= arguments;
       oop ap= arrayAt(get(applicators, Variable,value), getType(fun));
       if (nil != ap) {						GC_PROTECT(args);
-	arrayAtPut(traceStack, traceDepth++, fun);
+	if (opt_g) arrayAtPut(traceStack, traceDepth++, fun);
 	args= newPair(fun, args);
 	args= apply(ap, args, ctx);				GC_UNPROTECT(args);
-	--traceDepth;
+	if (opt_g) --traceDepth;
 	return args;
       }
       fprintf(stderr, "\nerror: cannot apply: ");
@@ -2257,6 +2279,7 @@ int main(int argc, char **argv)
     wchar_t *arg= get(args, String,bits);
     if 	    (!wcscmp(arg, L"-v"))	++opt_v;
     else if (!wcscmp(arg, L"-b"))	++opt_b;
+    else if (!wcscmp(arg, L"-g"))	++opt_g;
     else {
       if (!opt_b) {
 	replPath(L"boot.l");
