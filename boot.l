@@ -755,3 +755,7 @@
 (define-form define-namespace (name parent)	`(define ,name (environment ,parent)))
 
 (define-form namespace (name)			`(set *globals* ,name))
+
+;;; load/save
+
+(define-function load (name) (list-do expr (read name) (eval expr)))
