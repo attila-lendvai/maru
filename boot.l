@@ -37,6 +37,17 @@
 (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
 (define cddddr (lambda (x) (cdr (cdr (cdr (cdr x))))))
 
+(define memq
+  (lambda (object list)
+    (let ((result ()))
+      (while (pair? list)
+	(if (= object (car list))
+	    (let ()
+	      (set result list)
+	      (set list ()))
+	  (set list (cdr list))))
+      result)))
+
 (define assq
   (lambda (object list)
     (let ((result ()))
@@ -222,6 +233,13 @@
 (define %structure-bases	(array))
 (define %structure-derivatives	(array))
 
+(define-function sanity-check-structure-fields (name fields)
+  (let ((f fields))
+    (while (pair? f)
+      (and (memq (car f) (cdr f))
+	   (error "field '"(car f)"' multiply-defined in structure: "name" "fields))
+      (set f (cdr f)))))
+
 (define-function fields-of-type (type)
   (array-at %structure-fields type))
 
@@ -260,6 +278,7 @@
 (define-form define-structure (name fields)
   (let ((type (%allocate-type name))
 	(size (list-length fields)))
+    (sanity-check-structure-fields name fields)
     (set-array-at %structure-sizes  type size)
     (set-array-at %structure-fields type fields)
     `(let ()
@@ -277,6 +296,7 @@
 (define-form define-class (name basis fields)
   (let ((base (eval basis)))
     (set fields (concat-list (array-at %structure-fields base) fields))
+    (sanity-check-structure-fields name fields)
     (let ((type   (%allocate-type name))
 ;	  (offset (list-length (array-at %structure-fields base)))
 	  (size   (list-length fields)))
@@ -720,6 +740,9 @@
 	 ((> c 0)	(set lo (+ m 1)))
 	 (else		(set ix m)))))
     ix))
+
+(define-function max (a b)	(if (> a b) a b))
+(define-function min (a b)	(if (< a b) a b))
 
 ;;; structural equality
 
