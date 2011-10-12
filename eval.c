@@ -1,4 +1,4 @@
-// last edited: 2011-10-08 01:13:52 by piumarta on debian.piumarta.com
+// last edited: 2011-10-11 18:24:44 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -466,7 +466,10 @@ static oop readList(FILE *fp, int delim)
   }
 eof:;
   int c= getwc(fp);
-  if (c != delim)			fatal("EOF while reading list");
+  if (c != delim) {
+    if (c < 0) fatal("EOF while reading list");
+    fatal("mismatched delimiter: expected '%c' found '%c'", delim, c);
+  }
   GC_UNPROTECT(obj);
   GC_UNPROTECT(head);
   return head;
@@ -773,8 +776,10 @@ static void doprint(FILE *stream, oop obj, int storing)
 #endif
       fprintf(stream, "(");
       for (;;) {
+	assert(is(Pair, obj));
 	if (is(Env, getHead(obj))) {
 	  obj= getTail(obj);
+	  if (!is(Pair, obj)) break;
 	  continue;
 	}
 	doprint(stream, getHead(obj), storing);
@@ -805,6 +810,7 @@ static void doprint(FILE *stream, oop obj, int storing)
 	fprintf(stream, ".");
 	doprint(stream, get(obj, Expr,name), storing);
       }
+      fprintf(stream, "=");
       doprint(stream, cadr(get(obj, Expr,defn)), storing);
       break;
     }
@@ -869,6 +875,14 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     default: {
+      oop name= lookup(get(globals, Variable,value), intern(L"%type-names"));
+      if (is(Array, name)) {
+	name= arrayAt(name, getType(obj));
+	if (is(Symbol, name)) {
+	  printf("[34m%ls[m", get(name, Symbol,bits));
+	  break;
+	}
+      }
       fprintf(stream, "<type=%i>", getType(obj));
       break;
     }
@@ -1097,21 +1111,23 @@ static void fatal(char *reason, ...)
       //printf("%3d: ", i);
       oop exp= arrayAt(traceStack, i);
       int l= 0;
-      printf("[7m");
+      printf("[31m[?7l");
       if (is(Pair, exp)) {
 	  oop src= get(exp, Pair,source);
 	  if (nil != src) {
 	      oop path= car(src);
 	      oop line= cdr(src);
 	      if (is(String, path) && is(Long, line)) {
-		  l= printf(" %ls:%ld", get(path, String,bits), getLong(line));
-		  if (l >= j) j= l + 1;
+		  l= printf("%ls:%ld", get(path, String,bits), getLong(line));
+		  if (l >= j) j= l;
 	      }
 	  }
       }
+      if (!l) while (l < 3) l++, putchar('.');
       while (l++ < j) putchar(' ');
       printf("[0m ");
       dumpln(arrayAt(traceStack, i));
+      printf("[?7h");
     }
   }
   exit(1);
