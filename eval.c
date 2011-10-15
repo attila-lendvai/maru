@@ -1,4 +1,4 @@
-// last edited: 2011-10-14 17:04:20 by piumarta on debian.piumarta.com
+// last edited: 2011-10-15 14:02:36 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -1609,15 +1609,19 @@ static subr(ne)
     return newBool(!equal(lhs, rhs));
 }
 
+#if (!LIB_GC)
 static void profilingDisable(int);
+#endif
 
 static subr(exit)
 {
   oop n= car(args);
+#if (!LIB_GC)
   if (opt_p)
   {
       profilingDisable(1);
   }
+#endif
   exit(isLong(n) ? getLong(n) : 0);
 }
 
@@ -2152,6 +2156,8 @@ static void sigint(int signo)
   fatal("\nInterrupt");
 }
 
+#if (!LIB_GC)
+
 static int profilerCount= 0;
 
 static void sigvtalrm(int signo)
@@ -2232,6 +2238,8 @@ static void profilingDisable(int stats)
 	}
     }
 }
+
+#endif
 
 int main(int argc, char **argv)
 {
@@ -2385,14 +2393,17 @@ int main(int argc, char **argv)
 
   int repled= 0;
 
+  signal(SIGINT, sigint);
+
+#if (!LIB_GC)
   {
-      signal(SIGINT, sigint);
       struct sigaction sa;
       sa.sa_handler= sigvtalrm;
       sigemptyset(&sa.sa_mask);
       sa.sa_flags= 0;
       if (sigaction(SIGVTALRM, &sa, 0)) perror("vtalrm");
   }
+#endif
 
   while (is(Pair, get(arguments, Variable,value))) {
     oop argl= get(arguments, Variable,value);
@@ -2402,6 +2413,7 @@ int main(int argc, char **argv)
     if 	    (!wcscmp (arg, L"-v"))	{ ++opt_v; }
     else if (!wcscmp (arg, L"-b"))	{ ++opt_b; }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
+#if (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
 	opt_g= 0;
 	opt_p= wcstoul(arg + 2, 0, 0);
@@ -2418,6 +2430,7 @@ int main(int argc, char **argv)
       repled= 1;
       if (opt_p) profilingDisable(0);
     }							GC_UNPROTECT(args);
+#endif
   }
 
   if (opt_v) {
@@ -2435,7 +2448,9 @@ int main(int argc, char **argv)
     printf("\nmorituri te salutant\n");
   }
 
+#if (!LIB_GC)
   if (opt_p) profilingDisable(1);
+#endif
 
   return 0;
 }
