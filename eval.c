@@ -1,4 +1,4 @@
-// last edited: 2011-10-15 14:02:36 by piumarta on debian.piumarta.com
+// last edited: 2011-10-15 14:04:23 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -2420,17 +2420,21 @@ int main(int argc, char **argv)
 	if (!opt_p) opt_p= 1;
 	printf("profiling every %i mSec(s)\n", opt_p);
     }
+#endif
     else {
       if (!opt_b) {
 	replPath(L"boot.l");
 	opt_b= 1;
       }
+#if (!LIB_GC)
       if (opt_p) profilingEnable();
+#endif
       replPath(arg);
       repled= 1;
+#if (!LIB_GC)
       if (opt_p) profilingDisable(0);
-    }							GC_UNPROTECT(args);
 #endif
+    }							GC_UNPROTECT(args);
   }
 
   if (opt_v) {
