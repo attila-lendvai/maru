@@ -1,4 +1,4 @@
-// last edited: 2011-10-15 14:04:23 by piumarta on debian.piumarta.com
+// last edited: 2011-10-17 10:46:14 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -882,7 +882,7 @@ static void doprint(FILE *stream, oop obj, int storing)
       if (is(Array, name)) {
 	name= arrayAt(name, getType(obj));
 	if (is(Symbol, name)) {
-	  printf("[34m%ls[m", get(name, Symbol,bits));
+	  fprintf(stream, "[34m%ls[m", get(name, Symbol,bits));
 	  break;
 	}
       }
