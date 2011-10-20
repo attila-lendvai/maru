@@ -1,4 +1,4 @@
-// last edited: 2011-10-17 10:46:14 by piumarta on debian.piumarta.com
+// last edited: 2011-10-20 01:28:22 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1784,6 +1784,7 @@ static subr(format)
       free(p);
       break;
     }
+    if (n < 0 && errno == EILSEQ) return nil;
     if (n >= 0)	size= n + 1;
     else	size *= 2;
     if (!(np= realloc(p, sizeof(wchar_t) * size))) {
