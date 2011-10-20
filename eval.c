@@ -1,4 +1,4 @@
-// last edited: 2011-10-20 14:37:49 by piumarta on emilia
+// last edited: 2011-10-20 15:41:58 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1128,7 +1128,7 @@ static void fatal(char *reason, ...)
     while (i--) {
       //printf("%3d: ", i);
       oop exp= arrayAt(traceStack, i);
-      printf("[31m[?7l");
+      printf("[32m[?7l");
       int l= printSource(exp);
       if (l >= j) j= l;
       if (!l) while (l < 3) l++, putchar('.');
@@ -1191,7 +1191,8 @@ static oop evlist(oop obj, oop ctx)
   if (!is(Pair, obj)) return obj;
   oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
   oop tail= evlist(getTail(obj), ctx);		GC_PROTECT(tail);
-  head= newPairFrom(head, tail, obj);		GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+  //head= newPairFrom(head, tail, obj);		GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+  head= newPair(head, tail);		GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   return head;
 }
 
@@ -1627,7 +1628,7 @@ static subr(exit)
 
 static subr(abort)
 {
-  fatal("aborted");
+  fatal(0);
   return nil;
 }
 
