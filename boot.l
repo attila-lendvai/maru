@@ -18,7 +18,7 @@
 (set error
   (lambda args
     (set error %error)
-    (%print "\n[31merror: ")
+    (%print "\n[31;1merror: ")
     (apply print args)
     (%print "[m\n")
     (abort)))
