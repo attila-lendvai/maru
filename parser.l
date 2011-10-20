@@ -157,14 +157,23 @@
 ;(define <token>-value car)	(define set-<token>-value set-car)
 ;(define <token>-tail  cdr)	(define set-<token>-tail  set-cdr)
 
-(define-structure <token> (value tail notes))
+(define-structure <token> (value tail notes index))
 
 (define-function new-<token> () (new <token>))
 
-(define-function token (value)
+(define-function token (value index)
   (let ((self (new <token>)))
     (set (<token>-value self) value)
+    (set (<token>-index self) index)
     self))
+
+(define-method do-print <token> ()
+  (print "<token "self.index" "(format "%c" self.value))
+  (map (lambda (x)
+	 (and (symbol? (car x))
+	      (print " "(car x))))
+       self.notes)
+  (print ">"))
 
 ;(define <token> <pair>)		;(define token cons)			;(define new-<token> cons)
 ;(define <token>-value car)	(define set-<token>-value set-car)
@@ -282,7 +291,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <parser-stream> (source position))
+(define-structure <parser-stream> (source position index))
 
 ;;(define-function parser-stream (source)
 ;;  (let ((self (new <parser-stream>)))
@@ -293,7 +302,8 @@
 (define-function parser-stream (source)
   (let ((self (new <parser-stream>)))
     (set (<parser-stream>-source self)   source)
-    (set (<parser-stream>-position self) (token ($next source)))
+    (set (<parser-stream>-position self) (token ($next source) 0))
+    (set (<parser-stream>-index self) 0)
     self))
 
 (define-function parser-stream-at-end (self)
@@ -311,7 +321,7 @@
 	(let ((tail (<token>-tail here)))
 	  (set (<parser-stream>-position self)
 	       (or tail (set (<token>-tail here)
-			     (token ($next (<parser-stream>-source self))))))))
+			     (token ($next (<parser-stream>-source self)) (incr (<parser-stream>-index self) 1)))))))
     here))
 
 (define-function parser-stream-next (self)
@@ -322,7 +332,7 @@
   (set (<parser-stream>-position self) token))
 
 (define-function parser-stream-push (self value)
-  (parser-stream-push-token self (token value)))
+  (parser-stream-push-token self (token value (incr (<parser-stream>-index self)))))
 
 (define-function parser-stream-match-object (self value)
   (and (= value (parser-stream-peek self))
