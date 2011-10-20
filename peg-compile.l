@@ -1,7 +1,6 @@
 (define *outer* '(*outer*))
 (define *inner* '(*inner*))
 (define *recur* '(*recur*))
-(define *recurred* '(*recurred*))
 
 (define-structure <memo> (success result position))
 
@@ -76,19 +75,19 @@
 
 (define-form match-zero-one (exp)
   `(let ((_list_ (group)))
-     (and ,exp (group-append _list_ self.result))
+     (and ,exp (group-append _list_ self.result self.source))
      (set self.result (group->list! _list_))
      1))
 
 (define-form match-zero-more (exp)
   `(let ((_list_ (group)))
-     (while ,exp (group-append _list_ self.result))
+     (while ,exp (group-append _list_ self.result self.source))
      (set self.result (group->list! _list_))
      1))
 
 (define-form match-one-more (exp)
   `(let ((_list_ (group)))
-     (while ,exp (group-append _list_ self.result))
+     (while ,exp (group-append _list_ self.result self.source))
      (and (not (group-empty? _list_))
 	  (let ()
 	    (set self.result (group->list! _list_))
