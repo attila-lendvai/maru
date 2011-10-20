@@ -474,6 +474,7 @@
     (car args)))
 
 (define-method do-dump  <string> ()	(%dump self))
+(define-method do-dump  <array> ()	(%dump self))
 (define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
 
 (define-method do-print <pair> ()
