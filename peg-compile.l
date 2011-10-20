@@ -1,3 +1,8 @@
+(define *outer* '(*outer*))
+(define *inner* '(*inner*))
+(define *recur* '(*recur*))
+(define *recurred* '(*recurred*))
+
 (define-structure <memo> (success result position))
 
 (define-method do-print <memo> ()
@@ -12,13 +17,6 @@
     (set self.position position)))
 
 (define %cookies 0)
-
-(define-function make-cookie (prefix)
-  (string->symbol (concat-string (symbol->string prefix) (concat-string "." (long->string (incr %cookies 1))))))
-
-(define-function pcons (a b)
-  (println "CONS "a" "b)
-  (cons a b))
 
 (define-form put (where key val)	`(set ,where (cons (cons ,key ,val) ,where)))
 (define-form get (where key)		`(cdr (assq ,key ,where)))
@@ -50,16 +48,31 @@
      `(match-save
         (let ((_p (parser ,tname self.source)))
 	  ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
-	  (if (,rname _p)
-	      (let () (set self.result (<parser>-result _p)) 1)
+          (let ((_s (,rname _p)))
+	    (if _s
+		(let () (set self.result (<parser>-result _p)) _s))
 	    (match-ko))))
      `(let ((_p (parser ,tname self.source)))
 	,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
-	(and (,rname _p)
-	     (let () (set self.result (<parser>-result _p)) 1))))))
+	(let ((_s (,rname _p)))
+	  (and _s
+	       (let () (set self.result (<parser>-result _p)) _s)))))))
 
 (define-form match-first exprs		`(or ,@exprs))
-(define-form match-all exprs		`(match-save (or (and ,@exprs) (match-ko))))
+
+(define-function %match-all (exprs)
+  (if (pair? exprs)
+      `(and (let ((_s_ ,(car exprs)))
+	      ;;(println "MATCH ALL -> "_s_)
+	      (and _s_
+		   (or (= _s_ *recurred*)
+		       ,(%match-all (cdr exprs))))))
+    1))
+
+(define-form match-all exprs
+  `(match-save
+    (or ,(%match-all exprs)
+	(match-ko))))
 
 (define-form match-zero-one (exp)
   `(let ((_list_ (group)))
@@ -109,7 +122,7 @@
 (define-form make-symbol	(exp)		`(and ,exp (set self.result (string->symbol (list->string self.result)))))
 (define-form make-number	(base exp)	`(and ,exp (set self.result (string->number-base (list->string self.result) ,base))))
 
-(define-form assign-result (name exp)	`(and ,exp (let () (set ,name self.result) 1)))
+(define-form assign-result (name exp)	`(let ((_s ,exp)) (and _s (let () (set ,name self.result) _s))))
 (define-form result-expr (exp)		`(let () (set self.result ,exp) 1))
 
 (define-function peg-find-variables (tree vars)
@@ -150,10 +163,6 @@
 		 (put (<token>-notes _here_) ,qname (new <memo> success self.result (<parser-stream>-position self.source))))
 	       success)))))))
 
-(define *outer* '(*outer*))
-(define *inner* '(*inner*))
-(define *recur* '(*recur*))
-
 (define-function peg-make-definition-with-recursion (type rule)
   (let* ((name  (string->symbol (car rule)))
 	 (qname (list 'quote name)))
@@ -180,29 +189,31 @@
 								)
 							      ;;(println ,qname"\tRECUR -> DONE "_pos_" "(!= _pos_ _here_)" "(<memo>-result _memo_))
 							      (set (<memo>-position _memo_) _pos_)
-							      1)))
+							      (set (<memo>-success _memo_) *recurred*))))
 		 ((= *inner* (<memo>-success _memo_))	;;(println ,qname"\t<- INNER "_here_)
 							())
 		 ((= *recur* (<memo>-success _memo_))	(set self.result (<memo>-result _memo_))
 							;;(println ,qname"\t<- RECUR "_here_)
-							1)
+							102)
 		 (else					(and (<memo>-success _memo_)
 							     (let ()
 							       (set self.result (<memo>-result _memo_))
 							       (set (<parser-stream>-position self.source) (<memo>-position _memo_))
-							       1))))
+							       101))))
 	     (set _memo_ (new <memo> *outer*))
 	     (put (<token>-notes _here_) ,(list 'quote name) _memo_)
 	     ;;(println ,qname  "\tBEGIN  "_here_)
 	     (let ((success  ,(expand (cadr rule))))
 	       ;;(println ,qname"\tEND    "_here_" "success" "(<memo>-success _memo_)" "(<parser-stream>-position self.source)" "(<memo>-position _memo_))
 	       (and success
-		    (= (<memo>-success  _memo_) *recur*)
-		    (let ()
-		      (set self.result (<memo>-result   _memo_))
-		      ;;(set (<memo>-position _memo_) (<parser-stream>-position self.source))
-		      (set (<parser-stream>-position self.source) (<memo>-position _memo_))))
-	       success)))))))
+		    (if (= (<memo>-success  _memo_) *recur*)
+			(let ()
+			  (set (<memo>-success _memo_) 1)
+			  (set self.result (<memo>-result   _memo_))
+			  ;;(set (<memo>-position _memo_) (<parser-stream>-position self.source))
+			  (set (<parser-stream>-position self.source) (<memo>-position _memo_))
+			  *recurred*)
+		      103)))))))))
 
 (define peg-make-definition peg-make-definition-without-memo)
 
