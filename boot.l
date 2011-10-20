@@ -18,9 +18,9 @@
 (set error
   (lambda args
     (set error %error)
-    (%print "\nerror: ")
+    (%print "\n[31merror: ")
     (apply print args)
-    (%print "\n")
+    (%print "[m\n")
     (abort)))
 
 (define caar (lambda (x) (car (car x))))
