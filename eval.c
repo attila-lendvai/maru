@@ -1,4 +1,4 @@
-// last edited: 2011-10-20 01:28:22 by piumarta on emilia
+// last edited: 2011-10-20 14:37:49 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1811,7 +1811,7 @@ static subr(cons)
 {
   oop lhs= car(args);
   oop rhs= cadr(args);
-  return is(Pair, args) ? newPairFrom(lhs, rhs, args) : newPair(lhs, rhs);
+  return newPair(lhs, rhs);	// (is(Pair, rhs) ? newPairFrom(lhs, rhs, rhs) : newPair(lhs, rhs));
 }
 
 static subr(pairP)
