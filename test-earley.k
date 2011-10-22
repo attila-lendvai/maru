@@ -189,6 +189,8 @@
             (print-tree s 0 ()))
         (println "no match")))))
 
+(println "\nleft-recursive expression grammar...\n")
+
 (earley-test
   (list->array '(1 + 2 * 3))
   (list->array
@@ -197,6 +199,28 @@
       (new <production> 'S (list->array (list (nonterminal 'S) (terminal '+) (nonterminal 'M))))
       (new <production> 'S (list->array (list (nonterminal 'M))))
       (new <production> 'M (list->array (list (nonterminal 'M) (terminal '*) (nonterminal 'T))))
+      (new <production> 'M (list->array (list (nonterminal 'T))))
+      (new <production> 'T (list->array (list (terminal 0))))
+      (new <production> 'T (list->array (list (terminal 1))))
+      (new <production> 'T (list->array (list (terminal 2))))
+      (new <production> 'T (list->array (list (terminal 3))))
+      (new <production> 'T (list->array (list (terminal 4))))
+      (new <production> 'T (list->array (list (terminal 5))))
+      (new <production> 'T (list->array (list (terminal 6))))
+      (new <production> 'T (list->array (list (terminal 7))))
+      (new <production> 'T (list->array (list (terminal 8))))
+      (new <production> 'T (list->array (list (terminal 9)))))))
+
+(println "\nright-recursive expression grammar...\n")
+
+(earley-test
+  (list->array '(1 + 2 * 3))
+  (list->array
+    (list
+      (new <production> 'P (list->array (list (nonterminal 'S))))
+      (new <production> 'S (list->array (list (nonterminal 'M) (terminal '+) (nonterminal 'S))))
+      (new <production> 'S (list->array (list (nonterminal 'M))))
+      (new <production> 'M (list->array (list (nonterminal 'T) (terminal '*) (nonterminal 'M))))
       (new <production> 'M (list->array (list (nonterminal 'T))))
       (new <production> 'T (list->array (list (terminal 0))))
       (new <production> 'T (list->array (list (terminal 1))))
