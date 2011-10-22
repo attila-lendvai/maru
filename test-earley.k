@@ -101,6 +101,8 @@
     (println)
     ))
 
+;;; ----------------
+
 ;; procedure PREDICTOR((A → α•B, i), j, grammar),
 ;;     for each (B → γ) in GRAMMAR-RULES-FOR(B, grammar) do
 ;;         ADD-TO-SET((B → •γ, j), chart[ j])
@@ -160,10 +162,8 @@
 
 (define-function earley-parse (words grammar)
   (let ((chart (array)))
-    (print "input: ") (for-each words print) (println)
     (array-append (chart-at chart 0) (new <state> 0 (array-at grammar 0) 0))
-    (for (i 0 (+ 1 (array-length words)))
-      ;;(println "POSITION "i)
+    (for (i 0 (+ 1 (array-length words)))					;;(println "POSITION "i)
       (let* ((Si  (chart-at chart i))
              (idx 0))
         (while (< idx (array-length Si))
@@ -174,19 +174,22 @@
                   (scanner words chart state i))
               (completer chart state i)))
           (set idx (+ idx 1)))))
-    ;;(println "---------------- output")
-    ;;(print-chart chart)
+    chart))
+
+;;; ----------------
+
+(define-function earley-test (words grammar)
+  (print "input: ") (for-each words print) (println)
+  (let ((chart (earley-parse words grammar)))
+    ;;(println "---------------- output") (print-chart chart)
     (let ((s (array-state-for-production (array-last chart) (array-at grammar 0))))
       (if s
           (let ()
-            (println "input was matched: " s)
             (println "derivation:")
-            (print-tree s 0 ())
-            s)
-        (println "NO MATCH")
-        ()))))
+            (print-tree s 0 ()))
+        (println "no match")))))
 
-(earley-parse
+(earley-test
   (list->array '(1 + 2 * 3))
   (list->array
     (list
