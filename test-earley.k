@@ -79,7 +79,7 @@
 (define-function array-contains-state (a s)
   (let ((len (array-length a))
         (idx 0)
-	(got ()))
+        (got ()))
     (while (< idx len)
       (and (state= (array-at a idx) s)
            (set got (array-at a idx) s)
@@ -121,9 +121,9 @@
 (define-function scanner (words chart state j)                  ;;(println "SCANNER "state" "j)
   (let ((tok (<terminal>-token (next-cat state))))              ;;(println "scanning for term "tok)
     (and (= tok (array-at words j))                             ;;(println "scanning "tok" from "state)
-	 (set-state-left-down
-	   (chart-add-state chart (+ j 1) (state-advance state))
-	   state ())))                                          ;;(println "-------- scanned") (print-chart chart) (println "--------")
+         (set-state-left-down
+           (chart-add-state chart (+ j 1) (state-advance state))
+           state ())))                                          ;;(println "-------- scanned") (print-chart chart) (println "--------")
   )
 
 ;; procedure COMPLETER((B → γ•, j), k),
@@ -138,9 +138,9 @@
       (let ((Y (next-cat s)))
         (and (nonterminal? Y)
              (= X (<nonterminal>-name Y))                       ;;(println "completing "s" from "state)
-	     (set-state-left-down
-	       (chart-add-state chart k (state-advance s))
-	       s state)))))					;;(println "-------- completed") (print-chart chart) (println "--------")
+             (set-state-left-down
+               (chart-add-state chart k (state-advance s))
+               s state)))))                                     ;;(println "-------- completed") (print-chart chart) (println "--------")
   )
 
 ;; function EARLEY-PARSE(words, grammar)
@@ -181,7 +181,7 @@
           (let ()
             (println "input was matched: " s)
             (println "derivation:")
-	    (print-tree s 0 ())
+            (print-tree s 0 ())
             s)
         (println "NO MATCH")
         ()))))
