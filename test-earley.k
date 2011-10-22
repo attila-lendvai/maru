@@ -16,14 +16,32 @@
 (define-method do-print <terminal> () (print "\""self.token"\""))
 
 (define-structure <production> (name symbols))
+
 (define-method do-print <production> ()
   (print "<production "self.name" ->")
   (array-do sym self.symbols (print " " sym))
   (print ">"))
 
-(define-structure <state> (i production k))
+(define-method print-tree <production> (i)
+  (for (j 0 i) (print "  "))
+  (print self.name" ->")
+  (array-do sym self.symbols (print " " sym))
+  (println))
+
+(define-structure <state> (i production k left down))
+
 (define-method do-print <state> ()
-  (print "<state "self.i" "self.production" "self.k">"))
+  (print "<state "self.i" "self.production" "self.k))
+
+(define-method print-tree <undefined> (i p))
+
+(define-method print-tree <state> (i p)
+  (or (= p self.production)
+     (let () 
+       (print-tree self.production i)
+       (incr i)))
+  (print-tree self.left i self.production)
+  (print-tree self.down i ()))
 
 (define-function complete? (s)          (>= (<state>-i s) (array-length (<production>-symbols (<state>-production s)))))
 (define-function incomplete? (s)        (<  (<state>-i s) (array-length (<production>-symbols (<state>-production s)))))
@@ -36,6 +54,11 @@
        (= (<state>-k          a) (<state>-k          b))))
 
 (define-function state-advance (s)      (new <state> (+ (<state>-i s) 1) (<state>-production s) (<state>-k s)))
+
+(define-function set-state-left-down (s l d)
+  (set (<state>-left s) l)
+  (set (<state>-down s) d)
+  s)
 
 (define-function chart-at (chart i)
   (or (array-at chart i)
@@ -55,12 +78,14 @@
 
 (define-function array-contains-state (a s)
   (let ((len (array-length a))
-        (idx 0))
+        (idx 0)
+	(got ()))
     (while (< idx len)
       (and (state= (array-at a idx) s)
+           (set got (array-at a idx) s)
            (set idx len))
       (incr idx))
-    (> idx len)))
+    got))
 
 (define-function chart-add-state (chart i prod)
   (let ((a (chart-at chart i)))
@@ -96,7 +121,9 @@
 (define-function scanner (words chart state j)                  ;;(println "SCANNER "state" "j)
   (let ((tok (<terminal>-token (next-cat state))))              ;;(println "scanning for term "tok)
     (and (= tok (array-at words j))                             ;;(println "scanning "tok" from "state)
-         (chart-add-state chart (+ j 1) (state-advance state)))) ;(println "-------- scanned") (print-chart chart) (println "--------")
+	 (set-state-left-down
+	   (chart-add-state chart (+ j 1) (state-advance state))
+	   state ())))                                          ;;(println "-------- scanned") (print-chart chart) (println "--------")
   )
 
 ;; procedure COMPLETER((B → γ•, j), k),
@@ -111,7 +138,9 @@
       (let ((Y (next-cat s)))
         (and (nonterminal? Y)
              (= X (<nonterminal>-name Y))                       ;;(println "completing "s" from "state)
-             (chart-add-state chart k (state-advance s))))))    ;;(println "-------- completed") (print-chart chart) (println "--------")
+	     (set-state-left-down
+	       (chart-add-state chart k (state-advance s))
+	       s state)))))					;;(println "-------- completed") (print-chart chart) (println "--------")
   )
 
 ;; function EARLEY-PARSE(words, grammar)
@@ -152,6 +181,7 @@
           (let ()
             (println "input was matched: " s)
             (println "derivation:")
+	    (print-tree s 0 ())
             s)
         (println "NO MATCH")
         ()))))
