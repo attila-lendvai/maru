@@ -1,4 +1,4 @@
-// last edited: 2011-10-20 15:41:58 by piumarta on emilia
+// last edited: 2011-10-21 20:20:03 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1411,8 +1411,10 @@ static subr(define)
     fatal(0);
   }
   oop value= eval(cadr(args), ctx);
-  if (is(Expr, value) && (nil == get(value, Expr,name))) set(value, Expr,name, get(var, Variable,name));
   set(var, Variable,value, value);
+  oop expr= value;
+  if (is(Form, expr)) expr= get(value, Form,function);
+  if (is(Expr, expr) && (nil == get(expr, Expr,name))) set(expr, Expr,name, get(var, Variable,name));
   return value;
 }
 
