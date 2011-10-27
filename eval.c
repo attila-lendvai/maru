@@ -1,4 +1,4 @@
-// last edited: 2011-10-21 20:20:03 by piumarta on emilia
+// last edited: 2011-10-24 02:45:48 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -2095,6 +2095,13 @@ static subr(log)
   return newDouble(log(arg));
 }
 
+static subr(identity_hash)
+{
+  oop arg= car(args);
+  if (isLong(arg)) return newLong((long)arg);
+  return newLong((long)arg);
+}
+
 #undef subr
 
 static void replFile(FILE *stream, wchar_t *path)
@@ -2370,6 +2377,7 @@ int main(int argc, char **argv)
       { " sin",		   subr_sin },
       { " cos",		   subr_cos },
       { " log",		   subr_log },
+      { " identity-hash",  subr_identity_hash },
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
