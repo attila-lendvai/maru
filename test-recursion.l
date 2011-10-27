@@ -94,17 +94,17 @@ aaaaaaaaaaaaa.
 ;; could not match input
 ;; input matched: "a"
 ;; input matched: ""
-;; input matched: "a"
-;; input matched: "a"
+;; input matched: "aaaa"
+;; input matched: "aaaaaaaaaaaaa"
 
 {
-  digit = [0-9]:d		->  (- d ?0) ;
+  digit = [0-9]:d		-> (- d ?0) ;
 
-  term  = term:a "+" digit:b	-> `(add ,a ,b)
+  term  = term:a "+" digit:b	-> (println `(add ,a ,b))
         | digit
         ;
 
-  _ term:t -> (println t)
+  _ term:t			-> (println t)
 }
 
 0+1+2+3+4+5+6+7+8+9
