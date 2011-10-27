@@ -117,6 +117,21 @@
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
 
+(define-form define-macro (name args . body)
+  `(define-form ,name ,args (cons 'let (cons () (macro-expand (list-zip-assocs ',args (list ,@args)) ',body)))))
+
+(define-function macro-expand (bindings exp)
+  (if (pair? exp)
+      (cons (macro-expand bindings (car exp))
+	    (macro-expand bindings (cdr exp)))
+    (if (symbol? exp)
+	(let ((a (assq exp bindings)))
+	  (if a (cdr a) exp))
+      exp)))
+
+(define-form define-constant (name value)
+  `(define ,name (form () (lambda args ',value))))
+
 (define-function list-length (list)
   (if (pair? list)
       (+ 1 (list-length (cdr list)))
@@ -223,11 +238,8 @@
     (set-array-at %type-names %last-type name)
     %last-type))
 
-(define-function name-of-type (type)
-  (array-at %type-names type))
-
-(define-function type-name-of (obj)
-  (name-of-type (type-of obj)))
+(define-function name-of-type (type)	(array-at %type-names type))
+(define-function type-name-of (obj)	(name-of-type (type-of obj)))
 
 ;;; structure
 
@@ -317,6 +329,7 @@
 ;;; built-in types
 
 (define-structure <undefined>	())
+(define-structure <data>	())
 (define-structure <long>	(_bits))				(define-function long? (self) (= <long> (type-of self)))
 (define-structure <double>	(_bits))				(define-function double? (self) (= <double> (type-of self)))
 (define-structure <string>	(size _bits))
@@ -798,4 +811,10 @@
 
 ;;; load/save
 
-(define-function load (name) (list-do expr (read name) (eval expr)))
+(define-function pval (expr)
+  (and (> (verbose) 0) (println expr))
+  (let ((result (eval expr)))
+    (and (> (verbose) 1) (println "=> "result))
+    result))
+
+(define-function load (name) (list-do expr (read name) (pval expr)))
