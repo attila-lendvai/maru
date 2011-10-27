@@ -611,6 +611,11 @@
       (cons (car a) (cons (car b) (list-zip (cdr a) (cdr b))))
     (or a b)))
 
+(define-function list-zip-assocs (a b)
+  (if (and (pair? a) (pair? b))
+      (cons (cons (car a) (car b)) (list-zip-assocs (cdr a) (cdr b)))
+    (or a b)))
+
 ;;; iteration
 
 (define-form for (var-init-limit-step . body)
