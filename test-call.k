@@ -23,13 +23,13 @@
 (define-function _W (d x)	(_B d x) (_B d (>> x 8)))
 (define-function _L (d x)	(_W d x) (_W d (>> x 16)))
 
-(define-function _D1 (d x)	(error "D1 "x))
-(define-function _D4 (d x)	(error "D4 "x))
+(define-function _D1 (d x)	(_B d (- (- x (data-stream-address d)) 1)))
+(define-function _D4 (d x)	(_L d (- (- x (data-stream-address d)) 4)))
 
 (load "asm-x86.k")
 
-(define-form getB (d)	'(data-stream-get-byte d))
-(define-form getL (d)	'(let ((a (getB d)) (b (getB d)) (c (getB d)) (d (getB d)))  (+ a (+ (<< b 8) (+ (<< c 16) (<< d 24))))))
+(define-function getB (s)	(data-stream-get-byte s))
+(define-function getL (s)	(let ((a (getB s)) (b (getB s)) (c (getB s)) (d (getB s)))  (+ a (+ (<< b 8) (+ (<< c 16) (<< d 24))))))
 
 (load "dsm-x86.k")
 
@@ -42,21 +42,39 @@
 (define %ESI 0x46)
 (define %EDI 0x47)
 
-(let ((x (data-stream)))
-  (PUSHLr %EBP			x)
-  (MOVLrr %ESP 	%EBP		x)
-  (SUBLir  8   	%ESP		x)
-  (XORLrr %EAX 	%EAX		x)
-  (ADDLmr  8 %EBP 0 0 %EAX	x)
-  (ADDLmr 12 %EBP 0 0 %EAX	x)
-  (LEAVE			x)
-  (RET				x)
+(define-structure <label> (name address))
+
+(define-function label (name . rest)	(new <label> name (car rest)))
+
+(define-method do-print <label> ()	(print "<label "self.name" 0x"(and self.address (format "%08x" self.address))">"))
+
+(define putchar (label "putchar" (long-at (subr "putchar") 0)))
+
+(println putchar)
+
+(define-function LABEL (l x)	(set (<label>-address l) (data-stream-address x)) (println l))
+
+(let ((x    (data-stream 1024))
+      (loop (label "loop")))
+  (PUSHLr %EBP					x)
+  (MOVLrr %ESP        %EBP			x)
+  (SUBLir  8          %ESP			x)
+  (MOVLim ?A	       0 %ESP 0 0		x)
+  (LABEL  loop					x)
+  (CALLm  (<label>-address putchar) 0 0 0	x)
+  (ADDLim  1	       0 %ESP 0 0		x)
+  (CMPLim (+ ?Z 1)     0 %ESP 0 0		x)
+  (JNESm  (<label>-address loop) 0 0 0		x)
+  (MOVLim ?\n          0 %ESP 0 0		x)
+  (CALLm  (<label>-address putchar) 0 0 0	x)
+  (LEAVE					x)
+  (RET						x)
   (println (data-stream-position x)" bytes generated")
   (data-stream-truncate x)
   (data-stream-rewind x)
   (let ((p (console-port)))
     (while (not (data-stream-at-end? x))
-      (port-write p (format "%08x"(data-stream-position x))"\t")
+      (port-write p (format "%08x"(data-stream-address x))"\t")
       (disassemble-on x p)
       (port-put p ?\n)))
   (println (call (data-stream-data x) 3 4))
