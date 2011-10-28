@@ -349,7 +349,7 @@
 #define CMPLim(IM, MD, MB, MI, MS,X)      _O_r_X_L        (X,0x81                ,_b111             ,MD,MB,MI,MS    ,IM     )
         
 
-#define CWD(X)                           _O              (X,0x99                                                           )
+#define CWD(X)                            _O              (X,0x99                                                           )
 
 
 #define CMPXCHGBrr(RS,RD,X)               _OO_Mrm         (X,0x0fb0         ,_b11,_r1(RS),_r1(RD)                           )
@@ -383,7 +383,7 @@
 
 
 #define ENTERii(W, B,X)                   _O_W_B          (X,0xc8                                             ,_s2(W),_s1(B))
-#define HLT(X)                           _O              (X,0xf4                                                           )
+#define HLT(X)                            _O              (X,0xf4                                                           )
 
 
 #define IDIVBrr(RS,RD,X)          ( _rAL (RD) +   _O_Mrm  (X,0xf6           ,_b11,_b111  ,_r1(RS)                           ) )
@@ -424,66 +424,66 @@
 #define JCCSim(CC,D,B,I,S,X)              ((_r0P(B) && _r0P(I)) ? _O_D1   (X,0x70|(CC)              ,(D)                    ) : \
                                                                 ASMFAIL("illegal mode in conditional jump"))
 
-#define JOSm(D,B,I,S,X)                   JCCSim(X,0x0,D,B,I,S)
-#define JNOSm(D,B,I,S,X)                  JCCSim(X,0x1,D,B,I,S)
-#define JBSm(D,B,I,S,X)                   JCCSim(X,0x2,D,B,I,S)
-#define JNAESm(D,B,I,S,X)                 JCCSim(X,0x2,D,B,I,S)
-#define JNBSm(D,B,I,S,X)                  JCCSim(X,0x3,D,B,I,S)
-#define JAESm(D,B,I,S,X)                  JCCSim(X,0x3,D,B,I,S)
-#define JESm(D,B,I,S,X)                   JCCSim(X,0x4,D,B,I,S)
-#define JZSm(D,B,I,S,X)                   JCCSim(X,0x4,D,B,I,S)
-#define JNESm(D,B,I,S,X)                  JCCSim(X,0x5,D,B,I,S)
-#define JNZSm(D,B,I,S,X)                  JCCSim(X,0x5,D,B,I,S)
-#define JBESm(D,B,I,S,X)                  JCCSim(X,0x6,D,B,I,S)
-#define JNASm(D,B,I,S,X)                  JCCSim(X,0x6,D,B,I,S)
-#define JNBESm(D,B,I,S,X)                 JCCSim(X,0x7,D,B,I,S)
-#define JASm(D,B,I,S,X)                   JCCSim(X,0x7,D,B,I,S)
-#define JSSm(D,B,I,S,X)                   JCCSim(X,0x8,D,B,I,S)
-#define JNSSm(D,B,I,S,X)                  JCCSim(X,0x9,D,B,I,S)
-#define JPSm(D,B,I,S,X)                   JCCSim(X,0xa,D,B,I,S)
-#define JPESm(D,B,I,S,X)                  JCCSim(X,0xa,D,B,I,S)
-#define JNPSm(D,B,I,S,X)                  JCCSim(X,0xb,D,B,I,S)
-#define JPOSm(D,B,I,S,X)                  JCCSim(X,0xb,D,B,I,S)
-#define JLSm(D,B,I,S,X)                   JCCSim(X,0xc,D,B,I,S)
-#define JNGESm(D,B,I,S,X)                 JCCSim(X,0xc,D,B,I,S)
-#define JNLSm(D,B,I,S,X)                  JCCSim(X,0xd,D,B,I,S)
-#define JGESm(D,B,I,S,X)                  JCCSim(X,0xd,D,B,I,S)
-#define JLESm(D,B,I,S,X)                  JCCSim(X,0xe,D,B,I,S)
-#define JNGSm(D,B,I,S,X)                  JCCSim(X,0xe,D,B,I,S)
-#define JNLESm(D,B,I,S,X)                 JCCSim(X,0xf,D,B,I,S)
-#define JGSm(D,B,I,S,X)                   JCCSim(X,0xf,D,B,I,S)
+#define JOSm(D,B,I,S,X)                   JCCSim(0x0,D,B,I,S,X)
+#define JNOSm(D,B,I,S,X)                  JCCSim(0x1,D,B,I,S,X)
+#define JBSm(D,B,I,S,X)                   JCCSim(0x2,D,B,I,S,X)
+#define JNAESm(D,B,I,S,X)                 JCCSim(0x2,D,B,I,S,X)
+#define JNBSm(D,B,I,S,X)                  JCCSim(0x3,D,B,I,S,X)
+#define JAESm(D,B,I,S,X)                  JCCSim(0x3,D,B,I,S,X)
+#define JESm(D,B,I,S,X)                   JCCSim(0x4,D,B,I,S,X)
+#define JZSm(D,B,I,S,X)                   JCCSim(0x4,D,B,I,S,X)
+#define JNESm(D,B,I,S,X)                  JCCSim(0x5,D,B,I,S,X)
+#define JNZSm(D,B,I,S,X)                  JCCSim(0x5,D,B,I,S,X)
+#define JBESm(D,B,I,S,X)                  JCCSim(0x6,D,B,I,S,X)
+#define JNASm(D,B,I,S,X)                  JCCSim(0x6,D,B,I,S,X)
+#define JNBESm(D,B,I,S,X)                 JCCSim(0x7,D,B,I,S,X)
+#define JASm(D,B,I,S,X)                   JCCSim(0x7,D,B,I,S,X)
+#define JSSm(D,B,I,S,X)                   JCCSim(0x8,D,B,I,S,X)
+#define JNSSm(D,B,I,S,X)                  JCCSim(0x9,D,B,I,S,X)
+#define JPSm(D,B,I,S,X)                   JCCSim(0xa,D,B,I,S,X)
+#define JPESm(D,B,I,S,X)                  JCCSim(0xa,D,B,I,S,X)
+#define JNPSm(D,B,I,S,X)                  JCCSim(0xb,D,B,I,S,X)
+#define JPOSm(D,B,I,S,X)                  JCCSim(0xb,D,B,I,S,X)
+#define JLSm(D,B,I,S,X)                   JCCSim(0xc,D,B,I,S,X)
+#define JNGESm(D,B,I,S,X)                 JCCSim(0xc,D,B,I,S,X)
+#define JNLSm(D,B,I,S,X)                  JCCSim(0xd,D,B,I,S,X)
+#define JGESm(D,B,I,S,X)                  JCCSim(0xd,D,B,I,S,X)
+#define JLESm(D,B,I,S,X)                  JCCSim(0xe,D,B,I,S,X)
+#define JNGSm(D,B,I,S,X)                  JCCSim(0xe,D,B,I,S,X)
+#define JNLESm(D,B,I,S,X)                 JCCSim(0xf,D,B,I,S,X)
+#define JGSm(D,B,I,S,X)                   JCCSim(0xf,D,B,I,S,X)
 
 #define JCCim(CC,D,B,I,S,X)               ((_r0P(B) && _r0P(I)) ? _OO_D4  (X,0x0f80|(CC)            ,(D)                    ) : \
                                                                 ASMFAIL("illegal mode in conditional jump"))
 
-#define JOm(D,B,I,S,X)                    JCCim(X,0x0,D,B,I,S)
-#define JNOm(D,B,I,S,X)                   JCCim(X,0x1,D,B,I,S)
-#define JBm(D,B,I,S,X)                    JCCim(X,0x2,D,B,I,S)
-#define JNAEm(D,B,I,S,X)                  JCCim(X,0x2,D,B,I,S)
-#define JNBm(D,B,I,S,X)                   JCCim(X,0x3,D,B,I,S)
-#define JAEm(D,B,I,S,X)                   JCCim(X,0x3,D,B,I,S)
-#define JEm(D,B,I,S,X)                    JCCim(X,0x4,D,B,I,S)
-#define JZm(D,B,I,S,X)                    JCCim(X,0x4,D,B,I,S)
-#define JNEm(D,B,I,S,X)                   JCCim(X,0x5,D,B,I,S)
-#define JNZm(D,B,I,S,X)                   JCCim(X,0x5,D,B,I,S)
-#define JBEm(D,B,I,S,X)                   JCCim(X,0x6,D,B,I,S)
-#define JNAm(D,B,I,S,X)                   JCCim(X,0x6,D,B,I,S)
-#define JNBEm(D,B,I,S,X)                  JCCim(X,0x7,D,B,I,S)
-#define JAm(D,B,I,S,X)                    JCCim(X,0x7,D,B,I,S)
-#define JSm(D,B,I,S,X)                    JCCim(X,0x8,D,B,I,S)
-#define JNSm(D,B,I,S,X)                   JCCim(X,0x9,D,B,I,S)
-#define JPm(D,B,I,S,X)                    JCCim(X,0xa,D,B,I,S)
-#define JPEm(D,B,I,S,X)                   JCCim(X,0xa,D,B,I,S)
-#define JNPm(D,B,I,S,X)                   JCCim(X,0xb,D,B,I,S)
-#define JPOm(D,B,I,S,X)                   JCCim(X,0xb,D,B,I,S)
-#define JLm(D,B,I,S,X)                    JCCim(X,0xc,D,B,I,S)
-#define JNGEm(D,B,I,S,X)                  JCCim(X,0xc,D,B,I,S)
-#define JNLm(D,B,I,S,X)                   JCCim(X,0xd,D,B,I,S)
-#define JGEm(D,B,I,S,X)                   JCCim(X,0xd,D,B,I,S)
-#define JLEm(D,B,I,S,X)                   JCCim(X,0xe,D,B,I,S)
-#define JNGm(D,B,I,S,X)                   JCCim(X,0xe,D,B,I,S)
-#define JNLEm(D,B,I,S,X)                  JCCim(X,0xf,D,B,I,S)
-#define JGm(D,B,I,S,X)                    JCCim(X,0xf,D,B,I,S)
+#define JOm(D,B,I,S,X)                    JCCim(0x0,D,B,I,S,X)
+#define JNOm(D,B,I,S,X)                   JCCim(0x1,D,B,I,S,X)
+#define JBm(D,B,I,S,X)                    JCCim(0x2,D,B,I,S,X)
+#define JNAEm(D,B,I,S,X)                  JCCim(0x2,D,B,I,S,X)
+#define JNBm(D,B,I,S,X)                   JCCim(0x3,D,B,I,S,X)
+#define JAEm(D,B,I,S,X)                   JCCim(0x3,D,B,I,S,X)
+#define JEm(D,B,I,S,X)                    JCCim(0x4,D,B,I,S,X)
+#define JZm(D,B,I,S,X)                    JCCim(0x4,D,B,I,S,X)
+#define JNEm(D,B,I,S,X)                   JCCim(0x5,D,B,I,S,X)
+#define JNZm(D,B,I,S,X)                   JCCim(0x5,D,B,I,S,X)
+#define JBEm(D,B,I,S,X)                   JCCim(0x6,D,B,I,S,X)
+#define JNAm(D,B,I,S,X)                   JCCim(0x6,D,B,I,S,X)
+#define JNBEm(D,B,I,S,X)                  JCCim(0x7,D,B,I,S,X)
+#define JAm(D,B,I,S,X)                    JCCim(0x7,D,B,I,S,X)
+#define JSm(D,B,I,S,X)                    JCCim(0x8,D,B,I,S,X)
+#define JNSm(D,B,I,S,X)                   JCCim(0x9,D,B,I,S,X)
+#define JPm(D,B,I,S,X)                    JCCim(0xa,D,B,I,S,X)
+#define JPEm(D,B,I,S,X)                   JCCim(0xa,D,B,I,S,X)
+#define JNPm(D,B,I,S,X)                   JCCim(0xb,D,B,I,S,X)
+#define JPOm(D,B,I,S,X)                   JCCim(0xb,D,B,I,S,X)
+#define JLm(D,B,I,S,X)                    JCCim(0xc,D,B,I,S,X)
+#define JNGEm(D,B,I,S,X)                  JCCim(0xc,D,B,I,S,X)
+#define JNLm(D,B,I,S,X)                   JCCim(0xd,D,B,I,S,X)
+#define JGEm(D,B,I,S,X)                   JCCim(0xd,D,B,I,S,X)
+#define JLEm(D,B,I,S,X)                   JCCim(0xe,D,B,I,S,X)
+#define JNGm(D,B,I,S,X)                   JCCim(0xe,D,B,I,S,X)
+#define JNLEm(D,B,I,S,X)                  JCCim(0xf,D,B,I,S,X)
+#define JGm(D,B,I,S,X)                    JCCim(0xf,D,B,I,S,X)
 
 
 #define JMPSm(D,B,I,S,X)                  ((_r0P(B) && _r0P(I)) ? _O_D1   (X,0xeb                   ,(D)                    ) : \
@@ -494,9 +494,9 @@
                                                                 _O_r_X  (X,0xff        ,_b100     ,(D),B,I,S              ) ))
 
 
-#define LAHF(X)                          _O              (X,0x9f                                                           )
+#define LAHF(X)                           _O              (X,0x9f                                                           )
 #define LEALmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x8d                ,_r4(RD)           ,MD,MB,MI,MS            )
-#define LEAVE(X)                         _O              (X,0xc9                                                           )
+#define LEAVE(X)                          _O              (X,0xc9                                                           )
 
         
 #define LMSWr(RS,X)                       _OO_Mrm         (X,0x0f01         ,_b11,_b110,_r4(RS)                             )
@@ -559,7 +559,7 @@
 #define NEGLm(MD,MB,MI,MS,X)              _O_r_X          (X,0xf7                ,_b011             ,MD,MB,MI,MS            )
 
 
-#define NOP(X)                           _O              (X,0x90                                                           )
+#define NOP(X)                            _O              (X,0x90                                                           )
 
 
 #define NOTBr(RD,X)                       _O_Mrm          (X,0xf6           ,_b11,_b010  ,_r1(RD)                           )
@@ -598,11 +598,11 @@
 #define POPLm(MD,MB,MI,MS,X)              _O_r_X          (X,0x8f                ,_b000             ,MD,MB,MI,MS            )
 
 
-#define POPA(X)                          _wO             (X,0x61                                                           )
-#define POPAD(X)                         _O              (X,0x61                                                           )
+#define POPA(X)                           _wO             (X,0x61                                                           )
+#define POPAD(X)                          _O              (X,0x61                                                           )
 
-#define POPF(X)                          _wO             (X,0x9d                                                           )
-#define POPFD(X)                         _O              (X,0x9d                                                           )
+#define POPF(X)                           _wO             (X,0x9d                                                           )
+#define POPFD(X)                          _O              (X,0x9d                                                           )
 
 
 #define PUSHWr(R,X)                       _wOr            (X,0x50,_r2(R)                                                    )
@@ -614,101 +614,101 @@
 #define PUSHLi(IM,X)                      _Os_sL          (X,0x68                                                   ,IM     )
 
 
-#define PUSHA(X)                         _wO             (X,0x60                                                           )
-#define PUSHAD(X)                        _O              (X,0x60                                                           )
+#define PUSHA(X)                          _wO             (X,0x60                                                           )
+#define PUSHAD(X)                         _O              (X,0x60                                                           )
 
-#define PUSHF(X)                         _O              (X,0x9c                                                           )
-#define PUSHFD(X)                        _wO             (X,0x9c                                                           )
+#define PUSHF(X)                          _O              (X,0x9c                                                           )
+#define PUSHFD(X)                         _wO             (X,0x9c                                                           )
 
-#define RET(X)                           _O              (X,0xc3                                                           )
+#define RET(X)                            _O              (X,0xc3                                                           )
 #define RETi(IM,X)                        _O_W            (X,0xc2                                                   ,_s2(IM))
 
 
 #define ROLBir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd0   ,_b11,_b000,_r1(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc0   ,_b11,_b000,_r1(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc0   ,_b11,_b000,_r1(RD)                     ,_u1(IM) ) )
 #define ROLBim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd0        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc0        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc0        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define ROLBrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd2   ,_b11,_b000,_r1(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define ROLBrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd2        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define ROLWir(IM,RD,X)           (((IM)==1) ?    _wO_Mrm         (X,0xd1   ,_b11,_b000,_r2(RD)                             ) : \
-                                                _wO_Mrm_B       (X,0xc1   ,_b11,_b000,_r2(RD)                     ,_u1(IM) ) )
+                                                  _wO_Mrm_B       (X,0xc1   ,_b11,_b000,_r2(RD)                     ,_u1(IM) ) )
 #define ROLWim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _wO_r_X         (X,0xd1        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                _wO_r_X_B       (X,0xc1        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _wO_r_X_B       (X,0xc1        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define ROLWrr(RS,RD,X)           (((RS)==_CL) ?  _wO_Mrm         (X,0xd3   ,_b11,_b000,_r2(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 #define ROLWrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _wO_r_X         (X,0xd3        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 
 #define ROLLir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd1   ,_b11,_b000,_r4(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc1   ,_b11,_b000,_r4(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc1   ,_b11,_b000,_r4(RD)                     ,_u1(IM) ) )
 #define ROLLim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd1        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc1        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc1        ,_b000             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define ROLLrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd3   ,_b11,_b000,_r4(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define ROLLrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd3        ,_b000             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 
 #define RORBir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd0   ,_b11,_b001,_r1(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc0   ,_b11,_b001,_r1(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc0   ,_b11,_b001,_r1(RD)                     ,_u1(IM) ) )
 #define RORBim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd0        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc0        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc0        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define RORBrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd2   ,_b11,_b001,_r1(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define RORBrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd2        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define RORWir(IM,RD,X)           (((IM)==1) ?    _wO_Mrm         (X,0xd1   ,_b11,_b001,_r2(RD)                             ) : \
-                                                _wO_Mrm_B       (X,0xc1   ,_b11,_b001,_r2(RD)                     ,_u1(IM) ) )
+                                                  _wO_Mrm_B       (X,0xc1   ,_b11,_b001,_r2(RD)                     ,_u1(IM) ) )
 #define RORWim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _wO_r_X         (X,0xd1        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                _wO_r_X_B       (X,0xc1        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _wO_r_X_B       (X,0xc1        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define RORWrr(RS,RD,X)           (((RS)==_CL) ?  _wO_Mrm         (X,0xd3   ,_b11,_b001,_r2(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 #define RORWrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _wO_r_X         (X,0xd3        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 
 #define RORLir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd1   ,_b11,_b001,_r4(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc1   ,_b11,_b001,_r4(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc1   ,_b11,_b001,_r4(RD)                     ,_u1(IM) ) )
 #define RORLim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd1        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc1        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc1        ,_b001             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define RORLrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd3   ,_b11,_b001,_r4(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define RORLrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd3        ,_b001             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 
-#define SAHF(X)                                  _O              (X,0x9e                                                           )
+#define SAHF(X)                                   _O              (X,0x9e                                                           )
 
 
 #define SARBir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd0   ,_b11,_b111,_r1(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc0   ,_b11,_b111,_r1(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc0   ,_b11,_b111,_r1(RD)                     ,_u1(IM) ) )
 #define SARBim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd0        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc0        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc0        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SARBrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd2   ,_b11,_b111,_r1(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SARBrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd2        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define SARWir(IM,RD,X)           (((IM)==1) ?    _wO_Mrm         (X,0xd1   ,_b11,_b111,_r2(RD)                             ) : \
-                                                _wO_Mrm_B       (X,0xc1   ,_b11,_b111,_r2(RD)                     ,_u1(IM) ) )
+                                                  _wO_Mrm_B       (X,0xc1   ,_b11,_b111,_r2(RD)                     ,_u1(IM) ) )
 #define SARWim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _wO_r_X         (X,0xd1        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                _wO_r_X_B       (X,0xc1        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _wO_r_X_B       (X,0xc1        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SARWrr(RS,RD,X)           (((RS)==_CL) ?  _wO_Mrm         (X,0xd3   ,_b11,_b111,_r2(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 #define SARWrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _wO_r_X         (X,0xd3        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 
 #define SARLir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd1   ,_b11,_b111,_r4(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc1   ,_b11,_b111,_r4(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc1   ,_b11,_b111,_r4(RD)                     ,_u1(IM) ) )
 #define SARLim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd1        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc1        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc1        ,_b111             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SARLrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd3   ,_b11,_b111,_r4(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SARLrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd3        ,_b111             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 
 #define SBBBrr(RS, RD,X)                  _O_Mrm                  (X,0x18           ,_b11,_r1(RS),_r1(RD)                           )
@@ -717,7 +717,7 @@
 #define SBBBir(IM, RD,X)                  _O_Mrm_B                (X,0x80           ,_b11,_b011  ,_r1(RD)                   ,_s1(IM))
 #define SBBBim(IM, MD, MB, MI, MS,X)      _O_r_X_B                (X,0x80                ,_b011             ,MD,MB,MI,MS    ,_s1(IM))
         
-#define SBBWrr(RS, RD,X)                  _wO_Mrm    	        (X,0x19           ,_b11,_r2(RS),_r2(RD)                           )
+#define SBBWrr(RS, RD,X)                  _wO_Mrm                 (X,0x19           ,_b11,_r2(RS),_r2(RD)                           )
 #define SBBWmr(MD, MB, MI, MS, RD,X)      _wO_r_X                 (X,0x1b                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define SBBWrm(RS, MD, MB, MI, MS,X)      _wO_r_X                 (X,0x19                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define SBBWir(IM, RD,X)                  _wOs_Mrm_sW             (X,0x81           ,_b11,_b011  ,_r2(RD)                   ,_s2(IM))
@@ -732,124 +732,124 @@
 
 #define SETCCir(CC,RD,X)                  _OO_Mrm         (X,0x0f90|(CC)    ,_b11,_b000,_r1(RD)                             )
 
-#define SETOr(RD,X)                       SETCCir(X,0x0,RD)
-#define SETNOr(RD,X)                      SETCCir(X,0x1,RD)
-#define SETBr(RD,X)                       SETCCir(X,0x2,RD)
-#define SETNAEr(RD,X)                     SETCCir(X,0x2,RD)
-#define SETNBr(RD,X)                      SETCCir(X,0x3,RD)
-#define SETAEr(RD,X)                      SETCCir(X,0x3,RD)
-#define SETEr(RD,X)                       SETCCir(X,0x4,RD)
-#define SETZr(RD,X)                       SETCCir(X,0x4,RD)
-#define SETNEr(RD,X)                      SETCCir(X,0x5,RD)
-#define SETNZr(RD,X)                      SETCCir(X,0x5,RD)
-#define SETBEr(RD,X)                      SETCCir(X,0x6,RD)
-#define SETNAr(RD,X)                      SETCCir(X,0x6,RD)
-#define SETNBEr(RD,X)                     SETCCir(X,0x7,RD)
-#define SETAr(RD,X)                       SETCCir(X,0x7,RD)
-#define SETSr(RD,X)                       SETCCir(X,0x8,RD)
-#define SETNSr(RD,X)                      SETCCir(X,0x9,RD)
-#define SETPr(RD,X)                       SETCCir(X,0xa,RD)
-#define SETPEr(RD,X)                      SETCCir(X,0xa,RD)
-#define SETNPr(RD,X)                      SETCCir(X,0xb,RD)
-#define SETPOr(RD,X)                      SETCCir(X,0xb,RD)
-#define SETLr(RD,X)                       SETCCir(X,0xc,RD)
-#define SETNGEr(RD,X)                     SETCCir(X,0xc,RD)
-#define SETNLr(RD,X)                      SETCCir(X,0xd,RD)
-#define SETGEr(RD,X)                      SETCCir(X,0xd,RD)
-#define SETLEr(RD,X)                      SETCCir(X,0xe,RD)
-#define SETNGr(RD,X)                      SETCCir(X,0xe,RD)
-#define SETNLEr(RD,X)                     SETCCir(X,0xf,RD)
-#define SETGr(RD,X)                       SETCCir(X,0xf,RD)
+#define SETOr(RD,X)                       SETCCir(0x0,RD,X)
+#define SETNOr(RD,X)                      SETCCir(0x1,RD,X)
+#define SETBr(RD,X)                       SETCCir(0x2,RD,X)
+#define SETNAEr(RD,X)                     SETCCir(0x2,RD,X)
+#define SETNBr(RD,X)                      SETCCir(0x3,RD,X)
+#define SETAEr(RD,X)                      SETCCir(0x3,RD,X)
+#define SETEr(RD,X)                       SETCCir(0x4,RD,X)
+#define SETZr(RD,X)                       SETCCir(0x4,RD,X)
+#define SETNEr(RD,X)                      SETCCir(0x5,RD,X)
+#define SETNZr(RD,X)                      SETCCir(0x5,RD,X)
+#define SETBEr(RD,X)                      SETCCir(0x6,RD,X)
+#define SETNAr(RD,X)                      SETCCir(0x6,RD,X)
+#define SETNBEr(RD,X)                     SETCCir(0x7,RD,X)
+#define SETAr(RD,X)                       SETCCir(0x7,RD,X)
+#define SETSr(RD,X)                       SETCCir(0x8,RD,X)
+#define SETNSr(RD,X)                      SETCCir(0x9,RD,X)
+#define SETPr(RD,X)                       SETCCir(0xa,RD,X)
+#define SETPEr(RD,X)                      SETCCir(0xa,RD,X)
+#define SETNPr(RD,X)                      SETCCir(0xb,RD,X)
+#define SETPOr(RD,X)                      SETCCir(0xb,RD,X)
+#define SETLr(RD,X)                       SETCCir(0xc,RD,X)
+#define SETNGEr(RD,X)                     SETCCir(0xc,RD,X)
+#define SETNLr(RD,X)                      SETCCir(0xd,RD,X)
+#define SETGEr(RD,X)                      SETCCir(0xd,RD,X)
+#define SETLEr(RD,X)                      SETCCir(0xe,RD,X)
+#define SETNGr(RD,X)                      SETCCir(0xe,RD,X)
+#define SETNLEr(RD,X)                     SETCCir(0xf,RD,X)
+#define SETGr(RD,X)                       SETCCir(0xf,RD,X)
 
 #define SETCCim(CC,MD,MB,MI,MS,X)         _OO_r_X         (X,0x0f90|(CC)         ,_b000             ,MD,MB,MI,MS            )
 
-#define SETOm(D,B,I,S,X)                  SETCCim(X,0x0,D,B,I,S)
-#define SETNOm(D,B,I,S,X)                 SETCCim(X,0x1,D,B,I,S)
-#define SETBm(D,B,I,S,X)                  SETCCim(X,0x2,D,B,I,S)
-#define SETNAEm(D,B,I,S,X)                SETCCim(X,0x2,D,B,I,S)
-#define SETNBm(D,B,I,S,X)                 SETCCim(X,0x3,D,B,I,S)
-#define SETAEm(D,B,I,S,X)                 SETCCim(X,0x3,D,B,I,S)
-#define SETEm(D,B,I,S,X)                  SETCCim(X,0x4,D,B,I,S)
-#define SETZm(D,B,I,S,X)                  SETCCim(X,0x4,D,B,I,S)
-#define SETNEm(D,B,I,S,X)                 SETCCim(X,0x5,D,B,I,S)
-#define SETNZm(D,B,I,S,X)                 SETCCim(X,0x5,D,B,I,S)
-#define SETBEm(D,B,I,S,X)                 SETCCim(X,0x6,D,B,I,S)
-#define SETNAm(D,B,I,S,X)                 SETCCim(X,0x6,D,B,I,S)
-#define SETNBEm(D,B,I,S,X)                SETCCim(X,0x7,D,B,I,S)
-#define SETAm(D,B,I,S,X)                  SETCCim(X,0x7,D,B,I,S)
-#define SETSm(D,B,I,S,X)                  SETCCim(X,0x8,D,B,I,S)
-#define SETNSm(D,B,I,S,X)                 SETCCim(X,0x9,D,B,I,S)
-#define SETPm(D,B,I,S,X)                  SETCCim(X,0xa,D,B,I,S)
-#define SETPEm(D,B,I,S,X)                 SETCCim(X,0xa,D,B,I,S)
-#define SETNPm(D,B,I,S,X)                 SETCCim(X,0xb,D,B,I,S)
-#define SETPOm(D,B,I,S,X)                 SETCCim(X,0xb,D,B,I,S)
-#define SETLm(D,B,I,S,X)                  SETCCim(X,0xc,D,B,I,S)
-#define SETNGEm(D,B,I,S,X)                SETCCim(X,0xc,D,B,I,S)
-#define SETNLm(D,B,I,S,X)                 SETCCim(X,0xd,D,B,I,S)
-#define SETGEm(D,B,I,S,X)                 SETCCim(X,0xd,D,B,I,S)
-#define SETLEm(D,B,I,S,X)                 SETCCim(X,0xe,D,B,I,S)
-#define SETNGm(D,B,I,S,X)                 SETCCim(X,0xe,D,B,I,S)
-#define SETNLEm(D,B,I,S,X)                SETCCim(X,0xf,D,B,I,S)
-#define SETGm(D,B,I,S,X)                  SETCCim(X,0xf,D,B,I,S)
+#define SETOm(D,B,I,S,X)                  SETCCim(0x0,D,B,I,S,X)
+#define SETNOm(D,B,I,S,X)                 SETCCim(0x1,D,B,I,S,X)
+#define SETBm(D,B,I,S,X)                  SETCCim(0x2,D,B,I,S,X)
+#define SETNAEm(D,B,I,S,X)                SETCCim(0x2,D,B,I,S,X)
+#define SETNBm(D,B,I,S,X)                 SETCCim(0x3,D,B,I,S,X)
+#define SETAEm(D,B,I,S,X)                 SETCCim(0x3,D,B,I,S,X)
+#define SETEm(D,B,I,S,X)                  SETCCim(0x4,D,B,I,S,X)
+#define SETZm(D,B,I,S,X)                  SETCCim(0x4,D,B,I,S,X)
+#define SETNEm(D,B,I,S,X)                 SETCCim(0x5,D,B,I,S,X)
+#define SETNZm(D,B,I,S,X)                 SETCCim(0x5,D,B,I,S,X)
+#define SETBEm(D,B,I,S,X)                 SETCCim(0x6,D,B,I,S,X)
+#define SETNAm(D,B,I,S,X)                 SETCCim(0x6,D,B,I,S,X)
+#define SETNBEm(D,B,I,S,X)                SETCCim(0x7,D,B,I,S,X)
+#define SETAm(D,B,I,S,X)                  SETCCim(0x7,D,B,I,S,X)
+#define SETSm(D,B,I,S,X)                  SETCCim(0x8,D,B,I,S,X)
+#define SETNSm(D,B,I,S,X)                 SETCCim(0x9,D,B,I,S,X)
+#define SETPm(D,B,I,S,X)                  SETCCim(0xa,D,B,I,S,X)
+#define SETPEm(D,B,I,S,X)                 SETCCim(0xa,D,B,I,S,X)
+#define SETNPm(D,B,I,S,X)                 SETCCim(0xb,D,B,I,S,X)
+#define SETPOm(D,B,I,S,X)                 SETCCim(0xb,D,B,I,S,X)
+#define SETLm(D,B,I,S,X)                  SETCCim(0xc,D,B,I,S,X)
+#define SETNGEm(D,B,I,S,X)                SETCCim(0xc,D,B,I,S,X)
+#define SETNLm(D,B,I,S,X)                 SETCCim(0xd,D,B,I,S,X)
+#define SETGEm(D,B,I,S,X)                 SETCCim(0xd,D,B,I,S,X)
+#define SETLEm(D,B,I,S,X)                 SETCCim(0xe,D,B,I,S,X)
+#define SETNGm(D,B,I,S,X)                 SETCCim(0xe,D,B,I,S,X)
+#define SETNLEm(D,B,I,S,X)                SETCCim(0xf,D,B,I,S,X)
+#define SETGm(D,B,I,S,X)                  SETCCim(0xf,D,B,I,S,X)
 
 
 #define SHLBir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd0   ,_b11,_b100,_r1(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc0   ,_b11,_b100,_r1(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc0   ,_b11,_b100,_r1(RD)                     ,_u1(IM) ) )
 #define SHLBim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd0        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc0        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc0        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHLBrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd2   ,_b11,_b100,_r1(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHLBrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd2        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define SHLWir(IM,RD,X)           (((IM)==1) ?    _wO_Mrm         (X,0xd1   ,_b11,_b100,_r2(RD)                             ) : \
-                                                _wO_Mrm_B       (X,0xc1   ,_b11,_b100,_r2(RD)                     ,_u1(IM) ) )
+                                                  _wO_Mrm_B       (X,0xc1   ,_b11,_b100,_r2(RD)                     ,_u1(IM) ) )
 #define SHLWim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _wO_r_X         (X,0xd1        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                _wO_r_X_B       (X,0xc1        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _wO_r_X_B       (X,0xc1        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHLWrr(RS,RD,X)           (((RS)==_CL) ?  _wO_Mrm         (X,0xd3   ,_b11,_b100,_r2(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHLWrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _wO_r_X         (X,0xd3        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                                   ) )
+                                                  ASMFAIL         ("source register must be CL"                                   ) )
 
 #define SHLLir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd1   ,_b11,_b100,_r4(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc1   ,_b11,_b100,_r4(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc1   ,_b11,_b100,_r4(RD)                     ,_u1(IM) ) )
 #define SHLLim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd1        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc1        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc1        ,_b100             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHLLrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd3   ,_b11,_b100,_r4(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHLLrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd3        ,_b100             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 
 #define SHRBir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd0   ,_b11,_b101,_r1(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc0   ,_b11,_b101,_r1(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc0   ,_b11,_b101,_r1(RD)                     ,_u1(IM) ) )
 #define SHRBim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd0        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc0        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc0        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHRBrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd2   ,_b11,_b101,_r1(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHRBrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd2        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define SHRWir(IM,RD,X)           (((IM)==1) ?    _wO_Mrm         (X,0xd1   ,_b11,_b101,_r2(RD)                             ) : \
-                                                _wO_Mrm_B       (X,0xc1   ,_b11,_b101,_r2(RD)                     ,_u1(IM) ) )
+                                                  _wO_Mrm_B       (X,0xc1   ,_b11,_b101,_r2(RD)                     ,_u1(IM) ) )
 #define SHRWim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _wO_r_X         (X,0xd1        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                _wO_r_X_B       (X,0xc1        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _wO_r_X_B       (X,0xc1        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHRWrr(RS,RD,X)           (((RS)==_CL) ?  _wO_Mrm         (X,0xd3   ,_b11,_b101,_r2(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHRWrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _wO_r_X         (X,0xd3        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 #define SHRLir(IM,RD,X)           (((IM)==1) ?    _O_Mrm          (X,0xd1   ,_b11,_b101,_r4(RD)                             ) : \
-                                                _O_Mrm_B        (X,0xc1   ,_b11,_b101,_r4(RD)                     ,_u1(IM) ) )
+                                                  _O_Mrm_B        (X,0xc1   ,_b11,_b101,_r4(RD)                     ,_u1(IM) ) )
 #define SHRLim(IM,MD,MB,MS,MI,X)  (((IM)==1) ?    _O_r_X          (X,0xd1        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                _O_r_X_B        (X,0xc1        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
+                                                  _O_r_X_B        (X,0xc1        ,_b101             ,MD,MB,MI,MS    ,_u1(IM) ) )
 #define SHRLrr(RS,RD,X)           (((RS)==_CL) ?  _O_Mrm          (X,0xd3   ,_b11,_b101,_r4(RD)                             ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 #define SHRLrm(RS,MD,MB,MS,MI,X)  (((RS)==_CL) ?  _O_r_X          (X,0xd3        ,_b101             ,MD,MB,MI,MS            ) : \
-                                                ASMFAIL         ("source register must be CL"                           ) )
+                                                  ASMFAIL         ("source register must be CL"                           ) )
 
 
-#define STC(X)                           _O              (X,0xf9                                                           )
+#define STC(X)                            _O              (X,0xf9                                                           )
 
 
 #define SUBBrr(RS, RD,X)                  _O_Mrm          (X,0x28           ,_b11,_r1(RS),_r1(RD)                           )
