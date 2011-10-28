@@ -10,6 +10,8 @@
   (define-function data-stream-data (self)		self.data)
   (define-function data-stream-position (self)		self.position)
   (define-function data-stream-size (self)		self.limit)
+  (define-function data-stream-origin (self)		(address-of self.data))
+  (define-function data-stream-address (self)		(+ (address-of self.data) self.position))
 
   (define-function data-stream-grow (self)		(let ((lim (* self.limit 2))
 							      (old self.data)
