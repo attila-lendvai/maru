@@ -1,4 +1,4 @@
-// last edited: 2011-10-27 15:30:10 by piumarta on debian.piumarta.com
+// last edited: 2011-10-28 14:47:23 by piumarta on debian.piumarta.com
 
 #define _ISOC99_SOURCE 1
 
@@ -2041,6 +2041,8 @@ static subr(data)
 	oop obj= getHead(args);										\
 	oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;			\
 	int idx= getLong(arg);										\
+	if (is(Long, obj))										\
+	    return newLong(((type *)getLong(obj))[idx]);						\
 	if ((unsigned)idx >= (unsigned)GC_size(obj) / sizeof(type)) return nil;				\
 	return newLong(((type *)obj)[idx]);								\
     }													\
@@ -2052,8 +2054,12 @@ static subr(data)
 	oop arg= getHead(getTail(args));								\
 	oop val= getHead(getTail(getTail(args)));	if (!isLong(arg) || !isLong(val)) return nil;	\
 	int idx= getLong(arg);										\
-	if ((unsigned)idx >= (unsigned)GC_size(obj) / sizeof(type)) return nil;				\
-	((type *)obj)[idx]= getLong(val);								\
+	if (is(Long, obj))										\
+	    ((type *)getLong(obj))[idx]= getLong(val);							\
+	else {												\
+	    if ((unsigned)idx >= (unsigned)GC_size(obj) / sizeof(type)) return nil;			\
+	    ((type *)obj)[idx]= getLong(val);								\
+	}												\
 	return val;											\
     }
 
@@ -2198,10 +2204,9 @@ static subr(log)
   return newDouble(log(arg));
 }
 
-static subr(identity_hash)
+static subr(address_of)
 {
   oop arg= car(args);
-  if (isLong(arg)) return newLong((long)arg);
   return newLong((long)arg);
 }
 
@@ -2487,7 +2492,7 @@ int main(int argc, char **argv)
       { " sin",		   subr_sin },
       { " cos",		   subr_cos },
       { " log",		   subr_log },
-      { " identity-hash",  subr_identity_hash },
+      { " address-of",	   subr_address_of },
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
