@@ -216,14 +216,16 @@
 
 ;;; cond
 
+(define-function %progn (prog)	(if (cdr prog) (cons 'let (cons '() prog)) (car prog)))
+
 (define-function %cond (clauses)
   (if (pair? clauses)
       (let* ((clause (car clauses))
 	     (test   (car clause))
 	     (value  (cdr clause)))
 	(if (= 'else test)
-	    `(let () ,@value)
-	  `(if ,test (let () ,@value) ,(%cond (cdr clauses)))))))
+	    (%progn value)
+	  `(if ,test ,(%progn value) ,(%cond (cdr clauses)))))))
 
 (define-form cond clauses (%cond clauses))
 
