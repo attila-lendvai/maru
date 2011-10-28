@@ -1,32 +1,3 @@
-(define *outer* '(*outer*))
-(define *inner* '(*inner*))
-(define *recur* '(*recur*))
-
-(define-structure <memo> (success result position))
-
-(define-method do-print <memo> ()
-  (if (long? self.success)
-      (print "#"self.success)
-    (print "<memo>")))
-
-(define-function memoise (self success result position)
-  (with-instance-accessors <memo>
-    (set self.success  success)
-    (set self.result   result)
-    (set self.position position)))
-
-(define %cookies 0)
-
-(define-form put (where key val)	`(set ,where (cons (cons ,key ,val) ,where)))
-(define-form get (where key)		`(cdr (assq ,key ,where)))
-(define-form rem (where key)		`(set ,where (%rm ,where ,key)))
-
-(define-function %rm (where key)
-  (and (pair? where)
-       (if (= key (caar where))
-	   (cdr where)
-	 (cons (car where) (%rm (cdr where) key)))))
-
 (define-form match-save (exp)	`(let ((pos (<parser-stream>-position self.source))) ,exp))
 (define-form match-ok ()	`(set (<parser-stream>-position self.source) pos))
 (define-form match-ko ()	`(let () (set (<parser-stream>-position self.source) pos) ()))
