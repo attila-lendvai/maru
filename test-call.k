@@ -1,0 +1,75 @@
+(load "port.l")
+(load "data-stream.k")
+(load "ansiterm.l")
+
+(define-function nth (n list)
+  (while (and (pair? list) (>= (incr n -1) 0))
+    (set list (cdr list)))
+  (car list))
+
+(define-function %receive (vars)
+  (and (pair? vars)
+       (cons `(set ,(car vars) (car _))
+	     (cons '(set _ (cdr _))
+		   (%receive (cdr vars))))))
+
+(define-form receive (expr . vars)
+  `(let ((_ ,expr))
+     ,@(%receive vars)))
+
+(define values list)
+
+(define asm_code (data-stream 1024))
+
+(define-function _B (x)		(data-stream-put-byte asm_code x))
+(define-function _W (x)		(_B x) (_B (>> x 8)))
+(define-function _L (x)		(_W x) (_W (>> x 16)))
+
+(define-function _D1 (x)	(error "D1 "x))
+(define-function _D4 (x)	(error "D4 "x))
+
+(load "asm-x86.k")
+
+(define-form getB ()	'(data-stream-get-byte asm_code))
+(define-form getL ()	'(let ((a (getB)) (b (getB)) (c (getB)) (d (getB)))  (+ a (+ (<< b 8) (+ (<< c 16) (<< d 24))))))
+
+(load "dsm-x86.k")
+
+(define %EAX 0x40)
+(define %ECX 0x41)
+(define %EDX 0x42)
+(define %EBX 0x43)
+(define %ESP 0x44)
+(define %EBP 0x45)
+(define %ESI 0x46)
+(define %EDI 0x47)
+
+(let ()
+  (PUSHLr %EBP)
+  (MOVLrr %ESP 	      %EBP)
+  (SUBLir  8   	      %ESP)
+  (XORLrr %EAX 	      %EAX)
+  (ADDLmr  8 %EBP 0 0 %EAX)
+  (ADDLmr 12 %EBP 0 0 %EAX)
+  (LEAVE)
+  (RET)
+  (println "\n"(data-stream-position asm_code)" bytes generated")
+  (data-stream-truncate asm_code)
+  (data-stream-rewind asm_code)
+  ;; (let ((p (console-port)))
+  ;;   (while (not (data-stream-at-end? asm_code))
+  ;;     (port-write p (format "%08x"(data-stream-position asm_code))"\t")
+  ;;     (disassemble-on p)
+  ;;     (port-put p ?\n)))
+  (println (call (data-stream-data asm_code) 3 4))
+  )
+
+;; (define-form MOVLir (i r)	`(genBL (+ 0xb8 ,r) ,i))
+;; (define-form MOVLmr (d b i s r)	`(genBL (+ 0xb8 ,r) ,i))
+;; (define-form MOVLrr (s d)	`(genBB (+ 0x89 ,r) (+ 0xc0 (+ (<< s 3) d))))
+;; (define-form PUSHLr (r)		`(genBL (+ 0x50 ,r) ,i))
+;; (define-form SUBLir (i r)	`(let ((i ,i) (r ,r))
+;; 				   (cond
+;; 				     ((imm8?  i)	(genBBB (+ 0x83 (+ 0xc0 (+ (<< 5 3) r) i))))
+;; 				     (else		(genBBL (+ 0x81 (+ 0xc0 (+ (<< 5 3) r) i)))))))
+;; (define-form RET ()		`(genB 0xc3))
