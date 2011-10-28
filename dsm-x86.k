@@ -67,13 +67,8 @@
     (port-write p (nth (mrm-reg mrm) ops)"\t$"(getL d)",")
     (mrm-write p mrm sib dsp)))
 
-(define-function jb (d p op)
-  (let ((dsp (getB d)))
-    (port-write p op"\t0x"(format "%08x" (+ dsp (data-stream-address d))))))
-
-(define-function jv (d p op)
-  (let ((dsp (getL d)))
-    (port-write p op"\t0x"(format "%08x" (+ dsp (data-stream-address d))))))
+(define-function jb (d p op)	(port-write p op"\t"(getD1 d)))
+(define-function jv (d p op)	(port-write p op"\t"(getD4 d)))
 
 (define-function disassemble-on (d p)
   (let ((b0 (getB d)))
