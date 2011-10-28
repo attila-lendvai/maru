@@ -63,13 +63,3 @@
       (port-put p ?\n)))
   (println (call (data-stream-data asm_code) 3 4))
   )
-
-;; (define-form MOVLir (i r)	`(genBL (+ 0xb8 ,r) ,i))
-;; (define-form MOVLmr (d b i s r)	`(genBL (+ 0xb8 ,r) ,i))
-;; (define-form MOVLrr (s d)	`(genBB (+ 0x89 ,r) (+ 0xc0 (+ (<< s 3) d))))
-;; (define-form PUSHLr (r)		`(genBL (+ 0x50 ,r) ,i))
-;; (define-form SUBLir (i r)	`(let ((i ,i) (r ,r))
-;; 				   (cond
-;; 				     ((imm8?  i)	(genBBB (+ 0x83 (+ 0xc0 (+ (<< 5 3) r) i))))
-;; 				     (else		(genBBL (+ 0x81 (+ 0xc0 (+ (<< 5 3) r) i)))))))
-;; (define-form RET ()		`(genB 0xc3))
