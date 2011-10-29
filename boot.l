@@ -819,4 +819,7 @@
     (and (> (verbose) 1) (println "=> "result))
     result))
 
-(define-function load (name) (list-do expr (read name) (pval expr)))
+(define-function load (name)
+  (let ((exps (read name)))
+    (or exps (error "file not found or empty: "name))
+    (list-do expr exps (pval expr))))
