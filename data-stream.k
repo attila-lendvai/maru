@@ -39,7 +39,7 @@
 							     (let ((b (byte-at self.data self.position)))
 							       (incr self.position)
 							       b)))
-    
+
   (define-function data-stream-put-byte (self b)	(while (>= self.position self.limit) (data-stream-grow self))
 							(set-byte-at self.data self.position b)
 							(incr self.position)
