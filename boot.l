@@ -276,14 +276,14 @@
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
-			    (list '%typecheck ',name self) ; self ; xxx
+			    (list '%typecheck ',name self)
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define-function %make-unsafe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
 		      (list 'oop-at
-			    self;(list '%typecheck ',name self) ; self ; xxx
+			    self
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
@@ -823,3 +823,11 @@
   (let ((exps (read name)))
     (or exps (error "file not found or empty: "name))
     (list-do expr exps (pval expr))))
+
+(define *loaded*)
+
+(define-function require (name)
+  (or (member? name *loaded*)
+      (let ()
+	(push *loaded* name)
+	(load name))))
