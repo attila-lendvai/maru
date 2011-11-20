@@ -22,6 +22,7 @@
 
 (define-class <temp-grammar> <parser> ())
 
+(load "port.l")
 (load "pretty-print.l")
 
 (define-form grammar-eval (rules expr)
