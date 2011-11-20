@@ -33,7 +33,10 @@
   (do-print ()			(print "<local-label "self.name" "(format "%08x"self.address)">"))
   (label-relocate (offset)	(incr self.address offset) (println self)))
 
-;;; 
+(define-function label-address (l)
+  (<label>-address l))
+
+;;;
 
 (define-structure <assembler> (data labels references pass))
 
@@ -58,9 +61,6 @@
     (let ((labels self.labels))
       (while (and labels (!= addr (cdar labels))) (set labels (cdr labels)))
       (or (caar labels) (format "0x%08x" addr))))
-
-  (define-function label-address (self l)
-    (<label>-address l))
 
   (define-function set-assembler-pass (self p)
     (set self.pass p)
@@ -91,8 +91,8 @@
       (else		(or (= (<label>-address l) (data-stream-address (<assembler>-data x)))
 			    (error "phase error: "l))))))
 
-(define-function CALLl (l x)	(CALLm (label-address x l) 0 0 0 x))
-(define-function JNESl (l x)	(JNESm (label-address x l) 0 0 0 x))
+(define-function CALLl (l x)	(CALLm (label-address l) 0 0 0 x))
+(define-function JNESl (l x)	(JNESm (label-address l) 0 0 0 x))
 
 (define-function extB (b)	(>> (<< b 24) 24))
 
