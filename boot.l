@@ -811,6 +811,17 @@
 
 (define-form namespace (name)			`(set *globals* ,name))
 
+;;; command line
+
+(define *load-path*)
+
+(and (= "-L" (car *arguments*))
+     (let ()
+       (pop *arguments*)
+       (set *load-path* (pop *arguments*))))
+
+(define-form next-argument () '(pop *arguments*))
+
 ;;; load/save
 
 (define-function pval (expr)
@@ -819,8 +830,12 @@
     (and (> (verbose) 1) (println "=> "result))
     result))
 
+(define-function find-and-read (name)
+  (or (and *load-path* (read (concat-string *load-path* name)))
+      (read name)))
+
 (define-function load (name)
-  (let ((exps (read name)))
+  (let ((exps (find-and-read name)))
     (or exps (error "file not found or empty: "name))
     (list-do expr exps (pval expr))))
 
