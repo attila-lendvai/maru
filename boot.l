@@ -194,9 +194,9 @@
       (let ((head (apply function (map car lists))))
 	(cons head (apply map* (cons function (map cdr lists)))))))
 
-(define-function inject (op value list)
+(define-function foldr (op value list)
   (if (pair? list)
-      (op (car list) (inject op value (cdr list)))
+      (op (car list) (foldr op value (cdr list)))
     value))
 
 (set *expanders*   (array))	(define-form define-expand (type args . body)	`(set-array-at *expanders*   ,type (lambda ,args ,@body)))
