@@ -670,6 +670,9 @@
 
 (define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
 
+(define-form until (condition . body)
+  `(while (not ,condition) ,@body))
+
 ;;; conversion
 
 (define-function string->number-base (str radix)
