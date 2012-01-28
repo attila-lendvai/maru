@@ -709,3 +709,32 @@
        (if (= key (caar where))
 	   (cdr where)
 	 (cons (car where) (%rm (cdr where) key)))))
+
+;;;----------------------------------------------------------------
+
+(define-function parse-list (grammar rule list)
+  (let ((q (parser grammar (parser-stream (list-stream list)))))
+    (and (rule q)
+	 (<parser>-result q))))
+
+(define-function parse-files (grammar start-rule stop-rule paths)
+  (let ((g ()))
+    (list-do path paths
+      (let* ((handle  (or (open path) (error "cannot open: "path)))
+	     (stream  (parser-stream (input-stream handle path)))
+	     (p	  (parser <peg> stream)))
+	(while (start-rule p)
+	  (println "; "(car (<parser>-result p)))
+	  (set g (cons (<parser>-result p) g)))
+	(and stop-rule
+	     (let ()
+	       (stop-rule p)
+	       (or (parser-stream-at-end stream)
+		   (let ()
+		     (print "\nsyntax error in grammar "(name-of-type grammar)"."(<selector>-name start-rule)" near: ")
+		     (until (parser-stream-at-end stream)
+		       (print (format "%c" (parser-stream-next stream))))
+		     (println "<EOF>")
+		     (error "abort")))))
+	(close handle)))
+    g))
