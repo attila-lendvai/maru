@@ -156,10 +156,10 @@ findvars = .:vars `( 'assign-result .:name {findvars vars}:vars		   -> (if (assq
 		   ) ;
 
 value =
-`( 'match-rule .:name .+:args		-> `(let ()
+`( 'match-rule .:name .+:args		-> `(let ((pos (<parser-stream>-position self.source)))
    	       	      			      ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
 					      (or (,(concat-symbol '$ name) self)
-					      (let () (set (<parser-stream>-position self.source) pos) ())))
+						  (let () (set (<parser-stream>-position self.source) pos) ())))
  | 'match-rule .:name			-> `(,(concat-symbol '$ name) self)
  | 'match-rule-in .:type .:name .+:args	-> `(let ((pos (<parser-stream>-position self.source))
 						  (_p  (parser ,(concat-symbol '< (concat-symbol type '>)) self.source)))
