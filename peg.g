@@ -219,7 +219,7 @@ value =
  ) ;
 
 effect =
-`( 'match-rule .:name .+:args		-> `(let ()
+`( 'match-rule .:name .+:args		-> `(let ((pos (<parser-stream>-position self.source)))
    	       	      			      ,@(map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args)
 					      (or (,(concat-symbol '$$ name) self)
 					      (let () (set (<parser-stream>-position self.source) pos) ())))
