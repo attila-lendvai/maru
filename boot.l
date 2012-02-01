@@ -621,6 +621,17 @@
     (set list (cdr list)))
   (car list))
 
+(define-function list-reverse! (head)
+  (let ((curr head)
+	(prev ())
+	(next ()))
+    (while curr
+      (set next (cdr curr))
+      (set-cdr curr prev)
+      (set prev curr)
+      (set curr next))
+    prev))
+
 (define-function list-zip (a b)
   (if (and (pair? a) (pair? b))
       (cons (car a) (cons (car b) (list-zip (cdr a) (cdr b))))
