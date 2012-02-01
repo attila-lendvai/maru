@@ -5,9 +5,6 @@
 (require "parser.l")
 (require "peg.l")
 
-(let* ((p (parse-files <peg> $definition $space *arguments*))
-       (q (parse-list  <peg> $gen_cola p)))
-  (or q (error "could not generate parser implementation"))
-  (map dumpln q))
-
-(exit 0)
+(while *arguments*
+  (let ((g (parse-file <peg> $start (next-argument))))
+    (map dumpln g)))
