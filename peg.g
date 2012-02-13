@@ -146,8 +146,8 @@ gen_cola_effect_declaration	= `( .:id )			-> `(define-selector ,(concat-symbol '
 gen_cola_value_definitions	= `( gen_cola_value_definition* :d ) -> d ;
 gen_cola_effect_definitions	= `( gen_cola_effect_definition*:d ) -> d ;
 
-gen_cola_value_definition	= `( .:id &{findvars ()}:vars value:exp )  -> `(define-method ,(concat-symbol  '$ id) ,(<peg>-grammar-name self) () (let ,vars ,exp)) ;
-gen_cola_effect_definition	= `( .:id &{findvars ()}:vars effect:exp ) -> `(define-method ,(concat-symbol '$$ id) ,(<peg>-grammar-name self) () (let ,vars ,exp)) ;
+gen_cola_value_definition	= `( .:id &{findvars ()}:vars value:exp )  -> `(peg-define-rule ,(concat-symbol  '$ id) ,(<peg>-grammar-name self) () (let ,vars ,exp)) ;
+gen_cola_effect_definition	= `( .:id &{findvars ()}:vars effect:exp ) -> `(peg-define-rule ,(concat-symbol '$$ id) ,(<peg>-grammar-name self) () (let ,vars ,exp)) ;
 
 findvars = .:vars `( 'assign-result .:name {findvars vars}:vars		   -> (if (assq name vars) vars (cons (cons name) vars))
 		   | 'result-expr		-> vars

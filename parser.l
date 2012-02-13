@@ -718,6 +718,36 @@
 
 ;;;----------------------------------------------------------------
 
+(define-form peg-define-rule-without-memo (name type args . body)
+  (println "; RULE "name" "type" "args)
+  `(define-method ,name ,type ,args ,@body))
+
+(define-form peg-define-rule-with-memo (name type args . body)
+  (println "; MEMO "name" "type" "args)
+  (let ((qname (list 'quote name)))
+    `(define-method ,name ,type ,args
+       (let ((_here_ (<parser-stream>-position self.source))
+	     (_memo_ (get (<token>-notes _here_) ,qname)))
+	 (if _memo_
+	     (let ()
+	       (and (<memo>-success _memo_)
+		    (let ()
+		      (set self.result (<memo>-result _memo_))
+		      (set (<parser-stream>-position self.source) (<memo>-position _memo_))
+		      (<memo>-success _memo_))))
+	   (let ((success  ,@body)
+		 (_memo_2  (get (<token>-notes _here_) ,qname)))
+	     (if _memo_2
+		 (memoise _memo_2 success self.result (<parser-stream>-position self.source))
+	       (put (<token>-notes _here_) ,qname (new <memo> success self.result (<parser-stream>-position self.source))))
+	     success))))))
+
+(define peg-define-rule peg-define-rule-without-memo)
+;;(define peg-define-rule peg-define-rule-with-memo)
+;;(define peg-define-rule peg-define-rule-with-recursion)
+
+;;;----------------------------------------------------------------
+
 (define-function parse-file (grammar rule path)
   (let* ((handle  (or (open path) (error "cannot open: "path)))
 	 (stream  (parser-stream (input-stream handle path)))
