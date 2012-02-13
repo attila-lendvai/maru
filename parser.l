@@ -753,10 +753,9 @@
 
 ;;;----------------------------------------------------------------
 
-(define-function parse-file (grammar rule path)
-  (let* ((handle  (or (open path) (error "cannot open: "path)))
-	 (stream  (parser-stream (input-stream handle path)))
-	 (p       (parser grammar stream)))
+(define-function parse-stream (grammar rule stream)
+  (let* ((s (parser-stream stream))
+	 (p (parser grammar s)))
     (or (rule p)
 	(let ()
 	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
@@ -764,5 +763,11 @@
 	    (print (format "%c" (parser-stream-next stream))))
 	  (println "<EOF>")
 	  (error "abort")))
-    (close handle)
     (<parser>-result p)))
+
+(define-function parse-file (grammar rule path)
+  (let* ((handle  (or (open path) (error "cannot open: "path)))
+	 (stream  (input-stream handle path))
+	 (result  (parse-stream grammar rule stream)))
+    (close handle)
+    result))
