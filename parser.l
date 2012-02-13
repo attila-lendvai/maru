@@ -156,6 +156,11 @@
       (array-append a ($next self)))
     (array->string a)))
 
+(define-function contents-of-file-named (name)
+  (input-stream-up-to (input-stream (or (open "peg.g")
+					(error "no such file: "name))
+				    "peg.g") *end*))
+
 ;; (unit-test "<input-stream>"
 ;;   (let ((s (input-stream *input*))
 ;; 	(c 0)
