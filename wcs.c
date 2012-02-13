@@ -31,7 +31,7 @@ static char *wcs2mbs(wchar_t *wcs)
 }
 
 
-#if defined(__MACH__)
+#if defined(__MACH__) && !defined(__MAC_10_7)
 
 static wchar_t *wcsdup(wchar_t *s)
 {
