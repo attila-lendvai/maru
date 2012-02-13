@@ -157,9 +157,9 @@
     (array->string a)))
 
 (define-function contents-of-file-named (name)
-  (input-stream-up-to (input-stream (or (open "peg.g")
+  (input-stream-up-to (input-stream (or (open name)
 					(error "no such file: "name))
-				    "peg.g") *end*))
+				    name) *end*))
 
 ;; (unit-test "<input-stream>"
 ;;   (let ((s (input-stream *input*))
