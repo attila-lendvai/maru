@@ -705,9 +705,9 @@
 
 (define-function memoise (self success result position)
   (with-instance-accessors <memo>
-    (set self.success  success)
     (set self.result   result)
-    (set self.position position)))
+    (set self.position position)
+    (set self.success  success)))
 
 (define %cookies 0)
 
@@ -724,35 +724,31 @@
 ;;;----------------------------------------------------------------
 
 (define-form peg-define-rule-without-memo (name type args expr)
-  (println "; RULE "name" "type" "args)
+  ;;(println "; RULE "name" "type" "args)
   `(define-method ,name ,type ,args ,expr))
 
 (define-form peg-define-rule-with-memo (name type args expr)
-  (println "; MEMO "name" "type" "args)
+  ;;(println "; MEMO "name" "type" "args)
   (let ((qname (list 'quote name)))
     `(define-method ,name ,type ,args
-       (let ((_here_ (<parser-stream>-position self.source))
-	     (_memo_ (get (<token>-notes _here_) ,qname)))
+       (let* ((_here_ (<parser-stream>-position self.source))
+	      (_memo_ (get (<token>-notes _here_) ,qname)))
 	 (if _memo_
 	     (let ()
 	       (and (<memo>-success _memo_)
 		    (let ()
 		      (set self.result (<memo>-result _memo_))
 		      (set (<parser-stream>-position self.source) (<memo>-position _memo_))
-		      (<memo>-success _memo_))))
-	   (let ((success  ,expr)
-		 (_memo_2  (get (<token>-notes _here_) ,qname)))
-	     (if _memo_2
-		 (memoise _memo_2 success self.result (<parser-stream>-position self.source))
-	       (put (<token>-notes _here_) ,qname (new <memo> success self.result (<parser-stream>-position self.source))))
-	     success))))))
+		      _memo_)))
+	   (put (<token>-notes _here_) ,qname (set _memo_ (new <memo>)))
+	   (and ,expr (memoise _memo_ _memo_ self.result (<parser-stream>-position self.source))))))))
 
 (define-form peg-define-rule-with-recursion (name type args expr)
   (println "; LREC "name" "type" "args)
   (let ((qname (list 'quote name)))
     `(define-method ,name ,type ,args
-       (let ((_here_ (<parser-stream>-position self.source))
-	     (_memo_ (get (<token>-notes _here_) ,(list 'quote name))))
+       (let* ((_here_ (<parser-stream>-position self.source))
+	      (_memo_ (get (<token>-notes _here_) ,qname)))
 	 (if _memo_
 	     (cond
 	      ((= *outer* (<memo>-success _memo_))	(set (<memo>-success _memo_) *inner*)
@@ -799,8 +795,8 @@
 		    103))))))))
 
 ;;(define peg-define-rule peg-define-rule-without-memo)
-;;(define peg-define-rule peg-define-rule-with-memo)
-(define peg-define-rule peg-define-rule-with-recursion)
+(define peg-define-rule peg-define-rule-with-memo)
+;;(define peg-define-rule peg-define-rule-with-recursion)
 
 ;;;----------------------------------------------------------------
 
