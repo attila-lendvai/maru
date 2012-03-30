@@ -117,8 +117,8 @@
 	 (qname (list 'quote name)))
     `(define-method ,(concat-symbol '$ name) ,type ()
        (let ,(peg-find-variables (cadr rule) ())
-	 (let ((_here_ (<parser-stream>-position self.source))
-	       (_memo_ (get (<token>-notes _here_) ,qname)))
+	 (let* ((_here_ (<parser-stream>-position self.source))
+		(_memo_ (get (<token>-notes _here_) ,qname)))
 	   (if _memo_
 	       (let ()
 		 (and (<memo>-success _memo_)
@@ -138,8 +138,8 @@
 	 (qname (list 'quote name)))
     `(define-method ,(concat-symbol '$ (car rule)) ,type ()
        (let ,(peg-find-variables (cadr rule) ())
-	 (let ((_here_ (<parser-stream>-position self.source))
-	       (_memo_ (get (<token>-notes _here_) ,(list 'quote name))))
+	 (let* ((_here_ (<parser-stream>-position self.source))
+		(_memo_ (get (<token>-notes _here_) ,(list 'quote name))))
 	   (if _memo_
 	       (cond
 		 ((= *outer* (<memo>-success _memo_))	(set (<memo>-success _memo_) *inner*)
