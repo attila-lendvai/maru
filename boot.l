@@ -225,7 +225,10 @@
 	     (value  (cdr clause)))
 	(if (= 'else test)
 	    (%progn value)
-	  `(if ,test ,(%progn value) ,(%cond (cdr clauses)))))))
+	  (if (= '=> (car value))
+	      `(let ((_ ,test))
+		 (if _ (,(%progn (cdr value)) _) ,(%cond (cdr clauses))))
+	    `(if ,test ,(%progn value) ,(%cond (cdr clauses))))))))
 
 (define-form cond clauses (%cond clauses))
 
@@ -369,9 +372,9 @@
     self))
 
 (define-function environment-define (env name value)
-  (let ((bindings (<env>-bindings env))
-	(offset   (<env>-offset   env))
-	(var      (variable name value env offset)))
+  (let* ((bindings (<env>-bindings env))
+	 (offset   (<env>-offset   env))
+	 (var      (variable name value env offset)))
     (set (<env>-offset env) (+ offset 1))
     (array-append bindings var)))
 
@@ -398,7 +401,7 @@
   (and (pair? fields)
        (cons `(,(concat-symbol 'self. (car fields)) () ((name) (list 'oop-at 'self ,i)))
 	     (make-instance-accessors name (cdr fields) (+ i 1)))))
-  
+
 (define-form with-instance-accessors (type . body)
   `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
     (let () ,@body)))
