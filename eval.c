@@ -1,4 +1,4 @@
-// last edited: 2011-12-13 14:12:22 by piumarta on emilia
+// last edited: 2012-03-30 12:36:33 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -321,11 +321,14 @@ static oop newBaseContext(oop home, oop caller, oop env)
 static oop newContext(oop home, oop caller, oop env)
 {
   oop obj= nil;
+  //xxx fix escape analysis for nested lambdas with free variables
+#if 0
   if ((nil != caller) && (nil != (obj= get(caller, Context,callee)))) {
     set(obj, Context,home, home);
     set(obj, Context,env,  env);
     return obj;
   }
+#endif
   obj= newBaseContext(home, caller, env);
   if (nil != caller) set(caller, Context,callee, obj);
   return obj;
