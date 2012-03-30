@@ -1,4 +1,4 @@
-// last edited: 2012-03-30 12:36:33 by piumarta on emilia
+// last edited: 2012-03-30 15:46:42 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -794,11 +794,13 @@ static void doprint(FILE *stream, oop obj, int storing)
       fprintf(stream, "(");
       for (;;) {
 	assert(is(Pair, obj));
+#if defined(NDEBUG)
 	if (is(Env, getHead(obj))) {
 	  obj= getTail(obj);
 	  if (!is(Pair, obj)) break;
 	  continue;
 	}
+#endif
 	doprint(stream, getHead(obj), storing);
 	obj= getTail(obj);
 	if (!is(Pair, obj)) break;
@@ -863,7 +865,7 @@ static void doprint(FILE *stream, oop obj, int storing)
       if (!isGlobal(obj) && isatty(1)) fprintf(stream, "[4m");
       doprint(stream, get(obj, Variable,name), 0);
       if (!isGlobal(obj) && isatty(1)) fprintf(stream, "[m");
-#if 0
+#if !defined(NDEBUG)
       oop env= get(obj, Variable,env);
       if (nil != env) fprintf(stream, ";%ld+%ld", getLong(get(env, Env,level)), getLong(get(obj, Variable,index)));
 #endif
@@ -1007,6 +1009,42 @@ static oop exlist(oop list, oop env)
 
 static oop enlist(oop obj, oop env);
 
+static oop encode_bindings(oop expr, oop bindings, oop outerEnv, oop innerEnv)
+{
+    if (is(Pair, bindings))
+    {										GC_PROTECT(bindings);
+	oop binding= getHead(bindings);						GC_PROTECT(binding);
+	if (is(Symbol, binding))
+	    binding= newPairFrom(binding, nil, expr);
+	oop var= car(binding);							GC_PROTECT(var);
+	oop val= cdr(binding);							GC_PROTECT(val);
+	var= define(innerEnv, var, nil);
+	val= enlist(val, outerEnv);
+	binding= newPairFrom(var, val, expr);					GC_UNPROTECT(val);  GC_UNPROTECT(var);
+	oop rest= encode_bindings(expr, getTail(bindings), outerEnv, innerEnv);
+	bindings= newPairFrom(binding, rest, expr);				GC_UNPROTECT(binding);
+										GC_UNPROTECT(bindings);
+    }
+    return bindings;
+}
+
+static oop encode_let(oop expr, oop tail, oop env)
+{
+    oop args= car(tail);					GC_PROTECT(tail);  GC_PROTECT(env);
+    oop env2= newEnv(env, 0, getLong(get(env, Env,offset)));	GC_PROTECT(env2);
+    oop bindings= encode_bindings(expr, args, env, env2);	GC_PROTECT(bindings);
+    oop body= cdr(tail);					GC_PROTECT(body);
+    body= enlist(body, env2);
+    //printf("0 ---> "); dumpln(bindings);
+    //printf("0 ---> "); dumpln(body);
+    tail= newPairFrom(bindings, body, expr);			GC_UNPROTECT(body);  GC_UNPROTECT(bindings);
+    //printf("1 ---> "); dumpln(env2);
+    //printf("1 ---> "); dumpln(tail);
+    tail= newPairFrom(env2, tail, expr);			GC_UNPROTECT(env2);  GC_UNPROTECT(env);  GC_UNPROTECT(tail);
+    //printf("2 ---> "); dumpln(tail);
+    return tail;
+}
+
 static oop encode(oop expr, oop env)
 {
   if (opt_v > 1) { printf("ENCODE ");  dumpln(expr); }
@@ -1014,16 +1052,7 @@ static oop encode(oop expr, oop env)
     oop head= encode(getHead(expr), env);			GC_PROTECT(head);
     oop tail= getTail(expr);					GC_PROTECT(tail);
     if (f_let == head) { // (let ENV (bindings...) . body)
-      oop args= cadr(expr);
-      env= newEnv(env, 0, getLong(get(env, Env,offset)));	GC_PROTECT(env);
-      while (is(Pair, args)) {
-	oop var= getHead(args);
-	if (is(Pair, var)) var= getHead(var);
-	define(env, var, nil);
-	args= getTail(args);
-      }
-      tail= enlist(tail, env);
-      tail= newPairFrom(env, tail, expr);			GC_UNPROTECT(env);
+	tail= encode_let(expr, tail, env);
     }
     else if (f_lambda == head) { // (lambda ENV params . body)
       oop args= car(tail);
