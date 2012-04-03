@@ -687,6 +687,15 @@
 (define-form until (condition . body)
   `(while (not ,condition) ,@body))
 
+(define-form list-detect (name list expr)
+  `(let ((_ ())
+	 (__ ,list))
+     (while (and __ (not _))
+       (let ((,name (car __)))
+	 (and ,expr (set _ (car __)))
+	 (set __ (cdr __))))
+     _))
+
 ;;; conversion
 
 (define-function string->number-base (str radix)
