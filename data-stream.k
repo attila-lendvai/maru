@@ -13,9 +13,9 @@
   (define-function data-stream-origin (self)		(address-of self.data))
   (define-function data-stream-address (self)		(+ (address-of self.data) self.position))
 
-  (define-function data-stream-grow (self)		(let ((lim (max 8 (* self.limit 2)))
-							      (old self.data)
-							      (big (data lim)))
+  (define-function data-stream-grow (self)		(let* ((lim (max 8 (* self.limit 2)))
+							       (old self.data)
+							       (big (data lim)))
 							  (for (i 0 self.limit) (set-byte-at big i (byte-at old i)))
 							  (set self.data  big)
 							  (set self.limit lim)
