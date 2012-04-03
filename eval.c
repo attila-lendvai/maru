@@ -1,4 +1,4 @@
-// last edited: 2012-03-30 15:46:42 by piumarta on emilia
+// last edited: 2012-04-03 14:16:10 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -127,6 +127,9 @@ static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applica
 static oop arguments= nil, backtrace= nil, input= nil;
 
 static int opt_b= 0, opt_g= 0, opt_p= 0, opt_v= 0;
+
+static oop traceStack= nil;
+static int traceDepth= 0;
 
 static oop newData(size_t len)		{ return _newBits(Data, len); }
 
@@ -1047,6 +1050,7 @@ static oop encode_let(oop expr, oop tail, oop env)
 
 static oop encode(oop expr, oop env)
 {
+  arrayAtPut(traceStack, traceDepth++, expr);
   if (opt_v > 1) { printf("ENCODE ");  dumpln(expr); }
   if (is(Pair, expr)) {
     oop head= encode(getHead(expr), env);			GC_PROTECT(head);
@@ -1116,6 +1120,7 @@ static oop encode(oop expr, oop env)
     }
   }
   if (opt_v > 1) { printf("ENCODE => ");  dumpln(expr); }
+  --traceDepth;
   return expr;
 }
 
@@ -1129,9 +1134,6 @@ static oop enlist(oop list, oop env)
 }
 
 static oop evlist(oop obj, oop env);
-
-static oop traceStack= nil;
-static int traceDepth= 0;
 
 static int printSource(oop exp)
 {
@@ -1168,20 +1170,25 @@ static void fatal(char *reason, ...)
     apply(tracer, args, nil);			GC_UNPROTECT(args);
   }
   else {
-    int i= traceDepth;
-    int j= 12;
-    while (i--) {
-      //printf("%3d: ", i);
-      oop exp= arrayAt(traceStack, i);
-      printf("[32m[?7l");
-      int l= printSource(exp);
-      if (l >= j) j= l;
-      if (!l) while (l < 3) l++, putchar('.');
-      while (l++ < j) putchar(' ');
-      printf("[0m ");
-      dumpln(arrayAt(traceStack, i));
-      printf("[?7h");
-    }
+      if (traceDepth) {
+	  int i= traceDepth;
+	  int j= 12;
+	  while (i--) {
+	      //printf("%3d: ", i);
+	      oop exp= arrayAt(traceStack, i);
+	      printf("[32m[?7l");
+	      int l= printSource(exp);
+	      if (l >= j) j= l;
+	      if (!l) while (l < 3) l++, putchar('.');
+	      while (l++ < j) putchar(' ');
+	      printf("[0m ");
+	      dumpln(arrayAt(traceStack, i));
+	      printf("[?7h");
+	  }
+      }
+      else {
+	  printf("no backtrace\n");
+      }
   }
   exit(1);
 }
