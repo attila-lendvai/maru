@@ -6,5 +6,11 @@
 (require "test-dc.g.l")
 
 (while *arguments*
-  (let ((g (parse-file <dc> $program (next-argument))))
-    (map dumpln g)))
+  (let* ((arg (next-argument))
+	 (ans ()))
+    (peg-disable-memoisation)
+    (map dumpln (parse-file <dc> $program arg))
+    (peg-enable-memoisation)
+    (map dumpln (parse-file <dc> $program arg))
+    (peg-enable-recursion)
+    (map dumpln (parse-file <dc> $program arg))))
