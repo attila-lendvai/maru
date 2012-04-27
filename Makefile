@@ -72,6 +72,10 @@ test-compile-grammar :
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
+test-recursion2 :
+	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
+	./eval compile-recursion2.l test.dc
+
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
 	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
