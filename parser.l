@@ -1,5 +1,3 @@
-(define *recurred* '(*recurred*))
-
 ;; (define %make-accessor %make-unsafe-accessor)
 
 (define-structure <*end-of-stream-marker*> ())
@@ -190,10 +188,10 @@
 
 (define-method do-print <token> ()
   (print "<token "self.index" "(format "%c" self.value))
-  (map (lambda (x)
-	 (and (symbol? (car x))
-	      (print " "(car x))))
-       self.notes)
+;  (map (lambda (x)
+;	 (and (symbol? (car x))
+;	      (print " "(car x))))
+;       self.notes)
   (print ">"))
 
 ;(define <token> <pair>)		;(define token cons)			;(define new-<token> cons)
@@ -417,9 +415,29 @@
 	str
       (parser-stream-fail self pos))))
 
+(define-function parser-stream-short-context (self)
+  (let ((a (array))
+	(p (<parser-stream>-position self)))
+    (while (and (<token>-tail (parser-stream-peek-token self))
+		(!= *end* (parser-stream-peek self))
+		(!= ?\n   (parser-stream-peek self))
+		(!= ?\r   (parser-stream-peek self)))
+      (array-append a (parser-stream-next self)))
+    (for (i 0 32)
+      (if (and (!= *end* (parser-stream-peek self))
+	       (!= ?\n   (parser-stream-peek self))
+	       (!= ?\r   (parser-stream-peek self)))
+	  (array-append a (parser-stream-next self))
+	(set i 999)))
+    ;;(array-do x a (println x))
+    (set (<parser-stream>-position self) p)
+    (array->string a)))
+
 (define-function parser-stream-context (self)
-  (let ((a (array)))
-    (while (and (<token>-tail (parser-stream-peek-token self)) (!= *end* (parser-stream-peek self)))
+  (let ((a (array))
+	(p (<parser-stream>-position self)))
+    (while (and (<token>-tail (parser-stream-peek-token self))
+		(!= *end* (parser-stream-peek self)))
       (array-append a (parser-stream-next self)))
     (and (> (array-length a) 0)
 	 (string-do c "[31;1m<!>[30;0m" (array-append a c)))
@@ -429,6 +447,7 @@
 	(string-do c "[34;1m<EOF>[30;0m" (array-append a c))
 	(set i 999)))
     ;;(array-do x a (println x))
+    (set (<parser-stream>-position self) p)
     (array->string a)))
 
 (define-method $source-position <parser-stream> () ($source-position self.source))
@@ -462,6 +481,17 @@
 								(unit-assert (= 'symbols (parser-stream-next s)))
 								(unit-assert (equal '(and "strings!" (and (lists)))
 										    (parser-stream-next s))))))
+
+;;;----------------------------------------------------------------
+
+(define-structure <parser-input-stream> (source))
+
+(define-function parser-input-stream (source)	(new <parser-input-stream> source))
+
+(define-method $at-end <parser-input-stream>		() ($at-end self.source))
+(define-method $peek <parser-input-stream>		() (or ($peek self.source) *end*))
+(define-method $next <parser-input-stream>		() (or ($next self.source) *end*))
+(define-method $source-position <parser-input-stream>	() ($source-position self.source))
 
 ;;;----------------------------------------------------------------
 
@@ -703,6 +733,11 @@
       (print "#"self.success)
     (print "<memo>")))
 
+(define-function copy-memo (src dst)
+  (set (<memo>-success  dst) (<memo>-success  src))
+  (set (<memo>-result   dst) (<memo>-result   src))
+  (set (<memo>-position dst) (<memo>-position src)))
+
 (define-function memoise (self success result position)
   (with-instance-accessors <memo>
     (set self.result   result)
@@ -713,90 +748,117 @@
 
 (define-form put (where key val)	`(set ,where (cons (cons ,key ,val) ,where)))
 (define-form get (where key)		`(cdr (assq ,key ,where)))
-(define-form rem (where key)		`(set ,where (%rm ,where ,key)))
+(define-form del (where key)		`(set ,where (%del ,where ,key)))
 
-(define-function %rm (where key)
+(define-function %del (where key)
   (and (pair? where)
        (if (= key (caar where))
 	   (cdr where)
-	 (cons (car where) (%rm (cdr where) key)))))
+	 (cons (car where) (%del (cdr where) key)))))
 
 ;;;----------------------------------------------------------------
 
-(define-form peg-define-rule-without-memo (name type args expr)
-  ;;(println "; RULE "name" "type" "args)
-  `(define-method ,name ,type ,args ,expr))
+(define-form peg-define-rule (name type vars expr)
+  (if vars
+      `(define-method ,name ,type () (let ,vars ,expr))
+    `(define-method ,name ,type () ,expr)))
 
-(define-form peg-define-rule-with-memo (name type args expr)
-  ;;(println "; MEMO "name" "type" "args)
+(define *succeeded*	'(*succeeded*))
+(define *failed*	'(*failed*))
+(define *active*	'(*active*))
+(define *recurring*	'(*recurring*))
+
+(define-function peg-invoke-rule-simply (rule name self)
+  ;;(println "; simple "name)
+  (rule self))
+
+(define-function peg-invoke-rule-with-memo (rule name self)
+  (println "; memoised "name" "self)
+  (let* ((here (<parser-stream>-position (<parser>-source self)))
+	 (memo (get (<token>-notes here) name)))
+    ;;(println "; memo "memo)
+    (cond
+      (memo	(and (= *succeeded* (<memo>-success memo))
+		     (let ()
+		       (set (<parser>-result self) (<memo>-result memo))
+		       (set (<parser-stream>-position (<parser>-source self)) (<memo>-position memo)))))
+      (else	(put (<token>-notes here) name (set memo (new <memo>)))
+		(if (rule self)
+		    (memoise memo *succeeded* (<parser>-result self) (<parser-stream>-position (<parser>-source self)))
+		  (set (<memo>-success memo) *failed*)
+		  ())))))
+
+(define-function peg-invoke-rule-with-recursion (rule name self)
+  ;;(println "; recursive "name)
+  (let* ((stream (<parser>-source self))
+	 (posn   (<parser-stream>-position stream))
+	 (notes  (<token>-notes posn))
+	 (memo   (get notes name)))
+    (if memo
+	;; this rule has already been entered at this position and has either succeeded, failed, or is in left-recursive iteration
+	(let ((success (<memo>-success memo))
+	      (result  (<memo>-result  memo)))
+	  ;;(println "trying "name" "(<memo>-success memo)"\t==> <"(parser-stream-short-context stream)">")
+	  (cond
+	    ((= success *succeeded*)	;;(println "MEMO SUCCEED "(<memo>-result memo))
+					(set (<parser>-result	       self)   (<memo>-result   memo))
+					(set (<parser-stream>-position stream) (<memo>-position memo))
+					101)
+	    ((= success *failed*)	;;(println "MEMO FAIL")
+					())
+	    ((= success *active*)	(set (<memo>-success memo) *recurring*)
+					(let ((ok (rule self)))
+					  (if ok ;; non-left recursive alternate succeded in rule at posn
+					      (let* ((epos (<parser-stream>-position stream))
+						     (emem (new <memo> *succeeded* (<parser>-result self) epos))
+						     (toks ())) ;; or () -> posn to remove the original memo
+						(copy-memo emem memo)
+						(put (<token>-notes epos) name emem)
+						(push toks epos)
+						(while (and (rule self)
+							    (!= epos (<parser-stream>-position stream)))
+						  (copy-memo emem memo)
+						  (set epos (<parser-stream>-position stream))
+						  (set (<memo>-result   emem) (<parser>-result self))
+						  (set (<memo>-position emem) epos)
+						  (put (<token>-notes epos) name emem)
+						  (push toks epos)
+						  )
+						(set (<parser>-result	       self)   (<memo>-result   memo))
+						(set (<parser-stream>-position stream) (<memo>-position memo))
+						(list-do tok toks (del (<token>-notes tok) name))
+						;;(println "*** RECURSION SUCCESS "name" -> "(<memo>-result memo))
+						102)
+					    (set (<memo>-success  memo) *failed*)
+					    ())))
+	    ((= success *recurring*)	;;(println "MEMO RECURSION FAIL") ;; left-recursion at this position: fail to next alternate in rule
+					())))
+      ;; this rule has not been entered at this position
+      (put (<token>-notes posn) name (set memo (new <memo>)))
+      (set (<memo>-success memo) *active*)
+      ;;(println "starting "name" "(<memo>-success memo)"\t==> <"(parser-stream-short-context stream)">")
+      (let ((ok (rule self)))
+	(if ok
+	    (let ()
+	      (set (<memo>-success  memo) *succeeded*)
+	      (set (<memo>-result   memo) (<parser>-result self))
+	      (set (<memo>-position memo) (<parser-stream>-position stream))
+	      ;;(println "finishing "name" "(<memo>-success memo)"\t==> <"(parser-stream-short-context stream)">")
+	      )
+	  (set (<memo>-success  memo) *failed*))
+	ok))))
+
+(define peg-invoke-rule peg-invoke-rule-simply)
+
+(define-form peg-match-rule (name self)
   (let ((qname (list 'quote name)))
-    `(define-method ,name ,type ,args
-       (let* ((_here_ (<parser-stream>-position self.source))
-	      (_memo_ (get (<token>-notes _here_) ,qname)))
-	 (if _memo_
-	     (let ()
-	       (and (<memo>-success _memo_)
-		    (let ()
-		      (set self.result (<memo>-result _memo_))
-		      (set (<parser-stream>-position self.source) (<memo>-position _memo_))
-		      _memo_)))
-	   (put (<token>-notes _here_) ,qname (set _memo_ (new <memo>)))
-	   (and ,expr (memoise _memo_ _memo_ self.result (<parser-stream>-position self.source))))))))
+    `(peg-invoke-rule ,name ,qname ,self)))
 
-(define-form peg-define-rule-with-recursion (name type args expr)
-  (println "; LREC "name" "type" "args)
-  (let ((qname (list 'quote name)))
-    `(define-method ,name ,type ,args
-       (let* ((_here_ (<parser-stream>-position self.source))
-	      (_memo_ (get (<token>-notes _here_) ,qname)))
-	 (if _memo_
-	     (cond
-	      ((= *outer* (<memo>-success _memo_))	(set (<memo>-success _memo_) *inner*)
-							;;(println ,qname"\tOUTER -> INNER "_here_)
-							(if ,expr
-							    (let ((_pos_ (<parser-stream>-position self.source)))
-							      (set (<memo>-success _memo_) *recur*)
-							      (set (<memo>-result  _memo_) self.result)
-							      ;;(println ,qname"\tINNER -> RECUR "_pos_)
-							      (put (<token>-notes _pos_) ,(list 'quote name) _memo_)
-							      (while (and ,expr
-									  (!= _pos_ (<parser-stream>-position self.source)))
-								;;(println ,qname"\tRECUR -> RECUR "_pos_)
-								(set _pos_ (<parser-stream>-position self.source))
-								(set (<memo>-result _memo_) self.result)
-								(put (<token>-notes _pos_) ,(list 'quote name) _memo_)
-								)
-							      ;;(println ,qname"\tRECUR -> DONE "_pos_" "(!= _pos_ _here_)" "(<memo>-result _memo_))
-							      (set (<memo>-position _memo_) _pos_)
-							      (set (<memo>-success _memo_) *recurred*))))
-	      ((= *inner* (<memo>-success _memo_))	;;(println ,qname"\t<- INNER "_here_)
-							())
-	      ((= *recur* (<memo>-success _memo_))	(set self.result (<memo>-result _memo_))
-							;;(println ,qname"\t<- RECUR "_here_)
-							102)
-	      (else					(and (<memo>-success _memo_)
-							     (let ()
-							       (set self.result (<memo>-result _memo_))
-							       (set (<parser-stream>-position self.source) (<memo>-position _memo_))
-							       101))))
-	   (set _memo_ (new <memo> *outer*))
-	   (put (<token>-notes _here_) ,(list 'quote name) _memo_)
-	   ;;(println ,qname  "\tBEGIN  "_here_)
-	   (let ((success  ,expr))
-	     ;;(println ,qname"\tEND    "_here_" "success" "(<memo>-success _memo_)" "(<parser-stream>-position self.source)" "(<memo>-position _memo_))
-	     (and success
-		  (if (= (<memo>-success  _memo_) *recur*)
-		      (let ()
-			(set (<memo>-success _memo_) 1)
-			(set self.result (<memo>-result   _memo_))
-			;;(set (<memo>-position _memo_) (<parser-stream>-position self.source))
-			(set (<parser-stream>-position self.source) (<memo>-position _memo_))
-			*recurred*)
-		    103))))))))
+(define-function peg-disable-memoisation ()	(println "; PEG memoisation disabled")	(set peg-invoke-rule peg-invoke-rule-simply))
+(define-function peg-enable-memoisation ()	(println "; PEG memoisation enabled")	(set peg-invoke-rule peg-invoke-rule-with-memo))
+(define-function peg-enable-recursion ()	(println "; PEG recursion enabled")	(set peg-invoke-rule peg-invoke-rule-with-recursion))
 
-;;(define peg-define-rule peg-define-rule-without-memo)
-(define peg-define-rule peg-define-rule-with-memo)
-;;(define peg-define-rule peg-define-rule-with-recursion)
+;;(peg-enable-recursion)
 
 ;;;----------------------------------------------------------------
 
