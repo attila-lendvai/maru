@@ -25,7 +25,7 @@
 
   (define-function data-stream-truncate (self)		(set self.limit self.position))
 
-  (define-function data-stream-rewind (self . rest)	(set self.position (if rest (car rest) 0)))
+  (define-function data-stream-rewind (self . rest)	(set self.position (or (car rest) 0)))
 
   (define-function data-stream-byte-at (self n)		(let ((i (+ self.position n)))
 							  (and (< i self.limit)
