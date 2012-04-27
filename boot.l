@@ -683,6 +683,7 @@
   (for-each collection (lambda (x) (function x value))))
 
 (define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
+(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
 
 (define-form until (condition . body)
   `(while (not ,condition) ,@body))
