@@ -5,7 +5,7 @@
 ;; interested, I'm wondering how a few example grammars behave under your preferred
 ;; left-recursive parsing technique, and how you think they should behave.
 
-(define peg-make-definition peg-make-definition-with-recursion)
+(peg-enable-recursion)
 
 (define-function input-between (a b)
   (list->string (list-from-to a b)))
@@ -100,11 +100,15 @@ aaaaaaaaaaaaa.
 {
   digit = [0-9]:d		-> (- d ?0) ;
 
-  term  = term:a "+" digit:b	-> (println `(add ,a ,b))
+  term  = term:a "+" digit:b	-> `(add ,a ,b)
         | digit
         ;
 
-  _ term:t			-> (println t)
+  (_ term)*:t			-> (map dumpln t)
 }
 
+0
+1
+1
+1
 0+1+2+3+4+5+6+7+8+9
