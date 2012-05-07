@@ -1,10 +1,6 @@
 (define-function array-append-all (arr . vals)
   (list-do val vals (array-append arr val)))
 
-(define-function pval (expr)
-  ;;(println "### expr")
-  (eval expr))
-
 (load "parser.l")
 (load "peg-compile.l")
 (load "peg.l")
