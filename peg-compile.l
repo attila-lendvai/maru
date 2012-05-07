@@ -3,34 +3,34 @@
 
 (define-form match-save (exp)	`(let ((pos (<parser-stream>-position self.source))) ,exp))
 (define-form match-ok ()	`(set (<parser-stream>-position self.source) pos))
-(define-form match-ko ()	`(let () (set (<parser-stream>-position self.source) pos) ()))
+(define-form match-ko ()	`(let ()
+				   (set (<parser-stream>-position self.source) pos)
+				   ()))
 
 (define-form match-rule (name . args)
-  (let* ((rname (concat-symbol '$ name))
-	 (qname (list 'quote rname)))
+  (let* ((rname (concat-symbol '$ name)))
     (if args
 	`(match-save
 	  (let ()
 	    ,@(list-reverse! (map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args))
-	    (or (peg-invoke-rule ,rname ,qname self)
+	    (or (peg-match-rule ,rname self)
 		(match-ko))))
-      `(peg-invoke-rule ,rname ,qname self))))
+      `(peg-match-rule ,rname self))))
 
 (define-form match-rule-in (type name . args)
   (let* ((tname (concat-symbol '< (concat-symbol type '>)))
-	 (rname (concat-symbol '$ name))
-	 (qname (list 'quote rname)))
+	 (rname (concat-symbol '$ name)))
     (if args
      `(match-save
         (let ((_p (parser ,tname self.source)))
 	  ,@(list-reverse! (map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args))
-          (let ((_s (peg-invoke-rule ,rname ,qname _p)))
+          (let ((_s (peg-match-rule ,rname _p)))
 	    (if _s
 		(let () (set self.result (<parser>-result _p)) _s))
 	    (match-ko))))
      `(let ((_p (parser ,tname self.source)))
 	,@(list-reverse! (map (lambda (arg) (list 'parser-stream-push 'self.source arg)) args))
-	(let ((_s (peg-invoke-rule ,rname ,qname _p)))
+	(let ((_s (peg-match-rule ,rname _p)))
 	  (and _s
 	       (let () (set self.result (<parser>-result _p)) _s)))))))
 
@@ -43,8 +43,13 @@
 
 (define-form match-all exprs
   `(match-save
-    (or ,(%match-all exprs)
+    (or (and ,@exprs)
 	(match-ko))))
+
+;; (define-form match-all exprs
+;;   `(match-save
+;;     (or ,(%match-all exprs)
+;; 	(match-ko))))
 
 (define-form match-zero-one (exp)
   `(let ((_list_ (group)))
@@ -114,22 +119,18 @@
      (let ,(peg-find-variables (cadr rule) ())
        ,(expand (cadr rule)))))
 
-;; (define-function pval (expr)
-;;   (dumpln expr)
-;;   (eval expr))
-
 (define-function peg-compile-grammar (grammar)
   (let ((class (list 'define-class (<grammar>-name grammar) (<grammar>-base grammar) (<grammar>-fields grammar)))
 	(decls (with-map peg-make-declaration (<grammar>-name grammar) (<grammar>-rules grammar)))
 	(defns (with-map peg-make-definition  (<grammar>-name grammar) (<grammar>-rules grammar))))
-    (set (<grammar>-type grammar) (eval class))
-    (list-do decl decls (eval decl))
-    (list-do defn defns (eval defn))
+    (set (<grammar>-type grammar) (pval class))
+    (list-do decl decls (pval decl))
+    (list-do defn defns (pval defn))
     (cons class (concat-list decls defns))))
 
 (define-function peg-compile-rules (name rules)
   (let ((decls (with-map peg-make-declaration name rules))
 	(defns (with-map peg-make-definition  name rules)))
-    (list-do decl decls (eval decl))
-    (list-do defn defns (eval defn))
+    (list-do decl decls (pval decl))
+    (list-do defn defns (pval defn))
     (concat-list decls defns)))
