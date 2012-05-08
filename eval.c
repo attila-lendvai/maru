@@ -1,4 +1,4 @@
-// last edited: 2012-04-03 14:16:10 by piumarta on emilia
+// last edited: 2012-05-08 14:57:40 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -742,7 +742,7 @@ static oop read(FILE *fp)
     }
   }
 }
-    
+
 static void doprint(FILE *stream, oop obj, int storing)
 {
   if (!obj) {
@@ -772,7 +772,7 @@ static void doprint(FILE *stream, oop obj, int storing)
 	int c;
 	putc('"', stream);
 	while ((c= *p++)) {
-	  if (c >= ' ' && c < 127)
+	  if (c >= ' ')
 	    switch (c) {
 	      case '"':  printf("\\\"");  break;
 	      case '\\': printf("\\\\");  break;
