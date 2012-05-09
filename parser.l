@@ -804,19 +804,19 @@
       ;; this rule has not been entered at this position
       (put (<token>-notes posn) name (set memo (new <memo> *active* () posn)))
       (if (rule self)
+	  ;; rule succeeded without recursion or entered recursion and found a non-recursive initial prefix
 	  (let ((state (<memo>-state memo)))
-	    (cond
-	      ((= state *active*)	(memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position stream)))
-	      ((= state *recurred*)	(memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position stream))
-					(set (<parser-stream>-position stream) posn)
-					(while (and (rule self)
-						    (token-preceeds (<memo>-position memo) (<parser-stream>-position stream)))
-					  (set (<memo>-result   memo) (<parser>-result	        self))
-					  (set (<memo>-position memo) (<parser-stream>-position stream))
-					  (set (<parser-stream>-position stream) posn))
-					(set (<parser>-result self) (<memo>-result memo))
-					(set (<parser-stream>-position stream) (<memo>-position memo)))
-	      (else			(error "unknown parser state after recursion: "state))))
+	    (memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position stream))
+	    (if (= state *recurred*)
+		(let ()
+		  (set (<parser-stream>-position stream) posn)	;; rewind to start of recursive match
+		  (while (and (rule self) (token-preceeds (<memo>-position memo) (<parser-stream>-position stream)))	;; grow the prefix recursively
+		    (set (<memo>-result   memo) (<parser>-result self))
+		    (set (<memo>-position memo) (<parser-stream>-position stream))
+		    (set (<parser-stream>-position stream) posn))
+		  (set (<parser>-result self) (<memo>-result memo))			;; store the final result when recursion fails to grow prefix
+		  (set (<parser-stream>-position stream) (<memo>-position memo)))
+	      (or (= state *active*) (error "unknown parser state after recursion: "state))))
 	(set (<memo>-state memo) *failed*)
 	()))))
 
