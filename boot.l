@@ -206,13 +206,31 @@
 
 ;;; let*
 
+(define-function %let*getters (vars getter rest)
+  (if (pair? vars)
+      (cons (list (car vars) (list 'car getter))
+	    (%let*getters (cdr vars) (list 'cdr getter) rest))
+    rest))
+
+(define-function %let*unpack (vars val rest)
+    (cons (cons '_%let_values_ val)
+	  (%let*getters vars '_%let_values_ rest)))
+
+(define-function %let*bindings (bindings)
+  (if (pair? bindings)
+      (let ((var     (caar bindings))
+	    (val     (cdar bindings)))
+	(if (pair? var)
+	    (%let*unpack var val (%let*bindings (cdr bindings)))
+	  (cons (cons var val) (%let*bindings (cdr bindings)))))))
+
 (define-function %let* (bindings body)
   (if (pair? (cdr bindings))
       `(let (,(car bindings)) ,(%let* (cdr bindings) body))
     `(let ,bindings ,@body)))
 
 (define-form let* bindings-body
-  (%let* (car bindings-body) (cdr bindings-body)))
+  (%let* (%let*bindings (car bindings-body)) (cdr bindings-body)))
 
 ;;; cond
 
@@ -413,10 +431,12 @@
 (define-function selector? (obj) (= <selector> (type-of obj)))
 
 (define-function <selector>-inherit (methods type)
-  (let ((method ()))
-    (while (and (set type (array-at %structure-bases type))
-		(not (set method (array-at methods type)))))
-    method)) ;; xxx THIS SHOULD COPY DOWN THE METHOD FOR PERFORMANCE xxx
+  (let ((method ())
+	(probe  type))
+    (while (and (set probe (array-at %structure-bases probe))
+		(not (set method (array-at methods probe)))))
+    ;; (and method (set (array-at methods type) method))	;; copy down the method for performance
+    method))
 
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
