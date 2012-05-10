@@ -210,7 +210,9 @@
   (if (pair? vars)
       (cons (list (car vars) (list 'car getter))
 	    (%let*getters (cdr vars) (list 'cdr getter) rest))
-    rest))
+    (if (symbol? vars)
+	(cons (list vars getter) rest)
+      rest)))
 
 (define-function %let*unpack (vars val rest)
     (cons (cons '_%let_values_ val)
