@@ -1,4 +1,4 @@
-// last edited: 2012-05-08 14:57:40 by piumarta on emilia
+// last edited: 2012-05-10 19:17:14 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -121,7 +121,7 @@ static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	se
 static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  return obj; }
 
 static oop symbols= nil;
-static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil; //, s_in= nil;
+static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil; //, s_in= nil;
 static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
 static oop arguments= nil, backtrace= nil, input= nil;
@@ -695,8 +695,18 @@ static oop read(FILE *fp)
 	return obj;
       }
       case '(': return readList(fp, ')');      case ')': ungetwc(c, fp);  return DONE;
-      case '[': return readList(fp, ']');      case ']': ungetwc(c, fp);  return DONE;
-      case '{': return readList(fp, '}');      case '}': ungetwc(c, fp);  return DONE;
+      case '[': {
+	  oop obj= readList(fp, ']');			GC_PROTECT(obj);
+	  obj= newPairFrom(s_bracket, obj, obj);	GC_UNPROTECT(obj);
+	  return obj;
+      }
+      case ']': ungetwc(c, fp);  return DONE;
+      case '{': {
+	  oop obj= readList(fp, '}');			GC_PROTECT(obj);
+	  obj= newPairFrom(s_brace, obj, obj);		GC_UNPROTECT(obj);
+	  return obj;
+      }
+      case '}': ungetwc(c, fp);  return DONE;
       case '-': {
 	wint_t d= getwc(fp);
 	ungetwc(d, fp);
@@ -2433,6 +2443,8 @@ int main(int argc, char **argv)
   s_unquote_splicing	= intern(L"unquote-splicing");
   s_t			= intern(L"t");
   s_dot			= intern(L".");
+  s_bracket		= intern(L"bracket");
+  s_brace		= intern(L"brace");
 //s_in			= intern(L"in");
 
   oop tmp= nil;		GC_PROTECT(tmp);
