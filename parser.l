@@ -709,8 +709,6 @@
     (set (<peg>-grammar-name self) name)
     self))
 
-(define %make-accessor %make-safe-accessor)
-
 ;;;----------------------------------------------------------------
 
 (define-function %set-list-source (x y)
