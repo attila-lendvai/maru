@@ -61,6 +61,7 @@ sexpr		= ("-"? digit+) @$#
 		| "?".
 		| "\""  (!"\""  char)* $:e "\""					-> e
 		| "("  sexpression*:e (space dot sexpression:f)? sspace ")"	-> (set-list-source `(,@e ,@f) e)
+		| "["  sexpression*:e (space dot sexpression:f)? sspace "]"	-> (set-list-source `(bracket ,@e ,@f) e)
 		| "'"  sexpression:e						-> (list 'quote e)
 		| "`"  sexpression:e						-> (list 'quasiquote e)
 		| ",@" sexpression:e						-> (list 'unquote-splicing e)
