@@ -1,4 +1,4 @@
-// last edited: 2012-05-10 19:17:14 by piumarta on emilia
+// last edited: 2012-05-12 03:49:00 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -126,7 +126,7 @@ static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
 static oop arguments= nil, backtrace= nil, input= nil;
 
-static int opt_b= 0, opt_g= 0, opt_p= 0, opt_v= 0;
+static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 
 static oop traceStack= nil;
 static int traceDepth= 0;
@@ -1060,7 +1060,7 @@ static oop encode_let(oop expr, oop tail, oop env)
 
 static oop encode(oop expr, oop env)
 {
-  arrayAtPut(traceStack, traceDepth++, expr);
+  if (opt_O < 2) arrayAtPut(traceStack, traceDepth++, expr);
   if (opt_v > 1) { printf("ENCODE ");  dumpln(expr); }
   if (is(Pair, expr)) {
     oop head= encode(getHead(expr), env);			GC_PROTECT(head);
@@ -1145,7 +1145,7 @@ static oop enlist(oop list, oop env)
 
 static oop evlist(oop obj, oop env);
 
-static int printSource(oop exp)
+static int fprintSource(FILE *stream, oop exp)
 {
     if (is(Pair, exp)) {
 	oop src= get(exp, Pair,source);
@@ -1153,11 +1153,16 @@ static int printSource(oop exp)
 	    oop path= car(src);
 	    oop line= cdr(src);
 	    if (is(String, path) && is(Long, line)) {
-		return printf("%ls:%ld", get(path, String,bits), getLong(line));
+		return fprintf(stream, "%ls:%ld", get(path, String,bits), getLong(line));
 	    }
 	}
     }
     return 0;
+}
+
+static int printSource(oop exp)
+{
+    return fprintSource(stdout, exp);
 }
 
 static void fatal(char *reason, ...)
@@ -1183,7 +1188,7 @@ static void fatal(char *reason, ...)
       if (traceDepth) {
 	  int i= traceDepth;
 	  int j= 12;
-	  while (i--) {
+	  while (i-- > 0) {
 	      //printf("%3d: ", i);
 	      oop exp= arrayAt(traceStack, i);
 	      printf("[32m[?7l");
@@ -1214,15 +1219,15 @@ static oop eval(oop obj, oop ctx)
       return obj;
     }
     case Pair: {
-      arrayAtPut(traceStack, traceDepth++, obj);
+      if (opt_O < 2) arrayAtPut(traceStack, traceDepth++, obj);
       oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
       if (is(Fixed, head))
 	head= apply(get(head, Fixed,function), getTail(obj), ctx);
       else  {
 	oop args= evlist(getTail(obj), ctx);		GC_PROTECT(args);
-	if (opt_g) arrayAtPut(traceStack, traceDepth++, newPair(head, args));
+	if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, newPair(head, args));
 	head= apply(head, args, ctx);			GC_UNPROTECT(args);
-	if (opt_g) --traceDepth;
+	if (opt_g > 1) --traceDepth;
       }							GC_UNPROTECT(head);
       --traceDepth;
       return head;
@@ -1235,13 +1240,13 @@ static oop eval(oop obj, oop ctx)
       return arrayAt(get(cx, Context,bindings), getLong(get(obj, Variable,index)));
     }
     default: {
-      if (opt_g) arrayAtPut(traceStack, traceDepth++, obj);
+      if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, obj);
       oop ev= arrayAt(get(evaluators, Variable,value), getType(obj));
       if (nil != ev) {
 	oop args= newPair(obj, nil);			GC_PROTECT(args);
 	obj= apply(ev, args, ctx);			GC_UNPROTECT(args);
       }
-      if (opt_g) --traceDepth;
+      if (opt_g > 1) --traceDepth;
       return obj;
     }
   }
@@ -1296,14 +1301,14 @@ static oop apply(oop fun, oop arguments, oop ctx)
       }
       oop ans= nil;
       oop body= cddr(defn);
-      if (opt_g) arrayAtPut(traceStack, traceDepth++, body);
+      if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, body);
       while (is(Pair, body)) {
-	if (opt_g) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
+	if (opt_g > 1) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
 	set(ctx, Context,pc, body);
 	ans= eval(getHead(body), ctx);
 	body= getTail(body);
       }
-      if (opt_g || opt_p) --traceDepth;
+      if ((opt_g > 1) || opt_p) --traceDepth;
       //GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
@@ -1323,10 +1328,10 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop args= arguments;
       oop ap= arrayAt(get(applicators, Variable,value), getType(fun));
       if (nil != ap) {						GC_PROTECT(args);
-	if (opt_g) arrayAtPut(traceStack, traceDepth++, fun);
+	if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, fun);
 	args= newPair(fun, args);
 	args= apply(ap, args, ctx);				GC_UNPROTECT(args);
-	if (opt_g) --traceDepth;
+	if (opt_g > 1) --traceDepth;
 	return args;
       }
       fprintf(stderr, "\nerror: cannot apply: ");
@@ -2211,6 +2216,15 @@ static subr(verbose)
   return obj;
 }
 
+static subr(optimised)
+{
+  oop obj= car(args);
+  if (nil == obj) return newLong(opt_O);
+  if (!isLong(obj)) return nil;
+  opt_O= getLong(obj);
+  return obj;
+}
+
 static subr(sin)
 {
   oop obj= getHead(args);
@@ -2366,7 +2380,7 @@ static void profilingDisable(int stats)
     {
 	struct profile { int profile;  oop object, source; } profiles[64];
 	int nprofiles= 0;
-	printf("%i profiles\n", profilerCount);
+	fprintf(stderr, "%i profiles\n", profilerCount);
 	GC_gcollect();
 	oop obj;
 	for (obj= GC_first_object();  obj;  obj= GC_next_object(obj)) {
@@ -2398,11 +2412,11 @@ static void profilingDisable(int stats)
 	}
 	int i;
 	for (i= 0;  i < nprofiles;  ++i) {
-	    printf("%i\t", profiles[i].profile);
-	    int l= printSource(profiles[i].source);
-	    if (l < 20) printf("%*s", 20 - l, "");
-	    printf(" ");
-	    dumpln(profiles[i].object);
+	    fprintf(stderr, "%i\t", profiles[i].profile);
+	    int l= fprintSource(stderr, profiles[i].source);
+	    if (l < 20) fprintf(stderr, "%*s", 20 - l, "");
+	    fprintf(stderr, " ");
+	    fdumpln(stderr, profiles[i].object);
 	}
     }
 }
@@ -2540,6 +2554,7 @@ int main(int argc, char **argv)
       { " set-oop-at",	   subr_set_oop_at },
       { " not",		   subr_not },
       { " verbose",	   subr_verbose },
+      { " optimised",	   subr_optimised },
       { " sin",		   subr_sin },
       { " cos",		   subr_cos },
       { " log",		   subr_log },
@@ -2591,6 +2606,7 @@ int main(int argc, char **argv)
     if 	    (!wcscmp (arg, L"-v"))	{ ++opt_v; }
     else if (!wcscmp (arg, L"-b"))	{ ++opt_b; }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
+    else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
 #  if (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
 	opt_g= 0;
