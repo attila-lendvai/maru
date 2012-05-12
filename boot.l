@@ -310,7 +310,10 @@
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
-(define %make-accessor %make-safe-accessor)
+(define %make-accessor
+  (if (> (optimised) 0)
+      %make-unsafe-accessor
+    %make-safe-accessor))
 
 (define-function %make-accessors (name fields)
   (%make-accessor name fields 0))
