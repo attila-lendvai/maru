@@ -1,4 +1,4 @@
-// last edited: 2012-05-12 03:49:00 by piumarta on emilia
+// last edited: 2012-05-12 03:56:08 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -1225,9 +1225,9 @@ static oop eval(oop obj, oop ctx)
 	head= apply(get(head, Fixed,function), getTail(obj), ctx);
       else  {
 	oop args= evlist(getTail(obj), ctx);		GC_PROTECT(args);
-	if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, newPair(head, args));
+	if (opt_g) arrayAtPut(traceStack, traceDepth++, newPair(head, args));
 	head= apply(head, args, ctx);			GC_UNPROTECT(args);
-	if (opt_g > 1) --traceDepth;
+	if (opt_g) --traceDepth;
       }							GC_UNPROTECT(head);
       --traceDepth;
       return head;
@@ -1240,13 +1240,13 @@ static oop eval(oop obj, oop ctx)
       return arrayAt(get(cx, Context,bindings), getLong(get(obj, Variable,index)));
     }
     default: {
-      if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, obj);
+      if (opt_g) arrayAtPut(traceStack, traceDepth++, obj);
       oop ev= arrayAt(get(evaluators, Variable,value), getType(obj));
       if (nil != ev) {
 	oop args= newPair(obj, nil);			GC_PROTECT(args);
 	obj= apply(ev, args, ctx);			GC_UNPROTECT(args);
       }
-      if (opt_g > 1) --traceDepth;
+      if (opt_g) --traceDepth;
       return obj;
     }
   }
@@ -1301,14 +1301,14 @@ static oop apply(oop fun, oop arguments, oop ctx)
       }
       oop ans= nil;
       oop body= cddr(defn);
-      if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, body);
+      if (opt_g) arrayAtPut(traceStack, traceDepth++, body);
       while (is(Pair, body)) {
-	if (opt_g > 1) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
+	if (opt_g) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
 	set(ctx, Context,pc, body);
 	ans= eval(getHead(body), ctx);
 	body= getTail(body);
       }
-      if ((opt_g > 1) || opt_p) --traceDepth;
+      if (opt_g || opt_p) --traceDepth;
       //GC_UNPROTECT(tmp);
       GC_UNPROTECT(ctx);
       GC_UNPROTECT(defn);
@@ -1328,10 +1328,10 @@ static oop apply(oop fun, oop arguments, oop ctx)
       oop args= arguments;
       oop ap= arrayAt(get(applicators, Variable,value), getType(fun));
       if (nil != ap) {						GC_PROTECT(args);
-	if (opt_g > 1) arrayAtPut(traceStack, traceDepth++, fun);
+	if (opt_g) arrayAtPut(traceStack, traceDepth++, fun);
 	args= newPair(fun, args);
 	args= apply(ap, args, ctx);				GC_UNPROTECT(args);
-	if (opt_g > 1) --traceDepth;
+	if (opt_g) --traceDepth;
 	return args;
       }
       fprintf(stderr, "\nerror: cannot apply: ");
