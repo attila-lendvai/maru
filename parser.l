@@ -771,7 +771,7 @@
   (rule self))
 
 (define-function peg-invoke-rule-with-memo (rule name self)
-  (println "; memoised "name" "self)
+  ;;(println "; memoised "name" "self)
   (let* ((here (<parser-stream>-position (<parser>-source self)))
 	 (memo (get (<token>-notes here) name)))
     ;;(println "; memo "memo)
