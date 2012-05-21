@@ -117,7 +117,7 @@
 (define-function peg-make-definition (type rule)
   `(define-method ,(concat-symbol '$ (car rule)) ,type ()
      (let ,(peg-find-variables (cadr rule) ())
-       ,(cadr rule))))
+       ,(expand (cadr rule)))))
 
 (define-function peg-compile-grammar (grammar)
   (let ((class (list 'define-class (<grammar>-name grammar) (<grammar>-base grammar) (<grammar>-fields grammar)))
