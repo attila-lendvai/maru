@@ -1,4 +1,4 @@
-// last edited: 2012-05-12 03:56:08 by piumarta on emilia
+// last edited: 2012-05-21 18:43:32 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -786,7 +786,7 @@ static void doprint(FILE *stream, oop obj, int storing)
 	    switch (c) {
 	      case '"':  printf("\\\"");  break;
 	      case '\\': printf("\\\\");  break;
-	      default:	 putc(c, stream);  break;
+	      default:	 putwc(c, stream);  break;
 	    }
 	  else fprintf(stream, "\\%03o", c);
 	}
