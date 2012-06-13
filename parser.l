@@ -785,7 +785,7 @@
 		       (set (<parser>-result self) (<memo>-result memo))
 		       (set (<parser-stream>-position (<parser>-source self)) (<memo>-position memo)))))
       (else	(put (<token>-notes here) name (set memo (new <memo>)))
-		(if (rule self)
+		(if (peg-invoke-rule-simply rule name self)
 		    (memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position (<parser>-source self)))
 		  (set (<memo>-state memo) *failed*)
 		  ())))))
@@ -807,14 +807,15 @@
 	    (else			())))
       ;; this rule has not been entered at this position
       (put (<token>-notes posn) name (set memo (new <memo> *active* () posn)))
-      (if (rule self)
+      (if (peg-invoke-rule-simply rule name self)
 	  ;; rule succeeded without recursion or entered recursion and found a non-recursive initial prefix
 	  (let ((state (<memo>-state memo)))
 	    (memo-set memo *succeeded* (<parser>-result self) (<parser-stream>-position stream))
 	    (if (= state *recurred*)
 		(let ()
 		  (set (<parser-stream>-position stream) posn)	;; rewind to start of recursive match
-		  (while (and (rule self) (token-preceeds (<memo>-position memo) (<parser-stream>-position stream)))	;; grow the prefix recursively
+		  (while (and (peg-invoke-rule-simply rule name self)
+			      (token-preceeds (<memo>-position memo) (<parser-stream>-position stream)))	;; grow the prefix recursively
 		    (set (<memo>-result   memo) (<parser>-result self))
 		    (set (<memo>-position memo) (<parser-stream>-position stream))
 		    (set (<parser-stream>-position stream) posn))
