@@ -1,5 +1,5 @@
-(define-function peg-invoke-rule (rule name parser)
-  (rule parser))
+;(define-function peg-invoke-rule (rule name parser)
+;  (rule parser))
 
 (define-form match-save (exp)	`(let ((pos (<parser-stream>-position self.source))) ,exp))
 (define-form match-ok ()	`(set (<parser-stream>-position self.source) pos))
@@ -100,7 +100,7 @@
 (define-form make-number	(base exp)	`(and ,exp (set self.result (string->number-base (list->string self.result) ,base))))
 
 (define-form assign-result (name exp)	`(let ((_s ,exp)) (and _s (let () (set ,name self.result) _s))))
-(define-form result-expr (exp)		`(let () (set self.result ,exp) 1))
+(define-form result-expr (exp)		`(let () (peg-source-range-begin self) (set self.result ,exp) (peg-source-range-end self) 1))
 
 (define-function peg-find-variables (tree vars)
   (and (pair? tree)

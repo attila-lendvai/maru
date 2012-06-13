@@ -121,7 +121,7 @@
 (define-function input-stream (source path)
   (let ((self (new <input-stream>)))
     (set (<input-stream>-source self) source)
-    (set (<input-stream>-srcpos self) (cons path 0))
+    (set (<input-stream>-srcpos self) (cons path 1))
     self))
 
 (define-method $at-end <input-stream> ()
@@ -667,7 +667,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <parser> (source result))
+(define-structure <parser> (source result position))
 
 (define-function parser (type stream)
   (let ((self (new type)))
@@ -764,9 +764,15 @@
 (define *active*	'(*active*))
 (define *recurred*	'(*recurred*))
 
+(define-function peg-source-range-begin (self)	(push (<parser>-position self) ($source-position (<parser>-source self))))
+(define-function peg-source-range-end (self)	(pop (<parser>-position self)))
+
 (define-function peg-invoke-rule-simply (rule name self)
   ;;(println "; simple "name)
-  (rule self))
+  (peg-source-range-begin self)
+  (let ((result (rule self)))
+    (peg-source-range-end self)
+    result))
 
 (define-function peg-invoke-rule-with-memo (rule name self)
   ;;(println "; memoised "name" "self)

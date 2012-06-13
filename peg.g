@@ -214,7 +214,7 @@ value =
  | 'make-symbol value:exp		-> `(and ,exp (set self.result (string->symbol (list->string self.result))))
  | 'make-number .:r value:exp		-> `(and ,exp (set self.result (string->number-base (list->string self.result) ,r)))
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
- | 'result-expr .:exp			-> `(let () (set self.result ,exp) 1)
+ | 'result-expr .:exp			-> `(let () (peg-source-range-begin self) (set self.result ,exp) (peg-source-range-end self) 1)
  | .:op					->  (error "cannot generate value for "op)
  |					->  (error "cannot generate value for nil")
  ) ;
@@ -259,7 +259,7 @@ effect =
  | 'make-symbol   effect:exp		->  exp
  | 'make-number .:r effect:exp		->  exp
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
- | 'result-expr   .:exp			-> `(let () ,exp 1)
+ | 'result-expr   .:exp			-> `(let () (peg-source-range-begin self) ,exp (peg-source-range-end self) 1)
  | .:op					->  (error "cannot generate value for "op)
  |					->  (error "cannot generate value for nil")
  ) ;
