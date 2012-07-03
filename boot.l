@@ -159,6 +159,11 @@
 	(set list (cdr list))))
     (cdr head)))
 
+(define-function reverse-map (function list)
+  (and list
+       (let ((tail (reverse-map function (cdr list))))
+	 (cons (function (car list)) tail))))
+
 (define-function map-with (function list a)
   (if (pair? list)
       (let ((head (function (car list) a)))
@@ -369,7 +374,7 @@
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
 (define-structure <subr>	(_imp _name _profile))
-(define-structure <variable>	(name value env index))			(define-function variable? (obj) (= <variable> (type-of obj)))
+(define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 
@@ -378,12 +383,13 @@
     (set (<fixed>-function self) fun)
     self))
 
-(define-function variable (name value env index)
+(define-function variable (name value env index . opt-type)
   (let ((self (new <variable>)))
     (set (<variable>-name  self) name)
     (set (<variable>-value self) value)
     (set (<variable>-env   self) env)
     (set (<variable>-index self) index)
+    (set (<variable>-type  self) (car opt-type))
     self))
 
 (define-function environment (parent)
@@ -898,3 +904,19 @@
       (let ()
 	(push *loaded* name)
 	(load name))))
+
+(define-function contents-to-file-named (string path)
+  (let ((f (or (open path "w")
+	       (error "cannot open for writing: "path))))
+    (string-do c string (putc c f))
+    (close f)))
+
+(define-function contents-of-file-named (path)
+  (let ((f (or (open path)
+	       (error "cannot open for writing: "path)))
+	(s (array))
+	(c))
+    (while (set c (getc f))
+      (array-append s c))
+    (close f)
+    (array->string s)))
