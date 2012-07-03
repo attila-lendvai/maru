@@ -154,10 +154,11 @@
       (array-append a ($next self)))
     (array->string a)))
 
-(define-function contents-of-file-named (name)
-  (input-stream-up-to (input-stream (or (open name)
-					(error "no such file: "name))
-				    name) *end*))
+;; *** moved to boot.l ***
+;; (define-function contents-of-file-named (name)
+;;   (input-stream-up-to (input-stream (or (open name)
+;; 					(error "no such file: "name))
+;; 				    name) *end*))
 
 ;; (unit-test "<input-stream>"
 ;;   (let ((s (input-stream *input*))
