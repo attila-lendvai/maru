@@ -1,4 +1,4 @@
-// last edited: 2012-05-21 18:43:32 by piumarta on emilia
+// last edited: 2012-07-03 16:37:51 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -49,7 +49,7 @@ struct Expr	{ oop 	   name, defn, ctx, profile; };
 struct Form	{ oop 	   function, symbol; };
 struct Fixed	{ oop      function; };
 struct Subr	{ imp_t    imp;  wchar_t *name;  int profile; };
-struct Variable	{ oop 	   name, value, env, index; };
+struct Variable	{ oop 	   name, value, env, index, type; };
 struct Env	{ oop 	   parent, level, offset, bindings, stable; };
 struct Context	{ oop 	   home, env, bindings, callee, pc; };
 
@@ -298,7 +298,8 @@ static oop newVariable(oop name, oop value, oop env, int index)
   set(obj, Variable,name,  name);
   set(obj, Variable,value, value);
   set(obj, Variable,env,   env);
-  set(obj, Variable,index, newLong(index));	GC_UNPROTECT(obj);
+  set(obj, Variable,index, newLong(index));
+  set(obj, Variable,type,  0);			GC_UNPROTECT(obj);
   return obj;
 }
 
@@ -1705,7 +1706,11 @@ static subr(open)
 {
   oop arg= car(args);
   if (!is(String, arg)) { fprintf(stderr, "open: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  FILE *stream= (FILE *)fopen(wcs2mbs(get(arg, String,bits)), "rb");
+  char *name= strdup(wcs2mbs(get(arg, String,bits)));
+  char *mode= "rb";
+  if (is(String, cadr(args))) mode= wcs2mbs(get(cadr(args), String,bits));
+  FILE *stream= (FILE *)fopen(name, mode);
+  free(name);
   if (stream) fwide(stream, 1);
   return stream ? newLong((long)stream) : nil;
 }
@@ -1726,6 +1731,18 @@ static subr(getc)
   FILE *stream= (FILE *)getLong(arg);
   int c= getwc(stream);
   return (EOF == c) ? nil : newLong(c);
+}
+
+static subr(putc)
+{
+  oop chr= car(args);
+  oop arg= cadr(args);
+  if (nil == arg) arg= get(input, Variable,value);
+  if (!isLong(chr)) { fprintf(stderr, "putc: non-integer character: ");  fdumpln(stderr, chr);  fatal(0); }
+  if (!isLong(arg)) { fprintf(stderr, "putc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  FILE *stream= (FILE *)getLong(arg);
+  int c= putwc(getLong(chr), stream);
+  return (EOF == c) ? nil : chr;
 }
 
 static subr(read)
@@ -2502,6 +2519,7 @@ int main(int argc, char **argv)
       { " open",	   subr_open },
       { " close",	   subr_close },
       { " getc",	   subr_getc },
+      { " putc",	   subr_putc },
       { " read",	   subr_read },
       { " expand",	   subr_expand },
       { " encode",	   subr_encode },
