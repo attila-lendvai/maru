@@ -781,6 +781,12 @@
       (set list (cdr list)))
     str))
 
+(define-function character->string (c)		(let ((s (string 1))) (set-string-at s 0 c) s))
+
+(define-function array-append-all (a s)
+  (string-do e s (array-append a e))
+  s)
+
 ;;; sorting and searching
 
 (define-function %partition (items at set-at compare left pivot right)
