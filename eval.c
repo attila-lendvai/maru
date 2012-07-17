@@ -1,4 +1,4 @@
-// last edited: 2012-07-03 16:37:51 by piumarta on emilia
+// last edited: 2012-07-17 11:01:50 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -341,25 +341,26 @@ static oop newContext(oop home, oop caller, oop env)
 static void dump(oop);
 static void dumpln(oop);
 
-static oop findVariable(oop env, oop name)
+static oop findLocalVariable(oop env, oop name)
 {
-//  if (is(Pair, name) && s_in == getHead(name)) {
-//    env= findVariable(env, cadr(name));
-//    if (nil == env) fatal("undefined namespace: %s", get(cadr(name), Symbol,bits));
-//    if (!is(Env, env)) fatal("not a namespace: %s", get(cadr(name), Symbol,bits));
-//    return findVariable(env, caddr(name));
-//  }
-  while (nil != env) {
     oop bindings= get(env, Env,bindings);
     int index= arrayLength(bindings);
     while (--index >= 0) {
-      oop var= arrayAt(bindings, index);
-      if (get(var, Variable,name) == name)
-	return var;
+	oop var= arrayAt(bindings, index);
+	if (get(var, Variable,name) == name)
+	    return var;
     }
-    env= get(env, Env,parent);
-  }
-  return nil;
+    return nil;
+}
+
+static oop findVariable(oop env, oop name)
+{
+    while (nil != env) {
+	oop var= findLocalVariable(env, name);
+	if (nil != var) return var;
+	env= get(env, Env,parent);
+    }
+    return nil;
 }
 
 static oop lookup(oop env, oop name)
@@ -1023,6 +1024,18 @@ static oop exlist(oop list, oop env)
 
 static oop enlist(oop obj, oop env);
 
+static void define_bindings(oop bindings, oop innerEnv)
+{										GC_PROTECT(bindings);
+    while (is(Pair, bindings))
+    {
+	oop var= getHead(bindings);						GC_PROTECT(var);
+	if (!is(Symbol, var)) var= car(var);
+	//printf("DEFINE BINDING %p %ld ", innerEnv, getLong(get(innerEnv, Env,offset)));  dumpln(var);
+	var= define(innerEnv, var, nil);					GC_UNPROTECT(var);
+	bindings= getTail(bindings);
+    }										GC_UNPROTECT(bindings);
+}
+
 static oop encode_bindings(oop expr, oop bindings, oop outerEnv, oop innerEnv)
 {
     if (is(Pair, bindings))
@@ -1032,7 +1045,7 @@ static oop encode_bindings(oop expr, oop bindings, oop outerEnv, oop innerEnv)
 	    binding= newPairFrom(binding, nil, expr);
 	oop var= car(binding);							GC_PROTECT(var);
 	oop val= cdr(binding);							GC_PROTECT(val);
-	var= define(innerEnv, var, nil);
+	var= findLocalVariable(innerEnv, var);					assert(nil != var);
 	val= enlist(val, outerEnv);
 	binding= newPairFrom(var, val, expr);					GC_UNPROTECT(val);  GC_UNPROTECT(var);
 	oop rest= encode_bindings(expr, getTail(bindings), outerEnv, innerEnv);
@@ -1046,6 +1059,8 @@ static oop encode_let(oop expr, oop tail, oop env)
 {
     oop args= car(tail);					GC_PROTECT(tail);  GC_PROTECT(env);
     oop env2= newEnv(env, 0, getLong(get(env, Env,offset)));	GC_PROTECT(env2);
+    define_bindings(args, env2);
+    set(env, Env,offset, newLong(getLong(get(env2, Env,offset))));
     oop bindings= encode_bindings(expr, args, env, env2);	GC_PROTECT(bindings);
     oop body= cdr(tail);					GC_PROTECT(body);
     body= enlist(body, env2);
@@ -1435,6 +1450,7 @@ static subr(let)
 	tmp= eval(value, ctx);
 	prog= getTail(prog);
       }
+      //printf("SET %p LOCAL %ld TO ", locals, getLong(get(var, Variable,index)));  dumpln(tmp);
       arrayAtPut(locals, getLong(get(var, Variable,index)), tmp);
     }
     bindings= getTail(bindings);
