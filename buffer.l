@@ -22,7 +22,7 @@
 
 (define-function buffer-save (self path)
   (with-instance-accessors <buffer>
-    (let ((f (or (open path "w")
+    (let ((f (or (open path "w" -1)
 		 (error "cannot open for writing: "path))))
       (for (i 0 self.size) (putb (byte-at self.data i) f))
       (close f))))
@@ -32,3 +32,9 @@
 
 (define-function buffer-call (self offset)
   (call (+ (address-of (<buffer>-data self)) offset)))
+
+;; (let ((b (buffer-new 4096)))
+;;   (buffer-write b 65)
+;;   (buffer-write b 66)
+;;   (buffer-write b 67)
+;;   (buffer-save b "a.out"))
