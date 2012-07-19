@@ -1,4 +1,4 @@
-// last edited: 2012-07-17 11:01:50 by piumarta on emilia
+// last edited: 2012-07-19 01:01:57 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -111,7 +111,7 @@ static oop cadr(oop obj)		{ return car(cdr(obj)); }
 static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
 //static oop caaar(oop obj)		{ return car(car(car(obj))); }
 //static oop cadar(oop obj)		{ return car(cdr(car(obj))); }
-//static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
+static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
 //static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
@@ -1030,7 +1030,6 @@ static void define_bindings(oop bindings, oop innerEnv)
     {
 	oop var= getHead(bindings);						GC_PROTECT(var);
 	if (!is(Symbol, var)) var= car(var);
-	//printf("DEFINE BINDING %p %ld ", innerEnv, getLong(get(innerEnv, Env,offset)));  dumpln(var);
 	var= define(innerEnv, var, nil);					GC_UNPROTECT(var);
 	bindings= getTail(bindings);
     }										GC_UNPROTECT(bindings);
@@ -1064,13 +1063,8 @@ static oop encode_let(oop expr, oop tail, oop env)
     oop bindings= encode_bindings(expr, args, env, env2);	GC_PROTECT(bindings);
     oop body= cdr(tail);					GC_PROTECT(body);
     body= enlist(body, env2);
-    //printf("0 ---> "); dumpln(bindings);
-    //printf("0 ---> "); dumpln(body);
     tail= newPairFrom(bindings, body, expr);			GC_UNPROTECT(body);  GC_UNPROTECT(bindings);
-    //printf("1 ---> "); dumpln(env2);
-    //printf("1 ---> "); dumpln(tail);
     tail= newPairFrom(env2, tail, expr);			GC_UNPROTECT(env2);  GC_UNPROTECT(env);  GC_UNPROTECT(tail);
-    //printf("2 ---> "); dumpln(tail);
     return tail;
 }
 
@@ -1450,7 +1444,6 @@ static subr(let)
 	tmp= eval(value, ctx);
 	prog= getTail(prog);
       }
-      //printf("SET %p LOCAL %ld TO ", locals, getLong(get(var, Variable,index)));  dumpln(tmp);
       arrayAtPut(locals, getLong(get(var, Variable,index)), tmp);
     }
     bindings= getTail(bindings);
@@ -1724,10 +1717,12 @@ static subr(open)
   if (!is(String, arg)) { fprintf(stderr, "open: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
   char *name= strdup(wcs2mbs(get(arg, String,bits)));
   char *mode= "rb";
+  long  wide= 1;
   if (is(String, cadr(args))) mode= wcs2mbs(get(cadr(args), String,bits));
+  if (is(Long, caddr(args))) wide= getLong(caddr(args));
   FILE *stream= (FILE *)fopen(name, mode);
   free(name);
-  if (stream) fwide(stream, 1);
+  if (stream) fwide(stream, wide);
   return stream ? newLong((long)stream) : nil;
 }
 
@@ -1739,6 +1734,16 @@ static subr(close)
   return arg;
 }
 
+static subr(getb)
+{
+  oop arg= car(args);
+  if (nil == arg) arg= get(input, Variable,value);
+  if (!isLong(arg)) { fprintf(stderr, "getb: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  FILE *stream= (FILE *)getLong(arg);
+  int c= getc(stream);
+  return (EOF == c) ? nil : newLong(c);
+}
+
 static subr(getc)
 {
   oop arg= car(args);
@@ -1746,7 +1751,19 @@ static subr(getc)
   if (!isLong(arg)) { fprintf(stderr, "getc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
   int c= getwc(stream);
-  return (EOF == c) ? nil : newLong(c);
+  return (WEOF == c) ? nil : newLong(c);
+}
+
+static subr(putb)
+{
+  oop chr= car(args);
+  oop arg= cadr(args);
+  if (nil == arg) arg= get(input, Variable,value);
+  if (!isLong(chr)) { fprintf(stderr, "putb: non-integer character: ");  fdumpln(stderr, chr);  fatal(0); }
+  if (!isLong(arg)) { fprintf(stderr, "putb: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  FILE *stream= (FILE *)getLong(arg);
+  int c= putc(getLong(chr), stream);
+  return (EOF == c) ? nil : chr;
 }
 
 static subr(putc)
@@ -1758,7 +1775,7 @@ static subr(putc)
   if (!isLong(arg)) { fprintf(stderr, "putc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
   int c= putwc(getLong(chr), stream);
-  return (EOF == c) ? nil : chr;
+  return (WEOF == c) ? nil : chr;
 }
 
 static subr(read)
@@ -2534,7 +2551,9 @@ int main(int argc, char **argv)
 //    { " current-environment",	   subr_current_environment },
       { " open",	   subr_open },
       { " close",	   subr_close },
+      { " getb",	   subr_getb },
       { " getc",	   subr_getc },
+      { " putb",	   subr_putb },
       { " putc",	   subr_putc },
       { " read",	   subr_read },
       { " expand",	   subr_expand },
