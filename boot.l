@@ -164,6 +164,11 @@
        (let ((tail (reverse-map function (cdr list))))
 	 (cons (function (car list)) tail))))
 
+(define-function reverse-map-with (function list arg)
+  (and list
+       (let ((tail (reverse-map-with function (cdr list) arg)))
+	 (cons (function (car list) arg) tail))))
+
 (define-function map-with (function list a)
   (if (pair? list)
       (let ((head (function (car list) a)))
@@ -781,7 +786,9 @@
       (set list (cdr list)))
     str))
 
-(define-function character->string (c)		(let ((s (string 1))) (set-string-at s 0 c) s))
+(define-function character->string (c)
+  (let ((s (string 1)))
+    (set-string-at s 0 c) s))
 
 (define-function array-append-all (a s)
   (string-do e s (array-append a e))
@@ -911,10 +918,20 @@
 	(push *loaded* name)
 	(load name))))
 
-(define-function contents-to-file-named (string path)
+(define-method length <string> ()		(string-length self))
+(define-method length <array> ()		(array-length self))
+
+(define-method at <string> (index)		(string-at self index))
+(define-method at <array> (index)		(array-at self index))
+
+(define-method set-at <string> (index value)	(string-at self index))
+(define-method set-at <array> (index value)	(array-at self index))
+
+(define-function contents-to-file-named (string path . options)
   (let ((f (or (open path "w")
-	       (error "cannot open for writing: "path))))
-    (string-do c string (putc c f))
+	       (error "cannot open for writing: "path)))
+	(p (or (car options) putc)))
+    (for (i 0 (length string)) (p (at string i) f))
     (close f)))
 
 (define-function contents-of-file-named (path)
