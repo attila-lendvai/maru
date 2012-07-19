@@ -58,10 +58,10 @@
 	(.long	3)				; CPU_SUBTYPE_I386_ALL
 	(.long	2)				; MH_EXECUTE
 	(.long	2)				; ncmds
-	(.long	(- start cmds))			; cmdsize
+	(.long	(- start cmd0))			; cmdsize
 	(.long	0)				; flags
-cmds	(.long	1)				; LC_SEGMENT
-	(.long	124)				; cmdsize
+cmd0	(.long	1)				; LC_SEGMENT
+	(.long	(- cmd1 cmd0))			; cmdsize
 	(.ascii	"__TEXT")			; segname
 	(.byte	0 0 0 0 0 0 0 0 0 0)		; segname
 	(.long	0x1000)				; vmaddr
@@ -85,8 +85,8 @@ cmds	(.long	1)				; LC_SEGMENT
 	(.long	0)				; flags
 	(.long	0)				; reserved1
 	(.long	0)				; reserved2
-	(.long	5)				; LC_UNIXTHREAD
-	(.long	80)				; cmdsize
+cmd1	(.long	5)				; LC_UNIXTHREAD
+	(.long	(- start cmd1))			; cmdsize
 	(.long	1)				; i386_THREAD_STATE
 	(.long	16)				; i386_THREAD_STATE_COUNT
 	(.long	0 0 0 0 0 0 0 0)		; state
