@@ -3,7 +3,7 @@
 (define UNDERLINE	"[4m")
 (define BLINK		"[5m")
 (define NEGATIVE	"[7m")
-(define BOLD-OFF	"[21m")
+(define BOLD-OFF	"[22m")
 (define UNDERLINE-OFF	"[24m")
 (define BLINK-OFF	"[25m")
 (define NEGATIVE-OFF	"[27m")
