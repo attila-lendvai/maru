@@ -11,9 +11,11 @@ run : eval
 
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c -lm -ldl
+	-/usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c -lm -ldl -lgc
+	-/usr/sbin/execstack -s $@
 
 debug : .force
 	$(MAKE) OFLAGS="-O0"
