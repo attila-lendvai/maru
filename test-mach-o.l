@@ -1,4 +1,4 @@
-(require "buffer.l")
+(require "buffer.k")
 
 (define code (buffer-new 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
@@ -26,30 +26,32 @@
 (define-function .long longs		(list-do long longs (_L () (eval long))))
 (define-function .ascii strings		(list-do string strings (string-do char string (_B () char))))
 
-(define-function movlIR (src dst)	(MOVLir src dst ()))
-(define-function inclR (dst)		(INCLr dst ()))
-(define-function pushlI (src)		(PUSHLi src ()))
-(define-function addlIR (src dst)	(ADDLir src dst ()))
-(define-function sublIR (src dst)	(SUBLir src dst ()))
+(define-function movlIR (src dst)	(MOVLir () src dst))
+(define-function inclR (dst)		(INCLr () dst))
+(define-function pushlI (src)		(PUSHLi () src))
+(define-function addlIR (src dst)	(ADDLir () src dst))
+(define-function sublIR (src dst)	(SUBLir () src dst))
 (define-function intI (src)		(_B () 0xCD) (_B () src))
 
 (define-function assemble (program)
-  (list-do insn program
-    (cond
-      ((symbol? insn)		(eval (list 'define insn 0)))
-      ((= '.equ (car insn))	(eval (list 'define (cadr insn) 0)))))
-  (set phased 1)
-  (while phased
-    (set phased ())
-    (buffer-reset code)
-    (set $$ (set $ (buffer-address code)))
+;;  (let ((asm (assembler-new)))
     (list-do insn program
       (cond
-	((symbol? insn)		(define-label insn $))
-	((pair? insn)		(eval insn))
-	(else			(error "huh? "insn)))))
-  ;;(println "assembled "(buffer-size code)" bytes")
-  )
+        ((symbol? insn)		(eval (list 'define insn 0)))
+	((= '.equ (car insn))	(eval (list 'define (cadr insn) 0)))))
+    (set phased 1)
+    (while phased
+      (set phased ())
+      (buffer-reset code)
+      (set $$ (set $ (buffer-address code)))
+      (list-do insn program
+        (cond
+	  ((symbol? insn)	(define-label insn $))
+	  ((pair? insn)		(eval insn))
+	  (else			(error "huh? "insn)))))
+    ;;(println "assembled "(buffer-size code)" bytes")
+;;    )
+    )
 
 (assemble '(
 	(.org	0x1000)
