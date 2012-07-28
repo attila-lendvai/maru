@@ -1,4 +1,4 @@
-// last edited: 2012-07-19 01:01:57 by piumarta on emilia
+// last edited: 2012-07-23 00:43:21 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -2172,7 +2172,7 @@ accessor(long,  long)
 
 #undef accessor
 
-static subr(call)
+static subr(native_call)
 {
     oop  obj= car(args);
     struct { long l[34]; } argv;
@@ -2216,7 +2216,7 @@ static subr(subr)
     switch (getType(ptr))
     {
 	case String:	name= get(ptr, String,bits);  break;
-	case Symbol:	name= (wchar_t *)ptr;  break;
+	case Symbol:	name= get(ptr, Symbol,bits);  break;
 	default:	fatal("subr: argument must be string or symbol");
     }
     char *sym= wcs2mbs(name);
@@ -2600,7 +2600,7 @@ int main(int argc, char **argv)
       { " set-byte-at",    subr_set_byte_at },
       { " long-at",        subr_long_at },
       { " set-long-at",    subr_set_long_at },
-      { " call",	   subr_call },
+      { " native-call",	   subr_native_call },
       { " subr",	   subr_subr },
       { " allocate",	   subr_allocate },
       { " oop-at",	   subr_oop_at },
