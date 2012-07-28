@@ -134,7 +134,9 @@
 
 (define-function list-length (list)
   (if (pair? list)
-      (+ 1 (list-length (cdr list)))
+      (let ((len 1))
+	(while (set list (cdr list)) (set len (+ len 1)))
+	len)
     0))
 
 (define %list->array
@@ -163,6 +165,11 @@
   (and list
        (let ((tail (reverse-map function (cdr list))))
 	 (cons (function (car list)) tail))))
+
+(define-function reverse-with-map (function arg list)
+  (and list
+       (let ((tail (reverse-with-map function arg (cdr list))))
+	 (cons (function arg (car list)) tail))))
 
 (define-function reverse-map-with (function list arg)
   (and list
@@ -306,16 +313,18 @@
 
 (define %make-accessor) ;; forward
 
+(define-function %accessor (name)	(if (= ?_ (string-at (symbol->string name) 0)) 'long-at 'oop-at))
+
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-		      (list 'oop-at
+		      (list ',(%accessor (car fields))
 			    (list '%typecheck ',name self)
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define-function %make-unsafe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-		      (list 'oop-at
+		      (list ',(%accessor (car fields))
 			    self
 			    ,offset))
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
@@ -345,6 +354,17 @@
 	    (_self_ (allocate _type_ (array-at %structure-sizes _type_))))
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
+
+(define-function %make-make-inits (prefix inits)
+  (and inits
+       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
+	     (%make-make-inits prefix (cdr inits)))))
+
+(define-form make (type . inits)
+  `(let ((self (new ,type)))
+     (with-instance-accessors ,type
+       ,@(%make-make-inits (concat-symbol type '-) inits)
+       self)))
 
 (define-form define-class (name basis fields)
   (let ((base (eval basis)))
@@ -630,6 +650,7 @@
 (define-form define-multimethod (method typed-args . body)
   (let ((args  (map cadr typed-args))
 	(types (map car  typed-args)))
+    (or (defined? method) (eval (list 'define-generic method)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
 (define-apply <generic> (self . arguments)
@@ -699,6 +720,12 @@
        (let ((,var (car _list_))) ,@body)
        (set _list_ (cdr _list_)))))
 
+(define-form alist-do (var alist . body)
+  `(let ((_list_ ,alist))
+     (while _list_
+       (let ((,var (cdar _list_))) ,@body)
+       (set _list_ (cdr _list_)))))
+
 (define-function %generic-do (get len var col body)
   `(let* ((_col_ ,col)
 	  (_idx_ 0)
@@ -729,9 +756,37 @@
 	 (__ ,list))
      (while (and __ (not _))
        (let ((,name (car __)))
-	 (and ,expr (set _ (car __)))
+	 (and ,expr (set _ ,name))
 	 (set __ (cdr __))))
      _))
+
+(define-form array-detect (name arr expr)
+  `(let* ((_ ())
+	  (_a ,arr)
+	  (_l (array-length _a)))
+     (for (_i 0 _l)
+       (let ((,name (array-at _a _i)))
+	 (and ,expr (let () (set _ ,name) (set _i _l)))))
+     _))
+
+(define-form when (test . body)		`(and ,test (let () ,@body)))
+(define-form unless (test . body)	`(or  ,test (let () ,@body)))
+
+(define-function %loop-inits (bindings)
+  (and bindings
+       (cons (list (caar bindings) (cadar bindings))
+	     (%loop-inits (cdr bindings)))))
+
+(define-function %loop-steps (bindings)
+  (and bindings
+       (cons (list 'set (caar bindings) (caddar bindings))
+	     (%loop-steps (cdr bindings)))))
+
+(define-form loop (bindings test . body)
+  `(let ,(%loop-inits bindings)
+     (while ,test
+       ,@body
+       ,@(%loop-steps bindings))))
 
 ;;; conversion
 
@@ -844,8 +899,9 @@
 (define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
 (define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
 
-(define-function max (a b)	(if (> a b) a b))
-(define-function min (a b)	(if (< a b) a b))
+(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
+(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
+(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
 
 ;;; structural equality
 
