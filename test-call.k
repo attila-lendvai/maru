@@ -82,7 +82,7 @@
 
 (load "asm-x86.k")
 
-(define-function LABEL (l x)
+(define-function LABEL (x l)
   (let ((pass (<assembler>-pass x)))
     (cond
       ((= pass 0)	(set (<label>-address l) (data-stream-position (<assembler>-data x)))
@@ -91,8 +91,8 @@
       (else		(or (= (<label>-address l) (data-stream-address (<assembler>-data x)))
 			    (error "phase error: "l))))))
 
-(define-function CALLl (l x)	(CALLm (label-address l) 0 0 0 x))
-(define-function JNESl (l x)	(JNESm (label-address l) 0 0 0 x))
+(define-function CALLl (x l)	(CALLm x (label-address l) 0 0 0))
+(define-function JNESl (x l)	(JNESm x (label-address l) 0 0 0))
 
 (define-function extB (b)	(>> (<< b 24) 24))
 
@@ -114,22 +114,22 @@
 
 (let* ((x       (assembler (data-stream 8)))	;; small init guarantees buffer will move during assembly
        (putchar (new-external-label x "putchar"))
-       (loop    (new-local-label    x "loop")))
+       (loop1   (new-local-label    x "loop1")))
   (for (pass 0 2)
     (set-assembler-pass x pass)
-    (PUSHLr	%EBP				x)
-    (MOVLrr	%ESP		%EBP		x)
-    (SUBLir	8		%ESP		x)
-    (MOVLim	?A		0 %ESP 0 0	x)
-    (LABEL	loop				x)
-    (CALLl	putchar				x)
-    (ADDLim	1		0 %ESP 0 0	x)
-    (CMPLim	(+ ?Z 1)	0 %ESP 0 0	x)
-    (JNESl	loop				x)
-    (MOVLim	?\n		0 %ESP 0 0	x)
-    (CALLl	putchar				x)
-    (LEAVE					x)
-    (RET					x))
+    (PUSHLr	x	%EBP				)
+    (MOVLrr	x	%ESP		%EBP		)
+    (SUBLir	x	8		%ESP		)
+    (MOVLim	x	?A		0 %ESP 0 0	)
+    (LABEL	x	loop1				)
+    (CALLl	x	putchar				)
+    (ADDLim	x	1		0 %ESP 0 0	)
+    (CMPLim	x	(+ ?Z 1)	0 %ESP 0 0	)
+    (JNESl	x	loop1				)
+    (MOVLim	x	?\n		0 %ESP 0 0	)
+    (CALLl	x	putchar				)
+    (LEAVE	x					)
+    (RET	x					))
   (println (data-stream-position (<assembler>-data x))" bytes generated")
   (data-stream-truncate (<assembler>-data x))
   (data-stream-rewind (<assembler>-data x))
@@ -138,5 +138,5 @@
       (port-write p (format "%08x"(data-stream-address (<assembler>-data x)))"\t")
       (disassemble-on x p)
       (port-put p ?\n)))
-  (println (call (data-stream-data (<assembler>-data x)) 3 4))
+  (println (native-call (data-stream-data (<assembler>-data x)) 3 4))
   )
