@@ -17,6 +17,24 @@
     (set (byte-at self.data self.size) byte)
     (incr self.size)))
 
+(define-function buffer-at (self offset)
+  (with-instance-accessors <buffer>
+    (and (<= 0 offset)
+	 (<    offset self.size)
+	 (byte-at self.data offset))))
+
+(define-function buffer-set-byte-at (self offset value)
+  (with-instance-accessors <buffer>
+    (and (<= 0 offset)
+	 (<    offset self.size)
+	 (set-byte-at self.data offset value))))
+
+(define-function buffer-set-long-at (self offset value)
+  (buffer-set-byte-at self    offset        value    )
+  (buffer-set-byte-at self (+ offset 1) (>> value 8 ))
+  (buffer-set-byte-at self (+ offset 2) (>> value 16))
+  (buffer-set-byte-at self (+ offset 3) (>> value 24)))
+
 (define-function buffer-reset (self)	(set (<buffer>-size self) 0))
 (define-function buffer-size (self)	(<buffer>-size self))
 
@@ -31,7 +49,7 @@
   (address-of (<buffer>-data self)))
 
 (define-function buffer-call (self offset)
-  (call (+ (address-of (<buffer>-data self)) offset)))
+  (native-call (+ (address-of (<buffer>-data self)) offset)))
 
 ;; (let ((b (buffer-new 4096)))
 ;;   (buffer-write b 65)
