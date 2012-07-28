@@ -4,18 +4,18 @@ CC32 = $(CC) -m32
 
 .SUFFIXES :
 
-all : eval
+all : eval osdefs.k
 
-run : eval
+run : all
 	rlwrap ./eval
 
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c -lm -ldl
-	-/usr/sbin/execstack -s $@
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c -lm -ldl -lgc
-	-/usr/sbin/execstack -s $@
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 debug : .force
 	$(MAKE) OFLAGS="-O0"
@@ -27,6 +27,12 @@ profile : .force
 	$(MAKE) clean eval CFLAGS="$(CFLAGS) -O3 -fno-inline-functions -DNDEBUG"
 #	shark -q -1 -i ./eval emit.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l eval.l > test.s
 	shark -q -1 -i ./eval repl.l test-pepsi.l
+
+osdefs.k : mkosdefs
+	./mkosdefs > $@
+
+mkosdefs : mkosdefs.c
+	$(CC) -o $@ $<
 
 cg : eval .force
 	./eval codegen5.l | tee test.s
@@ -88,7 +94,7 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f *~ *.o main eval gceval test *.s
+	rm -f *~ *.o main eval gceval test *.s mkosdefs
 	rm -rf *.dSYM *.mshark
 
 #----------------------------------------------------------------
