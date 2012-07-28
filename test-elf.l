@@ -1,4 +1,4 @@
-(require "buffer.l")
+(require "buffer.k")
 
 (define code (buffer-new 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
@@ -27,11 +27,11 @@
 (define-function .long longs		(list-do long longs (_L () (eval long))))
 (define-function .ascii strings		(list-do string strings (string-do char string (_B () char))))
 
-(define-function movlIR (src dst)	(MOVLir src dst ()))
-(define-function inclR (dst)		(INCLr dst ()))
-(define-function pushlI (src)		(PUSHLi src ()))
-(define-function addlIR (src dst)	(ADDLir src dst ()))
-(define-function sublIR (src dst)	(SUBLir src dst ()))
+(define-function movlIR (src dst)	(MOVLir () src dst))
+(define-function inclR (dst)		(INCLr () dst))
+(define-function pushlI (src)		(PUSHLi () src))
+(define-function addlIR (src dst)	(ADDLir () src dst))
+(define-function sublIR (src dst)	(SUBLir () src dst))
 (define-function intI (src)		(_B () 0xCD) (_B () src))
 
 (define-function assemble (program)
