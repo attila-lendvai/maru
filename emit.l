@@ -474,6 +474,7 @@
     (and (!= *prev-source* source)
 	 (car source)
 	 (let ()
+	   (gen comp DEFLABEL (LABEL (temp-label-name)))		;; DEBUG ONLY
 	   (gen comp COMMENT (list (car source) " " (cdr source)))
 	   (set *prev-source* source))))
   (let* ((head  (car self))

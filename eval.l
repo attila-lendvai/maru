@@ -1,13 +1,13 @@
 ;;; -*- coke -*-
 
-(define-form gcdebug prog ())
-;;(define-form gcdebug prog `(let () ,@prog))
+;;(define-form gcdebug prog ())
+(define-form gcdebug prog `(let () ,@prog))
 
 (define-form debug prog ())
 ;;(define-form debug prog `(let () ,@prog))
 
-(define-form safe prog ())
-;;(define-form safe prog `(let () ,@prog))
+;;(define-form safe prog ())
+(define-form safe prog `(let () ,@prog))
 
 (define-form if-tagged-int (a b) b)
 
@@ -481,8 +481,15 @@
 	  (new-<pair> (get_head head) tail)))
     tail))
 
+(define k_println)
+
 (define-function k_array_length (obj)
-  (get_long (get <array> size obj)))
+  (let ((siz (get <array> size obj)))
+    (printf "SIZE ")
+    (k_println siz)
+    (let ((lon (get_long siz)))
+      (printf "LONG %i\n" lon)
+      lon)))
 
 (define-function k_array_at (obj idx)
   (and (is <array> obj)
@@ -846,19 +853,23 @@
       (fatal1 "undefined variable: %s" (get <symbol> _bits name)))))
 
 (define-function k_env_define (env name value)
-  (let* ((bindings (get <env> bindings env))
-	 (index (k_array_length bindings)))
-    (while (>= (set index (- index 1)) 0)
-      (let ((var (k_array_at bindings index)))
-	(and (= name (get <variable> value var))
-	     (let ()
-	       (set <variable> value var value)
-	       (return var)))))
-    (let ((off      (get_long (get <env> offset env)))
-	  (var      (new-<variable> name value env off)))
-      (gc-protect (var)
-	(put <env> offset env (new-<long> (+ off 1)))
-	(k_array_append bindings var)))))
+  (printf "A\n")
+  (let ((bindings (get <env> bindings env)))
+    (printf "B %p\n" bindings)
+    (let ((index (k_array_length bindings)))
+      (printf "C\n")
+      (while (>= (set index (- index 1)) 0)
+	(let ((var (k_array_at bindings index)))
+	  (printf "D\n")
+	  (and (= name (get <variable> value var))
+	       (let ()
+		 (set <variable> value var value)
+		 (return var)))))
+      (let ((off      (get_long (get <env> offset env)))
+	    (var      (new-<variable> name value env off)))
+	(gc-protect (var)
+		    (put <env> offset env (new-<long> (+ off 1)))
+		    (k_array_append bindings var))))))
 
 ;;; ----------------------------------------------------------------
 
@@ -1538,7 +1549,18 @@
   (gc_push_root (address-of globals))
 
   (set globals (new-<env> () 0 0))
+  (printf "GLOBALS %p\n" globals)
+  (k_println globals)
+  (printf "BINDINGS %p\n" (get <env> bindings globals))
+  (printf "LENGTH %i\n" (k_array_length (get <env> bindings globals)))
+  (intern "*globals*")
+  (printf "LENGTH2 %i\n" (k_array_length (get <env> bindings globals)))
+  (k_println (get <env> bindings globals))
+  (k_println (get <array> size (get <env> bindings globals)))
   (set globals (k_env_define globals (intern "*globals*") globals))
+  (k_println globals)
+  (k_println globals)
+  (k_println globals)
 
   (set input	   (k_env_define (get <variable> value globals) (intern "*input*"      ) ()))	(gc_push_root (address-of input      ))
   (set expanders   (k_env_define (get <variable> value globals) (intern "*expanders*"  ) ()))	(gc_push_root (address-of expanders  ))
