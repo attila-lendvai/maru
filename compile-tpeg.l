@@ -154,9 +154,7 @@
     ))
 
 (while *arguments*
-  (let* ((source (contents-of-file-named (next-argument)))
-	 (tpeg   (text-parser-for-on <tpeg> source))
-	 (spec   (and ($parser_spec tpeg) (<text-parser>-result tpeg)))
+  (let* ((spec   (parse-file <tpeg> $parser_spec (next-argument)))
 	 (decl   (caar spec))
 	 (rules  (cdr  spec))
 	 (names  (map car rules))

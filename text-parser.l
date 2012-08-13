@@ -186,3 +186,17 @@
 (define text-parser-invoke-rule text-parser-invoke-rule-simply)
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-memo)
 ;;(define text-parser-invoke-rule text-parser-invoke-rule-with-recursion)
+
+(define-function parse-string (grammar rule source)
+  (let* ((p (text-parser-for-on grammar source)))
+    (or (rule p)
+	(let ()
+	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
+	  (parser-context p)
+	  (error "abort")))
+    (<text-parser>-result p)))
+
+(define-function parse-file (grammar rule path)
+  (let* ((source (contents-of-file-named path))
+	 (result (parse-string grammar rule source)))
+    result))
