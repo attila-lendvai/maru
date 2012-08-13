@@ -113,20 +113,28 @@ expression	= sequence:s	( (bar sequence)+:t		-> `(match-first ,s ,@t)
 				|				-> s
 				) ;
 
-definition	= space identifier:id equals expression:e ";"	-> `(,id ,e) ;
+parameters	= (colon identifier)* ;
 
-start		= space
-		  (parser_spec | definition*):result
+definition	= space identifier:id parameters:p
+		  equals expression:e ";"			-> `(,id ,e ,p) ;
+
+definitions	= definition* ;
+
+start		= (parser_class | definitions):result
 		  ;
 
 varname		= symbol:s space -> s ;
 
-parser_spec	= varname:name colon varname:parent lparen (varname*):vars rparen
+parser_decl	= space varname:name colon varname:parent lparen (varname*):vars rparen	-> `(,name ,parent ,vars) ;
+
+parser_class	= parser_decl:decl
 		  definition*:definitions
 		  space (!. |					-> (error "error in grammar near: "(parser-stream-context self.source))
                         )
-		  {gen_cola_parser name parent vars definitions}
+		  {gen_cola_parser (car decl) (cadr decl) (caddr decl) definitions}
 		;
+
+parser_spec	= parser_decl?:decl definition*:defns		-> `(,decl ,@defns) ;
 
 #----------------------------------------------------------------
 
