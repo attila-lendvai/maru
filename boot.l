@@ -83,6 +83,13 @@
 	  (set j (+ j 1)))
 	s))))
 
+(define concat-strings
+  (lambda args
+    (let ((result (car args)))
+      (while (string? (car (set args (cdr args))))
+	(set result (concat-string result (car args))))
+      result)))
+
 (define concat-symbol
   (lambda (x y)
     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
@@ -431,6 +438,19 @@
 	 (var      (variable name value env offset)))
     (set (<env>-offset env) (+ offset 1))
     (array-append bindings var)))
+
+(define-function environment-find (env name)
+  (let* ((bindings (<env>-bindings env))
+	 (offset   (<env>-offset   env))
+	 (var      ())
+	 (idx      0))
+    (while (and (not var) (< idx offset))
+      (if (= name (<variable>-name (array-at bindings idx)))
+	  (set var (array-at bindings idx))
+	(set idx (+ idx 1))))
+    var))
+
+(define-function global? (var)	(= 0 (<env>-level (<variable>-env var))))
 
 ;;; local syntax
 
@@ -992,7 +1012,7 @@
 
 (define-function contents-of-file-named (path)
   (let ((f (or (open path)
-	       (error "cannot open for writing: "path)))
+	       (error "cannot open for reading: "path)))
 	(s (array))
 	(c))
     (while (set c (getc f))
