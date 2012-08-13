@@ -1,4 +1,4 @@
-// last edited: 2012-07-23 00:43:21 by piumarta on emilia
+// last edited: 2012-08-10 16:53:55 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -112,7 +112,7 @@ static oop cddr(oop obj)		{ return cdr(cdr(obj)); }
 //static oop caaar(oop obj)		{ return car(car(car(obj))); }
 //static oop cadar(oop obj)		{ return car(cdr(car(obj))); }
 static oop caddr(oop obj)		{ return car(cdr(cdr(obj))); }
-//static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
+static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 
 #define newBits(TYPE)	_newBits(TYPE, sizeof(struct TYPE))
 #define newOops(TYPE)	_newOops(TYPE, sizeof(struct TYPE))
@@ -124,7 +124,7 @@ static oop symbols= nil;
 static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil; //, s_in= nil;
 static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
 static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
-static oop arguments= nil, backtrace= nil, input= nil;
+static oop arguments= nil, backtrace= nil, input= nil, output= nil;
 
 static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 
@@ -161,12 +161,16 @@ static oop _newString(size_t len)
   return obj;
 }
 
-static oop newString(wchar_t *cstr)
+static oop newStringN(wchar_t *cstr, size_t len)
 {
-  size_t len= wcslen(cstr);
   oop obj= _newString(len);
   memcpy(get(obj, String,bits), cstr, sizeof(wchar_t) * len);
   return obj;
+}
+
+static oop newString(wchar_t *cstr)
+{
+    return newStringN(cstr, wcslen(cstr));
 }
 
 static int stringLength(oop string)
@@ -768,9 +772,9 @@ static void doprint(FILE *stream, oop obj, int storing)
   switch (getType(obj)) {
     case Undefined:	fprintf(stream, "UNDEFINED");		break;
     case Data: {
-	int i, j= GC_size(obj);
+	//int i, j= GC_size(obj);
 	fprintf(stream, "<data[%i]", (int)GC_size(obj));
-	for (i= 0;  i < j;  ++i) fprintf(stream, " %02x", ((unsigned char *)obj)[i]);
+	//for (i= 0;  i < j;  ++i) fprintf(stream, " %02x", ((unsigned char *)obj)[i]);
 	fprintf(stream, ">");
 	break;
     }
@@ -1758,7 +1762,7 @@ static subr(putb)
 {
   oop chr= car(args);
   oop arg= cadr(args);
-  if (nil == arg) arg= get(input, Variable,value);
+  if (nil == arg) arg= get(output, Variable,value);
   if (!isLong(chr)) { fprintf(stderr, "putb: non-integer character: ");  fdumpln(stderr, chr);  fatal(0); }
   if (!isLong(arg)) { fprintf(stderr, "putb: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
@@ -1770,7 +1774,7 @@ static subr(putc)
 {
   oop chr= car(args);
   oop arg= cadr(args);
-  if (nil == arg) arg= get(input, Variable,value);
+  if (nil == arg) arg= get(output, Variable,value);
   if (!isLong(chr)) { fprintf(stderr, "putc: non-integer character: ");  fdumpln(stderr, chr);  fatal(0); }
   if (!isLong(arg)) { fprintf(stderr, "putc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
@@ -2027,12 +2031,45 @@ static subr(set_string_at)
   return val;
 }
 
-static subr(string_compare)
+static subr(string_copy)	// string from len
 {
-  arity2(args, "string-compare");
-  oop str= getHead(args);			if (!is(String, str)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, str);  fatal(0); }
-  oop arg= getHead(getTail(args));		if (!is(String, arg)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  return newLong(wcscmp(get(str, String,bits), get(arg, String,bits)));
+  oop str= car(args);			if (!is(String, str)) { fprintf(stderr, "string-copy: non-string argument: ");  fdumpln(stderr, str);  fatal(0); }
+  int ifr= 0;
+  int sln= stringLength(str);
+  oop ofr= cadr(args);
+  if (nil != ofr) {			if (!isLong(ofr)) { fprintf(stderr, "string-copy: non-integer start: ");  fdumpln(stderr, ofr);  fatal(0); }
+      ifr= getLong(ofr);
+      if (ifr < 0  ) ifr= 0;
+      if (ifr > sln) ifr= sln;		assert(ifr >= 0 && ifr <= sln);
+      sln -= ifr;			assert(sln >= 0);
+  }
+  oop oln= caddr(args);
+  if (nil != oln) {			if (!isLong(oln)) { fprintf(stderr, "string-copy: non-integer length: ");  fdumpln(stderr, oln);  fatal(0); }
+      int iln= getLong(oln);
+      if (iln < 0) iln= 0;
+      if (iln > sln) iln= sln;		assert(iln >= 0 && ifr + iln <= sln);
+      sln= iln;
+  }
+  return newStringN(get(str, String,bits) + ifr, sln);
+}
+
+static subr(string_compare)	// string substring offset=0 length=strlen(substring)
+{
+  oop str= car(args);			if (!is(String, str)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, str);  fatal(0); }
+  oop arg= cadr(args);			if (!is(String, arg)) { fprintf(stderr, "string-compare: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  oop oof= caddr(args);
+  int off= 0;
+  if (nil != oof) {			if (!isLong(oof)) { fprintf(stderr, "string-compare: non-integer offset: ");  fdumpln(stderr, oof);  fatal(0); }
+      off= getLong(oof);
+  }
+  oop oln= cadddr(args);
+  int len= stringLength(str);
+  if (nil != oln) {			if (!isLong(oln)) { fprintf(stderr, "string-compare: non-integer length: ");  fdumpln(stderr, oln);  fatal(0); }
+      len= getLong(oln);
+  }
+  if (off < 0 || len < 0) return newLong(-1);
+  if (off >= stringLength(str)) return newLong(-1);
+  return newLong(wcsncmp(get(str, String,bits) + off, get(arg, String,bits), len));
 }
 
 static subr(symbol_compare)
@@ -2111,7 +2148,7 @@ static subr(array_length)
 {
   arity1(args, "array-length");
   oop arg= getHead(args);		if (!is(Array, arg)) { fprintf(stderr, "array-length: non-Array argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  return newLong(arrayLength(arg));
+  return get(arg, Array,size);
 }
 
 static subr(array_at)
@@ -2131,11 +2168,48 @@ static subr(set_array_at)
   return arrayAtPut(arr, getLong(arg), val);
 }
 
+static subr(array_compare)	// array subarray offset=0 length=arrlen(subarray)
+{
+  oop arr= car(args);			if (!is(Array, arr)) { fprintf(stderr, "array-compare: non-array argument: ");  fdumpln(stderr, arr);  fatal(0); }
+  oop brr= cadr(args);			if (!is(Array, brr)) { fprintf(stderr, "array-compare: non-array argument: ");  fdumpln(stderr, brr);  fatal(0); }
+  int off= 0;
+  int len= 0;
+  int aln= arrayLength(arr);
+  int bln= arrayLength(brr);
+  oop oof= caddr(args);
+  if (nil != oof) {			if (!isLong(oof)) { fprintf(stderr, "array-compare: non-integer offset: ");  fdumpln(stderr, oof);  fatal(0); }
+      off= getLong(oof);
+      if (off < 0) off += aln;
+      if (off < 0 || off >= aln)	return newLong(-1);
+  }
+  oop oln= cadddr(args);
+  if (nil != oln) {			if (!isLong(oln)) { fprintf(stderr, "array-compare: non-integer length: ");  fdumpln(stderr, oln);  fatal(0); }
+      len= getLong(oln);
+      if (len < 0 || len > bln
+	  || off + len >= aln)		return newLong(-1);
+  }
+  else {
+      len= arrayLength(arr) - off;
+  }
+  long *aptr= (long *)get(arr, Array,_array) + off;
+  long *bptr= (long *)get(brr, Array,_array);
+  long  cmp = 0;
+  while (!cmp && len--) cmp= *aptr++ - *bptr++;
+  return newLong(cmp);
+}
+
 static subr(data)
 {
     oop arg= car(args);
     int num= isLong(arg) ? getLong(arg) : 0;
     return newData(num);
+}
+
+static subr(data_length)
+{
+  arity1(args, "data-length");
+  oop arg= getHead(args);		if (!is(Data, arg)) { fprintf(stderr, "data-length: non-Data argument: ");  fdumpln(stderr, arg);  fatal(0); }
+  return newLong(GC_size(arg));
 }
 
 #define accessor(name, type)										\
@@ -2223,6 +2297,12 @@ static subr(subr)
     void *addr= dlsym(RTLD_DEFAULT, sym);
     if (!addr) fatal("could not find symbol: %s", sym);
     return newSubr(addr, name);
+}
+
+static subr(subr_name)
+{
+    oop arg= car(args);				if (!is(Subr, arg)) { fprintf(stderr, "subr-name: non-Subr argument: ");  fdumpln(stderr, arg);  fatal(0); }
+    return newString(get(arg, Subr,name));
 }
 
 static subr(allocate)
@@ -2323,6 +2403,32 @@ static subr(address_of)
   return newLong((long)arg);
 }
 
+#include <sys/time.h>
+
+static struct timeval epoch;
+
+static void init_times(void)
+{
+    gettimeofday(&epoch, 0);
+}
+
+static subr(times)
+{
+    struct timeval tv;
+    struct rusage ru;
+    gettimeofday(&tv, 0);
+    getrusage(RUSAGE_SELF, &ru);
+    timersub(&tv, &epoch, &tv);
+    oop real= newLong(tv.tv_sec * 1000 + tv.tv_usec / 1000);			GC_PROTECT(real);
+    oop user= newLong(ru.ru_utime.tv_sec * 1000 + ru.ru_utime.tv_usec / 1000);	GC_PROTECT(user);
+    oop syst= newLong(ru.ru_stime.tv_sec * 1000 + ru.ru_stime.tv_usec / 1000);	GC_PROTECT(syst);
+    syst= newPair(syst, nil);
+    user= newPair(user, syst);							GC_UNPROTECT(syst);
+    real= newPair(real, user);							GC_UNPROTECT(user);
+										GC_UNPROTECT(real);
+    return real;
+}
+
 #undef subr
 
 static void replFile(FILE *stream, wchar_t *path)
@@ -2418,7 +2524,7 @@ static void sigvtalrm(int signo)
 
 static void profilingEnable(void)
 {
-    struct itimerval itv= { { 0, opt_p * 1000 }, { 0, opt_p * 1000 } };	/* VTALARM every opt_p mSecs */
+    struct itimerval itv= { { 0, opt_p }, { 0, opt_p } };	/* VTALARM every opt_p mSecs */
     setitimer(ITIMER_VIRTUAL, &itv, 0);
 }
 
@@ -2475,6 +2581,8 @@ static void profilingDisable(int stats)
 
 int main(int argc, char **argv)
 {
+  init_times();
+
   if ((fwide(stdin, 1) <= 0) || (fwide(stdout, -1) >= 0) || (fwide(stderr, -1) >= 0)) {
     fprintf(stderr, "Cannot set stream widths.\n");
     return 1;
@@ -2525,6 +2633,7 @@ int main(int argc, char **argv)
 
   backtrace=	define(get(globals, Variable,value), intern(L"*backtrace*"), nil);
   input=	define(get(globals, Variable,value), intern(L"*input*"), nil);
+  output=	define(get(globals, Variable,value), intern(L"*output*"), nil);
 
   currentPath= nil;			GC_add_root(&currentPath);
   currentLine= nil;			GC_add_root(&currentLine);
@@ -2580,6 +2689,7 @@ int main(int argc, char **argv)
       { " string-length",  subr_string_length },
       { " string-at",	   subr_string_at },
       { " set-string-at",  subr_set_string_at },
+      { " string-copy",    subr_string_copy },
       { " string-compare", subr_string_compare },
       { " symbol->string", subr_symbol_string },
       { " string->symbol", subr_string_symbol },
@@ -2595,13 +2705,16 @@ int main(int argc, char **argv)
       { " array-length",   subr_array_length },
       { " array-at",	   subr_array_at },
       { " set-array-at",   subr_set_array_at },
+      { " array-compare",  subr_array_compare },
       { " data",	   subr_data },
+      { " data-length",	   subr_data_length },
       { " byte-at",	   subr_byte_at },
       { " set-byte-at",    subr_set_byte_at },
       { " long-at",        subr_long_at },
       { " set-long-at",    subr_set_long_at },
       { " native-call",	   subr_native_call },
       { " subr",	   subr_subr },
+      { " subr-name",	   subr_subr_name },
       { " allocate",	   subr_allocate },
       { " oop-at",	   subr_oop_at },
       { " set-oop-at",	   subr_set_oop_at },
@@ -2612,6 +2725,7 @@ int main(int argc, char **argv)
       { " cos",		   subr_cos },
       { " log",		   subr_log },
       { " address-of",	   subr_address_of },
+      { " times",	   subr_times },
       { 0,		   0 }
     };
     for (ptr= subrs;  ptr->name;  ++ptr) {
@@ -2664,8 +2778,8 @@ int main(int argc, char **argv)
     else if (!wcsncmp(arg, L"-p", 2)) {
 	opt_g= 0;
 	opt_p= wcstoul(arg + 2, 0, 0);
-	if (!opt_p) opt_p= 1;
-	printf("profiling every %i mSec(s)\n", opt_p);
+	if (!opt_p) opt_p= 1000;
+	printf("profiling every %i uSec(s)\n", opt_p);
     }
 #  endif
     else
@@ -2700,6 +2814,8 @@ int main(int argc, char **argv)
 	   GC_count_fragments() * 100.0);
 #endif
   }
+
+  set(output, Variable,value, newLong((long)stdout));
 
   if (!repled) {
     if (!opt_b) replPath(L"boot.l");
