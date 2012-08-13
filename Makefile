@@ -80,6 +80,19 @@ test-compile-grammar :
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
+test-compile-irl : irl.g.l .force
+	./eval compile-irl.l test.irl > test.c
+	$(CC) -fno-builtin -g -o test test.c
+	./test
+
+irl.g.l : irl.g
+	./eval compile-tpeg.l irl.g > irl.g.l
+
+test-ir : .force
+	./eval test-ir.k > test.c
+	$(CC) -fno-builtin -g -o test test.c
+	./test
+
 test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
 	./eval compile-recursion2.l test-recursion2.txt
