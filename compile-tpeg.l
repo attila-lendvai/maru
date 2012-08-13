@@ -113,7 +113,6 @@
 	   (= op 'match-one-more)
 	   (= op 'match-require)
 	   (= op 'peek-for)
-	   (= op 'peek-expr)
 	   (= op 'peek-not)
 	   (= op 'make-span)
 	   (= op 'make-string)
@@ -125,6 +124,7 @@
 	   (= op 'match-string)
 	   (= op 'match-any)
 	   (= op 'match-rule)
+	   (= op 'peek-expr)
 	   (= op 'result-expr)))
       (else				(error "cannot find vars in: "pe)))))
 
