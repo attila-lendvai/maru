@@ -1,4 +1,4 @@
-(require "ir-common.k")
+(require "ir.k")
 
 (let ((ir (ir-new <ir> ())))
 
