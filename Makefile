@@ -4,13 +4,17 @@ CC32 = $(CC) -m32
 
 .SUFFIXES :
 
-all : eval osdefs.k
+all : eval eval32 osdefs.k
 
 run : all
 	rlwrap ./eval
 
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c -lm -ldl
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
+
+eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+	$(CC32) -g $(CFLAGS) -o eval32 eval.c -lm -ldl
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
@@ -80,17 +84,19 @@ test-compile-grammar :
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
-test-compile-irl : irl.g.l .force
+test-compile-irl : eval32 irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
-	$(CC) -fno-builtin -g -o test test.c
+	$(CC32) -fno-builtin -g -o test test.c
+	@echo
 	./test
 
 irl.g.l : tpeg.l irl.g
 	./eval compile-tpeg.l irl.g > irl.g.l
 
-test-ir : .force
+test-ir : eval .force
 	./eval test-ir.k > test.c
-	$(CC) -fno-builtin -g -o test test.c
+	$(CC32) -fno-builtin -g -o test test.c
+	@echo
 	./test
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
@@ -98,6 +104,22 @@ tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
 	time ./eval compile-tpeg.l tpeg.g > tpeg.ll
 	diff tpeg.l tpeg.ll
 	rm tpeg.ll
+
+test-mach-o : eval32 .force
+	./eval32 test-mach-o.l
+	@echo
+	size a.out
+	chmod +x a.out
+	@echo
+	./a.out
+
+test-elf : eval32 .force
+	./eval32 test-elf.l
+	@echo
+	size a.out
+	chmod +x a.out
+	@echo
+	./a.out
 
 test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
@@ -113,8 +135,8 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f irl.g.l osdefs.k test.c tpeg.l
-	rm -f *~ *.o main eval gceval test *.s mkosdefs
+	rm -f irl.g.l osdefs.k test.c tpeg.l a.out
+	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs
 	rm -rf *.dSYM *.mshark
 
 #----------------------------------------------------------------
