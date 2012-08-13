@@ -85,13 +85,19 @@ test-compile-irl : irl.g.l .force
 	$(CC) -fno-builtin -g -o test test.c
 	./test
 
-irl.g.l : irl.g
+irl.g.l : tpeg.l irl.g
 	./eval compile-tpeg.l irl.g > irl.g.l
 
 test-ir : .force
 	./eval test-ir.k > test.c
 	$(CC) -fno-builtin -g -o test test.c
 	./test
+
+tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
+	time ./eval compile-peg.l  tpeg.g > tpeg.l
+	time ./eval compile-tpeg.l tpeg.g > tpeg.ll
+	diff tpeg.l tpeg.ll
+	rm tpeg.ll
 
 test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
