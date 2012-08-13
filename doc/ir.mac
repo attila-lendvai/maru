@@ -558,18 +558,28 @@ $ ./c
 }}
 
 
+
+
+
+<h2>BUGS</h2>
+
+<table>
+\item{&bull;}{structure types are declared outside the program and are global (they should be local to the nearest enclosing scope, whether global or local)}
+\item{&bull;}{structure tags are in a different namespace to regular variables (fake namespaces are easy to
+simulate in the client by prepending something unattainable as a program variable name)}
+</table>
+
 <h2>TO DO</h2>
 
-<il>
-<li>varargs
-<li>structure types, member declarations, field accessors via ir-get/ir-set
-<li>option to support closures, nested functions with free variables
-<li>option to support oop type and GC; cooperation between code generator and GC make memory management transparent
-<li>low-level programming interface, i.e: how to extend with new instructions, data types, code generators, etc.
-<li>explanation of output from \\tt{ir-dump}
-<li>example of code generation from within a parser (complete implementation of a small language)
-<li>find a real name to use instead of `\\IR', and... do we \\b{really} need all those \tt{ir-} prefixes?
-</il>
+<table>
+\item{&bull;}{varargs}
+\item{&bull;}{option to support closures, nested functions with free variables}
+\item{&bull;}{option to support oop type and GC; cooperation between code generator and GC make memory management transparent}
+\item{&bull;}{low-level programming interface, i.e: how to extend with new instructions, data types, code generators, etc.}
+\item{&bull;}{explanation of output from \\tt{ir-dump}}
+\item{&bull;}{example of code generation from within a parser (complete implementation of a small language)}
+\item{&bull;}{find a real name to use instead of `\\IR', and... do we \\b{really} need all those \tt{ir-} prefixes?}
+</table>
 
 <!-- <address> -->
 <!-- <a href="mailto:com -dot- gmail -at- piumarta (backwards)">Ian Piumarta</a> -->

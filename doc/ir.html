@@ -555,18 +555,28 @@ $ ./c
 </pre></blockquote>
 
 
+
+
+
+<h2>BUGS</h2>
+
+<table>
+<tr valign=top><td>&bull;&nbsp;</td><td>structure types are declared outside the program and are global (they should be local to the nearest enclosing scope, whether global or local)</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>structure tags are in a different namespace to regular variables (fake namespaces are easy to
+simulate in the client by prepending something unattainable as a program variable name)</td></tr>
+</table>
+
 <h2>TO DO</h2>
 
-<il>
-<li>varargs
-<li>structure types, member declarations, field accessors via ir-get/ir-set
-<li>option to support closures, nested functions with free variables
-<li>option to support oop type and GC; cooperation between code generator and GC make memory management transparent
-<li>low-level programming interface, i.e: how to extend with new instructions, data types, code generators, etc.
-<li>explanation of output from \ttir-dump
-<li>example of code generation from within a parser (complete implementation of a small language)
-<li>find a real name to use instead of `\IR', and... do we \breally need all those <tt>ir-</tt> prefixes?
-</il>
+<table>
+<tr valign=top><td>&bull;&nbsp;</td><td>varargs</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>option to support closures, nested functions with free variables</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>option to support oop type and GC; cooperation between code generator and GC make memory management transparent</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>low-level programming interface, i.e: how to extend with new instructions, data types, code generators, etc.</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>explanation of output from \ttir-dump</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>example of code generation from within a parser (complete implementation of a small language)</td></tr>
+<tr valign=top><td>&bull;&nbsp;</td><td>find a real name to use instead of `\IR', and... do we \breally need all those <tt>ir-</tt> prefixes?</td></tr>
+</table>
 
 <!-- <address> -->
 <!-- <a href="mailto:com -dot- gmail -at- piumarta (backwards)">Ian Piumarta</a> -->
