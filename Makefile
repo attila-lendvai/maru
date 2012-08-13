@@ -121,6 +121,9 @@ test-elf : eval32 .force
 	@echo
 	./a.out
 
+test-assembler : eval32 .force
+	./eval32 assembler.k
+
 test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
 	./eval compile-recursion2.l test-recursion2.txt
