@@ -113,6 +113,7 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
+	rm -f irl.g.l osdefs.k test.c tpeg.l
 	rm -f *~ *.o main eval gceval test *.s mkosdefs
 	rm -rf *.dSYM *.mshark
 
