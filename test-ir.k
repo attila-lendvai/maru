@@ -19,5 +19,5 @@
     (ir-call (ir-get 'doit) (ir-get 'point))
     )
 
-  (ir-gen-main ir (new <c-code-gen>))
+  (ir-gen-main ir)
   )
