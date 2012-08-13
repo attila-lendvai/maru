@@ -23,6 +23,7 @@
 
 (define IR-VOID		(new <ir-void-type>	'void	 0 1))
 (define IR-INT8		(new <ir-integral-type> 'int8_t	 1 1))
+(define IR-INT16	(new <ir-integral-type> 'int16_t 2 2))
 (define IR-INT32	(new <ir-integral-type> 'int32_t 4 4))
 (define IR-INT64	(new <ir-integral-type> 'int64_t 8 8))
 (define IR-FLOAT32	(new <ir-integral-type> 'float	 4 4))
@@ -76,11 +77,14 @@
 
 (define-structure <ir> (scope globals function program cvt-table function-types structure-types))
 
-(define-function ir-new (scope)		(make <ir>
-					      (scope		(or scope (scope-new ())))
-					      (globals		scope)
-					      (program		(array))
-					      (function-types	(trie-new))))
+(define-function ir-new (ir-type scope)
+  (let ((self (new ir-type)))
+    (with-instance-accessors <ir>
+      (set self.scope		(or scope (scope-new ())))
+      (set self.globals		scope)
+      (set self.program		(array))
+      (set self.function-types	(trie-new)))
+    self))
 
 (define-function temp-name ()		(string->symbol (concat-string "__" (format "%05d" (incr *temp-name-index*)))))
 
@@ -220,7 +224,7 @@
 (define-function ir-gen-c-name (name)			(print name))
 
 (define-method ir-gen-c-decl <ir-type> (name)		(print self.name" ") (ir-gen-c-name name))
-(define-method ir-gen-c-decl <ir-pointer-type> (name)	(ir-gen-c-decl self.referent (concat-string "*" name)))
+(define-method ir-gen-c-decl <ir-pointer-type> (name)	(ir-gen-c-decl self.referent (concat-symbol '* name)))
 
 (define-method ir-gen-c-decl <ir-function-type> (name)
   (print (<ir-type>-name self.ret-type)"("name")(")
@@ -560,7 +564,7 @@
 (define-class <ir-fun> <ir-insn> ())		(define-function ir-fun (name type . body) (new <ir-fun> name (ir-imp (or name (temp-name)) type body)))
 
 (define-method ir-check-type <ir-fun> (ir)	(let* ((var (and self.parameters (ir-declare ir self.parameters (<ir-insn>-type self.operands) <ir-function>)))
-						       (fir (ir-new (<ir>-scope ir))))
+						       (fir (ir-new (type-of ir) (<ir>-scope ir))))
 						  (ir-put fir self.operands)
 						  ;; recursive generation of function implementation
 						  (ir-typecheck fir)
@@ -598,27 +602,42 @@
 (define-method ir-gen-c <ir-var> (ir)		(ir-gen-c (car self.operands) ir))
 
 
-(define-class <ir-if> <ir-insn> ())		(define-function ir-if (test consequent alternate)	(insn <ir-if> test consequent alternate))
+(define-class <ir-ife> <ir-insn> ())		(define-function ir-ife (test consequent alternate)	(insn <ir-ife> test consequent alternate))
 
-(define-method ir-check-type <ir-if> (ir)	(or (= IR-BOOL   (ir-check-type (car   self.operands) ir))	(error "non-integral condition: "self))
+(define-method ir-check-type <ir-ife> (ir)	(or (= IR-BOOL   (ir-check-type (car   self.operands) ir))	(error "non-integral condition: "self))
 						(set   self.type (ir-check-type (cadr  self.operands) ir))
 						(or (= self.type (ir-check-type (caddr self.operands) ir))	(error "type mismatch: "self))
 						self.type)
 
-(define-method ir-gen-c <ir-if> (ir)		(print "(")  (ir-gen-c (car   self.operands) ir)
+(define-method ir-gen-c <ir-ife> (ir)		(print "(")  (ir-gen-c (car   self.operands) ir)
 						(print "?")  (ir-gen-c (cadr  self.operands) ir)
 						(print ":")  (ir-gen-c (caddr self.operands) ir)  (print ")"))
 
 
-(define-class <ir-while> <ir-insn> ())		(define-function ir-while test-exprs (new <ir-while> test-exprs))
+(define-class <ir-ifs> <ir-insn> ())		(define-function ir-ifs (test consequent . alternate)	(insn <ir-ifs> test consequent (car alternate)))
 
-(define-method ir-check-type <ir-while> (ir)	(or (= IR-BOOL   (ir-check-type (car self.operands) ir)) (error "non-integral condition: "self))
+(define-method ir-check-type <ir-ifs> (ir)	(or (= IR-BOOL   (ir-check-type (car   self.operands) ir))	(error "non-integral condition: "self))
 						(ir-check-type (cadr  self.operands) ir)
+						(and (caddr self.operands) (ir-check-type (caddr self.operands) ir))
+						(set self.type IR-VOID))
+
+(define-method ir-gen-c <ir-ifs> (ir)		(print "if (")      (ir-gen-c (car   self.operands) ir)  (println ")")
+						(print "{ ")        (ir-gen-c (cadr  self.operands) ir)  (println ";}")
+						(when (caddr self.operands)
+						  (print "else {")  (ir-gen-c (caddr self.operands) ir)  (println ";}")))
+
+
+(define-class <ir-while> <ir-insn> ())		(define-function ir-while test-exprs (new <ir-while> () test-exprs))
+
+(define-method ir-check-type <ir-while> (ir)	(or (= IR-BOOL (ir-check-type (car self.operands) ir)) (error "non-integral condition: "self))
+						(map-with ir-check-type (cdr self.operands) ir)
 						(set self.type IR-VOID))
 
 (define-method ir-gen-c <ir-while> (ir)		(print "while (")  (ir-gen-c (car self.operands) ir)  (println ") {")
-						(ir-gen-c (cadr self.operands) ir)
-						(println ";}"))
+						(list-do stmt (cdr self.operands)
+						  (ir-gen-c stmt ir)
+						  (println ";"))
+						(println "}"))
 
 
 (define-class <ir-cvt> <ir-insn> ())		(define-function ir-cvt (type value) (new <ir-cvt> type (list value)))
@@ -663,10 +682,14 @@
 							(parameters (list name type))
 							(header (car header))))
 
-(define-method ir-check-type <ir-ext> (ir)	(and self.header (println "#include <"self.header">"))
-						(let ((name (car  self.parameters))
+(define-method ir-check-type <ir-ext> (ir)	(let ((name (car  self.parameters))
 						      (type (cadr self.parameters)))
 						  (ir-declare ir name type <ir-extern>)
+						  (if self.header
+						      (println "#include <"self.header">")
+						    (print "extern ")
+						    (ir-gen-c-decl type name)
+						    (println ";"))
 						  (set self.type type)))
 
 (define-method ir-gen-c <ir-ext> (ir)		)
@@ -720,7 +743,7 @@
 						    (or member "no such structure member: "self)
 						    (set self.type (ir-pointer-to (<ir-struct-member>-type member))))))
 
-(define-method ir-gen-c <ir-member> (ir)	(print "(&")  (ir-gen-c (car self.operands) ir)  (print "->"self.parameters")"))
+(define-method ir-gen-c <ir-member> (ir)	(print "(")  (ir-gen-c (car self.operands) ir)  (print "->"self.parameters")"))
 
 
 (define-class <ir-addr> <ir-insn> ())		(define-function ir-addr (name) (new <ir-addr> name))
@@ -747,12 +770,17 @@
   (with-instance-accessors <ir>
     ;;(ir-dump self)
     (println "#include <stdint.h>")
-    (alist-do def self.structure-types (ir-gen-c-declaration def))
+    (alist-do def self.structure-types
+	      ;;(print "// ") (dumpln def)
+	      (ir-gen-c-declaration def))
     (ir-typecheck self)
     ;;(ir-dump self)
-    (alist-do var (<scope>-bindings (<ir>-scope self)) (ir-gen-c-definition var))
+    (alist-do var (<scope>-bindings (<ir>-scope self))
+	      ;;(print "// ")  (dumpln var)
+	      (ir-gen-c-definition var))
     (println "int main() {")
     (array-do insn self.program
+      ;;(print "// ")  (dumpln insn)
       (ir-gen-c insn self)
       (println ";")
       )
