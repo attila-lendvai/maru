@@ -268,7 +268,7 @@
 	 (or (RULE expression) (error "expression expected after ="))
 	 (set exp self.result)
 	 (or (OBJECT ?\;) (error "; expected"))
-	 (set self.result (list id exp)))))
+	 (set self.result (list id exp ())))))
 
 (unit-test "<begpeg>"
   (let ((self (new <begpeg>))
@@ -330,7 +330,7 @@
     (unit-assert (RULE semicolon	))
     (unit-assert (RULE expression	))	(unit-assert (equal (<begpeg>-result self) '(match-first (match-all (match-rule and) (match-rule this)) (match-all (match-rule is) (match-rule an)) (match-rule expression))))
     (unit-assert (RULE semicolon	))
-    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-all (match-rule lots) (match-rule of)) (match-all (match-rule rules) (match-rule here) (match-any))))))))
+    (unit-assert (RULE definition	))	(unit-assert (equal (<begpeg>-result self) '(definition (match-first (match-all (match-rule lots) (match-rule of)) (match-all (match-rule rules) (match-rule here) (match-any))) ())))))
 
 ;;;----------------------------------------------------------------
 
