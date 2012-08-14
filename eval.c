@@ -1,4 +1,4 @@
-// last edited: 2012-08-13 19:05:09 by piumarta on emilia
+// last edited: 2012-08-13 19:08:48 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -2280,7 +2280,8 @@ static subr(native_call)
 	case Subr:	addr= get(obj, Subr,imp);	break;
 	default:	fatal("call: cannot call object of type %i", getType(obj));
     }
-    if (mprotect((void *)addr, getpagesize(), PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
+    int sz= getpagesize();
+    if (mprotect((void *)((long)addr & -sz), sz * 2, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
     return newLong(((int (*)())addr)(argv));
 }
 
