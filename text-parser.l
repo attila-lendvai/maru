@@ -88,16 +88,16 @@
       (concat-strings
         RESET
         (string-copy self.string start (- self.position start))
-	FG-RED BOLD"<-- "message" expected-->"RESET
+	FG-RED BOLD"<-- "message" -->"RESET
 	(string-copy self.string self.position (- stop self.position))))))
 
 (define text-parser-context
-  (define-method parser-context <text-parser> (message)
+  (define-method parser-context <text-parser> ()
     (text-parser-context-with "here")))
 
 (define text-parser-expected
   (define-method parser-expected <text-parser> (what)
-    (error "at line "(format "%d"(text-parser-current-line-number self))":\n"(text-parser-context-with self what))))
+    (error "at line "(format "%d"(text-parser-current-line-number self))":\n"(text-parser-context-with self (concat-string what" expected")))))
 
 ;;; ----
 

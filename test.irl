@@ -119,7 +119,7 @@ void sieve2(int n)
 begin
   for i := 2 until n do flags[i] := true;
   for i := 2 until n do
-    if flags[i] then begin
+    if flags[] then begin
       printf("%4d", i);
       for j := i step i until n do flags[j] := false;
     end
