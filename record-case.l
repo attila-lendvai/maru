@@ -28,6 +28,6 @@
 	  (_tag_ (car _exp_)))
      ,@(make-record-cases cases)))
 
-(define-form record (exp vars . body)
+(define-form get-record (exp vars . body)
   `(let ((_exp_ ,exp))
      (let ,(make-record-case-inits vars 0) ,@body)))
