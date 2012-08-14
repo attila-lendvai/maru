@@ -48,7 +48,7 @@
     (match-string	(str)		(let ((len (string-length str)))
 					  (cond
 					    ((= len 0)	1)
-					    ((= len 1)	`(text-parser-match-object self ,(string-at str 0)))
+					    ((= len 1)	`(text-parser-match-char   self ,(string-at str 0)))
 					    (else	`(text-parser-match-string self ,str ,(string-length str))))))
     (match-any		()		'(text-parser-match-any self))
     (make-span		(exp)		`(let ((pos self.position))

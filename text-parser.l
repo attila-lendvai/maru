@@ -52,6 +52,12 @@
       (set self.result obj)
       (incr self.position))))
 
+(define text-parser-match-char
+  (define-method parser-match-object <text-parser> (obj)
+    (when (= obj (string-at self.string self.position))
+      (set self.result (string-copy self.string self.position 1))
+      (incr self.position))))
+
 (define text-parser-match-string
   (define-method parser-match-string <text-parser> (string len)
     (when (= 0 (string-compare self.string string self.position len))
