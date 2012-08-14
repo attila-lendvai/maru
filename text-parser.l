@@ -93,7 +93,7 @@
 
 (define text-parser-context
   (define-method parser-context <text-parser> ()
-    (text-parser-context-with "here")))
+    (text-parser-context-with self "here")))
 
 (define text-parser-expected
   (define-method parser-expected <text-parser> (what)
