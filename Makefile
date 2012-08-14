@@ -1,3 +1,5 @@
+NOW = $(shell date '+%Y%m%d.%H%M')
+
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
 CFLAGS = -Wall -g $(OFLAGS)
 CC32 = $(CC) -m32
@@ -100,10 +102,14 @@ test-ir : eval .force
 	./test
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
-	time ./eval compile-peg.l  tpeg.g > tpeg.l
+	time ./eval compile-peg.l  tpeg.g > tpeg.l.new
+	cp tpeg.l tpeg.l.$(NOW)
+	mv tpeg.l.new tpeg.l
 	time ./eval compile-tpeg.l tpeg.g > tpeg.ll
-	diff tpeg.l tpeg.ll
-	rm tpeg.ll
+	sort tpeg.l > tpeg.ls
+	sort tpeg.ll > tpeg.lls
+	diff tpeg.ls tpeg.lls
+	rm tpeg.ls tpeg.ll tpeg.lls
 
 test-mach-o : eval32 .force
 	./eval32 test-mach-o.l
@@ -150,8 +156,6 @@ FILES = Makefile \
 	parser.l peg-compile.l peg-compile-2.l peg-boot.l peg.l test-peg.l test-repl.l \
 	repl.l repl-2.l mpl.l sim.l \
 	peg.g
-
-NOW = $(shell date '+%Y%m%d.%H%M')
 
 DIST = maru-$(NOW)
 DEST = ckpt/$(DIST)
