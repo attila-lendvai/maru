@@ -103,6 +103,13 @@
 
 (define-form put (where key val)	`(set ,where (cons (cons ,key ,val) ,where)))
 (define-form get (where key)		`(cdr (assq ,key ,where)))
+(define-form del (where key)		`(set ,where (%del ,where ,key)))
+
+(define-function %del (where key)
+  (and (pair? where)
+       (if (= key (caar where))
+	   (cdr where)
+	 (cons (car where) (%del (cdr where) key)))))
 
 (define-form set-list-source (list source)	list)
 
@@ -177,6 +184,7 @@
 		    (set (<memo>-result   memo) (<text-parser>-result self))
 		    (set (<memo>-position memo) (<text-parser>-position self))
 		    (set (<text-parser>-position self) posn))
+		  (del (array-at memos posn) name)
 		  (set (<text-parser>-result self) (<memo>-result memo))			;; store the final result when recursion fails to grow prefix
 		  (set (<text-parser>-position self) (<memo>-position memo)))
 	      (or (= state *active*) (error "unknown parser state after recursion: "state))))
