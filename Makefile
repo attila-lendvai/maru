@@ -103,7 +103,7 @@ test-ir : eval .force
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
 	time ./eval compile-peg.l  tpeg.g > tpeg.l.new
-	cp tpeg.l tpeg.l.$(NOW)
+	-test -f tpeg.l && cp tpeg.l tpeg.l.$(NOW)
 	mv tpeg.l.new tpeg.l
 	time ./eval compile-tpeg.l tpeg.g > tpeg.ll
 	sort tpeg.l > tpeg.ls
