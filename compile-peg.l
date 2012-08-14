@@ -19,7 +19,9 @@
 
 (define-function value-pe (pe)
   (record-case pe
-    (match-rule		(name . args)	`(text-parser-invoke-rule ',name ,(concat-symbol '$ name) self ,@args))
+    (match-rule		(name . args)	(if args
+					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$ name) self ,@args)
+					  `(text-parser-invoke-rule ',name ,(concat-symbol '$ name) self)))
     (match-first	exps		`(or ,@(map value-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(mapN1 effect-pe value-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(let ((_list_ (array)))
@@ -70,7 +72,9 @@
 
 (define-function effect-pe (pe)
   (record-case pe
-    (match-rule		(name . args)	`(text-parser-invoke-rule ',name ,(concat-symbol '$$ name) self ,@args))
+    (match-rule		(name . args)	(if args
+					    `(text-parser-invoke-rule-simply ',name ,(concat-symbol '$$ name) self ,@args)
+					  `(text-parser-invoke-rule ',name ,(concat-symbol '$$ name) self)))
     (match-first	exps		`(or ,@(map effect-pe exps)))
     (match-all		exps		`(let ((pos self.position)) (unless (and ,@(map effect-pe exps)) (set self.position pos) ())))
     (match-zero-one	(exp)		`(let () ,(effect-pe exp) 1))
