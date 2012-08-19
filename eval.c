@@ -1,4 +1,4 @@
-// last edited: 2012-08-13 19:08:48 by piumarta on emilia
+// last edited: 2012-08-19 19:58:31 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
 
@@ -2248,8 +2248,6 @@ accessor(long,  long)
 
 #include <sys/mman.h>
 
-extern int getpagesize(void);
-
 static subr(native_call)
 {
     oop  obj= car(args);
@@ -2272,16 +2270,18 @@ static subr(native_call)
 	}
 	++argc;
     }
-    void *addr= 0;
+    void  *addr= 0;
+    size_t size= 0;
     switch (getType(obj))
     {
-	case Data:	addr= obj;			break;
-	case Long:	addr= (void *)getLong(obj);	break;
-	case Subr:	addr= get(obj, Subr,imp);	break;
+	case Data:	addr= obj;			size= GC_size(obj);	break;
+	case Long:	addr= (void *)getLong(obj);				break;
+	case Subr:	addr= get(obj, Subr,imp);				break;
 	default:	fatal("call: cannot call object of type %i", getType(obj));
     }
-    int sz= getpagesize();
-    if (mprotect((void *)((long)addr & -sz), sz * 2, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
+    if (size) {
+	if (mprotect(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
+    }
     return newLong(((int (*)())addr)(argv));
 }
 
