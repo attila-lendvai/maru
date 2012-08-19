@@ -47,13 +47,13 @@ cg : eval .force
 	./test
 
 test : emit.l eval.l eval
-	time ./emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
+	time ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
 
 time : .force
-	time ./eval emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
+	time ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test2 : test .force
-	time ./test boot.l emit.l eval.l > test2.s
+	time ./test -O boot.l emit.l eval.l > test2.s
 	diff test.s test2.s
 
 time2 : .force
@@ -94,6 +94,15 @@ test-compile-irl : eval32 irl.g.l .force
 
 irl.g.l : tpeg.l irl.g
 	./eval compile-tpeg.l irl.g > irl.g.l
+
+test-compile-sirl : eval32 sirl.g.l .force
+	./eval compile-sirl.l test.sirl > test.c
+	$(CC32) -fno-builtin -g -o test test.c
+	@echo
+	./test
+
+sirl.g.l : tpeg.l sirl.g
+	./eval compile-tpeg.l sirl.g > sirl.g.l
 
 test-ir : eval .force
 	./eval test-ir.k > test.c
@@ -144,7 +153,7 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f irl.g.l osdefs.k test.c tpeg.l a.out
+	rm -f irl.g.l sirl.g.l osdefs.k test.c tpeg.l a.out
 	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs
 	rm -rf *.dSYM *.mshark
 
