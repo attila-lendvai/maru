@@ -11,6 +11,9 @@
 
 (define-form if-tagged-int (a b) b)
 
+(define-form long-at args `(oop-at ,@args))
+(define-form set-long-at args `(set-oop-at ,@args))
+
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
 
@@ -303,6 +306,7 @@
 (define f_define		0)
 
 (define opt_verbose		0)
+(define opt_optimised		0)
 
 (define-function new-bits (type size)
   (let ((obj (gc_malloc_atomic size)))
@@ -515,9 +519,9 @@
 (define-function k_array_insert (obj index value)
   (let ((len (k_array_length obj)))
     (k_array_append obj value)
-    (and (< index len) 
-	 (let ((elts (get <array> _array obj))
-	       (oops (+ elts (* 4 index))))
+    (and (< index len)
+	 (let* ((elts (get <array> _array obj))
+		(oops (+ elts (* 4 index))))
 	   (memmove (+ 4 oops) oops (* 4 (- len index))))))
   (k_set_array_at obj index value))
 
@@ -856,8 +860,8 @@
 	     (let ()
 	       (put <variable> value var value)
 	       (return var)))))
-    (let ((off (get_long (get <env> offset env)))
-	  (var (new-<variable> name value env off)))
+    (let* ((off (get_long (get <env> offset env)))
+	   (var (new-<variable> name value env off)))
       (gc-protect (var)
 	(put <env> offset env (new-<long> (+ off 1)))
 	(k_array_append bindings var)))))
@@ -1286,6 +1290,14 @@
       (and (>= c 0)
 	   (new-<long> c)))))
 
+(define-function subr_putc (args ctx)
+  (let ((arg (k_car args))
+	(obj (k_cadr args)))
+    (or arg (set arg (get <variable> value input)))
+    (or (is_long arg) (fatal "non-integer stream id in putc"))
+    (or (is_long obj) (fatal "non-integer character in putc"))
+    (new-<long> (putc (get_long arg)))))
+
 (define-function subr_format (args ctx)
   (arity2 "format" args)
   (let ((ofmt (k_car args))
@@ -1480,6 +1492,12 @@
 	(set opt_verbose (get_long arg))
       (new-<long> opt_verbose))))
 
+(define-function subr_optimised (args ctx)
+  (let ((arg (k_car args)))
+    (if (is_long arg)
+	(set opt_optimised (get_long arg))
+      (new-<long> opt_optimised))))
+
 (define-function subr_read (args ctx)
   (if (= () args)
       (let ((obj (k_read stdin)))
@@ -1490,9 +1508,9 @@
       (let* ((path   (get <string> _bits arg))
 	     (stream (fopen path "r")))
 	(if stream
-	    (let ((head (new-<pair> () ()))
-		  (tail head)
-		  (obj  ()))
+	    (let* ((head (new-<pair> () ()))
+		   (tail head)
+		   (obj  ()))
 	      (gc-protect (head obj)
 	        (while (!= DONE (set obj (k_read stream)))
 		  (set tail (set_tail tail (new-<pair> obj ())))))
@@ -1610,6 +1628,7 @@
   (define-subr  "open"			subr_open)
   (define-subr  "close"			subr_close)
   (define-subr  "getc"			subr_getc)
+  (define-subr  "putc"			subr_putc)
   (define-subr  "allocate"		subr_allocate)
   (define-subr  "type-of"		subr_type_of)
   (define-subr  "string?"		subr_stringP)
@@ -1632,6 +1651,7 @@
   (define-subr  "symbol->string"	subr_symbol_string)
   (define-subr  "long->string"		subr_long_string)
   (define-subr  "verbose"		subr_verbose)
+  (define-subr  "optimised"		subr_optimised)
   (define-subr  "read"			subr_read)
 
   (let ((tmp ()))
@@ -1658,7 +1678,8 @@
       (gc-protect (args)
         (put <variable> value arguments (get_tail argl))
 	(cond
-	  ((not (strcmp arg "-v"))	(set opt_verbose (+ 1 opt_verbose)))
+	  ((not (strcmp arg "-v"))	(set opt_verbose   (+ 1 opt_verbose)))
+	  ((not (strcmp arg "-O"))	(set opt_optimised (+ 1 opt_optimised)))
 	  ((not (strcmp arg "-"))		(repl_stream stdin))
 	  (else				(let ((stream (fopen arg "r")))
 					  (or stream (fatal1 "no such file: %s" arg))
