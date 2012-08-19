@@ -1,9 +1,6 @@
-#!./eval
+(require "osdefs.k")
 
-(define __MACH__	'(t))
-(define __WINDOWS__	'( ))
-
-(define __PREFIX__ (if (or __MACH__ __WINDOWS__) "_" ""))
+(define __PREFIX__ (if (or (defined? '__MACH__) (defined? '__WIN32__)) "_" ""))
 
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
@@ -520,7 +517,7 @@
 (define-method gen-definition <extern> (name comp)
   (let ((nlabel (LABEL                self.name        ))
 	(slabel (LABEL (concat-symbol self.name '$stub))))
-    (if __MACH__
+    (if (defined? '__MACH__)
 	(let ()
 	  (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
 	  (gen comp DEFLABEL slabel)
