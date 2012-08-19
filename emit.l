@@ -120,12 +120,16 @@
 						  (set-array-at mangled outdex (digit-for (&  c 15)))	(set outdex (+ outdex 1))))))
       (set index (+ 1 index)))
     (array->string mangled)))
-      
+
 ;;; IA32 -- OPERANDS
 
-(let ((counter 0))
-  (define-function temp-label-name ()
-    (concat-string "_L_" (long->string (set counter (+ counter 1))))))
+(define *label-source* ())
+(define *label-counter* 0)
+
+(define-function temp-label-name ()
+  (let ((label (concat-string "_L_" (long->string (set *label-counter* (+ *label-counter* 1))))))
+    (and *label-source* (set label (concat-strings label"_"(car *label-source*)"_"(long->string (cdr *label-source*)))))
+    label))
 
 (define-operand LABEL (name) 	__PREFIX__(mangle-label (<LABEL>-name self)))
 (define-operand GI32 (name)	(<GI32>-name self))
@@ -467,16 +471,16 @@
   (cons  return		gen-return)
   (cons  address-of	gen-address-of)))
 
-(define *prev-source* ())
-
 (define-method gen <pair> (comp)
-  (let ((source (oop-at self 2)))
-    (and (!= *prev-source* source)
-	 (car source)
-	 (let ()
-	   (gen comp DEFLABEL (LABEL (temp-label-name)))		;; DEBUG ONLY
-	   (gen comp COMMENT (list (car source) " " (cdr source)))
-	   (set *prev-source* source))))
+  (and (= 0 (optimised))
+       (let ((source (oop-at self 2)))
+	 (and (!= *label-source* source)
+	      (car source)
+	      (let ()
+		(set *label-source* source)
+		;;(gen comp DEFLABEL (LABEL (temp-label-name)))		;; DEBUG ONLY
+		;;(gen comp COMMENT (list (car source) " " (cdr source)))
+		(gen comp DEFLABEL (LABEL (temp-label-name)))))))
   (let* ((head  (car self))
 	 (arity (- (list-length self) 1))
 	 (op    (and (variable? head) (cadr (assq (<variable>-value head) (array-at operators arity))))))
@@ -484,10 +488,10 @@
 	((array-at generators arity) op (cdr self) comp)
       (if (set op (cdr (assq head forms)))
 	  (op self comp)
-	(let ((tmps (map-with gen-tmp (cdr self) comp))
-	      (args (map-with gen-arg (cdr self) comp))
-	      (func (gen (car self) comp))
-	      (narg (list-length args)))
+	(let* ((tmps (map-with gen-tmp (cdr self) comp))
+	       (args (map-with gen-arg (cdr self) comp))
+	       (func (gen (car self) comp))
+	       (narg (list-length args)))
 	  (map2-with gen-move tmps args comp)
 	  (free-temps comp tmps)
 	  (free-args  comp args)
