@@ -1,6 +1,7 @@
-// last edited: 2012-08-19 19:58:31 by piumarta on emilia
+// last edited: 2012-08-20 07:20:08 by piumarta on emilia
 
 #define _ISOC99_SOURCE 1
+#define _BSD_SOURCE 1
 
 #include <stdio.h>
 #include <string.h>
@@ -2410,6 +2411,7 @@ static subr(address_of)
 }
 
 #include <sys/time.h>
+#include <sys/resource.h>
 
 static struct timeval epoch;
 
