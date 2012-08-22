@@ -1,4 +1,4 @@
-// last edited: 2012-08-20 07:20:08 by piumarta on emilia
+// last edited: 2012-08-22 17:08:24 by piumarta on WINXP
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1727,7 +1727,7 @@ static subr(open)
   oop arg= car(args);
   if (!is(String, arg)) { fprintf(stderr, "open: non-string argument: ");  fdumpln(stderr, arg);  fatal(0); }
   char *name= strdup(wcs2mbs(get(arg, String,bits)));
-  char *mode= "rb";
+  char *mode= "r";
   long  wide= 1;
   if (is(String, cadr(args))) mode= wcs2mbs(get(cadr(args), String,bits));
   if (is(Long, caddr(args))) wide= getLong(caddr(args));
