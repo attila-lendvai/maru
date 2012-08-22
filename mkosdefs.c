@@ -19,6 +19,9 @@ int main()
 # ifdef __MACH__
     defint(__MACH__);
 # endif
+# ifdef __WIN32__
+    defint(__WIN32__);
+# endif
 # ifdef __USER_LABEL_PREFIX__
     defstr(__USER_LABEL_PREFIX__);
 # endif
