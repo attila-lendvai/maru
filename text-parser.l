@@ -1,13 +1,15 @@
 (require "ansiterm.l")
 
-(define-structure <text-parser> (string limit position memos positions result))
+(define-structure <text-parser> (string limit position memos refill result))
+
+(define-function text-parser-refill-default (self len) ())
 
 (define-function text-parser-for-on (class str)
-  (new class str (string-length str) 0 (array)))
+  (new class str (string-length str) 0 (array) text-parser-refill-default))
 
 (define text-parser-match-any
   (define-method parser-match-any <text-parser> ()
-    (when (< self.position self.limit)
+    (when (or (< self.position self.limit) (self.refill self 1))
       (set self.result (string-at self.string self.position))
       (incr self.position))))
 
@@ -38,29 +40,33 @@
 
 (define text-parser-match-class
   (define-method parser-match-class <text-parser> (class)
-    (let ((c (string-at self.string self.position)))
-      (and c
-	   (let ((i (string-search class c)))
-	     (and i
-		  (<= 0 i)
-		  (set self.result c)
-		  (incr self.position)))))))
+    (when (or (< self.position self.limit) (self.refill self 1))
+      (let ((c (string-at self.string self.position)))
+	(and c
+	     (let ((i (string-search class c)))
+	       (and i
+		    (<= 0 i)
+		    (set self.result c)
+		    (incr self.position))))))))
 
 (define text-parser-match-object
   (define-method parser-match-object <text-parser> (obj)
-    (when (= obj (string-at self.string self.position))
+    (when (and (or (< self.position self.limit) (self.refill self 1))
+	       (= obj (string-at self.string self.position)))
       (set self.result obj)
       (incr self.position))))
 
 (define text-parser-match-char
   (define-method parser-match-object <text-parser> (obj)
-    (when (= obj (string-at self.string self.position))
+    (when (and (or (< self.position self.limit) (self.refill self 1))
+	       (= obj (string-at self.string self.position)))
       (set self.result (string-copy self.string self.position 1))
       (incr self.position))))
 
 (define text-parser-match-string
   (define-method parser-match-string <text-parser> (string len)
-    (when (= 0 (string-compare self.string string self.position len))
+    (when (and (or (< (+ self.position len) self.limit) (self.refill self len))
+	       (= 0 (string-compare self.string string self.position len)))
       (set self.result string)
       (incr self.position len))))
 
