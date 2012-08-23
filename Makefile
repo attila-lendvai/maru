@@ -164,7 +164,7 @@ stats : .force
 
 clean : .force
 	rm -f irl.g.l sirl.g.l osdefs.k test.c tpeg.l a.out
-	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs
+	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe
 	rm -rf *.dSYM *.mshark
 
 #----------------------------------------------------------------
