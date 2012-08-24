@@ -160,13 +160,23 @@
 (define-function array-append (arr val)
   (set-array-at arr (array-length arr) val))
 
-(define-function map (function list)
+(define-function map1 (function list)
   (let ((head (cons)))
     (let ((tail head))
       (while (pair? list)
 	(set tail (set (cdr tail) (cons (function (car list)) ())))
 	(set list (cdr list))))
     (cdr head)))
+
+(define-function mapN (function lists)
+  (and (pair? (car lists))
+       (cons (apply function (map1 car lists))
+	     (mapN function (map1 cdr lists)))))
+
+(define-function map (function . lists)
+  (if (pair? (cdr lists))
+      (mapN function lists)
+    (map1 function (car lists))))
 
 (define-function reverse-map (function list)
   (and list
@@ -712,10 +722,7 @@
       (set curr next))
     prev))
 
-(define-function list-zip (a b)
-  (if (and (pair? a) (pair? b))
-      (cons (list (car a) (car b)) (list-zip (cdr a) (cdr b)))
-    (or a b)))
+(define-function list-zip lists		(apply map list lists))
 
 (define-function list-zip-assocs (a b)
   (if (and (pair? a) (pair? b))
@@ -743,7 +750,7 @@
 (define-form alist-do (var alist . body)
   `(let ((_list_ ,alist))
      (while _list_
-       (let ((,var (cdar _list_))) ,@body)
+       (let*  ((,var (cdar _list_))) ,@body)
        (set _list_ (cdr _list_)))))
 
 (define-function %generic-do (get len var col body)
@@ -751,7 +758,7 @@
 	  (_idx_ 0)
 	  (_end_ (,len _col_)))
      (while (< _idx_ _end_)
-       (let ((,var (,get _col_ _idx_))) ,@body)
+       (let* ((,var (,get _col_ _idx_))) ,@body)
        (set _idx_ (+ _idx_ 1)))))
 
 (define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
