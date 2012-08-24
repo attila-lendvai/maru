@@ -1,4 +1,4 @@
-// last edited: 2012-08-24 09:32:46 by piumarta on emilia.local
+// last edited: 2012-08-24 13:02:22 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1280,7 +1280,7 @@ static oop evlist(oop obj, oop ctx)
   oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
   oop tail= evlist(getTail(obj), ctx);		GC_PROTECT(tail);
   //head= newPairFrom(head, tail, obj);		GC_UNPROTECT(tail);  GC_UNPROTECT(head);
-  head= newPair(head, tail);		GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+  head= newPair(head, tail);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   return head;
 }
 
@@ -1851,9 +1851,14 @@ static subr(eval)
 
 static subr(apply)
 {
-  oop f= car(args);  args= cdr(args);
-  oop a= car(args);  args= cdr(args);
-  return apply(f, a, ctx);
+    if (!is(Pair, args))					fatal("too few arguments in: apply");
+    oop f= car(args);
+    oop a= args;						assert(is(Pair, a));
+    oop b= getTail(a);
+    oop c= cdr(b);
+    while (is(Pair, c)) a= b, c= cdr(b= c);			assert(is(Pair, a));
+    setTail(a, car(b));
+    return apply(f, cdr(args), ctx);
 }
 
 static subr(type_of)
