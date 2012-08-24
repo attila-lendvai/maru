@@ -714,7 +714,7 @@
 
 (define-function list-zip (a b)
   (if (and (pair? a) (pair? b))
-      (cons (car a) (cons (car b) (list-zip (cdr a) (cdr b))))
+      (cons (list (car a) (car b)) (list-zip (cdr a) (cdr b)))
     (or a b)))
 
 (define-function list-zip-assocs (a b)
@@ -737,7 +737,7 @@
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
-       (let ((,var (car _list_))) ,@body)
+       (let* ((,var (car _list_))) ,@body)	;; let* allows (list-do (vars...) list-of-lists)
        (set _list_ (cdr _list_)))))
 
 (define-form alist-do (var alist . body)
