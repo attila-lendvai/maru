@@ -1,4 +1,4 @@
-// last edited: 2012-08-22 17:08:24 by piumarta on WINXP
+// last edited: 2012-08-24 09:32:46 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -2290,7 +2290,10 @@ static subr(native_call)
     }
     if (size) {
 #     if !defined(WIN32)
-	if (mprotect(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
+	extern int getpagesize();
+	void *start = (void *)((long)addr & -(long)getpagesize());	// round down to page boundary for Darwin
+	size_t len  = (addr + size) - start;
+	if (mprotect(start, len, PROT_READ | PROT_WRITE | PROT_EXEC)) perror("mprotect");
 #     endif
     }
     return newLong(((int (*)())addr)(argv));
