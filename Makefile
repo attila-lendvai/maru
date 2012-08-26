@@ -153,6 +153,16 @@ test-recursion2 :
 	./eval compile-grammar.l test-recursion2.g > test-recursion2.g.l
 	./eval compile-recursion2.l test-recursion2.txt
 
+test-main : eval32 .force
+	time ./eval32 test-main.k
+	chmod +x test-main
+	time ./test-main hello world
+
+test-main2 : eval32 .force
+	time ./eval32 test-pegen.k save.k test-pegen
+	chmod +x test-pegen
+	time ./test-pegen
+
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
 	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
@@ -165,6 +175,7 @@ stats : .force
 clean : .force
 	rm -f irl.g.l sirl.g.l osdefs.k test.c tpeg.l a.out
 	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe
+	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
 
 #----------------------------------------------------------------
