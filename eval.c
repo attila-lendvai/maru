@@ -1,4 +1,4 @@
-// last edited: 2012-08-24 13:02:22 by piumarta on emilia.local
+// last edited: 2012-08-26 12:06:54 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -26,6 +26,7 @@ extern int isatty(int);
 //#define	LIB_GC	1
 
 #define GC_APP_HEADER	int type;
+#define GC_SAVE		1
 
 #if (LIB_GC)
 # include "libgc.c"
@@ -127,11 +128,11 @@ static oop cadddr(oop obj)		{ return car(cdr(cdr(cdr(obj)))); }
 static oop _newBits(int type, size_t size)	{ oop obj= GC_malloc_atomic(size);	setType(obj, type);  return obj; }
 static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(obj, type);  return obj; }
 
-static oop symbols= nil;
-static oop s_define= nil, s_set= nil, s_quote= nil, s_lambda= nil, s_let= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil; //, s_in= nil;
-static oop f_lambda= nil, f_let= nil, f_quote= nil, f_set= nil, f_define;
-static oop globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil;
-static oop arguments= nil, backtrace= nil, input= nil, output= nil;
+static char *argv0;
+
+static oop symbols= nil, globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil, backtrace= nil, arguments= nil, input= nil, output= nil;
+static oop s_set= nil, s_define= nil, s_let= nil, s_lambda= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil, s_main= nil;
+static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
 
 static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 
@@ -1514,7 +1515,7 @@ static subr(definedP)
   return findVariable(theenv, symbol);
 }
 
-#define _do_unary()				\
+#define _do_unary()								\
   _do(com, ~)
 
 #define _do(NAME, OP)								\
@@ -2488,6 +2489,109 @@ static subr(times)
     return real;
 }
 
+typedef struct { char *name;  imp_t imp; } subr_ent_t;
+
+static subr_ent_t subr_tab[];
+
+#if !defined(LIB_GC)
+
+static void saver(FILE *out, void *ptr)
+{
+    oop obj= (oop)ptr;								assert(ptr && !((long)ptr & 1));
+    int type= ptr2hdr(ptr)->type;
+    if (out) put32(out, type);
+    switch (type) {
+	case Symbol: {
+	    wchar_t *str= get(obj, Symbol,bits);
+	    int      len= wcslen(str);
+	    if (out) {
+		int i;
+		put32(out, len);
+		for (i= 0;  i < len;  ++i) put32(out, str[i]);
+	    }
+	    break;
+	}
+	case Subr: {
+	    wchar_t *str= get(obj, Subr,name);
+	    int      len= wcslen(str);
+	    if (out) {
+		int i;
+		put32(out, len);
+		for (i= 0;  i < len;  ++i) put32(out, str[i]);
+	    }
+	    break;
+	}
+	default:
+	    GC_saver(out, ptr);
+	    break;
+    }
+}
+
+static void loader(FILE *in, void *ptr)
+{
+    oop obj= (oop)ptr;								assert(ptr && !((long)ptr & 1));
+    int tmp32;
+    int type= get32(in, &tmp32);
+    ptr2hdr(ptr)->type= type;
+    switch (type) {
+	case Symbol: {
+	    int      len= get32(in, &tmp32);
+	    wchar_t *str= (wchar_t *)alloca(4 * len + 4);
+	    int      i;
+	    for (i= 0;  i < len;  ++i) str[i]= get32(in, &tmp32);
+	    str[i]= 0;
+	    //wprintf(L"loading Symbol %ls\n", str);
+	    set(obj, Symbol,bits, wcsdup(str));
+	    break;
+	}
+	case Subr: {
+	    int i, len= get32(in, &tmp32);
+	    wchar_t *str= (wchar_t *)alloca(4 * len + 4);
+	    for (i= 0;  i < len;  ++i) str[i]= get32(in, &tmp32);
+	    str[i]= 0;
+	    //wprintf(L"loading Subr %ls\n", str);
+	    set(obj, Subr,name, wcsdup(str));
+	    set(obj, Subr,imp,  0);
+	    char *sym= wcs2mbs(str);
+	    void *addr= 0;
+	    subr_ent_t *ptr= subr_tab;
+	    for (ptr= subr_tab;  ptr->name;  ++ptr) {
+		if (!strcmp(sym, ptr->name + 1)) {
+		    addr= ptr->imp;
+		    break;
+		}
+	    }
+	    if (!addr) {
+		addr= dlsym(RTLD_DEFAULT, sym);
+		if (!addr) fatal("loader: could not find Subr name: %s", sym);
+	    }
+	    set(obj, Subr,imp, addr);
+	    break;
+	}
+	default:
+	    GC_loader(in, ptr);
+	    break;
+    }
+}
+
+#include <sys/stat.h>
+
+static subr(save)
+{
+    oop       arg= car(args);		if (!is(String, arg)) { fprintf(stderr, "save: non-String argument: ");  fdumpln(stderr, arg);  fatal(0); }
+    wchar_t *name= get(arg, String,bits);
+    char    *path= wcs2mbs(name);
+    FILE  *stream= fopen(path, "w");
+    if (!stream) return nil;
+    fprintf(stream, "#!%s -l\n", argv0);
+    GC_save(stream, saver);
+    fclose(stream);
+    chmod(path, 0755);
+    return arg;
+}
+
+#endif
+
 #undef subr
 
 static void replFile(FILE *stream, wchar_t *path)
@@ -2638,8 +2742,108 @@ static void profilingDisable(int stats)
 
 #endif
 
+static subr_ent_t subr_tab[] = {
+# define _do(NAME, OP)				\
+    { " "#OP,			subr_##NAME },
+    _do_unary()
+    _do_ibinary()
+    _do_binary()
+    { " -",			subr_sub },
+    { " %",			subr_mod },
+    _do_relation()
+    { " =",			subr_eq },
+    { " !=",			subr_ne },
+# undef _do
+    { ".if",			subr_if },
+    { ".and",			subr_and },
+    { ".or",			subr_or },
+    { ".set",			subr_set },
+    { ".let",			subr_let },
+    { ".while",			subr_while },
+    { ".quote",			subr_quote },
+    { ".lambda",		subr_lambda },
+    { ".define",		subr_define },
+    { " defined?",		subr_definedP },
+    { " exit",			subr_exit },
+    { " abort",			subr_abort },
+//  { " current-environment",	subr_current_environment },
+    { " open",			subr_open },
+    { " close",			subr_close },
+    { " getb",			subr_getb },
+    { " getc",			subr_getc },
+    { " putb",			subr_putb },
+    { " putc",			subr_putc },
+    { " read",			subr_read },
+    { " expand",		subr_expand },
+    { " encode",		subr_encode },
+    { " eval",			subr_eval },
+    { " apply",			subr_apply },
+    { " type-of",		subr_type_of },
+    { " warn",			subr_warn },
+    { " print",			subr_print },
+    { " dump",			subr_dump },
+    { " format",		subr_format },
+    { " form",			subr_form },
+    { " fixed?",		subr_fixedP },
+    { " cons",			subr_cons },
+    { " pair?",			subr_pairP },
+    { " car",			subr_car },
+    { " set-car",		subr_set_car },
+    { " cdr",			subr_cdr },
+    { " set-cdr",		subr_set_cdr },
+    { " form?",			subr_formP },
+    { " symbol?",		subr_symbolP },
+    { " string?",		subr_stringP },
+    { " string", 		subr_string },
+    { " string-length",		subr_string_length },
+    { " string-at",		subr_string_at },
+    { " set-string-at",		subr_set_string_at },
+    { " string-copy",		subr_string_copy },
+    { " string-compare",	subr_string_compare },
+    { " symbol->string", 	subr_symbol_string },
+    { " string->symbol", 	subr_string_symbol },
+    { " symbol-compare", 	subr_symbol_compare },
+    { " long->double",   	subr_long_double },
+    { " long->string",   	subr_long_string },
+    { " string->long",   	subr_string_long },
+    { " double->long",   	subr_double_long },
+    { " double->string", 	subr_double_string },
+    { " string->double", 	subr_string_double },
+    { " array",			subr_array },
+    { " array?",		subr_arrayP },
+    { " array-length",		subr_array_length },
+    { " array-at",		subr_array_at },
+    { " set-array-at",		subr_set_array_at },
+    { " array-compare",		subr_array_compare },
+    { " data",			subr_data },
+    { " data-length",		subr_data_length },
+    { " byte-at",		subr_byte_at },
+    { " set-byte-at",		subr_set_byte_at },
+    { " long-at",		subr_long_at },
+    { " set-long-at",		subr_set_long_at },
+    { " native-call",		subr_native_call },
+    { " subr",			subr_subr },
+    { " subr-name",		subr_subr_name },
+    { " allocate",		subr_allocate },
+    { " oop-at",		subr_oop_at },
+    { " set-oop-at",		subr_set_oop_at },
+    { " not",			subr_not },
+    { " verbose",		subr_verbose },
+    { " optimised",		subr_optimised },
+    { " sin",			subr_sin },
+    { " cos",			subr_cos },
+    { " log",			subr_log },
+    { " address-of",		subr_address_of },
+    { " times",			subr_times },
+#if !defined(LIB_GC)
+    { " save",			subr_save },
+#endif
+    { 0,			0 }};
+
 int main(int argc, char **argv)
 {
+  argv0= argv[0];
+
   init_times();
 
   if ((fwide(stdin, 1) <= 0) || (fwide(stdout, -1) >= 0) || (fwide(stderr, -1) >= 0)) {
@@ -2661,22 +2865,25 @@ int main(int argc, char **argv)
   GC_add_root(&evaluators);
   GC_add_root(&applicators);
   GC_add_root(&backtrace);
+  GC_add_root(&arguments);
+  GC_add_root(&input);
+  GC_add_root(&output);
 
   symbols= newArray(0);
 
-  s_set			= intern(L"set");
-  s_define		= intern(L"define");
-  s_let			= intern(L"let");
-  s_lambda		= intern(L"lambda");
-  s_quote		= intern(L"quote");
-  s_quasiquote		= intern(L"quasiquote");
-  s_unquote		= intern(L"unquote");
-  s_unquote_splicing	= intern(L"unquote-splicing");
-  s_t			= intern(L"t");
-  s_dot			= intern(L".");
-  s_bracket		= intern(L"bracket");
-  s_brace		= intern(L"brace");
-//s_in			= intern(L"in");
+  s_set			= intern(L"set");			GC_add_root(&s_set		);
+  s_define		= intern(L"define");			GC_add_root(&s_define		);
+  s_let			= intern(L"let");			GC_add_root(&s_let		);
+  s_lambda		= intern(L"lambda");			GC_add_root(&s_lambda		);
+  s_quote		= intern(L"quote");			GC_add_root(&s_quote		);
+  s_quasiquote		= intern(L"quasiquote");		GC_add_root(&s_quasiquote	);
+  s_unquote		= intern(L"unquote");			GC_add_root(&s_unquote		);
+  s_unquote_splicing	= intern(L"unquote-splicing");		GC_add_root(&s_unquote_splicing	);
+  s_t			= intern(L"t");				GC_add_root(&s_t		);
+  s_dot			= intern(L".");				GC_add_root(&s_dot		);
+  s_bracket		= intern(L"bracket");			GC_add_root(&s_bracket		);
+  s_brace		= intern(L"brace");			GC_add_root(&s_brace		);
+  s_main		= intern(L"*main*");			GC_add_root(&s_main		);
 
   oop tmp= nil;		GC_PROTECT(tmp);
 
@@ -2698,96 +2905,9 @@ int main(int argc, char **argv)
   currentLine= nil;			GC_add_root(&currentLine);
   currentSource= newPair(nil, nil);	GC_add_root(&currentSource);
 
-#define _do(NAME, OP)	tmp= newSubr(subr_##NAME, WIDEN(#OP));  define(get(globals, Variable,value), intern(WIDEN(#OP)), tmp);
-  _do_unary();  _do_ibinary();  _do_binary();  _do(sub, -);  _do(mod, %);  _do_relation();  _do(eq, =);  _do(ne, !=);
-#undef _do
-
   {
-    struct { char *name;  imp_t imp; } *ptr, subrs[]= {
-      { ".if",		   subr_if },
-      { ".and",		   subr_and },
-      { ".or",		   subr_or },
-      { ".set",		   subr_set },
-      { ".let",		   subr_let },
-      { ".while",	   subr_while },
-      { ".quote",	   subr_quote },
-      { ".lambda",	   subr_lambda },
-      { ".define",	   subr_define },
-      { " defined?",	   subr_definedP },
-      { " exit",	   subr_exit },
-      { " abort",	   subr_abort },
-//    { " current-environment",	   subr_current_environment },
-      { " open",	   subr_open },
-      { " close",	   subr_close },
-      { " getb",	   subr_getb },
-      { " getc",	   subr_getc },
-      { " putb",	   subr_putb },
-      { " putc",	   subr_putc },
-      { " read",	   subr_read },
-      { " expand",	   subr_expand },
-      { " encode",	   subr_encode },
-      { " eval",	   subr_eval },
-      { " apply",	   subr_apply },
-      { " type-of",	   subr_type_of },
-      { " warn",	   subr_warn },
-      { " print",	   subr_print },
-      { " dump",	   subr_dump },
-      { " format",	   subr_format },
-      { " form",	   subr_form },
-      { " fixed?",	   subr_fixedP },
-      { " cons",	   subr_cons },
-      { " pair?",	   subr_pairP },
-      { " car",		   subr_car },
-      { " set-car",	   subr_set_car },
-      { " cdr",		   subr_cdr },
-      { " set-cdr",	   subr_set_cdr },
-      { " form?",	   subr_formP },
-      { " symbol?",	   subr_symbolP },
-      { " string?",	   subr_stringP },
-      { " string", 	   subr_string },
-      { " string-length",  subr_string_length },
-      { " string-at",	   subr_string_at },
-      { " set-string-at",  subr_set_string_at },
-      { " string-copy",    subr_string_copy },
-      { " string-compare", subr_string_compare },
-      { " symbol->string", subr_symbol_string },
-      { " string->symbol", subr_string_symbol },
-      { " symbol-compare", subr_symbol_compare },
-      { " long->double",   subr_long_double },
-      { " long->string",   subr_long_string },
-      { " string->long",   subr_string_long },
-      { " double->long",   subr_double_long },
-      { " double->string", subr_double_string },
-      { " string->double", subr_string_double },
-      { " array",	   subr_array },
-      { " array?",	   subr_arrayP },
-      { " array-length",   subr_array_length },
-      { " array-at",	   subr_array_at },
-      { " set-array-at",   subr_set_array_at },
-      { " array-compare",  subr_array_compare },
-      { " data",	   subr_data },
-      { " data-length",	   subr_data_length },
-      { " byte-at",	   subr_byte_at },
-      { " set-byte-at",    subr_set_byte_at },
-      { " long-at",        subr_long_at },
-      { " set-long-at",    subr_set_long_at },
-      { " native-call",	   subr_native_call },
-      { " subr",	   subr_subr },
-      { " subr-name",	   subr_subr_name },
-      { " allocate",	   subr_allocate },
-      { " oop-at",	   subr_oop_at },
-      { " set-oop-at",	   subr_set_oop_at },
-      { " not",		   subr_not },
-      { " verbose",	   subr_verbose },
-      { " optimised",	   subr_optimised },
-      { " sin",		   subr_sin },
-      { " cos",		   subr_cos },
-      { " log",		   subr_log },
-      { " address-of",	   subr_address_of },
-      { " times",	   subr_times },
-      { 0,		   0 }
-    };
-    for (ptr= subrs;  ptr->name;  ++ptr) {
+    subr_ent_t *ptr;
+    for (ptr= subr_tab;  ptr->name;  ++ptr) {
       wchar_t *name= wcsdup(mbs2wcs(ptr->name + 1));
       tmp= newSubr(ptr->imp, name);
       if ('.' == ptr->name[0]) tmp= newFixed(tmp);
@@ -2795,22 +2915,46 @@ int main(int argc, char **argv)
     }
   }
 
-  tmp= nil;
-  while (--argc) {
-    tmp= newPair(nil, tmp);
-    setHead(tmp, newString(mbs2wcs(argv[argc])));
-  }
-  arguments= define(get(globals, Variable,value), intern(L"*arguments*"), tmp);
-
   tmp= nil;		GC_UNPROTECT(tmp);
 
   f_set=    lookup(get(globals, Variable,value), s_set   );		GC_add_root(&f_set);
   f_quote=  lookup(get(globals, Variable,value), s_quote );		GC_add_root(&f_quote);
   f_lambda= lookup(get(globals, Variable,value), s_lambda);		GC_add_root(&f_lambda);
   f_let=    lookup(get(globals, Variable,value), s_let   );		GC_add_root(&f_let);
-  f_define= lookup(get(globals, Variable,value), s_define);		GC_add_root(&f_let);
+  f_define= lookup(get(globals, Variable,value), s_define);		GC_add_root(&f_define);
 
   int repled= 0;
+
+#if !defined(LIB_GC)
+
+  if (argc > 2 && !strcmp(argv[1], "-l")) {
+      FILE *stream= fopen(argv[2], "r");
+      //printf("load memory from %s %p\n", argv[2], stream);
+      if (!stream) {
+	  perror(argv[2]);
+	  exit(1);
+      }
+      while ('\n' != getc(stream));
+      GC_load(stream, loader);
+      fclose(stream);
+      argc -= 2;
+      argv += 2;
+      opt_b= 1;	// don't load boot.l
+  }
+
+#endif
+
+  {
+      tmp= nil;		GC_PROTECT(tmp);
+
+      while (--argc) {
+	  tmp= newPair(nil, tmp);
+	  setHead(tmp, newString(mbs2wcs(argv[argc])));
+      }
+      arguments= define(get(globals, Variable,value), intern(L"*arguments*"), tmp);
+
+      tmp= nil;		GC_UNPROTECT(tmp);
+  }
 
   signal(SIGINT, sigint);
 
@@ -2823,6 +2967,14 @@ int main(int argc, char **argv)
       if (sigaction(SIGVTALRM, &sa, 0)) perror("vtalrm");
   }
 #endif
+
+  {
+      oop func= findVariable(get(globals, Variable,value), s_main);
+      if (is(Variable, func)) {
+	  apply(get(func, Variable,value), nil, nil);
+	  exit(0);
+      }
+  }
 
   while (is(Pair, get(arguments, Variable,value))) {
     oop argl= get(arguments, Variable,value);		GC_PROTECT(argl);
