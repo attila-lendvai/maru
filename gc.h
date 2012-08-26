@@ -143,4 +143,12 @@ extern GC_mark_function_t GC_mark_function;
 typedef void (*GC_free_function_t)(void *ptr);
 extern GC_free_function_t GC_free_function;
 
+#if defined(GC_SAVE)
+# include <stdio.h>
+  GC_API void GC_saver (FILE *out, void *ptr);
+  GC_API void GC_save  (FILE *out, void (*saver)(FILE *, void *));
+  GC_API void GC_loader(FILE *in,  void *ptr);
+  GC_API int  GC_load  (FILE *in,  void (*loader)(FILE *, void*));
+#endif
+
 #endif /* _GC_H_ */

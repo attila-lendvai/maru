@@ -15,7 +15,7 @@
 **
 ** THE SOFTWARE IS PROVIDED 'AS IS'.  USE ENTIRELY AT YOUR OWN RISK.
 **
-** Last edited: 2011-10-14 17:04:43 by piumarta on debian.piumarta.com
+** Last edited: 2012-08-26 12:01:48 by piumarta on emilia.local
 */
 
 #include <stdio.h>
@@ -491,6 +491,150 @@ GC_API void GC_register_finaliser(void *ptr, GC_finaliser_t finaliser, void *dat
   gch->finalisers  = gcf;
 }
 
+#if defined(GC_SAVE)
+
+#include <stdint.h>
+
+#define GC_MAGIC	0x4f626a4d
+
+//static void put8  (FILE *out, uint8_t  value)	{ fwrite(&value, sizeof(value), 1, out); }
+//static void put16 (FILE *out, uint16_t value)	{ fwrite(&value, sizeof(value), 1, out); }
+static void put32 (FILE *out, uint32_t value)	{ fwrite(&value, sizeof(value), 1, out); }
+//static void put64 (FILE *out, uint64_t value)	{ fwrite(&value, sizeof(value), 1, out); }
+
+static void putobj(FILE *out, void *value)
+{
+    //printf("  field %p\n", value);
+    if (value && !((long)value & 1))
+	fwrite(&ptr2hdr(value)->finalisers, sizeof(void *), 1, out);
+    else
+	fwrite(&value, sizeof(void *), 1, out);
+}
+
+GC_API void GC_saver(FILE *out, void *ptr)
+{
+    gcheader *hdr= ptr2hdr(ptr);
+    if (out) {
+	if (hdr->atom)
+	    fwrite(hdr2ptr(hdr), hdr->size, 1, out);
+	else {
+	    int i;
+	    for (i= 0;  i < hdr->size;  i += sizeof(void *))
+		putobj(out, *(void **)(ptr + i));
+	}
+    }
+}
+
+GC_API void GC_save(FILE *out, void (*saver)(FILE *, void *))
+{
+    long numObjs= 0;
+    long numBytes= 0;
+    gcheader *hdr= gcbase.next;
+    int i;
+    if (!saver) saver= GC_saver;
+    do {
+	if (hdr->used) {
+	    hdr->finalisers= (void *)(numBytes + sizeof(gcheader));
+	    numBytes += sizeof(gcheader) + hdr->size;
+	    ++numObjs;
+	}
+	hdr= hdr->next;
+    } while (hdr != &gcbase);
+    printf("saving %ld bytes, %ld objects, %ld roots\n", numBytes, numObjs, numRoots);
+    put32(out, GC_MAGIC);
+    put32(out, numObjs);
+    put32(out, numBytes);
+    hdr= gcbase.next;
+    do {
+	if (hdr->used) {
+	    //printf("writing object %p -> %p\n", hdr2ptr(hdr), hdr->finalisers);
+	    put32(out, hdr->size);
+	    put32(out, hdr->flags);
+	    saver(out, hdr2ptr(hdr));
+	    --numObjs;
+	}
+	hdr= hdr->next;
+    } while (hdr != &gcbase);					assert(numObjs == 0);
+    put32(out, GC_MAGIC + 1);
+    put32(out, numRoots);
+    for (i= 0;  i < numRoots;  ++i) {
+	void *p= *roots[i];
+	//printf("writing root %p -> %p\n", roots[i], p);
+	putobj(out, p);
+    }
+    put32(out, GC_MAGIC + 2);
+    hdr= gcbase.next;
+    do {
+	hdr->finalisers= 0;
+	hdr= hdr->next;
+    } while (hdr != &gcbase);
+}
+
+static int32_t get32(FILE *in, int32_t *p)	{ fread(p, sizeof(*p), 1, in);  return *p; }
+
+static void *getobj(FILE *in, void **value)
+{
+    fread(value, sizeof(void *), 1, in);
+    if (*value && !(((long)*value) & 1)) *value += (long)gcbase.next;
+    //printf("  field %p\n", *value);
+    return *value;
+}
+
+GC_API void GC_loader(FILE *in, void *ptr)
+{
+    gcheader *hdr= ptr2hdr(ptr);
+    if (hdr->atom)	fread(hdr2ptr(hdr), hdr->size, 1, in);
+    else		{ int i;  for (i= 0;  i < hdr->size;  i += sizeof(void *))  getobj(in, ptr + i); }
+}
+
+GC_API int GC_load(FILE *in, void (*loader)(FILE *, void*))
+{
+    int32_t  magic    = 0;
+    int32_t  numObjs  = 0;
+    int32_t  numBytes = 0;
+    int32_t  tmp32;
+    int      i;
+    if (!loader) loader= GC_loader;
+    if (get32(in, &magic) != GC_MAGIC) return 0;
+    get32(in, &numObjs);
+    get32(in, &numBytes);
+    //printf("loading %i bytes, %i objects\n", (int)numBytes, (int)numObjs);
+    gcheader *hdr= (gcheader *)malloc(numBytes + sizeof(gcheader));
+    bzero(hdr, numBytes + sizeof(gcheader));
+    if (!hdr) {
+	fprintf(stderr, "GC_load: could not allocate %i bytes\n", numBytes);
+	exit(1);
+    }
+    gcbase.next= hdr;
+    hdr->flags= 0;
+    hdr->next= &gcbase;
+    hdr->size= numBytes;
+    while (numObjs--) {
+	void *ptr= hdr2ptr(hdr);
+	//printf("reading object %p -> %p\n", hdr2ptr(hdr) - (long)gcbase.next, hdr2ptr(hdr));
+	hdr->size=  get32(in, &tmp32);
+	hdr->flags= get32(in, &tmp32);
+	loader(in, hdr2ptr(hdr));
+	numBytes -= sizeof(gcheader) + hdr->size;		assert(numBytes >= 0);
+	hdr->next= ptr + hdr->size;
+	hdr= hdr->next;
+	hdr->flags= 0;
+	hdr->next= &gcbase;
+	hdr->size= numBytes;
+    };								assert(numBytes == 0);
+    get32(in, &tmp32);
+    assert(tmp32 == GC_MAGIC + 1);
+    if (numRoots != get32(in, &tmp32)) {
+	fprintf(stderr, "GC_load: wrong number of roots (expected %i, found %i)\n", (int)numRoots, (int)tmp32);
+	exit(1);
+    }
+    for (i= 0;  i < numRoots;  ++i)  getobj(in, roots[i]);
+    get32(in, &tmp32);
+    assert(tmp32 == GC_MAGIC + 2);
+    return 1;
+}
+
+#endif
 
 #if 0
 
