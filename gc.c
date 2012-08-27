@@ -15,7 +15,7 @@
 **
 ** THE SOFTWARE IS PROVIDED 'AS IS'.  USE ENTIRELY AT YOUR OWN RISK.
 **
-** Last edited: 2012-08-26 12:01:48 by piumarta on emilia.local
+** Last edited: 2012-08-27 13:43:18 by piumarta on WIN7
 */
 
 #include <stdio.h>
@@ -600,7 +600,7 @@ GC_API int GC_load(FILE *in, void (*loader)(FILE *, void*))
     get32(in, &numBytes);
     //printf("loading %i bytes, %i objects\n", (int)numBytes, (int)numObjs);
     gcheader *hdr= (gcheader *)malloc(numBytes + sizeof(gcheader));
-    bzero(hdr, numBytes + sizeof(gcheader));
+    memset(hdr, 0, numBytes + sizeof(gcheader));
     if (!hdr) {
 	fprintf(stderr, "GC_load: could not allocate %i bytes\n", numBytes);
 	exit(1);
