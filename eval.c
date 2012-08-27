@@ -1,4 +1,4 @@
-// last edited: 2012-08-26 12:06:54 by piumarta on emilia.local
+// last edited: 2012-08-27 14:21:19 by piumarta on WIN7
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -17,6 +17,7 @@
 extern int isatty(int);
 
 #if defined(WIN32)
+# include <malloc.h>
 # define swnprintf(BUF, SIZE, FMT, ARG) swprintf(BUF, FMT, ARG)
 #else
 # define swnprintf swprintf
@@ -2581,7 +2582,7 @@ static subr(save)
     oop       arg= car(args);		if (!is(String, arg)) { fprintf(stderr, "save: non-String argument: ");  fdumpln(stderr, arg);  fatal(0); }
     wchar_t *name= get(arg, String,bits);
     char    *path= wcs2mbs(name);
-    FILE  *stream= fopen(path, "w");
+    FILE  *stream= fopen(path, "wb");
     if (!stream) return nil;
     fprintf(stream, "#!%s -l\n", argv0);
     GC_save(stream, saver);
@@ -2928,7 +2929,7 @@ int main(int argc, char **argv)
 #if !defined(LIB_GC)
 
   if (argc > 2 && !strcmp(argv[1], "-l")) {
-      FILE *stream= fopen(argv[2], "r");
+      FILE *stream= fopen(argv[2], "rb");
       //printf("load memory from %s %p\n", argv[2], stream);
       if (!stream) {
 	  perror(argv[2]);
@@ -2940,6 +2941,7 @@ int main(int argc, char **argv)
       argc -= 2;
       argv += 2;
       opt_b= 1;	// don't load boot.l
+      GC_gcollect();
   }
 
 #endif
