@@ -7,8 +7,10 @@ CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
 LIBS = -lm libw32dl.a
+TIME =
 else
 LIBS = -lm -ldl
+TIME = time
 endif
 
 .SUFFIXES :
@@ -57,23 +59,23 @@ cg : eval .force
 	./test
 
 test : emit.l eval.l eval
-	time ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
+	$(TIME) ./eval -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
 
 time : .force
-	time ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
+	$(TIME) ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test2 : test .force
-	time ./test -O boot.l emit.l eval.l > test2.s
+	$(TIME) ./test -O boot.l emit.l eval.l > test2.s
 	diff test.s test2.s
 
 time2 : .force
-	time ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
+	$(TIME) ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test-eval : test .force
-	time ./test test-eval.l
+	$(TIME) ./test test-eval.l
 
 test-boot : test .force
-	time ./test boot-emit.l
+	$(TIME) ./test boot-emit.l
 
 test-emit : eval .force
 	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
@@ -88,8 +90,8 @@ test-repl : eval peg.l .force
 	./eval repl.l test-repl.l
 
 test-peg : eval peg.l .force
-	time ./eval parser.l peg.l test-peg.l > peg.n
-	time ./eval parser.l peg.n test-peg.l > peg.m
+	$(TIME) ./eval parser.l peg.l test-peg.l > peg.n
+	$(TIME) ./eval parser.l peg.n test-peg.l > peg.m
 	diff peg.n peg.m
 
 test-compile-grammar :
@@ -121,10 +123,10 @@ test-ir : eval .force
 	./test
 
 tpeg.l : tpeg.g compile-peg.l compile-tpeg.l
-	time ./eval compile-peg.l  tpeg.g > tpeg.l.new
+	$(TIME) ./eval compile-peg.l  tpeg.g > tpeg.l.new
 	-test -f tpeg.l && cp tpeg.l tpeg.l.$(NOW)
 	mv tpeg.l.new tpeg.l
-	time ./eval compile-tpeg.l tpeg.g > tpeg.ll
+	$(TIME) ./eval compile-tpeg.l tpeg.g > tpeg.ll
 	sort tpeg.l > tpeg.ls
 	sort tpeg.ll > tpeg.lls
 	diff tpeg.ls tpeg.lls
@@ -154,14 +156,14 @@ test-recursion2 :
 	./eval compile-recursion2.l test-recursion2.txt
 
 test-main : eval32 .force
-	time ./eval32 test-main.k
+	$(TIME) ./eval32 test-main.k
 	chmod +x test-main
-	time ./test-main hello world
+	$(TIME) ./test-main hello world
 
 test-main2 : eval32 .force
-	time ./eval32 test-pegen.k save.k test-pegen
+	$(TIME) ./eval32 test-pegen.k save.k test-pegen
 	chmod +x test-pegen
-	time ./test-pegen
+	$(TIME) ./test-pegen
 
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
