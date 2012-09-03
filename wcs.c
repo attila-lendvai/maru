@@ -19,15 +19,18 @@ static wchar_t *mbs2wcs(char *mbs)
 
 static char *wcs2mbs(wchar_t *wcs)
 {
-    static char *mbs= 0;
-    static size_t bufSize= 0;
+    typedef struct { char *mbs;  size_t size; } buf_t;
+    static buf_t bufs[32]= {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
+    static int bufn= 0;
+    buf_t *buf= bufs + bufn++;
+    if (bufn == 32) bufn= 0;
     size_t len= 6 * wcslen(wcs) + 1;
-    if (bufSize < len) {
-	mbs= mbs ? (char *)realloc(mbs, len) : (char *)malloc(len);
-	bufSize= len;
+    if (buf->size < len) {
+	buf->mbs= buf->mbs ? (char *)realloc(buf->mbs, len) : (char *)malloc(len);
+	buf->size= len;
     }
-    wcstombs(mbs, wcs, bufSize);
-    return mbs;
+    wcstombs(buf->mbs, wcs, buf->size);
+    return buf->mbs;
 }
 
 
