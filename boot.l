@@ -415,7 +415,7 @@
 (define-structure <expr>	(name defn ctx profile))		(define-function expr? (obj) (= <expr> (type-of obj)))
 (define-structure <form>	(function symbol))
 (define-structure <fixed>	(function))
-(define-structure <subr>	(_imp _name _profile))
+(define-structure <subr>	(_name _imp _sig _profile))
 (define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
@@ -929,6 +929,8 @@
 (define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
 (define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
 
 ;;; structural equality
 
