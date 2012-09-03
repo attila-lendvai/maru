@@ -13,6 +13,14 @@ LIBS = -lm -ldl
 TIME = time
 endif
 
+ifeq ($(findstring Darwin,$(SYS)),Darwin)
+SO = dylib
+SOCFLAGS = -dynamiclib -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup,-flat_namespace
+else
+SO = so
+SOCFLAGS = -shared
+endif
+
 .SUFFIXES :
 
 all : eval eval32 osdefs.k
@@ -169,6 +177,15 @@ profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
 	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
 
+NILE = ../nile
+GEZIRA = ../gezira
+
+libnile.$(SO) : .force
+	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(NILE)/runtimes/c/nile.c
+
+libgezira.$(SO) : .force
+	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(GEZIRA)/c/gezira.c $(GEZIRA)/c/gezira-image.c
+
 stats : .force
 	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
@@ -176,7 +193,7 @@ stats : .force
 
 clean : .force
 	rm -f irl.g.l sirl.g.l osdefs.k test.c tpeg.l a.out
-	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe
+	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
 
