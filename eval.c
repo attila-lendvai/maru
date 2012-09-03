@@ -1,12 +1,13 @@
-// last edited: 2012-08-27 14:21:19 by piumarta on WIN7
+// last edited: 2012-08-31 02:03:01 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
 
+#include <stddef.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <wchar.h>
@@ -43,24 +44,26 @@ typedef union Object *oop;
 
 typedef oop (*imp_t)(oop args, oop env);
 
+typedef void *(*cast_t)(void *argv, oop arg);
+
 #define nil ((oop)0)
 
 enum { Undefined, Data, Long, Double, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr, Variable, Env, Context };
 
 struct Data	{ };
-struct Long	{ long	   bits; };
-struct Double	{ double   bits; };
-struct String	{ oop      size;  wchar_t *bits; };	/* bits is in managed memory */
-struct Symbol	{ wchar_t *bits; };
-struct Pair	{ oop 	   head, tail, source; };
-struct Array	{ oop      size, _array; };
-struct Expr	{ oop 	   name, defn, ctx, profile; };
-struct Form	{ oop 	   function, symbol; };
-struct Fixed	{ oop      function; };
-struct Subr	{ imp_t    imp;  wchar_t *name;  int profile; };
-struct Variable	{ oop 	   name, value, env, index, type; };
-struct Env	{ oop 	   parent, level, offset, bindings, stable; };
-struct Context	{ oop 	   home, env, bindings, callee, pc; };
+struct Long	{ long	    bits; };
+struct Double	{ double    bits; };
+struct String	{ oop       size;  wchar_t *bits; };	/* bits is in managed memory */
+struct Symbol	{ wchar_t  *bits; };
+struct Pair	{ oop 	    head, tail, source; };
+struct Array	{ oop       size, _array; };
+struct Expr	{ oop 	    name, defn, ctx, profile; };
+struct Form	{ oop 	    function, symbol; };
+struct Fixed	{ oop       function; };
+struct Subr	{ wchar_t  *name;  imp_t imp;  cast_t *sig;  int profile; };
+struct Variable	{ oop 	    name, value, env, index, type; };
+struct Env	{ oop 	    parent, level, offset, bindings, stable; };
+struct Context	{ oop 	    home, env, bindings, callee, pc; };
 
 union Object {
   struct Data		Data;
@@ -156,6 +159,7 @@ static void   setDouble(oop obj, double bits)	{		memcpy(&obj->Double.bits, &bits
 static double getDouble(oop obj)		{ double bits;  memcpy(&bits, &obj->Double.bits, sizeof(bits));  return bits; }
 
 #define isDouble(X)			is(Double, (X))
+#define isPair(X)			is(Pair, (X))
 
 static inline int isNumeric(oop obj)	{ return isLong(obj) || isDouble(obj); }
 
@@ -296,11 +300,12 @@ static oop newExpr(oop defn, oop ctx)
 static oop newForm(oop fn, oop sym)	{ oop obj= newOops(Form);	set(obj, Form,function, fn);	set(obj, Form,symbol, sym);	return obj; }
 static oop newFixed(oop function)	{ oop obj= newOops(Fixed);	set(obj, Fixed,function, function);				return obj; }
 
-static oop newSubr(imp_t imp, wchar_t *name)
+static oop newSubr(wchar_t *name, imp_t imp, cast_t *sig)
 {
   oop obj= newBits(Subr);
-  set(obj, Subr,imp,     imp);
   set(obj, Subr,name,    name);
+  set(obj, Subr,imp,     imp);
+  set(obj, Subr,sig,     sig);
   set(obj, Subr,profile, 0);
   return obj;
 }
@@ -1286,6 +1291,8 @@ static oop evlist(oop obj, oop ctx)
   return head;
 }
 
+static oop ffcall(imp_t imp, cast_t *sig, oop arguments);
+
 static oop apply(oop fun, oop arguments, oop ctx)
 {
   if (opt_v > 2) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(ctx); }
@@ -1342,10 +1349,12 @@ static oop apply(oop fun, oop arguments, oop ctx)
       return apply(get(fun, Fixed,function), arguments, ctx);
     }
     case Subr: {
-	if (opt_p) arrayAtPut(traceStack, traceDepth++, fun);
-	oop ans= get(fun, Subr,imp)(arguments, ctx);
-	if (opt_p) --traceDepth;
-	return ans;
+      if (opt_p) arrayAtPut(traceStack, traceDepth++, fun);
+      cast_t *sig= get(fun, Subr,sig);
+      imp_t   imp= get(fun, Subr,imp);
+      oop     ans= sig ? ffcall(imp, sig, arguments) : imp(arguments, ctx);
+      if (opt_p) --traceDepth;
+      return ans;
     }
     default: {
       oop args= arguments;
@@ -1363,6 +1372,97 @@ static oop apply(oop fun, oop arguments, oop ctx)
     }
   }
   return nil;
+}
+
+#define alignof(X)	offsetof(struct { char _; X x; }, x)
+#define align(X, S)	((void *)(((long)(X) + (S) - 1) & -(S)))
+
+#define ffcast(NAME, CTYPE, OTYPE)												\
+    void *ff##NAME(void *argv, oop arg)												\
+    {																\
+	argv= align(argv, alignof(CTYPE));											\
+	switch (getType(arg)) {													\
+	    case OTYPE:	*(CTYPE *)argv= get##OTYPE(arg);  break;								\
+	    default:	fprintf(stderr, "\nnon-"#OTYPE" argument in foreign call: ");  fdumpln(stderr, arg);  fatal(0);  break;	\
+	}															\
+	return argv + sizeof(CTYPE);												\
+    }
+
+ffcast(double,	double,  Double)
+ffcast(float,	float,   Double)
+ffcast(int,	int,     Long)
+ffcast(int32,	int32_t, Long)
+ffcast(int64,	int64_t, Long)
+ffcast(long,	long,	 Long)
+
+#undef ffcast
+
+void *ffpointer(void *argv, oop arg)
+{
+    argv= align(argv, sizeof(void *));
+    void *ptr= 0;
+    switch (getType(arg)) {
+	case Undefined:	ptr= 0;					break;
+	case Data:	ptr= (void *)arg;			break;
+	case Long:	ptr= (void *)getLong(arg);		break;
+	case Double:	ptr= (void *)arg;			break;
+	case String:	ptr= get(arg, String,bits);		break;
+	case Symbol:	ptr= get(arg, Symbol,bits);		break;
+	case Subr:	ptr= get(arg, Subr,imp);		break;
+	case Variable:	ptr= &get(arg, Variable,value);		break;
+	default:
+	    if (GC_atomic(arg))
+		ptr= (void *)arg;
+	    else {
+		fprintf(stderr, "\ninvalid pointer argument: ");
+		fdumpln(stderr, arg);
+		fatal(0);
+	    }
+	    break;
+    }
+    *(void **)argv= ptr;
+    return argv + sizeof(void *);
+}
+
+void *ffstring(void *argv, oop arg)
+{
+    argv= align(argv, sizeof(void *));
+    switch (getType(arg)) {
+	case String:	*(void **)argv= wcs2mbs(get(arg, String,bits));  break;
+	default:	fprintf(stderr, "\nnon-String argument in foreign call: ");  fdumpln(stderr, arg);  fatal(0);  break;
+    }
+    return argv + sizeof(void *);
+}
+
+void *ffdefault(void *argv, oop arg)
+{
+    switch (getType(arg))
+    {
+	case Undefined:	argv= align(argv, sizeof(void *));  *(void **)argv= 0;				return argv + sizeof(void *);
+	case Long:	argv= align(argv, sizeof(int   ));  *(int   *)argv= getLong(arg);		return argv + sizeof(int   );
+	case Double:	argv= align(argv, sizeof(int   ));  *(double*)argv= getDouble(arg);		return argv + sizeof(double);
+	case String:	argv= align(argv, sizeof(void *));  *(void **)wcs2mbs(get(arg, String,bits));	return argv + sizeof(void *);
+	case Subr:	argv= align(argv, sizeof(void *));  *(void **)argv= get(arg, Subr,imp);		return argv + sizeof(void *);
+    }
+    argv= align(argv, sizeof(void *));
+    *(void **)argv= (void *)arg;
+    return argv + sizeof(void *);
+}
+
+oop ffcall(imp_t imp, cast_t *sig, oop arguments)
+{
+    struct { long l[32]; } argv;
+    void   *argp= &argv;
+    cast_t  cast= 0;
+    while ((cast= *sig++) && (nil != arguments)) {
+	argp= cast(argp, getHead(arguments));
+	arguments= getTail(arguments);
+    }
+    while (nil != arguments) {
+	argp= ffdefault(argp, getHead(arguments));
+	arguments= getTail(arguments);
+    }
+    return newLong(((int (*)())imp)(argv));
 }
 
 static int length(oop list)
@@ -1902,14 +2002,14 @@ static subr(format)
   oop     ofmt= car(args);		if (!is(String, ofmt)) fatal("format is not a string");
   oop     oarg= cadr(args);
   wchar_t *fmt= get(ofmt, String,bits);
-  void    *arg= 0;
+  union { long l;  void *p;  double d; } arg;
   switch (getType(oarg)) {
-    case Undefined:						break;
-    case Long:		arg= (void *)getLong(oarg);		break;
-	//case Double:	arg= (void *)getDouble(oarg);		break;
-    case String:	arg= (void *)get(oarg, String,bits);	break;
-    case Symbol:	arg= (void *)get(oarg, Symbol,bits);	break;
-    default:		arg= (void *)oarg;			break;
+      case Undefined:					break;
+      case Long:	arg.l= getLong(oarg);		break;
+      case Double:	arg.d= getDouble(oarg);		break;
+      case String:	arg.p= get(oarg, String,bits);	break;
+      case Symbol:	arg.p= get(oarg, Symbol,bits);	break;
+      default:		arg.p= oarg;			break;
   }
   size_t size= 100;
   wchar_t *p, *np;
@@ -2226,37 +2326,117 @@ static subr(data_length)
   return newLong(GC_size(arg));
 }
 
-#define accessor(name, type)										\
-    static subr(name##_at)										\
-    {													\
-	arity2(args, #name"-at");									\
-	oop obj= getHead(args);										\
-	oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;			\
-	int idx= getLong(arg);										\
-	if (is(Long, obj))										\
-	    return newLong(((type *)getLong(obj))[idx]);						\
-	if ((unsigned)idx >= (unsigned)GC_size(obj) / sizeof(type)) return nil;				\
-	return newLong(((type *)obj)[idx]);								\
-    }													\
-													\
-    static subr(set_##name##_at)									\
-    {													\
-	arity3(args, "set-"#name"-at");									\
-	oop obj= getHead(args);										\
-	oop arg= getHead(getTail(args));								\
-	oop val= getHead(getTail(getTail(args)));	if (!isLong(arg) || !isLong(val)) return nil;	\
-	int idx= getLong(arg);										\
-	if (is(Long, obj))										\
-	    ((type *)getLong(obj))[idx]= getLong(val);							\
-	else {												\
-	    if ((unsigned)idx >= (unsigned)GC_size(obj) / sizeof(type)) return nil;			\
-	    ((type *)obj)[idx]= getLong(val);								\
-	}												\
-	return val;											\
+#define oldaccessor(name, otype, ctype)											\
+    static subr(name##_at)												\
+    {															\
+	arity2(args, #name"-at");											\
+	oop obj= getHead(args);												\
+	oop arg= getHead(getTail(args));		if (!isLong(arg)) return nil;					\
+	oop opt= getHead(getTail(getTail(args)));									\
+	int mul= sizeof(ctype);												\
+	if (nil != opt) {												\
+	    if (!isLong(opt)) return nil;										\
+	    mul= getLong(opt);												\
+	}														\
+	int idx= getLong(arg);												\
+	if (isLong(obj)) return new##otype(*((ctype *)(getLong(obj) + mul * idx)));					\
+	if ((unsigned)(idx + 1) * mul >= (unsigned)GC_size(obj)) return nil;						\
+	return new##otype(*((ctype *)((long)obj + mul * idx)));								\
+    }															\
+															\
+    static subr(set_##name##_at)											\
+    {															\
+	arity3(args, "set-"#name"-at");											\
+	oop obj= getHead(args);												\
+	oop arg= getHead(getTail(args));										\
+	oop val= getHead(getTail(getTail(args)));		if (!isLong(arg) || !is##otype(val)) return nil;	\
+	int idx= getLong(arg);												\
+	oop opt= getHead(getTail(getTail(getTail(args))));								\
+	int mul= sizeof(ctype);												\
+	if (nil != opt) {												\
+	    if (!isLong(opt)) return nil;										\
+	    mul= getLong(opt);												\
+	}														\
+	if (isLong(obj))												\
+	    *((ctype *)(getLong(obj) + mul * idx))= get##otype(val);							\
+	else {														\
+	    if ((unsigned)(idx + 1) * mul >= (unsigned)GC_size(obj)) return nil;					\
+	    *((ctype *)((long)obj + mul * idx))= get##otype(val);							\
+	}														\
+	return val;													\
     }
 
-accessor(byte,  unsigned char)
-accessor(long,  long)
+static void idxtype(oop args, char *who)
+{
+    fprintf(stderr, "\n%s: non-integer index: ", who);
+    fdumpln(stderr, args);
+    fatal(0);
+}
+
+static void valtype(oop args, char *who)
+{
+    fprintf(stderr, "\n%s: improper store: ", who);
+    fdumpln(stderr, args);
+    fatal(0);
+}
+
+static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned long eltsize, oop args, char *who)
+{
+    if (isLong(obj)) return getLong(obj) + offset;
+    if (offset + eltsize > GC_size(obj)) {
+	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
+	fdumpln(stderr, args);
+	fatal(0);
+    }
+    return (unsigned long)obj + offset;
+}
+
+#define accessor(name, otype, ctype)											\
+    static subr(name##_at)												\
+    {															\
+	oop arg= args;						if (!isPair(arg)) arity(args, #name"-at");		\
+	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, #name"-at");		\
+	oop idx= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, #name"-at");		\
+	unsigned long off= getLong(idx);										\
+	if (isPair(arg)) {												\
+	    oop mul= getHead(arg);				if (!isLong(mul)) idxtype(args, #name"-at");		\
+	    off *= getLong(mul);				if (nil != getTail(arg)) arity(args, #name"-at");	\
+	}														\
+	else														\
+	    off *= sizeof(ctype);											\
+	return new##otype(*(ctype *)checkRange(obj, off, sizeof(ctype), args, #name"-at"));				\
+    }															\
+															\
+    static subr(set_##name##_at)											\
+    {															\
+	oop arg= args;						if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop idx= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop val= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, "set-"#name"-at");	\
+	unsigned long off= getLong(idx);										\
+	if (isPair(arg)) {					if (!isLong(val)) idxtype(args, "set-"#name"-at");	\
+	    off *= getLong(val);											\
+	    val= getHead(arg);					if (nil != getTail(arg)) arity(args, "set-"#name"-at");	\
+	}														\
+	else														\
+	    off *= sizeof(ctype);				if (!is##otype(val)) valtype(args, "set-"#name"-at");	\
+	*(ctype *)checkRange(obj, off, sizeof(ctype), args, "set-"#name"-at")= get##otype(val);				\
+	return val;													\
+    }
+
+accessor(byte,		Long, 	 unsigned char)
+accessor(char,		Long, 	 char)
+accessor(short,		Long, 	 short)
+accessor(wchar,		Long, 	 wchar_t)
+accessor(int,		Long, 	 int)
+accessor(int32,		Long, 	 int32_t)
+accessor(int64,		Long, 	 int64_t)
+accessor(long,		Long, 	 long)
+accessor(longlong,	Long, 	 long long)
+accessor(pointer,	Long, 	 long)
+accessor(float,		Double,	 float)
+accessor(double,	Double,	 double)
+accessor(longdouble,	Double,	 long double)
 
 #undef accessor
 
@@ -2267,7 +2447,7 @@ accessor(long,  long)
 static subr(native_call)
 {
     oop  obj= car(args);
-    struct { long l[34]; } argv;
+    union { long l[34]; float f[34]; double d[17]; } argv;
     int  argc= 0;
     args= cdr(args);
     while (is(Pair, args) && argc < 32)
@@ -2278,8 +2458,12 @@ static subr(native_call)
 	{
 	    case Undefined:	argv.l[argc]= 0;						break;
 	    case Long:		argv.l[argc]= getLong(arg);					break;
- 	    case Double:	argc= (argc + 1) & -2;  argv.l[argc++]= ((long *)arg)[0];
-				argv.l[argc]= ((long *)arg)[1];					break;
+ 	    case Double:
+#if 1
+				argc= (argc + 1) & -2;  argv.d[argc++ >> 2]= getDouble(arg);	break;
+#else
+				argv.f[argc]= getDouble(arg);					break;
+#endif
  	    case String:	argv.l[argc]= (long)wcs2mbs(get(arg, String,bits));		break;
 	    case Subr:		argv.l[argc]= (long)get(arg, Subr,imp);				break;
 	    default:		argv.l[argc]= (long)arg;					break;
@@ -2316,18 +2500,42 @@ static subr(native_call)
 
 static subr(subr)
 {
-    oop ptr= car(args);
+    oop arg= car(args);
     wchar_t *name= 0;
-    switch (getType(ptr))
+    switch (getType(arg))
     {
-	case String:	name= get(ptr, String,bits);  break;
-	case Symbol:	name= get(ptr, Symbol,bits);  break;
+	case String:	name= get(arg, String,bits);  break;
+	case Symbol:	name= get(arg, Symbol,bits);  break;
 	default:	fatal("subr: argument must be string or symbol");
     }
     char *sym= wcs2mbs(name);
     void *addr= dlsym(RTLD_DEFAULT, sym);
     if (!addr) fatal("could not find symbol: %s", sym);
-    return newSubr(addr, name);
+    cast_t *sig= 0;
+    arg= cadr(args);
+    if (nil != arg) {				if (!is(String, arg)) { fprintf(stderr, "subr: non-String signature: ");  fdumpln(stderr, arg);  fatal(0); }
+	wchar_t *spec = get(arg, String,bits);
+	int      mode = 0;
+	cast_t  *ptr  = calloc(32, sizeof(cast_t));	/* xxx leakage */;
+	cast_t   cast = 0;
+	sig= ptr;
+	while ((mode= *spec++)) {
+	    switch (mode) {
+		case 'd':	cast= ffdouble;		break;
+		case 'f':	cast= fffloat;		break;
+		case 'i':	cast= ffint;		break;
+		case 'j':	cast= ffint32;		break;
+		case 'k':	cast= ffint64;		break;
+		case 'l':	cast= fflong;		break;
+		case 'p':	cast= ffpointer;	break;
+		case 's':	cast= ffstring;		break;
+		case 'S':	cast= ffpointer;	break;
+		default:	fatal("illegal type specification: %s", get(arg, String,bits));
+	    }
+	    *ptr++= cast;
+	}
+    }
+    return newSubr(name, addr, sig);
 }
 
 static subr(subr_name)
@@ -2342,6 +2550,14 @@ static subr(allocate)
   oop type= getHead(args);			if (!isLong(type)) return nil;
   oop size= getHead(getTail(args));		if (!isLong(size)) return nil;
   return _newOops(getLong(type), sizeof(oop) * getLong(size));
+}
+
+static subr(allocate_atomic)
+{
+    arity2(args, "allocate-atomic");
+    oop type= getHead(args);			if (!isLong(type)) return nil;
+    oop size= getHead(getTail(args));		if (!isLong(size)) return nil;
+    return _newBits(getLong(type), getLong(size));
 }
 
 static subr(oop_at)
@@ -2479,14 +2695,17 @@ static subr(times)
     struct rusage ru;
     gettimeofday(&tv, 0);
     getrusage(RUSAGE_SELF, &ru);
+    oop secs= newLong(tv.tv_sec);						GC_PROTECT(secs);
     timersub(&tv, &epoch, &tv);
     oop real= newLong(tv.tv_sec * 1000 + tv.tv_usec / 1000);			GC_PROTECT(real);
     oop user= newLong(ru.ru_utime.tv_sec * 1000 + ru.ru_utime.tv_usec / 1000);	GC_PROTECT(user);
     oop syst= newLong(ru.ru_stime.tv_sec * 1000 + ru.ru_stime.tv_usec / 1000);	GC_PROTECT(syst);
-    syst= newPair(syst, nil);
+    secs= newPair(secs, nil);
+    syst= newPair(syst, secs);
     user= newPair(user, syst);							GC_UNPROTECT(syst);
     real= newPair(real, user);							GC_UNPROTECT(user);
 										GC_UNPROTECT(real);
+										GC_UNPROTECT(secs);
     return real;
 }
 
@@ -2820,12 +3039,35 @@ static subr_ent_t subr_tab[] = {
     { " data-length",		subr_data_length },
     { " byte-at",		subr_byte_at },
     { " set-byte-at",		subr_set_byte_at },
+    { " char-at",		subr_char_at },
+    { " set-char-at",		subr_set_char_at },
+    { " short-at",		subr_short_at },
+    { " set-short-at",		subr_set_short_at },
+    { " wchar-at",		subr_wchar_at },
+    { " set-wchar-at",		subr_set_wchar_at },
+    { " int-at",		subr_int_at },
+    { " set-int-at",		subr_set_int_at },
+    { " int32-at",		subr_int32_at },
+    { " set-int32-at",		subr_set_int32_at },
+    { " int64-at",		subr_int64_at },
+    { " set-int64-at",		subr_set_int64_at },
     { " long-at",		subr_long_at },
     { " set-long-at",		subr_set_long_at },
+    { " longlong-at",		subr_longlong_at },
+    { " set-longlong-at",	subr_set_longlong_at },
+    { " pointer-at",		subr_pointer_at },
+    { " set-pointer-at",	subr_set_pointer_at },
+    { " float-at",		subr_float_at },
+    { " set-float-at",		subr_set_float_at },
+    { " double-at",		subr_double_at },
+    { " set-double-at",		subr_set_double_at },
+    { " longdouble-at",		subr_longdouble_at },
+    { " set-longdouble-at",	subr_set_longdouble_at },
     { " native-call",		subr_native_call },
     { " subr",			subr_subr },
     { " subr-name",		subr_subr_name },
     { " allocate",		subr_allocate },
+    { " allocate-atomic",	subr_allocate_atomic },
     { " oop-at",		subr_oop_at },
     { " set-oop-at",		subr_set_oop_at },
     { " not",			subr_not },
@@ -2910,7 +3152,7 @@ int main(int argc, char **argv)
     subr_ent_t *ptr;
     for (ptr= subr_tab;  ptr->name;  ++ptr) {
       wchar_t *name= wcsdup(mbs2wcs(ptr->name + 1));
-      tmp= newSubr(ptr->imp, name);
+      tmp= newSubr(name, ptr->imp, 0);
       if ('.' == ptr->name[0]) tmp= newFixed(tmp);
       define(get(globals, Variable,value), intern(name), tmp);
     }
