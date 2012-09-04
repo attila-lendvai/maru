@@ -180,6 +180,8 @@ profile-peg : .force
 NILE = ../nile
 GEZIRA = ../gezira
 
+libs : libnile.$(SO) libgezira.$(SO)
+
 libnile.$(SO) : .force
 	$(CC) -I$(NILE)/runtimes/c -O3 -ffast-math -fPIC -fno-common $(SOCFLAGS) -o $@ $(NILE)/runtimes/c/nile.c
 
