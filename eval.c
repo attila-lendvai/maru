@@ -1,4 +1,4 @@
-// last edited: 2012-08-31 02:03:01 by piumarta on emilia.local
+// last edited: 2012-09-05 14:44:43 by piumarta on linux32
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1438,11 +1438,11 @@ void *ffdefault(void *argv, oop arg)
 {
     switch (getType(arg))
     {
-	case Undefined:	argv= align(argv, sizeof(void *));  *(void **)argv= 0;				return argv + sizeof(void *);
-	case Long:	argv= align(argv, sizeof(int   ));  *(int   *)argv= getLong(arg);		return argv + sizeof(int   );
-	case Double:	argv= align(argv, sizeof(int   ));  *(double*)argv= getDouble(arg);		return argv + sizeof(double);
-	case String:	argv= align(argv, sizeof(void *));  *(void **)wcs2mbs(get(arg, String,bits));	return argv + sizeof(void *);
-	case Subr:	argv= align(argv, sizeof(void *));  *(void **)argv= get(arg, Subr,imp);		return argv + sizeof(void *);
+	case Undefined:	argv= align(argv, sizeof(void *));  *(void **)argv= 0;					return argv + sizeof(void *);
+	case Long:	argv= align(argv, sizeof(int   ));  *(int   *)argv= getLong(arg);			return argv + sizeof(int   );
+	case Double:	argv= align(argv, sizeof(int   ));  *(double*)argv= getDouble(arg);			return argv + sizeof(double);
+	case String:	argv= align(argv, sizeof(void *));  *(void **)argv= wcs2mbs(get(arg, String,bits));	return argv + sizeof(void *);
+	case Subr:	argv= align(argv, sizeof(void *));  *(void **)argv= get(arg, Subr,imp);			return argv + sizeof(void *);
     }
     argv= align(argv, sizeof(void *));
     *(void **)argv= (void *)arg;
