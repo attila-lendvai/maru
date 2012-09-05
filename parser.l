@@ -135,7 +135,7 @@
 		(let ()
 		  (and (= ?\n c) (set self.srcpos (cons (car self.srcpos) (+ 1 (cdr self.srcpos)))))
 		  (set self.pending c))
-	      (or (= self.source *input*) (close self.source))
+	      ;;(or (= self.source *input*) (close self.source)) ;; the caller should close the stream
 	      (set self.source ())
 	      (set self.pending *end*)))
 	(set self.pending *end*))))
