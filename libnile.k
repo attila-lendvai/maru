@@ -1,0 +1,18 @@
+(require "dlopen.k")
+
+(define-constant NILE_STATUS_OK			0)
+(define-constant NILE_STATUS_OUT_OF_MEMORY	1)
+(define-constant NILE_STATUS_BAD_ARG		2)
+(define-constant NILE_STATUS_SHUTTING_DOWN	3)
+
+(define-function init-libnile ()
+  (init-dlopen)
+  (define libnile (dlopen "libnile"))
+  (define nile_startup		(subr "nile_startup"		"pii"))
+  (define nile_sync		(subr "nile_sync"		"p"))
+  (define nile_status		(subr "nile_status"		"p"))
+  (define nile_shutdown		(subr "nile_shutdown"		"p"))
+  (define nile_Process_pipe	(subr "nile_Process_pipe"	"p"))
+  (define nile_Process_pipe_v	(subr "nile_Process_pipe_v"	"pi"))
+  (define nile_Process_feed	(subr "nile_Process_feed"	"ppi"))
+  (define nile_Process_gate	(subr "nile_Process_gate"	"pp")))
