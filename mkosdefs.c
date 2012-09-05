@@ -11,10 +11,10 @@
 
 #define STR(X)		#X
 
-#define defint(X)	printf("(define %s %d)\n", #X, X)
+#define defint(X)	printf("(define %s %ld)\n", #X, (long)X)
 #define defstr(X)	printf("(define %s \"%s\")\n", #X, STR(X))
-#define defsize(X)	printf("(define-constant sizeof-%s %d)\n", #X, sizeof(X))
-#define defalign(X)	{ struct { char _;  X x; } x;  printf("(define-constant alignof-%s %d)\n", #X, (long)&x.x - (long)&x); }
+#define defsize(X)	printf("(define-constant sizeof-%s %ld)\n", #X, (long)sizeof(X))
+#define defalign(X)	{ struct { char _;  X x; } x;  printf("(define-constant alignof-%s %ld)\n", #X, (long)&x.x - (long)&x); }
 #define defsao(X)	defsize(X);  defalign(X)
 
 typedef long long longlong;
