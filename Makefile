@@ -106,6 +106,15 @@ test-compile-grammar :
 	./eval compile-grammar.l test-dc.g > test-dc.g.l
 	./eval compile-dc.l test.dc
 
+test-compile-irgol : eval32 irgol.g.l .force
+	./eval compile-irgol.l test.irgol > test.c
+	$(CC32) -fno-builtin -g -o test test.c
+	@echo
+	./test
+
+irgol.g.l : tpeg.l irgol.g
+	./eval compile-tpeg.l irgol.g > irgol.g.l
+
 test-compile-irl : eval32 irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
@@ -114,15 +123,6 @@ test-compile-irl : eval32 irl.g.l .force
 
 irl.g.l : tpeg.l irl.g
 	./eval compile-tpeg.l irl.g > irl.g.l
-
-test-compile-sirl : eval32 sirl.g.l .force
-	./eval compile-sirl.l test.sirl > test.c
-	$(CC32) -fno-builtin -g -o test test.c
-	@echo
-	./test
-
-sirl.g.l : tpeg.l sirl.g
-	./eval compile-tpeg.l sirl.g > sirl.g.l
 
 test-ir : eval .force
 	./eval test-ir.k > test.c
@@ -194,7 +194,7 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f irl.g.l sirl.g.l osdefs.k test.c tpeg.l a.out
+	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
 	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
