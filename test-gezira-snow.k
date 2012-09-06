@@ -2,6 +2,7 @@
 (require "libgezira.k")
 (require "libglfw.k")
 (require "libglu.k")
+(require "libgl.k")
 (require "gl-texbuf.k")
 (require "matrix.k")
 (require "random.k")
@@ -69,9 +70,11 @@
   (gl-render texbuf))
 
 (define-function *main* ()
+  (init-dlopen)
   (init-libgezira)
   (init-libglfw)
   (init-libglu)
+  (init-libgl)
   (glfwInit)
   (let ((w window-width) (h window-height))
     (glfwOpenWindow w h 8 8 8 8 0 0 GLFW_WINDOW)
@@ -81,7 +84,7 @@
 	   (memory  (data mem-size))
 	   (process (nile_startup memory mem-size n-threads))
 	   (flakes  (array)))
-      (gezira_Image_init image (<texbuf>-bits texbuf) window-width window-height window-width)
+      (gezira_Image_init image (<texbuf>-bits texbuf) window-width window-height (<texbuf>-stride texbuf))
       (for (i 0 n-flakes)
 	(set-array-at flakes i (make <snowflake>
 				     (x	    (random 0 w))      (y     (random 0 h))	 (dy	 (random 0.5 3.0))
@@ -92,7 +95,7 @@
 	  (array-do flake flakes
 	    (snowflake-render flake image process)
 	    (snowflake-update flake))
-	  (nile_sync process)
+	  ;;(nile_sync process)
 	  (display texbuf)
 	  (glfwSwapBuffers)
 	  (glfwSleep 0.025)

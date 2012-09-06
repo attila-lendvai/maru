@@ -2,6 +2,5 @@
 
 (define-function init-libglu ()
   (init-dlopen)
-  (define libglu (dlopen "libGLU"))
-  (define gluPerspective	(subr "gluPerspective"	"dddd"))
-  )
+  (let ((lib "libGLU"))
+    (define gluPerspective	(dlextern lib "gluPerspective"	"dddd"))))

@@ -1,6 +1,6 @@
-(require "osdefs.k")
 (require "libglfw.k")
 (require "libglu.k")
+(require "libgl.k")
 
 (define rtri 0.0)
 
@@ -110,6 +110,7 @@
 (define-function *main* ()
   (init-libglfw)
   (init-libglu)
+  (init-libgl)
   (glfwInit)
   (let ((w 640) (h 320))
     (glfwOpenWindow w h 8 8 8 8 32 0 GLFW_WINDOW)
@@ -125,7 +126,7 @@
 	(draw-gl-scene)
 	(glfwSwapBuffers)
 	;;(glfwWaitEvents)
-	(glfwSleep 0.05)
+	(glfwSleep 0.033)
 	(set running (and (= 0 (glfwGetKey GLFW_KEY_ESC))
 			  (= 1 (glfwGetWindowParam GLFW_OPENED))))
 	)))

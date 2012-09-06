@@ -60,9 +60,11 @@
   (gl-render texbuf))
 
 (define-function *main* ()
+  (init-dlopen)
   (init-libgezira)
   (init-libglfw)
   (init-libglu)
+  (init-libgl)
   (glfwInit)
   (let ((w window-width) (h window-height))
     (glfwOpenWindow w h 8 8 8 8 0 0 GLFW_WINDOW)
@@ -76,6 +78,7 @@
 	(while running
 	  (clear image process 1.0 0.0 0.0 0.0)
 	  (render image process path path-size)
+	  (nile_sync process)
 	  (display texbuf)
 	  (glfwSwapBuffers)
 	  (glfwSleep 0.025)
