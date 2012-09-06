@@ -18,7 +18,7 @@ SO = dylib
 SOCFLAGS = -dynamiclib -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup,-flat_namespace
 else
 SO = so
-SOCFLAGS = -shared
+SOCFLAGS = -shared -msse -msse2
 endif
 
 .SUFFIXES :
