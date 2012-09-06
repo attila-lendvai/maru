@@ -11,7 +11,7 @@
 (define window-width	600)
 (define window-height	600)
 (define n-flakes	500)
-(define n-threads	1)
+(define n-threads	2)
 (define mem-size	(* 1000000 n-threads))
 
 (define flake-alpha	0.7)
@@ -95,7 +95,7 @@
 	  (array-do flake flakes
 	    (snowflake-render flake image process)
 	    (snowflake-update flake))
-	  ;;(nile_sync process)
+	  (nile_sync process)
 	  (display texbuf)
 	  (glfwSwapBuffers)
 	  (glfwSleep 0.025)
