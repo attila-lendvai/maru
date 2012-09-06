@@ -9,6 +9,10 @@
 # include <dlfcn.h>
 #endif
 
+#ifndef RTLD_DEFAULT
+# define RTLD_DEFAULT 0
+#endif
+
 #define STR(X)		#X
 
 #define defint(X)	printf("(define %s %ld)\n", #X, (long)X)
@@ -67,5 +71,6 @@ int main()
     defsao(pointer);
     defint(RTLD_NOW);
     defint(RTLD_GLOBAL);
+    defint(RTLD_DEFAULT);
     return 0;
 }
