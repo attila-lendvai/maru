@@ -94,6 +94,13 @@
   (lambda (x y)
     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
 
+(define concat-symbols
+  (lambda args
+    (let ((result (car args)))
+      (while (symbol? (car (set args (cdr args))))
+	(set result (concat-symbol result (car args))))
+      result)))
+
 (define quasiquote
   (form
     (let ((qq-list) (qq-element) (qq-object))
@@ -125,7 +132,7 @@
   `(define ,name (lambda ,args ,@body)))
 
 (define-form define-macro (name args . body)
-  `(define-form ,name ,args (cons 'let (cons () (macro-expand (list-zip-assocs ',args (list ,@args)) ',body)))))
+  `(define-form ,name ,args (cons 'let (cons () (macro-expand (zip-assocs ',args (list ,@args)) ',body)))))
 
 (define-function macro-expand (bindings exp)
   (if (pair? exp)
@@ -647,6 +654,8 @@
   ;;(println "; backtrace disabled")
   )
 
+(define-function printf (fmt arg) (print (format fmt arg)))
+
 ;;; multimethod
 
 (define-structure <generic> (name methods default))
@@ -722,11 +731,11 @@
       (set curr next))
     prev))
 
-(define-function list-zip lists		(apply map list lists))
+(define-function zip lists		(apply map list lists))
 
-(define-function list-zip-assocs (a b)
+(define-function zip-assocs (a b)
   (if (and (pair? a) (pair? b))
-      (cons (cons (car a) (car b)) (list-zip-assocs (cdr a) (cdr b)))
+      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
     (or a b)))
 
 ;;; iteration
@@ -782,8 +791,8 @@
   `(let ((_ ())
 	 (__ ,list))
      (while (and __ (not _))
-       (let ((,name (car __)))
-	 (and ,expr (set _ ,name))
+       (let* ((,name (car __)))
+	 (and ,expr (set _ (car __)))
 	 (set __ (cdr __))))
      _))
 
