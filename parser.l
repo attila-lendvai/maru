@@ -700,6 +700,9 @@
 (define-function parse-all (self source)
   (parse-all-from self source $start))
 
+(define-method parser-context <parser> ()
+  (parser-stream-context self.source))
+
 ;;;----------------------------------------------------------------
 
 (define-class <peg> <parser> (grammar-name))
