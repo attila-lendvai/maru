@@ -2,7 +2,7 @@ NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -g $(OFLAGS)
+CFLAGS = -Wall -g $(OFLAGS) -Wl,--export-dynamic
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
@@ -173,6 +173,22 @@ test-main2 : eval32 .force
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
 
+osdefs.g.l : osdefs.g tpeg.l
+	./eval compile-tpeg.l $< > $@.new
+	mv $@.new $@
+
+%.osdefs.k : %.osdefs osdefs.g.l
+	./eval compile-osdefs.l $< > $<.c
+	cc -o $<.exe $<.c
+	./$<.exe > $@.new
+	mv $@.new $@
+	rm -f $<.exe $<.c
+
+OSDEFS = $(wildcard *.osdefs) $(wildcard net/*.osdefs)
+OSKEFS = $(OSDEFS:.osdefs=.osdefs.k)
+
+osdefs : osdefs.g.l $(OSKEFS) .force
+
 profile-peg : .force
 	$(MAKE) clean eval CFLAGS="-O3 -fno-inline-functions -g -DNDEBUG"
 	shark -q -1 -i ./eval parser.l peg.n test-peg.l > peg.m
@@ -198,6 +214,7 @@ clean : .force
 	rm -f *~ *.o main eval eval32 gceval test *.s mkosdefs *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
+	rm -rf osdefs.g.l *.osdefs.k
 
 #----------------------------------------------------------------
 
