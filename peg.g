@@ -56,7 +56,11 @@ grammar         = symbol:name space plus
 symfirst	= [-!#$%&*+/:<=>@A-Z^_a-z|~] ;
 symrest		= [-!#$%&*+./:0-9<=>?@A-Z^_a-z|~] ;
 symbol		= (symfirst symrest*) @$$ ;
-sexpr		= ("-"? digit+) @$#
+sinteger	= "0x"(higit+) @$#16
+		|     (digit+) @$#
+		;
+sexpr		= "-" sinteger:i						-> (- i)
+		| sinteger
 		| symbol
 		| "?".
 		| "\""  (!"\""  char)* $:e "\""					-> e
