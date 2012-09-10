@@ -1,4 +1,4 @@
-// last edited: 2012-09-05 14:44:43 by piumarta on linux32
+// last edited: 2012-09-09 12:07:50 by piumarta on linux32
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1408,6 +1408,7 @@ void *ffpointer(void *argv, oop arg)
 	case Double:	ptr= (void *)arg;			break;
 	case String:	ptr= get(arg, String,bits);		break;
 	case Symbol:	ptr= get(arg, Symbol,bits);		break;
+	case Expr:	ptr= (void *)arg;			break;
 	case Subr:	ptr= get(arg, Subr,imp);		break;
 	case Variable:	ptr= &get(arg, Variable,value);		break;
 	default:
@@ -2004,12 +2005,12 @@ static subr(format)
   wchar_t *fmt= get(ofmt, String,bits);
   union { long l;  void *p;  double d; } arg;
   switch (getType(oarg)) {
-      case Undefined:					break;
-      case Long:	arg.l= getLong(oarg);		break;
-      case Double:	arg.d= getDouble(oarg);		break;
-      case String:	arg.p= get(oarg, String,bits);	break;
-      case Symbol:	arg.p= get(oarg, Symbol,bits);	break;
-      default:		arg.p= oarg;			break;
+      case Undefined:							break;
+      case Long:	arg.l= 	       getLong  (oarg             ) ;	break;
+      case Double:	arg.d= 	       getDouble(oarg             ) ;	break;
+      case String:	arg.p= wcs2mbs(get      (oarg, String,bits));	break;
+      case Symbol:	arg.p= 	       get      (oarg, Symbol,bits) ;	break;
+      default:		arg.p= 	                 oarg;			break;
   }
   size_t size= 100;
   wchar_t *p, *np;
@@ -2321,9 +2322,11 @@ static subr(data)
 
 static subr(data_length)
 {
-  arity1(args, "data-length");
-  oop arg= getHead(args);		if (!is(Data, arg)) { fprintf(stderr, "data-length: non-Data argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  return newLong(GC_size(arg));
+    arity1(args, "data-length");
+    oop arg= getHead(args);
+    if (!arg) return 0;
+    if (isLong(arg)) return 0;
+    return newLong(GC_size(arg));
 }
 
 #define oldaccessor(name, otype, ctype)											\
@@ -2867,7 +2870,7 @@ static void replPath(wchar_t *path)
     fatal(0);
   }
   fwide(stream, 1);
-  fscanf(stream, "#!%*[^\012\015]");
+  if (fscanf(stream, "#!%*[^\012\015]"));
   replFile(stream, path);
   fclose(stream);
 }
