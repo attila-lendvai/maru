@@ -10,7 +10,7 @@
 
 (define-function init-dlopen ()
   (define %dlopen  (subr "dlopen" "si"))
-  (define %dlsym   (subr "dlsym"  "is"))
+  (define %dlsym   (subr "dlsym"  "ps"))
   (define %dlerror (subr "dlerror" "" )))
 
 (define-function dlopen (name)
