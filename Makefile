@@ -6,10 +6,10 @@ CFLAGS = -Wall -g $(OFLAGS) -Wl,--export-dynamic
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
-LIBS = -lm libw32dl.a
+LIBS = -lm -lffi libw32dl.a
 TIME =
 else
-LIBS = -lm -ldl
+LIBS = -lm -lffi -ldl
 TIME = time
 endif
 
