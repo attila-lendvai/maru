@@ -73,7 +73,7 @@
 	   (image   (new-<gezira-image>))
 	   (memory  (data mem-size))
 	   (process (nile_startup memory mem-size 1)))
-      (gezira_Image_init image (<texbuf>-bits texbuf) window-width window-height window-width)
+      (gezira_Image_init image (<texbuf>-bits texbuf) window-width window-height (<texbuf>-stride texbuf))
       (let ((running 1))
 	(while running
 	  (clear image process 1.0 0.0 0.0 0.0)
