@@ -14,7 +14,7 @@
     (define nile_sync		(dlextern lib "nile_sync"		"p"))
     (define nile_status		(dlextern lib "nile_status"		"p"))
     (define nile_shutdown	(dlextern lib "nile_shutdown"		"p"))
-    (define nile_Process_pipe	(dlextern lib "nile_Process_pipe"	"p"))
+    (define nile_Process_pipe	(dlextern lib "nile_Process_pipe"	"p."))
     (define nile_Process_pipe_v	(dlextern lib "nile_Process_pipe_v"	"pi"))
     (define nile_Process_feed	(dlextern lib "nile_Process_feed"	"ppi"))
     (define nile_Process_gate	(dlextern lib "nile_Process_gate"	"pp"))))
