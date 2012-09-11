@@ -1,4 +1,4 @@
-// last edited: 2012-09-11 18:15:31 by piumarta on emilia.local
+// last edited: 2012-09-12 07:52:05 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -13,7 +13,11 @@
 #include <wchar.h>
 #include <locale.h>
 #include <math.h>
-#include <ffi/ffi.h>
+#if defined(__MACH__)
+# include <ffi/ffi.h>
+#else
+# include <ffi.h>
+#endif
 #include <assert.h>
 
 extern int isatty(int);
