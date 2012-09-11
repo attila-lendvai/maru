@@ -51,7 +51,7 @@
   (let ((lib "libGL"))
     (define glClearColor			(dlextern lib "glClearColor"			"ffff"))
     (define glClearDepth			(dlextern lib "glClearDepth"			"d"))
-    (define glViewport				(dlextern lib "glViewport"			"ii"))
+    (define glViewport				(dlextern lib "glViewport"			"iiii"))
     (define glMatrixMode			(dlextern lib "glMatrixMode"			"i"))
     (define glLoadIdentity			(dlextern lib "glLoadIdentity"			""))
     (define glOrtho				(dlextern lib "glOrtho"				"dddddd"))
