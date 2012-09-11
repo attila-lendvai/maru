@@ -2,7 +2,7 @@ NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -g $(OFLAGS) -Wl,-export-dynamic
+CFLAGS = -Wall -g $(OFLAGS)
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
