@@ -59,8 +59,8 @@
   (with-instance-accessors <ir-insn>
     (for (i 0 level) (print "  "))
     (print "{ "(type-name-of self))
-    (and self.parameters (print " "self.parameters))
-    (and self.type (print" : "self.type))
+    (when self.parameters (print " ") (dump self.parameters))
+    (when self.type (print" : "self.type))
     (list-do operand self.operands (println) (ir-insn-print operand (+ level 1)))
     (print " }")))
 
@@ -695,7 +695,7 @@
 (define-method ir-gen-c <ir-ext> (ir)		)
 
 
-(define-class <ir-call> <ir-insn> ())		(define-function ir-call dest-args	(new <ir-call> () dest-args))
+(define-class <ir-call> <ir-insn> ())		(define-function ir-call (dest args)	(new <ir-call> () (cons dest args)))
 
 (define-method ir-check-type <ir-call> (ir)	(let* ((call-sig  (map-with ir-check-type self.operands ir))
 						       (dest-type (car call-sig))

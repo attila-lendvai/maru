@@ -71,7 +71,7 @@ prefix		= "*"_ prefix:e							-> `(ir-get ,e)
 		| primary
 		;
 
-suffix		= prefix:a ( "("_ arglist:b ")"_				-> `(ir-call ,a ,@b)		:a
+suffix		= prefix:a ( "("_ arglist:b ")"_				-> `(ir-call ,a ,b)		:a
 ### FIX ME --->		   | "."_ xidentifier:b					-> `(ir-get (ir-member ',b ,a))	:a
 			   | "."_ xidentifier:b					-> `(ir-member ',b ,a)	:a
 			   | "["_ xexpression:b "]"_				-> `(ir-get (ir-add ,a ,b))	:a
