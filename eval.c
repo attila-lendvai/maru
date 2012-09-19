@@ -1,4 +1,4 @@
-// last edited: 2012-09-12 07:52:05 by piumarta on emilia.local
+// last edited: 2012-09-20 07:51:32 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1931,6 +1931,7 @@ static subr(putc)
 static subr(read)
 {
   FILE *stream= stdin;
+  oop   head= nil;
   if (nil == args) {
     beginSource(L"<stdin>");
     oop obj= read(stdin);
@@ -1938,23 +1939,36 @@ static subr(read)
     if (obj == DONE) obj= nil;
     return obj;
   }
-  oop arg= car(args);			if (!is(String, arg)) { fprintf(stderr, "read: non-String argument: ");  fdumpln(stderr, arg);  fatal(0); }
-  wchar_t *path= get(arg, String,bits);
-  stream= fopen(wcs2mbs(path), "r");
-  if (!stream) return nil;
-  fwide(stream, 1);
-  beginSource(path);
-  oop head= newPairFrom(nil, nil, currentSource), tail= head;	GC_PROTECT(head);
-  oop obj= nil;							GC_PROTECT(obj);
-  for (;;) {
-    obj= read(stream);
-    if (obj == DONE) break;
-    tail= setTail(tail, newPairFrom(obj, nil, currentSource));
-    if (stdin == stream) break;
+  oop arg= car(args);
+  if (is(String, arg)) {
+      wchar_t *path= get(arg, String,bits);
+      stream= fopen(wcs2mbs(path), "r");
+      if (!stream) return nil;
+      fwide(stream, 1);
+      beginSource(path);
+      head= newPairFrom(nil, nil, currentSource);		GC_PROTECT(head);
+      oop tail= head;
+      oop obj= nil;						GC_PROTECT(obj);
+      for (;;) {
+	  obj= read(stream);
+	  if (obj == DONE) break;
+	  tail= setTail(tail, newPairFrom(obj, nil, currentSource));
+	  if (stdin == stream) break;
+      }
+      head= getTail(head);				GC_UNPROTECT(obj);
+      fclose(stream);				GC_UNPROTECT(head);
+      endSource();
   }
-  head= getTail(head);				GC_UNPROTECT(obj);
-  fclose(stream);				GC_UNPROTECT(head);
-  endSource();
+  else if (isLong(arg)) {
+      stream= (FILE *)getLong(arg);
+      if (stream) head= read(stream);
+      if (head == DONE) head= nil;
+  }
+  else {
+      fprintf(stderr, "read: non-String/Long argument: ");
+      fdumpln(stderr, arg);
+      fatal(0);
+  }
   return head;
 }
 
