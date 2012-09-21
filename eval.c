@@ -1,4 +1,4 @@
-// last edited: 2012-09-20 07:51:32 by piumarta on emilia.local
+// last edited: 2012-09-21 18:36:55 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1082,16 +1082,14 @@ static oop encode_bindings(oop expr, oop bindings, oop outerEnv, oop innerEnv)
     if (is(Pair, bindings))
     {										GC_PROTECT(bindings);
 	oop binding= getHead(bindings);						GC_PROTECT(binding);
-	if (is(Symbol, binding))
-	    binding= newPairFrom(binding, nil, expr);
+	if (is(Symbol, binding)) binding= newPairFrom(binding, nil, expr);
 	oop var= car(binding);							GC_PROTECT(var);
 	oop val= cdr(binding);							GC_PROTECT(val);
 	var= findLocalVariable(innerEnv, var);					assert(nil != var);
 	val= enlist(val, outerEnv);
 	binding= newPairFrom(var, val, expr);					GC_UNPROTECT(val);  GC_UNPROTECT(var);
-	oop rest= encode_bindings(expr, getTail(bindings), outerEnv, innerEnv);
-	bindings= newPairFrom(binding, rest, expr);				GC_UNPROTECT(binding);
-										GC_UNPROTECT(bindings);
+	oop rest= encode_bindings(expr, getTail(bindings), outerEnv, innerEnv); GC_PROTECT(rest);
+	bindings= newPairFrom(binding, rest, expr);				GC_UNPROTECT(rest);  GC_UNPROTECT(binding);  GC_UNPROTECT(bindings);
     }
     return bindings;
 }
