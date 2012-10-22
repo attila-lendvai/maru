@@ -579,8 +579,10 @@
 	(println "## defn " name)
 	(warn name "\n")
 	;;x;(println (<expr>-defn (cdar env)))
-	(gen-definition value name comp)))
-    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
+	(gen-definition value name comp)
+	))
+    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
+    ))
 
 (define-form compile-begin ()	`(set *globals* (environment *globals*)))
 
