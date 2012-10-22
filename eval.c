@@ -1,4 +1,4 @@
-// last edited: 2012-09-21 18:36:55 by piumarta on emilia.local
+// last edited: 2012-10-05 09:11:14 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
 #define _BSD_SOURCE 1
@@ -1096,15 +1096,15 @@ static oop encode_bindings(oop expr, oop bindings, oop outerEnv, oop innerEnv)
 
 static oop encode_let(oop expr, oop tail, oop env)
 {
-    oop args= car(tail);					GC_PROTECT(tail);  GC_PROTECT(env);
-    oop env2= newEnv(env, 0, getLong(get(env, Env,offset)));	GC_PROTECT(env2);
+    oop args= car(tail);							GC_PROTECT(tail);  GC_PROTECT(env);
+    oop env2= newEnv(env, 0, getLong(get(env, Env,offset)));			GC_PROTECT(env2);
     define_bindings(args, env2);
     set(env, Env,offset, newLong(getLong(get(env2, Env,offset))));
-    oop bindings= encode_bindings(expr, args, env, env2);	GC_PROTECT(bindings);
-    oop body= cdr(tail);					GC_PROTECT(body);
+    oop bindings= encode_bindings(expr, args, env, env2);			GC_PROTECT(bindings);
+    oop body= cdr(tail);							GC_PROTECT(body);
     body= enlist(body, env2);
-    tail= newPairFrom(bindings, body, expr);			GC_UNPROTECT(body);  GC_UNPROTECT(bindings);
-    tail= newPairFrom(env2, tail, expr);			GC_UNPROTECT(env2);  GC_UNPROTECT(env);  GC_UNPROTECT(tail);
+    tail= newPairFrom(bindings, body, expr);					GC_UNPROTECT(body);  GC_UNPROTECT(bindings);
+    tail= newPairFrom(env2, tail, expr);					GC_UNPROTECT(env2);  GC_UNPROTECT(env);  GC_UNPROTECT(tail);
     return tail;
 }
 
