@@ -1,6 +1,6 @@
 (require "ir2.k")
 (require "ir-gen-c.k")
-(require "ir-gen-x86.k")
+;;(require "ir-gen-x86.k")
 
 (define-structure <extern> (name type))
 
@@ -252,7 +252,7 @@
 
 (compile-begin)
 
-(load "maru-gc.k")
+;;(load "maru-gc.k")
 
 (define (printf (int	char * ...	) *) (extern printf))
 (define (malloc (void *	long		) *) (extern malloc))
