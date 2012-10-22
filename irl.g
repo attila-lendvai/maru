@@ -67,13 +67,13 @@ primary		= "false" keyword						-> '(ir-lit 0)
 
 prefix		= "*"_ prefix:e							-> `(ir-get ,e)
 		| "&"_ xidentifier:i						-> `(ir-addr ',i)
-		| "struct" keyword xidentifier:a "("_ arglist:b ")"_		-> `(ir-struct ',a ,@b)
+		| "struct" keyword xidentifier:a "("_ arglist:b ")"_		-> `(ir-struct ',a (list ,@b))
 		| primary
 		;
 
-suffix		= prefix:a ( "("_ arglist:b ")"_				-> `(ir-call ,a ,@b)		:a
+suffix		= prefix:a ( "("_ arglist:b ")"_				-> `(ir-call ,a (list ,@b))	:a
 ### FIX ME --->		   | "."_ xidentifier:b					-> `(ir-get (ir-member ',b ,a))	:a
-			   | "."_ xidentifier:b					-> `(ir-member ',b ,a)	:a
+			   | "."_ xidentifier:b					-> `(ir-member ',b ,a)		:a
 			   | "["_ xexpression:b "]"_				-> `(ir-get (ir-add ,a ,b))	:a
 			   )*							-> a
 		;
@@ -162,7 +162,7 @@ primtype	= "void"   keyword						-> IR-VOID
 typelist	= type?:a type*:b						-> `(,@a ,@b) ;
 
 type		= primtype:a ( "*"_						-> `(ir-pointer-to ,a) :a
-			     | "("_ typelist:b ")"_				-> `(ir-function-type ir ,a ,@b) :a
+			     | "("_ typelist:b ")"_				-> `(ir-function-type ir ,a (list ,@b)) :a
 			     )*							-> a
 		;
 
@@ -176,17 +176,17 @@ decl		= type:t identifier:i						-> `(,t ,i) ;
 
 paramlist	= decl?:p (","_ decl)*:q					-> `(,@p ,@q) ;
 
-fndecl		= type:t identifier:i "("_ paramlist:p ")"_			-> `(ir-fun ',i (ir-function-type ir ,t ,@(param-list-types p))
+fndecl		= type:t identifier:i "("_ paramlist:p ")"_			-> `(ir-fun ',i (ir-function-type ir ,t (list ,@(param-list-types p)))
 										      ,@(param-list-decls p)) ;
 
 fndefn		= fndecl:d statement:e						-> (concat-list d (list e)) ;
 
-definition	= "struct" keyword xidentifier:i "{"_ mdecl*:d "}"_ ";"_	-> `(ir-def-struct ir ',i ,@d)
+definition	= "struct" keyword xidentifier:i "{"_ mdecl*:d "}"_ ";"_	-> `(ir-def-struct ir ',i (list ,@d))
 		| "import" keyword decl:d ";"_					-> `(ir-put ir (ir-ext ',(cadr d) ,(car d)))
 		| type:t identifier:i ( ":="_ xexpression:e ";"_		-> `(ir-put ir (ir-def ',i ,t ,e))
-				      | "("_ paramlist:p ")"_ xstatement:e	-> `(ir-put ir (ir-fun ',i (ir-function-type ir ,t ,@(param-list-types p))
-												       ,@(param-list-decls p)
-												       ,e))
+				      | "("_ paramlist:p ")"_ xstatement:e	-> `(ir-put ir (ir-fun ',i
+												       (ir-function-type ir ,t (list ,@(param-list-types p)))
+												       (list ,@(param-list-decls p) ,e)))
 				      )
 		| statement:s							-> `(ir-put ir ,s)
 		;
