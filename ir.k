@@ -20,14 +20,16 @@
 (define-class <ir-numeric-type> <ir-scalar-type> ())			(define-function ir-numeric-type? (x)	(inherits-from (type-of x) <ir-numeric-type>))
 (define-class <ir-integral-type> <ir-numeric-type> ())			(define-function ir-integral-type? (x)	(inherits-from (type-of x) <ir-integral-type>))
 (define-class <ir-floating-type> <ir-numeric-type> ())			(define-function ir-floating-type? (x)	(inherits-from (type-of x) <ir-floating-type>))
+(define-class <ir-varargs-type> <ir-type> ())
 
 (define IR-VOID		(new <ir-void-type>	'void	 0 1))
-(define IR-INT8		(new <ir-integral-type> 'int8_t	 1 1))
+(define IR-INT8		(new <ir-integral-type> 'uint8_t 1 1))
 (define IR-INT16	(new <ir-integral-type> 'int16_t 2 2))
 (define IR-INT32	(new <ir-integral-type> 'int32_t 4 4))
 (define IR-INT64	(new <ir-integral-type> 'int64_t 8 8))
 (define IR-FLOAT32	(new <ir-integral-type> 'float	 4 4))
 (define IR-FLOAT64	(new <ir-integral-type> 'double	 8 8))
+(define IR-VARARGS	(new <ir-varargs-type>  '...	 0 0))
 
 (define IR-INT		IR-INT32)
 (define IR-LONG		IR-INT32)
@@ -122,7 +124,7 @@
     (set name (concat-string name ")"))
     name))
 
-(define-function ir-function-type-with (ir ret-type param-types)
+(define-function ir-function-type (ir ret-type param-types)
   (let* ((proto (cons ret-type param-types)))
     (or (trie-at (<ir>-function-types ir) proto)
 	(set-trie-at (<ir>-function-types ir) proto
@@ -130,10 +132,22 @@
 			  (ir-function-type-name ret-type param-types)
 			  0 0 () ret-type param-types)))))
 
-(define-function ir-function-type (ir ret-type . param-types)
-  (ir-function-type-with ir ret-type param-types))
-
 ;;; structure
+
+(define-function c-mangle (s)
+  (let* ((in  (symbol->string s))
+	 (len (string-length in))
+	 (out (array)))
+    (for (i 0 len)
+      (let ((c (string-at in i)))
+	(if (or (and (<= 0x61 c) (<= c 0x7a))
+		(and (<= 0x40 c) (<= c 0x5a))
+		(and (<= 0x30 c) (<= c 0x39)))
+	    (array-append out c)
+	  (if (= ?_ c)
+	      (array-append-all out "__")
+	    (array-append-all out (format "_%02x" c))))))
+    (array->string out)))
 
 (define-function align (offset alignment)	(& (+ offset (- alignment 1)) (- alignment)))
 
@@ -166,23 +180,37 @@
 
 (define-function ir-make-struct-type (name members)
   (make <ir-struct-type>
-	(name      (string->symbol (concat-string "struct " (symbol->string name))))
+	(name      name)
 	(members   (ir-struct-make-members members))
 	(size      (ir-struct-add-member-offsets 0 self.members))
-	(alignment (apply max (map ir-type-alignment (map car members))))))
+	(alignment (and members (apply max (map ir-type-alignment (map car members)))))))
 
 (define-function ir-struct-type-member-named (self name)
   (list-detect member (<ir-struct-type>-members self)
 	       (= name (<ir-struct-member>-name member))))
 
-(define-function ir-def-struct (ir name . members)	(push (<ir>-structure-types ir) (cons name (ir-make-struct-type name members))))
+(define-function ir-def-struct (ir name members)
+  (let ((type (ir-make-struct-type name members))
+	(prev (assq name (<ir>-structure-types ir))))
+    (if prev
+	(if (<ir-struct-type>-alignment (cdr prev))
+	    (error "structure already defined: "name)
+	  (set-cdr prev type))
+      (push (<ir>-structure-types ir) (cons name type)))))
 
-(define-function ir-struct-type (ir name)		(or (cdr (assq name (<ir>-structure-types ir))) (error "undefined structure name: "name)))
+(define-function ir-struct-type (ir name)
+  (cdr (or (assq name (<ir>-structure-types ir))
+	   (car (ir-def-struct ir name ())))))
+
+(define-selector ir-gen-c-decl)
 
 (define-method ir-gen-c-declaration <ir-struct-type> ()
-  (println self.name" {")
+  (println "struct "(c-mangle self.name)" {")
   (list-do member self.members
-    (println (<ir-type>-name (<ir-struct-member>-type member))" "(<ir-struct-member>-name member)";"))
+    (ir-gen-c-decl (<ir-struct-member>-type member) (<ir-struct-member>-name member))
+    (println ";")
+    ;;(println (<ir-type>-name (<ir-struct-member>-type member))" "(<ir-struct-member>-name member)";")
+    )
   (println "};"))
 
 ;;; instructions
@@ -192,7 +220,7 @@
 
 (define-method ir-gen-c <long> (ir)		(print self))
 (define-method ir-gen-c <double> (ir)		(print self))
-(define-method ir-gen-c <string> (ir)		(dump  self))
+(define-method ir-gen-c <string> (ir)		(print "((unsigned char *)") (dump  self) (print ")"))
 (define-method ir-gen-c <ir-extern> (ir)	(print self.name))
 (define-method ir-gen-c <ir-function> (ir)	(print self.name))
 (define-method ir-gen-c <ir-global> (ir)	(print self.name))
@@ -229,8 +257,10 @@
 (define-method ir-gen-c-decl <ir-function-type> (name)
   (print (<ir-type>-name self.ret-type)"("name")(")
   (and self.arg-types (print (<ir-type>-name (car self.arg-types))))
-  (list-do arg-type (cdr self.arg-types) (print ", "(<ir-type>-name (car self.arg-types))))
+  (list-do arg-type (cdr self.arg-types) (print ", "(<ir-type>-name arg-type)))
   (print")"))
+
+(define-method ir-gen-c-decl <ir-struct-type> (name)	(print "struct "(c-mangle self.name)" "name))
 
 (define-method ir-gen-c-parameter <ir-variable> ()	)
 (define-method ir-gen-c-parameter <ir-param> ()		(ir-gen-c-decl self.type (symbol->string self.name)))
@@ -247,6 +277,9 @@
 
 
 (define-class <ir-lit> <ir-insn> ())		(define-function ir-lit (value . opt-type) (leaf <ir-lit> value (car opt-type)))
+
+(define-function ir-lit? (x)			(inherits-from (type-of x) <ir-lit>))
+(define-function ir-zero? (x)			(and (ir-lit? x) (= 0 (car (<ir-lit>-parameters x)))))
 
 (define-method ir-check-type <ir-lit> (ir)	(set self.type (or (cadr self.parameters) (ir-check-type (car self.parameters) ir))))
 
@@ -283,11 +316,14 @@
 (define-class <ir-set-var> <ir-insn> ())
 
 (define-method ir-check-type <ir-set-var> (ir)	(set self.parameters (ir-lookup ir self.parameters))
-						(set self.type (ir-check-type (car self.operands) ir))
-						(if (<ir-variable>-type self.parameters)
-						    (or (= self.type (<ir-variable>-type self.parameters))
-							(error "type mismatch in assignment: "self))
-						  (set (<ir-variable>-type self.parameters) self.type))
+						(let ((type (ir-check-type (car self.operands) ir)))
+						  (or (<ir-variable>-type self.parameters)
+						      (set (<ir-variable>-type self.parameters) type))
+						  (set self.type (<ir-variable>-type self.parameters))
+						  (or (= self.type type)
+						      (and (ir-pointer-type? self.type)
+							   (ir-zero? (car self.operands)))
+						      (error "type mismatch in assignment: "self)))
 						self.type)
 
 (define-method ir-gen-c <ir-set-var> (ir)	(print "(")  (ir-gen-c self.parameters ir)  (print "=")  (ir-gen-c (car self.operands) ir)  (print ")"))
@@ -539,7 +575,7 @@
 							    (error "return type mismatch: "self.ret-type" in: "self))
 							(or (equal arg-types (<ir-function-type>-arg-types self.type))
 							    (error "argument type mismatch: "self)))
-						    (set self.type (ir-function-type-with ir self.ret-type arg-types))))
+						    (set self.type (ir-function-type ir self.ret-type arg-types))))
 						self.type)
 
 (define-function ir-fun-param (self param)	(push (<ir-imp>-parameters self) param))
@@ -561,11 +597,12 @@
 						  (println "}")))
 
 
-(define-class <ir-fun> <ir-insn> ())		(define-function ir-fun (name type . body) (new <ir-fun> name (ir-imp (or name (temp-name)) type body)))
+(define-class <ir-fun> <ir-insn> ())		(define-function ir-fun (name type body) (new <ir-fun> name (list (ir-imp (or name (temp-name)) type body))))
 
-(define-method ir-check-type <ir-fun> (ir)	(let* ((var (and self.parameters (ir-declare ir self.parameters (<ir-insn>-type self.operands) <ir-function>)))
+(define-method ir-check-type <ir-fun> (ir)	(let* ((imp (car self.operands))
+						       (var (and self.parameters (ir-declare ir self.parameters (<ir-insn>-type imp) <ir-function>)))
 						       (fir (ir-new (type-of ir) (<ir>-scope ir))))
-						  (ir-put fir self.operands)
+						  (ir-put fir imp)
 						  ;; recursive generation of function implementation
 						  (ir-typecheck fir)
 						  (alist-do var (<scope>-bindings (<ir>-scope fir)) (ir-gen-c-definition var))
@@ -573,11 +610,11 @@
 						    (ir-gen-c insn fir)
 						    (println ";"))
 						  ;; back in enclosing
-						  (let ((type (<ir-insn>-type self.operands)))
+						  (let ((type (<ir-insn>-type imp)))
 						    (and var (set (<ir-variable>-type (cdr var)) type))
 						    (set self.type (ir-pointer-to type)))))
 
-(define-method ir-gen-c <ir-fun> (ir)		(print "&"(<ir-imp>-name self.operands)))
+(define-method ir-gen-c <ir-fun> (ir)		(print "&"(<ir-imp>-name (car self.operands))))
 
 
 (define-class <ir-arg> <ir-insn> ())		(define-function ir-arg (name type) (new <ir-arg> (list name type)))
@@ -695,6 +732,13 @@
 (define-method ir-gen-c <ir-ext> (ir)		)
 
 
+(define-function check-proto-args (a b)
+  (or (= (car a) IR-VARARGS)
+      (and (not a) (not b))
+      (and (= (car a) (car b))
+	   (check-proto-args (cdr a) (cdr b)))))
+
+
 (define-class <ir-call> <ir-insn> ())		(define-function ir-call (dest args)	(new <ir-call> () (cons dest args)))
 
 (define-method ir-check-type <ir-call> (ir)	(let* ((call-sig  (map-with ir-check-type self.operands ir))
@@ -704,7 +748,7 @@
 						       (arg-types (cdr call-sig)))
 						  (or (ir-function-type? fun-type)
 						      (error "called value is not a function: "self))
-						  (and fun-args (or (equal arg-types fun-args)
+						  (and fun-args (or (check-proto-args fun-args arg-types)
 								    (error "expected argument types "(<ir-function-type>-arg-types fun-type)" in call: "self)))
 						  (set self.type (<ir-function-type>-ret-type fun-type))))
 
@@ -717,7 +761,7 @@
 						  (print ")")))
 
 
-(define-class <ir-struct> <ir-insn> ())		(define-function ir-struct (name . members)	(new <ir-struct> name members))
+(define-class <ir-struct> <ir-insn> ())		(define-function ir-struct (name members)	(new <ir-struct> name members))
 
 (define-method ir-check-type <ir-struct> (ir)	(let* ((type  (ir-struct-type ir self.parameters))
 						       (specs (map ir-struct-member-type (<ir-struct-type>-members type)))
@@ -725,7 +769,7 @@
 						  (or (equal specs types) (error "member type mismatch: ")self)
 						  (set self.type type)))
 
-(define-method ir-gen-c <ir-struct> (ir)	(print "("(<ir-struct-type>-name self.type)"){")
+(define-method ir-gen-c <ir-struct> (ir)	(print "(struct "(c-mangle (<ir-struct-type>-name self.type))"){")
 						(and self.operands (ir-gen-c (car self.operands) ir))
 						(list-do operand (cdr self.operands)
 						  (print ", ")
@@ -741,7 +785,7 @@
 						      (error "value is not a pointer to a structure: "self))
 						  (let ((member (ir-struct-type-member-named (<ir-pointer-type>-referent type) self.parameters)))
 						    (or member "no such structure member: "self)
-						    (set self.type (ir-pointer-to (<ir-struct-member>-type member))))))
+						    (set self.type (<ir-struct-member>-type member)))))
 
 (define-method ir-gen-c <ir-member> (ir)	(print "(")  (ir-gen-c (car self.operands) ir)  (print "->"self.parameters")"))
 
