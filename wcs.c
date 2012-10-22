@@ -1,6 +1,7 @@
 #define _WIDEN(x)  L ## x
 #define WIDEN(x)   _WIDEN(x)
 
+#include <wchar.h>
 #include <stdlib.h>
 
 static wchar_t *mbs2wcs(char *mbs)
