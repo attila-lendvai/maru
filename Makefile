@@ -23,7 +23,7 @@ endif
 
 .SUFFIXES :
 
-all : eval eval32 osdefs.k
+all : eval2 eval eval32 osdefs.k
 
 run : all
 	rlwrap ./eval
@@ -33,6 +33,10 @@ status : .force
 
 eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
+
+eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c
+	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
@@ -115,6 +119,12 @@ test-compile-irgol : eval32 irgol.g.l .force
 irgol.g.l : tpeg.l irgol.g
 	./eval compile-tpeg.l irgol.g > irgol.g.l
 
+test-irgol : eval .force
+	./eval irgol.k |tee test.c
+	$(CC32) -fno-builtin -g -o test test.c
+	@echo
+	./test
+
 test-compile-irl : eval32 irl.g.l .force
 	./eval compile-irl.l test.irl > test.c
 	$(CC32) -fno-builtin -g -o test test.c
@@ -172,6 +182,13 @@ test-main2 : eval32 .force
 	$(TIME) ./eval32 test-pegen.k save.k test-pegen
 	chmod +x test-pegen
 	$(TIME) ./test-pegen
+
+cpp.g.l : cpp.g tpeg.l
+	./eval compile-tpeg.l $< > $@.new
+	mv $@.new $@
+
+test-cpp : eval cpp.g.l .force
+	./eval compile-cpp.l cpp-small-test.c
 
 osdefs.g.l : osdefs.g tpeg.l
 	./eval compile-tpeg.l $< > $@.new
