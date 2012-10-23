@@ -1,3 +1,11 @@
+* coercion from literal to different size
+
+* define-type
+
+* pragma to enable (* x) = (indir x), (& x) = (addressof x), etc.
+
+* x86 backend
+
 ----------------------------------------------------------------
 
 move the effect/value stuff out of maru-compile and into the IR
