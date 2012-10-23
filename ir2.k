@@ -1,3 +1,4 @@
+(require "osdefs.k")
 (require "trie.k")
 
 (define-structure <ir> (function scope program functions struct-types frame error-handler))
@@ -41,7 +42,7 @@
 (define IR-VARARGS	(new <ir-varargs-type>  '...	0 0))
 
 (define IR-INT		IR-INT32)
-(define IR-LONG		IR-INT32)
+(define IR-LONG		(cond ((= 4 sizeof-long) IR-INT32) ((= 8 sizeof-long) IR-INT64) (else (error "I cannot run here"))))
 (define IR-FLOAT	IR-FLOAT32)
 (define IR-DOUBLE	IR-FLOAT64)
 
@@ -518,7 +519,11 @@
 							       (index (cadr self.operands))  (itype (ir-check-type index ir 1)))
 							  (or (ir-pointer-type? btype)			(error "dereferencing a non-pointer type: "self))
 							  (or (ir-integral-type? itype)			(error "non-integer index: "self))
-							  (set self.type (<ir-pointer-type>-referent btype))))
+							  (let ((ref (<ir-pointer-type>-referent btype)))
+							    (cond
+							      ((= ref IR-INT8)	(set self.type IR-INT32))
+							      ((= ref IR-INT16)	(set self.type IR-INT32))
+							      (else		(set self.type ref))))))
 
 (define-selector ir-gen-indir)
 (define-method ir-gen <ir-indir> (gen)			(ir-gen-indir gen self.type (car self.operands) (cadr self.operands)))
