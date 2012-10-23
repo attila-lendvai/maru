@@ -31,7 +31,9 @@
 (define (gc_allocation_count	long)			0)
 (define (gc_collection_count	long)			0)
 
-(define-function fatal void ((reason char *))	(printf "\nmaru: %s\n" reason) (exit 1))
+(define log2-sizeof-long	(cond ((= 4 sizeof-long) 2) ((= 8 sizeof-long) 3) (else (error "I cannot run here"))))
+
+(define-function fatal void ((reason char *))	(printf "\nmaru: %s\n" reason) (exit (cast 1 int)))
 
 (define-function max long ((a long) (b long))	(return (if (>= a b) a b)))
 
@@ -64,6 +66,14 @@
   (set gc_root_count (- gc_root_count 1))
   (debug (printf "gc POP  root %d at %p\n" gc_root_count ptr))
   (or (= ptr (indir gc_roots gc_root_count)) (fatal "non-lifo root")))
+
+(let ((make-push-root (lambda (v) `(gc_push_root (addressof ,v))))
+      (make-pop-root  (lambda (v) `(gc_pop_root  (addressof ,v)))))
+  (define-form gc-protect (vars . body)
+    `(let ()
+       ,@(map make-push-root vars)
+       ,@body
+       ,@(reverse-map make-pop-root vars))))
 
 (define-function gc_grow_memory void ((size long))
   (let ((brk (cast (new_memory_block size) struct <header> *)))
@@ -109,7 +119,7 @@
 	     (let ()
 	       (set (. ptr flags) (| flags <header>-flags-mark))
 	       (or (& flags <header>-flags-atom)
-		   (let ((size (>> (. ptr size) 2)))
+		   (let ((size (>> (. ptr size) log2-sizeof-long)))
 		     (debug (printf "mark %p %d type %d\n" ptr size (. ptr type)))
 		     (while size
 		       (set size (- size 1))
@@ -129,7 +139,7 @@
   (set gc_alloc_count 0))
 
 (define-function gc_malloc (void *) ((size long))
-  (set size (& -4 (+ 3 size)))
+  (set size (& (+ size (- (sizeof long) 1)) (- (sizeof long))))
   (and (= gc_alloc_count gc_frequency) (gc_gcollect))
   (let* ((first (. gc_memory_last next))
 	 (chunk first)
@@ -162,7 +172,7 @@
 		      (set gc_memory_last chunk)
 		      (debug (printf "alloc chunk %p\n" chunk))
 		      (let ((obj (+ chunk 1)))
-			(memset obj 0 csize)
+			(memset obj (cast 0 int) csize)
 			(set gc_alloc_count (+ gc_alloc_count 1))
 			(set gc_allocation_count (+ gc_allocation_count 1))
 			(return obj))))))
@@ -177,24 +187,28 @@
 
 ;;; ----------------------------------------------------------------
 
-(let ((make-push-root (lambda (v) `(gc_push_root (addressof ,v))))
-      (make-pop-root  (lambda (v) `(gc_pop_root  (addressof ,v)))))
-  (define-form gc-protect (vars . body)
-    `(let ()
-       ,@(map make-push-root vars)
-       ,@body
-       ,@(reverse-map make-pop-root vars))))
+;; (define-function main int ((argc int) (argv char * *))
+;;   (cond
+;;     ((= (sizeof long) 4)	(set ffi_type_long ffi_type_sint32))
+;;     ((= (sizeof long) 8)	(set ffi_type_long ffi_type_sint32))
+;;     (else			(fatal "I cannot run here")))
+;;   )
 
-(define-struct <cell> ((head int) (tail struct <cell> *)))
+;; (compile-end)
+;; (exit)
 
-(define-function make_cell (struct <cell> *) ((head int) (tail struct <cell> *))
-  (let ((cell (cast (gc_malloc 8) struct <cell> *)))
+;;; ----------------------------------------------------------------
+
+(define-struct <cell> ((head long) (tail struct <cell> *)))
+
+(define-function make_cell (struct <cell> *) ((head long) (tail struct <cell> *))
+  (let ((cell (cast (gc_malloc (sizeof struct <cell>)) struct <cell> *)))
     (set (. cell head) head)
     (set (. cell tail) tail)
     ;;(printf "pair %p (%p %p) (%p %p)\n" cell head tail (oop-at cell 0) (oop-at cell 1))
     (return cell)))
 
-(define-function make_list (struct <cell> *) ((size int))
+(define-function make_list (struct <cell> *) ((size long))
   (if size
       (let ((list (make_list (- size 1))))
 	(gc_push_root (addressof list))
@@ -228,8 +242,5 @@
       ))
   (gc_gcollect)
   (info)
-  (return 0)
+  (return (cast 0 int))
   )
-
-(compile-end)
-(exit)
