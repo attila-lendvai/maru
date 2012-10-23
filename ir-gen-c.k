@@ -13,6 +13,9 @@
 	    (array-append-all out (format "_%02x" c))))))
     (array->string out)))
 
+(define-function ir-gen-c-variable-name (name)	(concat-string "v_" (c-mangle (symbol->string name))))
+(define-function ir-gen-c-function-name (name)	(concat-string "f_" (c-mangle (symbol->string name))))
+
 (define-method print-c-declaration <ir-type> (name)		(error "missing implementation: print-c-declaration "(type-name-of self)))
 
 (define-method print-c-declaration <ir-void-type>    	(name)	(print "void") (and name (print " "name)))
@@ -78,7 +81,6 @@
   (ir-gen-c-eol self))
 
 
-
 (define-method ir-gen-declare-struct <ir-gen-c> (struct)
   (println "struct "(c-mangle (<ir-struct-type>-name struct))" {")
   (list-do bind (<ir-struct-type>-members struct)
@@ -90,12 +92,12 @@
 
 (define-method ir-gen-global-declaration <ir-gen-c> (var)
   (unless (= 'main (<ir-global>-name var))
-    (print-c-declaration (<ir-global>-type var) (concat-string "v_" (symbol->string (<ir-global>-name var))))
+    (print-c-declaration (<ir-global>-type var) (ir-gen-c-variable-name (<ir-global>-name var)))
     (println ";")))
 
 (define-method ir-gen-local-declaration <ir-gen-c> (var)
   (ir-gen-c-bol self)
-  (print-c-declaration (<ir-local>-type var) (concat-string "v_" (symbol->string (<ir-local>-name var))))
+  (print-c-declaration (<ir-local>-type var) (ir-gen-c-variable-name (<ir-local>-name var)))
   (ir-gen-c-eol self))
 
 (define-method ir-gen-member <ir-gen-c> (field value)
@@ -129,11 +131,11 @@
   (print ")"))
 
 (define-method ir-gen-get-var <ir-gen-c> (var)
-  (print "v_"(<ir-variable>-name var)))
+  (print (ir-gen-c-variable-name (<ir-variable>-name var))))
 
 (define-method ir-gen-set-var <ir-gen-c> (var value)
   (unless (= 'main (<ir-variable>-name var))
-    (print "(v_"(<ir-variable>-name var)"=")
+    (print "("(ir-gen-c-variable-name (<ir-variable>-name var))"=")
     (ir-gen value self)
     (print ")")
     ))
@@ -253,7 +255,7 @@
   (print ")"))
 
 (define-method ir-gen-function <ir-gen-c> (value)
-  (print "f_"(car (<ir-function>-parameters value))))
+  (print (ir-gen-c-function-name (car (<ir-function>-parameters value)))))
 
 (define-method ir-gen-function-implementation <ir-gen-c> (value)
   (let ((name (car  (<ir-function>-parameters value)))
@@ -261,13 +263,13 @@
 	(args (cadr (<ir-function>-parameters value)))
 	(body (<ir-function>-operands value)))
     (print "static ")
-    (print-c-declaration (<ir-function-type>-ret-type type) (concat-string "f_" (symbol->string name)))
+    (print-c-declaration (<ir-function-type>-ret-type type) (ir-gen-c-function-name (symbol->string name)))
     (print "(")
     (let ((argn args)
 	  (argt (<ir-function-type>-arg-types type)))
       (unless (= IR-VARARGS (car argt))
 	(while (pair? argn)
-	  (print-c-declaration (car argt) (concat-string "v_" (symbol->string (car argn))))
+	  (print-c-declaration (car argt) (ir-gen-c-variable-name (symbol->string (car argn))))
 	  (set argt (cdr argt))
 	  (and (pair? (set argn (cdr argn))) (print ", ")))))
     (println ")")
@@ -304,6 +306,6 @@
   (ir-gen-c-begin self))
 
 (define-method ir-gen-postamble <ir-gen-c> ()
-  (ir-gen-c-bol self)    (print "f_main(argc, argv)")	(ir-gen-c-eol self)
-  (ir-gen-c-bol self)    (print "return 0")		(ir-gen-c-eol self)
+  (ir-gen-c-bol self)    (print (ir-gen-c-function-name "main")"(argc, argv)")	(ir-gen-c-eol self)
+  (ir-gen-c-bol self)    (print "return 0")					(ir-gen-c-eol self)
   (ir-gen-c-end self))
