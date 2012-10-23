@@ -28,6 +28,8 @@
 ;; 	(putchar c))))
 ;;   (return 0))
 
+(define-type foo_t struct <foo>)
+
 (define-function main int ((argc int) (argv char * *))
   (let ((n (if (= argc (cast 1 int)) 10 (cast (atoi (indir argv 1)) long))))
     (let (((s long *)	(malloc (* (sizeof long) n))))
@@ -41,7 +43,7 @@
       ))
   (printf "\n")
 
-  (let (((foo struct <foo>)))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
+  (let (((foo foo_t)))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
     (set (member foo x 42))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
     (set (member foo y 666))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
     (printf "sum is %d\n" (print-foo foo))

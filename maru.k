@@ -7,6 +7,8 @@
 (define-method do-print <extern> ()
   (print "<extern "self.name" : "self.type">"))
 
+(define *maru-types* ())
+
 (define maru->ir-type-map
   `((void    . ,IR-VOID)
     (char    . ,IR-INT8)	    (int8    . ,IR-INT8)
@@ -19,6 +21,8 @@
     (...     . ,IR-VARARGS)
     ))
 
+(define-form define-type (name . decl)	(push *maru-types* (cons name decl)) ())
+
 (define-function maru-struct (name ir)
   (if (symbol? name)
       (ir-struct ir name)
@@ -26,8 +30,9 @@
 
 (define-function maru->ir-type (exp ir)
   (cond
-    ((symbol? exp)	(cdr (or (assq exp maru->ir-type-map)
-				 (error "illegal type name: "exp))))
+    ((symbol? exp)	(or (cdr (assq exp maru->ir-type-map))
+			    (cdr (assq exp *maru-types*))
+			    (error "illegal type name: "exp)))
     ((pair? exp)	(let ((type (maru->ir-type (car exp) ir)))
 			  (and (= 'struct type) (set type (maru-struct (car (set exp (cdr exp))) ir)))
 			  (while (and (set exp (cdr exp))
@@ -215,7 +220,7 @@
 	 (body      (map-with maru-compile (cddr self.definition) ir)))
     (ir-function name (ir-function-of ret-type arg-types) arg-names body)))
 
-(define *structs* (array))
+(define *maru-structs* (array))
 
 (define-function maru-struct-member (decl ir)
   (let ((name (maru-declaration-name decl))
@@ -225,7 +230,8 @@
 (define-function compile-namespace (ns)
   (let ((ir  (ir-new ()))
 	(gen (ir-gen-c-new)))
-    (array-do s *structs* (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
+    (array-do s *maru-structs* (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
+    (list-do name-type *maru-types* (set (cdr name-type) (maru->ir-type (cdr name-type) ir)))
     (namespace-do binding ns
       (let* ((decl (car binding))
 	     (name (maru-declaration-name decl))
@@ -251,7 +257,7 @@
 (define-form extern (name . type)	`(new <extern> ',name ',type))
 
 (define-form define-struct (name members)
-  (array-append *structs* (cons name members))
+  (array-append *maru-structs* (cons name members))
   ())
 
 (define-form make-symbol (str) (string->symbol str))
