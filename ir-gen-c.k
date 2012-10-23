@@ -138,11 +138,10 @@
     (print ")")
     ))
 
-(define-method ir-gen-sizeof <ir-gen-c> (type)
-  (print (<ir-type>-size type)))
-
-(define-method ir-gen-lit <ir-gen-c> (value)
-  (dump value))
+(define-method ir-gen-sizeof <ir-gen-c> (type)			(print (<ir-type>-size type)))
+(define-method ir-gen-addressof-var <ir-gen-c> (var)		(print "&") (ir-gen-get-var self var))
+(define-method ir-gen-addressof-member <ir-gen-c> (field value)	(print "&") (ir-gen-member field value))
+(define-method ir-gen-lit <ir-gen-c> (value)			(dump value))
 
 (define-method ir-gen-cast <ir-gen-c> (to value)
   (print "((")
@@ -186,14 +185,17 @@
 (define-method ir-gen-bitor  <ir-gen-c> (lhs rhs)	(ir-gen-c-binary self '|  lhs rhs))
 (define-method ir-gen-bitxor <ir-gen-c> (lhs rhs)	(ir-gen-c-binary self '^  lhs rhs))
 
-(define-function ir-gen-c-logical (self type values op)
+(define-function ir-gen-c-logical (self type values op neg)
+  (print "/* LOG "op" : "type" */")
   (if (= IR-VOID type)
       (let ()
 	(print "if (")
+	(and neg (print "!("))
 	(while (cdr values)
 	  (ir-gen (car values) self)
 	  (and (cdr (set values (cdr values)))
 	       (print " "op" ")))
+	(and neg (print ")"))
 	(print ") ")
 	(ir-gen (car values) self))
     (print "(")
@@ -203,8 +205,8 @@
 	  (print " "op" ")))
     (print ")")))
 
-(define-method ir-gen-logand <ir-gen-c> (type values)	(ir-gen-c-logical self type values "&&"))
-(define-method ir-gen-logor  <ir-gen-c> (type values)	(ir-gen-c-logical self type values "||"))
+(define-method ir-gen-logand <ir-gen-c> (type values)	(ir-gen-c-logical self type values "&&" ()))
+(define-method ir-gen-logor  <ir-gen-c> (type values)	(ir-gen-c-logical self type values "||" 1 ))
 
 (define-method ir-gen-seq <ir-gen-c> (bindings exprs)
   (ir-gen-c-begin self)
@@ -215,8 +217,9 @@
     (ir-gen-c-eol self))
   (ir-gen-c-end self))
 
-(define-method ir-gen-let <ir-gen-c> (bindings exprs)
-  (print "(")
+(define-method ir-gen-let <ir-gen-c> (type bindings exprs)
+  (print "/* LET : "type" */")
+  (and (!= IR-VOID type) (print "("))
   (ir-gen-c-begin self)
   (list-do name-var bindings (ir-gen-local-declaration (cdr name-var) self))
   (list-do expr exprs
@@ -224,7 +227,7 @@
     (ir-gen expr self)
     (ir-gen-c-eol self))
   (ir-gen-c-end self)
-  (print ")"))
+  (and (!= IR-VOID type) (print ")")))
 
 (define-method ir-gen-if <ir-gen-c> (type test exp alt)
   (if (= type IR-VOID)

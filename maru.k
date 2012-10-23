@@ -57,11 +57,12 @@
   (and (pair? (cdr decl))
        (maru->ir-type (cdr decl) ir)))
 
-(define-method maru-compile <long>   (ir)	(ir-lit self IR-LONG))
-(define-method maru-compile <double> (ir)	(ir-lit self IR-DOUBLE))
-(define-method maru-compile <string> (ir)	(ir-lit self IR-STRING))
-(define-method maru-compile <symbol> (ir)	(ir-get-var self))
-(define-method maru-compile <extern> (ir)	(ir-extern self.name))
+(define-method maru-compile <undefined> (ir)	(ir-nop))
+(define-method maru-compile <long>   	(ir)	(ir-lit self IR-LONG))
+(define-method maru-compile <double> 	(ir)	(ir-lit self IR-DOUBLE))
+(define-method maru-compile <string> 	(ir)	(ir-lit self IR-STRING))
+(define-method maru-compile <symbol> 	(ir)	(ir-get-var self))
+(define-method maru-compile <extern> 	(ir)	(ir-extern self.name))
 
 (define-function maru-compile-define (exp ir)
   (let* ((decl (cadr exp))
@@ -69,6 +70,8 @@
 	 (type (maru-declaration-type decl ir))
 	 (init (maru-compile (caddr exp) ir)))
     (ir-define name type init)))
+
+(define-function maru-compile-opt (exp ir)	(if exp (maru-compile exp ir) (ir-nop)))
 
 (define-function maru-compile-let (exp ir)
   (let* ((bindings (cadr exp))
@@ -78,7 +81,7 @@
 	 (types    (map-with maru-declaration-type decls ir))
 	 (body     (cddr exp)))
     (ir-let names types
-	    (map-with maru-compile inits ir)
+	    (map-with maru-compile-opt inits ir)
 	    (map-with maru-compile body ir))))
 
 (define-function maru-compile-set (exp ir)
@@ -97,9 +100,12 @@
 (define-function maru-compile-if (exp ir)
   (ir-if (maru-compile (cadr exp) ir)
 	 (maru-compile (caddr exp) ir)
-	 (if (cadddr exp)
-	     (maru-compile (cadddr exp) ir)
-	   (ir-nop))))
+	 (let ((body (cdddr exp)))
+	   (if body
+	       (if (cdr body)
+		   (ir-let () () () (map-with maru-compile body ir))
+		 (maru-compile (car body) ir))
+	     (ir-nop)))))
 
 (define-function maru-compile-sizeof (exp ir)
   (let ((type (maru->ir-type (cdr exp) ir)))
@@ -160,6 +166,7 @@
 
 (define maru->ir-unary-map
   `(	(-  . ,ir-neg)  (~  . ,ir-com)  (!  . ,ir-not)  (not . ,ir-not)
+	(addressof . ,ir-addressof)
 	))
 
 (define maru->ir-binary-map
@@ -252,7 +259,7 @@
 
 (compile-begin)
 
-;;(load "maru-gc.k")
+(load "maru-gc.k")
 
 (define (printf (int	char * ...	) *) (extern printf))
 (define (malloc (void *	long		) *) (extern malloc))
@@ -272,8 +279,11 @@
 	      )))
       ))
   (printf "\n")
-  (printf "%d\n" (and 0 11 22))
-  (printf "%d\n" (or 0 11 22))
+
+  (let (((foo struct <foo>)))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
+    (set (member foo x 42))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
+    (set (member foo y 666))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y)))
+
   (return 0))
 
 (compile-end)

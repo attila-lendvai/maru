@@ -330,6 +330,10 @@
 (define-selector ir-gen-nop)
 (define-method   ir-gen <ir-nop> (gen)			(ir-gen-nop gen))
 
+(define-selector ir-nop? args				())
+
+(define-method ir-nop? <ir-nop> ()			1)
+
 ;
 
 (define-class <ir-sizeof> <ir-insn> ())			(define-function ir-sizeof (type)	(new <ir-sizeof> (list type) () IR-LONG))
@@ -482,6 +486,9 @@
 (define-selector ir-gen-member)
 (define-method ir-gen <ir-member> (gen)			(ir-gen-member gen (car self.parameters) (car self.operands)))
 
+(define-selector ir-member? args			())
+(define-method ir-member? <ir-member> ()		1)
+
 ;
 
 (define-class <ir-set-member> <ir-insn> ())		(define-function ir-set-member (field value init)
@@ -543,6 +550,9 @@
 (define-selector ir-gen-get-var)
 (define-method ir-gen <ir-get-var> (gen)		(ir-gen-get-var gen self.parameters))
 
+(define-selector ir-get-var? args			())
+(define-method ir-get-var? <ir-get-var> ()		1)
+
 ;
 
 (define-class <ir-set-var> <ir-insn> ())		(define-function ir-set-var (name value) (new <ir-set-var> name (list value)))
@@ -564,24 +574,45 @@
 
 ;
 
+(define-class <ir-addressof> <ir-insn> ())		(define-function ir-addressof (args)	(new <ir-addressof> () args))
+
+(define-method ir-check-type <ir-addressof> (ir val?)	(let* ((lval (car self.operands))
+							       (type (ir-check-type lval ir 1)))
+							  (or (ir-get-var? lval)
+							      (ir-member?  lval)
+							      (error "non-lvalue in addressof: "self))
+							  (set self.type (ir-pointer-to type))))
+
+(define-selector ir-gen-addressof-var)
+(define-selector ir-gen-addressof-member)
+
+(define-method ir-gen <ir-addressof> (gen)
+  (let ((lval (car self.operands)))
+    (cond
+      ((ir-get-var? lval)	(ir-gen-addressof-var    gen (<ir-get-var>-parameters lval)))
+      ((ir-member? lval)	(ir-gen-addressof-member gen (car (<ir-member>-parameters lval)) (car (<ir-member>-operands lval))))
+      (else			(error "this cannot happen")))))
+
+;
+
 (define-class <ir-let> <ir-insn> ())			(define-function ir-let (names types values body)
 							  (new <ir-let> (list names types) (list values (or body (list (ir-nop))))))
+
+(define-function ir-check-let-init-type (value ir)	(ir-check-type value ir (if (ir-nop? value) () 1)))
 
 (define-method ir-check-type <ir-let> (ir val?)		(let* ((names  (car  self.parameters))
 							       (types  (cadr self.parameters))
 							       (values (car  self.operands))
 							       (body   (cadr self.operands))
-							       (vtypes (map-with2 ir-check-type values ir 1))
+							       (vtypes (map-with ir-check-let-init-type values ir))
 							       (seq    body))
 							  (ir-begin-scope ir)
 							  (lists-do ((name names) (type types) (value values) (vtype vtypes))
-								    (or (= type vtype)
-									(or type (set type vtype))
-									(and (ir-pointer-type? type) (= IR-VOID* vtype))
-									(and (= IR-VOID* type) (ir-pointer-type? vtype))
-									(error "type mismatch in assignment of: "name))
-								    (let ((var (ir-declare-local ir name type)))
-								      (push seq (new <ir-set-var> var (list value) type))))
+							    (or type (set type vtype))
+							    (let ((var (ir-declare-local ir name type)))
+							      (unless (ir-nop? value)
+								(ir-check-assignment type vtype value self)
+								(push seq (new <ir-set-var> var (list value) type)))))
 							  (set self.type IR-VOID)
 							  (while (cdr body)
 							    (set self.type (ir-check-type (car body) ir ()))
@@ -590,10 +621,11 @@
 							    (set self.type (ir-check-type (car body) ir val?)))
 							  (set self.parameters (ir-end-scope ir))
 							  (set self.operands seq)
+							  (or val? (set self.type IR-VOID))
 							  self.type))
 
 (define-selector ir-gen-let)
-(define-method ir-gen <ir-let> (gen)			(ir-gen-let gen self.parameters self.operands))
+(define-method ir-gen <ir-let> (gen)			(ir-gen-let gen self.type self.parameters self.operands))
 
 (define-method ir-returns? <ir-let> ()			(ir-returns? (list-last self.operands)))
 
@@ -684,7 +716,7 @@
       (or (ir-bool? (ir-check-type (car exprs) ir 1))
 	  (error "non-boolean condition: "(car exprs)))
       (set exprs (cdr exprs)))
-    (ir-check-type (car exprs) ir 1)
+    (ir-check-type (car exprs) ir ())
     IR-VOID))
 
 (define-class <ir-logand> <ir-insn> ())			(define-function ir-logand (exprs)
