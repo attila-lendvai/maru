@@ -282,7 +282,7 @@
 
 ;;; instructions
 
-(define-structure <ir-insn> (parameters operands type source))
+(define-structure <ir-insn> (parameters operands type source location))
 
 (define-function ir-error-source (insn)	(or (<ir-insn>-source insn) insn))
 
@@ -332,7 +332,8 @@
 (define-function ir-can-coerce (ltype rtype rhs)
   (and                         (ir-lit?           rhs  )
     (ir-integral-type?  ltype) (ir-integral-type? rtype)
-    (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))))
+    (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))
+    (set (<ir-lit>-type rhs ltype))))
 
 (define-function ir-can-assign (ltype rtype rhs)
   (or (=                      ltype                    rtype )
@@ -426,7 +427,7 @@
 							  (or (= IR-VOID (<ir-function-type>-ret-type type))
 							      (ir-returns? fir)
 							      (error "missing return statement: "(or (car self.parameters) self)))
-							  (ir-finalise fir)
+							  ;;r-finalise fir)
 							  self.type))
 
 (define-selector ir-gen-function)
