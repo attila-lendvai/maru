@@ -60,7 +60,7 @@
 
 (define-structure <ir-gen-c> (indent))
 
-(define-function ir-gen-c-new ()				(new <ir-gen-c> 0))
+(define-function ir-gen-new ()					(new <ir-gen-c> 0))
 
 (define-function ir-gen-c-bol (gen)				(for (i 0 (<ir-gen-c>-indent gen)) (print "  ")))
 (define-function ir-gen-c-eol (gen)				(println ";"))
@@ -91,9 +91,8 @@
   (println "};"))
 
 (define-method ir-gen-global-declaration <ir-gen-c> (var)
-  (unless (= 'main (<ir-global>-name var))
-    (print-c-declaration (<ir-global>-type var) (ir-gen-c-variable-name (<ir-global>-name var)))
-    (println ";")))
+  (print-c-declaration (<ir-global>-type var) (ir-gen-c-variable-name (<ir-global>-name var)))
+  (println ";"))
 
 (define-method ir-gen-local-declaration <ir-gen-c> (var)
   (ir-gen-c-bol self)
@@ -188,7 +187,6 @@
 (define-method ir-gen-bitxor <ir-gen-c> (lhs rhs)	(ir-gen-c-binary self '^  lhs rhs))
 
 (define-function ir-gen-c-logical (self type values op neg)
-  (print "/* LOG "op" : "type" */")
   (if (= IR-VOID type)
       (let ()
 	(print "if (")
@@ -220,7 +218,6 @@
   (ir-gen-c-end self))
 
 (define-method ir-gen-let <ir-gen-c> (type bindings exprs)
-  (print "/* LET : "type" */")
   (and (!= IR-VOID type) (print "("))
   (ir-gen-c-begin self)
   (list-do name-var bindings (ir-gen-local-declaration (cdr name-var) self))
