@@ -9,7 +9,7 @@
 (define (memset	(void * void * int long)	*)	(extern memset))
 (define (memcpy	(void * void * void * long)	*)	(extern memcpy))
 
-(define-constant gc_quantum	(* 50 1024))
+(define-constant gc_quantum	59392)	; 50k
 (define-constant gc_frequency	32768)
 
 (define-struct <header> ((size long) (flags long) (next struct <header> *) (type long)))
@@ -86,9 +86,9 @@
 (define-function gc_sweep void ()
   (debug (printf "sweep\n"))
   (let ((ptr gc_memory_base)
-	(nobjs 0)
-	(nused 0)
-	(nfree 0))
+	(nobjs (cast 0 long))
+	(nused (cast 0 long))
+	(nfree (cast 0 long)))
     (while ptr
       (debug (printf "sweep? %d %p + %d\n" (. ptr flags) ptr (. ptr size)))
       (let ((flags (. ptr flags)))
@@ -130,7 +130,7 @@
   (gcdebug
     (or (& 1023 (set gc_collection_count (+ gc_collection_count 1)))
 	(printf "%d collections\n" gc_collection_count 1)))
-  (let ((i 0))
+  (let ((i (cast 0 long)))
     (while (< i gc_root_count)
       (debug (let ((ptr (indir gc_roots i))) (printf "mark gc root %d : %p -> %p\n" i ptr (indir ptr))))
       (gc_mark_and_trace (indir (indir gc_roots i)))
@@ -139,7 +139,7 @@
   (set gc_alloc_count 0))
 
 (define-function gc_malloc (void *) ((size long))
-  (set size (& (+ size (- (sizeof long) 1)) (- (sizeof long))))
+  (set size (& (+ size (cast (- (sizeof long) 1) long)) (cast (- (sizeof long)) long)))
   (and (= gc_alloc_count gc_frequency) (gc_gcollect))
   (let* ((first (. gc_memory_last next))
 	 (chunk first)
