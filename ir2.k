@@ -329,18 +329,19 @@
       (set i (>> i 1)))
     (>> (+ w 7) 3)))
 
-(define-function ir-can-coerce (ltype rtype rhs)
-  (and                         (ir-lit?           rhs  )
-    (ir-integral-type?  ltype) (ir-integral-type? rtype)
-    (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))
-    (set (<ir-lit>-type rhs ltype))))
+(define-function ir-can-coerce (ltype rhs)
+  (let ((rtype (<ir-insn>-type rhs)))
+    (and                         (ir-lit?           rhs  )
+      (ir-integral-type?  ltype) (ir-integral-type? rtype)
+      (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))
+      (set (<ir-insn>-type rhs) ltype))))
 
 (define-function ir-can-assign (ltype rtype rhs)
   (or (=                      ltype                    rtype )
       (and (= IR-VOID*        ltype) (ir-pointer-type? rtype))
       (and (ir-pointer-type?  ltype) (= IR-VOID*       rtype))
       (and (ir-pointer-type?  ltype) (ir-zero?         rhs  ))
-      (ir-can-coerce          ltype              rtype rhs  )
+      (ir-can-coerce          ltype		       rhs   )
       ))
 
 (define-function ir-check-assignment (ltype rtype rhs who)
@@ -363,16 +364,6 @@
 
 ;
 
-(define-class <ir-sizeof> <ir-insn> ())			(define-function ir-sizeof (type)	(new <ir-sizeof> (list type) () IR-LONG))
-
-(define-method ir-check-type <ir-sizeof> (ir val?)	(or val? (ir-warning-no-effect ir self))
-							self.type)
-
-(define-selector ir-gen-sizeof)
-(define-method   ir-gen <ir-sizeof> (gen)		(ir-gen-sizeof gen (car self.parameters)))
-
-;
-
 (define-class <ir-lit> <ir-insn> ())			(define-function ir-lit (value . opt-type)
 							  (new <ir-lit> (list value) () (car opt-type)))
 
@@ -384,6 +375,17 @@
 
 (define-selector ir-gen-lit)
 (define-method   ir-gen <ir-lit> (gen)			(ir-gen-lit gen (car self.parameters)))
+
+;
+
+(define-class <ir-sizeof> <ir-lit> ())			(define-function ir-sizeof (type)	(new <ir-sizeof> (list type) () IR-INT))
+
+(define-method ir-check-type <ir-sizeof> (ir val?)	(or val? (ir-warning-no-effect ir self))
+							(set self.parameters (list (<ir-type>-size (car self.parameters))))
+							self.type)
+
+(define-selector ir-gen-sizeof)
+(define-method   ir-gen <ir-sizeof> (gen)		(ir-gen-lit gen (car self.parameters)))
 
 ;
 
@@ -518,16 +520,17 @@
 (define-class <ir-set-member> <ir-insn> ())		(define-function ir-set-member (field value init)
 							  (new <ir-set-member> (list field) (list value init)))
 
-(define-method ir-check-type <ir-set-member> (ir val?)	(let ((fname (car self.parameters))
-							      (vtype (ir-check-type (car  self.operands) ir 1))
-							      (itype (ir-check-type (cadr self.operands) ir 1)))
+(define-method ir-check-type <ir-set-member> (ir val?)	(let* ((fname (car self.parameters))
+							       (vtype (ir-check-type (car  self.operands) ir 1))
+							       (init  (cadr self.operands))
+							       (itype (ir-check-type init ir 1)))
 							  (and (ir-pointer-type? vtype)			(set vtype (<ir-pointer-type>-referent vtype)))
 							  (or  (symbol? fname)				(error "field name is not a symbol: "self))
 							  (or  (ir-struct-type? vtype)			(error "value is not a structure: "self))
 							  (let* ((m     (cdr (or (assq fname (<ir-struct-type>-members vtype))
 										 (error "no such field: "self))))
 								 (mtype (<ir-struct-member>-type m)))
-							    (or (= mtype itype) (error "type mismatch in member assignment: "self))
+							    (or (ir-can-assign mtype itype init) (error "type mismatch in member assignment: "self))
 							    (set self.type mtype))))
 
 (define-selector ir-gen-set-member)
@@ -591,9 +594,7 @@
 							      (set (<ir-variable>-type self.parameters) type))
 							  (set self.type (<ir-variable>-type self.parameters))
 							  (or (= self.type type)
-							      (and (ir-pointer-type? self.type) (= IR-VOID*      type))
-							      (and (ir-pointer-type?      type) (= IR-VOID* self.type))
-							      (and (ir-pointer-type? self.type) (ir-zero? (car self.operands)))
+							      (ir-can-assign self.type type (car self.operands))
 							      (error "assigning value of type: "type" to variable of type: "self.type)))
 							self.type)
 
@@ -781,13 +782,16 @@
 (define-class <ir-add> <ir-insn> ())			(define-function ir-add (args) (new <ir-add> () args))
 
 (define-method ir-check-type <ir-add> (ir val?)		(or val? (ir-warning-no-effect ir self))
-							(let ((lhs (ir-check-type (car  self.operands) ir 1))
-							      (rhs (ir-check-type (cadr self.operands) ir 1)))
-							  (cond
-							    ((and (ir-numeric-type? lhs) (= rhs lhs))		)
-							    ((and (ir-pointer-type? lhs) (= rhs IR-LONG))	)
-							    (else						(error "illegal types in: "self)))
-							  (set self.type lhs)))
+							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
+							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
+							  (set self.type
+							       (cond
+								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
+								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
+								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
+								 ((and (ir-pointer-type? lht) (=             IR-LONG rht))	lht)
+								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
+								 (else (error "illegal types in: "self))))))
 
 (define-method ir-gen <ir-add> (gen)			(ir-gen-add gen (car self.operands) (cadr self.operands)))
 
@@ -796,14 +800,17 @@
 (define-class <ir-sub> <ir-insn> ())			(define-function ir-sub (args) (new <ir-sub> () args))
 
 (define-method ir-check-type <ir-sub> (ir val?)		(or val? (ir-warning-no-effect ir self))
-							(let ((lhs (ir-check-type (car  self.operands) ir 1))
-							      (rhs (ir-check-type (cadr self.operands) ir 1)))
-							  (cond
-							    ((and (ir-numeric-type? lhs) (= rhs lhs))		)
-							    ((and (ir-pointer-type? lhs) (= rhs lhs))		(set lhs IR-LONG))
-							    ((and (ir-pointer-type? lhs) (= rhs IR-LONG))	)
-							    (else						(error "illegal types in: "self)))
-							  (set self.type lhs)))
+							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
+							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
+							  (set self.type
+							       (cond
+								 ((and (ir-numeric-type? lht) (=                 lht rht))	lht)
+								 ((and (ir-numeric-type? lht) (ir-can-coerce     lht rhs))	lht)
+								 ((and (ir-numeric-type? rht) (ir-can-coerce     rht lhs))	rht)
+								 ((and (ir-pointer-type? lht) (=                 lht rht))	IR-LONG)
+								 ((and (ir-pointer-type? lht) (=             IR-LONG rht))	lht)
+								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
+								 (else (error "illegal types in: "self))))))
 
 (define-selector ir-gen-sub)
 (define-method ir-gen <ir-sub> (gen)			(ir-gen-sub gen (car self.operands) (cadr self.operands)))
@@ -834,22 +841,44 @@
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
-							(let ((lhs (ir-check-type (car  self.operands) ir 1))
-							      (rhs (ir-check-type (cadr self.operands) ir 1)))
-							  (or (and (,test lhs) (= rhs lhs))
-							      (error "illegal types in: "self))
-							  (set self.type lhs)))
+							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
+							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
+							  (set self.type
+							       (cond
+								 ((and (,test lht) (= rht lht))			lht)
+								 ((and (,test lht) (ir-can-coerce lht rhs))	lht)
+								 ((and (,test rht) (ir-can-coerce rht lhs))	rht)
+								 (else (error "illegal types in: "self))))))
        (define-selector ,gname)
        (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
 
 (define-binary-arithmetic mul 	 ir-numeric-type?)
 (define-binary-arithmetic div 	 ir-numeric-type?)
 (define-binary-arithmetic mod 	 ir-numeric-type?)
-(define-binary-arithmetic shl 	 ir-integral-type?)
-(define-binary-arithmetic shr 	 ir-integral-type?)
 (define-binary-arithmetic bitand ir-integral-type?)
 (define-binary-arithmetic bitor  ir-integral-type?)
 (define-binary-arithmetic bitxor ir-integral-type?)
+
+(define-form define-shift (name)
+  (let* ((iname (concat-symbol  'ir- name))
+	 (tname (concat-symbols '< iname '>))
+	 (gname (concat-symbol 'ir-gen- name)))
+    `(let ()
+       (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
+       (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
+							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
+							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
+							  (or (and (ir-integral-type? lht)
+								   (ir-integral-type? rht)
+								   (or (= IR-INT rht)
+								       (ir-can-coerce IR-INT rhs)))
+							      (error "illegal types in: "self))
+							  (set self.type lht)))
+       (define-selector ,gname)
+       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
+
+(define-shift shl)
+(define-shift shr)
 
 (define-form define-relation (name)
   (let* ((iname (concat-symbol  'ir- name))
@@ -860,12 +889,15 @@
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
 							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
 							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
-							  (or (and (ir-scalar-type?  lht) (= lht            rht))
-							      (and (ir-struct-type?  lht) (= lht            rht))
-							      (and (ir-pointer-type? lht) (= IR-VOID*       rht))
-							      (and (ir-pointer-type? lht) (ir-zero?         rhs))
-							      (and (= IR-VOID*       lht) (ir-pointer-type? rht))
-							      (and (ir-zero?         lhs) (ir-pointer-type? rht))
+							  (or (= lht rht)
+							      (and (ir-integral-type? lht) (ir-can-coerce lht rhs))
+							      (and (ir-integral-type? rht) (ir-can-coerce rht lhs))
+							      (and (ir-scalar-type?   lht) (= lht             rht))
+							      (and (ir-struct-type?   lht) (= lht             rht))
+							      (and (ir-pointer-type?  lht) (= IR-VOID*        rht))
+							      (and (= IR-VOID*        lht) (ir-pointer-type?  rht))
+							      (and (ir-pointer-type?  lht) (ir-zero?          rhs))
+							      (and (ir-zero?          lhs) (ir-pointer-type?  rht))
 							      (error "illegal types in: "self))
 							  (set self.type IR-BOOL)))
        (define-selector ,gname)
