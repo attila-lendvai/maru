@@ -1,6 +1,7 @@
 (require "ir2.k")
 
 (define *ir-gen-c-main* ())
+(define *ir-gen-c-init* ())
 
 (define-function c-mangle (s)
   (let* ((in  (symbol->string s))
@@ -78,12 +79,6 @@
   (decr (<ir-gen-c>-indent gen))
   (ir-gen-c-bol gen)
   (println "}"))
-
-(define-method ir-gen-initialisation <ir-gen-c> (value)
-  (ir-gen-c-bol self)
-  (ir-gen value self)
-  (ir-gen-c-eol self))
-
 
 (define-method ir-gen-declare-struct <ir-gen-c> (struct)
   (println "struct "(c-mangle (<ir-struct-type>-name struct))" {")
@@ -304,13 +299,37 @@
   (println "#include <dlfcn.h>"))
 
 (define-method ir-gen-preamble <ir-gen-c> ()
+  (cond
+    (*ir-gen-c-main*	(println "int main(int argc, char **argv)")	(ir-gen-c-begin self))
+    (*ir-gen-c-init*	(println "static void _init(void)")		(ir-gen-c-begin self))))
+
+(define-method ir-gen-initialisation <ir-gen-c> (value)
   (if *ir-gen-c-main*
-      (println "int main(int argc, char **argv)")
-    (println "static void _init(void)"))
-  (ir-gen-c-begin self))
+      (let ()
+	(ir-gen-c-bol self)
+	(ir-gen value self)
+	(ir-gen-c-eol self))
+    (let* ((setter (car (<ir-define>-operands value)))
+	   (var    (<ir-set-var>-parameters setter))
+	   (name   (<ir-global>-name var))
+	   (type   (<ir-global>-type var))
+	   (init   (car (<ir-set-var>-operands setter)))
+	   (kind   (type-of init)))
+      (cond
+	((= kind <ir-extern>)	(print "extern ") (print-c-declaration (<ir-pointer-type>-referent type) (symbol->string name)) (println ";")
+				(print-c-declaration type (ir-gen-c-variable-name name))
+				(println " = "name";"))
+	((= kind <ir-function>)	(print-c-declaration type (ir-gen-c-variable-name name))
+				(print " = ")
+				(print (ir-gen-c-function-name (car (<ir-function>-parameters init))))
+				(println ";"))
+	(else			(error "cannot initialise: "name" with: "value)))
+;    (println ";")))
+      )))
 
 (define-method ir-gen-postamble <ir-gen-c> ()
-  (when *ir-gen-c-main*
-    (ir-gen-c-bol self)    (print (ir-gen-c-function-name "main")"(argc, argv)")	(ir-gen-c-eol self)
-    (ir-gen-c-bol self)    (print "return 0")						(ir-gen-c-eol self))
-  (ir-gen-c-end self))
+  (cond
+    (*ir-gen-c-main*	(ir-gen-c-bol self)    (print (ir-gen-c-function-name "main")"(argc, argv)")	(ir-gen-c-eol self)
+			(ir-gen-c-bol self)    (print "return 0")					(ir-gen-c-eol self)
+			(ir-gen-c-end self))
+    (*ir-gen-c-init*	(ir-gen-c-end self))))
