@@ -39,6 +39,16 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
+check-maru : eval2
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k
+	./eval2 ir-gen-c.k maru.k maru-gc.k
+	./eval2 ir-gen-c.k maru.k maru-test.k
+
+test-maru : eval2
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@

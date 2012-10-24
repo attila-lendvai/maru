@@ -1,17 +1,15 @@
 (require "osdefs.k")
 (require "trie.k")
 
-(define-structure <ir> (function scope program functions struct-types frame error-handler))
+(define-structure <ir> (function scope program functions struct-types error-handler))
 
 (define ir-scope-new) ;; forward
-(define ir-frame-new) ;; forward
 (define ir-error-handler-new) ;; forward
 
 (define-function ir-new (parent . opts)
   (new <ir> (car opts)
        (ir-scope-new (and parent (<ir>-scope parent)))
        (array) (array) ()
-       (ir-frame-new)
        (if parent (<ir>-error-handler parent) (ir-error-handler-new))))
 
 (define-function ir-append (ir insn)		(array-append (<ir>-program ir) insn))
@@ -147,64 +145,12 @@
 
 (define-method do-print <ir-variable> ()
   (print "{"(type-name-of self)" "self.name" : "self.type)
-  (and self.location (print " @ "self.location))
+  (and self.location (print " "self.location))
   (print "}"))
 
 (define-class <ir-global>    <ir-variable> ())
 (define-class <ir-local>     <ir-variable> ())
 (define-class <ir-parameter> <ir-variable> ())
-
-(define-structure <ir-location> (zone offset))			;; relative to the frame pointer
-
-(define-method do-print <ir-location> ()	(print self.zone"["self.offset"]"))
-
-;
-
-(define-structure <ir-zone> (type locations index limit))	;; one or more contiguous locations sharing a common type
-
-(define-method do-print <ir-zone> ()		(print "@"self.type))
-
-(define-function ir-zone-new (type)		(new <ir-zone> type (array) 0 0))
-
-(define-function ir-zone-allocate (self)
-  (with-instance-accessors <ir-zone>
-    (let ((var (if (< self.index self.limit)
-		   (array-at self.locations self.index)
-		 (set-array-at self.locations self.index (new <ir-location> self self.index)))))
-      (set self.limit (max self.limit (incr self.index)))
-      var)))
-
-(define-function ir-zone-deallocate (self loc)
-  (with-instance-accessors <ir-zone>
-    (decr self.index)
-    (or (= loc (array-at self.locations self.index))
-	(error "non-lifo frame allocation"))))
-
-;
-
-(define-structure <ir-frame> (zones))				;; zero or more contiguous zones
-
-(define-function ir-frame-new ()	(new <ir-frame>))
-
-(define-function ir-frame-allocate (self type)
-  (with-instance-accessors <ir-frame>
-    (ir-zone-allocate (cdr (or (assq type self.zones)
-			       (car (push self.zones (cons type (ir-zone-new type)))))))))
-
-(define-function ir-frame-finalise (self)
-  (with-instance-accessors <ir-frame>
-    (let ((offset 0))
-      (list-do name-zone self.zones
-	;;(println name-zone)
-	(let ((zone (cdr name-zone)))
-	  (let ((type (<ir-zone>-type zone)))
-	    (array-do loc (<ir-zone>-locations zone)
-	      ;;(println loc)
-	      (set offset (align offset (<ir-type>-alignment type)))
-	      (set (<ir-location>-offset loc) offset)
-	      (incr offset (<ir-type>-size type)))))))))
-
-(define-function ir-finalise (ir)	(ir-frame-finalise (<ir>-frame ir)))
 
 ;
 
@@ -239,10 +185,10 @@
 
 (define-function ir-end-scope (self . opts)
   (let ((bindings (<ir-scope>-bindings (<ir>-scope self))))
-    (list-do bind bindings
-      (let* ((var  (cdr bind))
-	     (loc  (<ir-variable>-location var)))
-	(ir-zone-deallocate (<ir-location>-zone loc) loc)))
+;;    (list-do bind bindings
+;;      (let* ((var  (cdr bind))
+;;	     (loc  (<ir-variable>-location var)))
+;;	(ir-zone-deallocate (<ir-location>-zone loc) loc)))
     (set (<ir>-scope self) (if opts (car opts) (<ir-scope>-parent (<ir>-scope self))))
     bindings))
 
@@ -260,11 +206,11 @@
 
 (define-function ir-declare-parameter (ir name type)
   (or type (error "declaration has no type: "name))
-  (ir-declare ir name (new <ir-parameter> name type (ir-frame-allocate (<ir>-frame ir) type))))
+  (ir-declare ir name (new <ir-parameter> name type)))
 
 (define-function ir-declare-local (ir name type)
   (or type (error "declaration has no type: "name))
-  (ir-declare ir name (new <ir-local> name type (ir-frame-allocate (<ir>-frame ir) type))))
+  (ir-declare ir name (new <ir-local> name type)))
 
 ;;; errors
 
@@ -913,9 +859,11 @@
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
-							(let ((lhs (ir-check-type (car  self.operands) ir 1))
-							      (rhs (ir-check-type (cadr self.operands) ir 1)))
-							  (or (and (ir-scalar-type? lhs) (= rhs lhs))
+							(let* ((lhs (car  self.operands))  (lht (ir-check-type lhs ir 1))
+							       (rhs (cadr self.operands))  (rht (ir-check-type rhs ir 1)))
+							  (or (and (ir-scalar-type?   lht) (= lht rht))
+							      (and (ir-integral-type? lht) (ir-can-coerce lht rhs))
+							      (and (ir-integral-type? rht) (ir-can-coerce rht lhs))
 							      (error "illegal types in: "self))
 							  (set self.type IR-BOOL)))
        (define-selector ,gname)
@@ -965,11 +913,12 @@
     (ir-gen-function-implementation gen function)))
 
 
-(define-selector ir-gen-statement)
+(define-selector ir-gen-initialisation)
 
-(define-function ir-generate-program (ir gen)
-  (array-do statement (<ir>-program ir)
-    (ir-gen-statement gen statement)))
+(define-function ir-generate-initialisations (ir gen)
+  (ir-gen-preamble gen)
+  (array-do statement (<ir>-program ir) (ir-gen-initialisation gen statement))
+  (ir-gen-postamble gen))
 
 (define-selector ir-gen-header)
 (define-selector ir-gen-preamble)
@@ -999,7 +948,57 @@
   (ir-check-types ir)
   (ir-generate-declarations ir gen)
   (ir-generate-functions ir gen)
-  (ir-gen-preamble gen)
-  (ir-generate-program ir gen)
-  (ir-gen-postamble gen)
+  (ir-generate-initialisations ir gen)
   )
+
+;;; resource allocation
+
+(define-structure <ir-location> (zone offset))			;; relative to the frame pointer
+
+(define-method do-print <ir-location> ()	(print self.zone"["self.offset"]"))
+
+;
+
+(define-structure <ir-zone> (type locations index limit))	;; one or more contiguous locations sharing a common type
+
+(define-method do-print <ir-zone> ()		(print "@"self.type))
+
+(define-function ir-zone-new (type)		(new <ir-zone> type (array) 0 0))
+
+(define-function ir-zone-allocate (self)
+  (with-instance-accessors <ir-zone>
+    (let ((var (if (< self.index self.limit)
+		   (array-at self.locations self.index)
+		 (set-array-at self.locations self.index (new <ir-location> self self.index)))))
+      (set self.limit (max self.limit (incr self.index)))
+      var)))
+
+(define-function ir-zone-deallocate (self loc)
+  (with-instance-accessors <ir-zone>
+    (decr self.index)
+    (or (= loc (array-at self.locations self.index))
+	(error "non-lifo frame allocation"))))
+
+;
+
+(define-structure <ir-frame> (zones))				;; zero or more contiguous zones
+
+(define-function ir-frame-new ()	(new <ir-frame>))
+
+(define-function ir-frame-allocate (self type)
+  (with-instance-accessors <ir-frame>
+    (ir-zone-allocate (cdr (or (assq type self.zones)
+			       (car (push self.zones (cons type (ir-zone-new type)))))))))
+
+(define-function ir-frame-finalise (self)
+  (with-instance-accessors <ir-frame>
+    (let ((offset 0))
+      (list-do name-zone self.zones
+	;;(println name-zone)
+	(let ((zone (cdr name-zone)))
+	  (let ((type (<ir-zone>-type zone)))
+	    (array-do loc (<ir-zone>-locations zone)
+	      ;;(println loc)
+	      (set offset (align offset (<ir-type>-alignment type)))
+	      (set (<ir-location>-offset loc) offset)
+	      (incr offset (<ir-type>-size type)))))))))

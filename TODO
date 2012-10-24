@@ -1,10 +1,12 @@
+* constant folding
+
 * remove frame from <ir> and move it to <ir-gen>
   + each ir-gen-function-implementation walks the tree to allocate resources
   + seperate pools for temps and locals means the final value of a let can outlive the local context
   + register allocation is the responsibility of the gen, not the ir
   + move of function into var during init is a special case
 
-* use int64_t for boxed Long
+* use int64_t (or larger) for boxed Long
 
 * coercion from literal to different size
 
