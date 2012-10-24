@@ -1,3 +1,5 @@
+(require "ir2.k")
+
 (define-function c-mangle (s)
   (let* ((in  (symbol->string s))
 	 (len (string-length in))
