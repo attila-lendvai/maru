@@ -2,9 +2,9 @@
 (define (malloc (void *	long		) *) (extern malloc))
 (define (atoi   (int	char *		) *) (extern atoi))
 
-(define-struct <foo> ((x long) (y long)))
+(define-struct <foo> ((x int) (y int)))
 
-(define-function print-foo long ((foo struct <foo>))
+(define-function print-foo int ((foo struct <foo>))
   (printf "print-foo: %d %d\n" (member foo x) (member foo y))
   (return (+ (member foo x) (member foo y))))
 
@@ -31,8 +31,8 @@
 (define-type foo_t struct <foo>)
 
 (define-function main int ((argc int) (argv char * *))
-  (let ((n (if (= argc (cast 1 int)) 10 (cast (atoi (indir argv 1)) long))))
-    (let (((s long *)	(malloc (* (sizeof long) n))))
+  (let ((n (if (= argc 1) 10 (atoi (indir argv 1)))))
+    (let (((s int *)	(malloc (* (sizeof int) n))))
       (for (i 0 n) (set (indir s i) 1))
       (for (i 2 n)
 	(if (indir s i)
@@ -53,4 +53,4 @@
 
   ;;(my-printf "%s world %i %f\n" "goodbye" 42 6.66)
 
-  (return (cast 0 int)))
+  (return 0))
