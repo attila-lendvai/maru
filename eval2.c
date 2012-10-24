@@ -1,4 +1,4 @@
-// last edited: 2012-10-18 17:19:59 by piumarta on linux32
+// last edited: 2012-10-24 10:56:31 by piumarta on ubuntu
 
 #define DEMO_BITS	1
 
@@ -798,7 +798,9 @@ static oop readExpr(FILE *fp)
 		    oop obj=  newDouble(wcstod(buffer_contents(&buf), 0));
 		    return obj;
 		}
-		if (('x' == c) && (1 == buf.position))
+		if (('x' == c) && ((1 == buf.position)
+				   || ((2 == buf.position) && (buf.buffer[0] == '-'))
+			))
 		    do {
 			buffer_append(&buf, c);
 			c= getwc(fp);
