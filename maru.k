@@ -1,7 +1,3 @@
-(require "ir2.k")
-(require "ir-gen-c.k")
-;;(require "ir-gen-x86.k")
-
 (define-structure <extern> (name type))
 
 (define-method do-print <extern> ()
