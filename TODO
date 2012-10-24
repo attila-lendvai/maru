@@ -1,6 +1,6 @@
-* coercion from literal to different size
+* use int64_t for boxed Long
 
-* define-type
+* coercion from literal to different size
 
 * pragma to enable (* x) = (indir x), (& x) = (addressof x), etc.
 
