@@ -28,10 +28,20 @@
       (ir-struct ir name)
     (error "illegal struct name: "name)))
 
+(define maru->ir-type) ;; forward
+
+(define-function maru-defined-type (exp ir)
+  (let ((spec (assq exp *maru-types*)))
+    (if spec
+	(let ((type (cdr spec)))
+	  (or (ir-type? type)
+	      (set type (set (cdr spec) (maru->ir-type type ir))))
+	  type))))
+
 (define-function maru->ir-type (exp ir)
   (cond
     ((symbol? exp)	(or (cdr (assq exp maru->ir-type-map))
-			    (cdr (assq exp *maru-types*))
+			    (maru-defined-type exp ir)
 			    (error "illegal type name: "exp)))
     ((pair? exp)	(let ((type (maru->ir-type (car exp) ir)))
 			  (and (= 'struct type) (set type (maru-struct (car (set exp (cdr exp))) ir)))
@@ -64,7 +74,7 @@
        (maru->ir-type (cdr decl) ir)))
 
 (define-method maru-compile <undefined> (ir)	(ir-nop))
-(define-method maru-compile <long>   	(ir)	(ir-lit self IR-LONG))
+(define-method maru-compile <long>   	(ir)	(ir-lit self IR-INT))
 (define-method maru-compile <double> 	(ir)	(ir-lit self IR-DOUBLE))
 (define-method maru-compile <string> 	(ir)	(ir-lit self IR-STRING))
 (define-method maru-compile <symbol> 	(ir)	(ir-get-var self))
@@ -229,9 +239,12 @@
 
 (define-function compile-namespace (ns)
   (let ((ir  (ir-new ()))
-	(gen (ir-gen-c-new)))
-    (array-do s *maru-structs* (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
-    (list-do name-type *maru-types* (set (cdr name-type) (maru->ir-type (cdr name-type) ir)))
+	(gen (ir-gen-new)))
+    (array-do s *maru-structs*
+      (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
+    (list-do name-type *maru-types*
+      (or (ir-type? (cdr name-type))
+	  (maru->ir-type (cdr name-type) ir)))
     (namespace-do binding ns
       (let* ((decl (car binding))
 	     (name (maru-declaration-name decl))

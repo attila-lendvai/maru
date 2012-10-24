@@ -22,6 +22,8 @@
 
 (define-structure <ir-type> (name size alignment pointer function))
 
+(define-function ir-type? (x)	(inherits-from (type-of x) <ir-type>))
+
 (define-function ir-type-size (self)		(<ir-type>-size	     self))
 (define-function ir-type-alignment (self)	(<ir-type>-alignment self))
 
@@ -76,24 +78,28 @@
 
 ;
 
-(define-class <ir-struct-type> <ir-type> (members))			(define-function ir-struct-type? (x)	(inherits-from (type-of x) <ir-struct-type>))
+(define-class <ir-struct-type> <ir-type> (members defined))		(define-function ir-struct-type? (x)	(inherits-from (type-of x) <ir-struct-type>))
 
 (define-method do-print <ir-struct-type> ()	(print "{struct "self.name"}"))
 
-(define-function ir-declare-struct-type (self name members)
+(define-function ir-create-struct-type (self name members defined)
   (let ((type (cdr (assq name (<ir>-struct-types self)))))
     (if type
 	(let ()
-	  (and (<ir-struct-type>-members type)
+	  (and (<ir-struct-type>-defined type)
 	       (error "multiple definition of structure type: "name))
+	  (set (<ir-struct-type>-defined type) defined)
 	  (set (<ir-struct-type>-members type) members))
-      (set type (make <ir-struct-type> (name name) (members members)))
+      (set type (make <ir-struct-type> (name name) (members members) (defined defined)))
       (push (<ir>-struct-types self) (cons name type)))
     type))
 
+(define-function ir-declare-struct-type (self name members)
+  (ir-create-struct-type self name members 1))
+
 (define-function ir-struct (ir name)
   (or (cdr (assq name (<ir>-struct-types ir)))
-      (ir-declare-struct-type ir name ())))
+      (ir-create-struct-type ir name () ())))
 
 (define-structure <ir-struct-member> (name type offset))
 
@@ -106,6 +112,8 @@
 	  (stype     (cdr s))
 	  (offset    0)
 	  (alignment 1))
+      (or (<ir-struct-type>-defined stype)
+	  (error "undefined structure type: "sname))
       (list-do m (<ir-struct-type>-members stype)
 	(let* ((mname  (car m))
 	       (mtype  (cdr m))
@@ -116,8 +124,7 @@
 	  (set alignment (max alignment malign))
 	  (incr offset msize)))
       (set (<ir-type>-size stype) offset)
-      (set (<ir-type>-alignment stype) alignment)
-      )))
+      (set (<ir-type>-alignment stype) alignment))))
 
 ;
 
@@ -296,7 +303,8 @@
 (define-selector ir-returns?)
 
 (define-method ir-returns? <ir-insn> ()		())
-(define-method ir-returns? <ir> ()		(ir-returns? (array-last self.program)))
+(define-method ir-returns? <ir> ()		(and (< 0 (array-length self.program))
+						     (ir-returns? (array-last self.program))))
 ;
 
 (define ir-nop) ;; forward
@@ -311,11 +319,28 @@
 (define-method ir-check-type <double> (ir val?)	IR-DOUBLE)
 (define-method ir-check-type <string> (ir val?)	IR-STRING)
 
+(define ir-lit?) ;; forward
+
+(define-function ir-integer-width (i)
+  (set i (^ i (>> i 1)))
+  (let ((w 1))
+    (while (!= 0 i)
+      (incr w)
+      (set i (>> i 1)))
+    (>> (+ w 7) 3)))
+
+(define-function ir-can-coerce (ltype rtype rhs)
+  (and                         (ir-lit?           rhs  )
+    (ir-integral-type?  ltype) (ir-integral-type? rtype)
+    (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))))
+
 (define-function ir-can-assign (ltype rtype rhs)
-  (or (=                     ltype                    rtype )
-      (and (= IR-VOID*       ltype) (ir-pointer-type? rtype))
-      (and (ir-pointer-type? ltype) (= IR-VOID*       rtype))
-      (and (ir-pointer-type? ltype) (ir-zero?         rhs  ))))
+  (or (=                      ltype                    rtype )
+      (and (= IR-VOID*        ltype) (ir-pointer-type? rtype))
+      (and (ir-pointer-type?  ltype) (= IR-VOID*       rtype))
+      (and (ir-pointer-type?  ltype) (ir-zero?         rhs  ))
+      (ir-can-coerce          ltype              rtype rhs  )
+      ))
 
 (define-function ir-check-assignment (ltype rtype rhs who)
   (or (ir-can-assign ltype rtype rhs)
@@ -409,7 +434,7 @@
 
 (define-function ir-function-name (ir)
   (if (<ir>-function ir)
-      (car (<ir-function>-parameters (<ir>-function ir)))
+      (<ir-function>-parameters (<ir>-function ir))
     "<anonymous function>"))
 
 ;
@@ -426,10 +451,7 @@
 							  (let* ((fn    (<ir>-function ir))
 								 (type  (<ir-insn>-type fn))
 								 (ftype (<ir-function-type>-ret-type (<ir-pointer-type>-referent type))))
-							    (or (= self.type ftype)
-								(and (ir-pointer-type? ftype) (= IR-VOID*       self.type))
-								(and (= IR-VOID*       ftype) (ir-pointer-type? self.type))
-								(and (ir-pointer-type? ftype) (ir-zero?         (car self.operands)))
+							    (or (ir-can-assign ftype self.type (car self.operands))
 								(error (ir-function-name ir)": type mismatch in return: "self))))
 							self.type)
 
@@ -632,7 +654,8 @@
 (define-selector ir-gen-let)
 (define-method ir-gen <ir-let> (gen)			(ir-gen-let gen self.type self.parameters self.operands))
 
-(define-method ir-returns? <ir-let> ()			(ir-returns? (list-last self.operands)))
+(define-method ir-returns? <ir-let> ()			(and self.operands
+							     (ir-returns? (list-last self.operands))))
 
 ;
 
@@ -893,8 +916,8 @@
     (ir-gen-global-declaration var gen)))
 
 (define-method ir-gen-global-declaration <ir-global> (gen)
-  (ir-gen-global-declaration gen self))
-
+  (unless (= 'main self.name)
+    (ir-gen-global-declaration gen self)))
 
 (define-selector ir-gen-local-declaration (self gen) ())
 
@@ -931,7 +954,7 @@
   (let ((type (type-of gen)))
     (list-do s *ir-gen-selectors*
       (or (array-at (<selector>-methods s) type)
-	  (error (type-name-of gen)" does not implement "(<selector>-name s))))))
+	  (println "!!! "(type-name-of gen)" does not implement "(<selector>-name s))))))
 
 
 (define-function ir-generate (ir gen)
