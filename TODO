@@ -1,3 +1,9 @@
+* remove frame from <ir> and move it to <ir-gen>
+  + each ir-gen-function-implementation walks the tree to allocate resources
+  + seperate pools for temps and locals means the final value of a let can outlive the local context
+  + register allocation is the responsibility of the gen, not the ir
+  + move of function into var during init is a special case
+
 * use int64_t for boxed Long
 
 * coercion from literal to different size
@@ -5,10 +11,6 @@
 * pragma to enable (* x) = (indir x), (& x) = (addressof x), etc.
 
 * x86 backend
-
-----------------------------------------------------------------
-
-move the effect/value stuff out of maru-compile and into the IR
 
 ================================================================
 
