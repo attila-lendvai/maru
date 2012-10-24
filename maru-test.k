@@ -32,7 +32,7 @@
 
 (define-function main int ((argc int) (argv char * *))
   (let ((n (if (= argc 1) 10 (atoi (indir argv 1)))))
-    (let (((s int *)	(malloc (* (sizeof int) n))))
+    (let (((s int *)	(malloc (cast (* (sizeof int) n) long))))
       (for (i 0 n) (set (indir s i) 1))
       (for (i 2 n)
 	(if (indir s i)
