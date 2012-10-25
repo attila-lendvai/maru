@@ -19,7 +19,11 @@
     (array->string out)))
 
 (define-function ir-gen-c-variable-name (name)	(concat-string "v_" (c-mangle (symbol->string name))))
-(define-function ir-gen-c-function-name (name)	(concat-string "f_" (c-mangle (symbol->string name))))
+
+(define-function ir-gen-c-function-name (fun)
+  (let ((name (<ir-function>-export fun)))
+    (if name (symbol->string name)
+      (concat-string "f_" (c-mangle (symbol->string (car (<ir-function>-parameters fun))))))))
 
 (define-method print-c-declaration <ir-type> (name)		(error "missing implementation: print-c-declaration "(type-name-of self)))
 
@@ -251,7 +255,7 @@
   (print ")"))
 
 (define-method ir-gen-function <ir-gen-c> (value)
-  (print (ir-gen-c-function-name (car (<ir-function>-parameters value)))))
+  (print (ir-gen-c-function-name value)))
 
 (define-method ir-gen-function-implementation <ir-gen-c> (value)
   (let ((name (car  (<ir-function>-parameters value)))
@@ -259,8 +263,8 @@
 	(args (cadr (<ir-function>-parameters value)))
 	(body (<ir-function>-operands value)))
     (and (= 'main name) (set *ir-gen-c-main* name))
-    (print "static ")
-    (print-c-declaration (<ir-function-type>-ret-type type) (ir-gen-c-function-name (symbol->string name)))
+    (or (<ir-function>-export value) (print "static "))
+    (print-c-declaration (<ir-function-type>-ret-type type) (ir-gen-c-function-name value))
     (print "(")
     (let ((argn args)
 	  (argt (<ir-function-type>-arg-types type)))
@@ -321,7 +325,7 @@
 				(println " = "name";"))
 	((= kind <ir-function>)	(print-c-declaration type (ir-gen-c-variable-name name))
 				(print " = ")
-				(print (ir-gen-c-function-name (car (<ir-function>-parameters init))))
+				(print (ir-gen-c-function-name init))
 				(println ";"))
 	(else			(error "cannot initialise: "name" with: "value)))
 ;    (println ";")))

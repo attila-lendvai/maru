@@ -3,6 +3,7 @@
 (define-method do-print <extern> ()
   (print "<extern "self.name" : "self.type">"))
 
+(define *maru-exports* ())
 (define *maru-types* ())
 
 (define maru->ir-type-map
@@ -219,11 +220,11 @@
 							  (else			(maru-declaration-type exp ir))))
 
 (define-method maru-compile <expr> (ir)
-  (let* ((name      (maru-declaration-name self.name))
-	 (ret-type  (maru->ir-type (car self.definition) ir))
-	 (arg-names (map maru-argument-name (cadr self.definition)))
-	 (arg-types (map-with maru-argument-type (cadr self.definition) ir))
-	 (body      (map-with maru-compile (cddr self.definition) ir)))
+  (let ((name      (maru-declaration-name self.name))
+	(ret-type  (maru->ir-type (car self.definition) ir))
+	(arg-names (map maru-argument-name (cadr self.definition)))
+	(arg-types (map-with maru-argument-type (cadr self.definition) ir))
+	(body      (map-with maru-compile (cddr self.definition) ir)))
     (ir-function name (ir-function-of ret-type arg-types) arg-names body)))
 
 (define *maru-structs* (array))
@@ -236,6 +237,7 @@
 (define-function compile-namespace (ns)
   (let ((ir  (ir-new ()))
 	(gen (ir-gen-new)))
+    (list-do int-ext *maru-exports* (ir-export-symbol-as ir (car int-ext) (cdr int-ext)))
     (array-do s *maru-structs*
       (ir-declare-struct-type ir (car s) (map-with maru-struct-member (cdr s) ir)))
     (list-do name-type *maru-types*
@@ -268,6 +270,8 @@
 (define-form define-struct (name members)
   (array-append *maru-structs* (cons name members))
   ())
+
+(define-form export names	(list-do name names (push *maru-exports* (cons name name))))
 
 (define-form make-symbol (str) (string->symbol str))
 

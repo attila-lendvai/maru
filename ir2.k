@@ -1,7 +1,7 @@
 (require "osdefs.k")
 (require "trie.k")
 
-(define-structure <ir> (function scope program functions struct-types error-handler))
+(define-structure <ir> (function scope program functions struct-types error-handler exports))
 
 (define ir-scope-new) ;; forward
 (define ir-error-handler-new) ;; forward
@@ -356,7 +356,7 @@
 
 ;
 
-(define-class <ir-function> <ir-insn> (scope))		(define-function ir-function (name type args body)
+(define-class <ir-function> <ir-insn> (scope export))	(define-function ir-function (name type args body)
 							  (and (ir-function-type? type) (set type (ir-pointer-to type)))
 							  (new <ir-function> (list name args) body type))
 
@@ -939,6 +939,17 @@
 	  (println "!!! "(type-name-of gen)" does not implement "(<selector>-name s))))))
 
 
+(define-function ir-export-symbol-as (ir int ext)
+  (push (<ir>-exports ir) (cons int ext)))
+
+(define-function ir-export-functions (ir)
+  (let ((exports (<ir>-exports ir)))
+    (array-do function (<ir>-functions ir)
+      (let* ((name    (car (<ir-insn>-parameters function)))
+	     (int-ext (assq name exports)))
+	(and int-ext
+	     (set (<ir-function>-export function) (cdr int-ext)))))))
+
 (define-function ir-generate (ir gen)
   (ir-sanity-check-gen gen)
   (ir-finalise-structs ir gen)
@@ -946,6 +957,7 @@
   (ir-declare-structs ir gen)
   (ir-define-globals ir)
   (ir-check-types ir)
+  (ir-export-functions ir)
   (ir-generate-declarations ir gen)
   (ir-generate-functions ir gen)
   (ir-generate-initialisations ir gen)
