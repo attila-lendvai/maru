@@ -271,7 +271,12 @@
   (array-append *maru-structs* (cons name members))
   ())
 
-(define-form export names	(list-do name names (push *maru-exports* (cons name name))))
+(define-form export names
+  (list-do name names
+    (cond
+      ((symbol? name)	(push *maru-exports* (cons name name)))
+      ((pair? name)	(push *maru-exports* (cons (car name) (cadr name)))))
+    ()))
 
 (define-form make-symbol (str) (string->symbol str))
 
