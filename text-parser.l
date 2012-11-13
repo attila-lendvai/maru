@@ -155,14 +155,14 @@
   ;;(println "; memoised "name" "self)
   (let* ((here  (<text-parser>-position self))
 	 (memos (<text-parser>-memos self))
-	 (memo  (get (array-at memos here) name)))
+	 (memo  (get (array-at memos here) rule)))
     ;;(println "; memo "memo)
     (cond
       (memo	(and (= *succeeded* (<memo>-state memo))
 		     (let ()
 		       (set (<text-parser>-result self) (<memo>-result memo))
 		       (set (<text-parser>-position self) (<memo>-position memo)))))
-      (else	(put (array-at memos here) name (set memo (new <memo>)))
+      (else	(put (array-at memos here) rule (set memo (new <memo>)))
 		(if (text-parser-invoke-rule-simply-with name rule self args)
 		    (memo-set memo *succeeded* (<text-parser>-result self) (<text-parser>-position self))
 		  (set (<memo>-state memo) *failed*)
@@ -171,7 +171,7 @@
 (define-function text-parser-invoke-rule-with-recursion (name rule self . args)
   (let* ((posn   (<text-parser>-position self))
 	 (memos  (<text-parser>-memos self))
-	 (memo   (get (array-at memos posn) name)))
+	 (memo   (get (array-at memos posn) rule)))
     (if memo
 	;; this rule has already been entered at this position and has either succeeded, failed, or is in left-recursive iteration
 	(let ((state  (<memo>-state  memo))
@@ -183,7 +183,7 @@
 					())
 	    (else			())))
       ;; this rule has not been entered at this position
-      (put (array-at memos posn) name (set memo (new <memo> *active* () posn)))
+      (put (array-at memos posn) rule (set memo (new <memo> *active* () posn)))
       (if (text-parser-invoke-rule-simply-with name rule self args)
 	  ;; rule succeeded without recursion or entered recursion and found a non-recursive initial prefix
 	  (let ((state (<memo>-state memo)))
