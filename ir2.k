@@ -32,14 +32,14 @@
 (define-class <ir-floating-type> <ir-numeric-type> ())			(define-function ir-floating-type? (x)	(inherits-from (type-of x) <ir-floating-type>))
 (define-class <ir-varargs-type>  <ir-type> ())
 
-(define IR-VOID		(new <ir-void-type>	'void	0 1))
+(define IR-VOID		(new <ir-void-type>	'void	1 1))	;; 1 for pointer arithmetic calculations
 (define IR-INT8		(new <ir-integral-type> 'int8   1 1))
 (define IR-INT16	(new <ir-integral-type> 'int16  2 2))
 (define IR-INT32	(new <ir-integral-type> 'int32  4 4))
-(define IR-INT64	(new <ir-integral-type> 'int64  8 8))
-(define IR-FLOAT32	(new <ir-integral-type> 'float  4 4))
-(define IR-FLOAT64	(new <ir-integral-type> 'double 8 8))
-(define IR-VARARGS	(new <ir-varargs-type>  '...	0 0))
+(define IR-INT64	(new <ir-integral-type> 'int64  8 4))
+(define IR-FLOAT32	(new <ir-floating-type> 'float  4 4))
+(define IR-FLOAT64	(new <ir-floating-type> 'double 8 4))
+(define IR-VARARGS	(new <ir-varargs-type>  '...	0 1))
 
 (define IR-INT		IR-INT32)
 (define IR-LONG		(cond ((= 4 sizeof-long) IR-INT32) ((= 8 sizeof-long) IR-INT64) (else (error "I cannot run here"))))
@@ -144,19 +144,24 @@
 (define-structure <ir-variable> (name type location))
 
 (define-method do-print <ir-variable> ()
-  (print "{"(type-name-of self)" "self.name" : "self.type)
-  (and self.location (print " "self.location))
+  (print "{"(type-name-of self)" "self.name" : "self.type" ")
+  (and self.location (if (= self self.location) (print "SELF-REF ") (print self.location" ")))
   (print "}"))
 
-(define-class <ir-global>    <ir-variable> ())
-(define-class <ir-local>     <ir-variable> ())
-(define-class <ir-parameter> <ir-variable> ())
+(define-class <ir-global>    <ir-variable>  ())			(define-function ir-global? (x)	(inherits-from (type-of x) <ir-global>))
+
+(define-class <ir-local>     <ir-variable>  ())
+(define-class <ir-parameter> <ir-variable>  (offset))
+(define-class <ir-argument>  <ir-parameter> ())
 
 ;
 
-(define-structure <ir-scope> (parent bindings))
+(define-structure <ir-scope> (parent bindings subscopes))
 
-(define-function ir-scope-new (parent)		(new <ir-scope> parent))
+(define-function ir-scope-new (parent)
+  (let ((scope (new <ir-scope> parent)))
+    (and parent (push (<ir-scope>-subscopes parent) scope))
+    scope))
 
 (define-function ir-scope-find (self key)	(assq key (<ir-scope>-bindings self)))
 
@@ -179,6 +184,13 @@
        (let ((,var (cdar _bindings_)))
 	 ,@body
 	 (set _bindings_ (cdr _bindings_))))))
+
+(define-form ir-scope-subscopes-do (var scope . body)
+  `(let ((_scopes_ (<ir-scope>-subscopes ,scope)))
+     (while _scopes_
+       (let ((,var (car _scopes_)))
+	 ,@body
+	 (set _scopes_ (cdr _scopes_))))))
 
 (define-function ir-begin-scope (self)
   (set (<ir>-scope self) (ir-scope-new (<ir>-scope self))))
@@ -276,11 +288,13 @@
     (>> (+ w 7) 3)))
 
 (define-function ir-can-coerce (ltype rhs)
-  (let ((rtype (<ir-insn>-type rhs)))
-    (and                         (ir-lit?           rhs  )
-      (ir-integral-type?  ltype) (ir-integral-type? rtype)
-      (>= (<ir-type>-size ltype) (ir-integer-width (car (<ir-insn>-parameters rhs))))
-      (set (<ir-insn>-type rhs) ltype))))
+  (and (ir-lit? rhs)
+       (let ((rtype (<ir-insn>-type rhs)))
+	 (or (and (ir-integral-type? ltype) (ir-integral-type? rtype)
+		  (set (<ir-insn>-type rhs) ltype))
+	     (and (ir-floating-type? ltype) (ir-floating-type? rtype)
+		  (set (<ir-insn>-type rhs) ltype)))
+	 )))
 
 (define-function ir-can-assign (ltype rtype rhs)
   (or (=                      ltype                    rtype )
@@ -301,9 +315,6 @@
 (define-method ir-check-type <ir-nop> (ir val?)		(and val? (ir-error-no-value ir self))
 							(set self.type IR-VOID))
 
-(define-selector ir-gen-nop)
-(define-method   ir-gen <ir-nop> (gen)			(ir-gen-nop gen))
-
 (define-selector ir-nop? args				())
 
 (define-method ir-nop? <ir-nop> ()			1)
@@ -317,10 +328,7 @@
 (define-function ir-zero? (x)				(and (ir-lit? x) (= 0 (car (<ir-lit>-parameters x)))))
 
 (define-method ir-check-type <ir-lit> (ir val?)		(or val? (ir-warning-no-effect ir self))
-							(or self.type (set self.type (ir-check-type (car self.parameters) ir 1))))
-
-(define-selector ir-gen-lit)
-(define-method   ir-gen <ir-lit> (gen)			(ir-gen-lit gen (car self.parameters)))
+							(set self.type (ir-check-type (car self.parameters) ir 1)))
 
 ;
 
@@ -330,9 +338,6 @@
 							(set self.parameters (list (<ir-type>-size (car self.parameters))))
 							self.type)
 
-(define-selector ir-gen-sizeof)
-(define-method   ir-gen <ir-sizeof> (gen)		(ir-gen-lit gen (car self.parameters)))
-
 ;
 
 (define-class <ir-cast> <ir-insn> ())			(define-function ir-cast (type value)	(new <ir-cast> (list type) (list value)))
@@ -341,9 +346,6 @@
 							(ir-check-type (car self.operands) ir 1)
 							(set self.type (car self.parameters)))
 
-(define-selector ir-gen-cast)
-(define-method   ir-gen <ir-cast> (gen)			(ir-gen-cast gen (car self.parameters) (car self.operands)))
-
 ;
 
 (define-class <ir-extern> <ir-insn> ())			(define-function ir-extern (name) (new <ir-extern> (list name)))
@@ -351,12 +353,10 @@
 (define-method ir-check-type <ir-extern> (ir val?)	(or val? (ir-warning-no-effect ir self))
 							(set self.type IR-VOID*))
 
-(define-selector ir-gen-extern)
-(define-method ir-gen <ir-extern> (gen)			(ir-gen-extern gen self))
-
 ;
 
-(define-class <ir-function> <ir-insn> (scope export))	(define-function ir-function (name type args body)
+(define-class <ir-function> <ir-insn> (scope export calls))
+							(define-function ir-function (name type args body)
 							  (and (ir-function-type? type) (set type (ir-pointer-to type)))
 							  (new <ir-function> (list name args) body type))
 
@@ -378,13 +378,17 @@
 							  ;;r-finalise fir)
 							  self.type))
 
-(define-selector ir-gen-function)
-(define-method   ir-gen <ir-function> (gen)		(ir-gen-function gen self))
-
 (define-function ir-function-name (ir)
   (if (<ir>-function ir)
       (<ir-function>-parameters (<ir>-function ir))
     "<anonymous function>"))
+
+(define-form ir-function-calls-do (var function . body)
+  `(let ((_calls_ (<ir-function>-calls ,function)))
+     (while _calls_
+       (let ((,var (car _calls_)))
+	 ,@body
+	 (set _scopes_ (cdr _calls_))))))
 
 ;
 
@@ -404,18 +408,19 @@
 								(error (ir-function-name ir)": type mismatch in return: "self))))
 							self.type)
 
-(define-selector ir-gen-return)
-(define-method ir-gen <ir-return> (gen)			(ir-gen-return gen self))
+(define-selector ir-return? args ())
+(define-method ir-return?  <ir-return> () 1)
 
 (define-method ir-returns? <ir-return> ()		self.type)
 
 ;
 
 (define-function check-proto-args-rest (proto types args)
-  (or (= (car proto) IR-VARARGS)						;; (...) => args can be anything
-      (and (not proto) (not types))						;; end of proto => args must end
-      (and (ir-can-assign (car proto) (car types) (car args))			;; proto matches arg
-	   (check-proto-args-rest (cdr proto) (cdr types) (cdr args)))))
+  (or (= (car proto) IR-VARARGS)				;; (...) => args can be anything
+      (and (not proto) (not types))				;; end of proto => args must end
+      (and (ir-can-assign (car proto) (car types) (car args))	;; proto matches arg
+	   (check-proto-args-rest (cdr proto) (cdr types) (cdr args)))
+      (error "cannot pass "(car args)" "(car types)" as argument of type "(car proto))))
 
 (define-function check-proto-args (proto types args)
   (or (not proto)					;; () => args can be anything
@@ -424,22 +429,24 @@
 	   (not types))
        (check-proto-args-rest proto types args)))
 
-(define-class <ir-call> <ir-insn> ())			(define-function ir-call (dest args)	(new <ir-call> () (cons dest args)))
+(define-class <ir-call> <ir-insn> (signature))		(define-function ir-call (dest args)	(new <ir-call> () (cons dest args)))
+
+(define-function ir-function-type-of (type)
+  (and (ir-pointer-type? type)  (set type (<ir-pointer-type>-referent type)))
+  (and (ir-function-type? type) type))
 
 (define-method ir-check-type <ir-call> (ir val?)	(let* ((call-sig  (map-with2 ir-check-type self.operands ir 1))
 							       (dest-type (car call-sig))
-							       (fun-type  (if (ir-pointer-type? dest-type) (<ir-pointer-type>-referent dest-type) dest-type))
+							       (fun-type  (or (ir-function-type-of dest-type)
+									      (error "called value is not a function: "self)))
+							       (fun-ret   (<ir-function-type>-ret-type  fun-type))
 							       (fun-args  (<ir-function-type>-arg-types fun-type))
 							       (arg-types (cdr call-sig)))
-							  (or (ir-function-type? fun-type)
-							      (error "called value is not a function: "self))
 							  (and fun-args (or (check-proto-args fun-args arg-types (cdr self.operands))
 									    (error "expected argument types "(<ir-function-type>-arg-types fun-type)
 										   " in call: "self)))
-							  (set self.type (<ir-function-type>-ret-type fun-type))))
-
-(define-selector ir-gen-call)
-(define-method ir-gen <ir-call> (gen)			(ir-gen-call gen self))
+							  (set self.signature fun-type)
+							  (set self.type fun-ret)))
 
 ;
 
@@ -453,10 +460,8 @@
 							  (or  (ir-struct-type? vtype)			(error "value is not a structure: "self))
 							  (let ((m (cdr (assq fname (<ir-struct-type>-members vtype)))))
 							    (or m					(error "no such field: "self))
+							    (set self.parameters (list m))
 							    (set self.type (<ir-struct-member>-type m)))))
-
-(define-selector ir-gen-member)
-(define-method ir-gen <ir-member> (gen)			(ir-gen-member gen (car self.parameters) (car self.operands)))
 
 (define-selector ir-member? args			())
 (define-method ir-member? <ir-member> ()		1)
@@ -477,10 +482,8 @@
 										 (error "no such field: "self))))
 								 (mtype (<ir-struct-member>-type m)))
 							    (or (ir-can-assign mtype itype init) (error "type mismatch in member assignment: "self))
+							    (set self.parameters (list m))
 							    (set self.type mtype))))
-
-(define-selector ir-gen-set-member)
-(define-method ir-gen <ir-set-member> (gen)		(ir-gen-set-member gen (car self.parameters) (car self.operands) (cadr self.operands)))
 
 ;
 
@@ -491,14 +494,7 @@
 							       (index (cadr self.operands))  (itype (ir-check-type index ir 1)))
 							  (or (ir-pointer-type? btype)			(error "dereferencing a non-pointer type: "self))
 							  (or (ir-integral-type? itype)			(error "non-integer index: "self))
-							  (let ((ref (<ir-pointer-type>-referent btype)))
-							    (cond
-							      ((= ref IR-INT8)	(set self.type IR-INT32))
-							      ((= ref IR-INT16)	(set self.type IR-INT32))
-							      (else		(set self.type ref))))))
-
-(define-selector ir-gen-indir)
-(define-method ir-gen <ir-indir> (gen)			(ir-gen-indir gen self.type (car self.operands) (cadr self.operands)))
+							  (set self.type (<ir-pointer-type>-referent btype))))
 
 ;
 
@@ -513,9 +509,6 @@
 							    (ir-check-assignment rtype vtype value self)
 							    (set self.type rtype))))
 
-(define-selector ir-gen-set-indir)
-(define-method ir-gen <ir-set-indir> (gen)		(ir-gen-set-indir gen self.type (car self.operands) (cadr self.operands) (caddr self.operands)))
-
 ;
 
 (define-class <ir-get-var> <ir-insn> ())		(define-function ir-get-var (name)	(new <ir-get-var> name))
@@ -523,9 +516,6 @@
 (define-method ir-check-type <ir-get-var> (ir val?)	(or val? (ir-warning-no-effect ir self))
 							(set self.parameters (ir-lookup ir self.parameters))
 							(set self.type (<ir-variable>-type self.parameters)))
-
-(define-selector ir-gen-get-var)
-(define-method ir-gen <ir-get-var> (gen)		(ir-gen-get-var gen self.parameters))
 
 (define-selector ir-get-var? args			())
 (define-method ir-get-var? <ir-get-var> ()		1)
@@ -535,17 +525,14 @@
 (define-class <ir-set-var> <ir-insn> ())		(define-function ir-set-var (name value) (new <ir-set-var> name (list value)))
 
 (define-method ir-check-type <ir-set-var> (ir val?)	(set self.parameters (ir-lookup ir self.parameters))
-							(let ((type (ir-check-type (car self.operands) ir 1)))
-							  (or (<ir-variable>-type self.parameters)
-							      (set (<ir-variable>-type self.parameters) type))
-							  (set self.type (<ir-variable>-type self.parameters))
-							  (or (= self.type type)
-							      (ir-can-assign self.type type (car self.operands))
-							      (error "assigning value of type: "type" to variable of type: "self.type)))
-							self.type)
-
-(define-selector ir-gen-set-var)
-(define-method ir-gen <ir-set-var> (gen)		(ir-gen-set-var gen self.parameters (car self.operands)))
+							(let* ((init    (car self.operands))
+							       (valtype (ir-check-type init ir 1))
+							       (vartype (<ir-variable>-type self.parameters)))
+							  (or vartype
+							      (set vartype (set (<ir-variable>-type init) valtype)))
+							  (or (ir-can-assign vartype valtype (car self.operands))
+							      (error "assigning value of type: "type" to variable of type: "self.type))
+							  (set self.type (<ir-insn>-type init))))
 
 ;
 
@@ -557,16 +544,6 @@
 							      (ir-member?  lval)
 							      (error "non-lvalue in addressof: "self))
 							  (set self.type (ir-pointer-to type))))
-
-(define-selector ir-gen-addressof-var)
-(define-selector ir-gen-addressof-member)
-
-(define-method ir-gen <ir-addressof> (gen)
-  (let ((lval (car self.operands)))
-    (cond
-      ((ir-get-var? lval)	(ir-gen-addressof-var    gen (<ir-get-var>-parameters lval)))
-      ((ir-member? lval)	(ir-gen-addressof-member gen (car (<ir-member>-parameters lval)) (car (<ir-member>-operands lval))))
-      (else			(error "this cannot happen")))))
 
 ;
 
@@ -587,7 +564,8 @@
 							    (let ((var (ir-declare-local ir name type)))
 							      (unless (ir-nop? value)
 								(ir-check-assignment type vtype value self)
-								(push seq (new <ir-set-var> var (list value) type)))))
+								(push seq (new <ir-set-var> var (list value) (<ir-insn>-type value)))
+								)))
 							  (set self.type IR-VOID)
 							  (while (cdr body)
 							    (set self.type (ir-check-type (car body) ir ()))
@@ -598,9 +576,6 @@
 							  (set self.operands seq)
 							  (or val? (set self.type IR-VOID))
 							  self.type))
-
-(define-selector ir-gen-let)
-(define-method ir-gen <ir-let> (gen)			(ir-gen-let gen self.type self.parameters self.operands))
 
 (define-method ir-returns? <ir-let> ()			(and self.operands
 							     (ir-returns? (list-last self.operands))))
@@ -613,10 +588,6 @@
 							  ;;(new <ir-define> (list name type) (list (ir-set-var name value))))
 							  (new <ir-define> (list name type) (list value) type))
 
-(define-method ir-define-global <ir-define> (ir)	(let* ((name (car  self.parameters))
-							       (type (cadr self.parameters)))
-							  (set self.var (ir-declare-global ir name type))))
-
 (define-method ir-check-type <ir-define> (ir val?)	(let* ((name  (car  self.parameters))
 							       (type  (cadr self.parameters))
 							       (init  (car  self.operands))
@@ -627,29 +598,6 @@
 							  (set (car self.operands) (new <ir-set-var> self.var (list init) type))
 							  (set self.type type)))
 
-(define-method ir-gen <ir-define> (gen)			(ir-gen (car self.operands) gen))
-
-;
-
-(define-class <ir-seq> <ir-insn> ())			(define-function ir-seq (exprs) (new <ir-seq> () exprs))
-
-(define-method ir-check-type <ir-seq> (ir val?)		(or self.operands (set self.operands (ir-void)))
-							(ir-begin-scope ir)
-							(set self.type IR-VOID)
-							(let ((body self.operands))
-							  (while (cdr body)
-							    (set self.type (ir-check-type (car body) ir ()))
-							    (set body (cdr body)))
-							  (and body
-							    (set self.type (ir-check-type (car body) ir val?))))
-							(set self.parameters (ir-end-scope ir))
-							self.type)
-
-(define-selector ir-gen-seq)
-(define-method ir-gen <ir-seq> (gen)			(ir-gen-seq gen self.parameters self.operands))
-
-(define-method ir-returns? <ir-seq> ()			(ir-returns? (list-last self.operands)))
-
 ;
 
 (define-class <ir-while> <ir-insn> ())			(define-function ir-while (test expr) (new <ir-while> () (list test expr)))
@@ -658,9 +606,6 @@
 							(or (ir-bool? (ir-check-type (car self.operands) ir 1)) (error "non-boolean condition: "self))
 							(ir-check-type (cadr self.operands) ir ())
 							(set self.type IR-VOID))
-
-(define-selector ir-gen-while)
-(define-method ir-gen <ir-while> (gen)			(ir-gen-while gen (car self.operands) (cadr self.operands)))
 
 ;
 
@@ -673,9 +618,6 @@
 							      (or (= (set self.type t1) t2) (error "type mismatch: "self))
 							    (set self.type IR-VOID)))
 							self.type)
-
-(define-selector ir-gen-if)
-(define-method ir-gen <ir-if> (gen)			(ir-gen-if gen self.type (car self.operands) (cadr self.operands) (caddr self.operands)))
 
 (define-method ir-returns? <ir-if> ()			(and (ir-returns? (cadr  self.operands)) (ir-returns? (caddr self.operands))))
 
@@ -704,9 +646,6 @@
 
 (define-method ir-check-type <ir-logand> (ir val?)	(set self.type (ir-check-logical self.operands ir val?)))
 
-(define-selector ir-gen-logand)
-(define-method ir-gen <ir-logand> (gen)			(ir-gen-logand gen self.type self.operands))
-
 ;
 
 (define-class <ir-logor> <ir-insn> ())			(define-function ir-logor (exprs)
@@ -718,12 +657,7 @@
 
 (define-method ir-check-type <ir-logor> (ir val?)	(set self.type (ir-check-logical self.operands ir val?)))
 
-(define-selector ir-gen-logor)
-(define-method ir-gen <ir-logor> (gen)			(ir-gen-logor gen self.type self.operands))
-
 ;
-
-(define-selector ir-gen-add)
 
 (define-class <ir-add> <ir-insn> ())			(define-function ir-add (args) (new <ir-add> () args))
 
@@ -738,8 +672,6 @@
 								 ((and (ir-pointer-type? lht) (=             IR-LONG rht))	lht)
 								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
 								 (else (error "illegal types in: "self))))))
-
-(define-method ir-gen <ir-add> (gen)			(ir-gen-add gen (car self.operands) (cadr self.operands)))
 
 ;
 
@@ -758,23 +690,17 @@
 								 ((and (ir-pointer-type? lht) (ir-can-coerce IR-LONG rhs))	lht)
 								 (else (error "illegal types in: "self))))))
 
-(define-selector ir-gen-sub)
-(define-method ir-gen <ir-sub> (gen)			(ir-gen-sub gen (car self.operands) (cadr self.operands)))
-
 ;
 
 (define-form define-unary-arithmetic (name test)
   (let* ((iname (concat-symbol  'ir- name))
-	 (tname (concat-symbols '< iname '>))
-	 (gname (concat-symbol 'ir-gen- name)))
+	 (tname (concat-symbols '< iname '>)))
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
 							(let ((type (ir-check-type (car self.operands) ir 1)))
 							  (or (,test type) (error "illegal types in: "self))
-							  (set self.type type)))
-       (define-selector ,gname)
-       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands))))))
+							  (set self.type type))))))
 
 (define-unary-arithmetic neg ir-numeric-type?)
 (define-unary-arithmetic com ir-integral-type?)
@@ -782,8 +708,7 @@
 
 (define-form define-binary-arithmetic (name test)
   (let* ((iname (concat-symbol  'ir- name))
-	 (tname (concat-symbols '< iname '>))
-	 (gname (concat-symbol 'ir-gen- name)))
+	 (tname (concat-symbols '< iname '>)))
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
@@ -794,9 +719,7 @@
 								 ((and (,test lht) (= rht lht))			lht)
 								 ((and (,test lht) (ir-can-coerce lht rhs))	lht)
 								 ((and (,test rht) (ir-can-coerce rht lhs))	rht)
-								 (else (error "illegal types in: "self))))))
-       (define-selector ,gname)
-       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
+								 (else (error "illegal types in: "self)))))))))
 
 (define-binary-arithmetic mul 	 ir-numeric-type?)
 (define-binary-arithmetic div 	 ir-numeric-type?)
@@ -807,8 +730,7 @@
 
 (define-form define-shift (name)
   (let* ((iname (concat-symbol  'ir- name))
-	 (tname (concat-symbols '< iname '>))
-	 (gname (concat-symbol 'ir-gen- name)))
+	 (tname (concat-symbols '< iname '>)))
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
@@ -819,17 +741,14 @@
 								   (or (= IR-INT rht)
 								       (ir-can-coerce IR-INT rhs)))
 							      (error "illegal types in: "self))
-							  (set self.type lht)))
-       (define-selector ,gname)
-       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
+							  (set self.type lht))))))
 
 (define-shift shl)
 (define-shift shr)
 
 (define-form define-relation (name)
   (let* ((iname (concat-symbol  'ir- name))
-	 (tname (concat-symbols '< iname '>))
-	 (gname (concat-symbol 'ir-gen- name)))
+	 (tname (concat-symbols '< iname '>)))
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
@@ -845,17 +764,14 @@
 							      (and (ir-pointer-type?  lht) (ir-zero?          rhs))
 							      (and (ir-zero?          lhs) (ir-pointer-type?  rht))
 							      (error "illegal types in: "self))
-							  (set self.type IR-BOOL)))
-       (define-selector ,gname)
-       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
+							  (set self.type IR-BOOL))))))
 
 (define-relation eq)
 (define-relation ne)
 
 (define-form define-arithmetic-relation (name)
   (let* ((iname (concat-symbol  'ir- name))
-	 (tname (concat-symbols '< iname '>))
-	 (gname (concat-symbol 'ir-gen- name)))
+	 (tname (concat-symbols '< iname '>)))
     `(let ()
        (define-class ,tname <ir-insn> ())		(define-function ,iname (args) (new ,tname () args))
        (define-method ir-check-type ,tname (ir val?)	(or val? (ir-warning-no-effect ir self))
@@ -865,9 +781,7 @@
 							      (and (ir-integral-type? lht) (ir-can-coerce lht rhs))
 							      (and (ir-integral-type? rht) (ir-can-coerce rht lhs))
 							      (error "illegal types in: "self))
-							  (set self.type IR-BOOL)))
-       (define-selector ,gname)
-       (define-method ir-gen ,tname (gen)		(,gname gen (car self.operands) (cadr self.operands))))))
+							  (set self.type IR-BOOL))))))
 
 (define-arithmetic-relation lt)
 (define-arithmetic-relation le)
@@ -876,12 +790,16 @@
 
 ;;; compilation
 
-(define-selector ir-define-global (self ir))
+(define-selector ir-gen-header)
+(define-selector ir-gen-preamble)
+(define-selector ir-gen-postamble)
 
-(define-function ir-define-globals (ir)
-  (array-do init (<ir>-program ir)
-    (ir-define-global init ir)))
-
+(define-function ir-declare-globals (ir gen)
+  (array-do self (<ir>-program ir)
+    (with-instance-accessors <ir-define>
+      (let* ((name (car  self.parameters))
+	     (type (cadr self.parameters)))
+	(set self.var (ir-declare-global ir name type))))))
 
 (define-selector ir-gen-declare-struct)
 
@@ -920,10 +838,6 @@
   (array-do statement (<ir>-program ir) (ir-gen-initialisation gen statement))
   (ir-gen-postamble gen))
 
-(define-selector ir-gen-header)
-(define-selector ir-gen-preamble)
-(define-selector ir-gen-postamble)
-
 
 (define *ir-gen-selectors* ())
 
@@ -950,12 +864,13 @@
 	(and int-ext
 	     (set (<ir-function>-export function) (cdr int-ext)))))))
 
+
 (define-function ir-generate (ir gen)
   (ir-sanity-check-gen gen)
   (ir-finalise-structs ir gen)
   (ir-gen-header gen)
   (ir-declare-structs ir gen)
-  (ir-define-globals ir)
+  (ir-declare-globals ir gen)
   (ir-check-types ir)
   (ir-export-functions ir)
   (ir-generate-declarations ir gen)
@@ -965,7 +880,9 @@
 
 ;;; resource allocation
 
-(define-structure <ir-location> (zone offset))			;; relative to the frame pointer
+(define-structure <ir-location> (offset zone base))			;; relative to the frame pointer
+
+(define-function ir-location? (x)		(inherits-from (type-of x) <ir-location>))
 
 (define-method do-print <ir-location> ()	(print self.zone"["self.offset"]"))
 
@@ -981,7 +898,7 @@
   (with-instance-accessors <ir-zone>
     (let ((var (if (< self.index self.limit)
 		   (array-at self.locations self.index)
-		 (set-array-at self.locations self.index (new <ir-location> self self.index)))))
+		 (set-array-at self.locations self.index (new <ir-location> self.index self)))))
       (set self.limit (max self.limit (incr self.index)))
       var)))
 
@@ -990,6 +907,10 @@
     (decr self.index)
     (or (= loc (array-at self.locations self.index))
 	(error "non-lifo frame allocation"))))
+
+(define-function ir-location-deallocate (self)
+  (with-instance-accessors <ir-location>
+    (ir-zone-deallocate self.zone self)))
 
 ;
 
@@ -1002,15 +923,15 @@
     (ir-zone-allocate (cdr (or (assq type self.zones)
 			       (car (push self.zones (cons type (ir-zone-new type)))))))))
 
-(define-function ir-frame-finalise (self)
+(define-function ir-frame-finalise (self offset)
   (with-instance-accessors <ir-frame>
-    (let ((offset 0))
-      (list-do name-zone self.zones
-	;;(println name-zone)
-	(let ((zone (cdr name-zone)))
-	  (let ((type (<ir-zone>-type zone)))
-	    (array-do loc (<ir-zone>-locations zone)
-	      ;;(println loc)
-	      (set offset (align offset (<ir-type>-alignment type)))
-	      (set (<ir-location>-offset loc) offset)
-	      (incr offset (<ir-type>-size type)))))))))
+    (list-do name-zone self.zones
+      ;;(println name-zone)
+      (let ((zone (cdr name-zone)))
+	(let ((type (<ir-zone>-type zone)))
+	  (array-do loc (<ir-zone>-locations zone)
+	    ;;(println loc)
+	    (set offset (align offset (<ir-type>-alignment type)))
+	    (set (<ir-location>-offset loc) offset)
+	    (incr offset (<ir-type>-size type))))))
+    offset))
