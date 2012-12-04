@@ -1,4 +1,4 @@
-// last edited: 2012-10-24 10:56:31 by piumarta on ubuntu
+// last edited: 2012-12-01 18:35:14 by piumarta on emilia.local
 
 #define DEMO_BITS	1
 
@@ -86,8 +86,10 @@ enum {
 //  Variable, Env, Context
 };
 
+typedef long long_t;
+
 struct Data	{ };
-struct Long	{ long	    bits; };
+struct Long	{ long_t    bits; };
 struct Double	{ double    bits; };
 struct String	{ oop	    size;  wchar_t *bits; };	/* bits is in managed memory */
 struct Symbol	{ wchar_t  *bits; };
@@ -1559,7 +1561,10 @@ static oop apply(oop fun, oop arguments, oop env)
 #endif
 	    oop ans= nil;
 	    oop body= cdr(defn);
-	    if (opt_g) arrayAtPut(traceStack, traceDepth++, body);
+	    if (opt_g) {
+		arrayAtPut(traceStack, traceDepth++, body);
+		if (traceDepth > 1000)					fatal("infinite recursion suspected");
+	    }
 	    while (is(Pair, body)) {
 //		if (opt_g) arrayAtPut(traceStack, traceDepth - 1, getHead(body));
 //		set(ctx, Context,pc, body);
@@ -2595,75 +2600,75 @@ static subr(set_array_at)
 //   return newLong(GC_size(arg));
 // }
 
-// static void idxtype(oop args, char *who)
-// {
-//     fprintf(stderr, "\n%s: non-integer index: ", who);
-//     fdumpln(stderr, args);
-//     fatal(0);
-// }
+static void idxtype(oop args, char *who)
+{
+    fprintf(stderr, "\n%s: non-integer index: ", who);
+    fdumpln(stderr, args);
+    fatal(0);
+}
 
-// static void valtype(oop args, char *who)
-// {
-//     fprintf(stderr, "\n%s: improper store: ", who);
-//     fdumpln(stderr, args);
-//     fatal(0);
-// }
+static void valtype(oop args, char *who)
+{
+    fprintf(stderr, "\n%s: improper store: ", who);
+    fdumpln(stderr, args);
+    fatal(0);
+}
 
-// static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned long eltsize, oop args, char *who)
-// {
-//     if (isLong(obj)) return getLong(obj) + offset;
-//     if (offset + eltsize > GC_size(obj)) {
-//	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
-//	fdumpln(stderr, args);
-//	fatal(0);
-//     }
-//     return (unsigned long)obj + offset;
-// }
+static inline unsigned long checkRange(oop obj, unsigned long offset, unsigned long eltsize, oop args, char *who)
+{
+    if (isLong(obj)) return getLong(obj) + offset;
+    if (offset + eltsize > GC_size(obj)) {
+	fprintf(stderr, "\n%s: index (%ld) out of range: ", who, offset);
+	fdumpln(stderr, args);
+	fatal(0);
+    }
+    return (unsigned long)obj + offset;
+}
 
-// #define accessor(name, otype, ctype)											\
-//     static subr(name##_at)												\
-//     {															\
-//	oop arg= args;						if (!isPair(arg)) arity(args, #name"-at");		\
-//	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, #name"-at");		\
-//	oop idx= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, #name"-at");		\
-//	unsigned long off= getLong(idx);										\
-//	if (isPair(arg)) {												\
-//	    oop mul= getHead(arg);				if (!isLong(mul)) idxtype(args, #name"-at");		\
-//	    off *= getLong(mul);				if (nil != getTail(arg)) arity(args, #name"-at");	\
-//	}														\
-//	else														\
-//	    off *= sizeof(ctype);											\
-//	return new##otype(*(ctype *)checkRange(obj, off, sizeof(ctype), args, #name"-at"));				\
-//     }															\
-//															\
-//     static subr(set_##name##_at)											\
-//     {															\
-//	oop arg= args;						if (!isPair(arg)) arity(args, "set-"#name"-at");	\
-//	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
-//	oop idx= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
-//	oop val= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, "set-"#name"-at");	\
-//	unsigned long off= getLong(idx);										\
-//	if (isPair(arg)) {					if (!isLong(val)) idxtype(args, "set-"#name"-at");	\
-//	    off *= getLong(val);											\
-//	    val= getHead(arg);					if (nil != getTail(arg)) arity(args, "set-"#name"-at");	\
-//	}														\
-//	else														\
-//	    off *= sizeof(ctype);				if (!is##otype(val)) valtype(args, "set-"#name"-at");	\
-//	*(ctype *)checkRange(obj, off, sizeof(ctype), args, "set-"#name"-at")= get##otype(val);				\
-//	return val;													\
-//     }
+#define accessor(name, otype, ctype)											\
+    static subr(name##_at)												\
+    {															\
+	oop arg= args;						if (!isPair(arg)) arity(args, #name"-at");		\
+	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, #name"-at");		\
+	oop idx= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, #name"-at");		\
+	unsigned long off= getLong(idx);										\
+	if (isPair(arg)) {												\
+	    oop mul= getHead(arg);				if (!isLong(mul)) idxtype(args, #name"-at");		\
+	    off *= getLong(mul);				if (nil != getTail(arg)) arity(args, #name"-at");	\
+	}														\
+	else														\
+	    off *= sizeof(ctype);											\
+	return new##otype(*(ctype *)checkRange(obj, off, sizeof(ctype), args, #name"-at"));				\
+    }															\
+															\
+    static subr(set_##name##_at)											\
+    {															\
+	oop arg= args;						if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop obj= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop idx= getHead(arg);		arg= getTail(arg);	if (!isPair(arg)) arity(args, "set-"#name"-at");	\
+	oop val= getHead(arg);		arg= getTail(arg);	if (!isLong(idx)) idxtype(args, "set-"#name"-at");	\
+	unsigned long off= getLong(idx);										\
+	if (isPair(arg)) {					if (!isLong(val)) idxtype(args, "set-"#name"-at");	\
+	    off *= getLong(val);											\
+	    val= getHead(arg);					if (nil != getTail(arg)) arity(args, "set-"#name"-at");	\
+	}														\
+	else														\
+	    off *= sizeof(ctype);				if (!is##otype(val)) valtype(args, "set-"#name"-at");	\
+	*(ctype *)checkRange(obj, off, sizeof(ctype), args, "set-"#name"-at")= get##otype(val);				\
+	return val;													\
+    }
 
 // accessor(byte,		Long,	 unsigned char)
 // accessor(char,		Long,	 char)
 // accessor(short,		Long,	 short)
 // accessor(wchar,		Long,	 wchar_t)
 // accessor(int,		Long,	 int)
-// accessor(int32,		Long,	 int32_t)
+accessor(int32,		Long,	 int32_t)
 // accessor(int64,		Long,	 int64_t)
 // accessor(long,		Long,	 long)
 // accessor(longlong,	Long,	 long long)
 // accessor(pointer,	Long,	 long)
-// accessor(float,		Double,	 float)
+accessor(float,		Double,	 float)
 // accessor(double,	Double,	 double)
 // accessor(longdouble,	Double,	 long double)
 
@@ -3283,8 +3288,8 @@ static subr_ent_t subr_tab[] = {
 //     { " set-wchar-at",		subr_set_wchar_at },
 //     { " int-at",		subr_int_at },
 //     { " set-int-at",		subr_set_int_at },
-//     { " int32-at",		subr_int32_at },
-//     { " set-int32-at",		subr_set_int32_at },
+    { " int32-at",		subr_int32_at },
+    { " set-int32-at",		subr_set_int32_at },
 //     { " int64-at",		subr_int64_at },
 //     { " set-int64-at",		subr_set_int64_at },
 //     { " long-at",		subr_long_at },
@@ -3293,8 +3298,8 @@ static subr_ent_t subr_tab[] = {
 //     { " set-longlong-at",	subr_set_longlong_at },
 //     { " pointer-at",		subr_pointer_at },
 //     { " set-pointer-at",	subr_set_pointer_at },
-//     { " float-at",		subr_float_at },
-//     { " set-float-at",		subr_set_float_at },
+    { " float-at",		subr_float_at },
+    { " set-float-at",		subr_set_float_at },
 //     { " double-at",		subr_double_at },
 //     { " set-double-at",		subr_set_double_at },
 //     { " longdouble-at",		subr_longdouble_at },
