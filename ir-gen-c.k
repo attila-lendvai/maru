@@ -22,7 +22,10 @@
 
 (define-function ir-gen-c-function-name (fun)
   (let ((name (<ir-function>-export fun)))
-    (if name (symbol->string name)
+    (if name
+	(if (= name 'main)
+	    'f_main
+	  (symbol->string name))
       (concat-string "f_" (c-mangle (symbol->string (car (<ir-function>-parameters fun))))))))
 
 (define-method print-c-declaration <ir-type> (name)		(error "missing implementation: print-c-declaration "(type-name-of self)))
@@ -107,21 +110,23 @@
 
 (define-method ir-gen-c <ir-member> (gen)
   (let* ((field (car self.parameters))
+	 (fname (<ir-struct-member>-name field))
 	 (value (car self.operands))
 	 (type  (<ir-insn>-type value)))
     (cond
-      ((ir-pointer-type? type)	(print "(")  (ir-gen-c value gen)  (print "->"field")"))
-      ((ir-struct-type? type)	(print "(")  (ir-gen-c value gen)  (print  "."field")"))
+      ((ir-pointer-type? type)	(print "(")  (ir-gen-c value gen)  (print "->"fname")"))
+      ((ir-struct-type? type)	(print "(")  (ir-gen-c value gen)  (print  "."fname")"))
       (else			(error "this cannot happen")))))
 
 (define-method ir-gen-c <ir-set-member> (gen)
   (let* ((field (car self.parameters))
+	 (fname (<ir-struct-member>-name field))
 	 (value (car self.operands))
 	 (init  (cadr self.operands))
 	 (type  (<ir-insn>-type value)))
     (cond
-      ((ir-pointer-type? type)	(print "(")  (ir-gen-c value gen)  (print "->"field"=")  (ir-gen-c init gen)  (print ")"))
-      ((ir-struct-type? type)	(print "(")  (ir-gen-c value gen)  (print  "."field"=")  (ir-gen-c init gen)  (print ")"))
+      ((ir-pointer-type? type)	(print "(")  (ir-gen-c value gen)  (print "->"fname"=")  (ir-gen-c init gen)  (print ")"))
+      ((ir-struct-type? type)	(print "(")  (ir-gen-c value gen)  (print  "."fname"=")  (ir-gen-c init gen)  (print ")"))
       (else			(error "this cannot happen")))))
 
 (define-method ir-gen-c <ir-indir> (gen)
@@ -130,10 +135,10 @@
   (print "])"))
 
 (define-method ir-gen-c <ir-set-indir> (gen)
-  (print "(")  (ir-gen-c (car   self.operands) gen)
-  (print "[")  (ir-gen-c (cadr  self.operands) gen)
-  (print "]=") (ir-gen-c (caddr self.operands) gen)
-  (print ")"))
+  (print "((")  (ir-gen-c (car   self.operands) gen)
+  (print ")[")  (ir-gen-c (cadr  self.operands) gen)
+  (print "]=(") (ir-gen-c (caddr self.operands) gen)
+  (print "))"))
 
 (define-method ir-gen-c <ir-get-var> (gen)		(print (ir-gen-c-variable-name (<ir-variable>-name self.parameters))))
 
@@ -160,7 +165,9 @@
   (print "))"))
 
 (define-function ir-gen-c-unary (insn op gen)
-  (print "("op)
+  (print "((")
+  (print-c-declaration (car self.type) ())
+  (print ")(")
   (ir-gen-c (car (<ir-insn>-operands insn)) gen)
   (print ")"))
 
@@ -169,11 +176,17 @@
 (define-method ir-gen-c <ir-not>    (gen)	(ir-gen-c-unary self '! (car self.operands)))
 
 (define-function ir-gen-c-binary (insn op gen)
-  (print "(")
-  (ir-gen-c (car  (<ir-insn>-operands insn)) gen)
-  (print op)
-  (ir-gen-c (cadr (<ir-insn>-operands insn)) gen)
-  (print ")"))
+  (let* ((type (<ir-insn>-type insn))
+	 (opds (<ir-insn>-operands insn))
+	 (lhs  (car  opds))  (lptr? (ir-pointer-type? (<ir-insn>-type lhs)))
+	 (rhs  (cadr opds))  (rptr? (ir-pointer-type? (<ir-insn>-type rhs))))
+    (print "((") (print-c-declaration type ()) (print ")((")
+    (and lptr? (print "(void *)"))
+    (ir-gen-c (car  (<ir-insn>-operands insn)) gen)
+    (print ")"op"(")
+    (and rptr? (print "(void *)"))
+    (ir-gen-c (cadr (<ir-insn>-operands insn)) gen)
+    (print ")))")))
 
 (define-method ir-gen-c <ir-add>    (gen)	(ir-gen-c-binary self '+  gen))
 (define-method ir-gen-c <ir-sub>    (gen)	(ir-gen-c-binary self '-  gen))
