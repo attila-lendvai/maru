@@ -62,7 +62,7 @@ test3-maru : eval2
 
 maru-check : eval2 .force
 	./eval2 ir-gen-x86.k maru.k maru-check.k > maru-check.s
-	cc -o maru-check maru-check.s
+	cc -m32 -o maru-check maru-check.s
 	./maru-check
 
 maru-check-c : eval2 .force
