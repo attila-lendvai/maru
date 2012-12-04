@@ -44,10 +44,34 @@ check-maru : eval2
 	./eval2 ir-gen-c.k maru.k maru-gc.k
 	./eval2 ir-gen-c.k maru.k maru-test.k
 
+check-marux : eval2
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k
+	./eval2 ir-gen-x86.k maru.k maru-gc.k
+	./eval2 ir-gen-x86.k maru.k maru-test.k
+
 test-maru : eval2
 	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
 	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
 	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+
+test2-maru : eval2
+	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
+
+test3-maru : eval2
+	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -fno-builtin -g -o test3 test.s && ./test3
+
+maru-check : eval2 .force
+	./eval2 ir-gen-x86.k maru.k maru-check.k > maru-check.s
+	cc -o maru-check maru-check.s
+	./maru-check
+
+maru-bench : eval2 .force
+	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-check.s
+	time ./nfibs 38
+	time ./nfibs 38
+	time ./maru-nfibs 38
+	time ./maru-nfibs 38
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
