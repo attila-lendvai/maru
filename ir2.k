@@ -1,6 +1,8 @@
 (require "osdefs.k")
 (require "trie.k")
 
+(define-constant pointer-size 4)	;; sizeof-long
+
 (define-structure <ir> (function scope program functions struct-types error-handler exports))
 
 (define ir-scope-new) ;; forward
@@ -42,7 +44,10 @@
 (define IR-VARARGS	(new <ir-varargs-type>  '...	0 1))
 
 (define IR-INT		IR-INT32)
-(define IR-LONG		(cond ((= 4 sizeof-long) IR-INT32) ((= 8 sizeof-long) IR-INT64) (else (error "I cannot run here"))))
+(define IR-LONG		(cond
+			  ((= 4 pointer-size)	IR-INT32)
+			  ((= 8 pointer-size)	IR-INT64)
+			  (else			(error "I cannot run here"))))
 (define IR-FLOAT	IR-FLOAT32)
 (define IR-DOUBLE	IR-FLOAT64)
 
@@ -273,7 +278,7 @@
   (array-do insn (<ir>-program ir)
     (ir-check-type insn ir ())))
 
-(define-method ir-check-type <long>   (ir val?)	IR-LONG)
+(define-method ir-check-type <long>   (ir val?)	IR-INT)
 (define-method ir-check-type <double> (ir val?)	IR-DOUBLE)
 (define-method ir-check-type <string> (ir val?)	IR-STRING)
 
