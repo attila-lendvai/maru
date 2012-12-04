@@ -58,7 +58,7 @@ test2-maru : eval2
 	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
 
 test3-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -fno-builtin -g -o test3 test.s && ./test3
+	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
 
 maru-check : eval2 .force
 	./eval2 ir-gen-x86.k maru.k maru-check.k > maru-check.s
