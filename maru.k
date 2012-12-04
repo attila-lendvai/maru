@@ -108,7 +108,7 @@
     (cond
       ((not body)		(ir-while test (ir-nop)))
       ((not (cdr body))		(ir-while test (car body)))
-      (else			(ir-while test (ir-seq body))))))
+      (else			(ir-while test (ir-let () () () body))))))
 
 (define-function maru-compile-if (exp ir)
   (ir-if (maru-compile (cadr exp) ir)
