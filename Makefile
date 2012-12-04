@@ -65,6 +65,11 @@ maru-check : eval2 .force
 	cc -o maru-check maru-check.s
 	./maru-check
 
+maru-check-c : eval2 .force
+	./eval2 ir-gen-c.k maru.k maru-check.k > maru-check.c
+	cc -o maru-check maru-check.c
+	./maru-check
+
 maru-bench : eval2 .force
 	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
 	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-check.s
