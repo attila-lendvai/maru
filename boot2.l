@@ -1084,3 +1084,10 @@
       (array-append s c))
     (close f)
     (array->string s)))
+
+;;; misc
+
+(define-method nth <pair> (n)
+  (while (< 0 (decr n)) (set self (cdr self)))
+  (car self))
+
