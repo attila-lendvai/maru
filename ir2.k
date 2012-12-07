@@ -150,7 +150,9 @@
 
 (define-method do-print <ir-variable> ()
   (print "{"(type-name-of self)" "self.name" : "self.type" ")
-  (and self.location (if (= self self.location) (print "SELF-REF ") (print self.location" ")))
+  (if self.location
+      (if (= self self.location) (print "SELF-REF ") (print self.location" "))
+    (print "NO-LOC "))
   (print "}"))
 
 (define-class <ir-global>    <ir-variable>  ())			(define-function ir-global? (x)	(inherits-from (type-of x) <ir-global>))
@@ -881,6 +883,7 @@
   (ir-generate-declarations ir gen)
   (ir-generate-functions ir gen)
   (ir-generate-initialisations ir gen)
+  (ir-gen-output gen)
   )
 
 ;;; resource allocation
