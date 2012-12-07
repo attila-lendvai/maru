@@ -403,9 +403,9 @@
 
 (define-method ir-check-type <ir-return> (ir val?)	(and val? (ir-error-no-value ir self))
 							(set self.type
-							     (if self.operands
-								 (ir-check-type (car self.operands) ir 1)
-							       IR-VOID))
+							     (if (ir-nop? (car self.operands))
+								 IR-VOID
+							       (ir-check-type (car self.operands) ir 1)))
 							(let ((fn (or (<ir>-function ir)
 								      (error "return outside function: "self))))
 							  (let* ((fn    (<ir>-function ir))

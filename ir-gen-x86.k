@@ -178,7 +178,7 @@
 (define-method ir-gen-x86-allocate <ir-gen-x86> (type)		(ir-frame-allocate self.frame type))
 
 (define-method ir-gen-x86-deallocate <ir-location> (gen)	(ir-location-deallocate self))
-(define-method ir-gen-x86-deallocate <ir-insn> (gen)		(ir-gen-x86-deallocate self.location gen))
+(define-method ir-gen-x86-deallocate <ir-insn> (gen)		(and self.location (ir-gen-x86-deallocate self.location gen)))
 
 ;
 
@@ -195,8 +195,9 @@
 ;
 
 (define-method ir-gen-x86-allocate <ir-return> (gen)
-  (ir-gen-x86-allocate (car self.operands) gen)
-  (ir-gen-x86-deallocate (car self.operands) gen)
+  (when self.operands
+    (ir-gen-x86-allocate (car self.operands) gen)
+    (ir-gen-x86-deallocate (car self.operands) gen))
   ())
 
 (define-method ir-gen-x86 <ir-return> (gen)
@@ -354,6 +355,7 @@
 
 ;
 
+(define-method ir-gen-x86-allocate <ir-nop> (gen))
 (define-method ir-gen-x86 <ir-nop> (gen))
 
 ;
