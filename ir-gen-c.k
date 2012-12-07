@@ -70,6 +70,8 @@
 
 ;
 
+(define-function ir-gen-output (gen))
+
 (define-structure <ir-gen-c> (indent))
 
 (define-function ir-gen-new ()					(new <ir-gen-c> 0))
@@ -302,7 +304,7 @@
   (print ")(")
   (let ((args (cdr self.operands)))
     (while (pair? args)
-      (ir-gen-c (car args) self)
+      (ir-gen-c (car args) gen)
       (and (pair? (set args (cdr args))) (print ", "))))
   (print ")"))
 
