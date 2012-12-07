@@ -1,16 +1,17 @@
 (require "ir2.k")
+(require "port.l")	(define-function long->string (x) (format "%d" x))
 
 (define *info-level* 99)
 
 (define *optimise-literals*	())
 (define *optimise-globals*	())
 (define *align-functions*	16)
+(define *compact-prologues*	())
+(define *compact-epilogues*	())
 
-(define-function info (level . args)	(and (< level *info-level*) (apply println args)))
+(define-structure <ir-gen-x86> (frame current-section callsize port))
 
-(define-structure <ir-gen-x86> (frame current-section callsize))
-
-(define-function ir-gen-new ()	(new <ir-gen-x86>))
+(define-function ir-gen-new ()	(make <ir-gen-x86> (port (string-port))))
 
 (define-function x86-mangle (s)
   (let* ((in  (symbol->string s))
@@ -45,20 +46,40 @@
 (define-structure <ir-register> (name))
 (define-structure <ir-label> (number))
 
+(define-function ir-gen-output (gen))
+
+(define-function info (gen level . args)	(and (< level *info-level*) (apply println args)))
+
 (define-method do-emit <long> (gen)		(print self))
 (define-method do-emit <symbol> (gen)		(print self))
 (define-method do-emit <string> (gen)		(print self))
 
 (define-method do-emit <ir-register> (gen)	(print self.name))
-(define-method do-emit <ir-lit> (gen)		(print "$"(car self.parameters)))
-(define-method do-emit <ir-location> (gen)	(print self.offset "("(if self.base (<ir-register>-name self.base) "%esp")")"))
+(define-method do-emit <ir-lit> (gen)		(print "$" (car self.parameters)))
+(define-method do-emit <ir-location> (gen)	(print self.offset"("(if self.base (<ir-register>-name self.base) "%esp")")"))
 (define-method do-emit <ir-label> (gen)		(print "L"(<ir-label>-number self)))
 (define-method do-emit <ir-global> (gen)	(print (ir-gen-x86-variable-name self)))
 (define-method do-emit <ir-local> (gen)		(do-emit self.location gen))
 (define-method do-emit <ir-parameter> (gen)	(do-emit self.location gen))
 
+;; (define-function ir-gen-output (gen)	 (print (port-contents (<ir-gen-x86>-port gen))))
+
+;; (define-function info (gen level . args)	(and (< level *info-level*) (apply print args)))
+
+;; (define-method do-emit <long> (gen)		(print self))
+;; (define-method do-emit <symbol> (gen)		(print self))
+;; (define-method do-emit <string> (gen)		(print self))
+
+;; (define-method do-emit <ir-register> (gen)	(print self.name))
+;; (define-method do-emit <ir-lit> (gen)		(print "$" (car self.parameters)))
+;; (define-method do-emit <ir-location> (gen)	(print self.offset"("(if self.base (<ir-register>-name self.base) "%esp")")"))
+;; (define-method do-emit <ir-label> (gen)		(print "L"(<ir-label>-number self)))
+;; (define-method do-emit <ir-global> (gen)	(print (ir-gen-x86-variable-name self)))
+;; (define-method do-emit <ir-local> (gen)		(do-emit self.location gen))
+;; (define-method do-emit <ir-parameter> (gen)	(do-emit self.location gen))
+
 (define-function emit (gen . args)	(list-do arg args (do-emit arg gen)))
-(define-function emitln (gen . args)	(list-do arg args (do-emit arg gen)) (println))
+(define-function emitln (gen . args)	(list-do arg args (do-emit arg gen)) (print "\n"))
 
 (define %eax (new <ir-register> "%eax"))
 (define %ecx (new <ir-register> "%ecx"))
@@ -95,13 +116,15 @@
     (else			(error "cannot store: "type))))
 
 (define-function ir-gen-x86-spill (insn gen)	(or (ir-struct-type? (<ir-insn>-type insn))
+						    (and (ir-lit? insn) (= insn (<ir-insn>-location insn)))
 						    (ir-gen-x86-store (<ir-insn>-type insn) (<ir-insn>-location insn) gen)))
 
 (define-function ir-gen-x86-reload (insn gen)	(or (ir-struct-type? (<ir-insn>-type insn))
+						    (and (ir-lit? insn) (= insn (<ir-insn>-location insn)))
 						    (ir-gen-x86-load  (<ir-insn>-type insn) (<ir-insn>-location insn) gen)))
 
 (define-function ir-gen-x86-move-struct-with (type sinit src dinit dst gen)
-  (info 2 "# move struct <"sinit" "dinit"> "type)
+  (info gen 2 "# move struct <"sinit" "dinit"> "type)
   (emitln gen "	"sinit"	"src", %esi")
   (emitln gen "	"dinit"	"dst", %edi")
   (emitln gen "	movl	$"(<ir-struct-type>-size type)", %ecx")
@@ -113,6 +136,29 @@
 (define-function ir-gen-x86-store-struct (type src dst gen)	(ir-gen-x86-move-struct-with type "leal" src "movl" dst gen))
 
 ;;; allocate-generate
+
+;; (define-function ir-gen-x86-prologue (framesize)
+;;   (if *compact-prologues*
+;;       (emitln gen "	pushl	%ebp")
+;;     (emitln gen "	subl	$4, %esp")
+;;     (emitln gen "	movl	%ebp, (%esp)"))
+;;   (emitln gen "	movl	%esp, %ebp")
+;;   (emitln gen "	subl	$"(- framesize 8)", %esp"))
+
+(define-function ir-gen-x86-prologue (gen framesize)
+  (if *compact-prologues*
+      (emitln gen "	pushl	%ebp")
+    (emitln gen "	subl	$4, %esp")
+    (emitln gen "	movl	%ebp, (%esp)"))
+  (emitln gen "	movl	%esp, %ebp")
+  (emitln gen "	subl	$"(- framesize 8)", %esp"))
+
+(define-function ir-gen-x86-epilogue (gen)
+  (if *compact-epilogues*
+      (emitln gen "	leave")
+    (emitln gen "	movl	%ebp, %esp")
+    (emitln gen "	popl	%ebp"))
+  (emitln gen "	ret"))
 
 (define-function ir-gen-x86-allocate-parameters (offset param-list)
   (if param-list
@@ -157,16 +203,12 @@
   (let* ((operand  (car self.operands))
 	 (type     (<ir-insn>-type     operand))
 	 (location (<ir-insn>-location operand)))
-    (info 2 "# return value")
+    (info gen 2 "# return value")
     (ir-gen-x86 operand gen)
     (and (ir-struct-type? type)
 	 (ir-gen-x86-store-struct type location (new <ir-location> 8 'struct-return %ebp) gen))
-    (info 2 "# return")
-    (emitln gen "	leave")
-;    (emitln gen "	movl	(%ebp), %esp")
-;    (emitln gen "	movl	(%esp), %ebp")
-;    (emitln gen "	addl	$4, %esp")
-    (emitln gen "	ret")))
+    (info gen 2 "# return")
+    (ir-gen-x86-epilogue gen)))
 
 ;
 
@@ -181,10 +223,11 @@
 (define-method ir-gen-x86 <ir-get-var> (gen)
   (or (<ir-variable>-location self.parameters) (error "var has no location "self.parameters))
   (or self.location (error "get-var has no location "self))
-  (info 2 "# get var "self)
+  (info gen 2 "# get var "self)
   (if (ir-struct-type? self.type)
       (ir-gen-x86-move-struct self.type (<ir-variable>-location self.parameters) self.location gen)
-    (ir-gen-x86-load (<ir-variable>-type self.parameters) (<ir-variable>-location self.parameters) gen)))
+    (ir-gen-x86-load (<ir-variable>-type self.parameters) (<ir-variable>-location self.parameters) gen))
+  (info gen 2 "# get var done"))
 
 (define-method ir-gen-x86-deallocate <ir-get-var> (gen)
   (let ((var self.parameters))
@@ -205,9 +248,9 @@
 (define-method ir-gen-x86 <ir-set-var> (gen)
   (or (<ir-variable>-location self.parameters) (error "var has no location "self.parameters))
   (let ((value (car self.operands)))
-    (info 2 "# set-var "self.parameters" <- "self.type" value")
+    (info gen 2 "# set-var "self.parameters" <- "self.type" value")
     (ir-gen-x86 value gen)
-    (info 2 "# set-var "(<ir-variable>-type self.parameters))
+    (info gen 2 "# set-var "(<ir-variable>-type self.parameters))
     (if (ir-struct-type? self.type)
 	(let ()
 	  (ir-gen-x86-move-struct self.type (<ir-insn>-location value) (<ir-variable>-location self.parameters) gen)
@@ -244,13 +287,13 @@
 	(body (cadr self.operands))
 	(rpt (ir-gen-x86-temp-label gen))
  	(tst (ir-gen-x86-temp-label gen)))
-			(info 2 "# WHILE")
+			(info gen 2 "# WHILE")
 			(emitln gen "	jmp	"tst)
     (emitln gen rpt":")	(ir-gen-x86 body gen)
     (emitln gen tst":")	(ir-gen-x86 test gen)
 			(emitln gen "	testl	%eax, %eax")
 			(emitln gen "	jne	"rpt)
-			(info 2 "# DONE")))
+			(info gen 2 "# DONE")))
 
 ;
 
@@ -267,16 +310,16 @@
 	(alt  (ir-gen-x86-temp-label gen))
  	(end  (ir-gen-x86-temp-label gen))
 	(void (= IR-VOID self.type)))
-			(info 2 "# IF")
+			(info gen 2 "# IF")
 			(ir-gen-x86 test gen)
 			(emitln gen "	testl	%eax, %eax")
 			(emitln gen "	je	"alt)
-			(info 2 "# THEN")
+			(info gen 2 "# THEN")
 			(ir-gen-x86 then gen)
 			(emitln gen "	jmp	"end)
-			(info 2 "# ELSE")
+			(info gen 2 "# ELSE")
     (emitln gen alt":")	(ir-gen-x86 else gen)
-			(info 2 "# FI")
+			(info gen 2 "# FI")
     (emitln gen end":")))
 
 ;
@@ -322,6 +365,7 @@
     (else			(set self.location (ir-gen-x86-allocate gen self.type)))))
 
 (define-method ir-gen-x86 <ir-lit> (gen)
+  (info gen 2 "# LIT "self)
   (or (= self.location self)
       (let ((value    (car self.parameters))
 	    (location self.location))
@@ -368,7 +412,7 @@
 	 (i   (<ir-insn>-type arg))
 	 (o   self.type))
     (ir-gen-x86 arg gen)
-    (info 2 "# CAST "i" -> "o)
+    (info gen 2 "# CAST "i" -> "o)
     (and (ir-pointer-type? i) (set i IR-LONG))
     (and (ir-pointer-type? o) (set o IR-LONG))
     (cond
@@ -475,9 +519,9 @@
 	 (ret-type  (<ir-function-type>-ret-type  fun-type))
 	 (arg-types (<ir-function-type>-arg-types fun-type))
 	 (location  (new <ir-location> 0 'args-out %esp)))
-    (info 2 "# call "ret-type arg-types)
+    (info gen 2 "# call "ret-type arg-types)
     (when (ir-struct-type? ret-type)
-      (info 2 "# struct return")
+      (info gen 2 "# struct return")
       (emitln gen "	leal	"self.location", %eax")
       (ir-gen-x86-store IR-LONG location gen)
       (ir-location-advance location (<ir-type>-size IR-LONG)))
@@ -488,14 +532,14 @@
 	    (set type (<ir-insn>-type op))
 	  (set arg-types (cdr arg-types)))
 	(ir-location-align location (<ir-type>-alignment type))
-	(info 2 "# ARG "type" "(<ir-insn>-location op))
+	(info gen 2 "# ARG "type" "(<ir-insn>-location op))
 	(if (ir-struct-type? type)
 	    (ir-gen-x86-move-struct type (<ir-insn>-location op) location gen)
 	  (ir-gen-x86-reload op gen)
 	  (ir-gen-x86-store type location gen))
 	(ir-location-advance location (<ir-type>-size type))))
     (ir-gen-x86-reload (car self.operands) gen)
-    (println "	call	*%eax")))
+    (emitln gen "	call	*%eax")))
 
 ;
 
@@ -548,7 +592,7 @@
   (let ((ptr  (car  self.operands))
 	(idx  (cadr self.operands))
 	(type self.type))
-    (info 2 "# INDIR")
+    (info gen 2 "# INDIR")
     (ir-gen-x86-indir-address gen self.type ptr idx %eax)
     (ir-gen-x86-indir-load gen self.type %eax self.location)))
 
@@ -557,7 +601,7 @@
 	(idx  (cadr  self.operands))
 	(val  (caddr self.operands))
 	(type self.type))
-    (info 2 "# SET-INDIR")
+    (info gen 2 "# SET-INDIR")
     (ir-gen-x86        val gen)
     (ir-gen-x86-spill  val gen)
     (ir-gen-x86-indir-address gen self.type ptr idx %ecx)
@@ -574,17 +618,17 @@
 	   (offset (<ir-struct-member>-offset member)))
       (if (and (ir-get-var? value) (ir-struct-type? vtype))
 	  (ir-gen-x86-addressof value dst gen)
-	(info 2 "# adddress of "value)
+	(info gen 2 "# adddress of "value)
 	(ir-gen-x86 value gen)
 	(or (= %eax dst) (emitln gen "	movl	%eax, "dst)))
-      (info 2 "# offset "offset)
+      (info gen 2 "# offset "offset)
       (or (= 0 offset)
 	  (emitln gen "	leal	"(<ir-struct-member>-offset member)"("dst"), "dst)))))
 
 (define-selector ir-gen-x86-addressof)
 
 (define-method ir-gen-x86-addressof <ir-get-var> (dst gen)
-  (info 2 "# adddress of "self.parameters)
+  (info gen 2 "# adddress of "self.parameters)
   (emitln gen "	leal	"self.parameters", "dst))
 
 (define-method ir-gen-x86-addressof <ir-member> (dst gen)	(ir-gen-x86-addressof-member self dst gen))
@@ -610,7 +654,7 @@
 (define-method ir-gen-x86 <ir-member> (gen)
   (let* ((memb     (car self.parameters))
 	 (mtype    (<ir-struct-member>-type memb)))
-    (info 2 "# get member "memb)
+    (info gen 2 "# get member "memb)
     (ir-gen-x86-addressof self %eax gen)
     (ir-gen-x86-indir-load gen mtype %eax self.location)))
 
@@ -633,7 +677,7 @@
 	 (mtype    (<ir-struct-member>-type memb)))
     (ir-gen-x86        rval gen)
     (ir-gen-x86-spill  rval gen)
-    (info 2 "# set member "memb)
+    (info gen 2 "# set member "memb)
     (ir-gen-x86-addressof self %ecx gen)
     (ir-gen-x86-reload rval gen)
     (ir-gen-x86-indir-store gen mtype self.location %ecx)))
@@ -645,7 +689,7 @@
     (let ((type self.type)
 	  (lhs  (car self.operands)))
       (ir-gen-x86 lhs gen)
-      (info 2 "# "op" "type)
+      (info gen 2 "# "op" "type)
       (cond
 	((= self.type IR-INT8)		(emitln gen "	"op"b	%al"))
 	((= self.type IR-INT16)		(emitln gen "	"op"w	%ax"))
@@ -679,7 +723,7 @@
   (let ((type self.type)
 	(lhs  (car  self.operands)))
     (ir-gen-x86 lhs gen)
-    (info 2 "# not "type)
+    (info gen 2 "# not "type)
     (cond
       ((= self.type IR-INT8)	(emitln gen "	testb	%al, %al"))
       ((= self.type IR-INT16)	(emitln gen "	testw	%ax, %ax"))
@@ -697,7 +741,7 @@
       (ir-gen-x86       rhs gen)
       (ir-gen-x86-spill rhs gen)
       (ir-gen-x86       lhs gen)
-      (info 2 "# "ltype" "op" "rtype)
+      (info gen 2 "# "ltype" "op" "rtype)
       (and (ir-pointer-type? ltype) (set ltype IR-LONG))	;; UNSCALED POINTER ARITHMETIC
       (cond
 	((= ltype IR-INT8)		(emitln gen "	"op"b	"(<ir-insn>-location rhs)", %al"))
@@ -709,7 +753,7 @@
 	((= ltype IR-FLOAT64)		(emitln gen "	"fp"sd	"(<ir-insn>-location rhs)", %xmm0"))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; C-like scaling of pointer arithmetic...
 ;;	((ir-pointer-type? ltype)	(let ((ptype (<ir-pointer-type>-referent ltype)))
-;;					  (println "# PTR ref "ptype" "(<ir-type>-size ptype))
+;;					  (info gen 2 "# PTR ref "ptype" "(<ir-type>-size ptype))
 ;;					  (cond
 ;;					    ((= IR-LONG        rtype)	(emitln gen "	movl	"(<ir-insn>-location rhs)", %ecx")
 ;;									(emitln gen "	imull	$"(<ir-type>-size ptype)", %ecx")
@@ -732,7 +776,7 @@
       (ir-gen-x86       rhs gen)
       (ir-gen-x86-spill rhs gen)
       (ir-gen-x86       lhs gen)
-      (info 2 "# mul "type" "(<ir-insn>-location lhs)" "(<ir-insn>-location rhs))
+      (info gen 2 "# mul "type" "(<ir-insn>-location lhs)" "(<ir-insn>-location rhs))
       (cond
 	((= self.type IR-INT8)		(emitln gen "	imulb	"(<ir-insn>-location rhs)))
 	((= self.type IR-INT16)		(emitln gen "	imulw	"(<ir-insn>-location rhs)))
@@ -749,7 +793,7 @@
     (ir-gen-x86       rhs gen)
     (ir-gen-x86-spill rhs gen)
     (ir-gen-x86       lhs gen)
-    (info 2 "# div "type)
+    (info gen 2 "# div "type)
     (cond
       ((= self.type IR-INT8)	(emitln gen "	cbw")	(emitln gen "	idivb	"(<ir-insn>-location rhs)))
       ((= self.type IR-INT16)	(emitln gen "	cwd")	(emitln gen "	idivw	"(<ir-insn>-location rhs)))
@@ -767,7 +811,7 @@
     (ir-gen-x86       rhs gen)
     (ir-gen-x86-spill rhs gen)
     (ir-gen-x86       lhs gen)
-    (info 2 "# mod "type)
+    (info gen 2 "# mod "type)
     (cond
       ((= self.type IR-INT8)	(emitln gen "	cbw")	(emitln gen "	idivb	"(<ir-insn>-location rhs))	(emitln gen " movb %ah, %al"))
       ((= self.type IR-INT16)	(emitln gen "	cwd")	(emitln gen "	idivw	"(<ir-insn>-location rhs))	(emitln gen " movw %dx, %ax"))
@@ -784,7 +828,7 @@
       (ir-gen-x86       rhs gen)
       (ir-gen-x86-spill rhs gen)
       (ir-gen-x86       lhs gen)
-      (info 2 "# "op" "type)
+      (info gen 2 "# "op" "type)
       (cond
 	((= self.type IR-INT8)	(emitln gen "	movl	"(<ir-insn>-location rhs)", %ecx")	(emitln gen "	"op"b	%cl, %al"))
 	((= self.type IR-INT16)	(emitln gen "	movl	"(<ir-insn>-location rhs)", %ecx")	(emitln gen "	"op"w	%cl, %ax"))
@@ -866,20 +910,14 @@
     (set framesize (align (+ 8 (ir-frame-finalise self.frame self.callsize)) 16))
     (ir-gen-x86-section self 'text)
     (and *align-functions* (emitln self "	.balign	"*align-functions*))
-    (info 0 "# FUNCTION "name" "self.callsize" "framesize" "type)
-    (println "	.globl	"name)
-    (println name":")
-    (println "	pushl	%ebp")
-;    (println "	subl	$4, %esp")
-;    (println "	movl	%ebp, (%esp)")
-    (println "	movl	%esp, %ebp")
-    (println "	subl	$"(- framesize 8)", %esp")
+    (info self 0 "# FUNCTION "name" "self.callsize" "framesize" "type)
+    (emitln self "	.globl	"name)
+    (emitln self name":")
+    (ir-gen-x86-prologue self framesize)
     (let ((last))
       (list-do insn body (ir-gen-x86 (set last insn) self))
       (unless (and last (ir-returns? last))
-	(emitln self "	leave")
-	(emitln self "	ret")))
-    ))
+	(ir-gen-x86-epilogue self)))))
 
 (define-method ir-gen-initialisation <ir-gen-x86> (definition)
   (ir-gen-x86-section self 'data)
@@ -890,10 +928,10 @@
 	 (init   (car (<ir-set-var>-operands setter)))
 	 (kind   (type-of init)))
     (cond
-      ((= kind <ir-extern>)	(println name":	.long	"__USER_LABEL_PREFIX__(car (<ir-extern>-parameters init))))
-      ((= kind <ir-function>)	(println name":	.long	"(ir-gen-x86-function-name init)))
+      ((= kind <ir-extern>)	(emitln self name":	.long	"__USER_LABEL_PREFIX__(car (<ir-extern>-parameters init))))
+      ((= kind <ir-function>)	(emitln self name":	.long	"(ir-gen-x86-function-name init)))
       (else			(error "cannot initialise: "name" with: "value)))))
 
-(define-method ir-gen-header <ir-gen-x86> ()	(info 0 "# HEADER"))
-(define-method ir-gen-preamble <ir-gen-x86> ()	(info 0 "# PRE-INITIALISATION"))
-(define-method ir-gen-postamble <ir-gen-x86> ()	(info 0 "# POST-INITIALISATION"))
+(define-method ir-gen-header <ir-gen-x86> ()	(info self 0 "# HEADER"))
+(define-method ir-gen-preamble <ir-gen-x86> ()	(info self 0 "# PRE-INITIALISATION"))
+(define-method ir-gen-postamble <ir-gen-x86> ()	(info self 0 "# POST-INITIALISATION"))
