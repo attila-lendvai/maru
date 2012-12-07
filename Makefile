@@ -72,7 +72,8 @@ maru-check-c : eval2 .force
 
 maru-bench : eval2 .force
 	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
-	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-check.s
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
+	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
 	time ./nfibs 38
 	time ./nfibs 38
 	time ./maru-nfibs 38
