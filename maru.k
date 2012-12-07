@@ -282,6 +282,13 @@
 
 (define-form (make-symbol ".") (value field) `(member ,value ,field))
 
+;; Remove the multiple-value reception facility from LET* since that would interfere with types.
+
+(define-form let* (bindings . body)
+  (if bindings
+      `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
+    `(let () ,@body)))
+
 (compile-begin)
 
 (while *arguments*

@@ -4,6 +4,8 @@
 ;; the compiler.
 
 (define-form assert expr
+  ;; The LET* here places each definition in the scope of its successors.  It does not support any
+  ;; other extended behaviours since the synax would be incompatible with that of type annotation.
   (let* ((source (<pair>-source expr))
 	 (file   (car source))
 	 (line   (cdr source)))
@@ -67,6 +69,7 @@
   (test-ints)
   (test-structs)
   (test-pointers)
+  (test-forms)
   ;; There is no implicit return of the value of the final expression in a function.  Returning a
   ;; value is always explicit.
   (return 0)
@@ -359,7 +362,9 @@
   (let ((p (make-<point> 1 2)))
     ;; Pointer subtraction yields the difference in *unscaled bytes* between the two pointers.
     (assert (= (sizeof int) (- (addressof (member p y)) (addressof (member p x))))))
-  (let* ((mem (malloc 1024))
+  ;; The LET* here places each definition in the scope of its successors.  It does not support any
+  ;; other extended behaviours since the synax would be incompatible with that of type annotation.
+  (let* (((mem void *) (malloc 1024))
 	 (pb  (cast mem int8  	*))
 	 (pw  (cast mem int16 	*))
 	 (pl  (cast mem int32 	*))
@@ -386,3 +391,8 @@
     (free mem)
     )
   (printf "pointers ok\n"))
+
+(define-function test-forms void ()
+  (for (i 0 10) (printf "%d " i))  (printf "\n")
+  (printf "%d\n" (let* (((a int) 1) ((b int) (+ a 1))) b))
+  )
