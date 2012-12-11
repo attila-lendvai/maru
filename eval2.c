@@ -1,4 +1,4 @@
-// last edited: 2012-12-01 18:35:14 by piumarta on emilia.local
+// last edited: 2012-12-11 20:00:42 by piumarta on emilia.local
 
 #define DEMO_BITS	1
 
@@ -1413,7 +1413,7 @@ static void oprintf(char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    vfoprintf(stdout, fmt, ap);
+    vfoprintf(stderr, fmt, ap);
     va_end(ap);
 }
 
