@@ -1,4 +1,4 @@
-// last edited: 2012-12-23 23:25:00 by piumarta on emilia.local
+// last edited: 2013-01-30 11:42:03 by piumarta on emilia.local
 
 #define DEMO_BITS	1
 
@@ -2345,7 +2345,9 @@ static subr(format)
 	    free(p);
 	    break;
 	}
-	if (n < 0 && errno == EILSEQ) return nil;
+	if (n < 0 && errno == EILSEQ) {
+	    return nil;
+	}
 	if (n >= 0)	size= n + 1;
 	else	size *= 2;
 	if (!(np= realloc(p, sizeof(wchar_t) * size))) {
@@ -2478,27 +2480,27 @@ static subr(set_string_at)
     return val;
 }
 
-// static subr(string_copy)	// string from len
-// {
-//   oop str= car(args);			if (!is(String, str)) { fprintf(stderr, "string-copy: non-string argument: ");	fdumpln(stderr, str);  fatal(0); }
-//   int ifr= 0;
-//   int sln= stringLength(str);
-//   oop ofr= cadr(args);
-//   if (nil != ofr) {			if (!isLong(ofr)) { fprintf(stderr, "string-copy: non-integer start: ");  fdumpln(stderr, ofr);	 fatal(0); }
-//	 ifr= getLong(ofr);
-//	 if (ifr < 0  ) ifr= 0;
-//	 if (ifr > sln) ifr= sln;		assert(ifr >= 0 && ifr <= sln);
-//	 sln -= ifr;			assert(sln >= 0);
-//   }
-//   oop oln= caddr(args);
-//   if (nil != oln) {			if (!isLong(oln)) { fprintf(stderr, "string-copy: non-integer length: ");  fdumpln(stderr, oln);  fatal(0); }
-//	 int iln= getLong(oln);
-//	 if (iln < 0) iln= 0;
-//	 if (iln > sln) iln= sln;		assert(iln >= 0 && ifr + iln <= sln);
-//	 sln= iln;
-//   }
-//   return newStringN(get(str, String,bits) + ifr, sln);
-// }
+static subr(string_copy)	// string from len
+{
+    oop str= car(args);			if (!is(String, str)) { fprintf(stderr, "string-copy: non-string argument: ");	fdumpln(stderr, str);  fatal(0); }
+    int ifr= 0;
+    int sln= stringLength(str);
+    oop ofr= cadr(args);
+    if (nil != ofr) {			if (!isLong(ofr)) { fprintf(stderr, "string-copy: non-integer start: ");  fdumpln(stderr, ofr);	 fatal(0); }
+	ifr= getLong(ofr);
+	if (ifr < 0  ) ifr= 0;
+	if (ifr > sln) ifr= sln;	assert(ifr >= 0 && ifr <= sln);
+	sln -= ifr;			assert(sln >= 0);
+    }
+    oop oln= caddr(args);
+    if (nil != oln) {			if (!isLong(oln)) { fprintf(stderr, "string-copy: non-integer length: ");  fdumpln(stderr, oln);  fatal(0); }
+	int iln= getLong(oln);
+	if (iln < 0) iln= 0;
+	if (iln > sln) iln= sln;		assert(iln >= 0 && ifr + iln <= sln);
+	sln= iln;
+    }
+    return newStringN(get(str, String,bits) + ifr, sln);
+}
 
 // static subr(string_compare)	// string substring offset=0 length=strlen(substring)
 // {
@@ -2553,11 +2555,11 @@ static subr(long_double)
 //   return newString(buf);
 // }
 
-// static subr(string_long)
-// {
-//     oop arg= car(args);				if (isLong(arg)) return arg;  if (!is(String, arg)) return nil;
-//     return newLong(wcstol(get(arg, String,bits), 0, 0));
-// }
+static subr(string_long)
+{
+    oop arg= car(args);				if (isLong(arg)) return arg;  if (!is(String, arg)) return nil;
+    return newLong(wcstol(get(arg, String,bits), 0, 0));
+}
 
 static subr(double_long)
 {
@@ -3318,14 +3320,14 @@ static subr_ent_t subr_tab[] = {
     { " string-length",		subr_string_length },
     { " string-at",		subr_string_at },
     { " set-string-at",		subr_set_string_at },
-//     { " string-copy",		subr_string_copy },
+    { " string-copy",		subr_string_copy },
 //     { " string-compare",	subr_string_compare },
     { " symbol->string",	subr_symbol_string },
     { " string->symbol",	subr_string_symbol },
 //     { " symbol-compare",	subr_symbol_compare },
     { " long->double",	subr_long_double },
 //     { " long->string",	subr_long_string },
-//     { " string->long",	subr_string_long },
+     { " string->long",	subr_string_long },
     { " double->long",	subr_double_long },
 //     { " double->string",	subr_double_string },
     { " string->double",	subr_string_double },
@@ -3454,9 +3456,9 @@ int main(int argc, char **argv)
 
     traceStack=		newArray(32);				GC_add_root(&traceStack);
 
-    backtrace=		define(globalNamespace, intern(L"*backtrace*"),    nil);
-    input=		define(globalNamespace, intern(L"*input*"),	     nil);
-    output=		define(globalNamespace, intern(L"*output*"),	     nil);
+    backtrace=		define(globalNamespace, intern(L"*backtrace*"),	nil);
+    input=		define(globalNamespace, intern(L"*input*"),	nil);
+    output=		define(globalNamespace, intern(L"*output*"),	nil);
 
     currentPath=	nil;					GC_add_root(&currentPath);
     currentLine=	nil;					GC_add_root(&currentLine);
@@ -3534,6 +3536,8 @@ int main(int argc, char **argv)
 //	 }
 //   }
 
+    setVar(output, newLong((long)stdout));
+
     while (is(Pair, getVar(arguments))) {
 	oop argl= getVar(arguments);				GC_PROTECT(argl);
 	oop args= getHead(argl);
@@ -3580,8 +3584,6 @@ int main(int argc, char **argv)
 //	   GC_count_fragments() * 100.0);
 // #endif
 //   }
-
-    setVar(output, newLong((long)stdout));
 
     if (!repled) {
 	if (!opt_b) replPath(L"boot2.l");
