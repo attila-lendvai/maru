@@ -389,10 +389,20 @@
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 
+;; (define-function %make-make-inits (prefix inits)
+;;   (and inits
+;;        (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
+;; 	     (%make-make-inits prefix (cdr inits)))))
+
+(define-function %make-field-name (key)
+  (let* ((str (symbol->string key))
+	 (len (string-length str)))
+    (string->symbol (string-copy str 0 (- len 1)))))
+
 (define-function %make-make-inits (prefix inits)
   (and inits
-       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-	     (%make-make-inits prefix (cdr inits)))))
+       (cons (list 'set (list (concat-symbol prefix (%make-field-name (car inits))) 'self) (cadr inits))
+	     (%make-make-inits prefix (cddr inits)))))
 
 (define-form make (type . inits)
   `(let ((self (new ,type)))
@@ -1008,6 +1018,18 @@
   (and unit-testing?
        `(let ((unit-name ,name))
 	  ,@body)))
+
+;;; assertions
+
+(define-function get-source-position (obj)
+  (while (and (pair? obj)
+	      (pair? (<pair>-source obj)))
+    (set obj (<pair>-source obj)))
+  (if (and (string? (car obj)) (long? (cdr obj)))
+      (concat-strings (car obj)":"(format "%i"(cdr obj))" ")
+    "?"))
+
+(define-form assert (what) `(or ,what (error ,(get-source-position what)"assertion failed: "',what)))
 
 ;;; namespace
 
