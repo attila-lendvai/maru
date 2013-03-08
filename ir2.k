@@ -93,7 +93,7 @@
 	       (error "multiple definition of structure type: "name))
 	  (set (<ir-struct-type>-defined type) defined)
 	  (set (<ir-struct-type>-members type) members))
-      (set type (make <ir-struct-type> (name name) (members members) (defined defined)))
+      (set type (make <ir-struct-type> name: name members: members defined: defined))
       (push (<ir>-struct-types self) (cons name type)))
     type))
 
