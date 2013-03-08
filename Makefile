@@ -2,7 +2,7 @@ NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -g $(OFLAGS)
+CFLAGS = -Wall -Wno-comment -g $(OFLAGS)
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
@@ -70,16 +70,22 @@ maru-check-c : eval2 .force
 	cc -o maru-check maru-check.c -ldl
 	./maru-check
 
+NFIBS=40
+
 maru-bench : eval2 .force
 ##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
 	cc -O2 -fomit-frame-pointer -o nfibs nfibs.c
 	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
 ##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
 	cc -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
-	time ./nfibs 38
-	time ./nfibs 38
-	time ./maru-nfibs 38
-	time ./maru-nfibs 38
+	time ./nfibs $(NFIBS)
+	time ./nfibs $(NFIBS)
+	time ./maru-nfibs $(NFIBS)
+	time ./maru-nfibs $(NFIBS)
+
+eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
+	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
