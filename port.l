@@ -1,3 +1,6 @@
+(define-function long->string   (self) (format "%d" self))
+(define-function double->string (self) (format "%f" self))
+
 (define-method ->string <string> () self)
 (define-method ->string <symbol> () (symbol->string self))
 (define-method ->string <long>   () (long->string self))
