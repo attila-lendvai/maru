@@ -1,4 +1,4 @@
-// last edited: 2013-01-30 11:42:03 by piumarta on emilia.local
+// last edited: 2013-03-08 23:27:55 by piumarta on emilia.local
 
 #define DEMO_BITS	1
 
@@ -92,7 +92,7 @@ struct Data	{ };
 struct Long	{ long_t    bits; };
 struct Double	{ double    bits; };
 struct String	{ oop	    size;  wchar_t *bits; };	/* bits is in managed memory */
-struct Symbol	{ wchar_t  *bits; int flags};
+struct Symbol	{ wchar_t  *bits; int flags; };
 struct Pair	{ oop	    head, tail, source; };
 struct Array	{ oop	    size, _array; };
 struct Expr	{ oop	    name, definition, environment, profile; };
