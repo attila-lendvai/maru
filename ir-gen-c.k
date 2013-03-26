@@ -68,6 +68,10 @@
   (print "struct "(c-mangle self.name))
   (and name (print " "name)))
 
+(define-method print-c-declaration <ir-label-type> (name)
+  (print "void *"(c-mangle self.name))
+  (and name (print " "name)))
+
 ;
 
 (define-function ir-gen-output (gen))
@@ -142,7 +146,9 @@
   (print "]=(") (ir-gen-c (caddr self.operands) gen)
   (print "))"))
 
-(define-method ir-gen-c <ir-get-var> (gen)		(print (ir-gen-c-variable-name (<ir-variable>-name self.parameters))))
+(define-method ir-gen-c <ir-get-var> (gen)
+  (and (ir-label-var? self.parameters) (print "&&"))
+  (print (ir-gen-c-variable-name (<ir-variable>-name self.parameters))))
 
 (define-method ir-gen-c <ir-set-var> (gen)
   (let ((var   self.parameters)
@@ -152,12 +158,21 @@
       (ir-gen-c value gen)
       (print ")"))))
 
-(define-method ir-gen-c <ir-nop>	(gen)	())
-(define-method ir-gen-c <ir-define>	(gen)	(ir-gen-c (car self.operands) gen))
-(define-method ir-gen-c <ir-addressof>	(gen)	(print "&") (ir-gen-c (car self.operands) gen))
-(define-method ir-gen-c <ir-lit>	(gen)	(dump (car self.parameters)))
-(define-method ir-gen-c <ir-extern>	(gen)	(print "dlsym(RTLD_DEFAULT, ")  (dump (symbol->string (car self.parameters)))  (print ")"))
-(define-method ir-gen-c <ir-function>	(gen)	(print (ir-gen-c-function-name self)))
+(define-method ir-gen-c <ir-nop>	  (gen)	())
+(define-method ir-gen-c <ir-define>	  (gen)	(ir-gen-c (car self.operands) gen))
+(define-method ir-gen-c <ir-define-label> (gen)	(print "v_"(car self.parameters)":"))
+
+(define-method ir-gen-c <ir-goto> (gen)
+  (if (ir-label-expression? (car self.operands))
+      (print "goto v_"(<ir-variable>-name (<ir-get-var>-parameters (car self.operands))))
+    (print "goto *(")
+    (ir-gen-c (car self.operands) gen)
+    (print ")")))
+
+(define-method ir-gen-c <ir-addressof>	  (gen)	(print "&") (ir-gen-c (car self.operands) gen))
+(define-method ir-gen-c <ir-lit>	  (gen)	(dump (car self.parameters)))
+(define-method ir-gen-c <ir-extern>	  (gen)	(print "dlsym(RTLD_DEFAULT, ")  (dump (symbol->string (car self.parameters)))  (print ")"))
+(define-method ir-gen-c <ir-function>	  (gen)	(print (ir-gen-c-function-name self)))
 
 (define-method ir-gen-c <ir-cast> (gen)
   (print "((")
