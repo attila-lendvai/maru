@@ -165,6 +165,9 @@
 	(type  (maru->ir-type (cddr exp) ir)))
     (ir-cast type value)))
 
+(define-function maru-compile-label (exp ir)	(ir-define-label (cadr exp)))
+(define-function maru-compile-goto (exp ir)	(ir-goto (maru-compile (cadr exp) ir)))
+
 (define maru-compile-form-map
   `((let	. ,maru-compile-let)
     (set	. ,maru-compile-set)
@@ -179,6 +182,8 @@
     (and	. ,maru-compile-and)
     (or		. ,maru-compile-or)
     (cast	. ,maru-compile-cast)
+    (label	. ,maru-compile-label)
+    (goto	. ,maru-compile-goto)
     ))
 
 (define maru->ir-unary-map
