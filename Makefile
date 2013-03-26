@@ -70,6 +70,16 @@ maru-check-c : eval2 .force
 	cc -o maru-check maru-check.c -ldl
 	./maru-check
 
+maru-label : eval2 .force
+	./eval2 ir-gen-x86.k maru.k maru-label.k > maru-label.s
+	cc -m32 -o maru-label maru-label.s
+	./maru-label
+
+maru-label-c : eval2 .force
+	./eval2 ir-gen-c.k maru.k maru-label.k > maru-label.c
+	cc -o maru-label maru-label.c -ldl
+	./maru-label
+
 NFIBS=40
 
 maru-bench : eval2 .force
