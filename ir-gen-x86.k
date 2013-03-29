@@ -232,7 +232,7 @@
     ((ir-struct-type? self.type)	(ir-gen-x86-move-struct self.type
 								(<ir-variable>-location self.parameters)
 								self.location gen))
-    ((ir-label-var? self.parameters)	(emitln gen "	movl	$"(<ir-variable>-name self.parameters)", %eax # LABEL"))
+    ((ir-label-var? self.parameters)	(emitln gen "	movl	$"(ir-gen-x86-variable-name self.parameters)", %eax # LABEL"))
     (else				(ir-gen-x86-load (<ir-variable>-type self.parameters)
 							 (<ir-variable>-location self.parameters) gen)))
   (info gen 2 "# get var done"))
@@ -271,7 +271,7 @@
 (define-method ir-gen-x86-allocate <ir-define-label> (gen))
 
 (define-method ir-gen-x86 <ir-define-label> (gen)
-  (emitln gen (car self.parameters)":"))
+  (emitln gen "v_"(x86-mangle (symbol->string (car self.parameters)))":"))
 
 (define-method ir-gen-x86-allocate <ir-goto> (gen) (ir-gen-x86-allocate (car self.operands) gen))
 

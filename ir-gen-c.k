@@ -160,11 +160,12 @@
 
 (define-method ir-gen-c <ir-nop>	  (gen)	())
 (define-method ir-gen-c <ir-define>	  (gen)	(ir-gen-c (car self.operands) gen))
-(define-method ir-gen-c <ir-define-label> (gen)	(print "v_"(car self.parameters)":"))
+(define-method ir-gen-c <ir-define-label> (gen)	(print (ir-gen-c-variable-name (symbol->string (car self.parameters))) ":"))
 
 (define-method ir-gen-c <ir-goto> (gen)
   (if (ir-label-expression? (car self.operands))
-      (print "goto v_"(<ir-variable>-name (<ir-get-var>-parameters (car self.operands))))
+	;;; (print "goto v_"(<ir-variable>-name (<ir-get-var>-parameters (car self.operands))))
+      (print "goto "(ir-gen-c-variable-name (<ir-variable>-name (<ir-get-var>-parameters (car self.operands)))))
     (print "goto *(")
     (ir-gen-c (car self.operands) gen)
     (print ")")))
