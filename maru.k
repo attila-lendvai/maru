@@ -3,6 +3,12 @@
 (define-method do-print <extern> ()
   (print "<extern "self.name" : "self.type">"))
 
+(define-function maru-error (source . args)
+  (while (and (pair? source) (<pair>-source source))
+    (set source (<pair>-source source)))
+  (and (pair? source) (print "\n"(car source)":"(cdr source)":"))
+  (apply error args))
+
 (define *maru-exports* ())
 (define *maru-types* ())
 
@@ -23,7 +29,7 @@
 (define-function maru-struct (name ir)
   (if (symbol? name)
       (ir-struct ir name)
-    (error "illegal struct name: "name)))
+    (maru-error name "illegal struct name: "name)))
 
 (define maru->ir-type) ;; forward
 
@@ -39,7 +45,7 @@
   (cond
     ((symbol? exp)	(or (cdr (assq exp maru->ir-type-map))
 			    (maru-defined-type exp ir)
-			    (error "illegal type name: "exp)))
+			    (maru-error exp "illegal type name: "exp)))
     ((pair? exp)	(let ((type (maru->ir-type (car exp) ir)))
 			  (and (= 'struct type) (set type (maru-struct (car (set exp (cdr exp))) ir)))
 			  (while (and (set exp (cdr exp))
@@ -58,13 +64,13 @@
 				  (set exp (cdr exp))))
 			      (set type (ir-function-of type (array->list args)))))
 			  type))
-    (else		(error "illegal type expression: "exp))))
+    (else		(maru-error exp "illegal type expression: "exp))))
 
-(define-function maru-declaration-name (decl)
+(define-function maru-declaration-name (decl from)
   (cond
     ((symbol? decl)		decl)
     ((symbol? (car decl))	(car decl))
-    (else			(error "illegal variable name in declaration: "decl))))
+    (else			(maru-error from "illegal variable name in declaration: "decl))))
 
 (define-function maru-declaration-type (decl ir)
   (and (pair? (cdr decl))
@@ -79,7 +85,7 @@
 
 (define-function maru-compile-define (exp ir)
   (let* ((decl (cadr exp))
-	 (name (maru-declaration-name decl))
+	 (name (maru-declaration-name decl exp))
 	 (type (maru-declaration-type decl ir))
 	 (init (maru-compile (caddr exp) ir)))
     (ir-define name type init)))
@@ -90,7 +96,7 @@
   (let* ((bindings (cadr exp))
 	 (decls    (map car bindings))
 	 (inits    (map cadr bindings))
-	 (names    (map maru-declaration-name decls))
+	 (names    (map-with maru-declaration-name decls exp))
 	 (types    (map-with maru-declaration-type decls ir))
 	 (body     (cddr exp)))
     (ir-let names types
@@ -131,14 +137,14 @@
 (define-function maru-compile-member (exp ir)
   (let ((value (maru-compile (cadr exp) ir))
 	(field (caddr exp)))
-    (or (symbol? field) (error "illegal field name: "exp))
+    (or (symbol? field) (maru-error exp "illegal field name: "exp))
     (ir-member field value)))
 
 (define-function maru-compile-set-member (exp ir)
   (let ((value (maru-compile (cadr exp) ir))
 	(field (caddr exp))
 	(init  (maru-compile (cadddr exp) ir)))
-    (or (symbol? field) (error "illegal field name: "exp))
+    (or (symbol? field) (maru-error exp "illegal field name: "exp))
     (ir-set-member field value init)))
 
 (define-function maru-compile-indir (exp ir)
@@ -152,7 +158,7 @@
     (cond
       (b	(ir-set-indir base         a  b))
       (a	(ir-set-indir base (ir-lit 0) a))
-      (else	(error "incomplete expression: "exp)))))
+      (else	(maru-error exp "incomplete expression: "exp)))))
 
 (define-function maru-compile-return (exp ir)
   (ir-return (if (cadr exp) (maru-compile (cadr exp) ir) (ir-nop))))
@@ -218,10 +224,10 @@
     (if op (op self ir)
       (maru-compile-operator self ir))))
 
-(define-function maru-argument-name (exp)		(cond
+(define-function maru-argument-name (exp from)		(cond
 							  ((= exp '...)		'...)
 							  ((= exp 'void)	())
-							  (else			(maru-declaration-name exp))))
+							  (else			(maru-declaration-name exp from))))
 
 (define-function maru-argument-type (exp ir)		(cond
 							  ((= exp '...)		IR-VARARGS)
@@ -229,17 +235,19 @@
 							  (else			(maru-declaration-type exp ir))))
 
 (define-method maru-compile <expr> (ir)
-  (let ((name      (maru-declaration-name self.name))
-	(ret-type  (maru->ir-type (car self.definition) ir))
-	(arg-names (map maru-argument-name (cadr self.definition)))
-	(arg-types (map-with maru-argument-type (cadr self.definition) ir))
-	(body      (map-with maru-compile (cddr self.definition) ir)))
-    (ir-function name (ir-function-of ret-type arg-types) arg-names body)))
+  (let* ((name      (maru-declaration-name self.name self.definition))
+	 (ret-type  (maru->ir-type (car self.definition) ir))
+	 (arg-names (map-with maru-argument-name (cadr self.definition) self.definition))
+	 (arg-types (map-with maru-argument-type (cadr self.definition) ir))
+	 (body      (map-with maru-compile (cddr self.definition) ir))
+	 (func	    (ir-function name (ir-function-of ret-type arg-types) arg-names body)))
+    (set (<ir-insn>-source func) (<pair>-source self.definition))
+    func))
 
 (define *maru-structs* (array))
 
 (define-function maru-struct-member (decl ir)
-  (let ((name (maru-declaration-name decl))
+  (let ((name (maru-declaration-name decl decl))
 	(type (maru-declaration-type decl ir)))
     (cons name type)))
 
@@ -254,7 +262,7 @@
 	  (maru->ir-type (cdr name-type) ir)))
     (namespace-do binding ns
       (let* ((decl (car binding))
-	     (name (maru-declaration-name decl))
+	     (name (maru-declaration-name decl binding))
 	     (type (maru-declaration-type decl ir))
 	     (init (cdr binding)))
 	(when (not (form? init))

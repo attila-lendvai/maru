@@ -227,12 +227,18 @@
 
 (define-function ir-declare-global    (ir name type)	(ir-declare ir name (new <ir-global>    name type)))
 
-(define-function ir-declare-parameter (ir name type)
-  (or type (error "declaration has no type: "name))
+(define-function ir-declare-parameter (ir name type insn)
+  (or type
+      (let ()
+	(ir-insn-print-source insn)
+	(error "declaration has no type: "name)))
   (ir-declare ir name (new <ir-parameter> name type)))
 
-(define-function ir-declare-local (ir name type)
-  (or type (error "declaration has no type: "name))
+(define-function ir-declare-local (ir name type insn)
+  (or type
+      (let ()
+	(ir-insn-print-source insn)
+	(error "declaration has no type: "name)))
   (ir-declare ir name (new <ir-local> name type)))
 
 ;;; errors
@@ -271,6 +277,10 @@
     (when self.type (print" : "self.type))
     (list-do operand self.operands (println) (ir-insn-print operand (+ level 1)))
     (print " }")))
+
+(define-method ir-insn-print-source <ir-insn> ()
+  (when self.source
+    (print "\n"(car self.source)":"(cdr self.source)": ")))
 
 (define-method do-print <ir-insn> ()	(ir-insn-print self 0))
 
@@ -388,7 +398,7 @@
 							  (set self.scope (<ir>-scope fir))
 							  (ir-append-function ir self)
 							  (lists-do ((argn args) (argt (<ir-function-type>-arg-types type)))
-							    (ir-declare-parameter fir argn argt))
+							    (ir-declare-parameter fir argn argt self))
 							  (ir-append-all fir body)
 							  (list-do stmt body (ir-declare-label stmt fir))
 							  (ir-check-types fir)
@@ -576,7 +586,7 @@
 (define-class <ir-define-label> <ir-insn> (var))	(define-function ir-define-label (name)	(new <ir-define-label> (list name)))
 
 (define-method ir-declare-label <ir-insn> (ir)		)
-(define-method ir-declare-label <ir-define-label> (ir)	(ir-declare-local ir (car self.parameters) IR-LABEL))
+(define-method ir-declare-label <ir-define-label> (ir)	(ir-declare-local ir (car self.parameters) IR-LABEL self))
 
 (define-method ir-check-type <ir-define-label> (ir val?) (set self.type IR-VOID))
 
@@ -604,7 +614,7 @@
 							  (ir-begin-scope ir)
 							  (lists-do ((name names) (type types) (value values) (vtype vtypes))
 							    (or type (set type vtype))
-							    (let ((var (ir-declare-local ir name type)))
+							    (let ((var (ir-declare-local ir name type self)))
 							      (unless (ir-nop? value)
 								(ir-check-assignment type vtype value self)
 								(push seq (new <ir-set-var> var (list value) (<ir-insn>-type value)))
@@ -637,7 +647,7 @@
 							       (init  (car  self.operands))
 							       (itype (ir-check-type init ir 1)))
 							  (or type	(set type itype))
-							  (or self.var	(set self.var (ir-declare-local ir name type)))
+							  (or self.var	(set self.var (ir-declare-local ir name type self)))
 							  (ir-check-assignment (<ir-variable>-type self.var) itype init self)
 							  (set (car self.operands) (new <ir-set-var> self.var (list init) type))
 							  (set self.type type)))
