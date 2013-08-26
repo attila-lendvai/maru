@@ -1,3 +1,5 @@
+EVAL = eval3
+
 NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
@@ -23,7 +25,9 @@ endif
 
 .SUFFIXES :
 
-all : eval2 eval eval32 osdefs.k
+all : $(EVAL) osdefs.k
+	rm -f eval;
+	ln -s $(EVAL) eval
 
 run : all
 	rlwrap ./eval
@@ -31,8 +35,8 @@ run : all
 status : .force
 	@echo "SYS is $(SYS)"
 
-eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c
-	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
+eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+	$(CC) -g $(CFLAGS) -o eval1 eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
