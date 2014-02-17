@@ -1,7 +1,7 @@
 (defsystem :maru.test
   :defsystem-depends-on (:hu.dwim.asdf)
   :class "hu.dwim.asdf:hu.dwim.test-system"
-  :depends-on (:maru
+  :depends-on (:maru+hu.dwim.logger
                :hu.dwim.stefil+swank)
   :components ((:module "test"
                 :components ((:file "package")
