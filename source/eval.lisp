@@ -10,6 +10,9 @@
 
 (defvar *eval-context*)
 
+;; helper for the debug output
+(defparameter *depth* 0)
+
 (defparameter *current-file* nil)
 
 (defparameter *maru/readtable* (let ((copy (with-standard-io-syntax
@@ -20,8 +23,9 @@
 (defparameter *predefined-subr-names* (list))
 (defparameter *predefined-fixed-names* (list))
 
-(declaim (inline maru/cons maru/length maru/intern maru/get-head maru/get-tail
+(declaim (inline maru/cons maru/intern maru/get-head maru/get-tail
                  maru/get-var maru/set-var
+                 maru/append maru/length
                  is-pair? is-symbol? is-nil?
                  maru/car maru/cdr maru/cddr maru/rest maru/first maru/second maru/third
                  maru/lookup
@@ -178,6 +182,14 @@
     :for cell = object :then (maru/cdr cell)
     :until (is-nil? cell)
     :count t))
+
+(defun maru/append (&rest lists)
+  (loop
+    :for list :in lists
+    :append (loop
+              :for cell = list :then (maru/cdr cell)
+              :until (is-nil? cell)
+              :collect (maru/car cell))))
 
 (defun maru/get-head (pair)
   (check-type pair maru/pair)
@@ -456,14 +468,14 @@
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
-                    (list* prefix object))))
+                    (list prefix object))))
             (backquote ()
               (let ((object (maru/read-expression input))
                     (prefix (maru-symbol "quasiquote")))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
-                    (list* prefix object))))
+                    (list prefix object))))
             (quoted ()
               (let ((object (maru/read-expression input))
                     (prefix (maru-symbol "quote")))
@@ -582,111 +594,120 @@
       object))
 
 (defun maru/eval (object &optional (env (global-namespace-of *eval-context*)))
-  (eval.debug "EVAL> ~S" object)
-  (check-type env maru/pair)
-  (cond
-    ((or (maru/fixed? object)
-         (maru/subr? object)
-         (maru/form? object)
-         (typep object '(or
-                         maru/undefined
-                         maru/long
-                         maru/double
-                         maru/string)))
-     object)
-    ((consp object)
-     (let ((head (maru/eval (maru/get-head object) env)))
-       (if (maru/fixed? head)
-           (progn
-             (eval.dribble "applying fixed ~S" head)
-             (setf head (maru/apply (maru/fixed/function head)
-                                    (maru/get-tail object)
-                                    env)))
-           (let ((args (maru/eval-list (maru/get-tail object) env)))
-             (setf head (maru/apply head args env))))
-       head))
-    ((is-symbol? object)
-     (let ((ass (maru/find-variable env object :otherwise :error)))
-       (maru/get-tail ass)))
-    (t (error "Don't know how to evaluate ~S" object))))
+  (let ((*depth* (1+ *depth*)))
+    (eval.debug "EVAL~S> ~S" *depth* object)
+   (check-type env maru/pair)
+   (cond
+     ((or (maru/fixed? object)
+          (maru/subr? object)
+          (maru/form? object)
+          (typep object '(or
+                          maru/undefined
+                          maru/long
+                          maru/double
+                          maru/string)))
+      object)
+     ((consp object)
+      (let ((head (maru/eval (maru/get-head object) env)))
+        (if (maru/fixed? head)
+            (progn
+              (eval.dribble "applying fixed ~S" head)
+              (setf head (maru/apply (maru/fixed/function head)
+                                     (maru/get-tail object)
+                                     env)))
+            (let ((args (maru/eval-list (maru/get-tail object) env)))
+              (setf head (maru/apply head args env))))
+        (eval.debug "EVAL~S< yields ~S" *depth* head)
+        head))
+     ((is-symbol? object)
+      (let* ((ass (maru/find-variable env object :otherwise :error))
+             (result (maru/get-tail ass)))
+        (eval.debug "EVAL~S< yields ~S" *depth* result)
+        result))
+     (t (error "Don't know how to evaluate ~S" object)))))
 
-(defun maru/expand (expression env)
-  (expander.debug "EXPAND> ~S" expression)
-  (let ((result expression))
-    (cond
-      ((typep expression 'maru/pair)
-       (let* ((head (maru/expand (maru/get-head expression) env))
-              (form (maru/find-form-function env head)))
-         (when form
-           (let* ((head (maru/apply form (maru/get-tail expression) env))
-                  (expanded (maru/expand head env)))
-             (eval.dribble "EXPAND => ~S" expanded)
-             (return-from maru/expand expanded)))
-         (let ((tail (maru/get-tail expression)))
-           (when (not (eq (maru-symbol "quote") head))
-             (setf tail (maru/expand-list tail env)))
-           (when (and (eq (maru-symbol "set") head)
-                      (is-pair? (maru/car tail))
-                      (is-symbol? (maru/car (maru/car tail))))
-             (let* ((name (maru/get-head (maru/get-head tail)))
-                    (setter-name (maru/intern (concatenate 'string "set-" (symbol-name name)))))
-               (setf head setter-name)
-               (setf tail (append (maru/get-tail (maru/get-head tail))
-                                  (maru/get-tail tail)))))
-           (setf result (maru/cons head tail)))))
-      ((typep expression 'maru/symbol)
-       (let ((form (maru/find-form-symbol env expression)))
-         ;; FIXME there sholdn't be an AND there... smells fishy.
-         (when (and form
-                    (not (is-nil? form)))
-           (let* ((args (maru/cons expression nil))
-                  (applied (maru/apply form args (maru-symbol "nil")))
-                  (expanded (maru/expand applied env)))
-             (setf result expanded))))))
-    (expander.debug "EXPAND< ~S => ~S" expression result)
-    result))
+(defun maru/expand (expression &optional (env (global-namespace-of *eval-context*)))
+  (let ((*depth* (1+ *depth*)))
+    (expander.debug "EXPAND~S> ~S" *depth* expression)
+    (let ((result expression))
+      (cond
+        ((typep expression 'maru/pair)
+         (let* ((head (maru/expand (maru/get-head expression) env))
+                (form (maru/find-form-function env head)))
+           (expander.dribble "expand (of a pair) looked up ~S to form ~S" expression form)
+           (when form
+             (let* ((head (maru/apply form (maru/get-tail expression) env))
+                    (expanded (maru/expand head env)))
+               (eval.dribble "EXPAND~S< => ~S" *depth* expanded)
+               (return-from maru/expand expanded)))
+           (let ((tail (maru/get-tail expression)))
+             (when (not (eq (maru-symbol "quote") head))
+               (setf tail (maru/expand-list tail env)))
+             (when (and (eq (maru-symbol "set") head)
+                        (is-pair? (maru/car tail))
+                        (is-symbol? (maru/car (maru/car tail))))
+               (let* ((name (maru/get-head (maru/get-head tail)))
+                      (setter-name (maru/intern (concatenate 'string "set-" (symbol-name name)))))
+                 (setf head setter-name)
+                 (setf tail (maru/append (maru/get-tail (maru/get-head tail))
+                                         (maru/get-tail tail)))))
+             (setf result (maru/cons head tail)))))
+        ((typep expression 'maru/symbol)
+         (let ((form (maru/find-form-symbol env expression)))
+           (expander.dribble "expand (of a symbol) looked up ~S to form ~S" expression form)
+           ;; FIXME there shouldn't be an AND there... smells fishy.
+           (when (and form
+                      (not (is-nil? form)))
+             (let* ((args (maru/cons expression nil))
+                    (applied (maru/apply form args (maru-symbol "nil")))
+                    (expanded (maru/expand applied env)))
+               (setf result expanded))))))
+      (expander.debug "EXPAND~S< ~S => ~S" *depth* expression result)
+      result)))
 
 (defun maru/apply (function arguments env)
-  (eval.dribble "APPLY> ~S to ~S" function arguments)
-  (cond
-    ((maru/expr? function)
-     (let* ((defn (maru/expr/definition function))
-            (formals (maru/car defn))
-            (actuals arguments)
-            ;; (caller env)
-            (callee (maru/expr/environment function)))
-       (loop
-         :while (is-pair? formals)
-         :do
-         (unless (is-pair? actuals)
-           (error "Too few arguments while applying ~S to ~S" function arguments))
-         (let ((tmp (maru/cons (maru/get-head formals)
-                               (maru/get-head actuals))))
-           (setf callee (maru/cons tmp callee))
-           (setf formals (maru/get-tail formals))
-           (setf actuals (maru/get-tail actuals))))
-       (when (is-symbol? formals)
-         (let ((tmp (maru/cons formals actuals)))
-           (setf callee (maru/cons tmp callee))
-           (setf actuals (maru-symbol "nil"))))
-       (unless (is-nil? actuals)
-         (error "Too many arguments applying ~S to ~S" function arguments))
-       (when (locals-are-namespace? *eval-context*)
-         (let ((tmp (maru/cons (maru-symbol/*locals*-of *eval-context*)
-                               (maru-symbol "nil"))))
-           (setf callee (maru/cons tmp callee))
-           (maru/set-tail tmp callee)))
-       (let ((ans (maru-symbol "nil"))
-             (body (maru/cdr defn)))
+  (let ((*depth* (1+ *depth*)))
+    (eval.dribble "APPLY~S> ~S to ~S" *depth* function arguments)
+    (cond
+      ((maru/expr? function)
+       (let* ((defn (maru/expr/definition function))
+              (formals (maru/car defn))
+              (actuals arguments)
+              ;; (caller env)
+              (callee (maru/expr/environment function)))
          (loop
-           :while (is-pair? body)
+           :while (is-pair? formals)
            :do
-           (setf ans (maru/eval (maru/get-head body) callee))
-           (setf body (maru/get-tail body)))
-         ans)))
-    ((maru/fixed? function)
-     (maru/apply (maru/fixed/function function) arguments env))
-    ((maru/subr? function)
-     (funcall (maru/subr/impl function) arguments env))
-    (t
-     (error "Don't know how to apply ~S" function))))
+           (unless (is-pair? actuals)
+             (error "Too few arguments while applying ~S to ~S" function arguments))
+           (let ((tmp (maru/cons (maru/get-head formals)
+                                 (maru/get-head actuals))))
+             (setf callee (maru/cons tmp callee))
+             (setf formals (maru/get-tail formals))
+             (setf actuals (maru/get-tail actuals))))
+         (when (is-symbol? formals)
+           (let ((tmp (maru/cons formals actuals)))
+             (setf callee (maru/cons tmp callee))
+             (setf actuals (maru-symbol "nil"))))
+         (unless (is-nil? actuals)
+           (error "Too many arguments applying ~S to ~S" function arguments))
+         (when (locals-are-namespace? *eval-context*)
+           (let ((tmp (maru/cons (maru-symbol/*locals*-of *eval-context*)
+                                 (maru-symbol "nil"))))
+             (setf callee (maru/cons tmp callee))
+             (maru/set-tail tmp callee)))
+         (let ((ans (maru-symbol "nil"))
+               (body (maru/cdr defn)))
+           (loop
+             :while (is-pair? body)
+             :do
+             (setf ans (maru/eval (maru/get-head body) callee))
+             (setf body (maru/get-tail body)))
+           (eval.dribble "APPLY~S< => ~S" *depth* ans)
+           ans)))
+      ((maru/fixed? function)
+       (maru/apply (maru/fixed/function function) arguments env))
+      ((maru/subr? function)
+       (funcall (maru/subr/impl function) arguments env))
+      (t
+       (error "Don't know how to apply ~S" function)))))

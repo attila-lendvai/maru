@@ -258,7 +258,7 @@
     (typecase lhs
       ((or maru/long
            maru/double)
-       (= lhs rhs))
+       (eql lhs rhs))
       (maru/string
        (and (typep rhs 'maru/string)
             (string= lhs rhs)))
