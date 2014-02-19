@@ -1,12 +1,16 @@
 (in-package :maru.eval)
 
-;; what state is shared between the maru vm and the hosting lisp vm:
-;; - the gc
-;; - cons cells
-;; - string literals, Long, Double
-;; - maru symbols are all intern'd into the CL package "MARU", including nil
+;; The following state/types are shared between the implemented maru VM and the hosting lisp VM:
+;; - Pair is CL cons cells
+;; - String
+;; - Long
+;; - Double
+;; - Array
+;; - Symbol (maru symbols are all INTERN'd into the CL package called "MARU" (including the maru nil))
+;; - other types are wrapped into CL structs
+;; - the gc/memory model
 ;;
-;; everything else is a bug.
+;; Anything else leaking into the maru universe is a bug.
 
 (defvar *eval-context*)
 
@@ -15,65 +19,27 @@
 
 (defparameter *current-file* nil)
 
-(defparameter *maru/readtable* (let ((copy (with-standard-io-syntax
-                                             (copy-readtable *readtable*))))
-                                 (setf (readtable-case copy) :preserve)
-                                 copy))
-
 (defparameter *predefined-subr-names* (list))
 (defparameter *predefined-fixed-names* (list))
 
-(declaim (inline maru/cons maru/intern maru/get-head maru/get-tail
+(declaim (inline maru/cons maru/get-head maru/get-tail
                  maru/get-var maru/set-var
                  maru/append maru/length
-                 is-pair? is-symbol? is-nil?
                  maru/car maru/cdr maru/cddr maru/rest maru/first maru/second maru/third
                  maru/lookup
                  maru/bool))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *well-known-maru-symbol-names*
-    '("*locals*"
-      "set"
-      "define"
-      "let"
-      "lambda"
-      "quote"
-      "quasiquote"
-      "unquote"
-      "unquote-splicing"
-      "nil"
-      "t"
-      "."
-      "..."
-      "bracket"
-      "brace"
-      "*main*")))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun well-known-maru-symbol-name->eval-context-slot-name (name)
-    (check-type name string)
-    (format-symbol :maru.eval "MARU-SYMBOL/~A" (string-upcase name)))
-
-  (defun well-known-maru-symbol-name->eval-context-accessor-name (name)
-    (check-type name string)
-    (format-symbol :maru.eval "~A-OF" (symbol-name (well-known-maru-symbol-name->eval-context-slot-name name)))))
-
 #+nil
-`(hu.dwim.defclass-star:defclass* eval-context ()
-   (;;(current-line 0)
-    ;;(current-path)
-    ;;(current-source)
-    (locals-are-namespace? :type boolean)
-    (global-namespace)
-    (globals)
-    (expanders)
-    (evaluators)
-    (applicators)
-    (well-known-symbols)
-    ,@(loop
-        :for name :in *well-known-maru-symbol-names*
-        :collect (list (well-known-maru-symbol-name->eval-context-slot-name name)))))
+(hu.dwim.defclass-star:defclass* eval-context ()
+  (;;(current-line 0)
+   ;;(current-path)
+   ;;(current-source)
+   (locals-are-namespace? nil :type boolean)
+   (global-namespace)
+   (globals)
+   (expanders)
+   (evaluators)
+   (applicators)))
 
 ;; macroexpansion of the above to lower dependencies
 (defclass eval-context ()
@@ -85,97 +51,19 @@
    (globals :accessor globals-of :initarg :globals)
    (expanders :accessor expanders-of :initarg :expanders)
    (evaluators :accessor evaluators-of :initarg :evaluators)
-   (applicators :accessor applicators-of :initarg :applicators)
-   (well-known-symbols :accessor well-known-symbols-of :initarg :well-known-symbols)
-   (maru-symbol/*locals* :accessor maru-symbol/*locals*-of :initarg :maru-symbol/*locals*)
-   (maru-symbol/set :accessor maru-symbol/set-of :initarg :maru-symbol/set)
-   (maru-symbol/define :accessor maru-symbol/define-of :initarg :maru-symbol/define)
-   (maru-symbol/let :accessor maru-symbol/let-of :initarg :maru-symbol/let)
-   (maru-symbol/lambda :accessor maru-symbol/lambda-of :initarg :maru-symbol/lambda)
-   (maru-symbol/quote :accessor maru-symbol/quote-of :initarg :maru-symbol/quote)
-   (maru-symbol/quasiquote :accessor maru-symbol/quasiquote-of :initarg :maru-symbol/quasiquote)
-   (maru-symbol/unquote :accessor maru-symbol/unquote-of :initarg :maru-symbol/unquote)
-   (maru-symbol/unquote-splicing :accessor maru-symbol/unquote-splicing-of :initarg :maru-symbol/unquote-splicing)
-   (maru-symbol/nil :accessor maru-symbol/nil-of :initarg :maru-symbol/nil)
-   (maru-symbol/t :accessor maru-symbol/t-of :initarg :maru-symbol/t)
-   (maru-symbol/. :accessor maru-symbol/.-of :initarg :maru-symbol/.)
-   (maru-symbol/... :accessor maru-symbol/...-of :initarg :maru-symbol/...)
-   (maru-symbol/bracket :accessor maru-symbol/bracket-of :initarg :maru-symbol/bracket)
-   (maru-symbol/brace :accessor maru-symbol/brace-of :initarg :maru-symbol/brace)
-   (maru-symbol/*main* :accessor maru-symbol/*main*-of :initarg :maru-symbol/*main*)))
+   (applicators :accessor applicators-of :initarg :applicators)))
 
 (defun make-eval-context ()
   (make-instance 'eval-context))
 
-;; TODO delme? package symbol lookup is just well enough for this... or maybe it's slow? then cache transparently through maru/intern
-(defmacro maru-symbol (name)
-  `(,(well-known-maru-symbol-name->eval-context-accessor-name name) *eval-context*))
-
-(define-compiler-macro maru-symbol (name)
-  `(,(well-known-maru-symbol-name->eval-context-accessor-name name) *eval-context*))
-
 (defun maru/bool (value)
   (if value
-      (maru-symbol "t")
-      (maru-symbol "nil")))
-
-;; map some maru types to cl types.
-;; foo -> maru/foo
-(macrolet ((frob (&rest entries)
-             `(progn
-                ,@(loop
-                    :for entry :in entries
-                    :collect `(deftype ,(symbolicate '#:maru/ (first entry)) ()
-                                ,(second entry))))))
-  (frob
-   (undefined 'null)
-   (double    'double-float)
-   (long      '(signed-byte 64))
-   (string    'string)
-   (character 'character)
-   (pair      'cons)
-   (symbol    'symbol)
-   ))
-
-(defun is-pair? (thing)
-  (typep thing 'maru/pair))
-
-(defun is-symbol? (thing)
-  (and (symbolp thing)
-       (progn
-         (assert (eq (symbol-package thing) (find-package :maru)))
-         t)))
-
-(defun is-nil? (thing)
-  (eq thing (maru-symbol "nil")))
-
-(defstruct (maru/fixed (:constructor make-maru/fixed (function))
-                       (:conc-name #:maru/fixed/)
-                       (:predicate maru/fixed?))
-  (function nil))
-
-(defstruct (maru/subr (:constructor make-maru/subr (name impl))
-                      (:conc-name #:maru/subr/)
-                      (:predicate maru/subr?))
-  (name nil)
-  (impl nil))
-
-(defstruct (maru/expr (:constructor make-maru/expr (definition environment &optional name))
-                      (:conc-name #:maru/expr/)
-                      (:predicate maru/expr?))
-  (name nil)
-  (definition nil)
-  (environment))
-
-(defstruct (maru/form (:constructor make-maru/form (function symbol))
-                      (:conc-name #:maru/form/)
-                      (:predicate maru/form?))
-  (function nil)
-  (symbol nil))
+      (maru/intern "t")
+      (maru/intern "nil")))
 
 (defun maru/cons (car cdr)
-  (cons (or car (maru-symbol "nil"))
-        (or cdr (maru-symbol "nil"))))
+  (cons (or car (maru/intern "nil"))
+        (or cdr (maru/intern "nil"))))
 
 (defun maru/length (object)
   (loop
@@ -197,7 +85,7 @@
 
 (defun maru/set-head (pair value)
   (check-type pair maru/pair)
-  (setf value (or value (maru-symbol "nil")))
+  (setf value (or value (maru/intern "nil")))
   (setf (car pair) value)
   value)
 
@@ -207,18 +95,18 @@
 
 (defun maru/set-tail (pair value)
   (check-type pair maru/pair)
-  (setf value (or value (maru-symbol "nil")))
+  (setf value (or value (maru/intern "nil")))
   (setf (cdr pair) value)
   value)
 
 (defun maru/car (pair)
   (if (is-nil? pair)
-      (maru-symbol "nil")
+      (maru/intern "nil")
       (car pair)))
 
 (defun maru/cdr (pair)
   (if (is-nil? pair)
-      (maru-symbol "nil")
+      (maru/intern "nil")
       (cdr pair)))
 
 (defun maru/cddr (pair)
@@ -235,10 +123,6 @@
 
 (defun maru/third (pair)
   (maru/car (maru/cdr (maru/cdr pair))))
-
-(defun maru/intern (symbol-name)
-  (check-type symbol-name string)
-  (values (intern symbol-name :maru)))
 
 ;; FIXME rename to what? find-environment-entry?
 (defun maru/find-environment (env &key otherwise)
@@ -284,7 +168,7 @@
 
 (defun maru/find-namespace-variable (env name)
   (let ((beg (maru/find-environment env :otherwise :error))
-        (end (maru/find-environment (maru/cdr env) :otherwise (maru-symbol "nil"))))
+        (end (maru/find-environment (maru/cdr env) :otherwise (maru/intern "nil"))))
     ;;(eval.dribble "MARU/FIND-NAMESPACE-VARIABLE beg ~S end ~S" beg end)
     (loop
       :until (eq beg end)
@@ -375,13 +259,21 @@
                      (#\)
                       (unread #\))
                       'done)
+                     (#\-
+                      (let ((c (next)))
+                        (unread c)
+                        (cond
+                          ((is-digit10? c)
+                           (read-number #\-))
+                          (t
+                           (read-symbol #\-)))))
                      (t
                       (if (is-letter? c)
                           (read-symbol c)
                           (read-error "Illegal character ~S" c))))))))
             (read-list (delimiter)
               (let* ((obj (start))
-                     (head (maru-symbol "nil"))
+                     (head (maru/intern "nil"))
                      (tail head))
                 (reader.dribble "Reading a list starts with object ~S" obj)
                 (flet ((process-eof ()
@@ -400,7 +292,7 @@
                     (reader.dribble "Reading a list continues with object ~S" obj)
                     (when (eq obj 'done)
                       (process-eof))
-                    (when (eq obj (maru-symbol "."))
+                    (when (eq obj (maru/intern "."))
                       (setf obj (start))
                       (when (eq obj 'done)
                         (read-error "Missing item after ."))
@@ -413,30 +305,39 @@
                     (setf tail (maru/set-tail tail obj))))))
             (read-number (first-char)
               (reader.dribble "Reading a number")
-              (let* ((c nil)
-                     (body (with-output-to-string (buffer)
-                             (write-char first-char buffer)
-                             (loop
-                               (setf c (next nil))
-                               (unless (is-digit10? c)
-                                 (return))
-                               (write-char c buffer)))))
-                (cond
-                  ((or (eql c #\,)
-                       (eql c #\e))
-                   (not-yet-implemented))
-                  ((and (eql c #\x)
-                        (or (= (length body) 1)
-                            (and (= (length body) 2)
-                                 (string= body "-"))))
-                   (not-yet-implemented))
-                  )
-                (unread c)
-                (reader.dribble "About to call cl:read-from-string on ~S" body)
-                (let ((number (cl:read-from-string body)))
-                  (assert (typep number '(integer 0)))
-                  (reader.dribble "Read number ~S" number)
-                  number)))
+              (let* ((c nil))
+                (flet
+                    ((slurp-digits (first-char predicate)
+                       (with-output-to-string (buffer)
+                         (write-char first-char buffer)
+                         (loop
+                           (setf c (next nil))
+                           (reader.dribble "Next is ~S" c)
+                           (unless (funcall predicate c)
+                             (return))
+                           (write-char c buffer)))))
+                  (let ((body (slurp-digits first-char 'is-digit10?)))
+                    (reader.dribble "Number body stopped at char ~S" c)
+                    (cond
+                      ((or (eql c #\.)
+                           (eql c #\e))
+                       (when (eql c #\.)
+                         (reader.dribble "Number slurps the decimals")
+                         (setf body (concatenate 'string body (slurp-digits c 'is-digit10?))))
+                       (when (eql c #\e)
+                         (not-yet-implemented)))
+                      ((and (eql c #\x)
+                            (or (= (length body) 1)
+                                (and (= (length body) 2)
+                                     (string= body "-"))))
+                       (not-yet-implemented)))
+                    (unread c)
+                    (reader.dribble "About to call cl:read-from-string on ~S" body)
+                    (let* ((*read-default-float-format* 'double-float)
+                           (number (cl:read-from-string body)))
+                      (reader.dribble "Read number ~S" number)
+                      (assert (typep number '(or maru/long maru/double)))
+                      number)))))
             (read-symbol (first-char)
               (reader.dribble "Reading a symbol")
               (let* ((name (with-output-to-string (buffer)
@@ -460,10 +361,10 @@
             (unquote ()
               (let* ((c (next))
                      (prefix (if (eql c #\@)
-                                 (maru-symbol "unquote-splicing")
+                                 (maru/intern "unquote-splicing")
                                  (progn
                                    (unread c)
-                                   (maru-symbol "unquote"))))
+                                   (maru/intern "unquote"))))
                      (object (maru/read-expression input)))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
@@ -471,14 +372,14 @@
                     (list prefix object))))
             (backquote ()
               (let ((object (maru/read-expression input))
-                    (prefix (maru-symbol "quasiquote")))
+                    (prefix (maru/intern "quasiquote")))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
                     (list prefix object))))
             (quoted ()
               (let ((object (maru/read-expression input))
-                    (prefix (maru-symbol "quote")))
+                    (prefix (maru/intern "quote")))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
@@ -594,37 +495,38 @@
       object))
 
 (defun maru/eval (object &optional (env (global-namespace-of *eval-context*)))
-  (let ((*depth* (1+ *depth*)))
+  (let ((*depth* (1+ *depth*))
+        (type-index (maru/type-index-of object)))
     (eval.debug "EVAL~S> ~S" *depth* object)
-   (check-type env maru/pair)
-   (cond
-     ((or (maru/fixed? object)
-          (maru/subr? object)
-          (maru/form? object)
-          (typep object '(or
-                          maru/undefined
-                          maru/long
-                          maru/double
-                          maru/string)))
-      object)
-     ((consp object)
-      (let ((head (maru/eval (maru/get-head object) env)))
-        (if (maru/fixed? head)
-            (progn
-              (eval.dribble "applying fixed ~S" head)
-              (setf head (maru/apply (maru/fixed/function head)
-                                     (maru/get-tail object)
-                                     env)))
-            (let ((args (maru/eval-list (maru/get-tail object) env)))
-              (setf head (maru/apply head args env))))
-        (eval.debug "EVAL~S< yields ~S" *depth* head)
-        head))
-     ((is-symbol? object)
-      (let* ((ass (maru/find-variable env object :otherwise :error))
-             (result (maru/get-tail ass)))
-        (eval.debug "EVAL~S< yields ~S" *depth* result)
-        result))
-     (t (error "Don't know how to evaluate ~S" object)))))
+    (check-type env maru/pair)
+    (case type-index
+      (#.(list +maru/type-index/undefined+
+               +maru/type-index/long+
+               +maru/type-index/double+
+               +maru/type-index/string+
+               +maru/type-index/form+
+               +maru/type-index/subr+
+               +maru/type-index/fixed+)
+       object)
+      (#.+maru/type-index/pair+
+       (let ((head (maru/eval (maru/get-head object) env)))
+         (if (maru/fixed? head)
+             (progn
+               (eval.dribble "applying fixed ~S" head)
+               (setf head (maru/apply (maru/fixed/function head)
+                                      (maru/get-tail object)
+                                      env)))
+             (let ((args (maru/eval-list (maru/get-tail object) env)))
+               (setf head (maru/apply head args env))))
+         (eval.debug "EVAL~S< yields ~S" *depth* head)
+         head))
+      (#.+maru/type-index/symbol+
+       (let* ((ass (maru/find-variable env object :otherwise :error))
+              (result (maru/get-tail ass)))
+         (eval.debug "EVAL~S< yields ~S" *depth* result)
+         result))
+      (t
+       (error "Don't know how to evaluate ~S, of type-index ~S" object type-index)))))
 
 (defun maru/expand (expression &optional (env (global-namespace-of *eval-context*)))
   (let ((*depth* (1+ *depth*)))
@@ -641,9 +543,9 @@
                (eval.dribble "EXPAND~S< => ~S" *depth* expanded)
                (return-from maru/expand expanded)))
            (let ((tail (maru/get-tail expression)))
-             (when (not (eq (maru-symbol "quote") head))
+             (when (not (eq (maru/intern "quote") head))
                (setf tail (maru/expand-list tail env)))
-             (when (and (eq (maru-symbol "set") head)
+             (when (and (eq (maru/intern "set") head)
                         (is-pair? (maru/car tail))
                         (is-symbol? (maru/car (maru/car tail))))
                (let* ((name (maru/get-head (maru/get-head tail)))
@@ -659,7 +561,7 @@
            (when (and form
                       (not (is-nil? form)))
              (let* ((args (maru/cons expression nil))
-                    (applied (maru/apply form args (maru-symbol "nil")))
+                    (applied (maru/apply form args (maru/intern "nil")))
                     (expanded (maru/expand applied env)))
                (setf result expanded))))))
       (expander.debug "EXPAND~S< ~S => ~S" *depth* expression result)
@@ -688,15 +590,15 @@
          (when (is-symbol? formals)
            (let ((tmp (maru/cons formals actuals)))
              (setf callee (maru/cons tmp callee))
-             (setf actuals (maru-symbol "nil"))))
+             (setf actuals (maru/intern "nil"))))
          (unless (is-nil? actuals)
            (error "Too many arguments applying ~S to ~S" function arguments))
          (when (locals-are-namespace? *eval-context*)
-           (let ((tmp (maru/cons (maru-symbol/*locals*-of *eval-context*)
-                                 (maru-symbol "nil"))))
+           (let ((tmp (maru/cons (maru/intern "*locals*")
+                                 (maru/intern "nil"))))
              (setf callee (maru/cons tmp callee))
              (maru/set-tail tmp callee)))
-         (let ((ans (maru-symbol "nil"))
+         (let ((ans (maru/intern "nil"))
                (body (maru/cdr defn)))
            (loop
              :while (is-pair? body)

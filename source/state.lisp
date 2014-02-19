@@ -22,11 +22,6 @@
 (defun initialize-maru-state ()
   (check-type *eval-context* eval-context)
 
-  ;; intern and store symbols
-  (dolist (name *well-known-maru-symbol-names*)
-    (setf (slot-value *eval-context* (well-known-maru-symbol-name->eval-context-slot-name name))
-          (maru/intern name)))
-
   (setf (global-namespace-of *eval-context*) (make-global-namespace))
 
   (flet ((maru/define-in-global-namespace (name &optional value)

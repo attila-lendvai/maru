@@ -42,7 +42,7 @@
          (let ((-subr- ',subr-name))
            (declare (ignorable -subr-))
            ,@(when expected-arg-count
-                   `((proper-arity-or-die -subr- ,expected-arg-count -args-)))
+               `((proper-arity-or-die -subr- ,expected-arg-count -args-)))
            ,@body)))))
 
 ;;;
@@ -51,8 +51,10 @@
 
 (def-subr (invoke-debugger)
   (break "Maru invoked the debugger with args ~S in env ~S" -args- -env-)
-  (maru-symbol "nil"))
+  (maru/intern "nil"))
 
+(def-subr (optimised)
+  0)
 
 ;;;
 ;;; predefined maru, fixed
@@ -60,9 +62,9 @@
 
 (def-subr (if :fixed t)
   (if (not (eq (maru/eval (first -args-) -env-)
-               (maru-symbol "nil")))
+               (maru/intern "nil")))
       (maru/eval (maru/second -args-) -env-)
-      (let ((result (maru-symbol "nil"))
+      (let ((result (maru/intern "nil"))
             (else (maru/cddr -args-)))
         (loop
           :while (is-pair? else)
@@ -72,24 +74,24 @@
         result)))
 
 (def-subr (and :fixed t)
-  (let ((result (maru-symbol "t")))
+  (let ((result (maru/intern "t")))
     (loop
       :for cell = -args- :then (maru/rest cell)
       :while (is-pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
-      (when (eq (maru-symbol "nil") result)
+      (when (eq (maru/intern "nil") result)
         (return)))
     result))
 
 (def-subr (or :fixed t)
-  (let ((result (maru-symbol "nil")))
+  (let ((result (maru/intern "nil")))
     (loop
       :for cell = -args- :then (maru/rest cell)
       :while (is-pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
-      (when (not (eq (maru-symbol "nil") result))
+      (when (not (eq (maru/intern "nil") result))
         (return)))
     result))
 
@@ -102,43 +104,43 @@
          (val (maru/eval (maru/second -args-) -env-)))
     (when (and (maru/expr? val)
                (eq (maru/expr/name val)
-                   (maru-symbol "nil")))
+                   (maru/intern "nil")))
       (setf (maru/expr/name val) sym))
     (maru/set-tail var val)
     val))
 
 (def-subr (let :fixed t)
   (eval.dribble "LET with bindings ~S" (maru/first -args-))
-  (let* ((bound (maru/cons (maru-symbol "nil")
-                           (maru-symbol "nil")))
+  (let* ((bound (maru/cons (maru/intern "nil")
+                           (maru/intern "nil")))
          (ptr bound))
     (loop
       :for cell = (maru/first -args-) :then (maru/get-tail cell)
       :while (is-pair? cell)
       :for binding = (maru/get-head cell)
       :do
-      (let ((name (maru-symbol "nil"))
-            (value (maru-symbol "nil")))
+      (let ((name (maru/intern "nil"))
+            (value (maru/intern "nil")))
         (if (is-pair? binding)
             (progn
               (setf name (maru/first binding))
-              (setf value (if (eq (maru-symbol "nil")
+              (setf value (if (eq (maru/intern "nil")
                                   (maru/second binding))
-                              (maru-symbol "nil")
+                              (maru/intern "nil")
                               (maru/eval (maru/second binding) -env-))))
             (progn
               (unless (is-symbol? binding)
                 (error "~S as a binding is illegal in ~S" binding -subr-))
               (setf name binding)))
-        (setf ptr (maru/set-tail ptr (maru/cons (maru-symbol "nil")
-                                                (maru-symbol "nil"))))
+        (setf ptr (maru/set-tail ptr (maru/cons (maru/intern "nil")
+                                                (maru/intern "nil"))))
         (maru/set-head ptr (maru/cons name value))))
     (maru/set-tail ptr -env-)
     (if (locals-are-namespace? *eval-context*)
-        (maru/set-head bound (maru/cons (maru-symbol "*locals*")
+        (maru/set-head bound (maru/cons (maru/intern "*locals*")
                                         bound))
         (setf bound (maru/get-tail bound)))
-    (let ((result (maru-symbol "nil")))
+    (let ((result (maru/intern "nil")))
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
         :while (is-pair? cell)
@@ -148,13 +150,13 @@
 (def-subr (while :fixed t)
   (let ((test (maru/first -args-)))
     (loop
-      :until (eq (maru-symbol "nil") (maru/eval test -env-))
+      :until (eq (maru/intern "nil") (maru/eval test -env-))
       :do
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
         :while (is-pair? cell)
         :do (maru/eval (maru/get-head cell) -env-))))
-  (maru-symbol "nil"))
+  (maru/intern "nil"))
 
 (def-subr (quote :fixed t :expected-arg-count 1)
   (maru/car -args-))
@@ -183,12 +185,12 @@
 (def-subr (defined?)
   (let* ((name (maru/car -args-))
          (env (maru/car (maru/cdr -args-))))
-    (when (eq (maru-symbol "nil")
+    (when (eq (maru/intern "nil")
               env)
       (setf env (maru/get-var (globals-of *eval-context*))))
     (if (maru/find-variable env name :otherwise nil)
-        (maru-symbol "t")
-        (maru-symbol "nil"))))
+        (maru/intern "t")
+        (maru/intern "nil"))))
 
 (defmacro def-binary-arithmetic-subr (operator &optional (lisp-operator operator))
   `(def-subr (,operator :expected-arg-count 2)
@@ -295,14 +297,14 @@
 (def-subr (expand)
   (let ((expr (maru/car -args-))
         (env (maru/car (maru/cdr -args-))))
-    (when (eq env (maru-symbol "nil"))
+    (when (eq env (maru/intern "nil"))
       (setf env -env-))
     (maru/expand expr env)))
 
 (def-subr (eval)
   (let ((expr (maru/car -args-))
         (env (maru/car (maru/cdr -args-))))
-    (when (eq env (maru-symbol "nil"))
+    (when (eq env (maru/intern "nil"))
       (setf env (globals-of *eval-context*)))
     (let ((expanded (maru/expand expr env)))
       (maru/eval expanded env))))
@@ -326,33 +328,31 @@
 (def-subr (current-environment)
   -env-)
 
-(def-subr (type-of)
-  (proper-arity-or-die -subr- 1 -args-)
-  (not-yet-implemented)
-  (maru-symbol "nil"))
+(def-subr (type-of :expected-arg-count 1)
+  (maru/type-index-of (maru/first -args-)))
 
 (def-subr (print)
   (loop
     :for cell = -args- :then (maru/cdr -args-)
     :while (is-pair? cell)
     :do (print (maru/car cell)))
-  (maru-symbol "nil"))
+  (maru/intern "nil"))
 
 (def-subr (dump)
   (loop
     :for cell = -args- :then (maru/cdr -args-)
     :while (is-pair? cell)
     :do (print (maru/car cell)))
-  (maru-symbol "nil"))
+  (maru/intern "nil"))
 
 (def-subr (format)
   (not-yet-implemented)
-  (maru-symbol "nil"))
+  (maru/intern "nil"))
 
 (def-subr (form)
   (make-maru/form (maru/car -args-) (maru/car (maru/cdr -args-))))
 
-(def-subr (cons :expected-arg-count 2)
+(def-subr (cons)
   (maru/cons (maru/first -args-) (maru/second -args-)))
 
 (def-subr (pair? :expected-arg-count 1)
@@ -401,11 +401,11 @@
 
 (def-subr (set-string-at :expected-arg-count 3)
   (let ((object (maru/first -args-))
-        (value (maru/second -args-))
-        (index (maru/third -args-)))
+        (index (maru/second -args-))
+        (value (maru/third -args-)))
     (check-type object maru/string)
     (check-type index maru/long)
-    (check-type value maru/character)
+    ;; TODO character will probably arrive here as a long, convert to lisp char
     (setf (elt object index) value)))
 
 (def-subr (string-copy)
@@ -417,11 +417,11 @@
 (def-subr (symbol-compare)
   (not-yet-implemented))
 
-(def-subr (string->symbol)
-  (not-yet-implemented))
+(def-subr (string->symbol :expected-arg-count 1)
+  (maru/intern (maru/first -args-)))
 
-(def-subr (symbol->string)
-  (not-yet-implemented))
+(def-subr (symbol->string :expected-arg-count 1)
+  (symbol-name (maru/first -args-)))
 
 (def-subr (long->double)
   (not-yet-implemented))
@@ -436,19 +436,44 @@
   (not-yet-implemented))
 
 (def-subr (array)
-  (not-yet-implemented))
+  (let* ((arg (maru/car -args-))
+         (num (cond
+                ((is-long? arg)
+                 arg)
+                ((is-nil? arg)
+                 0)
+                (t (error "Illegal argument to array: ~S" arg)))))
+    (make-array num :adjustable t)))
 
 (def-subr (array?)
   (not-yet-implemented))
 
-(def-subr (array-length)
-  (not-yet-implemented))
+(def-subr (array-length :expected-arg-count 1)
+  (let ((array (maru/first -args-)))
+    (check-type array array)
+    (array-dimension array 0)))
 
-(def-subr (array-at)
-  (not-yet-implemented))
+(def-subr (array-at :expected-arg-count 2)
+  (let ((array (maru/first -args-))
+        (index (maru/second -args-)))
+    (check-type array array)
+    (check-type index (integer 0))
+    (aref array index)))
 
-(def-subr (set-array-at)
-  (not-yet-implemented))
+(def-subr (set-array-at :expected-arg-count 3)
+  (let ((array (maru/first -args-))
+        (index (maru/second -args-))
+        (value (maru/third -args-)))
+    (check-type array array)
+    (check-type index (integer 0))
+    (loop
+      :while (>= index
+                 (array-dimension array 0))
+      :do (let ((new-array (adjust-array array (* 2 (max (array-dimension array 0)
+                                                         2)))))
+            ;; CLHS is unclear, so let's just assert it
+            (assert (eq array new-array))))
+    (setf (aref array index) value)))
 
 (def-subr (insert-array-at)
   (not-yet-implemented))
@@ -458,3 +483,51 @@
 
 (def-subr (data-length)
   (not-yet-implemented))
+
+;; TODO accessors
+
+(def-subr (subr)
+  (not-yet-implemented))
+
+(def-subr (subr-name :expected-arg-count 1)
+  (let ((subr (maru/first -args-)))
+    (copy-seq (maru/subr/name subr))))
+
+(def-subr (allocate :expected-arg-count 2)
+  (let ((type (maru/first -args-))
+        (size (maru/second -args-)))
+    (maru/allocate type size)))
+
+(def-subr (allocate-atomic :expected-arg-count 2)
+  (let ((type (maru/first -args-))
+        (size (maru/second -args-)))
+    (maru/allocate type size)))
+
+(def-subr (oop-at :expected-arg-count 2)
+  (let ((object (maru/first -args-))
+        (index (maru/second -args-)))
+    (check-type index maru/long)
+    (etypecase object
+      (maru/oops
+       (aref (maru/oops/bits object) index))
+      #+nil
+      (maru/data
+       (aref (maru/data/bits object) index)))))
+
+(def-subr (set-oop-at :expected-arg-count 3)
+  (let ((object (maru/first -args-))
+        (index (maru/second -args-))
+        (value (maru/third -args-)))
+    (check-type index maru/long)
+    (etypecase object
+      (maru/oops
+       (setf (aref (maru/oops/bits object) index) value))
+      #+nil
+      (maru/data
+       (aref (maru/data/bits object) index)))))
+
+(def-subr (not :expected-arg-count 1)
+  (if (eq (maru/intern "nil")
+          (maru/first -args-))
+      (maru/intern "t")
+      (maru/intern "nil")))

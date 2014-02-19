@@ -8,6 +8,7 @@
                                      (:file "utils" :depends-on ("package"))
                                      (:file "logger" :depends-on ("utils"))
                                      (:file "character-table" :depends-on ("package"))
-                                     (:file "eval" :depends-on ("character-table" "logger"))
+                                     (:file "types" :depends-on ("character-table" "logger"))
+                                     (:file "eval" :depends-on ("character-table" "logger" "types"))
                                      (:file "subrs" :depends-on ("eval" "logger"))
                                      (:file "state" :depends-on ("eval" "subrs"))))))

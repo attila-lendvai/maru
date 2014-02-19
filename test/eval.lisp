@@ -25,22 +25,22 @@
     (is (null (maru/find-variable env (maru/intern "zork") :otherwise nil)))
     (values)))
 
-(deftest test/expand/simple ()
+(deftest test/eval/expand/simple ()
   (let ((form (maru/read-expression "(define unit-testing? '(t))")))
     (is (equal form
                (maru/expand form (global-namespace-of *eval-context*))))))
 
 (deftest test/eval/simple/1 ()
-  (is (eql (maru-symbol "t") (read-and-run "'t")))
-  (signals error (read-and-run "nil"))
+  (is (eql (maru/intern "t") (read-and-run "'t")))
+  (is (eql (maru/intern "nil") (read-and-run "nil")))
   (is (eql (global-namespace-of *eval-context*) (read-and-run "*globals*")))
   (is (eql 4 (read-and-run "(+ 2 2)")))
   (is (eql 42 (read-and-run "(if 't 42)")))
   (is (eql 43 (read-and-run "(if 'nil 42 43)")))
   (is (eql 44 (read-and-run "(or 'nil 44)")))
   (is (eql 45 (read-and-run "(and 44 45)")))
-  (is (eql (maru-symbol "t") (read-and-run "(and)")))
-  (is (eql (maru-symbol "nil") (read-and-run "(or)")))
+  (is (eql (maru/intern "t") (read-and-run "(and)")))
+  (is (eql (maru/intern "nil") (read-and-run "(or)")))
   (finishes (read-and-run "(define unit-testing? '(t))")))
 
 (deftest test/eval/simple/2 ()
@@ -67,6 +67,28 @@
                (read-and-run "((lambda () (list 1 2 3)))")))
     (is (equal ref
                (read-and-run "(let (foo) (set foo ((lambda () (list 1 2 3)))) foo)")))))
+
+(deftest test/eval/types/1 ()
+  (macrolet
+      ((frob (&body entries)
+         `(progn
+            ,@(loop
+                :for entry :in entries
+                :collect `(is (eql (read-and-run ,(first entry))
+                                   ,(second entry)))))))
+    (frob
+     ("(type-of 'nil)"           +maru/type-index/undefined+)
+     ;; TODO ("(allocate 42)" +maru/type-index/data+)
+     ("(type-of 42)"             +maru/type-index/long+)
+     ("(type-of 42.43)"          +maru/type-index/double+)
+     ("(type-of \"str\")"        +maru/type-index/string+)
+     ("(type-of 'sym)"           +maru/type-index/symbol+)
+     ("(type-of (cons 'nil 'nil))" +maru/type-index/pair+)
+     ("(type-of (array 1))"      +maru/type-index/array+)
+     ;; TODO                     +maru/type-index/expr+
+     ("(type-of (form 42))"      +maru/type-index/form+)
+     ("(type-of let)"            +maru/type-index/fixed+)
+     ("(type-of +)"              +maru/type-index/subr+))))
 
 (deftest test/eval/bug/1 ()
   ;; verbatim from boot.l
@@ -102,7 +124,6 @@
 			   (qq-element object)
 			 (list 'quote object))))
       (lambda (expr)
-        (print expr)
 	(qq-object expr)))))"))
   (dolist (entry '(("(foo 42)"
                     "`(foo ,42)")

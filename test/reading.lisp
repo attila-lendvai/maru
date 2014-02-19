@@ -4,7 +4,7 @@
 
 (in-suite test/reading)
 
-(deftest test/reading/simple ()
+(deftest test/reading/simple/1 ()
   (labels ((recurse (form)
              (etypecase form
                (cons
@@ -39,6 +39,11 @@
     (is (equal expr
                '(maru::|quasiquote| (1 . maru::|nil|))))))
 
-(deftest test/reading/boot.l ()
+(deftest test/reading/numbers/1 ()
+  (is (eql (maru/read-expression "-1") -1))
+  (is (equal (maru/read-expression "(- 1)")
+             '(maru::- 1 . maru::|nil|))))
+
+(deftest (test/reading/boot.l :auto-call nil) ()
   (finishes (maru/repl-on-stream (asdf:system-relative-pathname :maru "../../boot.l"))))
 
