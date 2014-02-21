@@ -6,7 +6,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun fun-name-from-subr-name (name)
-    (assert (is-symbol? name))
+    (assert (maru/symbol? name))
     (format-symbol :maru.eval "MARU/SUBR/~A" (string-upcase (symbol-name name)))))
 
 (defun arity-error (operator-name expected actual)
@@ -67,7 +67,7 @@
       (let ((result (maru/intern "nil"))
             (else (maru/cddr -args-)))
         (loop
-          :while (is-pair? else)
+          :while (maru/pair? else)
           :do
           (setf result (maru/eval (maru/get-head else) -env-))
           (setf else (maru/cdr else)))
@@ -77,7 +77,7 @@
   (let ((result (maru/intern "t")))
     (loop
       :for cell = -args- :then (maru/rest cell)
-      :while (is-pair? cell)
+      :while (maru/pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
       (when (eq (maru/intern "nil") result)
@@ -88,7 +88,7 @@
   (let ((result (maru/intern "nil")))
     (loop
       :for cell = -args- :then (maru/rest cell)
-      :while (is-pair? cell)
+      :while (maru/pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
       (when (not (eq (maru/intern "nil") result))
@@ -98,7 +98,7 @@
 (def-subr (set :fixed t :expected-arg-count 2)
   (let* ((sym (maru/first -args-))
          (var (progn
-                (unless (is-symbol? sym)
+                (unless (maru/symbol? sym)
                   (error "~S can only set variables denoted by symbols, but it got ~S" -subr- sym))
                 (maru/find-variable -env- sym :otherwise :error)))
          (val (maru/eval (maru/second -args-) -env-)))
@@ -116,12 +116,12 @@
          (ptr bound))
     (loop
       :for cell = (maru/first -args-) :then (maru/get-tail cell)
-      :while (is-pair? cell)
+      :while (maru/pair? cell)
       :for binding = (maru/get-head cell)
       :do
       (let ((name (maru/intern "nil"))
             (value (maru/intern "nil")))
-        (if (is-pair? binding)
+        (if (maru/pair? binding)
             (progn
               (setf name (maru/first binding))
               (setf value (if (eq (maru/intern "nil")
@@ -129,7 +129,7 @@
                               (maru/intern "nil")
                               (maru/eval (maru/second binding) -env-))))
             (progn
-              (unless (is-symbol? binding)
+              (unless (maru/symbol? binding)
                 (error "~S as a binding is illegal in ~S" binding -subr-))
               (setf name binding)))
         (setf ptr (maru/set-tail ptr (maru/cons (maru/intern "nil")
@@ -143,7 +143,7 @@
     (let ((result (maru/intern "nil")))
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
-        :while (is-pair? cell)
+        :while (maru/pair? cell)
         :do (setf result (maru/eval (maru/get-head cell) bound)))
       result)))
 
@@ -154,7 +154,7 @@
       :do
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
-        :while (is-pair? cell)
+        :while (maru/pair? cell)
         :do (maru/eval (maru/get-head cell) -env-))))
   (maru/intern "nil"))
 
@@ -217,13 +217,13 @@
 (def-binary-arithmetic-subr /)
 (def-binary-arithmetic-subr % mod)
 (def-subr (-)
-  (unless (is-pair? -args-)
+  (unless (maru/pair? -args-)
     (arity-error -subr- "at least 1" (maru/length -args-)))
   (let ((lhs (maru/get-head -args-))
         (args (maru/rest -args-)))
-    (if (is-pair? args)
+    (if (maru/pair? args)
         (let ((rhs (maru/get-head -args-)))
-          (when (is-pair? (maru/rest -args-))
+          (when (maru/pair? (maru/rest -args-))
             (arity-error -subr- "at most 2" (maru/length -args-)))
           (cond
             ((typep lhs 'maru/long)
@@ -310,14 +310,14 @@
       (maru/eval expanded env))))
 
 (def-subr (apply)
-  (unless (is-pair? -args-)
+  (unless (maru/pair? -args-)
     (arity-error -subr- "2+" (maru/length -args-)))
   (let* ((fun (maru/first -args-))
          (a -args-)
          (b (maru/get-tail a))
          (c (maru/cdr b)))
     (loop
-      :while (is-pair? c)
+      :while (maru/pair? c)
       :do
       (setf a b)
       (setf c (maru/cdr (setf b c))))
@@ -329,19 +329,19 @@
   -env-)
 
 (def-subr (type-of :expected-arg-count 1)
-  (maru/type-index-of (maru/first -args-)))
+  (maru/type-of (maru/first -args-)))
 
 (def-subr (print)
   (loop
     :for cell = -args- :then (maru/cdr -args-)
-    :while (is-pair? cell)
+    :while (maru/pair? cell)
     :do (print (maru/car cell)))
   (maru/intern "nil"))
 
 (def-subr (dump)
   (loop
     :for cell = -args- :then (maru/cdr -args-)
-    :while (is-pair? cell)
+    :while (maru/pair? cell)
     :do (print (maru/car cell)))
   (maru/intern "nil"))
 
@@ -356,7 +356,7 @@
   (maru/cons (maru/first -args-) (maru/second -args-)))
 
 (def-subr (pair? :expected-arg-count 1)
-  (maru/bool (is-pair? (maru/first -args-))))
+  (maru/bool (maru/pair? (maru/first -args-))))
 
 (def-subr (car :expected-arg-count 1)
   (maru/car (maru/first -args-)))
@@ -371,7 +371,7 @@
   (maru/set-tail (maru/first -args-) (maru/second -args-)))
 
 (def-subr (symbol? :expected-arg-count 1)
-  (maru/bool (is-symbol? (maru/first -args-))))
+  (maru/bool (maru/symbol? (maru/first -args-))))
 
 (def-subr (string? :expected-arg-count 1)
   (maru/bool (typep (maru/first -args-) 'string)))
@@ -438,12 +438,12 @@
 (def-subr (array)
   (let* ((arg (maru/car -args-))
          (num (cond
-                ((is-long? arg)
+                ((maru/long? arg)
                  arg)
-                ((is-nil? arg)
+                ((maru/nil? arg)
                  0)
                 (t (error "Illegal argument to array: ~S" arg)))))
-    (make-array num :adjustable t)))
+    (make-array num :adjustable t :initial-element (maru/intern "nil"))))
 
 (def-subr (array?)
   (not-yet-implemented))
@@ -456,24 +456,13 @@
 (def-subr (array-at :expected-arg-count 2)
   (let ((array (maru/first -args-))
         (index (maru/second -args-)))
-    (check-type array array)
-    (check-type index (integer 0))
-    (aref array index)))
+    (maru/array-at array index)))
 
 (def-subr (set-array-at :expected-arg-count 3)
   (let ((array (maru/first -args-))
         (index (maru/second -args-))
         (value (maru/third -args-)))
-    (check-type array array)
-    (check-type index (integer 0))
-    (loop
-      :while (>= index
-                 (array-dimension array 0))
-      :do (let ((new-array (adjust-array array (* 2 (max (array-dimension array 0)
-                                                         2)))))
-            ;; CLHS is unclear, so let's just assert it
-            (assert (eq array new-array))))
-    (setf (aref array index) value)))
+    (maru/set-array-at array index value)))
 
 (def-subr (insert-array-at)
   (not-yet-implemented))

@@ -12,8 +12,6 @@
 ;;
 ;; Anything else leaking into the maru universe is a bug.
 
-(defvar *eval-context*)
-
 ;; helper for the debug output
 (defparameter *depth* 0)
 
@@ -21,179 +19,6 @@
 
 (defparameter *predefined-subr-names* (list))
 (defparameter *predefined-fixed-names* (list))
-
-(declaim (inline maru/cons maru/get-head maru/get-tail
-                 maru/get-var maru/set-var
-                 maru/append maru/length
-                 maru/car maru/cdr maru/cddr maru/rest maru/first maru/second maru/third
-                 maru/lookup
-                 maru/bool))
-
-#+nil
-(hu.dwim.defclass-star:defclass* eval-context ()
-  (;;(current-line 0)
-   ;;(current-path)
-   ;;(current-source)
-   (locals-are-namespace? nil :type boolean)
-   (global-namespace)
-   (globals)
-   (expanders)
-   (evaluators)
-   (applicators)))
-
-;; macroexpansion of the above to lower dependencies
-(defclass eval-context ()
-  (;;(current-line :initform 0 :accessor current-line-of :initarg :current-line)
-   ;;(current-path :accessor current-path-of :initarg :current-path)
-   ;;(current-source :accessor current-source-of :initarg :current-source)
-   (locals-are-namespace? :initform nil :accessor locals-are-namespace? :initarg :locals-are-namespace? :type boolean)
-   (global-namespace :accessor global-namespace-of :initarg :global-namespace)
-   (globals :accessor globals-of :initarg :globals)
-   (expanders :accessor expanders-of :initarg :expanders)
-   (evaluators :accessor evaluators-of :initarg :evaluators)
-   (applicators :accessor applicators-of :initarg :applicators)))
-
-(defun make-eval-context ()
-  (make-instance 'eval-context))
-
-(defun maru/bool (value)
-  (if value
-      (maru/intern "t")
-      (maru/intern "nil")))
-
-(defun maru/cons (car cdr)
-  (cons (or car (maru/intern "nil"))
-        (or cdr (maru/intern "nil"))))
-
-(defun maru/length (object)
-  (loop
-    :for cell = object :then (maru/cdr cell)
-    :until (is-nil? cell)
-    :count t))
-
-(defun maru/append (&rest lists)
-  (loop
-    :for list :in lists
-    :append (loop
-              :for cell = list :then (maru/cdr cell)
-              :until (is-nil? cell)
-              :collect (maru/car cell))))
-
-(defun maru/get-head (pair)
-  (check-type pair maru/pair)
-  (car pair))
-
-(defun maru/set-head (pair value)
-  (check-type pair maru/pair)
-  (setf value (or value (maru/intern "nil")))
-  (setf (car pair) value)
-  value)
-
-(defun maru/get-tail (pair)
-  (check-type pair maru/pair)
-  (cdr pair))
-
-(defun maru/set-tail (pair value)
-  (check-type pair maru/pair)
-  (setf value (or value (maru/intern "nil")))
-  (setf (cdr pair) value)
-  value)
-
-(defun maru/car (pair)
-  (if (is-nil? pair)
-      (maru/intern "nil")
-      (car pair)))
-
-(defun maru/cdr (pair)
-  (if (is-nil? pair)
-      (maru/intern "nil")
-      (cdr pair)))
-
-(defun maru/cddr (pair)
-  (maru/cdr (maru/cdr pair)))
-
-(defun maru/rest (pair)
-  (maru/cdr pair))
-
-(defun maru/first (pair)
-  (maru/car pair))
-
-(defun maru/second (pair)
-  (maru/car (maru/cdr pair)))
-
-(defun maru/third (pair)
-  (maru/car (maru/cdr (maru/cdr pair))))
-
-;; FIXME rename to what? find-environment-entry?
-(defun maru/find-environment (env &key otherwise)
-  ;; TODO rewrite to something lispy
-  (loop
-    :with entry = env
-    :while (typep entry 'maru/pair)
-    :for ass = (maru/get-head entry)
-    :do (if (and (typep ass 'maru/pair)
-                 (eq (maru/get-tail ass) entry))
-            (return-from maru/find-environment entry)
-            (setf entry (maru/get-tail entry))))
-  (handle-otherwise/value otherwise :default-message `("Failed to find environment ~S" ,env)))
-
-(defun maru/find-variable-2 (env name)
-  (eval.dribble "MARU/FIND-VARIABLE-2 for ~S in ~S" name env)
-  (loop
-    :until (is-nil? env)
-    :do
-    ;; (eval.dribble "MARU/FIND-VARIABLE-2 looking at env ~S" env)
-    (let ((ass (maru/get-head env)))
-      (if (eq name (maru/car ass))
-          (progn
-            (eval.dribble "MARU/FIND-VARIABLE-2 is returning with ~S" ass)
-            (return-from maru/find-variable-2 ass))
-          (setf env (maru/get-tail env)))))
-  (eval.dribble "MARU/FIND-VARIABLE-2 is returning without a match")
-  nil)
-
-(defun maru/find-variable (env name &key otherwise)
-  (loop
-    :until (is-nil? env)
-    :do (if (eq env (global-namespace-of *eval-context*))
-            (let ((ass (maru/find-variable-2 env name)))
-              (return-from maru/find-variable
-                (or ass
-                    (handle-otherwise/value otherwise :default-message `("Failed to find variable ~S" ,name)))))
-            (let ((ass (maru/get-head env)))
-              (if (eq name (maru/car ass))
-                  (return-from maru/find-variable ass)
-                  (setf env (maru/get-tail env))))))
-  (handle-otherwise/value otherwise :default-message `("Failed to find variable ~S" ,name)))
-
-(defun maru/find-namespace-variable (env name)
-  (let ((beg (maru/find-environment env :otherwise :error))
-        (end (maru/find-environment (maru/cdr env) :otherwise (maru/intern "nil"))))
-    ;;(eval.dribble "MARU/FIND-NAMESPACE-VARIABLE beg ~S end ~S" beg end)
-    (loop
-      :until (eq beg end)
-      :for ass = (maru/car beg)
-      :do (if (eq name (maru/car ass))
-              (return-from maru/find-namespace-variable ass)
-              (setf beg (maru/get-tail beg)))))
-  nil)
-
-(defun maru/lookup (env name)
-  (maru/cdr (maru/find-variable env name)))
-
-(defun maru/get-var (thing)
-  (maru/get-tail thing))
-
-(defun maru/set-var (thing value)
-  (maru/set-tail thing value))
-
-(defun maru/define (env name value)
-  (let* ((env (maru/find-environment env :otherwise :error))
-         (binding (maru/cons nil (maru/get-tail env))))
-    (maru/set-tail env binding)
-    (setf binding (maru/set-head binding (maru/cons name value)))
-    (eval.dribble "Defined new binding, name ~S, value ~S, in env ~S" name value env)
-    binding))
 
 (defmacro with-file-input ((var path) &body body)
   `(let ((*current-file* ,path))
@@ -473,7 +298,7 @@
             (maru/form/function value)))))))
 
 (defun maru/find-form-symbol (env var)
-  (assert (is-symbol? var))
+  (assert (maru/symbol? var))
   (let ((var (maru/find-variable env var)))
     (when var
       (let ((value (maru/get-var var)))
@@ -481,7 +306,7 @@
           (maru/form/symbol value))))))
 
 (defun maru/expand-list (expression-list env)
-  (if (is-pair? expression-list)
+  (if (maru/pair? expression-list)
       (let ((head (maru/expand (maru/get-head expression-list) env))
             (tail (maru/expand-list (maru/get-tail expression-list) env)))
         (maru/cons head tail))
@@ -496,7 +321,7 @@
 
 (defun maru/eval (object &optional (env (global-namespace-of *eval-context*)))
   (let ((*depth* (1+ *depth*))
-        (type-index (maru/type-index-of object)))
+        (type-index (maru/type-of object)))
     (eval.debug "EVAL~S> ~S" *depth* object)
     (check-type env maru/pair)
     (case type-index
@@ -546,8 +371,8 @@
              (when (not (eq (maru/intern "quote") head))
                (setf tail (maru/expand-list tail env)))
              (when (and (eq (maru/intern "set") head)
-                        (is-pair? (maru/car tail))
-                        (is-symbol? (maru/car (maru/car tail))))
+                        (maru/pair? (maru/car tail))
+                        (maru/symbol? (maru/car (maru/car tail))))
                (let* ((name (maru/get-head (maru/get-head tail)))
                       (setter-name (maru/intern (concatenate 'string "set-" (symbol-name name)))))
                  (setf head setter-name)
@@ -559,7 +384,7 @@
            (expander.dribble "expand (of a symbol) looked up ~S to form ~S" expression form)
            ;; FIXME there shouldn't be an AND there... smells fishy.
            (when (and form
-                      (not (is-nil? form)))
+                      (not (maru/nil? form)))
              (let* ((args (maru/cons expression nil))
                     (applied (maru/apply form args (maru/intern "nil")))
                     (expanded (maru/expand applied env)))
@@ -578,20 +403,20 @@
               ;; (caller env)
               (callee (maru/expr/environment function)))
          (loop
-           :while (is-pair? formals)
+           :while (maru/pair? formals)
            :do
-           (unless (is-pair? actuals)
+           (unless (maru/pair? actuals)
              (error "Too few arguments while applying ~S to ~S" function arguments))
            (let ((tmp (maru/cons (maru/get-head formals)
                                  (maru/get-head actuals))))
              (setf callee (maru/cons tmp callee))
              (setf formals (maru/get-tail formals))
              (setf actuals (maru/get-tail actuals))))
-         (when (is-symbol? formals)
+         (when (maru/symbol? formals)
            (let ((tmp (maru/cons formals actuals)))
              (setf callee (maru/cons tmp callee))
              (setf actuals (maru/intern "nil"))))
-         (unless (is-nil? actuals)
+         (unless (maru/nil? actuals)
            (error "Too many arguments applying ~S to ~S" function arguments))
          (when (locals-are-namespace? *eval-context*)
            (let ((tmp (maru/cons (maru/intern "*locals*")
@@ -601,7 +426,7 @@
          (let ((ans (maru/intern "nil"))
                (body (maru/cdr defn)))
            (loop
-             :while (is-pair? body)
+             :while (maru/pair? body)
              :do
              (setf ans (maru/eval (maru/get-head body) callee))
              (setf body (maru/get-tail body)))

@@ -2,49 +2,144 @@
 
 ;; if you change anything here, then make sure that the assumptions in boot.l are in sync (e.g. predefined type indexes)
 
-(declaim (inline is-pair? is-symbol? is-nil? is-long?
-                 maru/intern))
+(declaim (inline maru/oops? maru/array-at maru/set-array-at))
 
-(defun maru/intern (symbol-name)
-  (check-type symbol-name string)
-  (values (intern symbol-name :maru)))
+;; (define-function name-of-type (type)	(array-at %type-names type))
+(defun maru/name-of-type (type-index)
+  (let ((type-names (maru/get-var (maru/find-variable (global-namespace-of *eval-context*) (maru/intern "%type-names")))))
+    (maru/array-at type-names type-index)))
 
-(define-compiler-macro maru/intern (&whole form name)
-  (if (stringp name)
-      `(load-time-value (intern ,name :maru) t)
-      form))
+;;(define-function type-name-of (obj)	(name-of-type (type-of obj)))
+(defun maru/type-name-of (object)
+  (maru/name-of-type (maru/type-of object)))
 
-;; map some maru types to cl types, foo -> maru/foo
-;; when changing don't forget to update the type-of subr!
-(macrolet ((frob (&rest entries)
-             `(progn
-                ,@(loop
-                    :for entry :in entries
-                    :collect `(deftype ,(symbolicate '#:maru/ (first entry)) ()
-                                ,(second entry))))))
-  (frob
-   ;; (undefined 'null)
-   (double    'double-float)
-   (long      '(signed-byte 64))
-   (string    'string)
-   ;; (character 'character)
-   (pair      'cons)
-   (symbol    'symbol)
-   (array     'array)))
+;;;
+;;; array
+;;;
+(defun maru/array-at (array index)
+  (check-type array array)
+  (check-type index (integer 0))
+  (aref array index))
 
-;; define CL constants for type indexes of the predefined types
-(macrolet
-    ((frob (&rest types)
-       `(progn
-          ,@(loop
-              :for type :in types
-              :for index :upfrom 0
-              :collect `(defconstant ,(symbolicate "+MARU/TYPE-INDEX/" type "+") ,index)))))
-  (frob #:undefined #:data #:long #:double #:string #:symbol #:pair #:_array #:array #:expr #:form #:fixed #:subr))
+(defun maru/set-array-at (array index value)
+  (check-type array array)
+  (check-type index (integer 0))
+  (loop
+    :while (>= index
+               (array-dimension array 0))
+    :do (let ((new-array (adjust-array array
+                                       (* 2 (max (array-dimension array 0)
+                                                 2))
+                                       :initial-element (maru/intern "nil"))))
+          ;; CLHS is unclear, so let's just assert it
+          (assert (eq array new-array))))
+  (setf (aref array index) value))
 
-(defun maru/type-index-of (object)
+;;;
+;;; data
+;;;
+(defstruct (maru/data (:constructor %make-maru/data)
+                      (:conc-name #:maru/data/)
+                      (:predicate maru/data?))
+  (bits #() :type vector))
+
+(defun make-maru/data (size)
+  (let ((object (%make-maru/data)))
+    (setf (maru/data/bits object) (make-array size :initial-element (maru/intern "nil")))
+    object))
+
+;;;
+;;; data
+;;;
+(defclass maru/oops ()
+  ((type :initform +maru/type-index/undefined+
+         :type maru/long
+         :accessor maru/oops/type
+         :initarg :type)
+   (bits :initform #()
+         :type vector
+         :accessor maru/oops/bits
+         :initarg :bits)))
+
+(defun maru/oops? (thing)
+  (typep thing 'maru/oops))
+
+(defun make-maru/oops (type size)
+  (make-instance 'maru/oops
+                 :type type
+                 :bits (make-array size :initial-element (maru/intern "nil"))))
+
+(defun oop-at (object index)
+  (let ((bits (maru/oops/bits object)))
+    (aref bits index)))
+
+(defun set-oop-at (object index value)
+  (let ((bits (maru/oops/bits object)))
+    (setf (aref bits index) value)))
+
+(def-print-object (maru/oops :identity nil :type nil)
+  (let ((*print-right-margin* most-positive-fixnum))
+    (write-string (or (ignore-errors
+                        (symbol-name (maru/type-name-of -self-)))
+                      (princ-to-string (maru/type-of -self-))))
+    (write-string " :size ")
+    (princ (array-dimension (maru/oops/bits -self-) 0))))
+
+(defmacro define-maru-struct ((name type-code &key (constructor-name (symbolicate '#:make-maru/ name)))
+                              &body fields)
+  (let* ((type-checker-name (symbolicate '#:maru/ name '#:?))
+         (inlined-function-names (list type-checker-name constructor-name))
+         (definitions (list*
+                       `(defun ,constructor-name (,@fields)
+                          (let ((object (make-maru/oops ,type-code ,(length fields))))
+                            ,@(loop
+                                :for field :in fields
+                                :for index :upfrom 0
+                                :collect `(set-oop-at object ,index ,field))
+                            object))
+                       `(defun ,type-checker-name (object)
+                          (and (maru/oops? object)
+                               (= (maru/oops/type object) ,type-code)))
+                       (loop
+                         :for field :in fields
+                         :for index :upfrom 0
+                         :collect (let ((fn-name (symbolicate '#:maru/ name '#:/ field)))
+                                    (push fn-name inlined-function-names)
+                                    `(defun ,fn-name (object)
+                                       (assert (,type-checker-name object))
+                                       (oop-at object ,index)))
+                         :collect (let ((fn-name `(setf ,(symbolicate '#:maru/ name '#:/ field))))
+                                    (push fn-name inlined-function-names)
+                                    `(defun ,fn-name (value object)
+                                       (assert (,type-checker-name object))
+                                       (set-oop-at object ,index value)))))))
+    `(progn
+       (declaim (inline ,@inlined-function-names))
+       ,@definitions)))
+
+(define-maru-struct (fixed +maru/type-index/fixed+)
+  function)
+
+(define-maru-struct (expr +maru/type-index/expr+
+                     :constructor-name %make-maru/expr)
+  name
+  definition
+  environment)
+
+(defun make-maru/expr (definition environment)
+  (%make-maru/expr nil definition environment))
+
+(define-maru-struct (form +maru/type-index/form+)
+  function
+  symbol)
+
+(define-maru-struct (subr +maru/type-index/subr+)
+  name
+  impl)
+
+(defun maru/type-of (object)
   (cond
-    ((is-nil? object)
+    ((maru/nil? object)
      +maru/type-index/undefined+)
     (t
      (etypecase object
@@ -72,104 +167,6 @@
     (+maru/type-index/pair+
      (not-yet-implemented))
     (+maru/type-index/array+
-     (make-array size))
+     (make-array size :initial-element (maru/intern "nil")))
     (t
      (make-maru/oops type size))))
-
-(defun is-pair? (thing)
-  (typep thing 'maru/pair))
-
-(defun is-symbol? (thing)
-  (and (symbolp thing)
-       (progn
-         (assert (eq (symbol-package thing) (find-package :maru)))
-         t)))
-
-(defun is-nil? (thing)
-  (eq thing (maru/intern "nil")))
-
-(defun is-long? (thing)
-  (typep thing 'maru/long))
-
-(defstruct (maru/data (:constructor %make-maru/data)
-                      (:conc-name #:maru/data/)
-                      (:predicate maru/data?))
-  (bits #() :type vector))
-
-(defun make-maru/data (size)
-  (let ((object (%make-maru/data)))
-    (setf (maru/data/bits object) (make-array size))
-    object))
-
-(defstruct (maru/oops (:constructor %make-maru/oops)
-                      (:conc-name #:maru/oops/)
-                      (:predicate maru/oops?))
-  (type +maru/type-index/undefined+ :type maru/long)
-  (bits #() :type vector))
-
-(defun make-maru/oops (type size)
-  (let ((object (%make-maru/oops)))
-    (setf (maru/oops/type object) type)
-    (setf (maru/oops/bits object) (make-array size))
-    object))
-
-(defun oop-at (object index)
-  (let ((bits (maru/oops/bits object)))
-    (aref bits index)))
-
-(defun set-oop-at (object index value)
-  (let ((bits (maru/oops/bits object)))
-    (setf (aref bits index) value)))
-
-(defmacro define-maru-struct ((name type-code &key (constructor-name (symbolicate '#:make-maru/ name)))
-                              &body fields)
-  (let* ((type-checker-name (symbolicate '#:maru/ name '#:?))
-         (inlined-function-names (list type-checker-name constructor-name)))
-    `(progn
-       (defun ,constructor-name (,@fields)
-         (let ((object (make-maru/oops ,type-code ,(length fields))))
-           ,@(loop
-               :for field :in fields
-               :for index :upfrom 0
-               :collect `(set-oop-at object ,index ,field))
-           object))
-
-       (defun ,type-checker-name (object)
-         (and (maru/oops? object)
-              (= (maru/oops/type object) ,type-code)))
-
-       ,@(loop
-           :for field :in fields
-           :for index :upfrom 0
-           :collect (let ((fn-name (symbolicate '#:maru/ name '#:/ field)))
-                      (push fn-name inlined-function-names)
-                      `(defun ,fn-name (object)
-                         (assert (,type-checker-name object))
-                         (oop-at object ,index)))
-           :collect (let ((fn-name `(setf ,(symbolicate '#:maru/ name '#:/ field))))
-                      (push fn-name inlined-function-names)
-                      `(defun ,fn-name (value object)
-                         (assert (,type-checker-name object))
-                         (set-oop-at object ,index value))))
-
-       (declaim (inline ,@inlined-function-names)))))
-
-(define-maru-struct (fixed +maru/type-index/fixed+)
-  function)
-
-(define-maru-struct (expr +maru/type-index/expr+
-                     :constructor-name %make-maru/expr)
-  name
-  definition
-  environment)
-
-(defun make-maru/expr (definition environment)
-  (%make-maru/expr nil definition environment))
-
-(define-maru-struct (form +maru/type-index/form+)
-  function
-  symbol)
-
-(define-maru-struct (subr +maru/type-index/subr+)
-  name
-  impl)
