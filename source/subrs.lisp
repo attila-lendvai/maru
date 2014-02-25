@@ -305,7 +305,7 @@
   (let ((expr (maru/car -args-))
         (env (maru/car (maru/cdr -args-))))
     (when (eq env (maru/intern "nil"))
-      (setf env (globals-of *eval-context*)))
+      (setf env (maru/get-var (globals-of *eval-context*))))
     (let ((expanded (maru/expand expr env)))
       (maru/eval expanded env))))
 

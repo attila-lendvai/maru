@@ -78,10 +78,11 @@
     (setf (aref bits index) value)))
 
 (def-print-object (maru/oops :identity nil :type nil)
-  (let ((*print-right-margin* most-positive-fixnum))
+  (let ((*print-right-margin* most-positive-fixnum)
+        (type (maru/type-of -self-)))
     (write-string (or (ignore-errors
-                        (symbol-name (maru/type-name-of -self-)))
-                      (princ-to-string (maru/type-of -self-))))
+                        (symbol-name (maru/name-of-type type)))
+                      (princ-to-string type)))
     (write-string " :size ")
     (princ (array-dimension (maru/oops/bits -self-) 0))))
 

@@ -13,7 +13,8 @@
 ;; Anything else leaking into the maru universe is a bug.
 
 ;; helper for the debug output
-(defparameter *depth* 0)
+(defparameter *eval-depth* 0)
+(defparameter *backtrace* (list))
 
 (defparameter *current-file* nil)
 
@@ -274,7 +275,7 @@
        :with input = stream-designator
        :do
        (let ((expr (maru/read-expression input)))
-         (when (eq expr 'eof)
+         (when (eq expr 'done)
            (return))
          (let* ((global-env (maru/get-var (globals-of *eval-context*)))
                 (expanded (maru/expand expr global-env)))
@@ -291,7 +292,7 @@
 (defun maru/find-form-function (env var)
   ;; TODO shouldn't we fail early here instead of returning with nil?
   (when (typep var 'maru/symbol)
-    (let ((var (maru/find-variable env var)))
+    (let ((var (maru/find-variable env var :otherwise nil)))
       (when var
         (let ((value (maru/get-var var)))
           (when (maru/form? value)
@@ -299,7 +300,7 @@
 
 (defun maru/find-form-symbol (env var)
   (assert (maru/symbol? var))
-  (let ((var (maru/find-variable env var)))
+  (let ((var (maru/find-variable env var :otherwise nil)))
     (when var
       (let ((value (maru/get-var var)))
         (when (maru/form? value)
@@ -320,9 +321,10 @@
       object))
 
 (defun maru/eval (object &optional (env (global-namespace-of *eval-context*)))
-  (let ((*depth* (1+ *depth*))
+  (let ((*eval-depth* (1+ *eval-depth*))
+        (*backtrace* (list* (list :eval object :environment env) *backtrace*))
         (type-index (maru/type-of object)))
-    (eval.debug "EVAL~S> ~S" *depth* object)
+    (eval.debug "EVAL~S> ~S" *eval-depth* object)
     (check-type env maru/pair)
     (case type-index
       (#.(list +maru/type-index/undefined+
@@ -343,19 +345,20 @@
                                       env)))
              (let ((args (maru/eval-list (maru/get-tail object) env)))
                (setf head (maru/apply head args env))))
-         (eval.debug "EVAL~S< yields ~S" *depth* head)
+         (eval.debug "EVAL~S< yields ~S" *eval-depth* head)
          head))
       (#.+maru/type-index/symbol+
        (let* ((ass (maru/find-variable env object :otherwise :error))
               (result (maru/get-tail ass)))
-         (eval.debug "EVAL~S< yields ~S" *depth* result)
+         (eval.debug "EVAL~S< yields ~S" *eval-depth* result)
          result))
       (t
        (error "Don't know how to evaluate ~S, of type-index ~S" object type-index)))))
 
 (defun maru/expand (expression &optional (env (global-namespace-of *eval-context*)))
-  (let ((*depth* (1+ *depth*)))
-    (expander.debug "EXPAND~S> ~S" *depth* expression)
+  (let ((*eval-depth* (1+ *eval-depth*))
+        (*backtrace* (list* (list :expand expression :environment env) *backtrace*)))
+    (expander.debug "EXPAND~S> ~S" *eval-depth* expression)
     (let ((result expression))
       (cond
         ((typep expression 'maru/pair)
@@ -365,7 +368,7 @@
            (when form
              (let* ((head (maru/apply form (maru/get-tail expression) env))
                     (expanded (maru/expand head env)))
-               (eval.dribble "EXPAND~S< => ~S" *depth* expanded)
+               (eval.dribble "EXPAND~S< => ~S" *eval-depth* expanded)
                (return-from maru/expand expanded)))
            (let ((tail (maru/get-tail expression)))
              (when (not (eq (maru/intern "quote") head))
@@ -389,12 +392,13 @@
                     (applied (maru/apply form args (maru/intern "nil")))
                     (expanded (maru/expand applied env)))
                (setf result expanded))))))
-      (expander.debug "EXPAND~S< ~S => ~S" *depth* expression result)
+      (expander.debug "EXPAND~S< ~S => ~S" *eval-depth* expression result)
       result)))
 
 (defun maru/apply (function arguments env)
-  (let ((*depth* (1+ *depth*)))
-    (eval.dribble "APPLY~S> ~S to ~S" *depth* function arguments)
+  (let ((*eval-depth* (1+ *eval-depth*))
+        (*backtrace* (list* (list :apply function :arguments arguments :environment env) *backtrace*)))
+    (eval.dribble "APPLY~S> ~S to ~S" *eval-depth* function arguments)
     (cond
       ((maru/expr? function)
        (let* ((defn (maru/expr/definition function))
@@ -430,11 +434,59 @@
              :do
              (setf ans (maru/eval (maru/get-head body) callee))
              (setf body (maru/get-tail body)))
-           (eval.dribble "APPLY~S< => ~S" *depth* ans)
+           (eval.dribble "APPLY~S< => ~S" *eval-depth* ans)
            ans)))
       ((maru/fixed? function)
        (maru/apply (maru/fixed/function function) arguments env))
       ((maru/subr? function)
        (funcall (maru/subr/impl function) arguments env))
       (t
-       (error "Don't know how to apply ~S" function)))))
+       (let ((applicator (maru/array-at (maru/get-var (applicators-of *eval-context*))
+                                        (maru/type-of function))))
+         (if applicator
+             (let ((result (maru/apply applicator (maru/cons function arguments) env)))
+               (eval.dribble "APPLY~S< => ~S" *eval-depth* result)
+               result)
+             (error "Don't know how to apply ~S" function)))))))
+
+(defun print-backtrace (&key (stream *standard-output*))
+  (labels
+      ((to-cl-list (thing)
+         (cond
+           ((consp thing)
+            (cons (to-cl-list (car thing))
+                  (to-cl-list (cdr thing))))
+           ((maru/nil? thing)
+            nil)
+           ((eq thing (maru/intern "quote"))
+            'quote)
+           ((symbolp thing)
+            (assert (eq (symbol-package thing) (load-time-value (find-package :maru))))
+            ;; without copying they'll be the same identity and the printer will print them using the #n# syntax.
+            (copy-seq (symbol-name thing)))
+           (t
+            thing))))
+    (with-standard-io-syntax
+      (let ((*standard-output* stream)
+            (*print-circle* t)
+            (*print-readably* nil)
+            (*print-pretty* t)
+            (*print-escape* nil)
+            (*package* (find-package :maru)))
+        (loop
+          :for frame :in *backtrace*
+          :for index :upfrom 0
+          :do (destructuring-bind
+                    (&key expand eval apply environment arguments)
+                  frame
+                (declare (ignore environment))
+                (format t "~&~3,'0D: " index)
+                (cond
+                  (eval
+                   (format t "E ~A~%" (to-cl-list eval)))
+                  (expand
+                   (format t "X ~A~%" (to-cl-list expand)))
+                  (apply
+                   (format t "A ~A~%" (to-cl-list arguments)))
+                  (t
+                   (error "unexpected frame in backtrace")))))))))
