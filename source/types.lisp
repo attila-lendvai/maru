@@ -171,3 +171,6 @@
      (make-array size :initial-element (maru/intern "nil")))
     (t
      (make-maru/oops type size))))
+
+(defun maru/print (object &key (stream *standard-output*))
+  (prin1 object stream))

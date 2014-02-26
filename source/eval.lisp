@@ -268,26 +268,33 @@
      (with-file-input (stream input)
        (maru/read-expression stream)))))
 
-(defun maru/repl-on-stream (stream-designator)
-  (etypecase stream-designator
+(defun maru/repl (input-stream-designator &key output-stream prompt)
+  (etypecase input-stream-designator
     (stream
      (loop
-       :with input = stream-designator
+       :with input = input-stream-designator
+       :with output = (or output-stream
+                          (make-broadcast-stream))
        :do
+       (when prompt
+         (write-string prompt output)
+         (finish-output output))
        (let ((expr (maru/read-expression input)))
          (when (eq expr 'done)
            (return))
          (let* ((global-env (maru/get-var (globals-of *eval-context*)))
                 (expanded (maru/expand expr global-env)))
            (let ((evaluated (maru/eval expanded global-env)))
-             (eval.dribble "repl before printing, result is ~S" evaluated))))))
+             (eval.dribble "repl before printing, result is ~S" evaluated)
+             (maru/print evaluated :stream output)
+             (terpri output))))))
     (string
      (let ((*current-file* "from a string"))
-       (with-input-from-string (stream stream-designator)
-         (maru/repl-on-stream stream))))
+       (with-input-from-string (stream input-stream-designator)
+         (maru/repl stream))))
     (pathname
-     (with-file-input (stream stream-designator)
-       (maru/repl-on-stream stream)))))
+     (with-file-input (stream input-stream-designator)
+       (maru/repl stream)))))
 
 (defun maru/find-form-function (env var)
   ;; TODO shouldn't we fail early here instead of returning with nil?

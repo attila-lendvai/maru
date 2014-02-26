@@ -45,5 +45,9 @@
              '(maru::- 1 . maru::|nil|))))
 
 (deftest (test/reading/boot.l :auto-call nil) ()
-  (finishes (maru/repl-on-stream (asdf:system-relative-pathname :maru "../../boot.l"))))
+  ;; boot.l unconditionally expects *arguments*
+  (maru/define (global-namespace-of *eval-context*)
+               (maru/intern "*arguments*")
+               (maru/intern "nil"))
+  (finishes (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))))
 

@@ -136,3 +136,9 @@
     (let ((expr1 (maru/read-expression (first entry)))
           (expr2 (maru/read-expression (second entry))))
       (is (equal expr1 (maru/eval (maru/expand expr2)))))))
+
+(deftest test/eval/maru-test ()
+  (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))
+  (maru/repl (asdf:system-relative-pathname :maru "../../ir-gen-c.k"))
+  (maru/repl (asdf:system-relative-pathname :maru "../../maru.k"))
+  (maru/repl (asdf:system-relative-pathname :maru "../../maru-test.k")))

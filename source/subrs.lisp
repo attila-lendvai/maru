@@ -335,7 +335,7 @@
   (loop
     :for cell = -args- :then (maru/cdr -args-)
     :while (maru/pair? cell)
-    :do (print (maru/car cell)))
+    :do (maru/print (maru/car cell)))
   (maru/intern "nil"))
 
 (def-subr (dump)

@@ -31,10 +31,6 @@
     (setf (evaluators-of *eval-context*)  (maru/define-in-global-namespace "*evaluators*"))
     (setf (applicators-of *eval-context*) (maru/define-in-global-namespace "*applicators*")))
 
-  (maru/define (global-namespace-of *eval-context*)
-               (maru/intern "*arguments*")
-               (maru/intern "nil"))
-
   (define-predefined))
 
 (defmacro with-new-maru-state (&body body)

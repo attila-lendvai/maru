@@ -91,11 +91,11 @@
 (defun maru/lookup (env name)
   (maru/cdr (maru/find-variable env name)))
 
-(defun maru/get-var (thing)
-  (maru/get-tail thing))
+(defun maru/get-var (var)
+  (maru/get-tail var))
 
-(defun maru/set-var (thing value)
-  (maru/set-tail thing value))
+(defun maru/set-var (var value)
+  (maru/set-tail var value))
 
 (defun maru/define (env name value)
   (let* ((env (maru/find-environment env :otherwise :error))
