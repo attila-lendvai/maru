@@ -1,7 +1,10 @@
 (in-package :cl-user)
 
 (defpackage :maru.eval
-  (:use :common-lisp)
+  (:use :common-lisp
+        :alexandria
+        :anaphora
+        :iterate)
   (:shadow
    ;; shadow some stuff to avoid confusion
    #:eval

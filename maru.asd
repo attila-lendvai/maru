@@ -2,7 +2,9 @@
 
 (defsystem :maru
   :description "Bootstrap eval implementation for maru."
-  :depends-on ()
+  :depends-on (:alexandria
+               :anaphora
+               :iterate)
   :components ((:module "source"
                 :components ((:file "package")
                              (:file "utils" :depends-on ("package"))
