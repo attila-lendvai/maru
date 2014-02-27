@@ -44,10 +44,4 @@
   (is (equal (maru/read-expression "(- 1)")
              '(maru::- 1 . maru::|nil|))))
 
-(deftest (test/reading/boot.l :auto-call nil) ()
-  ;; boot.l unconditionally expects *arguments*
-  (maru/define (global-namespace-of *eval-context*)
-               (maru/intern "*arguments*")
-               (maru/intern "nil"))
-  (finishes (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))))
 

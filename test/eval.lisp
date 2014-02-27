@@ -137,8 +137,18 @@
           (expr2 (maru/read-expression (second entry))))
       (is (equal expr1 (maru/eval (maru/expand expr2)))))))
 
-(deftest test/eval/maru-test ()
-  (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))
+(defun load-boot.l ()
+  ;; boot.l unconditionally expects *arguments*
+  (maru/define (global-namespace-of *eval-context*)
+               (maru/intern "*arguments*")
+               (maru/intern "nil"))
+  (maru/repl (asdf:system-relative-pathname :maru "../../boot.l")))
+
+(deftest (test/reading/boot.l :auto-call nil) ()
+  (finishes (load-boot.l)))
+
+(deftest (test/eval/maru-test :auto-call nil) ()
+  (load-boot.l)
   (maru/repl (asdf:system-relative-pathname :maru "../../ir-gen-c.k"))
   (maru/repl (asdf:system-relative-pathname :maru "../../maru.k"))
   (maru/repl (asdf:system-relative-pathname :maru "../../maru-test.k")))

@@ -173,4 +173,7 @@
      (make-maru/oops type size))))
 
 (defun maru/print (object &key (stream *standard-output*))
-  (prin1 object stream))
+  (with-standard-io-syntax
+    (let ((*print-circle* t)
+          (*print-readably* nil))
+      (prin1 object stream))))
