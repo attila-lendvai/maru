@@ -83,8 +83,13 @@
     (write-string (or (ignore-errors
                         (symbol-name (maru/name-of-type type)))
                       (princ-to-string type)))
-    (write-string " :size ")
-    (princ (array-dimension (maru/oops/bits -self-) 0))))
+    (case type
+      (#.+maru/type-index/subr+
+       (write-string " ")
+       (write-string (symbol-name (maru/subr/name -self-))))
+      (t
+       (write-string " :size ")
+       (princ (array-dimension (maru/oops/bits -self-) 0))))))
 
 (defmacro define-maru-struct ((name type-code &key (constructor-name (symbolicate '#:make-maru/ name)))
                               &body fields)

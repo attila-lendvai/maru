@@ -56,6 +56,13 @@
 (def-subr (optimised)
   0)
 
+(def-subr (verbose)
+  0)
+
+#+nil ; this can be C-c C-c'd as needed
+(def-subr (set-verbose)
+  (setf (hu.dwim.logger:log-level/runtime (hu.dwim.logger:find-logger 'maru)) hu.dwim.logger:+dribble+))
+
 ;;;
 ;;; predefined maru, fixed
 ;;;
@@ -103,20 +110,18 @@
                 (maru/find-variable -env- sym :otherwise :error)))
          (val (maru/eval (maru/second -args-) -env-)))
     (when (and (maru/expr? val)
-               (eq (maru/expr/name val)
-                   (maru/intern "nil")))
+               (maru/nil? (maru/expr/name val)))
       (setf (maru/expr/name val) sym))
     (maru/set-tail var val)
     val))
 
 (def-subr (let :fixed t)
   (eval.dribble "LET with bindings ~S" (maru/first -args-))
-  (let* ((bound (maru/cons (maru/intern "nil")
-                           (maru/intern "nil")))
+  (let* ((bound (maru/cons +maru/nil+ +maru/nil+))
          (ptr bound))
     (loop
       :for cell = (maru/first -args-) :then (maru/get-tail cell)
-      :while (maru/pair? cell)
+      :until (eq cell +maru/nil+) ; extra assert that it's either nil or a pair. for anything else the rest will actively error, which is what we want.
       :for binding = (maru/get-head cell)
       :do
       (let ((name (maru/intern "nil"))
@@ -222,8 +227,8 @@
   (let ((lhs (maru/get-head -args-))
         (args (maru/rest -args-)))
     (if (maru/pair? args)
-        (let ((rhs (maru/get-head -args-)))
-          (when (maru/pair? (maru/rest -args-))
+        (let ((rhs (maru/get-head args)))
+          (when (maru/pair? (maru/rest args))
             (arity-error -subr- "at most 2" (maru/length -args-)))
           (cond
             ((typep lhs 'maru/long)
@@ -291,8 +296,17 @@
 (def-subr (putc)
   (not-yet-implemented))
 
-(def-subr (read)
-  (not-yet-implemented))
+(def-subr (read :expected-arg-count 1)
+  (let ((source (maru/first -args-)))
+    (etypecase source
+      (maru/string
+       (with-open-file (input source)
+         (iter (with head = (maru/cons +maru/nil+ +maru/nil+))
+               (with tail = head)
+               (for expr = (maru/read-expression input))
+               (until (eq expr 'done))
+               (setf tail (maru/set-tail tail (maru/cons expr +maru/nil+)))
+               (finally (return (maru/get-tail head)))))))))
 
 (def-subr (expand)
   (let ((expr (maru/car -args-))
@@ -409,7 +423,18 @@
     (setf (elt object index) value)))
 
 (def-subr (string-copy)
-  (not-yet-implemented))
+  (let* ((string (maru/first -args-))
+         (string-length (length string))
+         (start (aif (maru/long? (maru/second -args-))
+                     it
+                     0))
+         (copy-length (aif (maru/long? (maru/third -args-))
+                           it
+                           string-length)))
+    (check-type string maru/string)
+    (check-type start (integer 0))
+    (check-type copy-length (integer 0))
+    (subseq string start (+ start copy-length))))
 
 (def-subr (string-compare)
   (not-yet-implemented))

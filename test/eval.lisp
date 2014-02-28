@@ -44,14 +44,13 @@
   (finishes (read-and-run "(define unit-testing? '(t))")))
 
 (deftest test/eval/simple/2 ()
-  ;; verbatim from boot.l
-  (with-logger-level (maru +warn+)
-    (read-and-run "(define list (lambda args args))")
-    (read-and-run "(define concat-list
-  (lambda (x y)
-    (if (pair? x)
-	(cons (car x) (concat-list (cdr x) y))
-      y)))"))
+  (load-boot.l)
+  (is (equal "lm"
+             (read-and-run "(string-copy \"alma\" 1 2)")))
+  (is (equal "alma"
+             (read-and-run "(string-copy \"alma\")")))
+  (is (equal "almakortebanan"
+             (read-and-run "(concat-strings \"alma\" \"korte\" \"banan\")")))
   (let ((ref (maru/read-expression "(1 2 3)")))
     (is (equal ref
                (read-and-run "(list 1 2 3)")))
@@ -59,14 +58,27 @@
                (read-and-run "(concat-list (list 1) (list 2 3))")))
     (is (equal (maru/bool t)
                (read-and-run "(pair? (list 1 2 3))")))
-    (is (equal (maru/bool t)
-               (read-and-run "(= 1 1)")))
     (is (equal (maru/bool nil)
                (read-and-run "(pair? 42)'")))
     (is (equal ref
                (read-and-run "((lambda () (list 1 2 3)))")))
     (is (equal ref
                (read-and-run "(let (foo) (set foo ((lambda () (list 1 2 3)))) foo)")))))
+
+(deftest test/eval/simple/arithmetic/1 ()
+  (load-boot.l)
+  (is (equal (maru/bool t)
+             (read-and-run "(= 1 1)")))
+  (is (equal (maru/bool t)
+             (read-and-run "(<= 1 1)")))
+  (is (equal (maru/bool t)
+             (read-and-run "(< 1 2)")))
+  (is (equal (maru/bool t)
+             (read-and-run "(>= 1 1)")))
+  (is (equal (maru/bool t)
+             (read-and-run "(> 2 1)")))
+  (is (equal (maru/read-expression "(1 2 3)")
+             (read-and-run "(let ((x 1) (y 1) (z 3)) (set y (+ y 1)) (list x y z))"))))
 
 (deftest test/eval/types/1 ()
   (macrolet
@@ -137,12 +149,21 @@
           (expr2 (maru/read-expression (second entry))))
       (is (equal expr1 (maru/eval (maru/expand expr2)))))))
 
+(deftest test/eval/bug/2 ()
+  (load-boot.l)
+  (with-logger-level (maru +warn+)
+    (let* ((expr (maru/read-expression "(set (cdr tail) 42)"))
+           (expanded (maru/expand expr (global-namespace-of *eval-context*))))
+      (is (equal expanded
+                 '(maru::|set-cdr| maru::|tail| 42 . maru::|nil|))))))
+
 (defun load-boot.l ()
   ;; boot.l unconditionally expects *arguments*
-  (maru/define (global-namespace-of *eval-context*)
-               (maru/intern "*arguments*")
-               (maru/intern "nil"))
-  (maru/repl (asdf:system-relative-pathname :maru "../../boot.l")))
+  (with-logger-level (maru +warn+)
+    (maru/define (global-namespace-of *eval-context*)
+                 (maru/intern "*arguments*")
+                 (maru/intern "nil"))
+    (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))))
 
 (deftest (test/reading/boot.l :auto-call nil) ()
   (finishes (load-boot.l)))

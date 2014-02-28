@@ -34,10 +34,17 @@
 
 (deftest test/reading/simple/bugs ()
   (let ((expr (maru/read-expression "'t")))
-    (is (= (length expr) 2)))
+    (is (equal expr
+               '(maru::|quote| maru::|t| . maru::|nil|))))
   (let ((expr (maru/read-expression "`(1)")))
     (is (equal expr
-               '(maru::|quasiquote| (1 . maru::|nil|))))))
+               '(maru::|quasiquote| (1 . maru::|nil|) . maru::|nil|))))
+  (let ((expr (maru/read-expression "(require \"ir2.k\")")))
+    (is (equal expr
+               '(maru::|require| "ir2.k" . maru::|nil|))))
+  (let ((expr (maru/read-expression "(let ())")))
+    (is (equal expr
+               '(maru::|let| maru::|nil| . maru::|nil|)))))
 
 (deftest test/reading/numbers/1 ()
   (is (eql (maru/read-expression "-1") -1))

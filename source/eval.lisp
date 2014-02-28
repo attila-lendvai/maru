@@ -195,21 +195,21 @@
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
-                    (list prefix object))))
+                    (maru/list prefix object))))
             (backquote ()
               (let ((object (maru/read-expression input))
                     (prefix (maru/intern "quasiquote")))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
-                    (list prefix object))))
+                    (maru/list prefix object))))
             (quoted ()
               (let ((object (maru/read-expression input))
                     (prefix (maru/intern "quote")))
                 (if (eq object 'done)
                     ;; shouldn't this just error instead?
                     prefix
-                    (list prefix object))))
+                    (maru/list prefix object))))
             (character-literal ()
               (char-code (next)))
             (comment ()
@@ -224,7 +224,7 @@
                      (return)))))
               (start))
             (string-literal ()
-              (with-output-to-string (buffer)
+              (with-output-to-string (*standard-output*)
                 (loop
                   (let ((c (next)))
                     (case c
@@ -253,13 +253,17 @@
                               (write-char (code-char (+ (ash (digit-value a) 12)
                                                         (ash (digit-value b) 8)
                                                         (ash (digit-value c) 4)
-                                                        (digit-value d)))
-                                          buffer)))
+                                                        (digit-value d))))))
                            (t
                             (when (alphanumericp char)
                               (read-error "Illelgal character escape: ~S" char))
-                            char))))))))))
-         (start))))
+                            (write-char c)))))
+                      (t
+                       (write-char c))))))))
+         (let ((result (start)))
+           (unless (eq result 'done)
+             (valid-maru-expression-or-die result))
+           result))))
     (string
      (let ((*current-file* "from a string"))
        (with-input-from-string (stream input)
@@ -285,7 +289,7 @@
          (let* ((global-env (maru/get-var (globals-of *eval-context*)))
                 (expanded (maru/expand expr global-env)))
            (let ((evaluated (maru/eval expanded global-env)))
-             (eval.dribble "repl before printing, result is ~S" evaluated)
+             (eval.dribble "repl about to print, result is ~S" evaluated)
              (maru/print evaluated :stream output)
              (terpri output))))))
     (string
@@ -314,11 +318,12 @@
           (maru/form/symbol value))))))
 
 (defun maru/expand-list (expression-list env)
-  (if (maru/pair? expression-list)
-      (let ((head (maru/expand (maru/get-head expression-list) env))
-            (tail (maru/expand-list (maru/get-tail expression-list) env)))
-        (maru/cons head tail))
-      (maru/expand expression-list env)))
+  (valid-maru-expression-or-die
+   (if (maru/pair? expression-list)
+       (let ((head (maru/expand (maru/get-head expression-list) env))
+             (tail (maru/expand-list (maru/get-tail expression-list) env)))
+         (maru/cons head tail))
+       (maru/expand expression-list env))))
 
 (defun maru/eval-list (object env)
   (if (typep object 'maru/pair)
@@ -376,7 +381,7 @@
              (let* ((head (maru/apply form (maru/get-tail expression) env))
                     (expanded (maru/expand head env)))
                (eval.dribble "EXPAND~S< => ~S" *eval-depth* expanded)
-               (return-from maru/expand expanded)))
+               (return-from maru/expand (valid-maru-expression-or-die expanded))))
            (let ((tail (maru/get-tail expression)))
              (when (not (eq (maru/intern "quote") head))
                (setf tail (maru/expand-list tail env)))
@@ -390,6 +395,7 @@
                                          (maru/get-tail tail)))))
              (setf result (maru/cons head tail)))))
         ((typep expression 'maru/symbol)
+         (assert (maru/symbol? expression))
          (let ((form (maru/find-form-symbol env expression)))
            (expander.dribble "expand (of a symbol) looked up ~S to form ~S" expression form)
            ;; FIXME there shouldn't be an AND there... smells fishy.
@@ -400,7 +406,7 @@
                     (expanded (maru/expand applied env)))
                (setf result expanded))))))
       (expander.debug "EXPAND~S< ~S => ~S" *eval-depth* expression result)
-      result)))
+      (valid-maru-expression-or-die result))))
 
 (defun maru/apply (function arguments env)
   (let ((*eval-depth* (1+ *eval-depth*))
@@ -456,17 +462,20 @@
                result)
              (error "Don't know how to apply ~S" function)))))))
 
-(defun print-backtrace (&key (stream *standard-output*))
+(defun maru/print-backtrace (&key (stream *standard-output*))
   (labels
       ((to-cl-list (thing)
          (cond
            ((consp thing)
             (cons (to-cl-list (car thing))
                   (to-cl-list (cdr thing))))
+           #+nil
            ((maru/nil? thing)
+            ;; TODO this is misleading when we have e.g. (let () ...) and it replaces that to cl:nil...
             nil)
            ((eq thing (maru/intern "quote"))
             'quote)
+           #+nil
            ((symbolp thing)
             (assert (eq (symbol-package thing) (load-time-value (find-package :maru))))
             ;; without copying they'll be the same identity and the printer will print them using the #n# syntax.
@@ -479,21 +488,30 @@
             (*print-readably* nil)
             (*print-pretty* t)
             (*print-escape* nil)
-            (*package* (find-package :maru)))
-        (loop
-          :for frame :in *backtrace*
-          :for index :upfrom 0
-          :do (destructuring-bind
-                    (&key expand eval apply environment arguments)
-                  frame
-                (declare (ignore environment))
-                (format t "~&~3,'0D: " index)
-                (cond
-                  (eval
-                   (format t "E ~A~%" (to-cl-list eval)))
-                  (expand
-                   (format t "X ~A~%" (to-cl-list expand)))
-                  (apply
-                   (format t "A ~A~%" (to-cl-list arguments)))
-                  (t
-                   (error "unexpected frame in backtrace")))))))))
+            (*package* (find-package :maru))
+            ;; TODO factor out printing to somewhere somehow...
+            (*readtable* (let ((table (with-standard-io-syntax
+                                        (copy-readtable *readtable*))))
+                           (setf (readtable-case table) :preserve)
+                           table)))
+        (iter
+          (for frame :in *backtrace*)
+          (for index :upfrom 0)
+          (destructuring-bind
+                (&key expand eval apply environment arguments)
+              frame
+            (declare (ignore environment))
+            (format t "~&~3,'0D: " index)
+            (handler-bind
+                ((serious-condition (lambda (error)
+                                      (format t "<error while printing frame, of type: ~S>~%" (type-of error))
+                                      (next-iteration))))
+              (cond
+                (eval
+                 (format t "E ~S~%" (to-cl-list eval)))
+                (expand
+                 (format t "X ~S~%" (to-cl-list expand)))
+                (apply
+                 (format t "A ~A to ~S~%" apply (to-cl-list arguments)))
+                (t
+                 (error "unexpected frame in backtrace"))))))))))

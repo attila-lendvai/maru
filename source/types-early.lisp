@@ -12,9 +12,11 @@
   (check-type symbol-name string)
   (values (intern symbol-name :maru)))
 
+(define-symbol-macro +maru/nil+ 'maru::|nil|)
+
 (define-compiler-macro maru/intern (&whole form name)
   (if (stringp name)
-      `(load-time-value (intern ,name :maru) t)
+      `(quote ,(intern name :maru))
       form))
 
 ;; map some maru types to cl types, foo -> maru/foo
@@ -61,7 +63,9 @@
   (eq thing (maru/intern "nil")))
 
 (defun maru/long? (thing)
-  (typep thing 'maru/long))
+  (if (typep thing 'maru/long)
+      thing
+      nil))
 
 (defun maru/bool (value)
   (if value
@@ -79,12 +83,18 @@
     :count t))
 
 (defun maru/append (&rest lists)
-  (loop
-    :for list :in lists
-    :append (loop
-              :for cell = list :then (maru/cdr cell)
-              :until (maru/nil? cell)
-              :collect (maru/car cell))))
+  ;; TODO there's room to optimize, and this may be fragile, too?
+  (let ((result (loop
+                  :for list :in lists
+                  :nconc (loop
+                           :for cell = list :then (maru/cdr cell)
+                           :until (maru/nil? cell)
+                           :collect (maru/car cell)))))
+    (setf (cdr (last result)) +maru/nil+)
+    result))
+
+(defmacro maru/list (&rest things)
+  `(list* ,@things ',+maru/nil+))
 
 (defun maru/get-head (pair)
   (check-type pair maru/pair)
@@ -130,3 +140,22 @@
 
 (defun maru/third (pair)
   (maru/car (maru/cdr (maru/cdr pair))))
+
+(defun valid-maru-expression-or-die (thing)
+  (labels
+      ((recurse (form)
+         (etypecase form
+           (cons
+            (recurse (car form))
+            (recurse (cdr form))
+            form)
+           (symbol
+            (assert (eq (symbol-package form)
+                        (load-time-value (find-package :maru))))
+            form)
+           ((or maru/long
+                maru/double
+                maru/string)
+            form))))
+    (recurse thing))
+  thing)
