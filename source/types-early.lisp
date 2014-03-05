@@ -12,7 +12,7 @@
   (check-type symbol-name string)
   (values (intern symbol-name :maru)))
 
-(define-symbol-macro +maru/nil+ 'maru::|nil|)
+(define-symbol-macro +maru/nil+ nil)
 
 (define-compiler-macro maru/intern (&whole form name)
   (if (stringp name)
@@ -34,7 +34,7 @@
    (string    'string)
    ;; (character 'character)
    (pair      'cons)
-   (symbol    'symbol)
+   (symbol    '(and symbol (not null)))
    (array     'array)))
 
 ;; define CL constants for type indexes of the predefined types
@@ -55,12 +55,13 @@
 
 (defun maru/symbol? (thing)
   (and (symbolp thing)
+       (not (maru/nil? thing))
        (progn
          (assert (eq (symbol-package thing) (find-package :maru)))
          t)))
 
 (defun maru/nil? (thing)
-  (eq thing (maru/intern "nil")))
+  (eq thing +maru/nil+))
 
 (defun maru/long? (thing)
   (if (typep thing 'maru/long)
@@ -70,11 +71,11 @@
 (defun maru/bool (value)
   (if value
       (maru/intern "t")
-      (maru/intern "nil")))
+      +maru/nil+))
 
 (defun maru/cons (car cdr)
-  (cons (or car (maru/intern "nil"))
-        (or cdr (maru/intern "nil"))))
+  (cons (or car +maru/nil+)
+        (or cdr +maru/nil+)))
 
 (defun maru/length (object)
   (loop
@@ -102,7 +103,7 @@
 
 (defun maru/set-head (pair value)
   (check-type pair maru/pair)
-  (setf value (or value (maru/intern "nil")))
+  (setf value (or value +maru/nil+))
   (setf (car pair) value)
   value)
 
@@ -112,18 +113,18 @@
 
 (defun maru/set-tail (pair value)
   (check-type pair maru/pair)
-  (setf value (or value (maru/intern "nil")))
+  (setf value (or value +maru/nil+))
   (setf (cdr pair) value)
   value)
 
 (defun maru/car (pair)
   (if (maru/nil? pair)
-      (maru/intern "nil")
+      +maru/nil+
       (car pair)))
 
 (defun maru/cdr (pair)
   (if (maru/nil? pair)
-      (maru/intern "nil")
+      +maru/nil+
       (cdr pair)))
 
 (defun maru/cddr (pair)
@@ -141,21 +142,32 @@
 (defun maru/third (pair)
   (maru/car (maru/cdr (maru/cdr pair))))
 
-(defun valid-maru-expression-or-die (thing)
+(defun valid-maru-expression? (thing)
   (labels
       ((recurse (form)
-         (etypecase form
+         (typecase form
            (cons
             (recurse (car form))
             (recurse (cdr form))
             form)
            (symbol
-            (assert (eq (symbol-package form)
-                        (load-time-value (find-package :maru))))
+            (unless (or (maru/nil? form)
+                        (eq (symbol-package form)
+                            (load-time-value (find-package :maru))))
+              (return-from valid-maru-expression? (values nil form)))
             form)
            ((or maru/long
                 maru/double
                 maru/string)
-            form))))
+            form)
+           (t
+            (return-from valid-maru-expression? (values nil form))))))
     (recurse thing))
+  t)
+
+(defun valid-maru-expression-or-die (thing)
+  (multiple-value-bind
+        (valid? invalid-thing) (valid-maru-expression? thing)
+    (unless valid?
+      (error "~S is not a valid element in the expression ~S" invalid-thing thing)))
   thing)

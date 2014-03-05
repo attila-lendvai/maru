@@ -51,7 +51,7 @@
 
 (def-subr (invoke-debugger)
   (break "Maru invoked the debugger with args ~S in env ~S" -args- -env-)
-  (maru/intern "nil"))
+  (maru/first -args-))
 
 (def-subr (optimised)
   0)
@@ -60,25 +60,24 @@
   0)
 
 #+nil ; this can be C-c C-c'd as needed
-(def-subr (set-verbose)
-  (setf (hu.dwim.logger:log-level/runtime (hu.dwim.logger:find-logger 'maru)) hu.dwim.logger:+dribble+))
+(def-subr (enable-verbose)
+  (setf (hu.dwim.logger:log-level/runtime (hu.dwim.logger:find-logger 'maru)) hu.dwim.logger:+debug+))
 
 ;;;
 ;;; predefined maru, fixed
 ;;;
 
 (def-subr (if :fixed t)
-  (if (not (eq (maru/eval (first -args-) -env-)
-               (maru/intern "nil")))
-      (maru/eval (maru/second -args-) -env-)
-      (let ((result (maru/intern "nil"))
+  (if (maru/nil? (maru/eval (first -args-) -env-))
+      (let ((result +maru/nil+)
             (else (maru/cddr -args-)))
         (loop
           :while (maru/pair? else)
           :do
           (setf result (maru/eval (maru/get-head else) -env-))
           (setf else (maru/cdr else)))
-        result)))
+        result)
+      (maru/eval (maru/second -args-) -env-)))
 
 (def-subr (and :fixed t)
   (let ((result (maru/intern "t")))
@@ -87,18 +86,18 @@
       :while (maru/pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
-      (when (eq (maru/intern "nil") result)
+      (when (maru/nil? result)
         (return)))
     result))
 
 (def-subr (or :fixed t)
-  (let ((result (maru/intern "nil")))
+  (let ((result +maru/nil+))
     (loop
       :for cell = -args- :then (maru/rest cell)
       :while (maru/pair? cell)
       :do
       (setf result (maru/eval (maru/get-head cell) -env-))
-      (when (not (eq (maru/intern "nil") result))
+      (when (not (maru/nil? result))
         (return)))
     result))
 
@@ -121,31 +120,29 @@
          (ptr bound))
     (loop
       :for cell = (maru/first -args-) :then (maru/get-tail cell)
-      :until (eq cell +maru/nil+) ; extra assert that it's either nil or a pair. for anything else the rest will actively error, which is what we want.
+      :until (maru/nil? cell) ; extra assert that it's either nil or a pair. for anything else the rest will actively error, which is what we want.
       :for binding = (maru/get-head cell)
       :do
-      (let ((name (maru/intern "nil"))
-            (value (maru/intern "nil")))
+      (let ((name +maru/nil+)
+            (value +maru/nil+))
         (if (maru/pair? binding)
             (progn
               (setf name (maru/first binding))
-              (setf value (if (eq (maru/intern "nil")
-                                  (maru/second binding))
-                              (maru/intern "nil")
+              (setf value (if (maru/nil? (maru/second binding))
+                              +maru/nil+
                               (maru/eval (maru/second binding) -env-))))
             (progn
               (unless (maru/symbol? binding)
                 (error "~S as a binding is illegal in ~S" binding -subr-))
               (setf name binding)))
-        (setf ptr (maru/set-tail ptr (maru/cons (maru/intern "nil")
-                                                (maru/intern "nil"))))
+        (setf ptr (maru/set-tail ptr (maru/cons +maru/nil+ +maru/nil+)))
         (maru/set-head ptr (maru/cons name value))))
     (maru/set-tail ptr -env-)
     (if (locals-are-namespace? *eval-context*)
         (maru/set-head bound (maru/cons (maru/intern "*locals*")
                                         bound))
         (setf bound (maru/get-tail bound)))
-    (let ((result (maru/intern "nil")))
+    (let ((result +maru/nil+))
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
         :while (maru/pair? cell)
@@ -155,13 +152,13 @@
 (def-subr (while :fixed t)
   (let ((test (maru/first -args-)))
     (loop
-      :until (eq (maru/intern "nil") (maru/eval test -env-))
+      :until (maru/nil? (maru/eval test -env-))
       :do
       (loop
         :for cell = (maru/cdr -args-) :then (maru/cdr cell)
         :while (maru/pair? cell)
         :do (maru/eval (maru/get-head cell) -env-))))
-  (maru/intern "nil"))
+  +maru/nil+)
 
 (def-subr (quote :fixed t :expected-arg-count 1)
   (maru/car -args-))
@@ -190,12 +187,9 @@
 (def-subr (defined?)
   (let* ((name (maru/car -args-))
          (env (maru/car (maru/cdr -args-))))
-    (when (eq (maru/intern "nil")
-              env)
+    (when (maru/nil? env)
       (setf env (maru/get-var (globals-of *eval-context*))))
-    (if (maru/find-variable env name :otherwise nil)
-        (maru/intern "t")
-        (maru/intern "nil"))))
+    (maru/bool (maru/find-variable env name :otherwise nil))))
 
 (defmacro def-binary-arithmetic-subr (operator &optional (lisp-operator operator))
   `(def-subr (,operator :expected-arg-count 2)
@@ -311,14 +305,14 @@
 (def-subr (expand)
   (let ((expr (maru/car -args-))
         (env (maru/car (maru/cdr -args-))))
-    (when (eq env (maru/intern "nil"))
+    (when (maru/nil? env)
       (setf env -env-))
     (maru/expand expr env)))
 
 (def-subr (eval)
   (let ((expr (maru/car -args-))
         (env (maru/car (maru/cdr -args-))))
-    (when (eq env (maru/intern "nil"))
+    (when (maru/nil? env)
       (setf env (maru/get-var (globals-of *eval-context*))))
     (let ((expanded (maru/expand expr env)))
       (maru/eval expanded env))))
@@ -350,18 +344,18 @@
     :for cell = -args- :then (maru/cdr -args-)
     :while (maru/pair? cell)
     :do (maru/print (maru/car cell)))
-  (maru/intern "nil"))
+  +maru/nil+)
 
 (def-subr (dump)
   (loop
     :for cell = -args- :then (maru/cdr -args-)
     :while (maru/pair? cell)
     :do (print (maru/car cell)))
-  (maru/intern "nil"))
+  +maru/nil+)
 
 (def-subr (format)
   (not-yet-implemented)
-  (maru/intern "nil"))
+  +maru/nil+)
 
 (def-subr (form)
   (make-maru/form (maru/car -args-) (maru/car (maru/cdr -args-))))
@@ -468,7 +462,9 @@
                 ((maru/nil? arg)
                  0)
                 (t (error "Illegal argument to array: ~S" arg)))))
-    (make-array num :adjustable t :initial-element (maru/intern "nil"))))
+    (make-array (max 1 num)
+                :adjustable t
+                :initial-element +maru/nil+)))
 
 (def-subr (array?)
   (not-yet-implemented))
@@ -541,7 +537,6 @@
        (aref (maru/data/bits object) index)))))
 
 (def-subr (not :expected-arg-count 1)
-  (if (eq (maru/intern "nil")
-          (maru/first -args-))
+  (if (maru/nil? (maru/first -args-))
       (maru/intern "t")
-      (maru/intern "nil")))
+      +maru/nil+))

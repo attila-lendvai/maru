@@ -16,8 +16,8 @@
 
 (defun make-global-namespace ()
   ;; this fn is used by the tests
-  (let ((ref (maru/cons (maru/intern "*global-namespace*") nil)))
-    (maru/set-tail ref (maru/cons ref nil))))
+  (let ((ref (maru/cons (maru/intern "*global-namespace*") +maru/nil+)))
+    (maru/set-tail ref (maru/cons ref +maru/nil+))))
 
 (defun initialize-maru-state ()
   (check-type *eval-context* eval-context)

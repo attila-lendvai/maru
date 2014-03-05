@@ -179,7 +179,7 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
             (flet
                 ((build-maru-args-list ()
                    (let ((args (clon:remainder))
-                         (maru/args (maru/intern "nil")))
+                         (maru/args +maru/nil+))
                      (dolist (arg (reverse args))
                        (setf maru/args (maru/cons arg maru/args)))
                      (maru/define (global-namespace-of *eval-context*)

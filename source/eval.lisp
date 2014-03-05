@@ -2,12 +2,13 @@
 
 ;; The following state/types are shared between the implemented maru VM and the hosting lisp VM:
 ;; - Pair is CL cons cells
+;; - Symbol (maru symbols are all CL:INTERN'd into the CL package called "MARU" (including the nil and t symbols, which have no special meaning in maru))
+;; - the maru nil concept/abstraction is mapped to CL:NIL and can be denoted in maru syntax using () (i.e. *not* by writing 'nil')
 ;; - String
 ;; - Long
 ;; - Double
 ;; - Array
-;; - Symbol (maru symbols are all INTERN'd into the CL package called "MARU" (including the maru nil))
-;; - other types are wrapped into CL structs
+;; - other maru types are wrapped into CL structs
 ;; - the gc/memory model
 ;;
 ;; Anything else leaking into the maru universe is a bug.
@@ -99,7 +100,7 @@
                           (read-error "Illegal character ~S" c))))))))
             (read-list (delimiter)
               (let* ((obj (start))
-                     (head (maru/intern "nil"))
+                     (head +maru/nil+)
                      (tail head))
                 (reader.dribble "Reading a list starts with object ~S" obj)
                 (flet ((process-eof ()
@@ -110,7 +111,7 @@
                            (return-from read-list head))))
                   (when (eq obj 'done)
                     (process-eof))
-                  (setf head (maru/cons obj nil))
+                  (setf head (maru/cons obj +maru/nil+))
                   (setf tail head)
                   (loop
                     :for obj = (start)
@@ -127,7 +128,7 @@
                       (unless (eq obj 'done)
                         (read-error "Extra item after ."))
                       (process-eof))
-                    (setf obj (maru/cons obj nil))
+                    (setf obj (maru/cons obj +maru/nil+))
                     (setf tail (maru/set-tail tail obj))))))
             (read-number (first-char)
               (reader.dribble "Reading a number")
@@ -401,8 +402,8 @@
            ;; FIXME there shouldn't be an AND there... smells fishy.
            (when (and form
                       (not (maru/nil? form)))
-             (let* ((args (maru/cons expression nil))
-                    (applied (maru/apply form args (maru/intern "nil")))
+             (let* ((args (maru/cons expression +maru/nil+))
+                    (applied (maru/apply form args +maru/nil+))
                     (expanded (maru/expand applied env)))
                (setf result expanded))))))
       (expander.debug "EXPAND~S< ~S => ~S" *eval-depth* expression result)
@@ -432,15 +433,15 @@
          (when (maru/symbol? formals)
            (let ((tmp (maru/cons formals actuals)))
              (setf callee (maru/cons tmp callee))
-             (setf actuals (maru/intern "nil"))))
+             (setf actuals +maru/nil+)))
          (unless (maru/nil? actuals)
            (error "Too many arguments applying ~S to ~S" function arguments))
          (when (locals-are-namespace? *eval-context*)
            (let ((tmp (maru/cons (maru/intern "*locals*")
-                                 (maru/intern "nil"))))
+                                 +maru/nil+)))
              (setf callee (maru/cons tmp callee))
              (maru/set-tail tmp callee)))
-         (let ((ans (maru/intern "nil"))
+         (let ((ans +maru/nil+)
                (body (maru/cdr defn)))
            (loop
              :while (maru/pair? body)
@@ -469,10 +470,6 @@
            ((consp thing)
             (cons (to-cl-list (car thing))
                   (to-cl-list (cdr thing))))
-           #+nil
-           ((maru/nil? thing)
-            ;; TODO this is misleading when we have e.g. (let () ...) and it replaces that to cl:nil...
-            nil)
            ((eq thing (maru/intern "quote"))
             'quote)
            #+nil
@@ -487,6 +484,8 @@
             (*print-circle* t)
             (*print-readably* nil)
             (*print-pretty* t)
+            (*print-level* 4)
+            (*print-length* 10)
             (*print-escape* nil)
             (*package* (find-package :maru))
             ;; TODO factor out printing to somewhere somehow...

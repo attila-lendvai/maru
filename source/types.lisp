@@ -24,15 +24,18 @@
 (defun maru/set-array-at (array index value)
   (check-type array array)
   (check-type index (integer 0))
-  (loop
-    :while (>= index
-               (array-dimension array 0))
-    :do (let ((new-array (adjust-array array
-                                       (* 2 (max (array-dimension array 0)
-                                                 2))
-                                       :initial-element (maru/intern "nil"))))
-          ;; CLHS is unclear, so let's just assert it
-          (assert (eq array new-array))))
+  (when (>= index
+            (array-dimension array 0))
+    (let ((new-capacity (max 2 (array-dimension array 0))))
+      (loop
+        :while (>= index
+                   new-capacity)
+        :do (setf new-capacity (* new-capacity 2)))
+      (let ((new-array (adjust-array array
+                                     new-capacity
+                                     :initial-element +maru/nil+)))
+        ;; CLHS is unclear, so let's just assert it
+        (assert (eq array new-array)))))
   (setf (aref array index) value))
 
 ;;;
@@ -45,7 +48,7 @@
 
 (defun make-maru/data (size)
   (let ((object (%make-maru/data)))
-    (setf (maru/data/bits object) (make-array size :initial-element (maru/intern "nil")))
+    (setf (maru/data/bits object) (make-array size :initial-element +maru/nil+))
     object))
 
 ;;;
@@ -67,7 +70,7 @@
 (defun make-maru/oops (type size)
   (make-instance 'maru/oops
                  :type type
-                 :bits (make-array size :initial-element (maru/intern "nil"))))
+                 :bits (make-array size :initial-element +maru/nil+)))
 
 (defun oop-at (object index)
   (let ((bits (maru/oops/bits object)))
@@ -173,7 +176,7 @@
     (+maru/type-index/pair+
      (not-yet-implemented))
     (+maru/type-index/array+
-     (make-array size :initial-element (maru/intern "nil")))
+     (make-array size :initial-element +maru/nil+))
     (t
      (make-maru/oops type size))))
 

@@ -78,7 +78,7 @@
 
 (defun maru/find-namespace-variable (env name)
   (let ((beg (maru/find-environment env :otherwise :error))
-        (end (maru/find-environment (maru/cdr env) :otherwise (maru/intern "nil"))))
+        (end (maru/find-environment (maru/cdr env) :otherwise +maru/nil+)))
     ;;(eval.dribble "MARU/FIND-NAMESPACE-VARIABLE beg ~S end ~S" beg end)
     (loop
       :until (eq beg end)
@@ -99,7 +99,7 @@
 
 (defun maru/define (env name value)
   (let* ((env (maru/find-environment env :otherwise :error))
-         (binding (maru/cons nil (maru/get-tail env))))
+         (binding (maru/cons +maru/nil+ (maru/get-tail env))))
     (maru/set-tail env binding)
     (setf binding (maru/set-head binding (maru/cons name value)))
     (eval.dribble "Defined new binding, name ~S, value ~S, in env ~S" name value env)
