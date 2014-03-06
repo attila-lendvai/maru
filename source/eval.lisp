@@ -27,6 +27,7 @@
      (with-open-file (,var *current-file*)
        ,@body)))
 
+;; this is ugly and ought to be generated not hand written...
 (defun maru/read-expression (input)
   (etypecase input
     (stream
@@ -136,7 +137,8 @@
                 (flet
                     ((slurp-digits (first-char predicate)
                        (with-output-to-string (buffer)
-                         (write-char first-char buffer)
+                         (when first-char
+                           (write-char first-char buffer))
                          (loop
                            (setf c (next nil))
                            (reader.dribble "Next is ~S" c)
@@ -154,12 +156,21 @@
                        (when (eql c #\e)
                          (not-yet-implemented)))
                       ((and (eql c #\x)
-                            (or (= (length body) 1)
-                                (and (= (length body) 2)
-                                     (string= body "-"))))
-                       (not-yet-implemented)))
+                            (or (string= body "0")
+                                (string= body "-0")))
+                       (let ((hex-digits (slurp-digits nil 'is-digit16?))
+                             (minus? (eql (elt body 0) #\-)))
+                         (setf body "#x")
+                         (when minus?
+                           (setf body (concatenate 'string body "-")))
+                         (setf body (concatenate 'string body hex-digits))
+                         #+nil ; TODO delme
+                         (iter (for digit :in-vector hex-digits)
+                               (for position :downfrom (length hex-digits))
+                               (incf number (* position 16 (digit-char-p digit 16)))))))
                     (unread c)
                     (reader.dribble "About to call cl:read-from-string on ~S" body)
+                    ;; NOTE we don't care much about security here...
                     (let* ((*read-default-float-format* 'double-float)
                            (number (cl:read-from-string body)))
                       (reader.dribble "Read number ~S" number)
