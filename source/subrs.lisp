@@ -341,14 +341,14 @@
 
 (def-subr (print)
   (loop
-    :for cell = -args- :then (maru/cdr -args-)
+    :for cell = -args- :then (maru/cdr cell)
     :while (maru/pair? cell)
     :do (maru/print (maru/car cell)))
   +maru/nil+)
 
 (def-subr (dump)
   (loop
-    :for cell = -args- :then (maru/cdr -args-)
+    :for cell = -args- :then (maru/cdr cell)
     :while (maru/pair? cell)
     :do (print (maru/car cell)))
   +maru/nil+)
@@ -413,7 +413,8 @@
         (value (maru/third -args-)))
     (check-type object maru/string)
     (check-type index maru/long)
-    ;; TODO character will probably arrive here as a long, convert to lisp char
+    ;; NOTE this is different from eval.c where characters are Long's
+    (check-type value character)
     (setf (elt object index) value)))
 
 (def-subr (string-copy)

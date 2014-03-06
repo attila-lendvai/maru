@@ -116,6 +116,12 @@
       (#.+maru/type-index/subr+
        (write-string " ")
        (write-string (symbol-name (maru/subr/name -self-))))
+      (#.+maru/type-index/expr+
+       (write-string " ")
+       (write-string (symbol-name (maru/expr/name -self-))))
+      (#.+maru/type-index/fixed+
+       (write-string " ")
+       (prin1 (maru/fixed/function -self-)))
       (t
        (write-string " :size ")
        (princ (array-dimension (maru/oops/bits -self-) 0))))))

@@ -16,7 +16,8 @@
     "(nil t)"
     "`(t ,nil)"
     "'(t nil)"
-    "(1 2.0 (\"three\" 4 (5)))"))
+    "(1 2.0 (\"three\" 4 (5)))"
+    "-42"))
 
 (deftest test/reading/simple/bugs ()
   (let ((expr (maru/read-expression "'t")))
@@ -33,7 +34,11 @@
                `(maru::|let| ,+maru/nil+ . ,+maru/nil+)))))
 
 (deftest test/reading/numbers/1 ()
-  (is (eql (maru/read-expression "-1") -1))
+  (is (eql (maru/read-expression "-42") -42))
+  (is (eql (maru/read-expression "0x42") #x42))
+  (is (eql (maru/read-expression "-0x42") #x-42))
+  (is (eql (maru/read-expression "1.123") 1.123d0))
+  (is (eql (maru/read-expression "-1.123") -1.123d0))
   (is (equal (maru/read-expression "(- 1)")
              `(maru::- 1 . ,+maru/nil+))))
 
