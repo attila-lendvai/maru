@@ -462,17 +462,13 @@
                 ((maru/nil? arg)
                  0)
                 (t (error "Illegal argument to array: ~S" arg)))))
-    (make-array (max 1 num)
-                :adjustable t
-                :initial-element +maru/nil+)))
+    (maru/make-array num)))
 
 (def-subr (array?)
   (not-yet-implemented))
 
 (def-subr (array-length :expected-arg-count 1)
-  (let ((array (maru/first -args-)))
-    (check-type array array)
-    (array-dimension array 0)))
+  (maru/array-length (maru/first -args-)))
 
 (def-subr (array-at :expected-arg-count 2)
   (let ((array (maru/first -args-))

@@ -16,27 +16,53 @@
 ;;;
 ;;; array
 ;;;
+(defstruct (maru/array (:constructor %make-maru/array)
+                       (:conc-name #:maru/array/)
+                       (:predicate maru/array?))
+  (elements #() :type array)
+  (size 0 :type fixnum))
+
+(defun maru/make-array (size)
+  (check-type size (integer 0))
+  (let ((array (%make-maru/array)))
+    (setf (maru/array/elements array) (make-array (max 4 size) :initial-element +maru/nil+))
+    (setf (maru/array/size array) size)
+    array))
+
+(defun maru/array-length (array)
+  (check-type array maru/array)
+  (maru/array/size array))
+
 (defun maru/array-at (array index)
-  (check-type array array)
+  (check-type array maru/array)
   (check-type index (integer 0))
-  (aref array index))
+  (let ((elements (maru/array/elements array))
+        (size (maru/array/size array)))
+    (unless (< index size)
+      (error "array-at ~S out of bounds ~S on array ~S" index size array))
+    (aref elements index)))
 
 (defun maru/set-array-at (array index value)
-  (check-type array array)
+  (check-type array maru/array)
   (check-type index (integer 0))
-  (when (>= index
-            (array-dimension array 0))
-    (let ((new-capacity (max 2 (array-dimension array 0))))
-      (loop
-        :while (>= index
-                   new-capacity)
-        :do (setf new-capacity (* new-capacity 2)))
-      (let ((new-array (adjust-array array
-                                     new-capacity
-                                     :initial-element +maru/nil+)))
-        ;; CLHS is unclear, so let's just assert it
-        (assert (eq array new-array)))))
-  (setf (aref array index) value))
+  (let ((elements (maru/array/elements array))
+        (size (maru/array/size array)))
+    (when (>= index size) ; maru semantic size
+      (let ((capacity (array-dimension elements 0)))
+        (when (>= index capacity) ; underlying CL array size
+          (let ((new-capacity (max 2 capacity)))
+            (loop
+              :while (>= index
+                         new-capacity)
+              :do (setf new-capacity (* new-capacity 2)))
+            ;; CLHS is unclear about the identity, so let's just setf it back
+            (setf elements (adjust-array elements
+                                         new-capacity
+                                         :initial-element +maru/nil+))
+            (setf (maru/array/elements array) elements))))
+      ;; update maru semantic size
+      (setf (maru/array/size array) (1+ index)))
+   (setf (aref elements index) value)))
 
 ;;;
 ;;; data

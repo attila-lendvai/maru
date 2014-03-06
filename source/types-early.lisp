@@ -35,7 +35,8 @@
    ;; (character 'character)
    (pair      'cons)
    (symbol    '(and symbol (not null)))
-   (array     'array)))
+   ;; (array     'array)
+   ))
 
 ;; define CL constants for type indexes of the predefined types
 (macrolet
