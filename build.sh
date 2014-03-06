@@ -7,6 +7,28 @@
 
 # this is not too tied to SBCL, but it won't work out of the box on anything else as is.
 
+# this build script may be simpler using cl-launch, see Fare's notes:
+#
+# Quick answer: cl-launch could help indeed, though it might need some love.
+#
+# A few things cl-launch 4 will do for you:
+# * abstract over implementation. More useful if you're on Windows or
+# ARM, where SBCL support is not as good and you'll want CCL instead.
+# * manage the painful loading of asdf and uiop and quicklisp — note
+# that any version of ASDF good enough for cl-launch 4 will have UIOP.
+# * let you easily specify --system hu.dwim.logger --system
+# maru+hu.dwim.logger --system swank --file setup.lisp, etc.
+# * (via UIOP) setup the debugger hooks, portably.
+#
+# Things it won't do (yet):
+# * support a non-standard quicklisp installation rather than the
+# builtin ~/quicklisp or ~/.quicklisp. It's a SMOP to add (see e.g. how
+# the source-registry is handled), but still has to be done. I believe
+# ${x#*=} is a standard enough shell construct that one could give an
+# argument to --quicklisp with --quicklisp=foo.
+# * same for output translation — though you can already export the
+# environment variable.
+
 SCRIPT_DIR=`dirname "$0"`
 SCRIPT_DIR=`readlink -f ${SCRIPT_DIR}`
 
@@ -76,7 +98,7 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
 ;; this is not strictly needed
 (asdf:load-system :uiop)
 
-(format t "Lips side speaking, will (asdf:load-system :maru) now and dump an executable image~%")
+(format t "Lisp side speaking, will (asdf:load-system :maru) now and dump an executable image~%")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; quicklisp doesn't hook into :defsystem-depends-on (?), so we need to quickload it explicitly
@@ -104,6 +126,8 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
 (defun invoke-slime-debugger (condition previous-hook)
   (declare (ignore previous-hook))
   (maru.error "There was an error: ~A" condition)
+  (maru/print-backtrace :stream *debug-io*)
+  (finish-output *debug-io*)
   (maru.error "Waiting for a slime/swank connection to present the error in the slime debugger. Press C-c to exit.")
   (loop
     :until (or swank::*emacs-connection*

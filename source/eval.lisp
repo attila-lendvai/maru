@@ -475,53 +475,38 @@
              (error "Don't know how to apply ~S" function)))))))
 
 (defun maru/print-backtrace (&key (stream *standard-output*))
-  (labels
-      ((to-cl-list (thing)
-         (cond
-           ((consp thing)
-            (cons (to-cl-list (car thing))
-                  (to-cl-list (cdr thing))))
-           ((eq thing (maru/intern "quote"))
-            'quote)
-           #+nil
-           ((symbolp thing)
-            (assert (eq (symbol-package thing) (load-time-value (find-package :maru))))
-            ;; without copying they'll be the same identity and the printer will print them using the #n# syntax.
-            (copy-seq (symbol-name thing)))
-           (t
-            thing))))
-    (with-standard-io-syntax
-      (let ((*standard-output* stream)
-            (*print-circle* t)
-            (*print-readably* nil)
-            (*print-pretty* t)
-            (*print-level* 4)
-            (*print-length* 10)
-            (*print-escape* nil)
-            (*package* (find-package :maru))
-            ;; TODO factor out printing to somewhere somehow...
-            (*readtable* (let ((table (with-standard-io-syntax
-                                        (copy-readtable *readtable*))))
-                           (setf (readtable-case table) :preserve)
-                           table)))
-        (iter
-          (for frame :in *backtrace*)
-          (for index :upfrom 0)
-          (destructuring-bind
-                (&key expand eval apply environment arguments)
-              frame
-            (declare (ignore environment))
-            (format t "~&~3,'0D: " index)
-            (handler-bind
-                ((serious-condition (lambda (error)
-                                      (format t "<error while printing frame, of type: ~S>~%" (type-of error))
-                                      (next-iteration))))
-              (cond
-                (eval
-                 (format t "E ~S~%" (to-cl-list eval)))
-                (expand
-                 (format t "X ~S~%" (to-cl-list expand)))
-                (apply
-                 (format t "A ~A to ~S~%" apply (to-cl-list arguments)))
-                (t
-                 (error "unexpected frame in backtrace"))))))))))
+  (with-standard-io-syntax
+    (let ((*standard-output* stream)
+          (*print-circle* t)
+          (*print-readably* nil)
+          (*print-pretty* t)
+          (*print-level* 4)
+          (*print-length* 10)
+          (*print-escape* nil)
+          (*package* (find-package :maru))
+          ;; TODO factor out printing to somewhere somehow...
+          (*readtable* (let ((table (with-standard-io-syntax
+                                      (copy-readtable *readtable*))))
+                         (setf (readtable-case table) :preserve)
+                         table)))
+      (iter
+        (for frame :in *backtrace*)
+        (for index :upfrom 0)
+        (destructuring-bind
+              (&key expand eval apply environment arguments)
+            frame
+          (declare (ignore environment))
+          (format t "~&~3,'0D: " index)
+          (handler-bind
+              ((serious-condition (lambda (error)
+                                    (format t "<error while printing frame, of type: ~S>~%" (type-of error))
+                                    (next-iteration))))
+            (cond
+              (eval
+               (format t "E ~S~%" eval))
+              (expand
+               (format t "X ~S~%" expand))
+              (apply
+               (format t "A ~A to ~S~%" apply arguments))
+              (t
+               (error "unexpected frame in backtrace")))))))))
