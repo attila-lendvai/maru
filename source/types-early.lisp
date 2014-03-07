@@ -28,14 +28,12 @@
                     :collect `(deftype ,(symbolicate '#:maru/ (first entry)) ()
                                 ,(second entry))))))
   (frob
-   ;; (undefined 'null)
    (double    'double-float)
    (long      '(signed-byte 64))
    (string    'string)
    ;; (character 'character)
    (pair      'cons)
    (symbol    '(and symbol (not null)))
-   ;; (array     'array)
    ))
 
 ;; define CL constants for type indexes of the predefined types
@@ -46,6 +44,7 @@
               :for type :in types
               :for index :upfrom 0
               :collect `(defconstant ,(symbolicate "+MARU/TYPE-INDEX/" type "+") ,index)))))
+  ;; this needs to be in sync with what's in boot.l
   (frob #:undefined #:data #:long #:double #:string #:symbol #:pair #:_array #:array #:expr #:form #:fixed #:subr))
 
 (defun maru/pair? (thing)

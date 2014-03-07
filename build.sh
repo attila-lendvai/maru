@@ -129,6 +129,7 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
   (maru/print-backtrace :stream *debug-io*)
   (finish-output *debug-io*)
   (maru.error "Waiting for a slime/swank connection to present the error in the slime debugger. Press C-c to exit.")
+  (format *debug-io* "Waiting for a Slime/Swank connection to present the error in SLDB.~%")
   (loop
     :until (or swank::*emacs-connection*
                (swank::default-connection))

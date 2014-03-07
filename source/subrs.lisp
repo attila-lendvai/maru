@@ -463,7 +463,7 @@
                 ((maru/nil? arg)
                  0)
                 (t (error "Illegal argument to array: ~S" arg)))))
-    (maru/make-array num)))
+    (make-maru/array num)))
 
 (def-subr (array?)
   (not-yet-implemented))

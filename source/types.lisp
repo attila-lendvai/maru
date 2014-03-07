@@ -14,57 +14,6 @@
   (maru/name-of-type (maru/type-of object)))
 
 ;;;
-;;; array
-;;;
-(defstruct (maru/array (:constructor %make-maru/array)
-                       (:conc-name #:maru/array/)
-                       (:predicate maru/array?))
-  (elements #() :type array)
-  (size 0 :type fixnum))
-
-(defun maru/make-array (size)
-  (check-type size (integer 0))
-  (let ((array (%make-maru/array)))
-    (setf (maru/array/elements array) (make-array (max 4 size) :initial-element +maru/nil+))
-    (setf (maru/array/size array) size)
-    array))
-
-(defun maru/array-length (array)
-  (check-type array maru/array)
-  (maru/array/size array))
-
-(defun maru/array-at (array index)
-  (check-type array maru/array)
-  (check-type index (integer 0))
-  (let ((elements (maru/array/elements array))
-        (size (maru/array/size array)))
-    (unless (< index size)
-      (error "array-at ~S out of bounds ~S on array ~S" index size array))
-    (aref elements index)))
-
-(defun maru/set-array-at (array index value)
-  (check-type array maru/array)
-  (check-type index (integer 0))
-  (let ((elements (maru/array/elements array))
-        (size (maru/array/size array)))
-    (when (>= index size) ; maru semantic size
-      (let ((capacity (array-dimension elements 0)))
-        (when (>= index capacity) ; underlying CL array size
-          (let ((new-capacity (max 2 capacity)))
-            (loop
-              :while (>= index
-                         new-capacity)
-              :do (setf new-capacity (* new-capacity 2)))
-            ;; CLHS is unclear about the identity, so let's just setf it back
-            (setf elements (adjust-array elements
-                                         new-capacity
-                                         :initial-element +maru/nil+))
-            (setf (maru/array/elements array) elements))))
-      ;; update maru semantic size
-      (setf (maru/array/size array) (1+ index)))
-   (setf (aref elements index) value)))
-
-;;;
 ;;; data
 ;;;
 (defstruct (maru/data (:constructor %make-maru/data)
@@ -78,7 +27,7 @@
     object))
 
 ;;;
-;;; data
+;;; general oops, the "base class" of other maru impl structures
 ;;;
 (defclass maru/oops ()
   ((type :initform +maru/type-index/undefined+
@@ -122,6 +71,9 @@
       (#.+maru/type-index/fixed+
        (write-string " ")
        (prin1 (maru/fixed/function -self-)))
+      (#.+maru/type-index/array+
+       (write-string " ")
+       (prin1 (maru/array/size -self-)))
       (t
        (write-string " :size ")
        (princ (array-dimension (maru/oops/bits -self-) 0))))))
@@ -178,6 +130,56 @@
   name
   impl)
 
+;;;
+;;; array
+;;;
+(define-maru-struct (array +maru/type-index/array+
+                     :constructor-name %make-maru/array)
+  elements
+  size)
+
+(defun make-maru/array (size)
+  (check-type size (integer 0))
+  (%make-maru/array (make-array (max 4 size) :initial-element +maru/nil+)
+                    size))
+
+(defun maru/array-length (array)
+  (assert (maru/array? array))
+  (maru/array/size array))
+
+(defun maru/array-at (array index)
+  (assert (maru/array? array))
+  (check-type index (integer 0))
+  (let ((elements (maru/array/elements array))
+        (size (maru/array/size array)))
+    (if (< index size)
+        (aref elements index)
+        ;; TODO signalling an error seems better, but would break eval.c compatibility
+        ;; (error "array-at ~S out of bounds ~S on array ~S" index size array)
+        +maru/nil+)))
+
+(defun maru/set-array-at (array index value)
+  (assert (maru/array? array))
+  (check-type index (integer 0))
+  (let ((elements (maru/array/elements array))
+        (size (maru/array/size array)))
+    (when (>= index size) ; maru semantic size
+      (let ((capacity (array-dimension elements 0)))
+        (when (>= index capacity) ; underlying CL array size
+          (let ((new-capacity (max 2 capacity)))
+            (loop
+              :while (>= index
+                         new-capacity)
+              :do (setf new-capacity (* new-capacity 2)))
+            ;; CLHS is unclear about the identity, so let's just setf it back
+            (setf elements (adjust-array elements
+                                         new-capacity
+                                         :initial-element +maru/nil+))
+            (setf (maru/array/elements array) elements))))
+      ;; update maru semantic size
+      (setf (maru/array/size array) (1+ index)))
+   (setf (aref elements index) value)))
+
 (defun maru/type-of (object)
   (cond
     ((maru/nil? object)
@@ -190,7 +192,6 @@
        (maru/string +maru/type-index/string+)
        (maru/symbol +maru/type-index/symbol+)
        (maru/pair   +maru/type-index/pair+)
-       (maru/array  +maru/type-index/array+)
        (maru/oops   (maru/oops/type object))))))
 
 (defun maru/allocate (type size)

@@ -5,7 +5,7 @@
 #+#.(maru.eval::if-symbol-exists :hu.dwim.logger '#:deflogger)
 (progn
   ;; if we are loaded after :hu.dwim.logger, then use a full-featured logger
-  (hu.dwim.logger:deflogger maru ())
+  (hu.dwim.logger:deflogger maru () :runtime-level hu.dwim.logger:+warn+)
   (hu.dwim.logger:deflogger eval (maru))
   (hu.dwim.logger:deflogger reader (maru))
   (hu.dwim.logger:deflogger expander (maru))

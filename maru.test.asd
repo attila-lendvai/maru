@@ -7,4 +7,5 @@
                 :components ((:file "package")
                              (:file "suite" :depends-on ("package"))
                              (:file "eval" :depends-on ("suite"))
+                             (:file "maru" :depends-on ("suite" "eval"))
                              (:file "reading" :depends-on ("suite"))))))

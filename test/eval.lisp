@@ -215,9 +215,3 @@
 
 (deftest (test/reading/boot.l :auto-call nil) ()
   (finishes (load-boot.l)))
-
-(deftest (test/eval/maru-test :auto-call nil) ()
-  (load-boot.l)
-  (maru/repl (asdf:system-relative-pathname :maru "../../ir-gen-c.k"))
-  (maru/repl (asdf:system-relative-pathname :maru "../../maru.k"))
-  (maru/repl (asdf:system-relative-pathname :maru "../../maru-test.k")))
