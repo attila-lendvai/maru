@@ -2,32 +2,10 @@
 #| -*- mode: lisp; coding: utf-8-unix -*-
 
 # usage:
+# ./build.sh
 # LISP=~/workspace/sbcl/run-sbcl.sh ./build.sh
-# or just ./build.sh if you have an sbcl in your path with a fresh enough ASDF
 
 # this is not too tied to SBCL, but it won't work out of the box on anything else as is.
-
-# this build script may be simpler using cl-launch, see Fare's notes:
-#
-# Quick answer: cl-launch could help indeed, though it might need some love.
-#
-# A few things cl-launch 4 will do for you:
-# * abstract over implementation. More useful if you're on Windows or
-# ARM, where SBCL support is not as good and you'll want CCL instead.
-# * manage the painful loading of asdf and uiop and quicklisp — note
-# that any version of ASDF good enough for cl-launch 4 will have UIOP.
-# * let you easily specify --system hu.dwim.logger --system
-# maru+hu.dwim.logger --system swank --file setup.lisp, etc.
-# * (via UIOP) setup the debugger hooks, portably.
-#
-# Things it won't do (yet):
-# * support a non-standard quicklisp installation rather than the
-# builtin ~/quicklisp or ~/.quicklisp. It's a SMOP to add (see e.g. how
-# the source-registry is handled), but still has to be done. I believe
-# ${x#*=} is a standard enough shell construct that one could give an
-# argument to --quicklisp with --quicklisp=foo.
-# * same for output translation — though you can already export the
-# environment variable.
 
 SCRIPT_DIR=`dirname "$0"`
 SCRIPT_DIR=`readlink -f ${SCRIPT_DIR}`
@@ -47,9 +25,9 @@ if [ ! -d build ]; then
     # get a recent enough ASDF
     #
     cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
-    git clone git://common-lisp.net/projects/asdf/asdf.git
+    git clone git@common-lisp.net:asdf/asdf.git
     cd asdf
-    git checkout 3.1.0.65
+    git checkout 3.3.4
     make
 
     #
@@ -58,14 +36,14 @@ if [ ! -d build ]; then
     cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
     git clone https://github.com/slime/slime.git
     cd slime
-    git checkout e44a4c0038ff456a65a495eb4a81f9cb4c53f79f
+    git checkout faa0c6a0b7c77f6a2db8d3244f24563106857944
 
     #
     # get quicklisp and load/install it under build/
     #
     cd ${SCRIPT_DIR}/build/
     wget http://beta.quicklisp.org/quicklisp.lisp
-    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\")" --quit
+    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\" :dist-url \"http://beta.quicklisp.org/dist/quicklisp/2020-03-25/distinfo.txt\")" --quit
 fi
 
 cd "${SCRIPT_DIR}"
@@ -75,13 +53,14 @@ export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (t (\"${SCRIPT_DIR}/build
 
 echo Building bootstrap executable using \'${LISP}\', CL_SOURCE_REGISTRY is \'${CL_SOURCE_REGISTRY}\', ASDF_OUTPUT_TRANSLATIONS is \'${ASDF_OUTPUT_TRANSLATIONS}\'
 
-#${LISP} --no-sysinit --no-userinit --eval "(load \"build.lisp\")" --end-toplevel-options $*
-
 ln -sf bootstrap/common-lisp/maru ../../eval.cl
 
 # and now let's switch over to lisp...
 
 exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
+
+# let's quit the shell part in case the shell interpreter accidentally runs on the lisp stuff below
+exit 0
 
 |#
 
@@ -92,6 +71,13 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
     (load quicklisp-init)))
 
 (require :asdf)
+
+(format t "~2&Running on ~A ~A, using ASDF ~A, Quicklisp dist version ~A~%"
+        (lisp-implementation-type)
+        (lisp-implementation-version)
+        (asdf:asdf-version)
+        (or #+quicklisp (ql:dist-version "quicklisp")
+            "n/a"))
 
 ;; initiate asdf upgrade
 (asdf:load-system :asdf)
@@ -105,7 +91,7 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
   (ql:quickload :hu.dwim.logger)
   (ql:quickload :maru+hu.dwim.logger)
   (asdf:load-system :swank)
-  (ql:quickload :com.dvlsoft.clon))
+  (ql:quickload :net.didierverna.clon))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; this is an arbitrary list of pretty much everything. without this swank would try to load them when connecting
@@ -116,12 +102,12 @@ exec ${LISP} --no-sysinit --no-userinit --script "$0" --end-toplevel-options $@
                                  "SWANK-ASDF" "asdf" "ASDF")
                                #+sbcl
                                '("SB-SPROF" "SB-GROVEL" "SWANK-SBCL-EXTS")))
-  (ql:quickload :com.dvlsoft.clon))
+  (ql:quickload :net.didierverna.clon))
 
 (in-package :maru.eval)
 
-(eval-when (:execute :load-toplevel :compile-toplevel)
-  (com.dvlsoft.clon:nickname-package))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (net.didierverna.clon:nickname-package))
 
 (defun invoke-slime-debugger (condition previous-hook)
   (declare (ignore previous-hook))

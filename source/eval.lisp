@@ -261,7 +261,7 @@
                                   (b (next))
                                   (c (next))
                                   (d (next)))
-                              ;; TODO a CODE-CHAR call may very well not be comparible with whatever happens in C, which is probably UTF-16.
+                              ;; TODO a CODE-CHAR call may very well not be compatible with whatever happens in C, which is probably UTF-16.
                               (write-char (code-char (+ (ash (digit-value a) 12)
                                                         (ash (digit-value b) 8)
                                                         (ash (digit-value c) 4)

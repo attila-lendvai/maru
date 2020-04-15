@@ -192,6 +192,7 @@
     (maru/bool (maru/find-variable env name :otherwise nil))))
 
 (defmacro def-binary-arithmetic-subr (operator &optional (lisp-operator operator))
+  ;; TODO make the overflow policy clear
   `(def-subr (,operator :expected-arg-count 2)
     (let ((lhs (maru/get-head -args-))
           (rhs (maru/get-head (maru/get-tail -args-))))
@@ -199,7 +200,9 @@
         ((typep lhs 'maru/long)
          (cond
            ((typep rhs 'maru/long)
-            (coerce (,lisp-operator lhs rhs) 'maru/long))
+            (the maru/long
+              ;; FIXME size constant tied to the definition of maru/long. same below a few times.
+              (truncate (,lisp-operator lhs rhs) #.(expt 2 64))))
            ((typep rhs 'maru/double)
             (coerce (,lisp-operator lhs rhs) 'maru/double))))
         ((typep lhs 'maru/double)
@@ -207,7 +210,8 @@
            ((typep rhs 'maru/double)
             (coerce (,lisp-operator lhs rhs) 'maru/double))
            ((typep rhs 'maru/long)
-            (coerce (,lisp-operator lhs rhs) 'maru/long))))
+            (the maru/long
+              (truncate (,lisp-operator lhs rhs) #.(expt 2 64))))))
         (t (error "Non-numeric arguments for (~S ~S ~S)" ',operator lhs rhs))))))
 
 (def-binary-arithmetic-subr +)
@@ -227,16 +231,16 @@
           (cond
             ((typep lhs 'maru/long)
              (cond
-               ((typep rhs 'maru/long) (coerce (- lhs rhs) 'maru/long))
+               ((typep rhs 'maru/long) (the maru/long (truncate (- lhs rhs) #.(expt 2 64))))
                ((typep rhs 'maru/double) (coerce (- lhs rhs) 'maru/double))))
             ((typep lhs 'maru/double)
              (cond
                ((typep rhs 'maru/double) (coerce (- lhs rhs) 'maru/double))
-               ((typep rhs 'maru/long) (coerce (- lhs rhs) 'maru/long))))
+               ((typep rhs 'maru/long) (the maru/long (truncate (- lhs rhs) #.(expt 2 64))))))
             (t (error "Non-numeric arguments for (~S ~S ~S)" -subr- lhs rhs))))
         (cond
           ((typep lhs 'maru/long)
-           (coerce (- lhs) 'maru/long))
+           (the maru/long (truncate (- lhs) #.(expt 2 64))))
           ((typep lhs 'maru/double)
            (coerce (- lhs) 'maru/double))
           (t (error "Non-numeric arguments for (~S ~S)" -subr- lhs))))))
@@ -415,6 +419,7 @@
     (check-type index maru/long)
     ;; NOTE this is different from eval.c where characters are Long's
     (check-type value character)
+    ;; FIXME eval.c auto expands the string with GC_realloc
     (setf (elt object index) value)))
 
 (def-subr (string-copy)
