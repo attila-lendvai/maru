@@ -1,23 +1,24 @@
 CFLAGS = -Wall -g # -Os
 
-.SUFFIXES :
-
-all : opt eval2
+all : boot-eval-opt eval2
 
 boot-eval : boot-eval.c
-	gcc -g $(CFLAGS) -o boot-eval boot-eval.c
+	gcc $(CFLAGS) -o boot-eval boot-eval.c
 
-opt : .force
+boot-eval-opt : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -O3 -fomit-frame-pointer -DNDEBUG" boot-eval
 
 debuggc : .force
 	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1" boot-eval
 
 eval : *.l boot-eval
-	time ./boot-eval boot.l emit.l eval.l > eval.s && gcc -m32 -c -o eval.o eval.s && size eval.o && gcc -m32 -o eval eval.o
+	time ./boot-eval boot.l emit.l eval.l >eval.s
+	gcc -g -m32 -c -o eval.o eval.s
+	size eval.o
+	gcc -g -m32 -o eval eval.o
 
 eval2 : eval .force
-	time ./eval boot.l emit.l eval.l > eval2.s
+	time ./eval boot.l emit.l eval.l >eval2.s
 	diff eval.s eval2.s
 
 stats : .force
