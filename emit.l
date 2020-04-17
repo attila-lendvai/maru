@@ -454,21 +454,30 @@
   (cons 'address-of     gen-address-of)))
 
 (define-method gen <pair> (comp)
-  (let* ((head  (car self))
-         (arity (- (list-length self) 1))
-         (op    (cadr (assq head (array-at operators arity)))))
+  (let* ((fn-name (car self))
+         (args    (cdr self))
+         (arity   (list-length args))
+         (op      (cadr (assq fn-name (array-at operators arity)))))
     (if op
-        ((array-at generators arity) op (cdr self) comp)
-      (if (set op (cdr (assq head forms)))
+        ((array-at generators arity) op args comp)
+      (if (set op (cdr (assq fn-name forms)))
           (op self comp)
-        (let ((tmps (map-with gen-tmp (cdr self) comp))
-              (args (map-with gen-arg (cdr self) comp))
-              (func (gen (car self) comp))
-              (narg (list-length args)))
-          (map2-with gen-move tmps args comp)
-          (free-temps comp tmps)
-          (free-args  comp args)
-          (gen comp CALL narg))))))
+        (let* ((tmp-locs (map-with gen-tmp args comp))
+               (arg-locs (map-with gen-arg args comp))
+               (expr     (cdr (assq fn-name (<compiler>-env comp)))))
+          (if (= <expr> (type-of expr))
+              (let* ((defn   (<expr>-defn expr))
+                     (params (car defn))
+                     (nparam (list-length params)))
+                (or (= nparam arity)
+                    (error "gen: calling " expr
+                           " with the wrong number of arguments: " args
+                           " vs. " params))))
+          (gen fn-name comp)
+          (map2-with gen-move tmp-locs arg-locs comp)
+          (free-temps comp tmp-locs)
+          (free-args  comp arg-locs)
+          (gen comp CALL arity))))))
 
 ;;; GEN-DEFINITION
 
