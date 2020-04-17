@@ -1,25 +1,25 @@
-CFLAGS = -Wall -std=c99 -D_ISOC99_SOURCE -g
+PREVIOUS_STAGE=stage-000-c99
+BOOTEVAL = build/$(PREVIOUS_STAGE)/eval
+BUILD=build/
 
-all : boot-eval-opt eval2
+all: eval2
 
-boot-eval : boot-eval.c
-	gcc $(CFLAGS) -o boot-eval boot-eval.c
+previous-stage: .force
+	echo Building $(PREVIOUS_STAGE)
+	rm -rf ./$(BUILD)/$(PREVIOUS_STAGE)
+	mkdir -p $(BUILD)
+	git clone --branch $(PREVIOUS_STAGE) . ./$(BUILD)/$(PREVIOUS_STAGE)
+	$(MAKE) -C ./$(BUILD)/$(PREVIOUS_STAGE)
 
-boot-eval-opt : .force
-	$(MAKE) CFLAGS="$(CFLAGS) -O3 -fomit-frame-pointer -DNDEBUG" boot-eval
+eval: *.l
+	time $(BOOTEVAL) boot.l emit.l eval.l >$(BUILD)/eval.s
+	gcc -g -m32 -c -o $(BUILD)/eval.o $(BUILD)/eval.s
+	size $(BUILD)/eval.o
+	gcc -g -m32 -o eval $(BUILD)/eval.o
 
-debuggc : .force
-	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1" boot-eval
-
-eval : *.l boot-eval
-	time ./boot-eval boot.l emit.l eval.l >eval.s
-	gcc -g -m32 -c -o eval.o eval.s
-	size eval.o
-	gcc -g -m32 -o eval eval.o
-
-eval2 : eval .force
-	time ./eval boot.l emit.l eval.l >eval2.s
-	diff eval.s eval2.s
+eval2: eval
+	time ./eval boot.l emit.l eval.l >$(BUILD)/eval2.s
+	diff $(BUILD)/eval.s $(BUILD)/eval2.s
 
 stats : .force
 	cat boot.l emit.l 	 | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
@@ -27,7 +27,6 @@ stats : .force
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean : .force
-	rm -f *~ *.o boot-eval eval *.s
-	rm -rf *.dSYM
+	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o eval
 
 .force :
