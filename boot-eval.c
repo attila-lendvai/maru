@@ -739,7 +739,17 @@ static int stringLength(oop string)
   return getLong(get(string, String,size));
 }
 
-static oop newSymbol(char *cstr)        { oop obj= newBits(Symbol);     set(obj, Symbol,bits, strdup(cstr));                    return obj; }
+static oop newSymbol(char *name)
+{
+  size_t len= strlen(name);
+  char *nameCopy= malloc(len + 1);
+  strcpy(nameCopy, name);
+  nameCopy[len] = 0;
+  oop obj= newBits(Symbol);
+  set(obj, Symbol,bits, nameCopy);
+  return obj;
+}
+
 static oop newPair(oop head, oop tail)  { oop obj= newOops(Pair);       set(obj, Pair,head, head);  set(obj, Pair,tail, tail);  return obj; }
 
 static oop newArray(int tally)

@@ -1,4 +1,4 @@
-CFLAGS = -Wall -g # -Os
+CFLAGS = -Wall -std=c99 -D_ISOC99_SOURCE -g
 
 all : boot-eval-opt eval2
 
