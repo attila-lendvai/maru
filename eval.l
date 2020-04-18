@@ -1,4 +1,4 @@
-;;; -*- coke -*-
+;;; The maru VM, written in itself
 
 (define-form gcdebug prog ())
 ;;(define-form gcdebug prog `(let () ,@prog))

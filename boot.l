@@ -1,3 +1,5 @@
+;;; This file is the "standard library"
+
 (define list (lambda args args))
 
 (define %print print)
