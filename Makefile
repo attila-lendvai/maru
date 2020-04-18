@@ -1,13 +1,14 @@
-PREVIOUS_STAGE=stage-0.c99
-BUILD=build
+PREVIOUS_STAGE = stage-0.c99
+BUILD = build
 BOOTEVAL = $(BUILD)/$(PREVIOUS_STAGE)/eval
+EVAL = $(BUILD)/eval
 
 all: eval
 
 eval: $(BUILD)/eval.s *.l
 	gcc -g -m32 -c -o $(BUILD)/eval.o $(BUILD)/eval.s
 	size $(BUILD)/eval.o
-	gcc -g -m32 -o eval $(BUILD)/eval.o
+	gcc -g -m32 -o $(BUILD)/eval $(BUILD)/eval.o
 
 bootstrap: $(BUILD)/eval2.s
 	diff $(BUILD)/eval.s $(BUILD)/eval2.s
@@ -16,7 +17,7 @@ $(BUILD)/eval.s: $(BOOTEVAL) *.l
 	time $(BOOTEVAL) boot.l emit.l eval.l >$(BUILD)/eval.s
 
 $(BUILD)/eval2.s: eval *.l
-	time ./eval boot.l emit.l eval.l >$(BUILD)/eval2.s
+	time $(EVAL) boot.l emit.l eval.l >$(BUILD)/eval2.s
 
 $(BOOTEVAL):
 	echo Building $(BOOTEVAL)
@@ -31,4 +32,4 @@ stats:
 	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean:
-	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o eval
+	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
