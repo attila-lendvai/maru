@@ -1,4 +1,4 @@
-(in-package :maru.test)
+(in-package :maru/test)
 
 (defsuite (test/reading :in test))
 
@@ -41,5 +41,3 @@
   (is (eql (maru/read-expression "-1.123") -1.123d0))
   (is (equal (maru/read-expression "(- 1)")
              `(maru::- 1 . ,+maru/nil+))))
-
-

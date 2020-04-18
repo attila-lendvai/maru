@@ -1,4 +1,4 @@
-(in-package :maru.test)
+(in-package :maru/test)
 
 (defsuite (test/eval :in test))
 
@@ -204,14 +204,3 @@
    x)")))
   (is (equal 'maru::|almakortebanan|
              (read-and-run "(concat-symbols 'alma 'korte 'banan)"))))
-
-(defun load-boot.l ()
-  ;; boot.l unconditionally expects *arguments*
-  (with-logger-level (maru +warn+)
-    (maru/define (global-namespace-of *eval-context*)
-                 (maru/intern "*arguments*")
-                 +maru/nil+)
-    (maru/repl (asdf:system-relative-pathname :maru "../../boot.l"))))
-
-(deftest (test/reading/boot.l :auto-call nil) ()
-  (finishes (load-boot.l)))

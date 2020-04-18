@@ -1,8 +1,9 @@
 (in-package :cl-user)
 
-(defpackage :maru.test
+(defpackage :maru/test
   (:use :maru.eval
         :common-lisp
+        :hu.dwim.util
         :hu.dwim.logger
         :hu.dwim.stefil)
   (:shadow
@@ -30,4 +31,4 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; from hu.dwim.common
-  (import-all-owned-symbols :maru.eval :maru.test :overwrite t))
+  (import-all-owned-symbols :maru.eval :maru/test :overwrite t))

@@ -19,17 +19,20 @@
       `(quote ,(intern name :maru))
       form))
 
+(defconstant +maru/long-nbits+ 64)
+(defconstant +maru/long-max+ (expt 2 +maru/long-nbits+))
+
 ;; map some maru types to cl types, foo -> maru/foo
 ;; when changing don't forget to update the type-of subr!
 (macrolet ((frob (&rest entries)
              `(progn
                 ,@(loop
-                    :for entry :in entries
-                    :collect `(deftype ,(symbolicate '#:maru/ (first entry)) ()
-                                ,(second entry))))))
+                        :for entry :in entries
+                        :collect `(deftype ,(symbolicate '#:maru/ (first entry)) ()
+                                    ,(second entry))))))
   (frob
    (double    'double-float)
-   (long      '(signed-byte 64))
+   (long      `(signed-byte ,+maru/long-nbits+))
    (string    'string)
    ;; (character 'character)
    (pair      'cons)

@@ -24,12 +24,13 @@
 
   (setf (global-namespace-of *eval-context*) (make-global-namespace))
 
+  ;; TODO properly mimic what's done in main()
   (flet ((maru/define-in-global-namespace (name &optional value)
            (maru/define (global-namespace-of *eval-context*) (maru/intern name) value)))
-    (setf (globals-of *eval-context*)     (maru/define-in-global-namespace "*globals*" (global-namespace-of *eval-context*)))
-    (setf (expanders-of *eval-context*)   (maru/define-in-global-namespace "*expanders*"))
-    (setf (evaluators-of *eval-context*)  (maru/define-in-global-namespace "*evaluators*"))
-    (setf (applicators-of *eval-context*) (maru/define-in-global-namespace "*applicators*")))
+    (setf (globals-of *eval-context*)     (maru/define-in-global-namespace "*globals*"     (global-namespace-of *eval-context*)))
+    (setf (expanders-of *eval-context*)   (maru/define-in-global-namespace "*expanders*"   (make-maru/array 32)))
+    (setf (evaluators-of *eval-context*)  (maru/define-in-global-namespace "*evaluators*"  (make-maru/array 32)))
+    (setf (applicators-of *eval-context*) (maru/define-in-global-namespace "*applicators*" (make-maru/array 32))))
 
   (define-predefined))
 

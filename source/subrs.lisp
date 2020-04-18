@@ -200,18 +200,16 @@
         ((typep lhs 'maru/long)
          (cond
            ((typep rhs 'maru/long)
-            (the maru/long
-              ;; FIXME size constant tied to the definition of maru/long. same below a few times.
-              (truncate (,lisp-operator lhs rhs) #.(expt 2 64))))
+            ;; FIXME simulate overflow?
+            (coerce (,lisp-operator lhs rhs) 'maru/long))
            ((typep rhs 'maru/double)
-            (coerce (,lisp-operator lhs rhs) 'maru/double))))
+            (the maru/double (,lisp-operator lhs rhs)))))
         ((typep lhs 'maru/double)
          (cond
            ((typep rhs 'maru/double)
-            (coerce (,lisp-operator lhs rhs) 'maru/double))
+            (the maru/double (,lisp-operator lhs rhs)))
            ((typep rhs 'maru/long)
-            (the maru/long
-              (truncate (,lisp-operator lhs rhs) #.(expt 2 64))))))
+            (the maru/double (,lisp-operator lhs rhs)))))
         (t (error "Non-numeric arguments for (~S ~S ~S)" ',operator lhs rhs))))))
 
 (def-binary-arithmetic-subr +)
@@ -231,18 +229,18 @@
           (cond
             ((typep lhs 'maru/long)
              (cond
-               ((typep rhs 'maru/long) (the maru/long (truncate (- lhs rhs) #.(expt 2 64))))
+               ((typep rhs 'maru/long)   (coerce (- lhs rhs) 'maru/long))
                ((typep rhs 'maru/double) (coerce (- lhs rhs) 'maru/double))))
             ((typep lhs 'maru/double)
              (cond
                ((typep rhs 'maru/double) (coerce (- lhs rhs) 'maru/double))
-               ((typep rhs 'maru/long) (the maru/long (truncate (- lhs rhs) #.(expt 2 64))))))
+               ((typep rhs 'maru/long)   (coerce (- lhs rhs) 'maru/double))))
             (t (error "Non-numeric arguments for (~S ~S ~S)" -subr- lhs rhs))))
         (cond
           ((typep lhs 'maru/long)
-           (the maru/long (truncate (- lhs) #.(expt 2 64))))
+           (the maru/long (- lhs)))
           ((typep lhs 'maru/double)
-           (coerce (- lhs) 'maru/double))
+           (the maru/double (- lhs)))
           (t (error "Non-numeric arguments for (~S ~S)" -subr- lhs))))))
 
 (defmacro def-comparator-subr (operator)
@@ -451,8 +449,14 @@
 (def-subr (long->double)
   (not-yet-implemented))
 
-(def-subr (double->long)
-  (not-yet-implemented))
+(defun double->long (double)
+  (check-type double maru/double)
+  ;; TODO this silently drops whatever doesn't fit
+  (the maru/long
+    (rational (floor (mod double +maru/long-max+)))))
+
+(def-subr (double->long :expected-arg-count 1)
+  (double->long (maru/get-head -args-)))
 
 (def-subr (string->long)
   (not-yet-implemented))
