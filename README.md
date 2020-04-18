@@ -44,6 +44,10 @@ and they are built there. A new stage needs to be opened when you want to use a 
 of the language in the code implementing the language itself.
 The `master` branch holds the upcoming next bootstrap stage ("symlinked" by `git symbolic-ref`).
 
+### Build instructions
+
+From the `master` branch invoke `make bootstrap`.
+
 ## Who
 
 Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/).
@@ -72,3 +76,5 @@ Their annual reports:
 [2010](http://www.vpri.org/pdf/tr2010004_steps10.pdf),
 [2011](http://www.vpri.org/pdf/tr2011004_steps11.pdf),
 [2012](http://www.vpri.org/pdf/tr2012001_steps.pdf).
+
+This git repo is a conversion of Ian Piumarta's mercurial repo that was once available at http://piumarta.com/hg/maru/, whose contents are preserved in the branch called `piumarta`. The plan is to eventually revive most of the goodies available there in a more organized/approachable manner.

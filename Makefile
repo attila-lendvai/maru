@@ -33,3 +33,6 @@ stats:
 
 clean:
 	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
+
+distclean:
+	rm -rf $(BUILD)
