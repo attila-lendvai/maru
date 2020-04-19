@@ -14,10 +14,10 @@ bootstrap: $(BUILD)/eval2.s
 	diff $(BUILD)/eval.s $(BUILD)/eval2.s
 
 $(BUILD)/eval.s: $(BOOTEVAL) *.l
-	time $(BOOTEVAL) boot.l emit.l eval.l >$(BUILD)/eval.s
+	time $(BOOTEVAL) boot.l emit-ia32.l eval.l >$(BUILD)/eval.s
 
 $(BUILD)/eval2.s: eval *.l
-	time $(EVAL) boot.l emit.l eval.l >$(BUILD)/eval2.s
+	time $(EVAL) boot.l emit-ia32.l eval.l >$(BUILD)/eval2.s
 
 $(BOOTEVAL):
 	echo Building $(BOOTEVAL)
@@ -27,9 +27,9 @@ $(BOOTEVAL):
 	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
 stats:
-	cat boot.l emit.l 	 | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.l        	 | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit-ia32.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat eval.l			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit-ia32.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean:
 	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
