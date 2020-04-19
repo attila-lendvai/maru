@@ -22,6 +22,9 @@
 
 (define-function extern? (obj) (= <extern> (type-of obj)))
 
+(define-function extern->label (extern)
+  (concat-symbol (<extern>-name extern) '$stub))
+
 ;;; DEFINE-OPERAND
 
 (define-function define-operand-make-setters (tname fields)
@@ -498,18 +501,18 @@
     (gen comp TEXT)))
 
 (define-method gen-definition <extern> (name comp)
-  (let ((nlabel (LABEL                name        ))
-        (slabel (LABEL (concat-symbol name '$stub))))
+  (let ((extern-label (LABEL (<extern>-name self)))
+        (our-label    (LABEL (concat-symbol name '$stub))))
     (if __MACH__
         (let ()
           (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-          (gen comp DEFLABEL slabel)
-          (gen comp INDIRECT nlabel)
+          (gen comp DEFLABEL our-label)
+          (gen comp INDIRECT extern-label)
           (gen comp LONG 0)
           (gen comp TEXT))
       (gen comp DATA)
-      (gen comp DEFLABEL slabel)
-      (gen comp LONG nlabel)
+      (gen comp DEFLABEL our-label)
+      (gen comp LONG extern-label)
       (gen comp TEXT))))
 
 (define-function gen-param (name comp)

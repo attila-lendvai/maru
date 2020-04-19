@@ -46,7 +46,7 @@
 (define memset  (extern 'memset))
 (define memcpy  (extern 'memcpy))
 (define printf  (extern 'printf))
-(define fprintf (extern 'frintf))
+(define fprintf (extern 'fprintf))
 (define sprintf (extern 'sprintf))
 
 (define stderr                  0)
