@@ -2,23 +2,23 @@
 
 (define list (lambda args args))
 
-(define %print print)
-(define %dump  dump)
+(define primitive/print print)
+(define primitive/dump  dump)
 
-(define %error
+(define error/nested
   (lambda args
-    (set error abort)
-    (%print "\nERROR: ")
-    (apply %print args)
-    (%print "\n")
+    (set error abort) ; let's give up in case of more recursive errors
+    (primitive/print "\nNESTED ERROR: ")
+    (apply primitive/print args)
+    (primitive/print "\n")
     (abort)))
 
 (define error
   (lambda args
-    (set error %error)
-    (%print "\nerror: ")
+    (set error error/nested) ; in case a nested error happens while reporting
+    (primitive/print "\nerror: ")
     (apply print args)
-    (%print "\n")
+    (primitive/print "\n")
     (abort)))
 
 (define caar (lambda (x) (car (car x))))
@@ -251,7 +251,7 @@
 
 ;;; print
 
-(define-selector do-print (arg) (%print arg))
+(define-selector do-print (arg) (primitive/print arg))
 (define-selector do-dump  (arg) (do-print arg))
 
 (define print
@@ -269,14 +269,14 @@
 (define println
   (lambda args
     (apply print args)
-    (%print "\n")))
+    (primitive/print "\n")))
 
 (define dumpln
   (lambda args
     (apply dump args)
-    (%print "\n")))
+    (primitive/print "\n")))
 
-(define-method do-dump  <string> ()     (%dump self))
+(define-method do-dump  <string> ()     (primitive/dump self))
 (define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
 
 (define-method do-print <pair> ()
