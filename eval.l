@@ -49,6 +49,7 @@
 (define fprintf (extern 'fprintf))
 (define sprintf (extern 'sprintf))
 
+(define stdout                  0)
 (define stderr                  0)
 
 (define gc_quantum              65504)
@@ -1012,6 +1013,8 @@
       (else                     (and (!= lhs rhs) s_t)))))
 
 (define-function subr_abort (args env)
+  (fflush stdout)
+  (fflush stderr)
   (abort))
 
 (define-function subr_exit (args env)
@@ -1244,6 +1247,7 @@
       (k_define (intern name) tmp globals))))
 
 (define-function main (argc argv)
+  (set stdout (fdopen 1 "r"))
   (set stderr (fdopen 2 "a"))
 
   (gc_initialise)               (gcdebug (set gc_frequency 1))
