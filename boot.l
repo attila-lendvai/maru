@@ -97,6 +97,12 @@
 (define define-form (form (lambda (name args . body)
                             `(define ,name (form (lambda ,args ,@body))))))
 
+(define-form when (test . body)
+  `(if ,test (let () ,@body) ()))
+
+(define-form unless (test . body)
+  `(if ,test () ,@body))
+
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
 
