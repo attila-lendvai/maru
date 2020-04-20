@@ -150,10 +150,12 @@
   (if (pair? clauses)
       (let* ((clause (car clauses))
              (test   (car clause))
-             (value  (cadr clause)))
+             (forms  (cdr clause)))
         (if (= 'else test)
-            value
-          `(if ,test ,value ,(%cond (cdr clauses)))))))
+            `(let () ,@forms)
+          `(if ,test
+               (let () ,@forms)
+             ,(%cond (cdr clauses)))))))
 
 (define-form cond clauses (%cond clauses))
 
