@@ -23,7 +23,7 @@
 (define-function extern? (obj) (= <extern> (type-of obj)))
 
 (define-function extern->label (extern)
-  (concat-symbol (<extern>-name extern) '$stub))
+  (concat-symbol (<extern>-name extern) '_stub))
 
 ;;; DEFINE-OPERAND
 
@@ -97,11 +97,9 @@
         (cond
           ((or (and (<= ?a c) (<= c ?z))
                (and (<= ?A c) (<= c ?Z))
-               (and (<= ?0 c) (<= c ?9)))
+               (and (<= ?0 c) (<= c ?9))
+               (= ?_ c))
            (putnext c))
-          ((= ?_ c)
-           (putnext ?_)
-           (putnext ?_))
           (else
            (putnext ?_)
            (putnext (digit-for (>> c  4)))
