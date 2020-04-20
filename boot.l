@@ -103,6 +103,12 @@
 (define-form unless (test . body)
   `(if ,test () ,@body))
 
+(define-form assert (test . args)
+  (unless args
+    (set args (list "assertion failed: " `(quote ,test))))
+  `(unless ,test
+     (error ,@args)))
+
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
 
