@@ -302,11 +302,10 @@
 (define-method gen <symbol> (comp)
   (let ((value (cdr (assq self (<compiler>-env comp)))))
     (or value (error "gen: undefined variable: " self))
-    (if (extern? value)
-        (gen comp LOAD (GI32 (LABEL (concat-symbol self '$stub))))
-      (if (temp? value)
-          (gen comp LOAD value)
-          (gen comp LOAD (GI32 (LABEL self)))))))
+    (cond
+      ((temp? value)   (gen comp LOAD value))
+      ((extern? value) (gen comp LOAD (GI32 (LABEL (extern->label value)))))
+      (else            (gen comp LOAD (GI32 (LABEL self)))))))
 
 (define-method gen <string> (comp)
   (let ((label (LABEL (temp-label-name))))
@@ -427,10 +426,11 @@
         (valu (caddr expr)))
     (gen valu comp)
     (let ((var (cdr (assq name (<compiler>-env comp)))))
-      (or var (error "set: undefined variable: "name))
-      (if (temp? var)
-          (gen comp STORE var)
-        (gen comp STORE (GI32 (LABEL name)))))))
+      (or var (error "set: undefined variable: " name))
+      (cond
+        ((temp? var)   (gen comp STORE var))
+        ((extern? var) (gen comp STORE (GI32 (LABEL (extern->label var)))))
+        (else          (gen comp STORE (GI32 (LABEL name))))))))
 
 (define-function gen-return (expr comp)
   (list-do stmt (cdr expr) (gen stmt comp))
@@ -502,7 +502,7 @@
 
 (define-method gen-definition <extern> (name comp)
   (let ((extern-label (LABEL (<extern>-name self)))
-        (our-label    (LABEL (concat-symbol name '$stub))))
+        (our-label    (LABEL (extern->label self))))
     (if __MACH__
         (let ()
           (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
