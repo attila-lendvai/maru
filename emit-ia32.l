@@ -104,7 +104,7 @@
            (putnext (digit-for (>> c  4)))
            (putnext (digit-for (&  c 15))))))
       (set index (+ 1 index)))
-    (array->string mangled)))
+    (array->string mangled outdex)))
 
 ;;; IA32 -- OPERANDS
 

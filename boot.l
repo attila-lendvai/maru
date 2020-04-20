@@ -415,10 +415,9 @@
 
 ;;; conversion
 
-(define-function array->string (arr)
-  (let* ((ind 0)
-         (lim (array-length arr))
-         (str (string lim)))
+(define-function array->string (arr lim)
+  (let ((ind 0)
+        (str (string lim)))
     (while (< ind lim)
       (set-string-at str ind (array-at arr ind))
       (set ind (+ 1 ind)))
