@@ -55,8 +55,7 @@
 ;;; DEFINE-EMIT
 
 (define-generic emit op-args
-  (print "\nemit: illegal instruction: "op-args)
-  (error "aborted"))
+  (error "no emit defined for: " op-args))
 
 (define-multimethod emit ((<pair> program))
   (while program
@@ -113,7 +112,8 @@
   (define-function temp-label-name ()
     (concat-string "_L_" (long->string (set counter (+ counter 1))))))
 
-(define-operand LABEL (name)    __PREFIX__(mangle-label (<LABEL>-name self)))
+(define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
+;; general, literal, and temp registers
 (define-operand GI32 (name)     (<GI32>-name self))
 (define-operand LI32 (value)    (<LI32>-value self))
 (define-operand TI32 (offset)   (<TI32>-offset self)"(%esp)")
@@ -465,15 +465,16 @@
           (op self comp)
         (let* ((tmp-locs (map-with gen-tmp args comp))
                (arg-locs (map-with gen-arg args comp))
-               (expr     (cdr (assq fn-name (<compiler>-env comp)))))
-          (if (= <expr> (type-of expr))
-              (let* ((defn   (<expr>-defn expr))
+               (op       (cdr (assq fn-name (<compiler>-env comp))))
+               (op-type  (type-of op)))
+          (if (= <expr> op-type)
+              (let* ((defn   (<expr>-defn op))
                      (params (car defn))
                      (nparam (list-length params)))
                 (or (= nparam arity)
-                    (error "gen: calling " expr
+                    (error "gen: calling " op
                            " with the wrong number of arguments: " args
-                           " vs. " params))))
+                           ", expecting " nparam))))
           (gen fn-name comp)
           (map2-with gen-move tmp-locs arg-locs comp)
           (free-temps comp tmp-locs)
