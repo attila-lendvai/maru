@@ -2,11 +2,16 @@
 
 ## What
 
-Maru is a tiny self-hosting lisp dialect: a symbolic expression evaluator that can compile its own implementation language.
+Maru is a tiny self-hosting lisp dialect: a symbolic expression evaluator
+that can compile its own implementation language.
+
+This repo is also the place of exploration in the land of bootstrapping
+and computing system development, by both growing *and* shrinking what's
+currently known as Maru.
 
 ## How
 
-The architecture is described in Ian Piumarta's paper:
+Maru's architecture is described in Ian Piumarta's paper:
 [Open, extensible composition models](https://www.piumarta.com/freeco11/freeco11-piumarta-oecm.pdf).
 
 > it is a sketch of how Maru's generalised eval works,
@@ -35,22 +40,35 @@ written in the s-expression language.
 The recursive implementation and compiler (in the .l files) is split into three parts for clarity,
 but it could all be in a single source file.
 
-### Build architecture
+### Build architecture, git repo layout
 
-The bootstrap stages are in separate git branches called `stage-n`;
-i.e. `stage-0.c99` holds the bootstrap implementation written in C.
-The bootstrap process is executed by stage `n` first requesting stage `(n-1)`
-to compile an `eval` executable. Then it uses that executable
-to compile itself (and provide the foundations for stage `(n+1)`).
+The bootstrap stages are in separate git branches with the following
+naming convention (without a `master` branch):
 
-During the build the bootstrap stages are `git checkout`'ed into `build/stage-n`,
+`[language name].[bootstrap stage]`, e.g `maru.1`.
+
+Optionally, for stage zero in the bootstrap, it also includes the name of the
+parent language, from which this "bootstrap sprout" grows:
+
+`[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
+the bootstrap implementation written in C.
+
+The bootstrap process in general is planned to be like this: stage `n` requests
+the/a parent stage (typically stage `(n-1)` of the same language) to compile an
+`eval` executable. Then it uses that executable to compile itself (and provide
+the foundations for stage `(n+1)`).
+
+During the build the bootstrap stages are `git checkout`'ed under `build/`
 and they are built there. A new stage needs to be opened when you want to use a new feature
-of the language in the code implementing the language itself. Part of that process is
-to capture the contents of the `master` branch into a new stage branch.
+of the language in the code implementing the language itself.
+
+My plan is not only to grow, but also to *shrink* the languages (i.e. introduce
+"negative" bootstrap stages). This will be part of the collaboration with
+Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 ### Build instructions
 
-From the `master` branch invoke `make bootstrap`.
+From the default branch (currently `maru.1`) invoke `make bootstrap`.
 
 ## Who
 
@@ -63,6 +81,11 @@ This repo is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 * Programming badly needs better foundations, and Maru is part of this exploration.
 The foundations should get smaller, simpler, more self-contained, and more approachable
 by people who set out to learn programming.
+
+* Repos and build infrastructures should capture the growth of a language, both for
+educational, and also for practical reasons: to have a minimal *seed* that is simple to
+port to a new architecture, and then have a self-contained bootstrap process that
+can "grow" the entire system on top of the new foundation (hardware).
 
 * Maru is very small: in about 1700 lines of code it can self-host
 (with about 2300 LoC of throwaway C code for the bootstrap).
