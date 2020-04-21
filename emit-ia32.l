@@ -113,7 +113,8 @@
                (and (<= ?0 c) (<= c ?9)))
            (putnext c))
           ((or (= ?/ c)
-               (= ?- c))
+               (= ?- c)
+               (= ?_ c))
            (putnext ?_))
           (else
            (putnext ?_)
@@ -126,7 +127,7 @@
 
 (let ((counter 0))
   (define-function temp-label-name ()
-    (concat-string "_L_" (long->string (set counter (+ counter 1))))))
+    (concat-string "L_" (long->string (set counter (+ counter 1))))))
 
 (define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
 ;; general, literal, and temp registers
@@ -541,12 +542,11 @@
   (gen comp COMMENT (list "form "name)))
 
 (define-method gen-definition <expr> (name ocomp)
-  (let* ((main (= 'main name))
+  (let* ((main? (= 'main name))
          (defn (<expr>-defn self))
          (body (cdr defn))
          (comp (compiler (<compiler>-env ocomp)))
-         (tnam (if main (LABEL name) (LABEL (temp-label-name))))
-         (vnam (if main ()           (LABEL name)))
+         (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
          (params (map-with gen-param (car defn) comp)))
     (list-do e body (gen e comp))
     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
@@ -555,20 +555,21 @@
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
       (emit TEXT)
-      (and main (emit GLOBAL tnam))
-      (emit DEFLABEL tnam)
+      (when main?
+        (emit GLOBAL entry-label))
+      (emit DEFLABEL entry-label)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
       (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
       (and (<compiler>-epilogue comp)
            (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
-    (or main
+    (unless main?
       (let ()
         (gen ocomp DATA)
-        (gen ocomp GLOBAL vnam)
-        (gen ocomp DEFLABEL vnam)
-        (gen ocomp LONG tnam)
+        (gen ocomp GLOBAL (LABEL name))
+        (gen ocomp DEFLABEL (LABEL name))
+        (gen ocomp LONG entry-label)
         (gen ocomp TEXT)))))
 
 ;;;
