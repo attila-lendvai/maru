@@ -6,6 +6,12 @@
 ;;; that in turn can be compiled by the gcc toolchain into an executable binary.
 ;;;
 
+;;; It can compile a subset of Maru.
+;;;
+;;; Introduces two extra primitives:
+;;;   - return
+;;;   - address-of
+
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
 (define __LINUX__ '(X)) ; non-nil for Linux, Cygwin, etc. (external symbols have no underscore prefix)
@@ -104,9 +110,11 @@
         (cond
           ((or (and (<= ?a c) (<= c ?z))
                (and (<= ?A c) (<= c ?Z))
-               (and (<= ?0 c) (<= c ?9))
-               (= ?_ c))
+               (and (<= ?0 c) (<= c ?9)))
            (putnext c))
+          ((or (= ?/ c)
+               (= ?- c))
+           (putnext ?_))
           (else
            (putnext ?_)
            (putnext (digit-for (>> c  4)))
