@@ -245,9 +245,9 @@
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
-  (or default (set default `(args (error "cannot apply selector "',name
-                                         " to "(array-at %type-names (type-of (car args)))
-                                         ": "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
+  (or default (set default `(args (error "cannot apply selector '"',name
+                                         "' to type '"(array-at %type-names (type-of (car args)))
+                                         "': "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
   `(define ,name (selector ',name (lambda ,@default))))
 
 (define-selector add-method)

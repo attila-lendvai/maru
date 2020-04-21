@@ -1,3 +1,11 @@
+;;; -*- mode: lisp; coding: us-ascii -*-
+;;;
+;;; This is a compiler that targets IA-32, aka x86 assembly (through the gcc toolchain).
+;;;
+;;; STATUS: it should successfully compile eval.l into eval.s,
+;;; that in turn can be compiled by the gcc toolchain into an executable binary.
+;;;
+
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
 (define __LINUX__ '(X)) ; non-nil for Linux, Cygwin, etc. (external symbols have no underscore prefix)
