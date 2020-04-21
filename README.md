@@ -38,7 +38,7 @@ but it could all be in a single source file.
 ### Build architecture
 
 The bootstrap stages are in separate git branches called `stage-n`;
-i.e. `stage-0-c99` holds the bootstrap implementation written in C.
+i.e. `stage-0.c99` holds the bootstrap implementation written in C.
 The bootstrap process is executed by stage `n` first requesting stage `(n-1)`
 to compile an `eval` executable. Then it uses that executable
 to compile itself (and provide the foundations for stage `(n+1)`).
@@ -70,11 +70,17 @@ by people who set out to learn programming.
 * Ian seems to have stopped working on Maru, but it's an interesting piece of code that deserves
 a repo and a maintainer.
 
-## History
+## Status
 
+
+### History
+
+#### Around 2010-2013
 Maru was developed as part of Alan Kay's *Fundamentals of New Computing* project,
 by the *[Viewpoints Research Institute](https://web.archive.org/web/20111002111856/http://www.viewpointsresearch.org/fonc_wiki/index.php/Idst)*.
 The goal of the project was to implement an entirely new, self-hosting computing system, with GUI, in 20.000 lines of code.
+
+At some point VPRI went quiet and closed down in 2018. Much of their online content disappeared, and the team (probably) also dissolved.
 
 Their annual reports:
 [2007](http://www.vpri.org/pdf/tr2007008_steps.pdf),
@@ -84,4 +90,22 @@ Their annual reports:
 [2011](http://www.vpri.org/pdf/tr2011004_steps11.pdf),
 [2012](http://www.vpri.org/pdf/tr2012001_steps.pdf).
 
-This git repo is a conversion of Ian Piumarta's mercurial repo that was once available at http://piumarta.com/hg/maru/, whose contents are preserved in the branch called `piumarta`. The plan is to eventually revive most of the goodies available there in a more organized/approachable manner.
+This git repo is a conversion of Ian Piumarta's mercurial repo that was once
+available at http://piumarta.com/hg/maru/, whose contents are preserved in the
+branch called `piumarta`. The plan is to eventually revive most of the goodies
+available there in a more organized/approachable manner, and also pay attention
+to the bootstrapping issues.
+
+#### This git repo
+
+To the best of my knowledge this repo holds the latest published state of
+Ian's work (captured in the branch called `piumarta`).
+
+This repo has received, and will receive forced updates until I come up with
+a build setup that nicely facilitates bootstrapping (in both directions:
+growing and simplifying the language), and multiple, parallel paths of these
+bootstrapping branches of language development (except the `piumarta` branch).
+
+There were two Mercurial repositories, one for the VPRI demos, and one for the
+minimal self-hosting Maru (? it's just an assumption of mine). I based my work
+on top of the minimal repo, which was created by Ian in 2011.
