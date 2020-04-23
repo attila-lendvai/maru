@@ -6,8 +6,13 @@ Maru is a tiny self-hosting lisp dialect: a symbolic expression evaluator
 that can compile its own implementation language.
 
 This repo is also the place of exploration in the land of bootstrapping
-and computing system development, by both growing *and* shrinking what's
-currently known as Maru.
+and computing system development. I'm planning to also **shrink**
+what's currently known as Maru, and/or introducing simpler languages into the
+bootstrap process; e.g. develop
+[a trivial stack machine based language](https://github.com/nagydani/seedling/)
+that can be used to bootstrap Maru directly onto the raw metal, without
+assuming a C compiler toolchain, or an Operating System, and all that with
+minimal efforts.
 
 ## How
 
@@ -113,18 +118,24 @@ Their annual reports:
 [2011](http://www.vpri.org/pdf/tr2011004_steps11.pdf),
 [2012](http://www.vpri.org/pdf/tr2012001_steps.pdf).
 
+#### This git repo
+
 This git repo is a conversion of Ian Piumarta's mercurial repo that was once
 available at http://piumarta.com/hg/maru/, whose contents are preserved in the
 branch called `piumarta`. The plan is to eventually revive most of the goodies
 available there in a more organized/approachable manner, and also pay attention
 to the bootstrapping issues.
 
-#### This git repo
-
 To the best of my knowledge this repo holds the latest published state of
 Ian's work (captured in the branch called `piumarta`).
 
-This repo has received, and will receive forced updates until I come up with
+Ian published another mercurial repo somewhere halfway in the commit history,
+with only a few commits. I assume that it was meant to hold a "vanilla"
+version of Maru that can self-host, but is not tailored to accommodate the VPRI demos.
+I started out my work from this minimal repo, hence the divergence between the
+git branch histories.
+
+This repo has received, and will **receive forced** updates until I come up with
 a build setup that nicely facilitates bootstrapping (in both directions:
 growing and simplifying the language), and multiple, parallel paths of these
 bootstrapping branches of language development (except the `piumarta` branch).
