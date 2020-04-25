@@ -2,8 +2,9 @@
 
 ## What
 
-Maru is a tiny self-hosting lisp dialect: a symbolic expression evaluator
-that can compile its own implementation language.
+Maru is a programming language. It's a tiny, self-hosting lisp dialect:
+a symbolic expression evaluator that can compile its own implementation language,
+in less than 2000 LoC.
 
 This repo is also the place of exploration in the land of bootstrapping
 and computing system development. I'm planning to also **shrink**
@@ -25,7 +26,7 @@ Maru's architecture is described in Ian Piumarta's paper:
 
 ### The Parts
 
-* `eval.c` (in branch `stage-0.c99`) contains a reader/evaluator for a simple
+* `eval.c` (in branch `stage.0.c99`) contains a reader/evaluator for a simple
 s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
 
 * `eval.l` contains the same evaluator, written in the s-expression language.
@@ -37,7 +38,7 @@ semantics-preserving "level shift" from s-expressions to IA-32 machine code, let
 evaluator in `eval.l` escape from "infinite metacircular regression" to a language grounded in hardware.
 A possible metaphor of this is a "parent universe" that, when compiling the abstract to the concrete,
 provides you with a set of axiomatic foundations to build upon. Another possible such "parent universe" is
-C99 (I'm planning to work next on an `emit-c99.l`).
+C99 (I'm planning to implement an `emit-c99.l`).
 
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
 written in the s-expression language.
@@ -75,6 +76,14 @@ Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 From the default branch (currently `maru.1`) invoke `make bootstrap`.
 
+**Linux:**
+
+You need support for compiling and running 32bit C code. On Debian based x64 systems:
+
+```
+sudo apt-get install gcc-multilib
+```
+
 ## Who
 
 Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/).
@@ -85,12 +94,13 @@ This repo is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 
 * Programming badly needs better foundations, and Maru is part of this exploration.
 The foundations should get smaller, simpler, more self-contained, and more approachable
-by people who set out to learn programming.
+for people who set out to learn programming.
 
-* Repos and build infrastructures should capture the growth of a language, both for
-educational, and also for practical reasons: to have a minimal *seed* that is simple to
-port to a new architecture, and then have a self-contained bootstrap process that
-can "grow" the entire system on top of the new foundation (hardware).
+* We lose a lot of value by not capturing the growth of a language into repo branches
+and formally encoded build instructions. They are useful both for educational purposes,
+and also for practical reasons: to have a minimal *seed* that is very simple to
+port to a new architecture, and then have a self-contained, formal bootstrap process that
+can automatically "grow" the entire system on top of that freshly layed, tiny foundation.
 
 * Maru is very small: in about 1700 lines of code it can self-host
 (with about 2300 LoC of throwaway C code for the bootstrap).
@@ -123,7 +133,7 @@ Their annual reports:
 This git repo is a conversion of Ian Piumarta's mercurial repo that was once
 available at http://piumarta.com/hg/maru/, whose contents are preserved in the
 branch called `piumarta`. The plan is to eventually revive most of the goodies
-available there in a more organized/approachable manner, and also pay attention
+available there in a more organized and approachable manner, and also pay attention
 to the bootstrapping issues.
 
 To the best of my knowledge this repo holds the latest published state of
@@ -135,10 +145,11 @@ version of Maru that can self-host, but is not tailored to accommodate the VPRI 
 I started out my work from this minimal repo, hence the divergence between the
 git branch histories.
 
-This repo has received, and will **receive forced** updates until I come up with
+This repo has received, and **will receive forced pushes** (i.e.
+`git push -f` to rewrite git history (except the `piumarta` branch)) until I come up with
 a build setup that nicely facilitates bootstrapping (in both directions:
-growing and simplifying the language), and multiple, parallel paths of these
-bootstrapping branches of language development (except the `piumarta` branch).
+growing and simplifying the language), and multiple, parallel bootstrapping
+paths of language development.
 
 There were two Mercurial repositories, one for the VPRI demos, and one for the
 minimal self-hosting Maru (? it's just an assumption of mine). I based my work
