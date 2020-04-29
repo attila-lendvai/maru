@@ -635,6 +635,13 @@ typedef oop (*imp_t)(oop args, oop env);
 
 #define nil ((oop)0)
 
+/*
+ NOTE: the subr's in eval.c assume a certain layout for the built-in types.
+ what actually happens is encoded in eval.c, and the define-structure forms
+ for the built-in types in boot.l merely fill in some missing parts. types
+ are represented internally as successive integers.
+ corollary: the two files must agree, both in the order and in the field layout.
+*/
 enum { Undefined, Long, String, Symbol, Pair, _Array, Array, Expr, Form, Fixed, Subr };
 
 struct Long     { long  bits; };
