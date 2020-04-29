@@ -278,6 +278,11 @@
 
 (define EOF     -1)
 
+;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
+;; what actually happens is encoded in eval.l, and the define-structure forms
+;; for the built-in types in boot.l merely fill in some missing parts. types
+;; are represented internally as successive integers.
+;; corollary: the two files must agree, both in the order and in the field layout.
 (define <undefined>      0)
 (define <long>           1)
 (define <string>         2)

@@ -8,9 +8,19 @@
 
 ;;; It can compile a subset of Maru.
 ;;;
+;;; Limitations:
+;;;   - no closures
+;;;   - no variable number of args for functions
+;;;   - only supports the following literals: Long, String
+;;;   - and probaby more
+;;;
 ;;; Introduces two extra primitives:
-;;;   - return
+;;;   - return (from the current function)
 ;;;   - address-of
+;;;
+;;; Naming:
+;;;   - emit: directly emits into the output stream
+;;;   - gen: collects instructions into a compiler object for later emission
 
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
@@ -69,6 +79,7 @@
 ;;; DEFINE-EMIT
 
 (define-generic emit op-args
+  ;; EMIT directly emits into the output stream (c.f. with GEN that records)
   (error "no emit defined for: " op-args))
 
 (define-multimethod emit ((<pair> program))
@@ -309,6 +320,7 @@
 (define-selector gen)
 
 (define-method gen <compiler> args
+  ;; GEN collects the instructions to be EMIT'ed at a later time
   ;;(print "## insn ") (dumpln args)
   (set-array-at (<compiler>-asm self) (<compiler>-pc self) args)
   (set (<compiler>-pc self) (+ 1 (<compiler>-pc self))))
@@ -560,7 +572,8 @@
       (emit DEFLABEL entry-label)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
-      (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))
+      (for (i 0 (<compiler>-pc comp))
+        (apply emit (array-at (<compiler>-asm comp) i)))
       (and (<compiler>-epilogue comp)
            (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
