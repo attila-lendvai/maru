@@ -25,23 +25,23 @@
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
 
-(define-function make-gc-protectors (vars)
-  (map (lambda (v) `(gc/push-root (address-of ,v)))
-       vars))
-
-(define-function make-gc-unprotectors (vars)
-  (let ((result ()))
-    (while (pair? vars)
-      (set result (cons `(gc/pop-root (address-of ,(car vars))) result))
-      (set vars (cdr vars)))
-    result))
-
-(define-form gc-protect (vars . prog)
-  `(let ()
-     ,@(make-gc-protectors vars)
-     (let ((__answer__ ,@prog))
-       ,@(make-gc-unprotectors vars)
-       __answer__)))
+(define-form gc/protect (vars . prog)
+  (let ((make-protectors
+         (lambda (vars)
+           (map (lambda (v) `(gc/push-root (address-of ,v)))
+                vars)))
+        (make-unprotectors
+         (lambda (vars)
+           (let ((result ()))
+             (while (pair? vars)
+               (set result (cons `(gc/pop-root (address-of ,(car vars))) result))
+               (set vars (cdr vars)))
+             result))))
+    `(let ()
+       ,@(make-protectors vars)
+       (let ((__answer__ ,@prog))
+         ,@(make-unprotectors vars)
+         __answer__))))
 
 (define-function make-gc-let* (inits prog)
   (if (pair? inits)
@@ -84,11 +84,11 @@
 
 (define-form size-of-structure (type)   (* 4 (array-at %structure-sizes (eval type))))
 
-(define-form <header>-flags-used ()     1)
-(define-form <header>-flags-atom ()     2)
-(define-form <header>-flags-mark ()     4)
+(define-form <header>-flags-used   ()     1)
+(define-form <header>-flags-opaque ()     2)
+(define-form <header>-flags-mark   ()     4)
 
-(define-form <header>-flags-used+atom ()        (+ (<header>-flags-used) (<header>-flags-atom)))
+(define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
 
 (define-function max (a b)      (if (> a b) a b))
 
@@ -135,7 +135,7 @@
        (libc/fprintf ,stream "\n")
        (die))))
 
-(define-function new_memory_block (size)
+(define-function gc/acquire-new-memory-block (size)
   (let ((ptr (libc/malloc size)))
     (or ptr (fatal "out of memory"))
     (set (<header>-size  ptr) (- size (size-of-structure <header>)))
@@ -145,7 +145,7 @@
     ptr))
 
 (define-function gc/initialise ()
-  (let ((ptr (new_memory_block gc/quantum)))
+  (let ((ptr (gc/acquire-new-memory-block gc/quantum)))
     (set gc/memory-base ptr)
     (set gc/memory-last ptr)))
 
@@ -167,18 +167,18 @@
       (fatal "non-lifo root")))
 
 (define-function gc/grow-memory (size)
-  (let ((brk (new_memory_block size)))
-    (set (<header>-next brk) (<header>-next gc/memory-last))
-    (set (<header>-next gc/memory-last) brk)))
+  (let ((new-block (gc/acquire-new-memory-block size)))
+    (set (<header>-next new-block) (<header>-next gc/memory-last))
+    (set (<header>-next gc/memory-last) new-block)))
 
 (define-function gc/size (obj)  (<header>-size (- obj (size-of-structure <header>))))
 
-(define-function gc/malloc-atomic (size)
-  (let* ((obj (gc/malloc size)))
-    (set (<header>-flags (- obj (size-of-structure <header>))) (<header>-flags-used+atom))
+(define-function gc/allocate-opaque (size)
+  (let ((obj (gc/allocate size)))
+    (set (<header>-flags (- obj (size-of-structure <header>))) (<header>-flags-used+opaque))
     obj))
 
-(define-function gc/malloc (size)
+(define-function gc/allocate (size)
   (set size (& -4 (+ 3 size)))
   (and (= gc/alloc-count gc/frequency) (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
@@ -254,7 +254,7 @@
          (or (& flags (<header>-flags-mark))
              (let ()
                (set (<header>-flags ptr) (| flags (<header>-flags-mark)))
-               (or (& flags (<header>-flags-atom))
+               (or (& flags (<header>-flags-opaque))
                    (let ((size (>> (<header>-size ptr) 2)))
                      (debug (libc/printf "mark %p %d type %d\n" ptr size (<header>-type ptr)))
                      (while size
@@ -322,12 +322,12 @@
 (define opt_verbose             0)
 
 (define-function new-bits (type size)
-  (let ((obj (gc/malloc-atomic size)))
+  (let ((obj (gc/allocate-opaque size)))
     (set (oop-at obj -1) type)
     obj))
 
-(define-function new-oops (type size)
-  (let ((obj (gc/malloc size)))
+(define-function new-oops (type size-in-bytes)
+  (let ((obj (gc/allocate size-in-bytes)))
     (set (oop-at obj -1) type)
     obj))
 
@@ -338,9 +338,9 @@
 
 (define-function _new-<string> (len)
   (let ((str (new-oops <string> (size-of-structure <string>))))
-    (gc-protect (str)
+    (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
-      (set (<string>-_bits str) (gc/malloc-atomic (+ len 1)))
+      (set (<string>-_bits str) (gc/allocate-opaque (+ len 1)))
       str)))
 
 (define-function new-<string> (cstr)
@@ -362,7 +362,7 @@
 
 (define-function new-<array> (size)
   (let ((arr (new-oops <array> (size-of-structure <array>))))
-    (gc-protect (arr)
+    (gc/protect (arr)
       (set (<array>-_array arr) (new-oops <_array> (* 4 size)))
       arr)))
 
@@ -374,19 +374,19 @@
 
 (define-function new-<form> (fn)
   (let ((obj (new-oops <form> (size-of-structure <form>))))
-    (gc-protect (obj)
+    (gc/protect (obj)
       (set (<form>-function obj) fn)
       obj)))
 
 (define-function new-<fixed> (fn)
   (let ((obj (new-oops <fixed> (size-of-structure <fixed>))))
-    (gc-protect (obj)
+    (gc/protect (obj)
       (set (<fixed>-function obj) fn)
       obj)))
 
 (define-function new-<subr> (_imp _name)
   (let ((obj (new-bits <subr> (size-of-structure <subr>))))
-    (gc-protect (obj)
+    (gc/protect (obj)
       (set (<subr>-_imp  obj) _imp )
       (set (<subr>-_name obj) _name)
       obj)))
@@ -491,7 +491,7 @@
             (return sym)))
       (set list (get_tail list))))
   (let ((sym (new-<symbol> cstr)))
-    (gc-protect (sym)
+    (gc/protect (sym)
       (set symbols (new-<pair> sym symbols))
       sym)))
 
@@ -602,7 +602,7 @@
   (let* ((head (new-<pair> () ()))
          (tail head)
          (elt  ()))
-    (gc-protect (head elt)
+    (gc/protect (head elt)
       (while (and (!= EOF (set elt (k/read stream))) (!= s_dot elt))
         (set elt (new-<pair> elt ()))
         (set tail (set_tail tail elt)))
@@ -616,7 +616,7 @@
   (let ((qobj (k/read stream)))
     (when (= EOF qobj)
       (k/error "EOF while reading quoted literal"))
-    (gc-protect (qobj)
+    (gc/protect (qobj)
       (set qobj (new-<pair> qobj ()))
       (set qobj (new-<pair> prefix qobj))
       qobj)))
@@ -711,7 +711,7 @@
 
 (define-function k/define (name value env)
   (let ((ass (new-<pair> name value)))
-    (gc-protect (ass)
+    (gc/protect (ass)
       (let ((ent (new-<pair> ass (get_tail env))))
         (set_tail env ent)
         ass))))
@@ -768,7 +768,7 @@
   (if (is <pair> head)
       (let ()
         (set tail (k/concat-list (get_tail head) tail))
-        (gc-protect (tail)
+        (gc/protect (tail)
           (new-<pair> (get_head head) tail)))
     tail))
 
@@ -777,9 +777,9 @@
 (define-function exlist (list env)
   (if (is <pair> list)
       (let ((head (k/expand (get_head list) env)))
-        (gc-protect (head)
+        (gc/protect (head)
           (let ((tail (exlist (get_tail list) env)))
-            (gc-protect (tail)
+            (gc/protect (tail)
               (new-<pair> head tail)))))
     list))
 
@@ -812,16 +812,16 @@
     (let ((fn (k/array-at (get_tail expanders) (k/type-of exp))))
       (and fn
            (let ((args (new-<pair> exp ())))
-             (gc-protect (args)
+             (gc/protect (args)
                (set exp (k/apply fn args env)))))))
   exp)
 
 (define-function enlist (list env)
   (if (is <pair> list)
       (let ((head (k/encode (get_head list) env)))
-        (gc-protect (head)
+        (gc/protect (head)
           (let ((tail (enlist (get_tail list) env)))
-            (gc-protect (tail)
+            (gc/protect (tail)
               (new-<pair> head tail)))))
     list))
 
@@ -829,7 +829,7 @@
   (if (is <pair> exp)
       (let ((head (k/encode (get_head exp) env))
             (tail (get_tail exp)))
-        (gc-protect (head tail)
+        (gc/protect (head tail)
           (if (is <symbol> head)
               (let ((val (k/cdr (k/assq head env))))
                 (and (or (is <fixed> val) (is <subr> val))
@@ -837,7 +837,7 @@
           (cond
             ((= head f_let)             (let ((args (k/cadr exp))
                                               (tmp  ()))
-                                          (gc-protect (env tmp)
+                                          (gc/protect (env tmp)
                                             (while (is <pair> args)
                                               (let ((var (get_head args)))
                                                 (and (is <pair> var) (set var (get_head var)))
@@ -847,7 +847,7 @@
                                             (set tail (enlist tail env)))))
             ((= head f_lambda)          (let ((args (k/cadr exp))
                                               (tmp  ()))
-                                          (gc-protect (env tmp)
+                                          (gc/protect (env tmp)
                                             (while (is <pair> args)
                                               (set tmp (new-<pair> (get_head args) ()))
                                               (set env (new-<pair> tmp env))
@@ -863,7 +863,7 @@
       (and fn (let () (libc/printf "APPLY GOT ENCODER\n... " (k/println fn) 1)))
       (and fn
            (let ((args (new-<pair> env ())))
-             (gc-protect (args)
+             (gc/protect (args)
                (set args (new-<pair> exp args))
                (libc/printf "APPLY ENCODER\n... ") (k/print fn) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env)
                (set exp (k/apply fn args env)))))))
@@ -873,7 +873,7 @@
   (let ((ev (k/array-at (get_tail evaluators) (k/type-of exp))))
     (and ev
          (let ((args (new-<pair> exp ())))
-           (gc-protect (args)
+           (gc/protect (args)
              (k/set-array-at trace_stack trace_depth exp)
              (set trace_depth (+ trace_depth 1))
              (set exp (k/apply ev args env))
@@ -886,7 +886,7 @@
     (let ((ap (k/array-at (get_tail applicators) (k/type-of fun))))
       (or ap (k/error "cannot apply: " fun))
       (let ((args arguments))
-        (gc-protect (args)
+        (gc/protect (args)
           (set args (new-<pair> fun args))
           (k/apply ap args env))))))
 
@@ -903,7 +903,7 @@
     (or (is <symbol> sym)
         (k/error "non-symbol identifier in define: " sym))
     (let ((val (k/eval (k/cadr args) env)))
-      (gc-protect (val)
+      (gc/protect (val)
                   (k/define sym val globals)
                   val))))
 
@@ -915,7 +915,7 @@
         (tmp      ())
         (bindings (k/car args))
         (body     (k/cdr args)))
-    (gc-protect (env2 tmp)
+    (gc/protect (env2 tmp)
       (while (is <pair> bindings)
         (let ((binding (get_head bindings)))
           (or (is <pair> binding)
@@ -1103,7 +1103,7 @@
                   (formals   (k/car defn))
                   (tmp       ()))
              (set env (get <expr> env fun))
-             (gc-protect (defn env tmp)
+             (gc/protect (defn env tmp)
                (while (is <pair> formals)
                  (unless (is <pair> argl)
                    (k/error "too few arguments: ("fun" "arguments")"))
@@ -1143,22 +1143,22 @@
 (define-function evlist (obj env)
   (if (is <pair> obj)
       (let ((head (k/eval (get_head obj) env)))
-        (gc-protect (head)
+        (gc/protect (head)
           (let ((tail (evlist (get_tail obj) env)))
-            (gc-protect (tail)
+            (gc/protect (tail)
               (new-<pair> head tail)))))
     obj))
 
 (define-subr eval-pair
   (let ((exp  (k/car args))
         (head (k/eval (k/car exp) env)))
-    (gc-protect (head)
+    (gc/protect (head)
       (k/set-array-at trace_stack trace_depth exp)
       (set trace_depth (+ trace_depth 1))
       (set head (if (is <fixed> head)
                     (k/apply (get <fixed> function head) (get_tail exp) env)
                   (let ((args (evlist (get_tail exp) env)))
-                    (gc-protect (args)
+                    (gc/protect (args)
                       (k/apply head args env)))))
       (set trace_depth (- trace_depth 1))
       head)))
@@ -1166,7 +1166,7 @@
 (define-subr eval
   (let ((x (k/car args))
         (e (or (k/cadr args) env)))
-    (gc-protect (x)
+    (gc/protect (x)
       (set x (k/expand x e))
       (set x (k/encode x e))
       (k/eval x e))))
@@ -1288,7 +1288,7 @@
   (let ((res 0))
     (libc/fscanf stream "#!%*[^\012\015]")
     (while (!= EOF (set res (k/read stream)))
-      (gc-protect (res)
+      (gc/protect (res)
         (and (> opt_verbose 0) (libc/printf ";;; ") (k/dumpln res))
         (set res (k/expand res globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (k/dumpln res))
         (set res (k/encode res globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (k/dumpln res))
@@ -1297,12 +1297,12 @@
 
 (define-function instantiate-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
-    (gc-protect (tmp)
+    (gc/protect (tmp)
       (k/define (intern name) tmp globals))))
 
 (define-function instantiate-fsubr (name imp)
   (let ((tmp (new-<subr> imp name)))
-    (gc-protect (tmp)
+    (gc/protect (tmp)
       (set tmp (new-<fixed> tmp))
       (k/define (intern name) tmp globals))))
 
@@ -1336,7 +1336,7 @@
   (gc/push-root (address-of applicators))
 
   (let ((tmp (new-<pair> (intern "*globals*") globals)))
-    (gc-protect (tmp)
+    (gc/protect (tmp)
       (set globals (new-<pair> tmp globals))
       (set_tail tmp globals)
       (set tmp (new-<array> 0))  (set expanders   (k/define (intern "*expanders*"  ) tmp globals))
