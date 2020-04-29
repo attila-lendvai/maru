@@ -74,7 +74,7 @@ Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 ### Build instructions
 
-From the default branch (currently `maru.1`) invoke `make bootstrap`.
+From the default branch (currently `maru.1`) invoke `make test-bootstrap`.
 
 **Linux:**
 

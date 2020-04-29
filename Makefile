@@ -1,29 +1,28 @@
 PREVIOUS_STAGE = maru.0.c99
 BUILD = build
-BOOTEVAL = $(BUILD)/$(PREVIOUS_STAGE)/eval
-EVAL = $(BUILD)/eval
+BOOT_EVAL_PATH = $(BUILD)/$(PREVIOUS_STAGE)
 
 all: eval
 
-eval: $(BUILD)/eval.s *.l
-	gcc -g -m32 -c -o $(BUILD)/eval.o $(BUILD)/eval.s
+eval: $(BUILD)/eval.s
+	$(CC) -g -m32 -c -o $(BUILD)/eval.o $(BUILD)/eval.s
 	size $(BUILD)/eval.o
-	gcc -g -m32 -o $(BUILD)/eval $(BUILD)/eval.o
+	$(CC) -g -m32 -o ./eval $(BUILD)/eval.o
 
-bootstrap: $(BUILD)/eval2.s
+# run the compiler once again, but this time using the bootstrapped eval executable
+# (as opposed to eval compiled from eval.c), and see if there's any difference in their outputs.
+test-bootstrap: eval $(BUILD)/eval.s .force
+	time ./eval boot.l emit-ia32.l eval.l >$(BUILD)/eval2.s 
 	diff $(BUILD)/eval.s $(BUILD)/eval2.s
 
-$(BUILD)/eval.s: $(BOOTEVAL) *.l
-	time $(BOOTEVAL) boot.l emit-ia32.l eval.l >$(BUILD)/eval.s
+$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit-ia32.l eval.l
+	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit-ia32.l eval.l >$(BUILD)/eval.s
 
-$(BUILD)/eval2.s: eval *.l
-	time $(EVAL) boot.l emit-ia32.l eval.l >$(BUILD)/eval2.s
-
-$(BOOTEVAL):
-	echo Building $(BOOTEVAL)
-	rm -rf $(BUILD)/$(PREVIOUS_STAGE)
+$(BOOT_EVAL_PATH)/eval:
+	echo Building $(BUILD)/$(PREVIOUS_STAGE)
 	mkdir -p $(BUILD)
-	git clone --branch $(PREVIOUS_STAGE) . $(BUILD)/$(PREVIOUS_STAGE)
+	@git clone --branch $(PREVIOUS_STAGE) . $(BUILD)/$(PREVIOUS_STAGE) || \
+	  echo "***\nseems like git has complained. do this once to create the local branch:\n'git checkout maru.0.c99; git checkout maru.1' and then try again.\n(yes, it's ugly, patches are welcome!) the gory details are here: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once\n***"
 	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
 stats:
@@ -35,4 +34,6 @@ clean:
 	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
 
 distclean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) eval
+
+.force:
