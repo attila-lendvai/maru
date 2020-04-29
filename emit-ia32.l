@@ -166,12 +166,12 @@
 
 (define-emit    (DEFLABEL LABEL)        (println $1":"))
 
+;; ENTER is slow, so don't use it (LEAVE is fine): http://agner.org/optimize
 (define-emit    (ENTER long)            (println "	pushl	%ebp")
                                         (println "	movl	%esp, %ebp")
                                         (println "	subl	$"$1", %esp"))
 
-(define-emit    (LEAVE long)            (println "	addl	$"$1", %esp")
-                                        (println "	leave")
+(define-emit    (LEAVE long)            (println "	leave")
                                         (println "	ret"))
 
 (define-emit    (NEG)                   (println "	negl	%eax"))
