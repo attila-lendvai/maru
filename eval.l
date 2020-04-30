@@ -280,10 +280,12 @@
 (define EOF     -1)
 
 ;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
-;; what actually happens is encoded in eval.l, and the define-structure forms
-;; for the built-in types in boot.l merely fill in some missing parts. types
-;; are represented internally as successive integers.
-;; corollary: the two files must agree, both in the order and in the field layout.
+;;   what actually happens is encoded in eval.l, and the define-structure forms
+;;   for the built-in types in boot.l merely fill in some missing parts. types
+;;   are represented internally as successive integers.
+;;   corollary: the two files must agree, both in the order and in the field layout.
+;; NOTE: type names are not visible to us from the host universe, so no need to
+;;   prefix these with t/.
 (define <undefined>      0)
 (define <long>           1)
 (define <string>         2)
@@ -302,6 +304,8 @@
 (define encoders                0)
 (define evaluators              0)
 (define applicators             0)
+
+;; the well-known symbols that we need to reference (they will be initialized at start)
 (define s_t                     0)
 (define s_dot                   0)
 (define s_set                   0)

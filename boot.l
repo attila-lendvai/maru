@@ -1,4 +1,4 @@
-;;; This file is the "standard library"
+;;; This is the minimum "standard library" that is needed/used while bootstrapping
 
 (define list (lambda args args))
 

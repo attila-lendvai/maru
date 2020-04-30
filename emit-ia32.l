@@ -106,7 +106,7 @@
 (define-function mangle-label (name)
   (let* ((plain   (symbol->string name))
          (length  (string-length plain))
-         (mangled (array))
+         (mangled (array)) ; strings don't auto-expand, so we need to use arrays here
          (index   0)
          (outdex  0)
          (putnext (lambda (c)
@@ -141,7 +141,7 @@
     (concat-string "L_" (long->string (set counter (+ counter 1))))))
 
 (define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
-;; general, literal, and temp registers
+;; global, literal, and temp pointers
 (define-operand GI32 (name)     (<GI32>-name self))
 (define-operand LI32 (value)    (<LI32>-value self))
 (define-operand TI32 (offset)   (<TI32>-offset self)"(%esp)")
