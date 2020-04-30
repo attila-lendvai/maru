@@ -894,12 +894,42 @@
 ;;;
 ;;; the subr's
 ;;;
+(define-form define-subr (name-and-props . body)
+  (unless (pair? name-and-props)
+    (set name-and-props (list name-and-props)))
+  (let ((name (car name-and-props))
+        (arity (car (cdr name-and-props))))
+    (assert (symbol? name))
+    `(define-function ,(concat-symbol 'subr/ (string->symbol name)) (args env)
+       ,@(when arity
+           `((safe (,(concat-symbol 'arity (string->symbol (long->string arity)))
+                    ,(symbol->string name)
+                    args))))
+       ,@body)))
 
-(define-form define-subr (name . body)
-  `(define-function ,(concat-symbol 'subr/ (string->symbol name)) (args env)
-     ,@body))
+(define-function arity0 (op args)
+  (or (not args)
+      (t/error "Operator '" op "' expected no arguments, got: " args)))
 
-(define-subr define
+(define-function arity1 (op args)
+  (or (and (is <pair> args)
+           (= () (get_tail args)))
+      (t/error "Operator '" op "' expected 1 argument, got: " args)))
+
+(define-function arity2 (op args)
+  (or (and (is <pair> args)
+           (is <pair> (get_tail args))
+           (= () (get_tail (get_tail args))))
+      (t/error "Operator '" op "' expected 2 arguments, got: " args)))
+
+(define-function arity3 (op args)
+  (or (and (is <pair> args)
+           (is <pair> (get_tail args))
+           (is <pair> (get_tail (get_tail args)))
+           (= () (get_tail (get_tail (get_tail args)))))
+      (t/error "Operator '" op "' expected 3 arguments, got: " args)))
+
+(define-subr (define 2)
   (let ((sym (t/car args)))
     (or (is <symbol> sym)
         (t/error "non-symbol identifier in define: " sym))
@@ -937,7 +967,7 @@
         (set body (get_tail body)))
      tmp)))
 
-(define-subr set
+(define-subr (set 2)
   (let ((var (t/assq (t/car args) env)))
     (or (is <pair> var)
         (t/error "undefined variable: (set "args")"))
@@ -975,33 +1005,13 @@
       (set args (get_tail args)))
     ans))
 
-(define-function arity1 (op args)
-  (safe (or (and (is <pair> args)
-                 (= () (get_tail args)))
-            (t/error "Operator '" op "' expected 1 argument, got: " args))))
-
-(define-function arity2 (op args)
-  (safe (or (and (is <pair> args)
-                 (is <pair> (get_tail args))
-                 (= () (get_tail (get_tail args))))
-            (t/error "Operator '" op "' expected 2 arguments, got: " args))))
-
-(define-function arity3 (op args)
-  (safe (or (and (is <pair> args)
-                 (is <pair> (get_tail args))
-                 (is <pair> (get_tail (get_tail args)))
-                 (= () (get_tail (get_tail (get_tail args)))))
-            (t/error "Operator '" op "' expected 3 arguments, got: " args))))
-
-(define-subr quote
-  (arity1 "quote" args)
+(define-subr (quote 1)
   (t/car args))
 
-(define-subr not
-  (arity1 "not" args)
+(define-subr (not 1)
   (if (t/car args) () s_t))
 
-(define-subr sub
+(define-subr long/substract
   (safe (or (and (t/car args) (not (t/cddr args))) (t/error "operator '-' expected 1 or 2 arguments, got: " args)))
   (let ((lhs (get_head args))
         (rhs (get_tail args)))
@@ -1014,37 +1024,34 @@
       (new-<long> (- (get_long lhs))))))
 
 (define-form define-binary (op name)
-  `(define-subr ,name
-     (arity2 ,name args)
+  `(define-subr (,name 2)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",name" "lhs" "rhs")")))
+       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (new-<long> (,op (get_long lhs) (get_long rhs))))))
 
-(define-binary &  "bitand")
-(define-binary |  "bitor")
-(define-binary ^  "bitxor")
-(define-binary +  "add")
-(define-binary *  "mul")
-(define-binary /  "div")
-(define-binary << "shl")
-(define-binary >> "shr")
+(define-binary &  bitand)
+(define-binary |  bitor)
+(define-binary ^  bitxor)
+(define-binary +  long/add)
+(define-binary *  long/multiply)
+(define-binary /  long/divide)
+(define-binary << long/shift-left)
+(define-binary >> long/shift-right)
 
 (define-form define-relation (op name)
-  `(define-subr ,name
-     (arity2 ,name args)
+  `(define-subr (,name 2)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",name" "lhs" "rhs")")))
+       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (and (,op (get_long lhs) (get_long rhs))
             s_t))))
 
-(define-relation <  "lt")
-(define-relation <= "le")
-(define-relation >  "gt")
+(define-relation <  relation/less)
+(define-relation <= relation/less-or-equal)
+(define-relation >  relation/greater)
 
-(define-subr eq
-  (arity2 "=" args)
+(define-subr (relation/equal 2)
   (let* ((lhs  (get_head args))
          (rhs  (get_head (get_tail args)))
          (type (t/type-of lhs)))
@@ -1053,7 +1060,7 @@
       ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t))
       (else                     (and (= lhs rhs) s_t)))))
 
-(define-subr ne
+(define-subr (relation/not-equal 2)
   (arity2 "!=" args)
   (let* ((lhs  (get_head args))
          (rhs  (get_head (get_tail args)))
@@ -1063,11 +1070,11 @@
       ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t)
       (else                     (and (!= lhs rhs) s_t)))))
 
-(define-subr abort
+(define-subr (abort 0)
   (libc/flush-streams)
   (libc/abort))
 
-(define-subr exit
+(define-subr (exit 1)
   (let ((arg (t/car args)))
     (or (is <long> arg)
         (t/error "argument to subr_exit is not a <long>: " arg))
@@ -1125,7 +1132,7 @@
                  (set defn (get_tail defn)))
                argl))))))
 
-(define-subr apply-fixed
+(define-subr (apply-fixed 2)
   (let ((fun  (t/car args))
         (argl (t/cdr args)))
     (and (is <fixed> fun)
@@ -1134,11 +1141,11 @@
 (define-subr apply
   (t/apply (t/car args) (t/cadr args) (or (t/caddr args) env)))
 
-(define-subr eval-symbol
+(define-subr (eval-symbol 1)
   (let ((exp (t/car args))
         (val (t/assq exp env)))
     (or (is <pair> val)
-        (t/error "subr_eval_symbol: undefined variable: " exp))
+        (t/error "eval-symbol: undefined variable: " exp))
     (get_tail val)))
 
 (define-function evlist (obj env)
@@ -1150,7 +1157,7 @@
               (new-<pair> head tail)))))
     obj))
 
-(define-subr eval-pair
+(define-subr (eval-pair 1)
   (let ((exp  (t/car args))
         (head (t/eval (t/car exp) env)))
     (gc/protect (head)
@@ -1172,68 +1179,61 @@
       (set x (t/encode x e))
       (t/eval x e))))
 
-(define-subr cons      (new-<pair> (t/car args) (t/cadr args)))
-(define-subr string    (_new-<string> (and (is <long> (t/car args)) (get_long (get_head args)))))
-(define-subr array     (new-<array> (and (is <long> (t/car args)) (get_long (get_head args)))))
-(define-subr form      (new-<form> (t/car args)))
+(define-subr (cons 2)   (new-<pair> (t/car args) (t/cadr args)))
+(define-subr (string 1) (_new-<string> (and (is <long> (t/car args)) (get_long (get_head args)))))
+(define-subr array      (new-<array> (and (is <long> (t/car args)) (get_long (get_head args)))))
+(define-subr (form 1)   (new-<form> (t/car args)))
 
-(define-subr allocate
+(define-subr (allocate 2)
   (arity2 "allocate" args)
   (let ((type (get_head args))
         (size (get_head (get_tail args))))
     (safe (t/assert (and (is <long> type) (is <long> size))))
     (new-oops (get_long type) (* (get_long size) 4))))
 
-(define-subr type-of   (and args (new-<long> (t/type-of (t/car args)))))
-(define-subr stringP   (and (is <string> (t/car args)) s_t))
-(define-subr symbolP   (and (is <symbol> (t/car args)) s_t))
-(define-subr pairP     (and (is <pair> (t/car args)) s_t))
-(define-subr arrayP    (and (is <array> (t/car args)) s_t))
-(define-subr car       (t/car (t/car args)))
-(define-subr cdr       (t/cdr (t/car args)))
+(define-subr (type-of 1) (and args (new-<long> (t/type-of (t/car args)))))
+(define-subr (string? 1) (and (is <string> (t/car args)) s_t))
+(define-subr (symbol? 1) (and (is <symbol> (t/car args)) s_t))
+(define-subr (pair? 1)   (and (is <pair>   (t/car args)) s_t))
+(define-subr (array? 1)  (and (is <array>  (t/car args)) s_t))
+(define-subr (car 1)     (t/car (t/car args)))
+(define-subr (cdr 1)     (t/cdr (t/car args)))
 
-(define-subr oop-at
-  (arity2 "oop-at" args)
+(define-subr (oop-at 2)
   (let ((obj (get_head args))
         (idx (get_head (get_tail args))))
     (safe (t/assert (and obj (is <long> idx))))
     (oop-at obj (get_long idx))))
 
-(define-subr set-oop-at
-  (arity3 "set-oop-at" args)
+(define-subr (set-oop-at 3)
   (let ((obj (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
     (safe (t/assert (and obj (is <long> idx))))
     (set-oop-at obj (get_long idx) val)))
 
-(define-subr array-length
-  (arity1 "array-length" args)
+(define-subr (array-length 1)
   (new-<long> (t/array-length (t/car args))))
 
-(define-subr array-at
-  (arity2 "array-at" args)
+(define-subr (array-at 2)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args))))
     (safe (t/assert (and (is <array> arr) (is <long> idx))))
     (t/array-at arr (get_long idx))))
 
-(define-subr set-array-at
-  (arity3 "set-array-at" args)
+(define-subr (set-array-at 3)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
     (safe (t/assert (and (is <array> arr) (is <long> idx))))
     (t/set-array-at arr (get_long idx) val)))
 
-(define-subr string-length
-  (arity1 "string-length" args)
+(define-subr (string-length 1)
   (let ((arg (t/car args)))
     (safe (t/assert (is <string> arg)))
     (get <string> size arg)))
 
-(define-subr string-at
-  (arity2 "string-at" args)
+(define-subr (string-at 2)
   (let ((arr (get_head args))
         (arg (get_head (get_tail args))))
     (safe (t/assert (and (is <string> arr) (is <long> arg))))
@@ -1242,8 +1242,7 @@
            (< idx (t/string-length arr))
            (new-<long> (string-at (get <string> _bits arr) idx))))))
 
-(define-subr set-string-at
-  (arity3 "set-string-at" args)
+(define-subr (set-string-at 3)
   (let ((arr (get_head args))
         (arg (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
@@ -1251,25 +1250,26 @@
     (let ((idx (get_long arg)))
       (and (<= 0 idx)
            (< idx (t/string-length arr))
+           ;; TODO don't just silently ignore wrong indexes?
            (let ()
              (set-string-at (get <string> _bits arr) idx (get_long val))
              val)))))
 
-(define-subr string->symbol
+(define-subr (string->symbol 1)
   (let ((arg (t/car args)))
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
            (intern (get <string> _bits arg))))))
 
-(define-subr symbol->string
+(define-subr (symbol->string 1)
   (let ((arg (t/car args)))
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
            (new-<string> (get <symbol> _bits arg))))))
 
-(define-subr long->string
+(define-subr (long->string 1)
   (let ((arg (t/car args)))
     (if (is <string> arg)
         arg
@@ -1364,17 +1364,17 @@
   (instantiate-subr  "&"                     subr/bitand)
   (instantiate-subr  "|"                     subr/bitor)
   (instantiate-subr  "^"                     subr/bitxor)
-  (instantiate-subr  "+"                     subr/add)
-  (instantiate-subr  "-"                     subr/sub)
-  (instantiate-subr  "*"                     subr/mul)
-  (instantiate-subr  "/"                     subr/div)
-  (instantiate-subr  "<<"                    subr/shl)
-  (instantiate-subr  ">>"                    subr/shr)
-  (instantiate-subr  "<"                     subr/lt)
-  (instantiate-subr  "<="                    subr/le)
-  (instantiate-subr  "!="                    subr/ne)
-  (instantiate-subr  "="                     subr/eq)
-  (instantiate-subr  ">"                     subr/gt)
+  (instantiate-subr  "+"                     subr/long/add)
+  (instantiate-subr  "-"                     subr/long/substract)
+  (instantiate-subr  "*"                     subr/long/multiply)
+  (instantiate-subr  "/"                     subr/long/divide)
+  (instantiate-subr  "<<"                    subr/long/shift-left)
+  (instantiate-subr  ">>"                    subr/long/shift-right)
+  (instantiate-subr  "<"                     subr/relation/less)
+  (instantiate-subr  "<="                    subr/relation/less-or-equal)
+  (instantiate-subr  "!="                    subr/relation/not-equal)
+  (instantiate-subr  "="                     subr/relation/equal)
+  (instantiate-subr  ">"                     subr/relation/greater)
   (instantiate-subr  "abort"                 subr/abort)
   (instantiate-subr  "exit"                  subr/exit)
   (instantiate-subr  "dump"                  subr/dump)
@@ -1388,10 +1388,10 @@
   (instantiate-subr  "form"                  subr/form)
   (instantiate-subr  "allocate"              subr/allocate)
   (instantiate-subr  "type-of"               subr/type-of)
-  (instantiate-subr  "string?"               subr/stringP)
-  (instantiate-subr  "symbol?"               subr/symbolP)
-  (instantiate-subr  "pair?"                 subr/pairP)
-  (instantiate-subr  "array?"                subr/arrayP)
+  (instantiate-subr  "string?"               subr/string?)
+  (instantiate-subr  "symbol?"               subr/symbol?)
+  (instantiate-subr  "pair?"                 subr/pair?)
+  (instantiate-subr  "array?"                subr/array?)
   (instantiate-subr  "car"                   subr/car)
   (instantiate-subr  "cdr"                   subr/cdr)
   (instantiate-subr  "oop-at"                subr/oop-at)
