@@ -1,26 +1,27 @@
 ;;; The maru VM, written in itself
 
 (define-form safe     prog ())
-(define-form k/assert prog ())
+(define-form t/assert prog ())
 (define-form debug    prog ())
 (define-form gc/debug prog ())
 
 ;;
 ;; you can enable safety and debugging features here
 ;;
-(define-form k/assert (test . args) `(or ,test (k/error ,@(or args (list "assertion failed")))))
+(define-form t/assert (test . args) `(or ,test (t/error ,@(or args (list "assertion failed")))))
 (define-form safe     prog `(let () ,@prog))
 ;(define-form debug    prog `(let () ,@prog))
 ;(define-form gc/debug prog `(let () ,@prog))
 
 ;;;
-;;; Naming convention
+;;; Naming convention in this file
 ;;;
-;;; k/ prefix means that it's some "level-shifted" code that is
-;;;    compiled into the target and "messes with the bits at runtime".
+;;; t/ prefix means that it's the target version of something that
+;;;    also exist in the host universe, and is exposed to us (i.e. we need
+;;;    to differenciate between the host and the target versions).
 ;;;
-;;; subr/ prefix means that it's the body of a maru <subr>, often
-;;;       just wrapping a k/ primitive, together with some safety checks.
+;;; subr/ prefix means that it's one of the maru <subr>'s that will
+;;;       be visible to user code in the target universe.
 
 (define-structure <header> (size flags next type))
 (define-structure <buffer> (contents size position))
@@ -107,19 +108,19 @@
   (let ((i trace_depth))
     (while (<= 0 (set i (- i 1)))
       (libc/printf "%3d: " i)
-      (k/dumpln (k/array-at trace_stack i))
+      (t/dumpln (t/array-at trace_stack i))
       (libc/flush-streams)))
   (libc/exit 1))
 
 ;; FATAL directly uses the libc printf (i.e. more resilient, and can properly print char type), while
-;; K/ERROR goes through our own printing facility (i.e. can print maru objects).
+;; T/ERROR goes through our own printing facility (i.e. can print maru objects).
 (define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (die))
 (define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (die))
 (define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (die))
 
-;; FIXME it would be nice for K/ERROR to be a function (or at least expand to a breakpoint'able function call),
+;; FIXME it would be nice for T/ERROR to be a function (or at least expand to a breakpoint'able function call),
 ;; but that would need the compiler to support variable nr of args, or literal lists
-(define-form k/error args
+(define-form t/error args
   (let ((stream 'libc/stderr))
     ;; KLUDGE if it's only strings, then print to stderr. to clean up this mess, the PRINT API needs support for setting the output stream.
     (list-do arg args
@@ -130,7 +131,7 @@
        ,@(map (lambda (arg)
                 (if (string? arg)
                     `(libc/fprintf ,stream ,arg)
-                  `(k/print ,arg)))
+                  `(t/print ,arg)))
               args)
        (libc/fprintf ,stream "\n")
        (die))))
@@ -397,24 +398,24 @@
           (not (& 1 __arg__))
           (= ,type (oop-at __arg__ -1)))))
 
-(define-form k/type-of (arg)
+(define-form t/type-of (arg)
   `(let ((__arg__ ,arg))
      (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>)))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
      (if __arg__
          (oop-at __arg__ -1)
        <undefined>)))
 
-(define-function type_check_fail (exp act)
-  (fatal2 "illegal type: expected %d got %d" exp act))
+(define-function %type-check-failed (exp act)
+  (fatal2 "type error: expected %d got %d" exp act))
 
 (define-form get (type field object)
   `(let ((__obj__ ,object))
-     (safe (let ((t (k/type-of __obj__))) (or (= ,type t) (type_check_fail ,type t))))
+     (safe (let ((t (t/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (,(concat-symbol (concat-symbol type '-) field) __obj__)))
 
 (define-form put (type field object value)
   `(let ((__obj__ ,object))
-     (safe (let ((t (k/type-of __obj__))) (or (= ,type t) (type_check_fail ,type t))))
+     (safe (let ((t (t/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
@@ -528,7 +529,7 @@
                                                    (is_hexadecimal b)
                                                    (is_hexadecimal c)
                                                    (is_hexadecimal d))
-                                              (k/error "illegal character escape"))
+                                              (t/error "illegal character escape"))
                                           (+ (<< (digit_value a) 24)
                                              (+ (<< (digit_value b) 16)
                                                 (+ (<< (digit_value c)  8)
@@ -541,7 +542,7 @@
                                                     (let ()
                                                       (set x (+ (* x 16) (digit_value c)))
                                                       (set c (libc/getc stream)))
-                                                  (k/error "illegal character escape"))))
+                                                  (t/error "illegal character escape"))))
                                           (libc/ungetc c stream)
                                           x))
           ((and (<= ?0 c) (<= c ?7))    (let ((x (digit_value c)))
@@ -552,7 +553,7 @@
                                                     (let ()
                                                       (set x (+ (* x 8) (digit_value c)))
                                                       (set c (libc/getc stream)))
-                                                  (k/error "illegal character escape"))))
+                                                  (t/error "illegal character escape"))))
                                           (libc/ungetc c stream)
                                           x))
           (else                 (if (or (is_alpha c) (is_digit10 c))
@@ -591,7 +592,7 @@
     (while (!= ?\" (set c (libc/getc stream)))
       (set c (read_char c stream))
       (when (= EOF c)
-        (k/error "unterminated string literal"))
+        (t/error "unterminated string literal"))
       (buffer_append buf c))
     (buffer_append buf 0)
     (let ((result (new-<string> (<buffer>-contents buf))))
@@ -603,25 +604,25 @@
          (tail head)
          (elt  ()))
     (gc/protect (head elt)
-      (while (and (!= EOF (set elt (k/read stream))) (!= s_dot elt))
+      (while (and (!= EOF (set elt (t/read stream))) (!= s_dot elt))
         (set elt (new-<pair> elt ()))
         (set tail (set_tail tail elt)))
-      (and (= s_dot elt) (set_tail tail (k/read stream))))
+      (and (= s_dot elt) (set_tail tail (t/read stream))))
     (let ((c (libc/getc stream)))
       (if (= delim c)
           (get_tail head)
         (fatal1 "missing closing '%c' delimiter while reading list" delim)))))
 
 (define-function read_quote (prefix stream)
-  (let ((qobj (k/read stream)))
+  (let ((qobj (t/read stream)))
     (when (= EOF qobj)
-      (k/error "EOF while reading quoted literal"))
+      (t/error "EOF while reading quoted literal"))
     (gc/protect (qobj)
       (set qobj (new-<pair> qobj ()))
       (set qobj (new-<pair> prefix qobj))
       qobj)))
 
-(define-function k/read (stream)
+(define-function t/read (stream)
   (while 1
     (let ((c (libc/getc stream)))
       (cond
@@ -651,7 +652,7 @@
 
 (define-function do_print (obj storing)
   (debug (libc/printf "{%p}" obj))
-  (let ((type (k/type-of obj)))
+  (let ((type (t/type-of obj)))
     (cond
       ((= type <undefined>)     (libc/printf "nil"))
       ((= type <long>)          (libc/printf "%d" (get <long> _bits obj)))
@@ -683,15 +684,15 @@
                                            (libc/printf " . ")
                                            (do_print obj storing))))
                                   (libc/printf ")")))
-      ((= type <array>)         (let ((len (k/array-length obj)))
+      ((= type <array>)         (let ((len (t/array-length obj)))
                                   (libc/printf "Array(")
                                   (for (i 0 len)
                                     (and i (libc/printf " "))
-                                    (do_print (k/array-at obj i) storing))
+                                    (do_print (t/array-at obj i) storing))
                                   (libc/printf ")")))
       ((= type <expr>)          (let ()
                                   (libc/printf "Expr(")
-                                  (do_print (k/car (get <expr> defn obj)) storing)
+                                  (do_print (t/car (get <expr> defn obj)) storing)
                                   (libc/printf ")")))
       ((= type <form>)          (let ()
                                   (libc/printf "Form(")
@@ -704,19 +705,19 @@
       ((= type <subr>)          (libc/printf "Subr(%s)" (get <subr> _name obj)))
       (else                     (libc/printf "<type:%d>" type)))))
 
-(define-function k/print (obj) (do_print obj 0))        (define-function k/println (obj) (do_print obj 0) (libc/printf "\n"))
-(define-function k/dump  (obj) (do_print obj 1))        (define-function k/dumpln  (obj) (do_print obj 1) (libc/printf "\n"))
+(define-function t/print (obj) (do_print obj 0))        (define-function t/println (obj) (do_print obj 0) (libc/printf "\n"))
+(define-function t/dump  (obj) (do_print obj 1))        (define-function t/dumpln  (obj) (do_print obj 1) (libc/printf "\n"))
 
 ;;; ----------------------------------------------------------------
 
-(define-function k/define (name value env)
+(define-function t/define (name value env)
   (let ((ass (new-<pair> name value)))
     (gc/protect (ass)
       (let ((ent (new-<pair> ass (get_tail env))))
         (set_tail env ent)
         ass))))
 
-(define-function k/assq (key list)
+(define-function t/assq (key list)
   (while (is <pair> list)
     (let ((head (get_head list)))
       (and (is <pair> head)
@@ -724,34 +725,34 @@
            (return head)))
     (set list (get_tail list))))
 
-(define-function k/car (list)   (and (is <pair> list) (get_head list)))
-(define-function k/cdr (list)   (and (is <pair> list) (get_tail list)))
+(define-function t/car (list)   (and (is <pair> list) (get_head list)))
+(define-function t/cdr (list)   (and (is <pair> list) (get_tail list)))
 
-(define-function k/caar (list)  (k/car (k/car list)))
-(define-function k/cadr (list)  (k/car (k/cdr list)))
-(define-function k/cddr (list)  (k/cdr (k/cdr list)))
+(define-function t/caar (list)  (t/car (t/car list)))
+(define-function t/cadr (list)  (t/car (t/cdr list)))
+(define-function t/cddr (list)  (t/cdr (t/cdr list)))
 
-(define-function k/caddr (list) (k/car (k/cdr (k/cdr list))))
+(define-function t/caddr (list) (t/car (t/cdr (t/cdr list))))
 
-(define-function k/string-length (obj)  (get_long (get <string> size obj)))
+(define-function t/string-length (obj)  (get_long (get <string> size obj)))
 
-(define-function k/array-length (obj)
-  (safe (or (is <array> obj) (fatal1 "k/array-length: called with object of type %d" (k/type-of obj))))
+(define-function t/array-length (obj)
+  (safe (or (is <array> obj) (fatal1 "t/array-length: called with object of type %d" (t/type-of obj))))
   (and (is <array> obj)
        (let ((_arr (get <array> _array obj)))
          (let ((sz (/ (gc/size _arr) 4)))
            sz))))
 
-(define-function k/array-at (obj idx)
-  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/array-at: called with object of type %d, and index %d" (k/type-of obj) idx)))
+(define-function t/array-at (obj idx)
+  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "t/array-at: called with object of type %d, and index %d" (t/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (size (/ (gc/size elts) 4)))
          (and (<= 0 idx) (< idx size)
               (oop-at elts idx)))))
 
-(define-function k/set-array-at (obj idx val)
-  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/set-array-at: called with object of type %d, and index %d" (k/type-of obj) idx)))
+(define-function t/set-array-at (obj idx val)
+  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "t/set-array-at: called with object of type %d, and index %d" (t/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (size (/ (gc/size elts) 4)))
@@ -764,10 +765,10 @@
                       (set elts (put <array> _array obj oops))))
                 (set-oop-at elts idx val))))))
 
-(define-function k/concat-list (head tail)
+(define-function t/concat-list (head tail)
   (if (is <pair> head)
       (let ()
-        (set tail (k/concat-list (get_tail head) tail))
+        (set tail (t/concat-list (get_tail head) tail))
         (gc/protect (tail)
           (new-<pair> (get_head head) tail)))
     tail))
@@ -776,66 +777,66 @@
 
 (define-function exlist (list env)
   (if (is <pair> list)
-      (let ((head (k/expand (get_head list) env)))
+      (let ((head (t/expand (get_head list) env)))
         (gc/protect (head)
           (let ((tail (exlist (get_tail list) env)))
             (gc/protect (tail)
               (new-<pair> head tail)))))
     list))
 
-(define-function k/expand (exp env)
+(define-function t/expand (exp env)
   (if (is <pair> exp)
-      (let ((head (k/expand (get_head exp) env)))
+      (let ((head (t/expand (get_head exp) env)))
         (gc/push-root (address-of head))
         (if (is <symbol> head)
-            (let ((val (k/cdr (k/assq head env))))
+            (let ((val (t/cdr (t/assq head env))))
               (if (is <form> val)
                   (let ()
-                    (set head (k/apply (get <form> function val) (get_tail exp) env))
-                    (set head (k/expand head env))
+                    (set head (t/apply (get <form> function val) (get_tail exp) env))
+                    (set head (t/expand head env))
                     (gc/pop-root (address-of head))
                     (return head)))))
         (let ((tail (get_tail exp)))
           (gc/push-root (address-of tail))
           (or (= head s_quote) (set tail (exlist tail env)))
           (and (= s_set head)
-               (is <pair>   (k/car  tail))
-               (is <symbol> (k/caar tail))
+               (is <pair>   (t/car  tail))
+               (is <symbol> (t/caar tail))
                (let ((buf (new_buffer)))
                  (buffer_append_all buf "set-")
                  (buffer_append_all buf (get <symbol> _bits (get_head (get_head tail))))
                  (set head (intern (buffer_contents buf)))
-                 (set tail (k/concat-list (get_tail (get_head tail)) (get_tail tail)))))
+                 (set tail (t/concat-list (get_tail (get_head tail)) (get_tail tail)))))
           (set exp (new-<pair> head tail))
           (gc/pop-root (address-of tail))
           (gc/pop-root (address-of head))))
-    (let ((fn (k/array-at (get_tail expanders) (k/type-of exp))))
+    (let ((fn (t/array-at (get_tail expanders) (t/type-of exp))))
       (and fn
            (let ((args (new-<pair> exp ())))
              (gc/protect (args)
-               (set exp (k/apply fn args env)))))))
+               (set exp (t/apply fn args env)))))))
   exp)
 
 (define-function enlist (list env)
   (if (is <pair> list)
-      (let ((head (k/encode (get_head list) env)))
+      (let ((head (t/encode (get_head list) env)))
         (gc/protect (head)
           (let ((tail (enlist (get_tail list) env)))
             (gc/protect (tail)
               (new-<pair> head tail)))))
     list))
 
-(define-function k/encode (exp env)
+(define-function t/encode (exp env)
   (if (is <pair> exp)
-      (let ((head (k/encode (get_head exp) env))
+      (let ((head (t/encode (get_head exp) env))
             (tail (get_tail exp)))
         (gc/protect (head tail)
           (if (is <symbol> head)
-              (let ((val (k/cdr (k/assq head env))))
+              (let ((val (t/cdr (t/assq head env))))
                 (and (or (is <fixed> val) (is <subr> val))
                      (set head val))))
           (cond
-            ((= head f_let)             (let ((args (k/cadr exp))
+            ((= head f_let)             (let ((args (t/cadr exp))
                                               (tmp  ()))
                                           (gc/protect (env tmp)
                                             (while (is <pair> args)
@@ -845,7 +846,7 @@
                                                 (set env (new-<pair> tmp env))
                                                 (set args (get_tail args))))
                                             (set tail (enlist tail env)))))
-            ((= head f_lambda)          (let ((args (k/cadr exp))
+            ((= head f_lambda)          (let ((args (t/cadr exp))
                                               (tmp  ()))
                                           (gc/protect (env tmp)
                                             (while (is <pair> args)
@@ -859,36 +860,36 @@
                                             (set tail (enlist tail env)))))
             ((!= head f_quote)          (set tail (enlist tail env))))
           (set exp (new-<pair> head tail))))
-    (let ((fn (k/array-at (get_tail encoders) (k/type-of exp))))
-      (and fn (let () (libc/printf "APPLY GOT ENCODER\n... " (k/println fn) 1)))
+    (let ((fn (t/array-at (get_tail encoders) (t/type-of exp))))
+      (and fn (let () (libc/printf "APPLY GOT ENCODER\n... " (t/println fn) 1)))
       (and fn
            (let ((args (new-<pair> env ())))
              (gc/protect (args)
                (set args (new-<pair> exp args))
-               (libc/printf "APPLY ENCODER\n... ") (k/print fn) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env)
-               (set exp (k/apply fn args env)))))))
+               (libc/printf "APPLY ENCODER\n... ") (t/print fn) (libc/printf " ") (t/print args) (libc/printf " ") (t/println env)
+               (set exp (t/apply fn args env)))))))
   exp)
 
-(define-function k/eval (exp env)
-  (let ((ev (k/array-at (get_tail evaluators) (k/type-of exp))))
+(define-function t/eval (exp env)
+  (let ((ev (t/array-at (get_tail evaluators) (t/type-of exp))))
     (and ev
          (let ((args (new-<pair> exp ())))
            (gc/protect (args)
-             (k/set-array-at trace_stack trace_depth exp)
+             (t/set-array-at trace_stack trace_depth exp)
              (set trace_depth (+ trace_depth 1))
-             (set exp (k/apply ev args env))
+             (set exp (t/apply ev args env))
              (set trace_depth (- trace_depth 1)))))
     exp))
 
-(define-function k/apply (fun arguments env)
+(define-function t/apply (fun arguments env)
   (if (is <subr> fun)
       ((get <subr> _imp fun) arguments env)
-    (let ((ap (k/array-at (get_tail applicators) (k/type-of fun))))
-      (or ap (k/error "cannot apply: " fun))
+    (let ((ap (t/array-at (get_tail applicators) (t/type-of fun))))
+      (or ap (t/error "cannot apply: " fun))
       (let ((args arguments))
         (gc/protect (args)
           (set args (new-<pair> fun args))
-          (k/apply ap args env))))))
+          (t/apply ap args env))))))
 
 ;;;
 ;;; the subr's
@@ -899,12 +900,12 @@
      ,@body))
 
 (define-subr define
-  (let ((sym (k/car args)))
+  (let ((sym (t/car args)))
     (or (is <symbol> sym)
-        (k/error "non-symbol identifier in define: " sym))
-    (let ((val (k/eval (k/cadr args) env)))
+        (t/error "non-symbol identifier in define: " sym))
+    (let ((val (t/eval (t/cadr args) env)))
       (gc/protect (val)
-                  (k/define sym val globals)
+                  (t/define sym val globals)
                   val))))
 
 (define-subr lambda
@@ -913,63 +914,63 @@
 (define-subr let
   (let ((env2     env)
         (tmp      ())
-        (bindings (k/car args))
-        (body     (k/cdr args)))
+        (bindings (t/car args))
+        (body     (t/cdr args)))
     (gc/protect (env2 tmp)
       (while (is <pair> bindings)
         (let ((binding (get_head bindings)))
           (or (is <pair> binding)
-              (k/error "invalid binding form for IF: " binding))
+              (t/error "invalid binding form for IF: " binding))
           (let ((sym  (get_head binding))
                 (prog (get_tail binding)))
             (or (is <symbol> sym)
-                (k/error "invalid binding name for IF: " sym))
+                (t/error "invalid binding name for IF: " sym))
             (while (is <pair> prog)
-              (set tmp (k/eval (get_head prog) env))
+              (set tmp (t/eval (get_head prog) env))
               (set prog (get_tail prog)))
             (set tmp  (new-<pair> sym tmp))
             (set env2 (new-<pair> tmp env2))))
         (set bindings (get_tail bindings)))
       (set tmp ())
       (while (is <pair> body)
-        (set tmp (k/eval (get_head body) env2))
+        (set tmp (t/eval (get_head body) env2))
         (set body (get_tail body)))
      tmp)))
 
 (define-subr set
-  (let ((var (k/assq (k/car args) env)))
+  (let ((var (t/assq (t/car args) env)))
     (or (is <pair> var)
-        (k/error "undefined variable: (set "args")"))
-    (set_tail var (k/eval (k/cadr args) env))))
+        (t/error "undefined variable: (set "args")"))
+    (set_tail var (t/eval (t/cadr args) env))))
 
 (define-subr while
-  (let ((tst  (k/car args))
+  (let ((tst  (t/car args))
         (prog args))
-    (while (k/eval tst env)
+    (while (t/eval tst env)
       (let ((body prog))
-        (while (is <pair> (set body (k/cdr body)))
-          (k/eval (get_head body) env))))))
+        (while (is <pair> (set body (t/cdr body)))
+          (t/eval (get_head body) env))))))
 
 (define-subr if
-  (if (k/eval (k/car args) env)
-      (k/eval (k/cadr args) env)
+  (if (t/eval (t/car args) env)
+      (t/eval (t/cadr args) env)
     (let ((ans ()))
-      (set args (k/cdr args))
-      (while (is <pair> (set args (k/cdr args)))
-        (set ans (k/eval (get_head args) env)))
+      (set args (t/cdr args))
+      (while (is <pair> (set args (t/cdr args)))
+        (set ans (t/eval (get_head args) env)))
       ans)))
 
 (define-subr or
   (let ((ans ()))
     (while (is <pair> args)
-      (and (set ans (k/eval (get_head args) env))
+      (and (set ans (t/eval (get_head args) env))
            (return ans))
       (set args (get_tail args)))))
 
 (define-subr and
   (let ((ans s_t))
     (while (is <pair> args)
-      (or (set ans (k/eval (get_head args) env))
+      (or (set ans (t/eval (get_head args) env))
           (return ()))
       (set args (get_tail args)))
     ans))
@@ -977,39 +978,39 @@
 (define-function arity1 (op args)
   (safe (or (and (is <pair> args)
                  (= () (get_tail args)))
-            (k/error "Operator '" op "' expected 1 argument, got: " args))))
+            (t/error "Operator '" op "' expected 1 argument, got: " args))))
 
 (define-function arity2 (op args)
   (safe (or (and (is <pair> args)
                  (is <pair> (get_tail args))
                  (= () (get_tail (get_tail args))))
-            (k/error "Operator '" op "' expected 2 arguments, got: " args))))
+            (t/error "Operator '" op "' expected 2 arguments, got: " args))))
 
 (define-function arity3 (op args)
   (safe (or (and (is <pair> args)
                  (is <pair> (get_tail args))
                  (is <pair> (get_tail (get_tail args)))
                  (= () (get_tail (get_tail (get_tail args)))))
-            (k/error "Operator '" op "' expected 3 arguments, got: " args))))
+            (t/error "Operator '" op "' expected 3 arguments, got: " args))))
 
 (define-subr quote
   (arity1 "quote" args)
-  (k/car args))
+  (t/car args))
 
 (define-subr not
   (arity1 "not" args)
-  (if (k/car args) () s_t))
+  (if (t/car args) () s_t))
 
 (define-subr sub
-  (safe (or (and (k/car args) (not (k/cddr args))) (k/error "operator '-' expected 1 or 2 arguments, got: " args)))
+  (safe (or (and (t/car args) (not (t/cddr args))) (t/error "operator '-' expected 1 or 2 arguments, got: " args)))
   (let ((lhs (get_head args))
         (rhs (get_tail args)))
     (if (is <pair> rhs)
         (let ()
           (set rhs (get_head rhs))
-          (safe (or (and (is <long> lhs) (is <long> rhs)) (k/error "non-numeric argument: (- "lhs" "rhs")")))
+          (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (- "lhs" "rhs")")))
           (new-<long> (- (get_long lhs) (get_long rhs))))
-      (safe (or (is <long> lhs) (k/error "non-numeric argument: (- "lhs")")))
+      (safe (or (is <long> lhs) (t/error "non-numeric argument: (- "lhs")")))
       (new-<long> (- (get_long lhs))))))
 
 (define-form define-binary (op name)
@@ -1017,7 +1018,7 @@
      (arity2 ,name args)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (k/error "non-numeric argument: (",name" "lhs" "rhs")")))
+       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",name" "lhs" "rhs")")))
        (new-<long> (,op (get_long lhs) (get_long rhs))))))
 
 (define-binary &  "bitand")
@@ -1034,7 +1035,7 @@
      (arity2 ,name args)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (k/error "non-numeric argument: (",name" "lhs" "rhs")")))
+       (safe (or (and (is <long> lhs) (is <long> rhs)) (t/error "non-numeric argument: (",name" "lhs" "rhs")")))
        (and (,op (get_long lhs) (get_long rhs))
             s_t))))
 
@@ -1046,7 +1047,7 @@
   (arity2 "=" args)
   (let* ((lhs  (get_head args))
          (rhs  (get_head (get_tail args)))
-         (type (k/type-of lhs)))
+         (type (t/type-of lhs)))
     (cond
       ((= type <long>)          (and (is <long> rhs) (= (get_long lhs) (get_long rhs)) s_t))
       ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t))
@@ -1056,7 +1057,7 @@
   (arity2 "!=" args)
   (let* ((lhs  (get_head args))
          (rhs  (get_head (get_tail args)))
-         (type (k/type-of lhs)))
+         (type (t/type-of lhs)))
     (cond
       ((= type <long>)          (and (is <long> rhs) (!= (get_long lhs) (get_long rhs)) s_t))
       ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) s_t)
@@ -1067,46 +1068,46 @@
   (libc/abort))
 
 (define-subr exit
-  (let ((arg (k/car args)))
+  (let ((arg (t/car args)))
     (or (is <long> arg)
-        (k/error "argument to subr_exit is not a <long>: " arg))
+        (t/error "argument to subr_exit is not a <long>: " arg))
     (libc/flush-streams)
     (libc/exit (get_long arg))))
 
 (define-subr dump
   (while (is <pair> args)
-    (k/dump (get_head args))
+    (t/dump (get_head args))
     (set args (get_tail args))))
 
 (define-subr print
   (while (is <pair> args)
-    (k/print (get_head args))
+    (t/print (get_head args))
     (set args (get_tail args))))
 
 (define-subr warn
   (while (is <pair> args)
     (let* ((arg  (get_head args))
-           (type (k/type-of arg)))
+           (type (t/type-of arg)))
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get <string> _bits arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get <symbol> _bits arg)))))
     (set args (get_tail args))))
 
 (define-subr apply-expr
-  (let ((fun (k/car args)))
+  (let ((fun (t/car args)))
     ;; TODO signal an explicit error otherwise?
     (and (is <expr> fun)
          (let ()
-           (let* ((arguments (k/cdr args))
+           (let* ((arguments (t/cdr args))
                   (argl      arguments)
                   (defn      (get <expr> defn fun))
-                  (formals   (k/car defn))
+                  (formals   (t/car defn))
                   (tmp       ()))
              (set env (get <expr> env fun))
              (gc/protect (defn env tmp)
                (while (is <pair> formals)
                  (unless (is <pair> argl)
-                   (k/error "too few arguments: ("fun" "arguments")"))
+                   (t/error "too few arguments: ("fun" "arguments")"))
                  (set tmp     (new-<pair> (get_head formals) (get_head argl)))
                  (set env     (new-<pair> tmp env))
                  (set formals (get_tail formals))
@@ -1117,32 +1118,32 @@
                       (set env (new-<pair> tmp env))
                       (set argl ())))
                (when argl
-                 (k/error "too many arguments: ("fun" "arguments")"))
+                 (t/error "too many arguments: ("fun" "arguments")"))
                (set defn (get_tail defn))
                (while (is <pair> defn)
-                 (set argl (k/eval (get_head defn) env))
+                 (set argl (t/eval (get_head defn) env))
                  (set defn (get_tail defn)))
                argl))))))
 
 (define-subr apply-fixed
-  (let ((fun  (k/car args))
-        (argl (k/cdr args)))
+  (let ((fun  (t/car args))
+        (argl (t/cdr args)))
     (and (is <fixed> fun)
-         (k/apply (get <fixed> function fun) argl env))))
+         (t/apply (get <fixed> function fun) argl env))))
 
 (define-subr apply
-  (k/apply (k/car args) (k/cadr args) (or (k/caddr args) env)))
+  (t/apply (t/car args) (t/cadr args) (or (t/caddr args) env)))
 
 (define-subr eval-symbol
-  (let ((exp (k/car args))
-        (val (k/assq exp env)))
+  (let ((exp (t/car args))
+        (val (t/assq exp env)))
     (or (is <pair> val)
-        (k/error "subr_eval_symbol: undefined variable: " exp))
+        (t/error "subr_eval_symbol: undefined variable: " exp))
     (get_tail val)))
 
 (define-function evlist (obj env)
   (if (is <pair> obj)
-      (let ((head (k/eval (get_head obj) env)))
+      (let ((head (t/eval (get_head obj) env)))
         (gc/protect (head)
           (let ((tail (evlist (get_tail obj) env)))
             (gc/protect (tail)
@@ -1150,52 +1151,52 @@
     obj))
 
 (define-subr eval-pair
-  (let ((exp  (k/car args))
-        (head (k/eval (k/car exp) env)))
+  (let ((exp  (t/car args))
+        (head (t/eval (t/car exp) env)))
     (gc/protect (head)
-      (k/set-array-at trace_stack trace_depth exp)
+      (t/set-array-at trace_stack trace_depth exp)
       (set trace_depth (+ trace_depth 1))
       (set head (if (is <fixed> head)
-                    (k/apply (get <fixed> function head) (get_tail exp) env)
+                    (t/apply (get <fixed> function head) (get_tail exp) env)
                   (let ((args (evlist (get_tail exp) env)))
                     (gc/protect (args)
-                      (k/apply head args env)))))
+                      (t/apply head args env)))))
       (set trace_depth (- trace_depth 1))
       head)))
 
 (define-subr eval
-  (let ((x (k/car args))
-        (e (or (k/cadr args) env)))
+  (let ((x (t/car args))
+        (e (or (t/cadr args) env)))
     (gc/protect (x)
-      (set x (k/expand x e))
-      (set x (k/encode x e))
-      (k/eval x e))))
+      (set x (t/expand x e))
+      (set x (t/encode x e))
+      (t/eval x e))))
 
-(define-subr cons      (new-<pair> (k/car args) (k/cadr args)))
-(define-subr string    (_new-<string> (and (is <long> (k/car args)) (get_long (get_head args)))))
-(define-subr array     (new-<array> (and (is <long> (k/car args)) (get_long (get_head args)))))
-(define-subr form      (new-<form> (k/car args)))
+(define-subr cons      (new-<pair> (t/car args) (t/cadr args)))
+(define-subr string    (_new-<string> (and (is <long> (t/car args)) (get_long (get_head args)))))
+(define-subr array     (new-<array> (and (is <long> (t/car args)) (get_long (get_head args)))))
+(define-subr form      (new-<form> (t/car args)))
 
 (define-subr allocate
   (arity2 "allocate" args)
   (let ((type (get_head args))
         (size (get_head (get_tail args))))
-    (and (is <long> type) (is <long> size)
-         (new-oops (get_long type) (* (get_long size) 4)))))
+    (safe (t/assert (and (is <long> type) (is <long> size))))
+    (new-oops (get_long type) (* (get_long size) 4))))
 
-(define-subr type-of   (and args (new-<long> (k/type-of (k/car args)))))
-(define-subr stringP   (and (is <string> (k/car args)) s_t))
-(define-subr symbolP   (and (is <symbol> (k/car args)) s_t))
-(define-subr pairP     (and (is <pair> (k/car args)) s_t))
-(define-subr arrayP    (and (is <array> (k/car args)) s_t))
-(define-subr car       (k/car (k/car args)))
-(define-subr cdr       (k/cdr (k/car args)))
+(define-subr type-of   (and args (new-<long> (t/type-of (t/car args)))))
+(define-subr stringP   (and (is <string> (t/car args)) s_t))
+(define-subr symbolP   (and (is <symbol> (t/car args)) s_t))
+(define-subr pairP     (and (is <pair> (t/car args)) s_t))
+(define-subr arrayP    (and (is <array> (t/car args)) s_t))
+(define-subr car       (t/car (t/car args)))
+(define-subr cdr       (t/cdr (t/car args)))
 
 (define-subr oop-at
   (arity2 "oop-at" args)
   (let ((obj (get_head args))
         (idx (get_head (get_tail args))))
-    (safe (k/assert (and obj (is <long> idx))))
+    (safe (t/assert (and obj (is <long> idx))))
     (oop-at obj (get_long idx))))
 
 (define-subr set-oop-at
@@ -1203,42 +1204,42 @@
   (let ((obj (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (k/assert (and obj (is <long> idx))))
+    (safe (t/assert (and obj (is <long> idx))))
     (set-oop-at obj (get_long idx) val)))
 
 (define-subr array-length
   (arity1 "array-length" args)
-  (new-<long> (k/array-length (k/car args))))
+  (new-<long> (t/array-length (t/car args))))
 
 (define-subr array-at
   (arity2 "array-at" args)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args))))
-    (safe (k/assert (and (is <array> arr) (is <long> idx))))
-    (k/array-at arr (get_long idx))))
+    (safe (t/assert (and (is <array> arr) (is <long> idx))))
+    (t/array-at arr (get_long idx))))
 
 (define-subr set-array-at
   (arity3 "set-array-at" args)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (k/assert (and (is <array> arr) (is <long> idx))))
-    (k/set-array-at arr (get_long idx) val)))
+    (safe (t/assert (and (is <array> arr) (is <long> idx))))
+    (t/set-array-at arr (get_long idx) val)))
 
 (define-subr string-length
   (arity1 "string-length" args)
-  (let ((arg (k/car args)))
-    (safe (k/assert (is <string> arg)))
+  (let ((arg (t/car args)))
+    (safe (t/assert (is <string> arg)))
     (get <string> size arg)))
 
 (define-subr string-at
   (arity2 "string-at" args)
   (let ((arr (get_head args))
         (arg (get_head (get_tail args))))
-    (safe (k/assert (and (is <string> arr) (is <long> arg))))
+    (safe (t/assert (and (is <string> arr) (is <long> arg))))
     (let ((idx (get_long arg)))
       (and (<= 0 idx)
-           (< idx (k/string-length arr))
+           (< idx (t/string-length arr))
            (new-<long> (string-at (get <string> _bits arr) idx))))))
 
 (define-subr set-string-at
@@ -1246,30 +1247,30 @@
   (let ((arr (get_head args))
         (arg (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (k/assert (and (is <string> arr) (is <long> val))))
+    (safe (t/assert (and (is <string> arr) (is <long> val))))
     (let ((idx (get_long arg)))
       (and (<= 0 idx)
-           (< idx (k/string-length arr))
+           (< idx (t/string-length arr))
            (let ()
              (set-string-at (get <string> _bits arr) idx (get_long val))
              val)))))
 
 (define-subr string->symbol
-  (let ((arg (k/car args)))
+  (let ((arg (t/car args)))
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
            (intern (get <string> _bits arg))))))
 
 (define-subr symbol->string
-  (let ((arg (k/car args)))
+  (let ((arg (t/car args)))
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
            (new-<string> (get <symbol> _bits arg))))))
 
 (define-subr long->string
-  (let ((arg (k/car args)))
+  (let ((arg (t/car args)))
     (if (is <string> arg)
         arg
       (and (is <long> arg)
@@ -1287,24 +1288,24 @@
 (define-function repl_stream (stream)
   (let ((res 0))
     (libc/fscanf stream "#!%*[^\012\015]")
-    (while (!= EOF (set res (k/read stream)))
+    (while (!= EOF (set res (t/read stream)))
       (gc/protect (res)
-        (and (> opt_verbose 0) (libc/printf ";;; ") (k/dumpln res))
-        (set res (k/expand res globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (k/dumpln res))
-        (set res (k/encode res globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (k/dumpln res))
-        (set res (k/eval   res globals))        (and (> opt_verbose 1) (libc/printf "eval--> ") (k/dumpln res))
+        (and (> opt_verbose 0) (libc/printf ";;; ") (t/dumpln res))
+        (set res (t/expand res globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (t/dumpln res))
+        (set res (t/encode res globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (t/dumpln res))
+        (set res (t/eval   res globals))        (and (> opt_verbose 1) (libc/printf "eval--> ") (t/dumpln res))
         ))))
 
 (define-function instantiate-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
-      (k/define (intern name) tmp globals))))
+      (t/define (intern name) tmp globals))))
 
 (define-function instantiate-fsubr (name imp)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
       (set tmp (new-<fixed> tmp))
-      (k/define (intern name) tmp globals))))
+      (t/define (intern name) tmp globals))))
 
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
@@ -1339,14 +1340,14 @@
     (gc/protect (tmp)
       (set globals (new-<pair> tmp globals))
       (set_tail tmp globals)
-      (set tmp (new-<array> 0))  (set expanders   (k/define (intern "*expanders*"  ) tmp globals))
-      (set tmp (new-<array> 0))  (set encoders    (k/define (intern "*encoders*"   ) tmp globals))
-      (set tmp (new-<array> 0))  (set evaluators  (k/define (intern "*evaluators*" ) tmp globals))
-      (set tmp (new-<array> 0))  (set applicators (k/define (intern "*applicators*") tmp globals))
-      (k/set-array-at (get_tail evaluators)  <symbol> (new-<subr> subr/eval-symbol "eval-<symbol>"))
-      (k/set-array-at (get_tail evaluators)  <pair>   (new-<subr> subr/eval-pair   "eval-<pair>"  ))
-      (k/set-array-at (get_tail applicators) <fixed>  (new-<subr> subr/apply-fixed "apply-<fixed>"))
-      (k/set-array-at (get_tail applicators) <expr>   (new-<subr> subr/apply-expr  "apply-<expr>" ))
+      (set tmp (new-<array> 0))  (set expanders   (t/define (intern "*expanders*"  ) tmp globals))
+      (set tmp (new-<array> 0))  (set encoders    (t/define (intern "*encoders*"   ) tmp globals))
+      (set tmp (new-<array> 0))  (set evaluators  (t/define (intern "*evaluators*" ) tmp globals))
+      (set tmp (new-<array> 0))  (set applicators (t/define (intern "*applicators*") tmp globals))
+      (t/set-array-at (get_tail evaluators)  <symbol> (new-<subr> subr/eval-symbol "eval-<symbol>"))
+      (t/set-array-at (get_tail evaluators)  <pair>   (new-<subr> subr/eval-pair   "eval-<pair>"  ))
+      (t/set-array-at (get_tail applicators) <fixed>  (new-<subr> subr/apply-fixed "apply-<fixed>"))
+      (t/set-array-at (get_tail applicators) <expr>   (new-<subr> subr/apply-expr  "apply-<expr>" ))
       ))
 
   (instantiate-fsubr "define"                subr/define)
@@ -1406,10 +1407,10 @@
   (instantiate-subr  "long->string"          subr/long->string)
   (instantiate-subr  "current-environment"   subr/current-environment)
 
-  (set f_set    (k/cdr (k/assq s_set    globals)))              (gc/push-root (address-of f_set   ))
-  (set f_quote  (k/cdr (k/assq s_quote  globals)))              (gc/push-root (address-of f_quote ))
-  (set f_lambda (k/cdr (k/assq s_lambda globals)))              (gc/push-root (address-of f_lambda))
-  (set f_let    (k/cdr (k/assq s_let    globals)))              (gc/push-root (address-of f_let   ))
+  (set f_set    (t/cdr (t/assq s_set    globals)))              (gc/push-root (address-of f_set   ))
+  (set f_quote  (t/cdr (t/assq s_quote  globals)))              (gc/push-root (address-of f_quote ))
+  (set f_lambda (t/cdr (t/assq s_lambda globals)))              (gc/push-root (address-of f_lambda))
+  (set f_let    (t/cdr (t/assq s_let    globals)))              (gc/push-root (address-of f_let   ))
 
   (set trace_stack (new-<array> 32))                            (gc/push-root (address-of trace_stack))
 
