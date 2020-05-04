@@ -44,13 +44,6 @@
          ,@(make-unprotectors vars)
          __answer__))))
 
-(define-function make-gc-let* (inits prog)
-  (if (pair? inits)
-      `((let (,(car inits)) (gc-protect (,(caar inits)) ,@(make-gc-let* (cdr inits) prog))))
-    prog))
-
-(define-form gc-let* (inits . prog) (car (make-gc-let* inits prog)))
-
 (define-form define-externs args
   `(let ()
      ,@(map (lambda (libc-name)
