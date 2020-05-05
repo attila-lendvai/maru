@@ -1,6 +1,6 @@
 ;;; The Maru VM, written in a subset of Maru.
 
-(define-form safe     prog ())
+
 (define-form s/assert prog ())
 (define-form debug    prog ())
 (define-form gc/debug prog ())
@@ -9,9 +9,14 @@
 ;; you can enable safety and debugging features here
 ;;
 (define-form s/assert (test . args) `(or ,test (s/error ,@(or args (list "assertion failed")))))
-(define-form safe     prog `(let () ,@prog))
 ;(define-form debug    prog `(let () ,@prog))
 ;(define-form gc/debug prog `(let () ,@prog))
+
+(define safety-level 1)
+
+(define-form safety (level . prog)
+  (when (<= level safety-level)
+    `(let () ,@prog)))
 
 ;;;
 ;;; Naming convention in this file:
@@ -34,8 +39,7 @@
 ;;; subr/ prefix is used for the Maru <subr>'s that will
 ;;;       be made visible to user code in the slave universe.
 
-(define-structure <header> (size flags next type))
-(define-structure <buffer> (contents size position))
+(eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
 (define-form gc/protect (vars . prog)
   (let ((make-protectors
@@ -91,6 +95,8 @@
 
 (define-form header-of (arg)
   `(- ,arg ,(size-of-structure <header>)))
+
+(define header-magic-marker 57005) ; 0xDEAD, it's just a token we check when we are expecting a heap object
 
 (define-form <header>-flags-used   ()     1)
 (define-form <header>-flags-opaque ()     2)
@@ -258,7 +264,7 @@
        (let* ((ptr   (header-of obj))
               (flags (<header>-flags ptr)))
          (debug (libc/printf "mark and trace %p flags %d\n" obj flags))
-         (safe (or (& (<header>-flags-used) flags) (fatal1 "attempt to mark dead object %p" ptr)))
+         (safety 1 (or (& (<header>-flags-used) flags) (fatal1 "attempt to mark dead object %p" ptr)))
          (or (& flags (<header>-flags-mark))
              (let ()
                (set (<header>-flags ptr) (| flags (<header>-flags-mark)))
@@ -335,14 +341,18 @@
 
 ;; TODO rename to new-opaque-bits?
 (define-function new-bits (type size)
-  (let ((obj (gc/allocate-opaque size)))
-    (set (<header>-type (header-of obj)) type)
+  (let* ((obj (gc/allocate-opaque size))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    (safety 3 (set (<header>-magic-marker header) header-magic-marker))
     obj))
 
 ;; TODO rename to new-oop-vector? maybe it should expect the size in words?
 (define-function new-oops (type size-in-bytes)
-  (let ((obj (gc/allocate size-in-bytes)))
-    (set (<header>-type (header-of obj)) type)
+  (let* ((obj (gc/allocate size-in-bytes))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    (safety 3 (set (<header>-magic-marker header) header-magic-marker))
     obj))
 
 (define-function new-<long> (bits)
@@ -409,13 +419,17 @@
   `(let ((__arg__ ,arg))
      (and __arg__
           (not (& 1 __arg__))           ; TODO ???
-          (= ,type (<header>-type (header-of __arg__))))))
+          (let ((header (header-of __arg__)))
+            (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "IS: encountered an untagged object: %p" __arg__)))
+            (= ,type (<header>-type header))))))
 
 (define-form s/type-of (arg)
   `(let ((__arg__ ,arg))
-     (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (header-of __arg__))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
      (if __arg__
-         (<header>-type (header-of __arg__))
+         (let ((header (header-of __arg__)))
+           (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "S/TYPE-OF: encountered an untagged object: %p" __arg__)))
+           (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "S/TYPE-OF: attempt to access dead object: %p" __arg__)))
+           (<header>-type (header-of __arg__)))
        <undefined>)))
 
 (define-function %type-check-failed (exp act)
@@ -423,12 +437,12 @@
 
 (define-form get (type field object)
   `(let ((__obj__ ,object))
-     (safe (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
+     (safety 2 (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (,(concat-symbol (concat-symbol type '-) field) __obj__)))
 
 (define-form put (type field object value)
   `(let ((__obj__ ,object))
-     (safe (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
+     (safety 2 (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
@@ -458,6 +472,8 @@
                                     (and (<= ?a  c) (<= c ?z))          ; a b c d e f g h i j k l m n o p q r s t u v w x y z
                                          ( = ?|  c)                     ; |
                                          ( = ?~  c)))                   ; ~
+
+(define-structure <buffer> (contents size position))
 
 (define-function new_buffer ()
   (let ((buf (libc/malloc (size-of-structure <buffer>))))
@@ -750,14 +766,14 @@
 (define-function s/string-length (obj)  (get_long (get <string> size obj)))
 
 (define-function s/array-length (obj)
-  (safe (or (is <array> obj) (fatal1 "s/array-length: called with object of type %d" (s/type-of obj))))
+  (safety 1 (or (is <array> obj) (fatal1 "s/array-length: called with object of type %d" (s/type-of obj))))
   (and (is <array> obj)
        (let ((_arr (get <array> _array obj)))
          (let ((sz (/ (gc/size _arr) 4)))
            sz))))
 
 (define-function s/array-at (obj idx)
-  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
+  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (size (/ (gc/size elts) 4)))
@@ -765,7 +781,7 @@
               (oop-at elts idx)))))
 
 (define-function s/set-array-at (obj idx val)
-  (safe (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/set-array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
+  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/set-array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (size (/ (gc/size elts) 4)))
@@ -915,9 +931,9 @@
     (assert (symbol? name))
     `(define-function ,(concat-symbol 'subr/ (string->symbol name)) (args env)
        ,@(when arity
-           `((safe (,(concat-symbol 'arity (string->symbol (long->string arity)))
-                    ,(symbol->string name)
-                    args))))
+           `((safety 1 (,(concat-symbol 'arity (string->symbol (long->string arity)))
+                       ,(symbol->string name)
+                       args))))
        ,@body)))
 
 (define-function arity0 (op args)
@@ -1025,22 +1041,22 @@
   (if (s/car args) () symbol/t))
 
 (define-subr long/substract
-  (safe (or (and (s/car args) (not (s/cddr args))) (s/error "operator '-' expected 1 or 2 arguments, got: " args)))
+  (safety 1 (or (and (s/car args) (not (s/cddr args))) (s/error "operator '-' expected 1 or 2 arguments, got: " args)))
   (let ((lhs (get_head args))
         (rhs (get_tail args)))
     (if (is <pair> rhs)
         (let ()
           (set rhs (get_head rhs))
-          (safe (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (- "lhs" "rhs")")))
+          (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (- "lhs" "rhs")")))
           (new-<long> (- (get_long lhs) (get_long rhs))))
-      (safe (or (is <long> lhs) (s/error "non-numeric argument: (- "lhs")")))
+      (safety 1 (or (is <long> lhs) (s/error "non-numeric argument: (- "lhs")")))
       (new-<long> (- (get_long lhs))))))
 
 (define-form define-binary (op name)
   `(define-subr (,name 2)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (new-<long> (,op (get_long lhs) (get_long rhs))))))
 
 (define-binary &  bitand)
@@ -1056,7 +1072,7 @@
   `(define-subr (,name 2)
      (let ((lhs (get_head args))
            (rhs (get_head (get_tail args))))
-       (safe (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (and (,op (get_long lhs) (get_long rhs))
             symbol/t))))
 
@@ -1074,7 +1090,6 @@
       (else                     (and (= lhs rhs) symbol/t)))))
 
 (define-subr (relation/not-equal 2)
-  (arity2 "!=" args)
   (let* ((lhs  (get_head args))
          (rhs  (get_head (get_tail args)))
          (type (s/type-of lhs)))
@@ -1198,10 +1213,9 @@
 (define-subr (form 1)   (new-<form> (s/car args)))
 
 (define-subr (allocate 2)
-  (arity2 "allocate" args)
   (let ((type (get_head args))
         (size (get_head (get_tail args))))
-    (safe (s/assert (and (is <long> type) (is <long> size))))
+    (safety 1 (s/assert (and (is <long> type) (is <long> size))))
     (new-oops (get_long type) (* (get_long size) 4))))
 
 (define-subr (type-of 1) (and args (new-<long> (s/type-of (s/car args)))))
@@ -1215,14 +1229,14 @@
 (define-subr (oop-at 2)
   (let ((obj (get_head args))
         (idx (get_head (get_tail args))))
-    (safe (s/assert (and obj (is <long> idx))))
+    (safety 1 (s/assert (and obj (is <long> idx))))
     (oop-at obj (get_long idx))))
 
 (define-subr (set-oop-at 3)
   (let ((obj (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (s/assert (and obj (is <long> idx))))
+    (safety 1 (s/assert (and obj (is <long> idx))))
     (set-oop-at obj (get_long idx) val)))
 
 (define-subr (array-length 1)
@@ -1231,25 +1245,25 @@
 (define-subr (array-at 2)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args))))
-    (safe (s/assert (and (is <array> arr) (is <long> idx))))
+    (safety 1 (s/assert (and (is <array> arr) (is <long> idx))))
     (s/array-at arr (get_long idx))))
 
 (define-subr (set-array-at 3)
   (let ((arr (get_head args))
         (idx (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (s/assert (and (is <array> arr) (is <long> idx))))
+    (safety 1 (s/assert (and (is <array> arr) (is <long> idx))))
     (s/set-array-at arr (get_long idx) val)))
 
 (define-subr (string-length 1)
   (let ((arg (s/car args)))
-    (safe (s/assert (is <string> arg)))
+    (safety 1 (s/assert (is <string> arg)))
     (get <string> size arg)))
 
 (define-subr (string-at 2)
   (let ((arr (get_head args))
         (arg (get_head (get_tail args))))
-    (safe (s/assert (and (is <string> arr) (is <long> arg))))
+    (safety 1 (s/assert (and (is <string> arr) (is <long> arg))))
     (let ((idx (get_long arg)))
       (and (<= 0 idx)
            (< idx (s/string-length arr))
@@ -1259,7 +1273,7 @@
   (let ((arr (get_head args))
         (arg (get_head (get_tail args)))
         (val (get_head (get_tail (get_tail args)))))
-    (safe (s/assert (and (is <string> arr) (is <long> val))))
+    (safety 1 (s/assert (and (is <string> arr) (is <long> val))))
     (let ((idx (get_long arg)))
       (and (<= 0 idx)
            (< idx (s/string-length arr))
