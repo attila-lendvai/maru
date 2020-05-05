@@ -89,6 +89,9 @@
 
 (define-form size-of-structure (type)   (* 4 (array-at %structure-sizes (eval type))))
 
+(define-form header-of (arg)
+  `(- ,arg ,(size-of-structure <header>)))
+
 (define-form <header>-flags-used   ()     1)
 (define-form <header>-flags-opaque ()     2)
 (define-form <header>-flags-mark   ()     4)
@@ -176,11 +179,11 @@
     (set (<header>-next new-block) (<header>-next gc/memory-last))
     (set (<header>-next gc/memory-last) new-block)))
 
-(define-function gc/size (obj)  (<header>-size (- obj (size-of-structure <header>))))
+(define-function gc/size (obj)  (<header>-size (header-of obj)))
 
 (define-function gc/allocate-opaque (size)
   (let ((obj (gc/allocate size)))
-    (set (<header>-flags (- obj (size-of-structure <header>))) (<header>-flags-used+opaque))
+    (set (<header>-flags (header-of obj)) (<header>-flags-used+opaque))
     obj))
 
 (define-function gc/allocate (size)
@@ -252,7 +255,7 @@
 (define-function gc/mark-and-trace (obj)
   (and obj
        (not (& 1 obj))
-       (let* ((ptr   (- obj (size-of-structure <header>)))
+       (let* ((ptr   (header-of obj))
               (flags (<header>-flags ptr)))
          (debug (libc/printf "mark and trace %p flags %d\n" obj flags))
          (safe (or (& (<header>-flags-used) flags) (fatal1 "attempt to mark dead object %p" ptr)))
@@ -332,12 +335,12 @@
 
 (define-function new-bits (type size)
   (let ((obj (gc/allocate-opaque size)))
-    (set (oop-at obj -1) type)
+    (set (<header>-type (header-of obj)) type)
     obj))
 
 (define-function new-oops (type size-in-bytes)
   (let ((obj (gc/allocate size-in-bytes)))
-    (set (oop-at obj -1) type)
+    (set (<header>-type (header-of obj)) type)
     obj))
 
 (define-function new-<long> (bits)
@@ -404,13 +407,13 @@
   `(let ((__arg__ ,arg))
      (and __arg__
           (not (& 1 __arg__))
-          (= ,type (oop-at __arg__ -1)))))
+          (= ,type (<header>-type (header-of __arg__))))))
 
 (define-form s/type-of (arg)
   `(let ((__arg__ ,arg))
-     (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>)))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
+     (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (header-of __arg__))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
      (if __arg__
-         (oop-at __arg__ -1)
+         (<header>-type (header-of __arg__))
        <undefined>)))
 
 (define-function %type-check-failed (exp act)
