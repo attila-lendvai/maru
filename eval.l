@@ -355,16 +355,16 @@
     (set (<long>-_bits obj) bits)
     obj))
 
-(define-function _new-<string> (len)
+(define-function new-<string>-of-length (len)
   (let ((str (new-oops <string> (size-of-structure <string>))))
     (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
       (set (<string>-_bits str) (gc/allocate-opaque (+ len 1)))
       str)))
 
-(define-function new-<string> (cstr)
+(define-function new-<string>-from-cstring (cstr)
   (let ((len (libc/strlen cstr)))
-    (let ((obj (_new-<string> len)))
+    (let ((obj (new-<string>-of-length len)))
       (libc/memcpy (<string>-_bits obj) cstr len)
       obj)))
 
@@ -619,7 +619,7 @@
         (s/error "unterminated string literal"))
       (buffer_append buf c))
     (buffer_append buf 0)
-    (let ((result (new-<string> (<buffer>-contents buf))))
+    (let ((result (new-<string>-from-cstring (<buffer>-contents buf))))
       (buffer_delete buf)
       result)))
 
@@ -927,7 +927,7 @@
     `(define-function ,(concat-symbol 'subr/ (string->symbol name)) (args env)
        ,@(when arity
            `((safety 1 (,(concat-symbol 'arity (string->symbol (long->string arity)))
-                        (new-<string> ,(symbol->string name))
+                        (new-<string>-from-cstring ,(symbol->string name))
                         args))))
        ,@body)))
 
@@ -1203,7 +1203,7 @@
       (s/eval x e))))
 
 (define-subr (cons 2)   (new-<pair> (s/car args) (s/cadr args)))
-(define-subr (string 1) (_new-<string> (and (is <long> (s/car args)) (get_long (get_head args)))))
+(define-subr (string 1) (new-<string>-of-length (and (is <long> (s/car args)) (get_long (get_head args)))))
 (define-subr array      (new-<array> (and (is <long> (s/car args)) (get_long (get_head args)))))
 (define-subr (form 1)   (new-<form> (s/car args)))
 
@@ -1289,7 +1289,7 @@
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
-           (new-<string> (get <symbol> _bits arg))))))
+           (new-<string>-from-cstring (get <symbol> _bits arg))))))
 
 (define-subr (long->string 1)
   (let ((arg (s/car args)))
@@ -1298,7 +1298,7 @@
       (and (is <long> arg)
            (let ((buf (libc/malloc 32)))
              (libc/sprintf buf "%ld" (get_long arg))
-             (let ((result (new-<string> buf)))
+             (let ((result (new-<string>-from-cstring buf)))
                (libc/free buf)
                result))))))
 
