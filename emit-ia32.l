@@ -498,12 +498,14 @@
                (op-type  (type-of op)))
           (if (= <expr> op-type)
               (let* ((defn   (<expr>-defn op))
-                     (params (car defn))
-                     (nparam (list-length params)))
-                (or (= nparam arity)
-                    (error "gen: calling " op
-                           " with the wrong number of arguments: " args
-                           ", expecting " nparam))))
+                     (params (car defn)))
+              ;; TODO this is broken, at least for dotted lists
+              (when (pair? params) ; ignore (lambda args ...) format, e.g. println
+                (let ((nparam (list-length params)))
+                  (or (= nparam arity)
+                      (error "gen: calling " op
+                             " with the wrong number of arguments: " args
+                             ", expecting " nparam))))))
           (gen fn-name comp)
           (map2-with gen-move tmp-locs arg-locs comp)
           (free-temps comp tmp-locs)
