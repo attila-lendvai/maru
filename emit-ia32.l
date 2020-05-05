@@ -1,26 +1,31 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; This is a compiler that targets IA-32, aka x86 assembly (through the gcc toolchain).
+;;; This is a compiler that targets static IA-32, aka x86 assembly, using the gcc toolchain.
 ;;;
-;;; STATUS: it should successfully compile eval.l into eval.s,
-;;; that in turn can be compiled by the gcc toolchain into an executable binary.
+;;; Status: it should successfully compile eval.l into eval.s,
+;;; that in turn can be compiled by the gcc toolchain into an executable eval binary.
 ;;;
 
 ;;; It can compile a subset of Maru.
 ;;;
-;;; Limitations:
+;;; Limitations and peculiarities:
 ;;;   - no closures
 ;;;   - no variable number of args for functions
-;;;   - only supports the following literals: Long, String
-;;;   - and probaby more
+;;;   - only supports the following literals: Long, String (no lists, quoted literals, etc)
+;;;   - string literals are compiled into .asciz, which means that they
+;;;     are *not* tagged Maru objects on the heap; i.e. (t/print "foo") will
+;;;     go astray because "foo" will be emitted as a null terminated string of
+;;;     ascii bytes (instead of a Maru object of type <string>).
+;;;   - probaby more
 ;;;
-;;; Introduces two extra primitives:
-;;;   - return (from the current function)
-;;;   - address-of
+;;; Understands some primitives:
+;;;   - RETURN (from the current function)
+;;;   - ADDRESS-OF
+;;;   - [SET-]OOP-AT, [SET-]STRING-AT
 ;;;
 ;;; Naming:
-;;;   - emit: directly emits into the output stream
-;;;   - gen: collects instructions into a compiler object for later emission
+;;;   - EMIT: directly emits into the output stream
+;;;   - GEN: collects instructions into a compiler object for later emission
 
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)

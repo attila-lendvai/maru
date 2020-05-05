@@ -1,4 +1,4 @@
-;;; The maru VM, written in itself
+;;; The Maru VM, written in a subset of Maru.
 
 (define-form safe     prog ())
 (define-form s/assert prog ())
@@ -254,7 +254,7 @@
 
 (define-function gc/mark-and-trace (obj)
   (and obj
-       (not (& 1 obj))
+       (not (& 1 obj)) ; TODO ???
        (let* ((ptr   (header-of obj))
               (flags (<header>-flags ptr)))
          (debug (libc/printf "mark and trace %p flags %d\n" obj flags))
@@ -263,7 +263,7 @@
              (let ()
                (set (<header>-flags ptr) (| flags (<header>-flags-mark)))
                (or (& flags (<header>-flags-opaque))
-                   (let ((size (>> (<header>-size ptr) 2)))
+                   (let ((size (>> (<header>-size ptr) 2))) ;; 32bit
                      (debug (libc/printf "mark %p %d type %d\n" ptr size (<header>-type ptr)))
                      (while size
                        (set size (- size 1))
@@ -291,8 +291,8 @@
 ;;   for the built-in types in boot.l merely fill in some missing parts. types
 ;;   are represented internally as successive integers.
 ;;   corollary: the two files must agree, both in the order and in the field layout.
-;; NOTE: type names are not visible to us from the host universe, so no need to
-;;   prefix these with s/.
+;; NOTE: the following type names will shadow the ones from the host universe.
+;;   strictly speaking, they should be prefixed with s/.
 (define <undefined>      0)
 (define <long>           1)
 (define <string>         2)
@@ -333,11 +333,13 @@
 
 (define opt_verbose             0)
 
+;; TODO rename to new-opaque-bits?
 (define-function new-bits (type size)
   (let ((obj (gc/allocate-opaque size)))
     (set (<header>-type (header-of obj)) type)
     obj))
 
+;; TODO rename to new-oop-vector? maybe it should expect the size in words?
 (define-function new-oops (type size-in-bytes)
   (let ((obj (gc/allocate size-in-bytes)))
     (set (<header>-type (header-of obj)) type)
@@ -406,7 +408,7 @@
 (define-form is (type arg)
   `(let ((__arg__ ,arg))
      (and __arg__
-          (not (& 1 __arg__))
+          (not (& 1 __arg__))           ; TODO ???
           (= ,type (<header>-type (header-of __arg__))))))
 
 (define-form s/type-of (arg)
@@ -417,7 +419,7 @@
        <undefined>)))
 
 (define-function %type-check-failed (exp act)
-  (fatal2 "type error: expected %d got %d" exp act))
+  (fatal2 "type error: expected %d, got %d" exp act))
 
 (define-form get (type field object)
   `(let ((__obj__ ,object))
@@ -946,8 +948,8 @@
         (s/error "non-symbol identifier in define: " sym))
     (let ((val (s/eval (s/cadr args) env)))
       (gc/protect (val)
-                  (s/define sym val globals)
-                  val))))
+        (s/define sym val globals)
+        val))))
 
 (define-subr lambda
   (new-<expr> args env))

@@ -113,6 +113,7 @@
   `(define ,name (lambda ,args ,@body)))
 
 (define-function list-length (list)
+  (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)
   (if (pair? list)
       (+ 1 (list-length (cdr list)))
     0))
@@ -193,8 +194,10 @@
 (define %structure-fields       (array))
 
 (define-function %make-accessor (name fields offset)
-  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self) (list 'oop-at self ,offset))
-                   (%make-accessor name (cdr fields) (+ 1 offset)))))
+  (when fields
+    (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
+             (list 'oop-at self ,offset))
+          (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define-function %make-accessors (name fields)
   (%make-accessor name fields 0))
