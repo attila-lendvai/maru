@@ -134,20 +134,15 @@
 ;; FIXME it would be nice for S/ERROR to be a function (or at least expand to a breakpoint'able function call),
 ;; but that would need the compiler to support variable nr of args, or literal lists
 (define-form s/error args
-  (let ((stream 'libc/stderr))
-    ;; KLUDGE if it's only strings, then print to stderr. to clean up this mess, the PRINT API needs support for setting the output stream.
-    (list-do arg args
-      (unless (string? arg)
-        (set stream 'libc/stdout)))
-    `(let ()
-       (libc/fprintf ,stream "\nerror: ")
-       ,@(map (lambda (arg)
-                (if (string? arg)
-                    `(libc/fprintf ,stream ,arg)
+  `(let ()
+     (libc/printf "\nerror: ")
+     ,@(map (lambda (arg)
+              (if (string? arg)
+                  `(libc/printf ,arg)
                   `(s/print ,arg)))
-              args)
-       (libc/fprintf ,stream "\n")
-       (die))))
+            args)
+     (libc/printf "\n")
+     (die)))
 
 (define-function gc/acquire-new-memory-block (size)
   (let ((ptr (libc/malloc size)))
@@ -932,8 +927,8 @@
     `(define-function ,(concat-symbol 'subr/ (string->symbol name)) (args env)
        ,@(when arity
            `((safety 1 (,(concat-symbol 'arity (string->symbol (long->string arity)))
-                       ,(symbol->string name)
-                       args))))
+                        (new-<string> ,(symbol->string name))
+                        args))))
        ,@body)))
 
 (define-function arity0 (op args)
