@@ -466,6 +466,9 @@
         ((extern? var) (gen comp STORE (GI32 (LABEL (extern->label var)))))
         (else          (gen comp STORE (GI32 (LABEL name))))))))
 
+(define-function gen-lambda (expr comp)
+  (error "gen: lambda forms are not supported"))
+
 (define-function gen-return (expr comp)
   (list-do stmt (cdr expr) (gen stmt comp))
   (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
@@ -485,6 +488,7 @@
   (cons  if             gen-if)
   (cons  while          gen-while)
   (cons  set            gen-set)
+  (cons  lambda         gen-lambda)
   (cons 'return         gen-return)
   (cons 'address-of     gen-address-of)))
 
