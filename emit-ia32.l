@@ -56,30 +56,28 @@
 
 ;;; DEFINE-OPERAND
 
-(define-function define-operand-make-setters (tname fields)
+(define-function define-operand-make-setters (type-name fields)
   (if (pair? fields)
-      (cons `(set (,(concat-symbol (concat-symbol tname '-) (car fields)) self) ,(car fields))
-            (define-operand-make-setters tname (cdr fields)))))
+      (cons `(set (,(concat-symbol (concat-symbol type-name '-) (car fields)) self) ,(car fields))
+            (define-operand-make-setters type-name (cdr fields)))))
 
 (define-form define-operand (name fields . printing)
-  (let* ((sname (symbol->string name))
-         (tname (string->symbol (concat-string "<" (concat-string sname ">")))))
-    (eval `(define-structure ,tname ,fields))
+  (let ((type-name (symbol->type-name name)))
+    (eval `(define-structure ,type-name ,fields))
     (eval `(define-function ,name ,fields
-             (let ((self (new ,tname)))
-               ,@(define-operand-make-setters tname fields)
+             (let ((self (new ,type-name)))
+               ,@(define-operand-make-setters type-name fields)
                self)))
-    `(define-method do-print ,tname () (print ,@printing))))
+    `(define-method do-print ,type-name () (print ,@printing))))
 
 ;;; DEFINE-INSTRUCTION
 
 (define-form define-instruction (name)
-  (let* ((sname (symbol->string name))
-         (tname (string->symbol (concat-string "<" (concat-string sname ">")))))
+  (let ((type-name (symbol->type-name name)))
     `(let ()
-       (define-structure ,tname ())
-       (define-method do-print ,tname () (print ,sname))
-       (define ,name (new ,tname)))))
+       (define-structure ,type-name ())
+       (define-method do-print ,type-name () (print ,(symbol->string name)))
+       (define ,name (new ,type-name)))))
 
 ;;; DEFINE-EMIT
 
@@ -102,11 +100,10 @@
 
 (define-form define-emit (op-args . body)
   (let* ((opsym (car op-args))
-         (sname (symbol->string opsym))
-         (tname (string->type-name sname)))
+         (type-name (symbol->type-name opsym)))
     `(let ()
        ,@(if (not (assq opsym *globals*)) `((define-instruction ,opsym)))
-       (define-multimethod emit ((,tname op) ,@(%define-emit-params 1 (cdr op-args))) ,@body))))
+       (define-multimethod emit ((,type-name op) ,@(%define-emit-params 1 (cdr op-args))) ,@body))))
 
 (define-function mangle-label (name)
   (let* ((plain   (symbol->string name))
