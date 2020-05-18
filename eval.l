@@ -1,6 +1,5 @@
 ;;; The Maru VM, written in a subset of Maru.
 
-
 (define-form s/assert prog ())
 (define-form debug    prog ())
 (define-form gc/debug prog ())
@@ -21,23 +20,35 @@
 ;;;
 ;;; Naming convention in this file:
 ;;;
-;;; host   - the Maru universe running the compiler.
+;;; vm     - Virtual Machine, i.e. a universe with its set of rules
+;;;          accepted as axioms.
 ;;;
-;;; target - the target universe of the "level-shift" operation (e.g. x86 asm).
+;;; host   - the Maru virtual machine (VM) running the compiler.
 ;;;
-;;; slave  - the bootstrapped Maru universe that will spring to life when
-;;;          the level-shifted output of the compiler gets executed in
-;;;          the target universe.
+;;; target - the target VM of the "level-shift" operation (e.g. x86 asm).
+;;;
+;;; slave  - the Maru VM that is being bootstrapped and will
+;;;          spring to life when the result of the level-shift
+;;;          (compilation) gets executed in the target VM.
 ;;;          'slave' comes from the idea that, having a dynamic compiler,
-;;;          the host could start up the slave universe under its full
+;;;          the host could start up the slave VM under its full
 ;;;          supervision.
+;;;
+;;; oop    - Ordinary Object Pointer
 ;;;
 ;;; s/ prefix means that it's the slave version of something that
 ;;;    also exist in the host Maru (i.e. we need to differentiate
-;;;    between the host and the slave versions).
+;;;    between the host and the slave versions). ideally, it should
+;;;    be done with packages/modules, and automated tests against leaks.
 ;;;
 ;;; subr/ prefix is used for the Maru <subr>'s that will
-;;;       be made visible to user code in the slave universe.
+;;;       be made visible to user code in the slave VM.
+
+;;;
+;;; Implementation details:
+;;;
+;;;  - () is the false value, and is mapped to 0 in the target. Its type is <undefined>.
+;;;
 
 (eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
@@ -91,12 +102,14 @@
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
 
-(define-form size-of-structure (type)   (* 4 (array-at %structure-sizes (eval type))))
+;; FIXME %structure-sizes: leakage from the host to the slave
+;; strategy: load the next boot.l into a clear env with only the primitives, then load eval.l, and compile from this clear env
+(define-form size-of-structure (type)   (* 4 (array-at %structure-sizes (eval type)))) ; 32bit
 
 (define-form header-of (arg)
   `(- ,arg ,(size-of-structure <header>)))
 
-(define header-magic-marker 57005) ; 0xDEAD, it's just a token we check when we are expecting a heap object
+(define header-magic-marker 57005) ; 0xDEAD, it's just a token that we check (on safety >= 3) when we are expecting a heap object
 
 (define-form <header>-flags-used   ()     1)
 (define-form <header>-flags-opaque ()     2)
@@ -137,6 +150,9 @@
   `(let ()
      (libc/printf "\nerror: ")
      ,@(map (lambda (arg)
+              ;; string literals are turned into pointers to .asciz, therefore
+              ;; we need to print them using libc/printf (or instantiate
+              ;; them into Maru objects using new-<string>-from-cstring).
               (if (string? arg)
                   `(libc/printf ,arg)
                   `(s/print ,arg)))
@@ -292,7 +308,7 @@
 ;;   for the built-in types in boot.l merely fill in some missing parts. types
 ;;   are represented internally as successive integers.
 ;;   corollary: the two files must agree, both in the order and in the field layout.
-;; NOTE: the following type names will shadow the ones from the host universe.
+;; NOTE: the following type names will shadow the ones from the host VM.
 ;;   strictly speaking, they should be prefixed with s/.
 (define <undefined>      0)
 (define <long>           1)
@@ -307,7 +323,7 @@
 (define <subr>          10)
 
 (define symbols                 0)
-(define globals                 0)
+(define globals                 0) ; an alist of (name . value)
 (define expanders               0)
 (define encoders                0)
 (define evaluators              0)
@@ -323,10 +339,6 @@
 (define symbol/quasiquote            0)
 (define symbol/unquote               0)
 (define symbol/unquote_splicing      0)
-(define symbol/expanders             0)
-(define symbol/encoders              0)
-(define symbol/evaluators            0)
-(define symbol/applicators           0)
 
 ;;(define fixed-subr/set          0)
 (define fixed-subr/quote        0)
@@ -1309,14 +1321,14 @@
 ;;; ----------------------------------------------------------------
 
 (define-function repl_stream (stream)
-  (let ((res 0))
+  (let ((value 0))
     (libc/fscanf stream "#!%*[^\012\015]")
-    (while (!= EOF (set res (s/read stream)))
-      (gc/protect (res)
-        (and (> opt_verbose 0) (libc/printf ";;; ") (s/dumpln res))
-        (set res (s/expand res globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (s/dumpln res))
-        (set res (s/encode res globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (s/dumpln res))
-        (set res (s/eval   res globals))        (and (> opt_verbose 1) (libc/printf "eval--> ") (s/dumpln res))
+    (while (!= EOF (set value (s/read stream)))
+      (gc/protect (value)
+        (and (> opt_verbose 0) (libc/printf ";;; ") (s/dumpln value))
+        (set value (s/expand value globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (s/dumpln value))
+        (set value (s/encode value globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (s/dumpln value))
+        (set value (s/eval   value globals))        (and (> opt_verbose 1) (libc/printf "eval--> ") (s/dumpln value))
         ))))
 
 (define-function instantiate-subr (name imp)
@@ -1359,9 +1371,9 @@
   (gc/push-root (address-of evaluators ))
   (gc/push-root (address-of applicators))
 
-  (let ((tmp (new-<pair> (intern "*globals*") globals)))
+  (let ((tmp (new-<pair> (intern "*globals*") 0)))
     (gc/protect (tmp)
-      (set globals (new-<pair> tmp globals))
+      (set globals (new-<pair> tmp 0))
       (set_tail tmp globals)
       (set tmp (new-<array> 0))  (set expanders   (s/define (intern "*expanders*"  ) tmp globals))
       (set tmp (new-<array> 0))  (set encoders    (s/define (intern "*encoders*"   ) tmp globals))
@@ -1446,6 +1458,7 @@
                                           (or stream (fatal1 "no such file: %s" (oop-at argv 0)))
                                           (repl_stream stream)
                                           (libc/fclose stream))))))
+  (libc/flush-streams)
   (and (> opt_verbose 0)
        (let ()
          (gc/collect)

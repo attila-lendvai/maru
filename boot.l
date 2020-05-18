@@ -233,7 +233,7 @@
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_imp _name))
 
-;;; selector
+;;; selector/method (single dispatch on the type of the first argument)
 
 (define-structure <selector> (name methods default))
 
@@ -346,7 +346,7 @@
           (set posn here))))
     (exit 0)))
 
-;;; multimethod
+;;; generic/multimethod (dispatch on the type of all arguments)
 
 (define-structure <generic> (name methods default))
 
