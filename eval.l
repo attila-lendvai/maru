@@ -323,7 +323,9 @@
 (define <subr>          10)
 
 (define symbols                 0)
-(define globals                 0) ; an alist of (name . value)
+
+;; these point to the respective assoc entries in the env
+(define globals                 0) ; environments are an alist of (name . value)
 (define expanders               0)
 (define encoders                0)
 (define evaluators              0)
@@ -711,10 +713,10 @@
       ((= type <symbol>)        (libc/printf "%s" (get <symbol> _bits obj)))
       ((= type <pair>)          (let ()
                                   (libc/printf "(")
-                                  (while (and (is <pair> obj) (!= globals obj))
+                                  (while (and (is <pair> obj) (!= (get_tail globals) obj))
                                     (do_print (get_head obj) storing)
                                     (and (is <pair> (set obj (get_tail obj))) (libc/printf " ")))
-                                  (if (= globals obj)
+                                  (if (= (get_tail globals) obj)
                                       (libc/printf "<globals>")
                                     (and obj
                                          (let ()
@@ -972,7 +974,7 @@
         (s/error "non-symbol identifier in define: " sym))
     (let ((val (s/eval (s/cadr args) env)))
       (gc/protect (val)
-        (s/define sym val globals)
+        (s/define sym val (get_tail globals))
         val))))
 
 (define-subr lambda
@@ -1326,21 +1328,21 @@
     (while (!= EOF (set value (s/read stream)))
       (gc/protect (value)
         (and (> opt_verbose 0) (libc/printf ";;; ") (s/dumpln value))
-        (set value (s/expand value globals))        (and (> opt_verbose 2) (libc/printf "expd--> ") (s/dumpln value))
-        (set value (s/encode value globals))        (and (> opt_verbose 2) (libc/printf "encd--> ") (s/dumpln value))
-        (set value (s/eval   value globals))        (and (> opt_verbose 1) (libc/printf "eval--> ") (s/dumpln value))
+        (set value (s/expand value (get_tail globals)))    (and (> opt_verbose 2) (libc/printf "expd--> ") (s/dumpln value))
+        (set value (s/encode value (get_tail globals)))    (and (> opt_verbose 2) (libc/printf "encd--> ") (s/dumpln value))
+        (set value (s/eval   value (get_tail globals)))    (and (> opt_verbose 1) (libc/printf "eval--> ") (s/dumpln value))
         ))))
 
 (define-function instantiate-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
-      (s/define (intern name) tmp globals))))
+      (s/define (intern name) tmp (get_tail globals)))))
 
 (define-function instantiate-fixed-subr (name imp)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
       (set tmp (new-<fixed> tmp))
-      (s/define (intern name) tmp globals))))
+      (s/define (intern name) tmp (get_tail globals)))))
 
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
@@ -1371,14 +1373,14 @@
   (gc/push-root (address-of evaluators ))
   (gc/push-root (address-of applicators))
 
-  (let ((tmp (new-<pair> (intern "*globals*") 0)))
+  (set globals (new-<pair> (intern "*globals*") 0))
+  (set_tail globals (new-<pair> globals 0))
+  (let ((tmp))
     (gc/protect (tmp)
-      (set globals (new-<pair> tmp 0))
-      (set_tail tmp globals)
-      (set tmp (new-<array> 0))  (set expanders   (s/define (intern "*expanders*"  ) tmp globals))
-      (set tmp (new-<array> 0))  (set encoders    (s/define (intern "*encoders*"   ) tmp globals))
-      (set tmp (new-<array> 0))  (set evaluators  (s/define (intern "*evaluators*" ) tmp globals))
-      (set tmp (new-<array> 0))  (set applicators (s/define (intern "*applicators*") tmp globals))
+      (set tmp (new-<array> 0))  (set expanders   (s/define (intern "*expanders*"  ) tmp (get_tail globals)))
+      (set tmp (new-<array> 0))  (set encoders    (s/define (intern "*encoders*"   ) tmp (get_tail globals)))
+      (set tmp (new-<array> 0))  (set evaluators  (s/define (intern "*evaluators*" ) tmp (get_tail globals)))
+      (set tmp (new-<array> 0))  (set applicators (s/define (intern "*applicators*") tmp (get_tail globals)))
       (s/set-array-at (get_tail evaluators)  <symbol> (new-<subr> subr/eval-<symbol> "eval-<symbol>"))
       (s/set-array-at (get_tail evaluators)  <pair>   (new-<subr> subr/eval-<pair>   "eval-<pair>"  ))
       (s/set-array-at (get_tail applicators) <fixed>  (new-<subr> subr/apply-<fixed> "apply-<fixed>"))
@@ -1442,10 +1444,10 @@
   (instantiate-subr  "long->string"          subr/long->string)
   (instantiate-subr  "current-environment"   subr/current-environment)
 
-  ;;(set fixed-subr/set    (s/cdr (s/assq symbol/set    globals)))              (gc/push-root (address-of fixed-subr/set   ))
-  (set fixed-subr/quote  (s/cdr (s/assq symbol/quote  globals)))              (gc/push-root (address-of fixed-subr/quote ))
-  (set fixed-subr/lambda (s/cdr (s/assq symbol/lambda globals)))              (gc/push-root (address-of fixed-subr/lambda))
-  (set fixed-subr/let    (s/cdr (s/assq symbol/let    globals)))              (gc/push-root (address-of fixed-subr/let   ))
+;;(set fixed-subr/set    (s/cdr (s/assq symbol/set    (get_tail globals))))      (gc/push-root (address-of fixed-subr/set   ))
+  (set fixed-subr/quote  (s/cdr (s/assq symbol/quote  (get_tail globals))))      (gc/push-root (address-of fixed-subr/quote ))
+  (set fixed-subr/lambda (s/cdr (s/assq symbol/lambda (get_tail globals))))      (gc/push-root (address-of fixed-subr/lambda))
+  (set fixed-subr/let    (s/cdr (s/assq symbol/let    (get_tail globals))))      (gc/push-root (address-of fixed-subr/let   ))
 
   (set trace_stack (new-<array> 32))                            (gc/push-root (address-of trace_stack))
 
