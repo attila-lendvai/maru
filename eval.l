@@ -1381,11 +1381,11 @@
       (set tmp (new-<array> 0))  (set encoders    (s/define (intern "*encoders*"   ) tmp (get_tail globals)))
       (set tmp (new-<array> 0))  (set evaluators  (s/define (intern "*evaluators*" ) tmp (get_tail globals)))
       (set tmp (new-<array> 0))  (set applicators (s/define (intern "*applicators*") tmp (get_tail globals)))
-      (s/set-array-at (get_tail evaluators)  <symbol> (new-<subr> subr/eval-<symbol> "eval-<symbol>"))
-      (s/set-array-at (get_tail evaluators)  <pair>   (new-<subr> subr/eval-<pair>   "eval-<pair>"  ))
-      (s/set-array-at (get_tail applicators) <fixed>  (new-<subr> subr/apply-<fixed> "apply-<fixed>"))
-      (s/set-array-at (get_tail applicators) <expr>   (new-<subr> subr/apply-<expr>  "apply-<expr>" ))
-      ))
+
+      (set tmp (new-<subr> subr/eval-<symbol> "eval-<symbol>")) (s/set-array-at (get_tail evaluators)  <symbol> tmp)
+      (set tmp (new-<subr> subr/eval-<pair>   "eval-<pair>"  )) (s/set-array-at (get_tail evaluators)  <pair>   tmp)
+      (set tmp (new-<subr> subr/apply-<fixed> "apply-<fixed>")) (s/set-array-at (get_tail applicators) <fixed>  tmp)
+      (set tmp (new-<subr> subr/apply-<expr>  "apply-<expr>" )) (s/set-array-at (get_tail applicators) <expr>   tmp)))
 
   (instantiate-fixed-subr "define"           subr/define)
   (instantiate-fixed-subr "lambda"           subr/lambda)
