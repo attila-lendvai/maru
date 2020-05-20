@@ -21,8 +21,15 @@ $(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PAT
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
 	mkdir -p $(BUILD)
-	@git clone --branch $(PREVIOUS_STAGE) . $(BUILD)/$(PREVIOUS_STAGE) || \
-	  echo "***\nseems like git has complained. do this once to create the local branch:\n'git checkout maru.0.c99; git checkout maru.1' and then try again.\n(yes, it's ugly, patches are welcome!) the gory details are here: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once\n***"
+# we need to create local the branches because git clone doesn't do that for us...
+	@git show-ref --verify --quiet refs/heads/maru.0.c99 || git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99
+	@git show-ref --verify --quiet refs/heads/maru.1     || git branch --quiet --track maru.1     remotes/origin/maru.1
+	@git show-ref --verify --quiet refs/heads/maru.2     || git branch --quiet --track maru.2     remotes/origin/maru.2
+	@git clone --local . $(BUILD)/$(PREVIOUS_STAGE) && \
+		cd "$(BUILD)/$(PREVIOUS_STAGE)" && \
+		git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99 && \
+		git branch --quiet --track maru.1     remotes/origin/maru.1 && \
+		git checkout --quiet $(PREVIOUS_STAGE)
 	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
 stats:
