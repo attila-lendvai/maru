@@ -152,9 +152,6 @@
 
 (define-function max (a b)      (if (> a b) a b))
 
-(define trace_stack     0)
-(define trace_depth     0)
-
 (define-form get_long (obj)     `(oop-at ,obj 0))
 
 (define-form get_head (obj)     `(oop-at ,obj 0))
@@ -345,7 +342,8 @@
 
 ;;; ----------------------------------------------------------------
 
-(define EOF     -1)
+(define EOF          -1)
+(define opt_verbose   0)
 
 ;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
 ;;   what actually happens is encoded in eval.l, and the define-structure forms
@@ -366,6 +364,11 @@
 (define <fixed>          9)
 (define <subr>          10)
 
+;;;
+;;; Some of the state of the Maru VM needs to be captured/known by the target VM.
+;;;
+;;; Two of these are essential: symbols and globals. The rest is optimization or debug helpers.
+;;;
 (define symbols                 0)
 
 ;; these point to the respective assoc entries in the env
@@ -379,8 +382,6 @@
 (define symbol/t                     0)
 (define symbol/dot                   0)
 (define symbol/set                   0)
-(define symbol/lambda                0)
-(define symbol/let                   0)
 (define symbol/quote                 0)
 (define symbol/quasiquote            0)
 (define symbol/unquote               0)
@@ -390,7 +391,8 @@
 (define fixed-subr/lambda       0)
 (define fixed-subr/let          0)
 
-(define opt_verbose             0)
+(define trace_stack     0)
+(define trace_depth     0)
 
 (define-function new-object/opaque (type bytesize)
   (safety 1 (s/assert (not (= 0 type)) "new-object/opaque was called with zero type"))
@@ -1392,41 +1394,24 @@
   (libc/fflush libc/stdout)
   (libc/fflush libc/stderr))
 
-(define-function main (argc argv)
-  ;; we need to dereference them once
-  (set libc/stdout (oop-at libc/stdout 0))
-  (set libc/stderr (oop-at libc/stderr 0))
+(define-function lookup-global-env-entry (name)
+  (or (s/assq (intern name) (get_tail globals))
+      (error "LOOKUP-GLOBAL-ENV-ENTRY failed")))
 
-  (gc/initialise)
-
-  (safety 4 (set gc/frequency 1))
-
-  (gc/push-root (address-of symbols))
-  (gc/push-root (address-of globals))
-
-  (set symbol/t                      (intern "t"))
-  (set symbol/dot                    (intern "."))
-  (set symbol/set                    (intern "set"))
-  (set symbol/lambda                 (intern "lambda"))
-  (set symbol/let                    (intern "let"))
-  (set symbol/quote                  (intern "quote"))
-  (set symbol/quasiquote             (intern "quasiquote"))
-  (set symbol/unquote                (intern "unquote"))
-  (set symbol/unquote_splicing       (intern "unquote-splicing"))
-
+(define-function populate-vm ()
   (set globals (new-<pair> (intern "*globals*") 0))
   (set_tail globals (new-<pair> globals 0))
   (let ((tmp))
     (gc/protect (tmp)
-      (set tmp (new-<array> 0))  (set expanders   (s/define (intern "*expanders*"  ) tmp (get_tail globals)))
-      (set tmp (new-<array> 0))  (set encoders    (s/define (intern "*encoders*"   ) tmp (get_tail globals)))
-      (set tmp (new-<array> 0))  (set evaluators  (s/define (intern "*evaluators*" ) tmp (get_tail globals)))
-      (set tmp (new-<array> 0))  (set applicators (s/define (intern "*applicators*") tmp (get_tail globals)))
+      (set tmp (new-<array> 0)) (s/define (intern "*expanders*"  ) tmp (get_tail globals))
+      (set tmp (new-<array> 0)) (s/define (intern "*encoders*"   ) tmp (get_tail globals))
+      (set tmp (new-<array> 0)) (s/define (intern "*evaluators*" ) tmp (get_tail globals))
+      (set tmp (new-<array> 0)) (s/define (intern "*applicators*") tmp (get_tail globals))
 
-      (set tmp (new-<subr> subr/eval-<symbol> "eval-<symbol>")) (s/set-array-at (get_tail evaluators)  <symbol> tmp)
-      (set tmp (new-<subr> subr/eval-<pair>   "eval-<pair>"  )) (s/set-array-at (get_tail evaluators)  <pair>   tmp)
-      (set tmp (new-<subr> subr/apply-<fixed> "apply-<fixed>")) (s/set-array-at (get_tail applicators) <fixed>  tmp)
-      (set tmp (new-<subr> subr/apply-<expr>  "apply-<expr>" )) (s/set-array-at (get_tail applicators) <expr>   tmp)))
+      (set tmp (new-<subr> subr/eval-<symbol> "eval-<symbol>")) (s/set-array-at (get_tail (lookup-global-env-entry "*evaluators*"))  <symbol> tmp)
+      (set tmp (new-<subr> subr/eval-<pair>   "eval-<pair>"  )) (s/set-array-at (get_tail (lookup-global-env-entry "*evaluators*"))  <pair>   tmp)
+      (set tmp (new-<subr> subr/apply-<fixed> "apply-<fixed>")) (s/set-array-at (get_tail (lookup-global-env-entry "*applicators*")) <fixed>  tmp)
+      (set tmp (new-<subr> subr/apply-<expr>  "apply-<expr>" )) (s/set-array-at (get_tail (lookup-global-env-entry "*applicators*")) <expr>   tmp)))
 
   (instantiate-fixed-subr "define"           subr/define)
   (instantiate-fixed-subr "lambda"           subr/lambda)
@@ -1483,13 +1468,44 @@
   (instantiate-subr  "string->symbol"        subr/string->symbol)
   (instantiate-subr  "symbol->string"        subr/symbol->string)
   (instantiate-subr  "long->string"          subr/long->string)
-  (instantiate-subr  "current-environment"   subr/current-environment)
+  (instantiate-subr  "current-environment"   subr/current-environment))
 
-  (set fixed-subr/quote  (s/cdr (s/assq symbol/quote  (get_tail globals))))
-  (set fixed-subr/lambda (s/cdr (s/assq symbol/lambda (get_tail globals))))
-  (set fixed-subr/let    (s/cdr (s/assq symbol/let    (get_tail globals))))
+(define-function capture-well-known-vm-values ()
+  (set expanders         (lookup-global-env-entry "*expanders*"))
+  (set encoders          (lookup-global-env-entry "*encoders*"))
+  (set evaluators        (lookup-global-env-entry "*evaluators*"))
+  (set applicators       (lookup-global-env-entry "*applicators*"))
 
-  (set trace_stack (new-<array> 32))                            (gc/push-root (address-of trace_stack))
+  (set fixed-subr/quote  (s/cdr (lookup-global-env-entry "quote")))
+  (set fixed-subr/lambda (s/cdr (lookup-global-env-entry "lambda")))
+  (set fixed-subr/let    (s/cdr (lookup-global-env-entry "let"))))
+
+(define-function main (argc argv)
+  ;; we need to dereference them once
+  (set libc/stdout (oop-at libc/stdout 0))
+  (set libc/stderr (oop-at libc/stderr 0))
+
+  (gc/initialise)
+
+  (safety 4 (set gc/frequency 1))
+
+  (gc/push-root (address-of symbols))
+  (gc/push-root (address-of globals))
+  (gc/push-root (address-of trace_stack))
+
+  (set symbol/t                      (intern "t"))
+  (set symbol/dot                    (intern "."))
+  (set symbol/set                    (intern "set"))
+  (set symbol/quote                  (intern "quote"))
+  (set symbol/quasiquote             (intern "quasiquote"))
+  (set symbol/unquote                (intern "unquote"))
+  (set symbol/unquote_splicing       (intern "unquote-splicing"))
+
+  (populate-vm)
+
+  (capture-well-known-vm-values)
+
+  (set trace_stack (new-<array> 32))
 
   (while (set argc (- argc 1))
     (set argv (+ argv 4))
