@@ -43,14 +43,14 @@
 ;;;
 ;;; subr/ prefix is used for the Maru <subr>'s that will
 ;;;       be made visible to user code in the slave VM.
+;;;
+;;; size means bytes; if not, then it should be indicated.
 
 ;;;
 ;;; Implementation details:
 ;;;
 ;;;  - () is the false value, and is mapped to 0 in the target. Its type is <undefined>.
 ;;;
-
-(eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
 (define-form gc/protect (vars . prog)
   (let ((make-protectors
@@ -77,6 +77,52 @@
                 `(define ,maru-name (extern ',libc-name))))
             args)))
 
+(define-form bytes-to-words (value)
+  `(>> ,value 2)) ; 32bit
+
+(define-form words-to-bytes (value)
+  `(<< ,value 2)) ; 32bit
+
+(define-form align-to-words (value)
+  `(& -4 (+ 3 ,value))) ; 32bit
+
+(define-form malloc-oops (wordcount)
+  `(libc/malloc (words-to-bytes ,wordcount)))
+
+(define-form copy-oops (from to wordcount)
+  `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
+
+;; FIXME structure-field-count: it's a leakage from the host to the slave
+;; strategy: load the next boot.l into a clear env with only the primitives, then load eval.l, and compile from this clear env
+(define-form size-of-structure (type)
+  (structure-field-count (eval type)))
+
+(eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
+
+(define-form size-of-<header> ()
+  (words-to-bytes (size-of-structure <header>)))
+
+(define-form header-of (arg)
+  `(- ,arg ,(size-of-<header>)))
+
+(let ((marker 233495534)) ; 0xDEADBEE, it's just an easy to recognize token without any meaning
+  (define-form valid-header-magic-marker? (header)
+    `(= (<header>-magic-marker ,header) ,marker))
+
+  (define-form initialize-header-magic-marker (header)
+    `(set (<header>-magic-marker ,header) ,marker)))
+
+(define-form <header>-flags-used   ()     1)
+(define-form <header>-flags-opaque ()     2)
+(define-form <header>-flags-mark   ()     4)
+
+(define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
+
+;;;
+;;;
+;;; Actual artifacts that are meant to be level-shifted into the target
+;;;
+;;;
 (compile-begin)
 
 (define-externs
@@ -101,36 +147,6 @@
 (define gc/memory-last          0)
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
-
-(define-form bytes-to-words (value)
-  `(>> ,value 2)) ; 32bit
-
-(define-form words-to-bytes (value)
-  `(<< ,value 2)) ; 32bit
-
-(define-form align-to-words (value)
-  `(& -4 (+ 3 ,value))) ; 32bit
-
-(define-form malloc-oops (wordcount)
-  `(libc/malloc (words-to-bytes ,wordcount)))
-
-(define-form copy-oops (from to wordcount)
-  `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
-
-;; FIXME %structure-sizes: leakage from the host to the slave
-;; strategy: load the next boot.l into a clear env with only the primitives, then load eval.l, and compile from this clear env
-(define-form size-of-structure (type)   (words-to-bytes (array-at %structure-sizes (eval type))))
-
-(define-form header-of (arg)
-  `(- ,arg ,(size-of-structure <header>)))
-
-(define header-magic-marker 233495534) ; 0xDEADBEE, it's just a token that we check for (on safety >= 3) when we are expecting a heap object
-
-(define-form <header>-flags-used   ()     1)
-(define-form <header>-flags-opaque ()     2)
-(define-form <header>-flags-mark   ()     4)
-
-(define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
 
 (define-function max (a b)      (if (> a b) a b))
 
@@ -178,7 +194,7 @@
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (libc/malloc size)))
     (or ptr (fatal "out of memory"))
-    (set (<header>-size  ptr) (- size (size-of-structure <header>)))
+    (set (<header>-size  ptr) (- size (size-of-<header>)))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
     (gc/debug (libc/printf "heap growth %p size %d %d/%d\n" ptr size gc/alloc-count gc/frequency))
@@ -226,7 +242,7 @@
        (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
          (chunk first)
-         (total-size (+ requested-size (size-of-structure <header>))))
+         (total-size (+ requested-size (size-of-<header>))))
     (while 1
       (while
         (let ()
@@ -234,10 +250,10 @@
           (when (= 0 (<header>-flags chunk))
             (let ((chunk-size (<header>-size chunk)))
               (while (and (= 0 (<header>-flags (<header>-next chunk)))
-                          (= (<header>-next chunk) (+ chunk (+ (size-of-structure <header>) chunk-size))))
+                          (= (<header>-next chunk) (+ chunk (+ (size-of-<header>) chunk-size))))
                 (let ((next (<header>-next chunk)))
                   (set (<header>-next chunk) (<header>-next next))
-                  (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ (size-of-structure <header>) (<header>-size next)))))
+                  (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ (size-of-<header>) (<header>-size next)))))
                   (and (= next gc/memory-last) (set gc/memory-last chunk))))
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk
@@ -254,17 +270,17 @@
                 (set (<header>-flags chunk) (<header>-flags-used))
                 (set gc/memory-last chunk)
                 (gc/debug (libc/printf "alloc chunk %p\n" chunk))
-                (let ((obj (+ chunk (size-of-structure <header>))))
+                (let ((obj (+ chunk (size-of-<header>))))
                   (libc/memset obj 0 chunk-size)
                   (set gc/alloc-count (+ gc/alloc-count 1))
                   (safety 4 (s/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (s/assert (& (<header>-flags-used) (<header>-flags (header-of obj))) "gc/allocate: was about to return with an object whose USED flag is unset"))
-                  (safety 3 (set (<header>-magic-marker (header-of obj)) header-magic-marker))
+                  (safety 3 (initialize-header-magic-marker (header-of obj)))
                   (safety 3 (set (<header>-type (header-of obj)) -42))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (%p), size %d\n" (header-of obj) obj (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
-      (gc/grow-heap (max (+ (size-of-structure <header>) requested-size) gc/quantum)))))
+      (gc/grow-heap (max (+ (size-of-<header>) requested-size) gc/quantum)))))
 
 (define-function gc/sweep ()
   (gc/debug (libc/printf "sweep\n"))
@@ -299,8 +315,8 @@
        (let* ((header (header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
-         (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
-         (safety 1 (or (& (<header>-flags-used) flags)                        (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
+         (safety 3 (or (valid-header-magic-marker? header)  (fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
+         (safety 1 (or (& (<header>-flags-used) flags)      (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
          (or (& flags (<header>-flags-mark))
              (let ()
                (set (<header>-flags header) (| flags (<header>-flags-mark)))
@@ -374,29 +390,27 @@
 
 (define opt_verbose             0)
 
-;; TODO rename to new-opaque-bits?
-(define-function new-bits (type size)
-  (safety 1 (s/assert (not (= 0 type)) "new-bits called with zero type"))
-  (let* ((obj (gc/allocate-opaque size))
+(define-function new-object/opaque (type bytesize)
+  (safety 1 (s/assert (not (= 0 type)) "new-object/opaque was called with zero type"))
+  (let* ((obj (gc/allocate-opaque bytesize))
          (header (header-of obj)))
     (set (<header>-type header) type)
     obj))
 
-;; TODO rename to new-oop-vector? maybe it should expect the size in words?
-(define-function new-oops (type size-in-bytes)
-  (safety 1 (s/assert (not (= 0 type)) "new-oops called with zero type"))
-  (let* ((obj (gc/allocate size-in-bytes))
+(define-function new-object (type wordsize)
+  (safety 1 (s/assert (not (= 0 type)) "new-object was called with zero type"))
+  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
          (header (header-of obj)))
     (set (<header>-type header) type)
     obj))
 
 (define-function new-<long> (bits)
-  (let ((obj (new-bits <long> (size-of-structure <long>))))
+  (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
     (set (<long>-_bits obj) bits)
     obj))
 
 (define-function new-<string>-of-length (len)
-  (let ((str (new-oops <string> (size-of-structure <string>))))
+  (let ((str (new-object <string> (size-of-structure <string>))))
     (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
       (set (<string>-_bits str) (gc/allocate-opaque (+ len 1)))
@@ -410,42 +424,42 @@
       obj)))
 
 (define-function new-<symbol> (cstr)
-  (let ((obj (new-bits <symbol> (size-of-structure <symbol>))))
+  (let ((obj (new-object/opaque <symbol> (words-to-bytes (size-of-structure <symbol>)))))
     (set (<symbol>-_bits obj) (libc/strdup cstr))
     obj))
 
 (define-function new-<pair> (head tail)
-  (let ((obj (new-oops <pair> (size-of-structure <pair>))))
+  (let ((obj (new-object <pair> (size-of-structure <pair>))))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
     obj))
 
 (define-function new-<array> (size)
-  (let ((arr (new-oops <array> (size-of-structure <array>))))
+  (let ((arr (new-object <array> (size-of-structure <array>))))
     (gc/protect (arr)
-      (set (<array>-_array arr) (new-oops <_array> (* 4 size)))
+      (set (<array>-_array arr) (new-object <_array> size))
       arr)))
 
 (define-function new-<expr> (defn env)
-  (let ((obj (new-oops <expr> (size-of-structure <expr>))))
+  (let ((obj (new-object <expr> (size-of-structure <expr>))))
     (set (<expr>-defn obj) defn)
     (set (<expr>-env  obj) env )
     obj))
 
 (define-function new-<form> (fn)
-  (let ((obj (new-oops <form> (size-of-structure <form>))))
+  (let ((obj (new-object <form> (size-of-structure <form>))))
     (gc/protect (obj)
       (set (<form>-function obj) fn)
       obj)))
 
 (define-function new-<fixed> (fn)
-  (let ((obj (new-oops <fixed> (size-of-structure <fixed>))))
+  (let ((obj (new-object <fixed> (size-of-structure <fixed>))))
     (gc/protect (obj)
       (set (<fixed>-function obj) fn)
       obj)))
 
 (define-function new-<subr> (_imp _name)
-  (let ((obj (new-bits <subr> (size-of-structure <subr>))))
+  (let ((obj (new-object/opaque <subr> (words-to-bytes (size-of-structure <subr>)))))
     (gc/protect (obj)
       (set (<subr>-_imp  obj) _imp )
       (set (<subr>-_name obj) _name)
@@ -456,14 +470,14 @@
      (and __arg__
           (not (& 1 __arg__))           ; TODO ???
           (let ((header (header-of __arg__)))
-            (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "IS: encountered an untagged pointer: %p" __arg__)))
+            (safety 3 (or (valid-header-magic-marker? header) (fatal1 "IS: encountered an untagged pointer: %p" __arg__)))
             (= ,type (<header>-type header))))))
 
 (define-form s/type-of (arg)
   `(let ((__arg__ ,arg))
      (if __arg__
          (let ((header (header-of __arg__)))
-           (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "S/TYPE-OF: encountered an untagged pointer: %p" __arg__)))
+           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "S/TYPE-OF: encountered an untagged pointer: %p" __arg__)))
            (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "S/TYPE-OF: attempt to access dead object: %p" __arg__)))
            (<header>-type (header-of __arg__)))
        <undefined>)))
@@ -512,7 +526,7 @@
 (define-structure <buffer> (contents size position))
 
 (define-function new_buffer ()
-  (let ((buf (libc/malloc (size-of-structure <buffer>))))
+  (let ((buf (libc/malloc (words-to-bytes (size-of-structure <buffer>)))))
     (set (<buffer>-contents buf) (libc/malloc 32))
     (set (<buffer>-size     buf) 32)
     (set (<buffer>-position buf) 0)
@@ -825,7 +839,7 @@
               (let ()
                 (or (< idx wordsize)
                     (let* ((newsize (max (+ idx 1) (* wordsize 2)))
-                           (oops  (new-oops <_array> (words-to-bytes newsize))))
+                           (oops  (new-object <_array> newsize)))
                       (copy-oops elts oops wordsize)
                       (set elts (put <array> _array obj oops))))
                 (set-oop-at elts idx val))))))
@@ -1252,7 +1266,7 @@
   (let ((type (get_head args))
         (size (get_head (get_tail args))))
     (safety 1 (s/assert (and (is <long> type) (is <long> size))))
-    (new-oops (get_long type) (* (get_long size) 4))))
+    (new-object (get_long type) (get_long size))))
 
 (define-subr (type-of 1) (and args (new-<long> (s/type-of (s/car args)))))
 (define-subr (string? 1) (and (is <string> (s/car args)) symbol/t))
