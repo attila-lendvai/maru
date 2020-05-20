@@ -102,14 +102,29 @@
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
 
+(define-form bytes-to-words (value)
+  `(>> ,value 2)) ; 32bit
+
+(define-form words-to-bytes (value)
+  `(<< ,value 2)) ; 32bit
+
+(define-form align-to-words (value)
+  `(& -4 (+ 3 ,value))) ; 32bit
+
+(define-form malloc-oops (wordcount)
+  `(libc/malloc (words-to-bytes ,wordcount)))
+
+(define-form copy-oops (from to wordcount)
+  `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
+
 ;; FIXME %structure-sizes: leakage from the host to the slave
 ;; strategy: load the next boot.l into a clear env with only the primitives, then load eval.l, and compile from this clear env
-(define-form size-of-structure (type)   (* 4 (array-at %structure-sizes (eval type)))) ; 32bit
+(define-form size-of-structure (type)   (words-to-bytes (array-at %structure-sizes (eval type))))
 
 (define-form header-of (arg)
   `(- ,arg ,(size-of-structure <header>)))
 
-(define header-magic-marker 57005) ; 0xDEAD, it's just a token that we check (on safety >= 3) when we are expecting a heap object
+(define header-magic-marker 233495534) ; 0xDEADBEE, it's just a token that we check for (on safety >= 3) when we are expecting a heap object
 
 (define-form <header>-flags-used   ()     1)
 (define-form <header>-flags-opaque ()     2)
@@ -160,104 +175,113 @@
      (libc/printf "\n")
      (die)))
 
-(define-function gc/acquire-new-memory-block (size)
+(define-function gc/acquire-new-heap-space (size)
   (let ((ptr (libc/malloc size)))
     (or ptr (fatal "out of memory"))
     (set (<header>-size  ptr) (- size (size-of-structure <header>)))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
-    (debug (libc/printf "BRK %p %d %d/%d\n" ptr size gc/alloc-count gc/frequency))
+    (gc/debug (libc/printf "heap growth %p size %d %d/%d\n" ptr size gc/alloc-count gc/frequency))
     ptr))
 
 (define-function gc/initialise ()
-  (let ((ptr (gc/acquire-new-memory-block gc/quantum)))
+  (let ((ptr (gc/acquire-new-heap-space gc/quantum)))
     (set gc/memory-base ptr)
     (set gc/memory-last ptr)))
 
 (define-function gc/push-root (ptr)
-  (and (= gc/root-count gc/root-max)
-       (let* ((roots (libc/malloc (* 4 (set gc/root-max (max 32 (* 2 gc/root-max)))))))
-         (libc/memcpy roots gc/roots (* 4 gc/root-count))
-         (and gc/roots (libc/free gc/roots))
-         (set gc/roots roots)))
+  (gc/debug (libc/printf "gc/push-root %d at %p\n" gc/root-count ptr))
+  (when (= gc/root-count gc/root-max)
+    (let ((new-roots (malloc-oops (set gc/root-max (max 32 (* 2 gc/root-max))))))
+      (copy-oops gc/roots new-roots gc/root-count)
+      (and gc/roots (libc/free gc/roots))
+      (set gc/roots new-roots)))
   (set-oop-at gc/roots gc/root-count ptr)
-  (debug (libc/printf "gc add root %d at %p\n" gc/root-count ptr))
   (set gc/root-count (+ 1 gc/root-count)))
 
 (define-function gc/pop-root (ptr)
+  (gc/debug (libc/printf "gc/pop-root %d at %p\n" gc/root-count ptr))
   (or gc/root-count (fatal "root table underflow"))
   (set gc/root-count (- gc/root-count 1))
-  (debug (libc/printf "gc del root %d at %p %s\n" gc/root-count ptr))
   (or (= ptr (oop-at gc/roots gc/root-count))
       (fatal "non-lifo root")))
 
-(define-function gc/grow-memory (size)
-  (let ((new-block (gc/acquire-new-memory-block size)))
+(define-function gc/grow-heap (size)
+  (let ((new-block (gc/acquire-new-heap-space size)))
     (set (<header>-next new-block) (<header>-next gc/memory-last))
     (set (<header>-next gc/memory-last) new-block)))
 
-(define-function gc/size (obj)  (<header>-size (header-of obj)))
+(define-function gc/object-size (obj)
+  (<header>-size (header-of obj)))
 
 (define-function gc/allocate-opaque (size)
   (let ((obj (gc/allocate size)))
     (set (<header>-flags (header-of obj)) (<header>-flags-used+opaque))
     obj))
 
-(define-function gc/allocate (size)
-  (set size (& -4 (+ 3 size)))
-  (and (= gc/alloc-count gc/frequency) (gc/collect))
+(define-function gc/allocate (requested-size)
+  (gc/debug (libc/printf "gc/allocate %d\n" requested-size))
+  (set requested-size (align-to-words requested-size))
+  (and (= gc/alloc-count gc/frequency)
+       (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
          (chunk first)
-         (ssize (+ size (size-of-structure <header>))))
+         (total-size (+ requested-size (size-of-structure <header>))))
     (while 1
       (while
         (let ()
-          (debug (libc/printf "alloc? %d %p %p [%p] %d >= %d %d\n" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) size (<= size (<header>-size chunk))))
-          (if (= 0 (<header>-flags chunk))
-              (let ((csize (<header>-size chunk)))
-                (while (and (= 0 (<header>-flags (<header>-next chunk)))
-                            (= (<header>-next chunk) (+ chunk (+ (size-of-structure <header>) csize))))
-                  (let ((next (<header>-next chunk)))
-                    (set (<header>-next chunk) (<header>-next next))
-                    (set csize (set (<header>-size chunk) (+ csize (+ (size-of-structure <header>) (<header>-size next)))))
-                    (and (= next gc/memory-last) (set gc/memory-last chunk))))
-                (if (or (< ssize csize) (= size csize))
-                    (let ()
-                      (debug (libc/printf "csize %d\n" csize))
-                      (and (> csize ssize)
-                           (let ((split (+ chunk ssize)))
-                             (debug (libc/printf "split %d: %p + %d -> %p + %d\n" csize chunk size split (- csize (+ size (size-of-structure <header>)))))
-                             (set (<header>-size  split) (- csize (+ size (size-of-structure <header>))))
-                             (set (<header>-flags split) 0)
-                             (set (<header>-next  split) (<header>-next chunk))
-                             (set (<header>-size  chunk) size)
-                             (set (<header>-next  chunk) split)
-                             (set csize size)))
-                      (set (<header>-flags chunk) (<header>-flags-used))
-                      (set gc/memory-last chunk)
-                      (debug (libc/printf "alloc chunk %p\n" chunk))
-                      (let ((obj (+ chunk (size-of-structure <header>))))
-                        (libc/memset obj 0 csize)
-                        (set gc/alloc-count (+ gc/alloc-count 1))
-                        (return obj))))))
+          (gc/debug (libc/printf "alloc? %d %p %p [%p] %d >= %d %d\n" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) requested-size (<= requested-size (<header>-size chunk))))
+          (when (= 0 (<header>-flags chunk))
+            (let ((chunk-size (<header>-size chunk)))
+              (while (and (= 0 (<header>-flags (<header>-next chunk)))
+                          (= (<header>-next chunk) (+ chunk (+ (size-of-structure <header>) chunk-size))))
+                (let ((next (<header>-next chunk)))
+                  (set (<header>-next chunk) (<header>-next next))
+                  (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ (size-of-structure <header>) (<header>-size next)))))
+                  (and (= next gc/memory-last) (set gc/memory-last chunk))))
+              (when (or (< total-size chunk-size) ; we'll split this chunk
+                        (= requested-size chunk-size)) ; we'll use the entire chunk
+                (gc/debug (libc/printf "chunk-size %d\n" chunk-size))
+                (when (> chunk-size total-size)
+                  (let ((split (+ chunk total-size)))
+                    (gc/debug (libc/printf "split %d: %p + %d -> %p + %d\n" chunk-size chunk requested-size split (- chunk-size total-size)))
+                    (set (<header>-size  split) (- chunk-size total-size))
+                    (set (<header>-flags split) 0)
+                    (set (<header>-next  split) (<header>-next chunk))
+                    (set (<header>-size  chunk) requested-size)
+                    (set (<header>-next  chunk) split)
+                    (set chunk-size requested-size)))
+                (set (<header>-flags chunk) (<header>-flags-used))
+                (set gc/memory-last chunk)
+                (gc/debug (libc/printf "alloc chunk %p\n" chunk))
+                (let ((obj (+ chunk (size-of-structure <header>))))
+                  (libc/memset obj 0 chunk-size)
+                  (set gc/alloc-count (+ gc/alloc-count 1))
+                  (safety 4 (s/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
+                  (safety 4 (s/assert (& (<header>-flags-used) (<header>-flags (header-of obj))) "gc/allocate: was about to return with an object whose USED flag is unset"))
+                  (safety 3 (set (<header>-magic-marker (header-of obj)) header-magic-marker))
+                  (safety 3 (set (<header>-type (header-of obj)) -42))
+                  (gc/debug (libc/printf "gc/allocate: returning with %p (%p), size %d\n" (header-of obj) obj (gc/object-size obj)))
+                  (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
-      (gc/grow-memory (max (+ (size-of-structure <header>) size) gc/quantum)))))
+      (gc/grow-heap (max (+ (size-of-structure <header>) requested-size) gc/quantum)))))
 
 (define-function gc/sweep ()
-  (debug (libc/printf "sweep\n"))
+  (gc/debug (libc/printf "sweep\n"))
   (let ((ptr gc/memory-base)
         (nobjs 0)
         (nused 0)
         (nfree 0))
     (while ptr
-      (debug (libc/printf "sweep? %d %p + %d\n" (<header>-flags ptr) ptr (<header>-size ptr)))
+      (gc/debug (libc/printf "sweep? %d %p + %d\n" (<header>-flags ptr) ptr (<header>-size ptr)))
       (let ((flags (<header>-flags ptr)))
         (if (& flags (<header>-flags-mark))
             (let ()
+              (safety 2 (or (not (= 0 (<header>-type ptr))) (fatal1 "gc/sweep: object with zero type %p" ptr)))
               (set nused (+ nused (<header>-size ptr)))
               (set nobjs (+ nobjs 1))
               (set (<header>-flags ptr) (^ flags (<header>-flags-mark))))
-          (debug (libc/printf "collect %p %d\n" ptr (<header>-size ptr)))
+          (gc/debug (libc/printf "collect %p size %d\n" ptr (<header>-size ptr)))
           (set nfree (+ nfree (<header>-size ptr)))
           (set (<header>-flags ptr) 0)))
       (and (= gc/memory-base (set ptr (<header>-next ptr)))
@@ -266,26 +290,28 @@
     (set gc/bytes-used nused)
     (set gc/bytes-free nfree)
     (debug (libc/printf "GC: %d used, %d free, %d allocations\n" nused nfree gc/alloc-count))
-    ;;(and (< nfree nused) (gc/grow-memory gc/quantum))
+    ;;(and (< nfree nused) (gc/grow-heap gc/quantum))
     ))
 
 (define-function gc/mark-and-trace (obj)
   (and obj
-       (not (& 1 obj)) ; TODO ???
-       (let* ((ptr   (header-of obj))
-              (flags (<header>-flags ptr)))
-         (debug (libc/printf "mark and trace %p flags %d\n" obj flags))
-         (safety 1 (or (& (<header>-flags-used) flags) (fatal1 "attempt to mark dead object %p" ptr)))
+       (not (& 1 obj)) ; TODO ??? is that supposed to be the used flag of the header?
+       (let* ((header (header-of obj))
+              (flags  (<header>-flags header)))
+         (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
+         (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
+         (safety 1 (or (& (<header>-flags-used) flags)                        (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
          (or (& flags (<header>-flags-mark))
              (let ()
-               (set (<header>-flags ptr) (| flags (<header>-flags-mark)))
+               (set (<header>-flags header) (| flags (<header>-flags-mark)))
                (or (& flags (<header>-flags-opaque))
-                   (let ((size (>> (<header>-size ptr) 2))) ;; 32bit
-                     (debug (libc/printf "mark %p %d type %d\n" ptr size (<header>-type ptr)))
-                     (while size
-                       (set size (- size 1))
-                       (debug (libc/printf "@%d %p\n" size (oop-at obj size)))
-                       (gc/mark-and-trace (oop-at obj size))))))))))
+                   (let ((index (bytes-to-words (<header>-size header))))
+                     (gc/debug (libc/printf "mark %p wordsize %d type %d\n" header index (<header>-type header)))
+                     (safety 2 (or (not (= 0 (<header>-type header))) (fatal1 "gc/mark-and-trace: object with zero type %p" header)))
+                     (while index
+                       (set index (- index 1))
+                       (gc/debug (libc/printf "@%d %p\n" index (header-of (oop-at obj index))))
+                       (gc/mark-and-trace (oop-at obj index))))))))))
 
 (define-function gc/collect ()
   (gc/debug
@@ -293,7 +319,7 @@
         (libc/fprintf libc/stderr "%d collections\n" gc/collection-count 1)))
   (let ((i 0))
     (while (< i gc/root-count)
-      (debug (let ((ptr (oop-at gc/roots i))) (libc/printf "mark gc root %d : %p -> %p\n" i ptr (oop-at ptr 0))))
+      (gc/debug (let ((root (oop-at gc/roots i))) (libc/printf "mark gc root %d : %p -> %p\n" i root (header-of (oop-at root 0)))))
       (gc/mark-and-trace (oop-at (oop-at gc/roots i) 0))
       (set i (+ 1 i))))
   (gc/sweep)
@@ -342,7 +368,6 @@
 (define symbol/unquote               0)
 (define symbol/unquote_splicing      0)
 
-;;(define fixed-subr/set          0)
 (define fixed-subr/quote        0)
 (define fixed-subr/lambda       0)
 (define fixed-subr/let          0)
@@ -351,18 +376,18 @@
 
 ;; TODO rename to new-opaque-bits?
 (define-function new-bits (type size)
+  (safety 1 (s/assert (not (= 0 type)) "new-bits called with zero type"))
   (let* ((obj (gc/allocate-opaque size))
          (header (header-of obj)))
     (set (<header>-type header) type)
-    (safety 3 (set (<header>-magic-marker header) header-magic-marker))
     obj))
 
 ;; TODO rename to new-oop-vector? maybe it should expect the size in words?
 (define-function new-oops (type size-in-bytes)
+  (safety 1 (s/assert (not (= 0 type)) "new-oops called with zero type"))
   (let* ((obj (gc/allocate size-in-bytes))
          (header (header-of obj)))
     (set (<header>-type header) type)
-    (safety 3 (set (<header>-magic-marker header) header-magic-marker))
     obj))
 
 (define-function new-<long> (bits)
@@ -375,6 +400,7 @@
     (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
       (set (<string>-_bits str) (gc/allocate-opaque (+ len 1)))
+      (safety 3 (set (<header>-type (header-of (<string>-_bits str))) -43))
       str)))
 
 (define-function new-<string>-from-cstring (cstr)
@@ -430,14 +456,14 @@
      (and __arg__
           (not (& 1 __arg__))           ; TODO ???
           (let ((header (header-of __arg__)))
-            (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "IS: encountered an untagged object: %p" __arg__)))
+            (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "IS: encountered an untagged pointer: %p" __arg__)))
             (= ,type (<header>-type header))))))
 
 (define-form s/type-of (arg)
   `(let ((__arg__ ,arg))
      (if __arg__
          (let ((header (header-of __arg__)))
-           (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "S/TYPE-OF: encountered an untagged object: %p" __arg__)))
+           (safety 3 (or (= (<header>-magic-marker header) header-magic-marker) (fatal1 "S/TYPE-OF: encountered an untagged pointer: %p" __arg__)))
            (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "S/TYPE-OF: attempt to access dead object: %p" __arg__)))
            (<header>-type (header-of __arg__)))
        <undefined>)))
@@ -779,28 +805,28 @@
   (safety 1 (or (is <array> obj) (fatal1 "s/array-length: called with object of type %d" (s/type-of obj))))
   (and (is <array> obj)
        (let ((_arr (get <array> _array obj)))
-         (let ((sz (/ (gc/size _arr) 4)))
-           sz))))
+         (let ((wordsize (bytes-to-words (gc/object-size _arr))))
+           wordsize))))
 
 (define-function s/array-at (obj idx)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
-              (size (/ (gc/size elts) 4)))
-         (and (<= 0 idx) (< idx size)
+              (wordsize (bytes-to-words (gc/object-size elts))))
+         (and (<= 0 idx) (< idx wordsize)
               (oop-at elts idx)))))
 
 (define-function s/set-array-at (obj idx val)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/set-array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
-              (size (/ (gc/size elts) 4)))
+              (wordsize (bytes-to-words (gc/object-size elts))))
          (and (<= 0 idx)
               (let ()
-                (or (< idx size)
-                    (let* ((nsize (max (+ idx 1) (* size 2)))
-                           (oops  (new-oops <_array> (* 4 nsize))))
-                      (libc/memcpy oops elts (* size 4))
+                (or (< idx wordsize)
+                    (let* ((newsize (max (+ idx 1) (* wordsize 2)))
+                           (oops  (new-oops <_array> (words-to-bytes newsize))))
+                      (copy-oops elts oops wordsize)
                       (set elts (put <array> _array obj oops))))
                 (set-oop-at elts idx val))))))
 
@@ -1353,9 +1379,12 @@
   (set libc/stdout (oop-at libc/stdout 0))
   (set libc/stderr (oop-at libc/stderr 0))
 
-  (gc/initialise)               (gc/debug (set gc/frequency 1))
+  (gc/initialise)
+
+  (safety 4 (set gc/frequency 1))
 
   (gc/push-root (address-of symbols))
+  (gc/push-root (address-of globals))
 
   (set symbol/t                      (intern "t"))
   (set symbol/dot                    (intern "."))
@@ -1366,12 +1395,6 @@
   (set symbol/quasiquote             (intern "quasiquote"))
   (set symbol/unquote                (intern "unquote"))
   (set symbol/unquote_splicing       (intern "unquote-splicing"))
-
-  (gc/push-root (address-of globals    ))
-  (gc/push-root (address-of expanders  ))
-  (gc/push-root (address-of encoders   ))
-  (gc/push-root (address-of evaluators ))
-  (gc/push-root (address-of applicators))
 
   (set globals (new-<pair> (intern "*globals*") 0))
   (set_tail globals (new-<pair> globals 0))
@@ -1444,10 +1467,9 @@
   (instantiate-subr  "long->string"          subr/long->string)
   (instantiate-subr  "current-environment"   subr/current-environment)
 
-;;(set fixed-subr/set    (s/cdr (s/assq symbol/set    (get_tail globals))))      (gc/push-root (address-of fixed-subr/set   ))
-  (set fixed-subr/quote  (s/cdr (s/assq symbol/quote  (get_tail globals))))      (gc/push-root (address-of fixed-subr/quote ))
-  (set fixed-subr/lambda (s/cdr (s/assq symbol/lambda (get_tail globals))))      (gc/push-root (address-of fixed-subr/lambda))
-  (set fixed-subr/let    (s/cdr (s/assq symbol/let    (get_tail globals))))      (gc/push-root (address-of fixed-subr/let   ))
+  (set fixed-subr/quote  (s/cdr (s/assq symbol/quote  (get_tail globals))))
+  (set fixed-subr/lambda (s/cdr (s/assq symbol/lambda (get_tail globals))))
+  (set fixed-subr/let    (s/cdr (s/assq symbol/let    (get_tail globals))))
 
   (set trace_stack (new-<array> 32))                            (gc/push-root (address-of trace_stack))
 
