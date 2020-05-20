@@ -15,8 +15,8 @@ test-bootstrap: eval $(BUILD)/eval.s .force
 	time ./eval boot.l emit-ia32.l eval.l >$(BUILD)/eval2.s 
 	diff $(BUILD)/eval.s $(BUILD)/eval2.s
 
-$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit-ia32.l eval.l
-	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit-ia32.l eval.l >$(BUILD)/eval.s
+$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit-ia32.l eval.l
+	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit-ia32.l eval.l >$(BUILD)/eval.s
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
