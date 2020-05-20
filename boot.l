@@ -190,8 +190,8 @@
 
 ;;; structure
 
-(define %structure-sizes        (array))
 (define %structure-fields       (array))
+(define %structure-field-counts (array))
 
 (define-function %make-accessor (name fields offset)
   (when fields
@@ -203,16 +203,18 @@
   (%make-accessor name fields 0))
 
 (define-form define-structure (name fields)
-  (let ((type (%allocate-type name))
-        (size (list-length fields)))
-    (set-array-at %structure-sizes  type size)
-    (set-array-at %structure-fields type fields)
+  (let ((type (%allocate-type name)))
+    (set-array-at %structure-field-counts type (list-length fields))
+    (set-array-at %structure-fields       type fields)
     `(let ()
        (define ,name ,type)
        ,@(%make-accessors name fields))))
 
 (define-function new (type)
-  (allocate type (array-at %structure-sizes type)))
+  (allocate type (structure-field-count type)))
+
+(define-function structure-field-count (type)
+  (array-at %structure-field-counts type))
 
 ;;; built-in types
 
