@@ -11,7 +11,9 @@
 ;(define-form debug    prog `(let () ,@prog))
 ;(define-form gc/debug prog `(let () ,@prog))
 
-(define safety-level 1)
+;; This variable controls the amount of safety features compiled
+;; into the runtime, at the cost of execution speed.
+(define safety-level 3)
 
 (define-form safety (level . prog)
   (when (<= level safety-level)
@@ -940,7 +942,9 @@
             ((!= head fixed-subr/quote)     (set tail (enlist tail env))))
           (set exp (new-<pair> head tail))))
     (let ((fn (s/array-at (get_tail encoders) (s/type-of exp))))
-      (and fn (let () (libc/printf "APPLY GOT ENCODER\n... " (s/println fn) 1)))
+      (debug (when fn
+               (libc/printf "APPLY GOT ENCODER\n... ")
+               (s/println fn)))
       (and fn
            (let ((args (new-<pair> env ())))
              (gc/protect (args)
