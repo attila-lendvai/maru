@@ -342,7 +342,7 @@
 
 ;;; ----------------------------------------------------------------
 
-(define EOF          -1)
+(define libc/EOF     -1)
 (define opt_verbose   0)
 
 ;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
@@ -674,7 +674,7 @@
   (let ((buf (new_buffer)))
     (while (!= ?\" (set c (libc/getc stream)))
       (set c (read_char c stream))
-      (when (= EOF c)
+      (when (= libc/EOF c)
         (s/error "unterminated string literal"))
       (buffer_append buf c))
     (buffer_append buf 0)
@@ -687,7 +687,7 @@
          (tail head)
          (elt  ()))
     (gc/protect (head elt)
-      (while (and (!= EOF (set elt (s/read stream))) (!= symbol/dot elt))
+      (while (and (!= libc/EOF (set elt (s/read stream))) (!= symbol/dot elt))
         (set elt (new-<pair> elt ()))
         (set tail (set_tail tail elt)))
       (and (= symbol/dot elt) (set_tail tail (s/read stream))))
@@ -698,7 +698,7 @@
 
 (define-function read_quote (prefix stream)
   (let ((qobj (s/read stream)))
-    (when (= EOF qobj)
+    (when (= libc/EOF qobj)
       (s/error "EOF while reading quoted literal"))
     (gc/protect (qobj)
       (set qobj (new-<pair> qobj ()))
@@ -722,15 +722,15 @@
                                     (libc/ungetc d stream)
                                     (read_quote symbol/unquote stream)))))
         ((is_letter c)  (return (read_symbol c stream)))
-        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) EOF)))
-        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) EOF)))
-        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) EOF)))
+        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) libc/EOF)))
+        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) libc/EOF)))
+        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) libc/EOF)))
         ((is_digit10 c) (return (read_number c stream)))
         ((= ?\; c)      (while (and (!= ?\n (set c (libc/getc stream)))
                                     (!= ?\r c)
-                                    (!= EOF c))))
+                                    (!= libc/EOF c))))
         ((= ?\" c)      (return (read_string c stream)))
-        ((< c 0)        (return EOF))
+        ((< c 0)        (return libc/EOF))
         (else           (fatal1 "illegal character: %c" c))))))
 
 (define-function do_print (obj storing)
@@ -1371,7 +1371,7 @@
 (define-function repl_stream (stream)
   (let ((value 0))
     (libc/fscanf stream "#!%*[^\012\015]")
-    (while (!= EOF (set value (s/read stream)))
+    (while (!= libc/EOF (set value (s/read stream)))
       (gc/protect (value)
         (and (> opt_verbose 0) (libc/printf ";;; ") (s/dumpln value))
         (set value (s/expand value (get_tail globals)))    (and (> opt_verbose 2) (libc/printf "expd--> ") (s/dumpln value))
