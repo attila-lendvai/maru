@@ -13,7 +13,7 @@
 
 ;; This variable controls the amount of safety features compiled
 ;; into the runtime, at the cost of execution speed.
-(define safety-level 3)
+(define safety-level 0)
 
 (define-form safety (level . prog)
   (when (<= level safety-level)
