@@ -234,6 +234,7 @@
 (define-structure <form>        (function))
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_imp _name))
+(define-structure <module>      (symbols env))
 
 ;;; selector/method (single dispatch on the type of the first argument)
 
@@ -302,19 +303,16 @@
 (define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
 
 (define-method do-print <pair> ()
-  (if (= *globals* (cdr self))
-      (print "*globals*")
-    (let ()
-      (print "(")
-      (while self
-        (if (pair? self)
-            (print (car self))
-          (let ()
-            (print ". ")
-            (print self)))
-        (if (set self (cdr self))
-            (print " ")))
-      (print ")"))))
+  (print "(")
+  (while self
+    (if (pair? self)
+        (print (car self))
+        (let ()
+          (print ". ")
+          (print self)))
+    (if (set self (cdr self))
+        (print " ")))
+  (print ")"))
 
 (define-function dump-until (target arg)
   (let ((found (= target arg)))

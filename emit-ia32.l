@@ -102,7 +102,7 @@
   (let* ((opsym (car op-args))
          (type-name (symbol->type-name opsym)))
     `(let ()
-       ,@(if (not (assq opsym *globals*)) `((define-instruction ,opsym)))
+       ,@(if (not (assq opsym (<module>-env (current-module)))) `((define-instruction ,opsym)))
        (define-multimethod emit ((,type-name op) ,@(%define-emit-params 1 (cdr op-args))) ,@body))))
 
 (define-function mangle-label (name)
@@ -608,4 +608,4 @@
 (define-form compile-begin () `(define compile-environment-marker ()))
 
 (define-function compile-end ()
-  (gen-env-to (cdr (current-environment)) 'compile-environment-marker))
+  (gen-env-to (cdr (<module>-env (current-module))) 'compile-environment-marker))
