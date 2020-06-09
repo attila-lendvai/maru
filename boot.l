@@ -179,11 +179,10 @@
 (define %type-names     (array 16))
 (define %last-type      -1)
 
-(define %allocate-type
-  (lambda (name)
-    (set %last-type (+ 1 %last-type))
-    (set-array-at %type-names %last-type name)
-    %last-type))
+(define-function %allocate-type (name)
+  (set %last-type (+ 1 %last-type))
+  (set-array-at %type-names %last-type name)
+  %last-type)
 
 (define-function name-of-type (type)
   (array-at %type-names type))

@@ -94,8 +94,6 @@
 (define-form copy-oops (from to wordcount)
   `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
 
-;; FIXME structure-field-count: it's a leakage from the host to the slave
-;; strategy: load the next boot.l into a clear env with only the primitives, then load eval.l, and compile from this clear env
 (define-form size-of-structure (type)
   (structure-field-count (eval type)))
 
