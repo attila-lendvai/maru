@@ -40,11 +40,15 @@
 
 (define-function align (alignment value)        (& (- alignment) (+ (- alignment 1) value )))
 
+(define-form slave-value (form)
+  `(eval-in-module slave ',form))
+
 ;;; EXTERN
 
 (define-structure <extern> (name stub))
 
 (define-function extern (name)
+  (assert (= <string> (type-of name)) "extern called with a non-string: " name)
   (let ((self (new <extern>)))
     (set (<extern>-name self) name)
     self))
@@ -389,16 +393,35 @@
 
 (define generators (list->array (list generate-nullary generate-unary generate-binary generate-ternary)))
 
-(define operators (list->array
-  `(()                                                          ; nullary
-    ((,-  ,NEG) (,not ,NOT))                                    ; unary
-    ((,+  ,ADD) (,-   ,SUB) (,* ,MUL) (,/ ,DIV)                 ; binary
-     (,&  ,AND) (,|   ,OR ) (,^ ,XOR)
-     (,<  ,LT ) (,<=  ,LE)  (,= ,EQ ) (,!= ,NE ) (,> ,GT )
-     (,<< ,SHL) (,>>  ,SHR)
-     (,oop-at         ,OOP-AT) (,string-at         ,CHR-AT))
-    ((,set-oop-at ,SET-OOP-AT) (,set-string-at ,SET-CHR-AT))    ; ternary
-    )))
+;; a vector of assoc lists indexed by operator arity
+(define operators
+    (let ((table
+           `(;; nullary
+             ()
+             ;; unary
+             ((slave:-  ,NEG) (slave:not ,NOT))
+             ;; binary
+             ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
+              (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
+              (slave:<  ,LT ) (slave:<=  ,LE)  (slave:= ,EQ ) (slave:!= ,NE ) (slave:> ,GT )
+              (slave:<< ,SHL) (slave:>>  ,SHR)
+              (slave:oop-at     ,OOP-AT)     (slave:string-at     ,CHR-AT))
+             ;; ternary
+             ((slave:set-oop-at ,SET-OOP-AT) (slave:set-string-at ,SET-CHR-AT)))))
+      (list->array
+       (map (lambda (arity-line)
+              (map (lambda (entry)
+                     (let* ((op-name (car entry))
+                            (op (eval-in-module slave op-name)))
+                       ;; NOTE this is not (slave-value slave:<subr>), because it's the eval.exe of the
+                       ;; previous stage that instantiates these subr's, and it instantiates them
+                       ;; with the type that is encoded into the executable (which should be in sync
+                       ;; with the definitions in the boot.l of that stage, which in turn is what we
+                       ;; see here at runtime).
+                       (assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       (cons op (cdr entry))))
+                   arity-line))
+            table))))
 
 (define-function gen-let-binding (binding comp)
   (let ((name (car binding))
@@ -479,15 +502,15 @@
         (gen comp ADDR (GI32 (LABEL name)))))))
 
 (define forms (list
-  (cons  let            gen-let)
-  (cons  and            gen-and)
-  (cons  or             gen-or)
-  (cons  if             gen-if)
-  (cons  while          gen-while)
-  (cons  set            gen-set)
-  (cons  lambda         gen-lambda)
-  (cons 'return         gen-return)
-  (cons 'address-of     gen-address-of)))
+  (cons  (slave-value slave:let)            gen-let)
+  (cons  (slave-value slave:and)            gen-and)
+  (cons  (slave-value slave:or)             gen-or)
+  (cons  (slave-value slave:if)             gen-if)
+  (cons  (slave-value slave:while)          gen-while)
+  (cons  (slave-value slave:set)            gen-set)
+  (cons  (slave-value slave:lambda)         gen-lambda)
+  (cons 'slave:return         gen-return)
+  (cons 'slave:address-of     gen-address-of)))
 
 (define-method gen <pair> (comp)
   (let* ((fn-name (car self))
@@ -562,7 +585,7 @@
   (gen comp COMMENT (list "form "name)))
 
 (define-method gen-definition <expr> (name ocomp)
-  (let* ((main? (= 'main name))
+  (let* ((main? (= 'slave:main name))
          (defn (<expr>-defn self))
          (body (cdr defn))
          (comp (compiler (<compiler>-env ocomp)))
@@ -605,7 +628,13 @@
       (set env (cdr env)))
     (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
-(define-form compile-begin () `(define compile-environment-marker ()))
+(switch-to-slave-module)
+
+(define-form compile-begin ()
+  '(define compile-environment-marker ()))
 
 (define-function compile-end ()
-  (gen-env-to (cdr (<module>-env (current-module))) 'compile-environment-marker))
+  (warn "begin compiling\n")
+  (eval-in-module host '(host:gen-env-to
+                         (host:cdr (host:<module>-env host:slave))
+                         (host:quote compile-environment-marker))))
