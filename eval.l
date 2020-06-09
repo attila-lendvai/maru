@@ -76,7 +76,7 @@
   `(let ()
      ,@(map (lambda (libc-name)
               (let ((maru-name (concat-symbol 'libc/ libc-name)))
-                `(define ,maru-name (extern ',libc-name))))
+                `(define ,maru-name (eval-in-module host (list 'host:extern ,(symbol->string libc-name))))))
             args)))
 
 (define-form bytes-to-words (value)
@@ -345,25 +345,24 @@
 (define libc/EOF     -1)
 (define opt_verbose   0)
 
-;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
-;;   what actually happens is encoded in eval.l, and the define-structure forms
-;;   for the built-in types in boot.l merely fill in some missing parts. types
-;;   are represented internally as successive integers.
-;;   corollary: the two files must agree, both in the order and in the field layout.
-;; NOTE: the following type names will shadow the ones from the host VM.
-;;   strictly speaking, they should be prefixed with s/.
-(define <undefined>      0)
-(define <long>           1)
-(define <string>         2)
-(define <symbol>         3)
-(define <pair>           4)
-(define <_array>         5)
-(define <array>          6)
-(define <expr>           7)
-(define <form>           8)
-(define <fixed>          9)
-(define <subr>          10)
-(define <module>        11)
+;; NOTE: types are represented at runtime as integers (starting with 0 as <undefined>).
+;;       the subr's here in eval.l encode/implement the behavior of the primitive types.
+;; TODO get rid of these by using something like a symbol-macro that turns the references into literal integers.
+(define-form bootstrap-type (type-name)
+  `(define ,type-name ,(eval type-name)))
+
+(bootstrap-type <undefined>)
+(bootstrap-type <long>)
+(bootstrap-type <string>)
+(bootstrap-type <symbol>)
+(bootstrap-type <pair>)
+(bootstrap-type <_array>)
+(bootstrap-type <array>)
+(bootstrap-type <expr>)
+(bootstrap-type <form>)
+(bootstrap-type <fixed>)
+(bootstrap-type <subr>)
+(bootstrap-type <module>)
 
 ;;;
 ;;; Some of the state of the Maru VM needs to be captured/known by the target VM.
