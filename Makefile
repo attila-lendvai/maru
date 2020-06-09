@@ -1,33 +1,44 @@
-CFLAGS = -Wall -std=c99 -D_ISOC99_SOURCE -g
+PREVIOUS_STAGE = maru.0.c99
+BUILD = build
+BOOT_EVAL_PATH = $(BUILD)/$(PREVIOUS_STAGE)
 
-all : boot-eval-opt eval2
+all: eval
 
-boot-eval : boot-eval.c
-	gcc $(CFLAGS) -o boot-eval boot-eval.c
+eval: $(BUILD)/eval.s
+	$(CC) -g -m32 -c -o $(BUILD)/eval.o $(BUILD)/eval.s
+	size $(BUILD)/eval.o
+	$(CC) -g -m32 -o ./eval $(BUILD)/eval.o
 
-boot-eval-opt : .force
-	$(MAKE) CFLAGS="$(CFLAGS) -O3 -fomit-frame-pointer -DNDEBUG" boot-eval
+# run the compiler once again, but this time using the bootstrapped eval executable
+# (as opposed to eval compiled from eval.c), and see if there's any difference in their outputs.
+test-bootstrap: eval .force
+	time ./eval boot.l emit.l eval.l >$(BUILD)/eval2.s 
+	diff -u $(BUILD)/eval.s $(BUILD)/eval2.s
 
-debuggc : .force
-	$(MAKE) CFLAGS="$(CFLAGS) -DDEBUGGC=1" boot-eval
+$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l eval.l
+	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l eval.l >$(BUILD)/eval.s || touch -t 200011220102 $(BUILD)/eval.s
 
-eval : *.l boot-eval
-	time ./boot-eval boot.l emit.l eval.l >eval.s
-	gcc -g -m32 -c -o eval.o eval.s
-	size eval.o
-	gcc -g -m32 -o eval eval.o
+$(BOOT_EVAL_PATH)/eval:
+	echo Building $(BUILD)/$(PREVIOUS_STAGE)
+	mkdir -p $(BUILD)
+# we need to create the local branches because git clone doesn't do that for us...
+	@git show-ref --verify --quiet refs/heads/maru.0.c99 || git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99
+	@git show-ref --verify --quiet refs/heads/maru.1     || git branch --quiet --track maru.1     remotes/origin/maru.1
+	@git clone --local . $(BUILD)/$(PREVIOUS_STAGE) && \
+		cd "$(BUILD)/$(PREVIOUS_STAGE)" && \
+		git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99 && \
+		git checkout --quiet $(PREVIOUS_STAGE)
+	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
-eval2 : eval .force
-	time ./eval boot.l emit.l eval.l >eval2.s
-	diff eval.s eval2.s
+stats:
+	cat boot.l emit.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat eval.l			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l emit.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
-stats : .force
-	cat boot.l emit.l 	 | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.l        	 | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+clean:
+	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
 
-clean : .force
-	rm -f *~ *.o boot-eval eval *.s
-	rm -rf *.dSYM
+distclean:
+	rm -rf $(BUILD) eval
 
-.force :
+.force:
