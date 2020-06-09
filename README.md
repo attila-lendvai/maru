@@ -7,13 +7,17 @@ a symbolic expression evaluator that can compile its own implementation language
 in less than 2000 LoC.
 
 This repo is also the place of exploration in the land of bootstrapping
-and computing system development. I'm planning to also **shrink**
-what's currently known as Maru, and/or introducing simpler languages into the
-bootstrap process; e.g. develop
+and computing system development. I'm planning to introduce simpler languages
+into the bootstrap process; e.g. develop
 [a trivial stack machine based language](https://github.com/nagydani/seedling/)
 that can be used to bootstrap Maru directly onto the raw metal, without
-assuming a C compiler toolchain, or an Operating System, and all that with
-minimal efforts.
+assuming a C compiler toolchain, or even an Operating System, and with
+minimal effort.
+
+> Maru is in particular trying to be malleable at the very lowest levels,
+> so any special interest that cannot be accommodated easily within the common
+> platform would be a strong indicator of a deficiency within the platform
+> that should be addressed rather than disinherited.
 
 ## How
 
@@ -92,9 +96,9 @@ sudo apt-get install gcc-multilib
 
 ## Who
 
-Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/).
+Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/), at around 2011.
 
-This repo is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
+This repo is currently (2020) maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 
 ## Why
 
