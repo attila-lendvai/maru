@@ -26,19 +26,20 @@ Maru's architecture is described in Ian Piumarta's paper:
 
 ### The Parts
 
-* `eval.c` (in branch `stage.0.c99`) contains a reader/evaluator for a simple
+* `eval.c` (in branch `maru.0.c99`) contains a reader/evaluator for a simple
 s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
 
-* `eval.l` contains the same evaluator, written in the s-expression language.
+* `eval.l` (in branch `maru.1` and up) contains the same evaluator, written in
+(a subset of) this s-expression language.
 In other words, `eval.l` is a metacircular evaluator for the language it is written in.
 
 * `emit.l` contains a compiler from s-expressions to [IA-32](https://en.wikipedia.org/wiki/IA-32) (x86)
 machine code, written in the s-expression language. This compiler can be thought of as a
 semantics-preserving "level shift" from s-expressions to IA-32 machine code, letting the metacircular
 evaluator in `eval.l` escape from "infinite metacircular regression" to a language grounded in hardware.
-A possible metaphor of this is a "parent universe" that, when compiling the abstract to the concrete,
-provides you with a set of axiomatic foundations to build upon. Another possible such "parent universe" is
-C99 (I'm planning to implement an `emit-c99.l`).
+A possible metaphor of this is a "host universe" that, when compiling the abstract to the concrete,
+provides you with a set of axiomatic foundations you can build upon. Other possible such
+"host universes" are e.g. C99 or LLVM.
 
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
 written in the s-expression language.
@@ -54,7 +55,7 @@ naming convention (without a `master` branch):
 `[language name].[bootstrap stage]`, e.g `maru.1`.
 
 Optionally, for stage zero in the bootstrap, it also includes the name of the
-parent language, from which this "bootstrap sprout" grows:
+parent language, from which this "bootstrap sprout" grows out:
 
 `[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
 the bootstrap implementation written in C.
@@ -64,17 +65,22 @@ the/a parent stage (typically stage `(n-1)` of the same language) to compile an
 `eval` executable. Then it uses that executable to compile itself (and provide
 the foundations for stage `(n+1)`).
 
-During the build the bootstrap stages are `git checkout`'ed under `build/`
-and they are built there. A new stage needs to be opened when you want to use a new feature
+The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`
+whose semantics they depend on. IOW, the `maru.2` stage is built using the
+`eval` executable, `boot.l`, and `emit.l` of the previous stage (`maru.1`).
+
+During the build the bootstrap stages are locally `git checkout`'ed into `build/`
+and they are built there (this becomes recursive with multiple stages). A new stage
+needs to be opened when you want to use a new feature
 of the language in the code implementing the language itself.
 
-My plan is not only to grow, but also to *shrink* the languages (i.e. introduce
+My plan is not only to grow, but also to *shrink* the languages (i.e. try to introduce
 "negative" bootstrap stages). This will be part of the collaboration with
 Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 ### Build instructions
 
-From the default branch (currently `maru.1`) invoke `make test-bootstrap`.
+TL;DR: From the default branch (currently `maru.3`) invoke `make test-bootstrap`.
 
 **Linux:**
 
@@ -110,6 +116,13 @@ a repo and a maintainer.
 
 ## Status
 
+There are 3 stages now, introducing non-trivial changes, and the repo structure seems to slowly mature.
+
+A short-term TODO:
+- capture the emitted `eval.s` files and check them into the repo; add makefile targets
+that use them, regenerate them, compare them (to "short circuit" the bootstrap process).
+- revive all the goodies in the repo in a structured way (PEG parser, x86 assembler, etc).
+- generate LLVM output.
 
 ### History
 
@@ -145,10 +158,9 @@ version of Maru that can self-host, but is not tailored to accommodate the VPRI 
 I started out my work from this minimal repo, hence the divergence between the
 git branch histories.
 
-This repo has received, and **will receive forced pushes** (i.e.
+**This repo will receive forced pushes** (i.e.
 `git push -f` to rewrite git history (except the `piumarta` branch)) until I come up with
-a build setup that nicely facilitates bootstrapping (in both directions:
-growing and simplifying the language), and multiple, parallel bootstrapping
+a build setup that nicely facilitates bootstrapping in multiple, parallel bootstrapping
 paths of language development.
 
 There were two Mercurial repositories, one for the VPRI demos, and one for the
