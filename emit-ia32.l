@@ -60,17 +60,17 @@
 
 ;;; DEFINE-OPERAND
 
-(define-function define-operand-make-setters (type-name fields)
+(define-function define-operand/make-setters (type-name fields)
   (if (pair? fields)
       (cons `(set (,(concat-symbol (concat-symbol type-name '-) (car fields)) self) ,(car fields))
-            (define-operand-make-setters type-name (cdr fields)))))
+            (define-operand/make-setters type-name (cdr fields)))))
 
 (define-form define-operand (name fields . printing)
   (let ((type-name (symbol->type-name name)))
     (eval `(define-structure ,type-name ,fields))
     (eval `(define-function ,name ,fields
              (let ((self (new ,type-name)))
-               ,@(define-operand-make-setters type-name fields)
+               ,@(define-operand/make-setters type-name fields)
                self)))
     `(define-method do-print ,type-name () (print ,@printing))))
 
@@ -98,16 +98,19 @@
   (string->symbol (concat-string "$" (long->string index))))
 
 (define-function %define-emit-params (index types)
-  (if (pair? types)
-      (cons (list (symbol->type-name (car types)) (%define-emit-param-name index))
-            (%define-emit-params (+ index 1) (cdr types)))))
+  (when (pair? types)
+    (cons (list (symbol->type-name (car types)) (%define-emit-param-name index))
+          (%define-emit-params (+ index 1) (cdr types)))))
 
 (define-form define-emit (op-args . body)
-  (let* ((opsym (car op-args))
-         (type-name (symbol->type-name opsym)))
+  (let* ((op-name (car op-args))
+         (type-name (symbol->type-name op-name)))
     `(let ()
-       ,@(if (not (assq opsym (<module>-env (current-module)))) `((define-instruction ,opsym)))
-       (define-multimethod emit ((,type-name op) ,@(%define-emit-params 1 (cdr op-args))) ,@body))))
+       ;; TODO factor out DEFINED?
+       ,@(unless (assq op-name (<module>-env (current-module)))
+           `((define-instruction ,op-name)))
+       (define-multimethod emit ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
+         ,@body))))
 
 (define-function mangle-label (name)
   (let* ((plain   (symbol->string name))
@@ -156,122 +159,122 @@
 
 ;;; IA32 -- INSTRUCTIONS
 
-(define-emit    (TEXT)                  (println "	.text"))
-(define-emit    (DATA)                  (println "	.data"))
-(define-emit    (SECTION string)        (println "	.section "$1))
+(define-emit    (TEXT)				(println "	.text"))
+(define-emit    (DATA)				(println "	.data"))
+(define-emit    (SECTION string)		(println "	.section "$1))
 
-(define-emit    (INDIRECT LABEL)        (println "	.indirect_symbol "$1))
-(define-emit    (GLOBAL LABEL)          (println "	.globl "$1))
+(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
+(define-emit    (GLOBAL LABEL)			(println "	.globl "$1))
 
-(define-emit    (ALIGN long)            (println "	.align " $1))
+(define-emit    (ALIGN long)			(println "	.align " $1))
 
-(define-emit    (LONG long)             (println "	.long	"$1))
-(define-emit    (LONG LABEL)            (println "	.long	"$1))
+(define-emit    (LONG long)			(println "	.long	"$1))
+(define-emit    (LONG LABEL)			(println "	.long	"$1))
 
-(define-emit    (ASCIZ string)          (print   "	.asciz ") (dumpln $1))
+(define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
 
-(define-emit    (DEFLABEL LABEL)        (println $1":"))
+(define-emit    (DEFLABEL LABEL)		(println $1":"))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): http://agner.org/optimize
-(define-emit    (ENTER long)            (println "	pushl	%ebp")
-                                        (println "	movl	%esp, %ebp")
-                                        (println "	subl	$"$1", %esp"))
+(define-emit    (ENTER long)			(println "	pushl	%ebp")
+						(println "	movl	%esp, %ebp")
+						(println "	subl	$"$1", %esp"))
 
-(define-emit    (LEAVE long)            (println "	leave")
-                                        (println "	ret"))
+(define-emit    (LEAVE long)			(println "	leave")
+						(println "	ret"))
 
-(define-emit    (NEG)                   (println "	negl	%eax"))
+(define-emit    (NEG)				(println "	negl	%eax"))
 
-(define-emit    (ADD TI32)              (println "	addl	"$1", %eax"))
+(define-emit    (ADD TI32)			(println "	addl	"$1", %eax"))
 
-(define-emit    (SUB TI32)              (println "	subl	"$1", %eax"))
+(define-emit    (SUB TI32)			(println "	subl	"$1", %eax"))
 
-(define-emit    (MUL TI32)              (println "	mull	"$1))
+(define-emit    (MUL TI32)			(println "	mull	"$1))
 
-(define-emit    (DIV TI32)              (println "	movl	$0, %edx")
-                                        (println "	divl	"$1))
+(define-emit    (DIV TI32)			(println "	movl	$0, %edx")
+						(println "	divl	"$1))
 
-(define-emit    (AND TI32)              (println "	andl	"$1", %eax"))
+(define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
 
-(define-emit    (OR TI32)               (println "	orl	"$1", %eax"))
+(define-emit    (OR TI32)			(println "	orl	"$1", %eax"))
 
-(define-emit    (XOR TI32)              (println "	xorl	"$1", %eax"))
+(define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
 
-(define-emit    (NOT)                   (println "	cmpl	$0, %eax")
-                                        (println "	sete	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (NOT)				(println "	cmpl	$0, %eax")
+						(println "	sete	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (LT TI32)               (println "	cmpl	"$1", %eax")
-                                        (println "	setl	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (LT TI32)			(println "	cmpl	"$1", %eax")
+						(println "	setl	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (LE TI32)               (println "	cmpl	"$1", %eax")
-                                        (println "	setle	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (LE TI32)			(println "	cmpl	"$1", %eax")
+						(println "	setle	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (EQ TI32)               (println "	cmpl	"$1", %eax")
-                                        (println "	sete	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (EQ TI32)			(println "	cmpl	"$1", %eax")
+						(println "	sete	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (NE TI32)               (println "	cmpl	"$1", %eax")
-                                        (println "	setne	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (NE TI32)			(println "	cmpl	"$1", %eax")
+						(println "	setne	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (GT TI32)               (println "	cmpl	"$1", %eax")
-                                        (println "	setg	%al")
-                                        (println "	movzbl	%al, %eax"))
+(define-emit    (GT TI32)			(println "	cmpl	"$1", %eax")
+						(println "	setg	%al")
+						(println "	movzbl	%al, %eax"))
 
-(define-emit    (SHL TI32)              (println "	movl	"$1", %ecx")
-                                        (println "	shll	%cl, %eax"))
+(define-emit    (SHL TI32)			(println "	movl	"$1", %ecx")
+						(println "	shll	%cl, %eax"))
 
-(define-emit    (SHR TI32)              (println "	movl	"$1", %ecx")
-                                        (println "	shrl	%cl, %eax"))
+(define-emit    (SHR TI32)			(println "	movl	"$1", %ecx")
+						(println "	shrl	%cl, %eax"))
 
-(define-emit    (BR LABEL)              (println "	jmp	"$1))
+(define-emit    (BR LABEL)			(println "	jmp	"$1))
 
-(define-emit    (BF LABEL)              (println "	cmpl	$0, %eax")
-                                        (println "	je	"$1))
+(define-emit    (BF LABEL)			(println "	cmpl	$0, %eax")
+						(println "	je	"$1))
 
-(define-emit    (BT LABEL)              (println "	cmpl	$0, %eax")
-                                        (println "	jne	"$1))
+(define-emit    (BT LABEL)			(println "	cmpl	$0, %eax")
+						(println "	jne	"$1))
 
-(define-emit    (CALL LABEL)            (println "	call	"$1))
-(define-emit    (CALL long)             (println "	call	*%eax"))
+(define-emit    (CALL LABEL)			(println "	call	"$1))
+(define-emit    (CALL long)			(println "	call	*%eax"))
 
-(define-emit    (LOAD LI32)             (println "	movl	$"$1", %eax"))
-(define-emit    (LOAD LABEL)            (println "	movl	$"$1", %eax"))
-(define-emit    (LOAD GI32)             (println "	movl	" $1", %eax"))
-(define-emit    (LOAD TI32)             (println "	movl	" $1", %eax"))
+(define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
+(define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
+(define-emit    (LOAD GI32)			(println "	movl	" $1", %eax"))
+(define-emit    (LOAD TI32)			(println "	movl	" $1", %eax"))
 
-(define-emit    (STORE TI32)            (println "	movl	%eax, "$1))
-(define-emit    (STORE GI32)            (println "	movl	%eax, "$1))
+(define-emit    (STORE TI32)			(println "	movl	%eax, "$1))
+(define-emit    (STORE GI32)			(println "	movl	%eax, "$1))
 
-(define-emit    (ADDR GI32)             (println "	movl	$"$1", %eax"))
-(define-emit    (ADDR TI32)             (println "	leal	"$1", %eax"))
+(define-emit    (ADDR GI32)			(println "	movl	$"$1", %eax"))
+(define-emit    (ADDR TI32)			(println "	leal	"$1", %eax"))
 
-(define-emit    (MOVE TI32 TI32)        (println "	movl	"$1", %ecx")
-                                        (println "	movl	%ecx, "$2))
+(define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
+						(println "	movl	%ecx, "$2))
 
-(define-emit    (COMMENT pair)          (print "## ") (apply println $1))
+(define-emit    (COMMENT pair)			(print "## ") (apply println $1))
 
-(define-emit    (CHR-AT TI32)           (println "	movl	"$1", %ecx")
-                                        (println "	leal	(%eax, %ecx), %ecx")
-                                        (println "	xorl	%eax, %eax")
-                                        (println "	movb	(%ecx), %al"))
+(define-emit    (CHR-AT TI32)			(println "	movl	"$1", %ecx")
+						(println "	leal	(%eax, %ecx), %ecx")
+						(println "	xorl	%eax, %eax")
+						(println "	movb	(%ecx), %al"))
 
-(define-emit    (SET-CHR-AT TI32 TI32)  (println "	movl	"$1", %ecx")
-                                        (println "	leal	(%eax, %ecx), %ecx")
-                                        (println "	movl	"$2", %eax")
-                                        (println "	movb	%al, (%ecx)"))
+(define-emit    (SET-CHR-AT TI32 TI32)		(println "	movl	"$1", %ecx")
+						(println "	leal	(%eax, %ecx), %ecx")
+						(println "	movl	"$2", %eax")
+						(println "	movb	%al, (%ecx)"))
 
-(define-emit    (OOP-AT TI32)           (println "	movl	"$1", %ecx")
-                                        (println "	leal	(%eax, %ecx, 4), %ecx")
-                                        (println "	movl	(%ecx), %eax"))
+(define-emit    (OOP-AT TI32)			(println "	movl	"$1", %ecx")
+						(println "	leal	(%eax, %ecx, 4), %ecx")
+						(println "	movl	(%ecx), %eax"))
 
-(define-emit    (SET-OOP-AT TI32 TI32)  (println "	movl	"$1", %ecx")
-                                        (println "	leal	(%eax, %ecx, 4), %ecx")
-                                        (println "	movl	"$2", %eax")
-                                        (println "	movl	%eax, (%ecx)"))
+(define-emit    (SET-OOP-AT TI32 TI32)		(println "	movl	"$1", %ecx")
+						(println "	leal	(%eax, %ecx, 4), %ecx")
+						(println "	movl	"$2", %eax")
+						(println "	movl	%eax, (%ecx)"))
 
 ;;;
 
@@ -477,8 +480,8 @@
 
 (define-function gen-set (expr comp)
   (let ((name (cadr  expr))
-        (valu (caddr expr)))
-    (gen valu comp)
+        (value-form (caddr expr)))
+    (gen value-form comp)
     (let ((var (cdr (assq name (<compiler>-env comp)))))
       (or var (error "set: undefined variable: " name))
       (cond
@@ -591,7 +594,8 @@
          (comp (compiler (<compiler>-env ocomp)))
          (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
          (params (map-with gen-param (car defn) comp)))
-    (list-do e body (gen e comp))
+    (list-do e body
+      (gen e comp))
     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
            (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
            (frm-size (align 16 (+ 8 tmp-size))))
