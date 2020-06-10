@@ -215,6 +215,17 @@
 (define-function structure-field-count (type)
   (array-at %structure-field-counts type))
 
+(define-function structure-field-index (type field-name)
+  (let ((i 0)
+        (list (array-at %structure-fields type)))
+    (while (and (pair? list)
+                (not (= field-name (car list))))
+      (set list (cdr list))
+      (set i (+ i 1)))
+    (or (and (pair? list)
+             i)
+        (error "structure-field-index has failed for type "type", field-name "field-name))))
+
 ;;; built-in types
 
 ;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
