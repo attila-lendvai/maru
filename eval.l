@@ -507,13 +507,11 @@
      (safety 2 (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
-;; TODO make these optimizations more formal? optimize them in the get macro?
-;; these are hacks/shorthands instead of: (get <long> _bits ptr).
-;; TODO rename to get/long
-(define-form get/long (obj)     `(oop-at ,obj 0))
-(define-form get/head (obj)     `(oop-at ,obj 0))
-(define-form get/tail (obj)     `(oop-at ,obj 1))
-(define-form put/tail (obj val) `(set-oop-at ,obj 1 ,val))
+;; shorthands (and optimizations)
+(define-form get/long (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <long> '_bits))     `(get <long> _bits ,obj)))
+(define-form get/head (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'head))      `(get <pair> head ,obj)))
+(define-form get/tail (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'tail))      `(get <pair> tail ,obj)))
+(define-form put/tail (obj val) (if (< safety-level 4) `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val) `(put <pair> tail ,obj ,val)))
 
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
                                          ( = ?\t c)                     ; ht
