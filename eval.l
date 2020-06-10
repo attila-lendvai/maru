@@ -512,6 +512,7 @@
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
 ;; shorthands (and optimizations)
+(define-form is/long  (obj)     `(is <long> ,obj))
 (define-form get/long (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <long> '_bits))     `(get <long> _bits ,obj)))
 (define-form get/head (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'head))      `(get <pair> head ,obj)))
 (define-form get/tail (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'tail))      `(get <pair> tail ,obj)))
@@ -775,7 +776,7 @@
   (let ((type (s/type-of obj)))
     (cond
       ((= type <undefined>)     (libc/printf "nil"))
-      ((= type <long>)          (libc/printf "%d" (get <long> _bits obj)))
+      ((= type <long>)          (libc/printf "%d" (get/long obj)))
       ((= type <string>)        (let ((bits (get <string> _bits obj)))
                                   (if (not storing)
                                       (libc/printf "%s" bits)
@@ -1148,16 +1149,16 @@
     (if (is <pair> rhs)
         (let ()
           (set rhs (get/head rhs))
-          (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (- "lhs" "rhs")")))
+          (safety 1 (or (and (is/long lhs) (is/long rhs)) (s/error "non-numeric argument: (- "lhs" "rhs")")))
           (new-<long> (- (get/long lhs) (get/long rhs))))
-      (safety 1 (or (is <long> lhs) (s/error "non-numeric argument: (- "lhs")")))
+      (safety 1 (or (is/long lhs) (s/error "non-numeric argument: (- "lhs")")))
       (new-<long> (- (get/long lhs))))))
 
 (define-form define-binary (op name)
   `(define-subr (,name 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
 (define-binary &  bitand)
@@ -1173,7 +1174,7 @@
   `(define-subr (,name 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is <long> lhs) (is <long> rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (s/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
        (and (,op (get/long lhs) (get/long rhs))
             symbol/t))))
 
@@ -1186,7 +1187,7 @@
          (rhs  (get/head (get/tail -args-)))
          (type (s/type-of lhs)))
     (cond
-      ((= type <long>)          (and (is <long> rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type <long>)          (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
       ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t))
       (else                     (and (= lhs rhs) symbol/t)))))
 
@@ -1195,7 +1196,7 @@
          (rhs  (get/head (get/tail -args-)))
          (type (s/type-of lhs)))
     (cond
-      ((= type <long>)          (and (is <long> rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type <long>)          (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
       ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t)
       (else                     (and (!= lhs rhs) symbol/t)))))
 
@@ -1205,7 +1206,7 @@
 
 (define-subr (exit 1)
   (let ((arg (s/car -args-)))
-    (or (is <long> arg)
+    (or (is/long arg)
         (s/error "argument to subr_exit is not a <long>: " arg))
     (libc/flush-streams)
     (libc/exit (get/long arg))))
@@ -1309,15 +1310,15 @@
       (s/eval x e))))
 
 (define-subr (cons 2)   (new-<pair> (s/car -args-) (s/cadr -args-)))
-(define-subr (string 1) (new-<string>-of-length (and (is <long> (s/car -args-)) (get/long (get/head -args-)))))
-(define-subr array      (new-<array> (and (is <long> (s/car -args-)) (get/long (get/head -args-)))))
+(define-subr (string 1) (new-<string>-of-length (and (is/long (s/car -args-)) (get/long (get/head -args-)))))
+(define-subr array      (new-<array> (and (is/long (s/car -args-)) (get/long (get/head -args-)))))
 (define-subr (form 1)   (new-<form> (s/car -args-)))
 
 (define-subr (allocate 2)
   (let ((type (get/head -args-))
         (size (get/head (get/tail -args-))))
-    (safety 1 (s/assert (is <long> type) "allocate: invalid type "type))
-    (safety 1 (s/assert (is <long> size) "allocate: invalid size "size))
+    (safety 1 (s/assert (is/long type) "allocate: invalid type "type))
+    (safety 1 (s/assert (is/long size) "allocate: invalid size "size))
     (new-object (get/long type) (get/long size))))
 
 (define-subr (type-of 1) (and -args- (new-<long> (s/type-of (s/car -args-)))))
@@ -1331,14 +1332,14 @@
 (define-subr (oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 1 (s/assert (and obj (is <long> idx))))
+    (safety 1 (s/assert (and obj (is/long idx))))
     (oop-at obj (get/long idx))))
 
 (define-subr (set-oop-at 3)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
-    (safety 1 (s/assert (and obj (is <long> idx))))
+    (safety 1 (s/assert (and obj (is/long idx))))
     (set-oop-at obj (get/long idx) val)))
 
 (define-subr (array-length 1)
@@ -1347,14 +1348,14 @@
 (define-subr (array-at 2)
   (let ((arr (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 1 (s/assert (and (is <array> arr) (is <long> idx))))
+    (safety 1 (s/assert (and (is <array> arr) (is/long idx))))
     (s/array-at arr (get/long idx))))
 
 (define-subr (set-array-at 3)
   (let ((arr (get/head -args-))
         (idx (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
-    (safety 1 (s/assert (and (is <array> arr) (is <long> idx))))
+    (safety 1 (s/assert (and (is <array> arr) (is/long idx))))
     (s/set-array-at arr (get/long idx) val)))
 
 (define-subr (string-length 1)
@@ -1365,7 +1366,7 @@
 (define-subr (string-at 2)
   (let ((arr (get/head -args-))
         (arg (get/head (get/tail -args-))))
-    (safety 1 (s/assert (and (is <string> arr) (is <long> arg))))
+    (safety 1 (s/assert (and (is <string> arr) (is/long arg))))
     (let ((idx (get/long arg)))
       (and (<= 0 idx)
            (< idx (s/string-length arr))
@@ -1375,7 +1376,7 @@
   (let ((arr (get/head -args-))
         (arg (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
-    (safety 1 (s/assert (and (is <string> arr) (is <long> val))))
+    (safety 1 (s/assert (and (is <string> arr) (is/long val))))
     (let ((idx (get/long arg)))
       (and (<= 0 idx)
            (< idx (s/string-length arr))
@@ -1402,7 +1403,7 @@
   (let ((arg (s/car -args-)))
     (if (is <string> arg)
         arg
-      (and (is <long> arg)
+      (and (is/long arg)
            (let ((buf (libc/malloc 32)))
              (libc/sprintf buf "%ld" (get/long arg))
              (let ((result (new-<string>-from-cstring buf)))
