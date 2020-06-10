@@ -46,12 +46,16 @@
 ;;; subr/ prefix is used for the Maru <subr>'s that will
 ;;;       be made visible to user code in the slave VM.
 ;;;
+;;; *foo* is global
+;;; -foo- comes from the implicit lexical scope
+;;; <foo> is a type
+;;;
 ;;; size means bytes; if not, then it should be indicated.
 
 ;;;
 ;;; Implementation details:
 ;;;
-;;;  - () is the false value, and is mapped to 0 in the target. Its type is <undefined>.
+;;;  - () is the false value, and is mapped to 0 in the target. Its type is the <undefined> type.
 ;;;
 
 (define-form bytes-to-words (value)
@@ -909,14 +913,13 @@
   (if (is <pair> exp)
       (let ((head (s/expand (get/head exp) env)))
         (gc/push-root (address-of head))
-        (if (is <symbol> head)
-            (let ((val (s/cdr (s/assq head env))))
-              (if (is <form> val)
-                  (let ()
-                    (set head (s/apply (get <form> function val) (get/tail exp) env))
-                    (set head (s/expand head env))
-                    (gc/pop-root (address-of head))
-                    (return head)))))
+        (when (is <symbol> head)
+          (let ((val (s/cdr (s/assq head env))))
+            (when (is <form> val)
+              (set head (s/apply (get <form> function val) (get/tail exp) env))
+              (set head (s/expand head env))
+              (gc/pop-root (address-of head))
+              (return head))))
         (let ((tail (get/tail exp)))
           (gc/push-root (address-of tail))
           (or (= head symbol/quote) (set tail (exlist tail env)))
@@ -953,10 +956,11 @@
       (let ((head (s/encode (get/head exp) env))
             (tail (get/tail exp)))
         (gc/protect (head tail)
-          (if (is <symbol> head)
-              (let ((val (s/cdr (s/assq head env))))
-                (and (or (is <fixed> val) (is <subr> val))
-                     (set head val))))
+          (when (is <symbol> head)
+            (let ((val (s/cdr (s/assq head env))))
+              (when (or (is <fixed> val)
+                        (is <subr> val))
+                (set head val))))
           (cond
             ((= head fixed-subr/let)    (let ((args (s/cadr exp))
                                               (tmp  ()))
@@ -990,7 +994,7 @@
            (let ((args (new-<pair> env ())))
              (gc/protect (args)
                (set args (new-<pair> exp args))
-               (libc/printf "APPLY ENCODER\n... ") (s/print fn) (libc/printf " ") (s/print args) (libc/printf " ") (s/println env)
+               (debug (libc/printf "APPLY ENCODER\n... ")) (s/print fn) (libc/printf " ") (s/print args) (libc/printf " ") (s/println env)
                (set exp (s/apply fn args env)))))))
   exp)
 

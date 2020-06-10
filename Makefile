@@ -18,7 +18,7 @@ test-bootstrap: eval .force
 $(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l prepare-for-bootstrap.l boot.l eval.l
 	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l prepare-for-bootstrap.l boot.l -c switch-to-host-module \
 		$(BOOT_EVAL_PATH)/emit.l eval.l >$(BUILD)/eval.s \
-		|| touch -t 200011220102 $(BUILD)/eval.s
+		|| { touch -t 200011220102 $(BUILD)/eval.s; exit 42; }
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
