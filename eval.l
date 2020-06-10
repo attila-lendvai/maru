@@ -29,6 +29,8 @@
 ;;;
 ;;; target - the target VM of the "level-shift" operation (e.g. x86 asm).
 ;;;
+;;; kernel - it's the part of the semantic space that runs on the target.
+;;;
 ;;; slave  - the Maru VM that is being bootstrapped and will
 ;;;          spring to life when the result of the level-shift
 ;;;          (compilation) gets executed in the target VM.
@@ -38,6 +40,11 @@
 ;;;
 ;;; oop    - Ordinary Object Pointer
 ;;;
+;;; get, put, is
+;;;        - they are the kernel "accessors" for Maru values.
+;;;          they are also used as a namespace, e.g. get/long.
+;;;
+;;; TODO rename back to k/ and rewrite the description.
 ;;; s/ prefix means that it's the slave version of something that
 ;;;    also exist in the host Maru (i.e. we need to differentiate
 ;;;    between the host and the slave versions). ideally, it should
@@ -307,13 +314,10 @@
     (set gc/objects-live nobjs)
     (set gc/bytes-used nused)
     (set gc/bytes-free nfree)
-    (debug (libc/printf "GC: %d used, %d free, %d allocations\n" nused nfree gc/alloc-count))
-    ;;(and (< nfree nused) (gc/grow-heap gc/quantum))
-    ))
+    (debug (libc/printf "GC: %d used, %d free, %d allocations\n" nused nfree gc/alloc-count))))
 
 (define-function gc/mark-and-trace (obj)
   (and obj
-       (not (& 1 obj)) ; TODO ??? is that supposed to be the used flag of the header?
        (let* ((header (header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
@@ -483,17 +487,16 @@
 (define-form is (type arg)
   `(let ((__arg__ ,arg))
      (and __arg__
-          (not (& 1 __arg__))           ; TODO ???
           (let ((header (header-of __arg__)))
             (safety 3 (or (valid-header-magic-marker? header) (fatal1 "IS: encountered an untagged pointer: %p" __arg__)))
             (= ,type (<header>-type header))))))
 
-(define-form s/type-of (arg)
+(define-form get/type (arg)
   `(let ((__arg__ ,arg))
      (if __arg__
          (let ((header (header-of __arg__)))
-           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "S/TYPE-OF: encountered an untagged pointer: %p" __arg__)))
-           (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "S/TYPE-OF: attempt to access dead object: %p" __arg__)))
+           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "GET/TYPE: encountered an untagged pointer: %p" __arg__)))
+           (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "GET/TYPE: attempt to access dead object: %p" __arg__)))
            (<header>-type (header-of __arg__)))
        <undefined>)))
 
@@ -503,12 +506,12 @@
 ;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers"
 (define-form get (type field object)
   `(let ((__obj__ ,object))
-     (safety 2 (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
+     (safety 2 (let ((t (get/type __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (,(concat-symbol (concat-symbol type '-) field) __obj__)))
 
 (define-form put (type field object value)
   `(let ((__obj__ ,object))
-     (safety 2 (let ((t (s/type-of __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
+     (safety 2 (let ((t (get/type __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
 ;; shorthands (and optimizations)
@@ -773,7 +776,7 @@
 
 (define-function do_print (obj storing)
   (debug (libc/printf "{%p}" obj))
-  (let ((type (s/type-of obj)))
+  (let ((type (get/type obj)))
     (cond
       ((= type <undefined>)     (libc/printf "nil"))
       ((= type <long>)          (libc/printf "%d" (get/long obj)))
@@ -863,14 +866,14 @@
 (define-function s/string-length (obj)  (get/long (get <string> size obj)))
 
 (define-function s/array-length (obj)
-  (safety 1 (or (is <array> obj) (fatal1 "s/array-length: called with object of type %d" (s/type-of obj))))
+  (safety 1 (or (is <array> obj) (fatal1 "s/array-length: called with object of type %d" (get/type obj))))
   (and (is <array> obj)
        (let ((_arr (get <array> _array obj)))
          (let ((wordsize (bytes-to-words (gc/object-size _arr))))
            wordsize))))
 
 (define-function s/array-at (obj idx)
-  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
+  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (wordsize (bytes-to-words (gc/object-size elts))))
@@ -878,7 +881,7 @@
               (oop-at elts idx)))))
 
 (define-function s/set-array-at (obj idx val)
-  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/set-array-at: called with object of type %d, and index %d" (s/type-of obj) idx)))
+  (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "s/set-array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
               (wordsize (bytes-to-words (gc/object-size elts))))
@@ -936,7 +939,7 @@
           (set exp (new-<pair> head tail))
           (gc/pop-root (address-of tail))
           (gc/pop-root (address-of head))))
-    (let ((fn (s/array-at (get/tail expanders) (s/type-of exp))))
+    (let ((fn (s/array-at (get/tail expanders) (get/type exp))))
       (and fn
            (let ((args (new-<pair> exp ())))
              (gc/protect (args)
@@ -987,7 +990,7 @@
                                             (set tail (enlist tail env)))))
             ((!= head fixed-subr/quote)     (set tail (enlist tail env))))
           (set exp (new-<pair> head tail))))
-    (let ((fn (s/array-at (get/tail encoders) (s/type-of exp))))
+    (let ((fn (s/array-at (get/tail encoders) (get/type exp))))
       (debug (when fn
                (libc/printf "APPLY GOT ENCODER\n... ")
                (s/println fn)))
@@ -1000,7 +1003,7 @@
   exp)
 
 (define-function s/eval (exp env)
-  (let ((ev (s/array-at (get/tail evaluators) (s/type-of exp))))
+  (let ((ev (s/array-at (get/tail evaluators) (get/type exp))))
     (and ev
          (let ((args (new-<pair> exp ())))
            (gc/protect (args)
@@ -1013,7 +1016,7 @@
 (define-function s/apply (fun arguments env)
   (if (is <subr> fun)
       ((get <subr> _imp fun) arguments env)
-    (let ((ap (s/array-at (get/tail applicators) (s/type-of fun))))
+    (let ((ap (s/array-at (get/tail applicators) (get/type fun))))
       (or ap (s/error "cannot apply: " fun))
       (let ((args arguments))
         (gc/protect (args)
@@ -1185,7 +1188,7 @@
 (define-subr (relation/equal 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
-         (type (s/type-of lhs)))
+         (type (get/type lhs)))
     (cond
       ((= type <long>)          (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
       ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t))
@@ -1194,7 +1197,7 @@
 (define-subr (relation/not-equal 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
-         (type (s/type-of lhs)))
+         (type (get/type lhs)))
     (cond
       ((= type <long>)          (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
       ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t)
@@ -1224,7 +1227,7 @@
 (define-subr warn
   (while (is <pair> -args-)
     (let* ((arg  (get/head -args-))
-           (type (s/type-of arg)))
+           (type (get/type arg)))
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get <string> _bits arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get <symbol> _bits arg)))))
@@ -1321,7 +1324,7 @@
     (safety 1 (s/assert (is/long size) "allocate: invalid size "size))
     (new-object (get/long type) (get/long size))))
 
-(define-subr (type-of 1) (and -args- (new-<long> (s/type-of (s/car -args-)))))
+(define-subr (type-of 1) (and -args- (new-<long> (get/type (s/car -args-)))))
 (define-subr (string? 1) (and (is <string> (s/car -args-)) symbol/t))
 (define-subr (symbol? 1) (and (is <symbol> (s/car -args-)) symbol/t))
 (define-subr (pair? 1)   (and (is <pair>   (s/car -args-)) symbol/t))
