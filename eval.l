@@ -72,13 +72,6 @@
          ,@(make-unprotectors vars)
          __answer__))))
 
-(define-form define-externs args
-  `(let ()
-     ,@(map (lambda (libc-name)
-              (let ((maru-name (concat-symbol 'libc/ libc-name)))
-                `(define ,maru-name (extern ',libc-name))))
-            args)))
-
 (define-form bytes-to-words (value)
   `(>> ,value 2)) ; 32bit
 
