@@ -104,13 +104,6 @@
 
 (define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
 
-(define-form define-externs args
-  `(let ()
-     ,@(map (lambda (libc-name)
-              (let ((maru-name (concat-symbol 'libc/ libc-name)))
-                `(define ,maru-name (eval-in-module host (list 'host:extern ,(symbol->string libc-name))))))
-            args)))
-
 ;;;
 ;;;
 ;;; Actual artifacts that are meant to be level-shifted into the target

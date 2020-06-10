@@ -632,6 +632,9 @@
       (set env (cdr env)))
     (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
+;;;
+;;; definitions visible in the slave
+;;;
 (switch-to-slave-module)
 
 (define-form compile-begin ()
@@ -642,3 +645,10 @@
   (eval-in-module host '(host:gen-env-to
                          (host:cdr (host:<module>-env host:slave))
                          (host:quote compile-environment-marker))))
+
+(define-form define-externs args
+  `(let ()
+     ,@(map (lambda (libc-name)
+              (let ((maru-name (concat-symbol 'libc/ libc-name)))
+                `(define ,maru-name (eval-in-module host (list 'host:extern ,(symbol->string libc-name))))))
+            args)))
