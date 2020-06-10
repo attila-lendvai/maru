@@ -17,7 +17,7 @@ minimal effort.
 > Maru is in particular trying to be malleable at the very lowest levels,
 > so any special interest that cannot be accommodated easily within the common
 > platform would be a strong indicator of a deficiency within the platform
-> that should be addressed rather than disinherited.
+> that should be addressed rather than disinherited. (Ian Piumarta)
 
 ## How
 
@@ -26,7 +26,7 @@ Maru's architecture is described in Ian Piumarta's paper:
 
 > it is a sketch of how Maru's generalised eval works,
 > which is entirely accurate in intent and approach,
-> if a little different in some implementation details
+> if a little different in some implementation details (Ian Piumarta)
 
 ### The Parts
 
@@ -48,17 +48,16 @@ provides you with a set of axiomatic foundations you can build upon. Other possi
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
 written in the s-expression language.
 
-The recursive implementation and compiler (in the .l files) is split into three parts for clarity,
-but it could all be in a single source file.
-
 ### Build architecture, git repo layout
 
-The bootstrap stages are in separate git branches with the following
-naming convention (without a `master` branch):
+The bootstrap stages are in separate git branches. When a new stage is opened
+the readme in the prior stages is reduced to only describe the specifics of that stage.
+
+The git branches follow a naming convention (no `master` branch):
 
 `[language name].[bootstrap stage]`, e.g `maru.1`.
 
-Optionally, for stage zero in the bootstrap, it also includes the name of the
+Optionally, e.g. for stage zero in the bootstrap, it may also include the name of the
 parent language, from which this "bootstrap sprout" grows out:
 
 `[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
@@ -98,7 +97,7 @@ sudo apt-get install gcc-multilib
 
 Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/), at around 2011.
 
-This repo is currently (2020) maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
+This repo and readme is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 
 ## Why
 
