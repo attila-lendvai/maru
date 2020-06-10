@@ -109,6 +109,10 @@
   `(unless ,test
      (error ,@args)))
 
+(define-form define-constant (name value)
+  ;; for now this is merely a maker of intention.
+  `(define ,name ,value))
+
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
 

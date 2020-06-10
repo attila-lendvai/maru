@@ -122,7 +122,7 @@
   strlen strcmp strdup strtoul getc ungetc putc
   fopen fdopen fclose fflush fscanf)
 
-(define libc/EOF     -1)
+(define-constant libc/EOF -1)
 
 (define-function die ()
   (libc/fprintf libc/stderr "\nDIE called, printing a backtrace to stdout and exiting with exit code 1...\n")
@@ -349,7 +349,7 @@
 ;;       the subr's here in eval.l encode/implement the behavior of the primitive types.
 ;; TODO get rid of these by using something like a symbol-macro that turns the references into literal integers.
 (define-form bootstrap-type (type-name)
-  `(define ,type-name ,(eval type-name)))
+  `(define-constant ,type-name ,(eval type-name)))
 
 (bootstrap-type <undefined>)
 (bootstrap-type <long>)
