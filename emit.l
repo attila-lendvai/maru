@@ -634,10 +634,11 @@
   (let ((comp (compiler env)))
     (while (not (= (caar env) limit))
       (println "## defn " (caar env))
-      (warn (caar env) "\n")
+      (warn (caar env) ", ")
       ;x;(println (<expr>-defn (cdar env)))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
+    (warn "\n")
     (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
 ;;;

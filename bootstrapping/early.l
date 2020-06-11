@@ -16,5 +16,5 @@
 
 (define switch-to-host-module
     (lambda ()
-      (warn "--- switching to the host module\n")
+      (warn "--- switching to the host  module\n")
       (set (current-module) host)))
