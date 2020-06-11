@@ -48,12 +48,41 @@ provides you with a set of axiomatic foundations you can build upon. Other possi
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
 written in the s-expression language.
 
-### Build architecture, git repo layout
+### Build architecture
 
-The bootstrap stages are in separate git branches. When a new stage is opened
-the readme in the prior stages is reduced to only describe the specifics of that stage.
+#### Overview - bootstrap stages
 
-The git branches follow a naming convention (no `master` branch):
+A language evolves by the introduction of new features (optimizations, new primitives, etc).
+If you want to use such a new language feature in its own implementation,
+then you need to *bootstrap* it:
+
+1) first implement the support for it in your compiler, and produce
+   an executable that already supports this new version of the language
+2) then you can start using this feature, and now you may even rewrite the
+   implementation of this feature, and use/assume this feature in it.
+
+It's a confusing enough process, so it makes sense to fork the codebase at the point between 1) and 2).
+Strictly speaking, checking out a specific prior commit would be enough for bootstrapping,
+but you may want to harmonize the build system, or you need to `git cherry-pick` some fixes into 1),
+and sometimes the implementation of the new feature simply requires two parallel, wildly diverged
+instances of the codebase, until the feature is fully implemented/debugged.
+But once it's working fine, the old branch becomes irrelevant/stale, except for:
+
+- didactic purposes (easier to follow how a language grows)
+- aesthetics (cherry-picking or backporting changes wouldn't be possible without having standalone branches)
+- "Oh God, we have lost all the executables!"
+
+> NOTE: do not confuse this notion of a *stage* (as in developmental stages) with e.g.
+> [the 3 bootstrap stages while compiling GCC](https://gcc.gnu.org/install/build.html).
+> Our notion is an endless iterative process of evolving the language.
+> Suggestions for a better nomenclature are welcome!
+
+#### Repo layout
+
+The developmental stages of the language are kept in separate git branches. When a new stage is opened,
+this readme is replaced in the old one to only document what's new/relevant for that stage.
+
+Naming convention of the branches (no `master`):
 
 `[language name].[bootstrap stage]`, e.g `maru.1`.
 
@@ -72,10 +101,11 @@ The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`
 whose semantics they depend on. IOW, the `maru.2` stage is built using the
 `eval` executable, `boot.l`, and `emit.l` of the previous stage (`maru.1`).
 
-During the build the bootstrap stages are locally `git checkout`'ed into `build/`
-and they are built there (this becomes recursive with multiple stages). A new stage
-needs to be opened when you want to use a new feature
-of the language in the code implementing the language itself.
+During the build the previous stage is `git checkout`'ed locally under `./build/`
+and its build process is invoked in that directory (note that short of caching
+the build output, which is planned, this potentially becomes a
+recursive process until a stage is reached that can be compiled with an
+assumed external dependency; e.g. gcc building the stage 0 eval.c).
 
 My plan is not only to grow, but also to *shrink* the languages (i.e. try to introduce
 "negative" bootstrap stages). This will be part of the collaboration with
@@ -99,6 +129,12 @@ Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/), at
 
 This repo and readme is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 
+## Where
+
+Bugs and patches: [maru github page](https://github.com/attila-lendvai/maru).
+
+Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru-dev).
+
 ## Why
 
 * Programming badly needs better foundations, and Maru is part of this exploration.
@@ -119,13 +155,13 @@ a repo and a maintainer.
 
 ## Status
 
-There are 3 stages now, introducing non-trivial changes, and the repo structure seems to slowly mature.
+There are 3 stages now, introducing non-trivial features. The repo structure seems to slowly mature.
 
 A short-term TODO:
 - capture the emitted `eval.s` files and check them into the repo; add makefile targets
 that use them, regenerate them, compare them (to "short circuit" the bootstrap process).
-- revive all the goodies in the repo in a structured way (PEG parser, x86 assembler, etc).
-- generate LLVM output.
+- revive all the goodies in the `piumarta` branch, but in a structured way.
+- generate LLVM output; support 64bit.
 
 ### History
 
@@ -146,20 +182,18 @@ Their annual reports:
 
 #### This git repo
 
-This git repo is a conversion of Ian Piumarta's mercurial repo that was once
-available at http://piumarta.com/hg/maru/, whose contents are preserved in the
-branch called `piumarta`. The plan is to eventually revive most of the goodies
-available there in a more organized and approachable manner, and also pay attention
-to the bootstrapping issues.
+The `piumarta` branch of this git repo is a conversion of Ian Piumarta's Mercurial
+repo that was once available at http://piumarta.com/hg/maru/. To the best of my knowledge
+this is latest publically available state of Ian's work. The `piumarta` branch will be
+left untouched, but the plan is to eventually revive most of the goodies from this branch,
+but in a more organized and approachable manner, and also paying attention to the
+bootstrapping issues.
 
-To the best of my knowledge this repo holds the latest published state of
-Ian's work (captured in the branch called `piumarta`).
-
-Ian published another mercurial repo somewhere halfway in the commit history,
-with only a few commits. I assume that it was meant to hold a "vanilla"
-version of Maru that can self-host, but is not tailored to accommodate the VPRI demos.
-I started out my work from this minimal repo, hence the divergence between the
-git branch histories.
+Ian published another Mercurial repo somewhere halfway in the commit history,
+with only a few commits. I assume that it was meant to hold a minimal version
+of Maru that can already self-host, but is not tailored to accommodate for the VPRI demos.
+I started out my work from this minimal repo (hence the divergence between the
+git branch histories).
 
 **This repo will receive forced pushes** (i.e.
 `git push -f` to rewrite git history (except the `piumarta` branch)) until I come up with
