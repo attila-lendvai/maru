@@ -1,5 +1,5 @@
 --- minimal	2020-06-11 09:29:42.070331633 +0200
-+++ latest	2020-06-11 09:28:43.454054994 +0200
++++ ../../../boot.l	2020-06-11 09:28:43.454054994 +0200
 @@ -1,8 +1,12 @@
 +(define unit-testing? '(t))
 +
@@ -13,7 +13,7 @@
  (define %error
    (lambda args
      (set error abort)
-@@ -11,21 +15,38 @@
+@@ -11,15 +15,15 @@
      (%print "\n")
      (abort)))
  
@@ -32,66 +32,7 @@
  (define cadr (lambda (x) (car (cdr x))))
  (define cdar (lambda (x) (cdr (car x))))
  (define cddr (lambda (x) (cdr (cdr x))))
-+(define cadar (lambda (x) (car (cdr (car x)))))
-+(define caadr (lambda (x) (car (car (cdr x)))))
-+(define cdadr (lambda (x) (cdr (car (cdr x)))))
- (define caddr (lambda (x) (car (cdr (cdr x)))))
- (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
-+(define caddar (lambda (x) (car (cdr (cdr (car x))))))
-+(define caaddr (lambda (x) (car (car (cdr (cdr x))))))
- (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
-+(define cddddr (lambda (x) (cdr (cdr (cdr (cdr x))))))
-+
-+(define memq
-+  (lambda (object list)
-+    (let ((result ()))
-+      (while (pair? list)
-+	(if (= object (car list))
-+	    (let ()
-+	      (set result list)
-+	      (set list ()))
-+	  (set list (cdr list))))
-+      result)))
- 
- (define assq
-   (lambda (object list)
-@@ -62,10 +83,24 @@
- 	  (set j (+ j 1)))
- 	s))))
- 
-+(define concat-strings
-+  (lambda args
-+    (let ((result (car args)))
-+      (while (string? (car (set args (cdr args))))
-+	(set result (concat-string result (car args))))
-+      result)))
-+
- (define concat-symbol
-   (lambda (x y)
-     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
- 
-+(define concat-symbols
-+  (lambda args
-+    (let ((result (car args)))
-+      (while (symbol? (car (set args (cdr args))))
-+	(set result (concat-symbol result (car args))))
-+      result)))
-+
- (define quasiquote
-   (form
-     (let ((qq-list) (qq-element) (qq-object))
-@@ -76,7 +111,9 @@
- 			       (if (cdr l)
- 				   (list 'concat-list (cadr obj) (qq-list (cdr l)))
- 				 (cadr obj))
--			     (list 'cons (qq-object obj) (qq-list (cdr l)))))
-+			     (if (and (= 'unquote obj) (pair? (cdr l)) (not (cddr l)))
-+				 (cadr l)
-+			       (list 'cons (qq-object obj) (qq-list (cdr l))))))
- 		       (list 'quote l))))
-       (set qq-element (lambda (l)
- 			(let ((head (car l)))
-@@ -87,18 +124,35 @@
+@@ -87,15 +124,30 @@
  		       (if (pair? object)
  			   (qq-element object)
  			 (list 'quote object))))
@@ -124,10 +65,9 @@
 +
  (define-function list-length (list)
    (if (pair? list)
--      (+ 1 (list-length (cdr list)))
-+      (let ((len 1))
-+	(while (set list (cdr list)) (set len (+ len 1)))
-+	len)
+      (let ((len 1))
+	(while (set list (cdr list)) (set len (+ len 1)))
+	len)
      0))
  
  (define %list->array
@@ -276,7 +216,7 @@
  
  (define-form cond clauses (%cond clauses))
  
-@@ -166,53 +306,216 @@
+@@ -166,53 +306,211 @@
      (set-array-at %type-names %last-type name)
      %last-type))
  
@@ -416,11 +356,6 @@
 +(define-structure <env>		(parent level offset bindings stable))
 +(define-structure <context>	(home env bindings callee pc))
 +
-+(define-function fixed (fun)
-+  (let ((self (new <fixed>)))
-+    (set (<fixed>-function self) fun)
-+    self))
-+
 +(define-function variable (name value env index . opt-type)
 +  (let ((self (new <variable>)))
 +    (set (<variable>-name  self) name)
@@ -547,41 +482,6 @@
  
  ;;; print
  
-@@ -252,25 +564,30 @@
-   (lambda args
-     (while (pair? args)
-       (do-print (car args))
--      (set args (cdr args)))))
-+      (set args (cdr args)))
-+    (car args)))
- 
- (define dump
-   (lambda args
-     (while (pair? args)
-       (do-dump (car args))
--      (set args (cdr args)))))
-+      (set args (cdr args)))
-+    (car args)))
- 
- (define println
-   (lambda args
-     (apply print args)
--    (%print "\n")))
-+    (%print "\n")
-+    (car args)))
- 
- (define dumpln
-   (lambda args
-     (apply dump args)
--    (%print "\n")))
-+    (%print "\n")
-+    (car args)))
- 
- (define-method do-dump  <string> ()	(%dump self))
-+(define-method do-dump  <array> ()	(%dump self))
- (define-method do-print <selector> ()	(print "<selector "(<selector>-name self)">"))
- 
- (define-method do-print <pair> ()
 @@ -288,6 +605,21 @@
  	    (print " ")))
        (print ")"))))
@@ -679,7 +579,7 @@
  ;;; iteration
  
  (define-form for (var-init-limit-step . body)
-@@ -392,11 +755,104 @@
+@@ -392,11 +755,101 @@
  (define-form list-do (var list . body)
    `(let ((_list_ ,list))
       (while _list_
@@ -735,9 +635,6 @@
 +       (let ((,name (array-at _a _i)))
 +	 (and ,expr (let () (set _ ,name) (set _i _l)))))
 +     _))
-+
-+(define-form when (test . body)		`(and ,test (let () ,@body)))
-+(define-form unless (test . body)	`(or  ,test (let () ,@body)))
 +
 +(define-function %loop-inits (bindings)
 +  (and bindings

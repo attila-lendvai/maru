@@ -1,32 +1,19 @@
 --- minimal.edited	2020-06-10 21:48:28.476932444 +0200
 +++ latest	2020-06-10 20:52:05.778511341 +0200
-@@ -9,6 +9,11 @@
+@@ -9,6 +9,9 @@
  (define-form safe prog ())
  ;;(define-form safe prog `(let () ,@prog))
  
-+(define-form if-tagged-int (a b) b)
-+
 +(define-form long-at args `(oop-at ,@args))
 +(define-form set-long-at args `(set-oop-at ,@args))
 +
  (define-structure <header> (size flags next type))
  (define-structure <buffer> (contents size position))
  
-@@ -42,17 +47,25 @@
+@@ -42,6 +47,10 @@
  (define abort	(extern	'abort))
  (define exit	(extern	'exit))
  (define malloc	(extern	'malloc))
-+(define realloc		(extern	'realloc))
- (define free	(extern	'free))
- (define memset	(extern	'memset))
- (define memcpy	(extern	'memcpy))
-+(define memmove		(extern	'memmove))
- (define printf	(extern	'printf))
--(define fprintf	(extern	'frintf))
-+(define fprintf		(extern	'fprintf))
- (define sprintf	(extern	'sprintf))
-+(define snprintf	(extern	'snprintf))
-+(define isatty		(extern	'isatty))
  
 +(define arguments		0)
 +(define input			0)
@@ -34,10 +21,8 @@
 +(define stdout			0)
  (define stderr			0)
  
--(define gc_quantum		65504)
--(define gc_frequency		65536)
-+(define gc_quantum		(* 50 1024))
-+(define gc_frequency		32768)
+(define gc_quantum		65504)
+(define gc_frequency		65536)
  
  (define gc_objects_live		0)
  (define gc_bytes_used		0)
@@ -104,19 +89,6 @@
  
  (define-function new-bits (type size)
    (let ((obj (gc_malloc_atomic size)))
-@@ -295,9 +319,11 @@
-     obj))
- 
- (define-function new-<long> (bits)
-+  (if-tagged-int
-+    (| (<< bits 1) 1)
-   (let ((obj (new-bits <long> (size-of-structure <long>))))
-     (set (<long>-_bits obj) bits)
--    obj))
-+      obj)))
- 
- (define-function _new-<string> (len)
-   (let ((str (new-oops <string> (size-of-structure <string>))))
 @@ -324,21 +350,24 @@
      obj))
  
@@ -182,17 +154,14 @@
  
  (define-function type_check_fail (exp act)
    (fatal2 "illegal type: expected %d got %d" exp act))
-@@ -380,12 +419,55 @@
+@@ -380,12 +419,53 @@
       (safe (let ((t (get-type __obj__))) (or (= ,type t) (type_check_fail ,type t))))
       (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
  
--(define-form get_long (obj)	`(oop-at ,obj 0))
-+(define-form is_long(obj)	(if-tagged-int	`(&  ,obj 1)	`(is <long> ,obj)))
-+(define-form get_long (obj)	(if-tagged-int	`(>> ,obj 1)	`(get <long> _bits ,obj)))
+ (define-form get_long (obj)	`(oop-at ,obj 0))
  
  (define-form get_head (obj)	`(oop-at ,obj 0))
  (define-form get_tail (obj)	`(oop-at ,obj 1))
-+(define-form set_head (obj val)	`(set-oop-at ,obj 0 ,val))
  (define-form set_tail (obj val)	`(set-oop-at ,obj 1 ,val))
  
 +(define-function new-<env> (parent level offset)
@@ -292,7 +261,7 @@
  (define-function do_print (obj storing)
    (debug (printf "{%p}" obj))
    (let ((type (get-type obj)))
-@@ -478,23 +572,35 @@
+@@ -478,16 +572,28 @@
        ((= type <form>)		(let ()
  				  (printf "Form(")
  				  (do_print (get <form> function obj) storing)
@@ -318,16 +287,7 @@
  
  (define-function k_print (obj) (do_print obj 0))	(define-function k_println (obj) (do_print obj 0) (printf "\n"))
  (define-function k_dump  (obj) (do_print obj 1))	(define-function k_dumpln  (obj) (do_print obj 1) (printf "\n"))
- 
--(define-function die ()
-+(set die (lambda ()
-   (let ((i trace_depth))
-     (while (<= 0 (set i (- i 1)))
-       (printf "%3d: " i)
-       (k_dumpln (k_array_at trace_stack i))))
--  (exit 1))
-+	   (exit 1)))
- 
+  
  ;;; ----------------------------------------------------------------
  
 @@ -524,7 +630,8 @@
@@ -371,30 +331,11 @@
  
  (define-function is_octal (c)		(and (<= ?0 c) (<= c ?7)))
  
-@@ -671,6 +780,8 @@
-       (buffer_delete buf)
-       result)))
- 
-+(define k_read) ;; forward
-+
- (define-function read_list (delim stream)
-   (let* ((head (new-<pair> () ()))
- 	 (tail head)
-@@ -693,7 +804,7 @@
-       (set qobj (new-<pair> prefix qobj))
-       qobj)))
- 
--(define-function k_read (stream)
-+(set k_read (lambda (stream)
-   (while 1
-     (let ((c (getc stream)))
-       (cond
-@@ -719,33 +830,88 @@
+@@ -719,3 +830,3 @@
  				    (!= EOF c))))
  	((= ?\" c)	(return (read_string c stream)))
  	((< c 0)	(return DONE))
--	(else		(fatal1 "illegal character: %c" c))))))
-+	(else		(fatal1 "illegal character: %c" c)))))))
+	(else		(fatal1 "illegal character: %c" c))))))
  
 -(define-function k_define (name value env)
 -  (let ((ass (new-<pair> name value)))
@@ -783,14 +724,6 @@
  
  (define-function subr_while (args ctx)
    (let ((tst  (k_car args))
-@@ -993,6 +1240,7 @@
- 
- (define-relation <  "lt")
- (define-relation <= "le")
-+(define-relation >= "ge")
- (define-relation >  "gt")
- 
- (define-function subr_eq (args ctx)
 @@ -1022,6 +1270,63 @@
    (let ((status (and (is_long (k_car args)) (get_long (k_car args)))))
      (exit status)))
