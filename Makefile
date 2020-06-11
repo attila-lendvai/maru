@@ -3,24 +3,41 @@ BUILD = build
 BOOT_EVAL_PATH = $(BUILD)/$(PREVIOUS_STAGE)
 
 CFLAGS += -m32
+DIFF = diff --unified --ignore-all-space
+
+# disable all built-in rules
+.SUFFIXES:
 
 all: eval
 
-eval: $(BUILD)/eval.s
-	$(CC) $(CFLAGS) -c -o $(BUILD)/eval.o $(BUILD)/eval.s
-	size $(BUILD)/eval.o
-	$(CC) $(CFLAGS) -o ./eval $(BUILD)/eval.o
+eval: $(BUILD)/eval2
+	cp $(BUILD)/eval2 ./eval
 
-test-bootstrap: eval .force
-	$(call bootstrap,./eval ,$(BUILD)/eval2.s)
-	diff --unified --ignore-all-space $(BUILD)/eval.s $(BUILD)/eval2.s
-# we don't need to go an extra round in this stage, our output is stable
-#	$(CC) $(CFLAGS) -o $(BUILD)/eval2 $(BUILD)/eval2.s
-#	$(call bootstrap,$(BUILD)/eval2 ,$(BUILD)/eval3.s)
-#	diff --unified --ignore-all-space $(BUILD)/eval2.s $(BUILD)/eval3.s
+test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3.s
+	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s
 
-$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l prepare-for-bootstrap.l boot.l eval.l
-	$(call bootstrap,$(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/,$(BUILD)/eval.s)
+$(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l bootstrapping/*.l boot.l eval.l
+	time $(BOOT_EVAL_PATH)/eval		\
+		$(BOOT_EVAL_PATH)/boot.l	\
+		bootstrapping/host-extras.l	\
+		bootstrapping/early.l		\
+		boot.l				\
+		bootstrapping/slave-extras.l	\
+		bootstrapping/late.l		\
+		$(BOOT_EVAL_PATH)/emit.l	\
+		eval.l				\
+			>$(BUILD)/eval1.s || { touch --date=2000-01-01 $(BUILD)/eval1.s; exit 42; }
+
+$(BUILD)/eval2.s: $(BUILD)/eval1  boot.l emit.l bootstrapping/*.l eval.l
+	$(call bootstrap,$(BUILD)/eval1,$(BUILD)/eval2.s)
+	$(DIFF) $(BUILD)/eval1.s $(BUILD)/eval2.s >$(BUILD)/eval2.diff || true
+
+$(BUILD)/eval3.s: $(BUILD)/eval2 boot.l emit.l bootstrapping/*.l eval.l
+	$(call bootstrap,$(BUILD)/eval2,$(BUILD)/eval3.s)
+	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s >$(BUILD)/eval3.diff || true
+
+$(BUILD)/%: $(BUILD)/%.s
+	$(CC) $(CFLAGS) -o $@ $<
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
@@ -47,7 +64,7 @@ stats:
 	cat boot.l emit.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 clean:
-	rm -f $(BUILD)/eval*.s $(BUILD)/eval.o $(BUILD)/eval
+	rm -f $(BUILD)/eval*
 
 distclean:
 	rm -rf $(BUILD) eval
@@ -58,6 +75,12 @@ distclean:
 # functions
 #
 define bootstrap
-  time $(1)boot.l prepare-for-bootstrap.l boot.l -c switch-to-host-module emit.l eval.l >$(2) \
-    || { touch -t 200011220102 $(2); exit 42; }
+ time $(1)				\
+	boot.l				\
+	bootstrapping/early.l		\
+	boot.l				\
+	bootstrapping/late.l		\
+	emit.l	\
+	eval.l				\
+		>$(2) || { touch --date=2000-01-01 $(2); exit 42; }
 endef
