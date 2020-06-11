@@ -17,15 +17,19 @@
 ;;;     go astray because "foo" will be emitted as a null terminated string of
 ;;;     ascii bytes (instead of a Maru object of type <string>).
 ;;;   - probaby more
-;;;
-;;; Understands some primitives:
-;;;   - RETURN (from the current function)
-;;;   - ADDRESS-OF
-;;;   - [SET-]OOP-AT, [SET-]STRING-AT
+;;;   - see the globals 'operators' and 'forms' for the list of specially
+;;;     handled constructs
 ;;;
 ;;; Naming:
 ;;;   - EMIT: directly emits into the output stream
 ;;;   - GEN: collects instructions into a compiler object for later emission
+
+(switch-to-slave-module)
+
+(define return      (fixed (lambda args (error "(return) encountered in interpreted code"))))
+(define address-of  (fixed (lambda args (error "(address-of) encountered in interpreted code"))))
+
+(switch-to-host-module)
 
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
@@ -224,11 +228,11 @@
 						(println "	setg	%al")
 						(println "	movzbl	%al, %eax"))
 
-(define-emit    (SHL TI32)			(println "	movl	"$1", %ecx")
+(define-emit    (SLA TI32)			(println "	movl	"$1", %ecx")
 						(println "	shll	%cl, %eax"))
 
-(define-emit    (SHR TI32)			(println "	movl	"$1", %ecx")
-						(println "	shrl	%cl, %eax"))
+(define-emit    (SRA TI32)			(println "	movl	"$1", %ecx")
+						(println "	sarl	%cl, %eax"))
 
 (define-emit    (BR LABEL)			(println "	jmp	"$1))
 
@@ -407,7 +411,7 @@
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE)  (slave:= ,EQ ) (slave:!= ,NE ) (slave:> ,GT )
-              (slave:<< ,SHL) (slave:>>  ,SHR)
+              (slave:<< ,SLA) (slave:>>  ,SRA)
               (slave:oop-at     ,OOP-AT)     (slave:string-at     ,CHR-AT))
              ;; ternary
              ((slave:set-oop-at ,SET-OOP-AT) (slave:set-string-at ,SET-CHR-AT)))))
@@ -505,15 +509,15 @@
         (gen comp ADDR (GI32 (LABEL name)))))))
 
 (define forms (list
-  (cons  (slave-value slave:let)            gen-let)
-  (cons  (slave-value slave:and)            gen-and)
-  (cons  (slave-value slave:or)             gen-or)
-  (cons  (slave-value slave:if)             gen-if)
-  (cons  (slave-value slave:while)          gen-while)
-  (cons  (slave-value slave:set)            gen-set)
-  (cons  (slave-value slave:lambda)         gen-lambda)
-  (cons 'slave:return         gen-return)
-  (cons 'slave:address-of     gen-address-of)))
+  (cons (slave-value slave:let)            gen-let)
+  (cons (slave-value slave:and)            gen-and)
+  (cons (slave-value slave:or)             gen-or)
+  (cons (slave-value slave:if)             gen-if)
+  (cons (slave-value slave:while)          gen-while)
+  (cons (slave-value slave:set)            gen-set)
+  (cons (slave-value slave:lambda)         gen-lambda)
+  (cons (slave-value slave:return)         gen-return)
+  (cons (slave-value slave:address-of)     gen-address-of)))
 
 (define-method gen <pair> (comp)
   (let* ((fn-name (car self))
@@ -598,7 +602,7 @@
       (gen e comp))
     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
            (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
-           (frm-size (align 16 (+ 8 tmp-size))))
+           (frm-size (align 16 (+ tmp-size 8))))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
       (emit TEXT)

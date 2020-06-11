@@ -250,6 +250,11 @@
 (define-structure <subr>        (_imp _name))
 (define-structure <module>      (symbols env))
 
+(define-function fixed (fun)
+  (let ((self (new <fixed>)))
+    (set (<fixed>-function self) fun)
+    self))
+
 ;;; selector/method (single dispatch on the type of the first argument)
 
 (define-structure <selector> (name methods default))
