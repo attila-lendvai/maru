@@ -25,9 +25,26 @@
 (define cadr (lambda (x) (car (cdr x))))
 (define cdar (lambda (x) (cdr (car x))))
 (define cddr (lambda (x) (cdr (cdr x))))
+(define cadar (lambda (x) (car (cdr (car x)))))
+(define caadr (lambda (x) (car (car (cdr x)))))
+(define cdadr (lambda (x) (cdr (car (cdr x)))))
 (define caddr (lambda (x) (car (cdr (cdr x)))))
 (define cdddr (lambda (x) (cdr (cdr (cdr x)))))
+(define caddar (lambda (x) (car (cdr (cdr (car x))))))
+(define caaddr (lambda (x) (car (car (cdr (cdr x))))))
 (define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
+(define cddddr (lambda (x) (cdr (cdr (cdr (cdr x))))))
+
+(define memq
+  (lambda (object list)
+    (let ((result ()))
+      (while (pair? list)
+        (if (= object (car list))
+            (let ()
+              (set result list)
+              (set list ()))
+          (set list (cdr list))))
+      result)))
 
 (define assq
   (lambda (object list)
@@ -64,9 +81,23 @@
           (set j (+ j 1)))
         s))))
 
+(define concat-strings
+  (lambda args
+    (let ((result (car args)))
+      (while (string? (car (set args (cdr args))))
+        (set result (concat-string result (car args))))
+      result)))
+
 (define concat-symbol
   (lambda (x y)
     (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
+
+(define concat-symbols
+  (lambda args
+    (let ((result (car args)))
+      (while (symbol? (car (set args (cdr args))))
+        (set result (concat-symbol result (car args))))
+      result)))
 
 (define quasiquote
   (form
@@ -98,10 +129,10 @@
                             `(define ,name (form (lambda ,args ,@body))))))
 
 (define-form when (test . body)
-  `(if ,test (let () ,@body) ()))
+  `(and ,test (let () ,@body)))
 
 (define-form unless (test . body)
-  `(if ,test () ,@body))
+  `(or ,test (let () ,@body)))
 
 (define-form assert (test . args)
   (unless args
@@ -119,7 +150,10 @@
 (define-function list-length (list)
   (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)
   (if (pair? list)
-      (+ 1 (list-length (cdr list)))
+      (let ((len 1))
+        (while (set list (cdr list))
+          (set len (+ len 1)))
+        len)
     0))
 
 (define %list->array
@@ -300,25 +334,30 @@
   (lambda args
     (while (pair? args)
       (do-print (car args))
-      (set args (cdr args)))))
+      (set args (cdr args)))
+    (car args)))
 
 (define dump
   (lambda args
     (while (pair? args)
       (do-dump (car args))
-      (set args (cdr args)))))
+      (set args (cdr args)))
+    (car args)))
 
 (define println
   (lambda args
     (apply print args)
-    (primitive/print "\n")))
+    (primitive/print "\n")
+    (car args)))
 
 (define dumpln
   (lambda args
     (apply dump args)
-    (primitive/print "\n")))
+    (primitive/print "\n")
+    (car args)))
 
 (define-method do-dump  <string> ()     (primitive/dump self))
+(define-method do-dump  <array> ()      (primitive/dump self))
 (define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
 
 (define-method do-print <pair> ()

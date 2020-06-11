@@ -53,6 +53,7 @@
 ;;;       semantic space as part of the laws of the slave vm.
 ;;;
 ;;; *foo* is global
+;;; +foo+ is a constant
 ;;; -foo- comes from the implicit lexical scope
 ;;; <foo> is a type
 ;;;
@@ -122,6 +123,7 @@
   fopen fdopen fclose fflush fscanf)
 
 (define-constant libc/EOF -1)
+(define-constant +done+ -4) ; NOTE: careful when introducing tagged immediates
 
 (define-function die ()
   (libc/fprintf libc/stderr "\nDIE called, printing a backtrace to stdout and exiting with exit code 1...\n")
@@ -158,8 +160,8 @@
 ;;;
 ;;; GC
 ;;;
-(define gc/quantum              65504)
-(define gc/frequency            65536)
+(define gc/quantum              (* 50 1024))
+(define gc/frequency            32768)
 
 (define gc/objects-live         0)
 (define gc/bytes-used           0)
@@ -720,7 +722,8 @@
          (tail head)
          (elt  ()))
     (gc/protect (head elt)
-      (while (and (!= libc/EOF (set elt (k/read stream))) (!= symbol/dot elt))
+      (while (and (!= +done+ (set elt (k/read stream)))
+                  (!= symbol/dot elt))
         (set elt (new-<pair> elt ()))
         (set tail (put/tail tail elt)))
       (and (= symbol/dot elt) (put/tail tail (k/read stream))))
@@ -731,7 +734,7 @@
 
 (define-function read_quote (prefix stream)
   (let ((qobj (k/read stream)))
-    (when (= libc/EOF qobj)
+    (when (= +done+ qobj)
       (k/error "EOF while reading quoted literal"))
     (gc/protect (qobj)
       (set qobj (new-<pair> qobj ()))
@@ -755,15 +758,15 @@
                                     (libc/ungetc d stream)
                                     (read_quote symbol/unquote stream)))))
         ((is_letter c)  (return (read_symbol c stream)))
-        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) libc/EOF)))
-        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) libc/EOF)))
-        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) libc/EOF)))
+        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) +done+)))
+        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) +done+)))
+        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) +done+)))
         ((is_digit10 c) (return (read_number c stream)))
         ((= ?\; c)      (while (and (!= ?\n (set c (libc/getc stream)))
                                     (!= ?\r c)
                                     (!= libc/EOF c))))
         ((= ?\" c)      (return (read_string c stream)))
-        ((< c 0)        (return libc/EOF))
+        ((= c libc/EOF) (return +done+)) ; TODO use feof and ferror to check whether it's an error, or a true libc/EOF
         (else           (fatal1 "illegal character: %c" c))))))
 
 (define-function do_print (obj storing)
@@ -1324,6 +1327,16 @@
 (define-subr (subr/car 1)     (k/car (k/car -args-)))
 (define-subr (subr/cdr 1)     (k/cdr (k/car -args-)))
 
+(define-subr (subr/set-car 2)
+  (let ((obj (k/car -args-)))
+    (and (is <pair> obj)
+         (put <pair> head obj (k/cadr -args-)))))
+
+(define-subr (subr/set-cdr 2)
+  (let ((obj (k/car -args-)))
+    (and (is <pair> obj)
+         (put <pair> tail obj (k/cadr -args-)))))
+
 (define-subr (subr/oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
@@ -1448,7 +1461,7 @@
 (define-function repl_stream (stream)
   (let ((value 0))
     (libc/fscanf stream "#!%*[^\012\015]")
-    (while (!= libc/EOF (set value (k/read stream)))
+    (while (!= +done+ (set value (k/read stream)))
       (gc/protect (value)
         (and (> *arg/verbose* 0) (libc/printf ";;; ") (k/dumpln value))
         (set value (k/expand value (<module>-env *module*)))  (and (> *arg/verbose* 2) (libc/printf "expd--> ") (k/dumpln value))
@@ -1542,7 +1555,9 @@
   (instantiate-subr  "pair?"                 subr/pair?              module)
   (instantiate-subr  "array?"                subr/array?             module)
   (instantiate-subr  "car"                   subr/car                module)
+  (instantiate-subr  "set-car"               subr/set-car            module)
   (instantiate-subr  "cdr"                   subr/cdr                module)
+  (instantiate-subr  "set-cdr"               subr/set-cdr            module)
   (instantiate-subr  "oop-at"                subr/oop-at             module)
   (instantiate-subr  "set-oop-at"            subr/set-oop-at         module)
   (instantiate-subr  "array-length"          subr/array-length       module)
