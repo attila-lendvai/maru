@@ -1178,6 +1178,7 @@
 
 (define-relation <  subr/relation/less)
 (define-relation <= subr/relation/less-or-equal)
+(define-relation >= subr/relation/greater-or-equal)
 (define-relation >  subr/relation/greater)
 
 (define-subr (subr/relation/equal 2)
@@ -1536,6 +1537,7 @@
   (instantiate-subr  "<="                    subr/relation/less-or-equal module)
   (instantiate-subr  "!="                    subr/relation/not-equal module)
   (instantiate-subr  "="                     subr/relation/equal     module)
+  (instantiate-subr  ">="                    subr/relation/greater-or-equal module)
   (instantiate-subr  ">"                     subr/relation/greater   module)
   (instantiate-subr  "abort"                 subr/abort              module)
   (instantiate-subr  "exit"                  subr/exit               module)

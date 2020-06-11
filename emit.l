@@ -224,6 +224,10 @@
 						(println "	setne	%al")
 						(println "	movzbl	%al, %eax"))
 
+(define-emit	(GE TI32)			(println "	cmpl	"$1", %eax")
+						(println "	setge	%al")
+						(println "	movzbl	%al, %eax"))
+
 (define-emit    (GT TI32)			(println "	cmpl	"$1", %eax")
 						(println "	setg	%al")
 						(println "	movzbl	%al, %eax"))
@@ -410,7 +414,7 @@
              ;; binary
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
-              (slave:<  ,LT ) (slave:<=  ,LE)  (slave:= ,EQ ) (slave:!= ,NE ) (slave:> ,GT )
+              (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
               (slave:<< ,SLA) (slave:>>  ,SRA)
               (slave:oop-at     ,OOP-AT)     (slave:string-at     ,CHR-AT))
              ;; ternary
