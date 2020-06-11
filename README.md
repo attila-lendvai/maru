@@ -2,6 +2,10 @@
 
 > **NOTE:** This readme only covers this specific stage of Maru. The full README.md file can be found in the git branch of the latest stage.
 
+## Assorted smaller changes
+
+- -c command line arg to call a function (used by the makefile/bootstrap)
+
 ## New abstraction: *module*
 
 This stage introduces the concept of *modules*. They will be used by the next stage to hermetically isolate the *host* and the *slave* universes in the bootstrap process. Modules can be thought of as isolated Maru universes that can peek into each other using the following new primitives:
