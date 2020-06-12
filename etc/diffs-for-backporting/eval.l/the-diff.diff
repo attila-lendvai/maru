@@ -1,15 +1,5 @@
 --- minimal.edited	2020-06-10 21:48:28.476932444 +0200
 +++ latest	2020-06-10 20:52:05.778511341 +0200
-@@ -9,6 +9,9 @@
- (define-form safe prog ())
- ;;(define-form safe prog `(let () ,@prog))
- 
-+(define-form long-at args `(oop-at ,@args))
-+(define-form set-long-at args `(set-oop-at ,@args))
-+
- (define-structure <header> (size flags next type))
- (define-structure <buffer> (contents size position))
- 
 @@ -42,6 +47,10 @@
  (define abort	(extern	'abort))
  (define exit	(extern	'exit))

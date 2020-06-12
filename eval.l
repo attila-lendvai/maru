@@ -30,7 +30,8 @@
 ;;; target - The target vm of the "level-shift" operation (e.g. x86 asm).
 ;;;
 ;;; kernel - It's the part of the semantic space that runs on the target.
-;;;          e.g. k/apply vs. subr/apply.
+;;;          e.g. k/apply vs. subr/apply (which uses k/apply in its
+;;;          implementation).
 ;;;
 ;;; k/ prefix means that it's the kernel version of something that
 ;;;    also exist in the Maru semantic space.
