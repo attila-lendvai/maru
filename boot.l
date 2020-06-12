@@ -272,7 +272,7 @@
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
 (define-structure <undefined>   ())
-(define-structure <long>        (_bits))
+(define-structure <long>        (_bits))				(define-function long? (self) (= <long> (type-of self)))
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))
 (define-structure <pair>        (head tail))

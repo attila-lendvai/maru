@@ -67,13 +67,17 @@
 ;;;
 
 (define-form bytes-to-words (value)
-  `(>> ,value 2)) ; 32bit
+  (if (long? value)
+      (>> value 2)
+    `(>> ,value 2)))
 
 (define-form words-to-bytes (value)
-  `(<< ,value 2)) ; 32bit
+  (if (long? value)
+      (<< value 2)
+    `(<< ,value 2)))
 
 (define-form align-to-words (value)
-  `(& -4 (+ 3 ,value))) ; 32bit
+  `(& -4 (+ 3 ,value)))
 
 (define-form malloc-oops (wordcount)
   `(libc/malloc (words-to-bytes ,wordcount)))
