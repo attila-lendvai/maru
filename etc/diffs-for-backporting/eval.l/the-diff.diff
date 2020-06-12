@@ -25,41 +25,6 @@
  (define-function fatal (reason)		(printf "\neval.k: %s\n" reason) (exit 1))
  
  (define-function fatal1 (fmt arg)	(printf "\neval.k: ") (printf fmt arg)		(printf "\n") (die))
-@@ -245,18 +260,24 @@
- (define fscanf	(extern 'fscanf))
- 
- (define EOF	-1)
-+(define DONE	-4)	;; cannot be the same as a tagged immediate
- 
- (define <undefined>	 0)
--(define <long>		 1)
--(define <string>	 2)
--(define <symbol>	 3)
--(define <pair>		 4)
--(define <_array>	 5)
--(define <array>		 6)
--(define <expr>		 7)
--(define <form>		 8)
--(define <fixed>		 9)
--(define <subr>		10)
-+(define <data>		 1)
-+(define <long>		 2)
-+(define <double>	 3)
-+(define <string>	 4)
-+(define <symbol>	 5)
-+(define <pair>		 6)
-+(define <_array>	 7)
-+(define <array>		 8)
-+(define <expr>		 9)
-+(define <form>		10)
-+(define <fixed>		11)
-+(define <subr>		12)
-+(define <variable>	13)
-+(define <env>		14)
-+(define <context>	15)
- 
- (define symbols			0)
- (define globals			0)
 @@ -266,6 +287,7 @@
  (define applicators		0)
  (define s_t			0)
@@ -79,18 +44,16 @@
  
  (define-function new-bits (type size)
    (let ((obj (gc_malloc_atomic size)))
-@@ -324,21 +350,24 @@
+@@ -324,4 +350,4 @@
      obj))
  
  (define-function new-<array> (size)
--  (let ((arr (new-oops <array> (size-of-structure <array>))))
-+  (let ((cap (if size size 1))
-+	(arr (new-oops <array> (size-of-structure <array>))))
-     (gc-protect (arr)
--      (set (<array>-_array arr) (new-oops <_array> (* 4 size)))
-+      (set (<array>-size   arr) (new-<long> size))
-+      (set (<array>-_array arr) (new-oops <_array> (* 4 cap)))
-       arr)))
+  (let ((cap (if size size 1))
+	(arr (new-oops <array> (size-of-structure <array>))))
+    (gc-protect (arr)
+    (set (<array>-size   arr) (new-<long> size))
+    (set (<array>-_array arr) (new-oops <_array> (* 4 cap)))
+    arr)))
  
 -(define-function new-<expr> (defn env)
 +(define-function new-<expr> (defn ctx)
@@ -100,16 +63,15 @@
 +    (set (<expr>-ctx  obj) ctx)
      obj))
  
--(define-function new-<form> (fn)
-+(define-function new-<form> (fn sym)
+ (define-function new-<form> (fn sym)
    (let ((obj (new-oops <form> (size-of-structure <form>))))
      (gc-protect (obj)
        (set (<form>-function obj) fn)
-+      (set (<form>-symbol   obj) sym)
+       (set (<form>-symbol   obj) sym)
        obj)))
  
  (define-function new-<fixed> (fn)
-@@ -354,18 +383,28 @@
+@@ -354,17 +383,28 @@
        (set (<subr>-_name obj) _name)
        obj)))
  
@@ -124,23 +86,17 @@
 +
  (define-form get-type (arg)
    `(let ((__arg__ ,arg))
--     (safe (and __arg__ (or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>)))) (fatal1 "attempt to access dead object %p type %d" __arg__))))
-+     (safe (and __arg__ (not (& __arg__ 1))
-+		(or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>))))
-+		    (fatal1 "attempt to access dead object %p type %d" __arg__))))
+     (safe (and __arg__ (not (& __arg__ 1))
+		(or (& (<header>-flags-used) (<header>-flags (- __arg__ (size-of-structure <header>))))
+		    (fatal1 "attempt to access dead object %p type %d" __arg__))))
       (if __arg__
--	 (oop-at __arg__ -1)
-+	 (if (& __arg__ 1)
-+	     <long>
-+	   (oop-at __arg__ -1))
+	 (if (& __arg__ 1)
+	     <long>
+	   (oop-at __arg__ -1))
         <undefined>)))
  
  (define-form is (type arg)
--  `(let ((__arg__ ,arg))
--     (and __arg__
--	  (not (& 1 __arg__))
--	  (= ,type (oop-at __arg__ -1)))))
-+  `(= ,type (get-type ,arg)))
+  `(= ,type (get-type ,arg)))
  
  (define-function type_check_fail (exp act)
    (fatal2 "illegal type: expected %d got %d" exp act))
@@ -198,65 +154,12 @@
  (define-function k_car (list)	(and (is <pair> list) (get_head list)))
  (define-function k_cdr (list)	(and (is <pair> list) (get_tail list)))
  
-@@ -406,31 +488,43 @@
-     tail))
- 
- (define-function k_array_length (obj)
--  (and (is <array> obj)
--       (let ((_arr (get <array> _array obj)))
--	 (let ((sz (/ (gc_size _arr) 4)))
--	   sz))))
-+  (get_long (get <array> size obj)))
- 
- (define-function k_array_at (obj idx)
-   (and (is <array> obj)
-        (let* ((elts (get <array> _array obj))
--	      (size (/ (gc_size elts) 4)))
-+	      (size (get_long (get <array> size obj))))
- 	 (and (<= 0 idx) (< idx size)
- 	      (oop-at elts idx)))))
- 
- (define-function k_set_array_at (obj idx val)
-   (and (is <array> obj)
-        (let* ((elts (get <array> _array obj))
--	      (size (/ (gc_size elts) 4)))
-+	      (size (get_long (get <array> size obj))))
- 	 (and (<= 0 idx)
- 	      (let ()
- 		(or (< idx size)
--		    (let* ((nsize (max (+ idx 1) (* size 2)))
--			   (oops  (new-oops <_array> (* 4 nsize))))
-+		    (let ((cap (/ (gc_size elts) 4)))
-+		      (while (<= cap idx) (set cap (* cap 2)))
-+		      (gc-protect (obj)
-+		        (let ((oops (new-oops <_array> (* 4 cap))))
- 		      (memcpy oops elts (* size 4))
--		      (set elts (put <array> _array obj oops))))
-+			  (set elts (put <array> _array obj oops)))
-+			(put <array> size obj (new-<long> (+ 1 idx))))))
- 		(set-oop-at elts idx val))))))
- 
-+(define-function k_array_append (array val)
-+  (k_set_array_at array (k_array_length array) val))
-+
-+(define-function k_array_insert (obj index value)
-+  (let ((len (k_array_length obj)))
-+    (k_array_append obj value)
-+    (and (< index len)
-+	 (let* ((elts (get <array> _array obj))
-+		(oops (+ elts (* 4 index))))
-+	   (memmove (+ 4 oops) oops (* 4 (- len index))))))
-+  (k_set_array_at obj index value))
-+
- (define-function do_print (obj storing)
-   (debug (printf "{%p}" obj))
-   (let ((type (get-type obj)))
-@@ -478,16 +572,28 @@
+@@ -478,3 +572,3 @@
        ((= type <form>)		(let ()
  				  (printf "Form(")
  				  (do_print (get <form> function obj) storing)
-+				  (printf ",")
-+				  (do_print (get <form> symbol   obj) storing)
+				  (printf ",")
+				  (do_print (get <form> symbol   obj) storing)
  				  (printf ")")))
        ((= type <fixed>)		(let ()
  				  (printf "Fixed(")
@@ -714,22 +617,10 @@
  
  (define-function subr_while (args ctx)
    (let ((tst  (k_car args))
-@@ -1022,6 +1270,63 @@
+@@ -1022,6 +1270,51 @@
    (let ((status (and (is_long (k_car args)) (get_long (k_car args)))))
      (exit status)))
  
-+(define-function subr_open (args ctx)
-+  (let ((arg (k_car args)))
-+    (or (is <string> arg) (fatal "non-string argument in open"))
-+    (let ((stream (fopen (get <string> _bits arg) "rb")))
-+      (and stream (new-<long> stream)))))
-+
-+(define-function subr_close (args ctx)
-+  (let ((arg (k_car args)))
-+    (or (is <long> arg) (fatal "non-integer argument in close"))
-+    (fclose (get_long arg))
-+    arg))
-+
 +(define-function subr_getc (args ctx)
 +  (let ((arg (k_car args)))
 +    (or arg (set arg (get <variable> value input)))
@@ -778,7 +669,7 @@
  (define-function subr_dump (args ctx)
    (while (is <pair> args)
      (k_dump (get_head args))
-@@ -1042,29 +1347,32 @@
+@@ -1042,28 +1347,31 @@
      (set args (get_tail args))))
  
  (define-function subr_apply (args ctx)
@@ -820,25 +711,13 @@
  (define-function subr_cons	(args ctx)	(new-<pair> (k_car args) (k_cadr args)))
  (define-function subr_string	(args ctx)	(_new-<string> (and (is_long (k_car args)) (get_long (get_head args)))))
  (define-function subr_array	(args ctx)	(new-<array> (and (is_long (k_car args)) (get_long (get_head args)))))
--(define-function subr_form	(args ctx)	(new-<form> (k_car args)))
-+(define-function subr_form	(args ctx)	(new-<form> (k_car args) (k_cadr args)))
  
  (define-function subr_allocate (args ctx)
    (arity2 "allocate" args)
-@@ -1081,11 +1389,22 @@
+@@ -1081,11 +1389,12 @@
  (define-function subr_car	(args ctx)	(k_car (k_car args)))
  (define-function subr_cdr	(args ctx)	(k_cdr (k_car args)))
  
-+(define-function subr_set_car (args ctx)
-+  (let ((arg (k_car args)))
-+    (and (is <pair> arg)
-+	 (put <pair> head arg (k_cadr args)))))
-+
-+(define-function subr_set_cdr (args ctx)
-+  (let ((arg (k_car args)))
-+    (and (is <pair> arg)
-+	 (put <pair> tail arg (k_cadr args)))))
-+
  (define-function subr_oop_at (args ctx)
    (arity2 "oop-at" args)
    (let ((obj (get_head args))
@@ -1003,11 +882,10 @@
    (define-subr  "not"			subr_not)
    (define-subr  "&"			subr_bitand)
    (define-subr  "|"			subr_bitor)
-@@ -1252,18 +1609,26 @@
+@@ -1252,18 +1609,23 @@
    (define-subr  "<="			subr_le)
    (define-subr  "!="			subr_ne)
    (define-subr  "="			subr_eq)
-+  (define-subr  ">="			subr_ge)
    (define-subr  ">"			subr_gt)
    (define-subr  "abort"			subr_abort)
    (define-subr  "exit"			subr_exit)
@@ -1023,22 +901,11 @@
    (define-subr  "string"		subr_string)
    (define-subr  "array"			subr_array)
    (define-subr  "form"			subr_form)
-+  (define-subr  "open"			subr_open)
-+  (define-subr  "close"			subr_close)
 +  (define-subr  "getc"			subr_getc)
 +  (define-subr  "putc"			subr_putc)
    (define-subr  "allocate"		subr_allocate)
    (define-subr  "type-of"		subr_type_of)
    (define-subr  "string?"		subr_stringP)
-@@ -1272,6 +1637,8 @@
-   (define-subr  "array?"		subr_arrayP)
-   (define-subr  "car"			subr_car)
-   (define-subr  "cdr"			subr_cdr)
-+  (define-subr  "set-car"		subr_set_car)
-+  (define-subr  "set-cdr"		subr_set_cdr)
-   (define-subr  "oop-at"		subr_oop_at)
-   (define-subr  "set-oop-at"		subr_set_oop_at)
-   (define-subr  "array-length"		subr_array_length)
 @@ -1283,24 +1650,42 @@
    (define-subr  "string->symbol"	subr_string_symbol)
    (define-subr  "symbol->string"	subr_symbol_string)
