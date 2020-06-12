@@ -202,6 +202,22 @@
          ,@(make-unprotectors vars)
          __answer__))))
 
+;; opaque objects are black boxes for the gc.
+(define-function gc/new-object/opaque (type bytesize)
+  (safety 1 (k/assert (not (= 0 type)) "gc/new-object/opaque: called with zero type"))
+  (let* ((obj (gc/allocate-opaque bytesize))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    obj))
+
+;; from the gc's pov objects are oop vectors
+(define-function gc/new-object (type wordsize)
+  (safety 1 (k/assert (not (= 0 type)) "gc/new-object: called with zero type"))
+  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    obj))
+
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (libc/malloc size)))
     (or ptr (fatal "out of memory"))
@@ -400,85 +416,72 @@
 (define *backtrace-stack*     0)
 (define *backtrace-index*     0)
 
-(define-function new-object/opaque (type bytesize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type"))
-  (let* ((obj (gc/allocate-opaque bytesize))
-         (header (header-of obj)))
-    (set (<header>-type header) type)
-    obj))
-
-(define-function new-object (type wordsize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
-  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
-         (header (header-of obj)))
-    (set (<header>-type header) type)
-    obj))
 
 (define-function new-<long> (bits)
-  (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
+  (let ((obj (gc/new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
     (set (<long>-_bits obj) bits)
     obj))
 
 (define-function new-<string>-of-length (len)
-  (let ((str (new-object <string> (size-of-structure <string>))))
+  (let ((str (gc/new-object <string> (size-of-structure <string>))))
     (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
-      (set (<string>-_bits str) (gc/allocate-opaque (+ len 1)))
+      (set (<string>-_bits str) (gc/allocate-opaque (+ len 1))) ; +1 is for the terminal zero
       (safety 3 (set (<header>-type (header-of (<string>-_bits str))) -43))
       str)))
 
 (define-function new-<string>-from-cstring (cstr)
   (let ((len (libc/strlen cstr)))
-    (let ((obj (new-<string>-of-length len)))
+    (let ((obj (new-<string>-of-length len))) ; also deals with the cstring terminal zero
       (libc/memcpy (<string>-_bits obj) cstr len)
       obj)))
 
 (define-function new-<symbol> (cstr)
-  (let ((obj (new-object/opaque <symbol> (words-to-bytes (size-of-structure <symbol>)))))
+  (let ((obj (gc/new-object/opaque <symbol> (words-to-bytes (size-of-structure <symbol>)))))
     (set (<symbol>-_bits obj) (libc/strdup cstr))
     obj))
 
 (define-function new-<pair> (head tail)
-  (let ((obj (new-object <pair> (size-of-structure <pair>))))
+  (let ((obj (gc/new-object <pair> (size-of-structure <pair>))))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
     obj))
 
 (define-function new-<array> (size)
   (let ((cap (or size 1))
-        (arr (new-object <array> (size-of-structure <array>))))
+        (arr (gc/new-object <array> (size-of-structure <array>))))
     (gc/protect (arr)
       (set (<array>-size arr)   (new-<long> size))
-      (set (<array>-_array arr) (new-object <_array> cap))
+      (set (<array>-_array arr) (gc/new-object <_array> cap))
       arr)))
 
 (define-function new-<expr> (defn env)
-  (let ((obj (new-object <expr> (size-of-structure <expr>))))
+  (let ((obj (gc/new-object <expr> (size-of-structure <expr>))))
     (set (<expr>-defn obj) defn)
     (set (<expr>-env  obj) env )
     obj))
 
 (define-function new-<form> (fn)
-  (let ((obj (new-object <form> (size-of-structure <form>))))
+  (let ((obj (gc/new-object <form> (size-of-structure <form>))))
     (gc/protect (obj)
       (set (<form>-function obj) fn)
       obj)))
 
 (define-function new-<fixed> (fn)
-  (let ((obj (new-object <fixed> (size-of-structure <fixed>))))
+  (let ((obj (gc/new-object <fixed> (size-of-structure <fixed>))))
     (gc/protect (obj)
       (set (<fixed>-function obj) fn)
       obj)))
 
 (define-function new-<subr> (_imp _name)
-  (let ((obj (new-object/opaque <subr> (words-to-bytes (size-of-structure <subr>)))))
+  (let ((obj (gc/new-object/opaque <subr> (words-to-bytes (size-of-structure <subr>)))))
     (gc/protect (obj)
       (set (<subr>-_imp  obj) _imp )
       (set (<subr>-_name obj) _name)
       obj)))
 
 (define-function new-<module> ()
-  (let ((obj (new-object <module> (words-to-bytes (size-of-structure <module>)))))
+  (let ((obj (gc/new-object <module> (words-to-bytes (size-of-structure <module>)))))
     (gc/protect (obj)
       ;; env is chained into the cdr of this cons. let's set up a dummy as the first assoc entry.
       ;; FIXME this is ugly, but for now it's compatible with the rest of the code.
@@ -895,7 +898,7 @@
                     (let ()
                       (while (not (< idx cap))
                         (set cap (* cap 2)))
-                      (let ((new-elts (new-object <_array> cap)))
+                      (let ((new-elts (gc/new-object <_array> cap)))
                         (gc/protect (new-elts) ; note: it's not really necessary here, because we store it before any new allocation
                           (copy-oops elts new-elts size)
                           (set elts (put <array> _array obj new-elts))))))
@@ -1347,7 +1350,7 @@
         (size (get/head (get/tail -args-))))
     (safety 1 (k/assert (is/long type) "allocate: invalid type "type))
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
-    (new-object (get/long type) (get/long size))))
+    (gc/new-object (get/long type) (get/long size))))
 
 (define-subr (subr/type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
 (define-subr (subr/string? 1) (and (is <string> (k/car -args-)) symbol/t))
