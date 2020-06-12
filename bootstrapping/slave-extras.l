@@ -1,7 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
 ;;; This file contains any temporary extra definitions that are needed
-;;; in the slave when using the previous stage for bootstrapping.
+;;; in the slave in the first iteration of the bootstrap, when we are
+;;; building using the executable of the previous stage.
 ;;;
 
 (warn "--- boostrapping: slave extras\n")
@@ -12,3 +13,10 @@
 ;; into a runtime error.
 (define-form >= args
   '(fatal "This is a bootstrapping dummy in place of the >= operator."))
+
+;; let's shadow the new map function in boot.l, because it requires
+;; set-car/set-cdr, and the previous stage doesn't have them yet.
+(define-function map (function list)
+  (if (pair? list)
+      (let ((head (function (car list))))
+        (cons head (map function (cdr list))))))

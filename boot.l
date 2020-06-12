@@ -167,20 +167,81 @@
 (define-function list->array (list)
   (%list->array list 0))
 
-(define-function map (function list)
-  (if (pair? list)
-      (let ((head (function (car list))))
-        (cons head (map function (cdr list))))))
+(define-function array-append (arr val)
+  (set-array-at arr (array-length arr) val))
+
+(define-function map1 (function list)
+  (let ((head (cons)))
+    (let ((tail head))
+      (while (pair? list)
+        (set tail (set (cdr tail) (cons (function (car list)) ())))
+        (set list (cdr list))))
+    (cdr head)))
+
+(define-function mapN (function lists)
+  (and (pair? (car lists))
+       (cons (apply function (map1 car lists))
+             (mapN function (map1 cdr lists)))))
+
+(define-function map (function . lists)
+  (if (pair? (cdr lists))
+      (mapN function lists)
+    (map1 function (car lists))))
+
+(define-function reverse-map (function list)
+  (and list
+       (let ((tail (reverse-map function (cdr list))))
+         (cons (function (car list)) tail))))
+
+(define-function reverse-with-map (function arg list)
+  (and list
+       (let ((tail (reverse-with-map function arg (cdr list))))
+         (cons (function arg (car list)) tail))))
+
+(define-function reverse-map-with (function list arg)
+  (and list
+       (let ((tail (reverse-map-with function (cdr list) arg)))
+         (cons (function (car list) arg) tail))))
 
 (define-function map-with (function list a)
   (if (pair? list)
       (let ((head (function (car list) a)))
         (cons head (map-with function (cdr list) a)))))
 
+(define-function with-map (function a list)
+  (if (pair? list)
+      (let ((head (function a (car list))))
+        (cons head (with-map function a (cdr list))))))
+
+(define-function map-with2 (function list a b)
+  (if (pair? list)
+      (let ((head (function (car list) a b)))
+        (cons head (map-with2 function (cdr list) a b)))))
+
+(define-function with2-map (function a b list)
+  (if (pair? list)
+      (let ((head (function a b (car list))))
+        (cons head (with2-map function a b (cdr list))))))
+
+(define-function with-map2 (function a alist blist)
+  (if (pair? alist)
+      (let ((head (function a (car alist) (car blist))))
+        (cons head (with-map2 function a (cdr alist) (cdr blist))))))
+
 (define-function map2-with (function alist blist a)
   (if (pair? alist)
       (let ((head (function (car alist) (car blist) a)))
         (cons head (map2-with function (cdr alist) (cdr blist) a)))))
+
+(define-function map* (function . lists)
+  (if (pair? (car lists))
+      (let ((head (apply function (map car lists))))
+        (cons head (apply map* (cons function (map cdr lists)))))))
+
+(define-function foldr (op value list)
+  (if (pair? list)
+      (op (car list) (foldr op value (cdr list)))
+    value))
 
 (define-form define-expand (type args . body)   `(set-array-at *expanders*   ,type (lambda ,args ,@body)))
 (define-form define-encode (type args . body)   `(set-array-at *encoders*    ,type (lambda ,args ,@body)))
@@ -199,16 +260,26 @@
 
 ;;; cond
 
+(define-function %maybe-progn (prog)
+  (if (cdr prog)
+      (cons 'let (cons '() prog))
+    (car prog)))
+
 (define-function %cond (clauses)
   (if (pair? clauses)
       (let* ((clause (car clauses))
              (test   (car clause))
-             (forms  (cdr clause)))
+             (body   (cdr clause)))
         (if (= 'else test)
-            `(let () ,@forms)
-          `(if ,test
-               (let () ,@forms)
-             ,(%cond (cdr clauses)))))))
+            (%maybe-progn body)
+          (if (= '=> (car body)) ; scheme syntax to funcall the body
+              `(let ((_ ,test))
+                 (if _
+                     (,(%maybe-progn (cdr body)) _)
+                   ,(%cond (cdr clauses))))
+            `(if ,test
+                 ,(%maybe-progn body)
+               ,(%cond (cdr clauses))))))))
 
 (define-form cond clauses (%cond clauses))
 
@@ -224,6 +295,9 @@
 
 (define-function name-of-type (type)
   (array-at %type-names type))
+
+(define-function type-name-of (obj)
+  (name-of-type (type-of obj)))
 
 ;;; structure
 
@@ -281,13 +355,81 @@
 (define-structure <expr>        (defn env))
 (define-structure <form>        (function symbol)) ; these are expander lambda's
 (define-structure <fixed>       (function))
-(define-structure <subr>        (_imp _name))
+(define-structure <subr>        (_name _imp _sig _profile))
 (define-structure <module>      (symbols env))
+(define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
+(define-structure <env>		(parent level offset bindings stable))
+(define-structure <context>	(home env bindings callee pc))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
     (set (<fixed>-function self) fun)
     self))
+
+(define-function variable (name value env index . opt-type)
+  (let ((self (new <variable>)))
+    (set (<variable>-name  self) name)
+    (set (<variable>-value self) value)
+    (set (<variable>-env   self) env)
+    (set (<variable>-index self) index)
+    (set (<variable>-type  self) (car opt-type))
+    self))
+
+(define-function environment (parent)
+  (let ((self (new <env>)))
+    (set (<env>-parent   self) parent)
+    (set (<env>-level    self) (<env>-level  parent))
+    (set (<env>-offset   self) (<env>-offset parent))
+    (set (<env>-bindings self) (array))
+    self))
+
+(define-function environment-define (env name value)
+  (let* ((bindings (<env>-bindings env))
+         (offset   (<env>-offset   env))
+         (var      (variable name value env offset)))
+    (set (<env>-offset env) (+ offset 1))
+    (array-append bindings var)))
+
+(define-function environment-find (env name)
+  (let* ((bindings (<env>-bindings env))
+         (offset   (<env>-offset   env))
+         (var      ())
+         (idx      0))
+    (while (and (not var) (< idx offset))
+      (if (= name (<variable>-name (array-at bindings idx)))
+          (set var (array-at bindings idx))
+        (set idx (+ idx 1))))
+    var))
+
+(define-function global? (var)        (= 0 (<env>-level (<variable>-env var))))
+
+;;; local syntax
+
+(define-function make-with-form (args-body)
+  (and args-body `(lambda (*env* ,@(car args-body)) ,@(cdr args-body))))
+
+(define-form with-forms (bindings . body)
+  (let ((env (environment *env*)))
+    (while bindings
+      (let* ((binding (car   bindings))
+             (name    (car   binding))
+             (fun     (cadr  binding))
+             (var     (caddr binding))
+             (exp     (list 'form (make-with-form fun) (make-with-form var))))
+        (environment-define env (caar bindings) (eval exp *env*))
+        (set bindings (cdr bindings))))
+    (cons 'let (cons () (map-with expand body env)))))
+
+;;; field accesors
+
+(define-function make-instance-accessors (name fields i)
+  (and (pair? fields)
+       (cons `(,(concat-symbol 'self. (car fields)) () ((name) (list 'oop-at 'self ,i)))
+             (make-instance-accessors name (cdr fields) (+ i 1)))))
+
+(define-form with-instance-accessors (type . body)
+  `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
+    (let () ,@body)))
 
 ;;; selector/method (single dispatch on the type of the first argument)
 
@@ -460,6 +602,30 @@
   `(let* ((_list_ ,list) (_head_ (car _list_)))
      (set ,list (cdr _list_))
      _head_))
+
+(define-function member? (key list)
+  (while (and (pair? list) (!= key (car list)))
+    (set list (cdr list)))
+  (car list))
+
+(define-function list-reverse! (head)
+  (let ((curr head)
+        (prev ())
+        (next ()))
+    (while curr
+      (set next (cdr curr))
+      (set-cdr curr prev)
+      (set prev curr)
+      (set curr next))
+    prev))
+
+(define-function zip lists
+  (apply map list lists))
+
+(define-function zip-assocs (a b)
+  (if (and (pair? a) (pair? b))
+      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
+    (or a b)))
 
 ;;; iteration
 

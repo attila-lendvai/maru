@@ -126,7 +126,7 @@
 (define-externs
   abort exit
   malloc free memset memcpy memmove
-  stdout stderr printf fprintf sprintf
+  stdin stdout stderr printf fprintf sprintf
   strlen strcmp strdup strtoul getc ungetc putc
   fopen fdopen fclose fflush fscanf)
 
@@ -1358,7 +1358,7 @@
       (set x (k/encode x e))
       (k/eval x e))))
 
-(define-subr (subr/cons 2)   (new-<pair> (k/car -args-) (k/cadr -args-)))
+(define-subr subr/cons       (new-<pair> (k/car -args-) (k/cadr -args-)))
 (define-subr (subr/string 1) (new-<string>-of-length (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
 (define-subr subr/array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
 (define-subr subr/form       (new-<form> (k/car -args-) (k/cadr -args-)))
@@ -1651,6 +1651,7 @@
 
 (define-function main (argc argv)
   ;; we need to dereference them once
+  (set libc/stdin  (oop-at libc/stdin 0))
   (set libc/stdout (oop-at libc/stdout 0))
   (set libc/stderr (oop-at libc/stderr 0))
 
