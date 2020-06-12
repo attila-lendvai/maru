@@ -416,7 +416,6 @@
 (define *backtrace-stack*     0)
 (define *backtrace-index*     0)
 
-
 (define-function new-<long> (bits)
   (let ((obj (gc/new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
     (set (<long>-_bits obj) bits)
@@ -527,6 +526,9 @@
 (define-form get/head (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'head))      `(get <pair> head ,obj)))
 (define-form get/tail (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'tail))      `(get <pair> tail ,obj)))
 (define-form put/tail (obj val) (if (< safety-level 4) `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val) `(put <pair> tail ,obj ,val)))
+
+(define-form get/string		(obj)		`(get <string> _bits ,obj))
+(define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
                                          ( = ?\t c)                     ; ht
@@ -788,7 +790,7 @@
     (cond
       ((= type <undefined>)     (libc/printf "nil"))
       ((= type <long>)          (libc/printf "%d" (get/long obj)))
-      ((= type <string>)        (let ((bits (get <string> _bits obj)))
+      ((= type <string>)        (let ((bits (get/string obj)))
                                   (if (not storing)
                                       (libc/printf "%s" bits)
                                     (let ((i 0)
@@ -1219,7 +1221,7 @@
          (type (get/type lhs)))
     (cond
       ((= type <long>)          (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t))
+      ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
       (else                     (and (= lhs rhs) symbol/t)))))
 
 (define-subr (subr/relation/not-equal 2)
@@ -1228,7 +1230,7 @@
          (type (get/type lhs)))
     (cond
       ((= type <long>)          (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get <string> _bits lhs) (get <string> _bits rhs))) symbol/t)
+      ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
       (else                     (and (!= lhs rhs) symbol/t)))))
 
 (define-subr (subr/abort 0)
@@ -1257,8 +1259,8 @@
     (let* ((arg  (get/head -args-))
            (type (get/type arg)))
       (cond
-        ((= type <string>) (libc/fprintf libc/stderr "%s" (get <string> _bits arg)))
-        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get <symbol> _bits arg)))))
+        ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
+        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))))
     (set -args- (get/tail -args-))))
 
 (define-subr subr/apply-<expr>
@@ -1411,7 +1413,7 @@
     (let ((idx (get/long arg)))
       (and (<= 0 idx)
            (< idx (k/string-length arr))
-           (new-<long> (string-at (get <string> _bits arr) idx))))))
+           (new-<long> (string-at (get/string arr) idx))))))
 
 (define-subr (subr/set-string-at 3)
   (let ((arr (get/head -args-))
@@ -1423,7 +1425,7 @@
            (< idx (k/string-length arr))
            ;; TODO don't just silently ignore wrong indexes?
            (let ()
-             (set-string-at (get <string> _bits arr) idx (get/long val))
+             (set-string-at (get/string arr) idx (get/long val))
              val)))))
 
 (define-subr (subr/string->symbol 1)
@@ -1431,7 +1433,7 @@
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
-           (intern (get <string> _bits arg))))))
+           (intern (get/string arg))))))
 
 (define-subr (subr/symbol->string 1)
   (let ((arg (k/car -args-)))
