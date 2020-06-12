@@ -460,10 +460,11 @@
     (set (<expr>-env  obj) env )
     obj))
 
-(define-function new-<form> (fn)
+(define-function new-<form> (fn sym)
   (let ((obj (gc/new-object <form> (size-of-structure <form>))))
     (gc/protect (obj)
       (set (<form>-function obj) fn)
+      (set (<form>-symbol   obj) fn)
       obj)))
 
 (define-function new-<fixed> (fn)
@@ -830,6 +831,8 @@
       ((= type <form>)          (let ()
                                   (libc/printf "Form(")
                                   (do_print (get <form> function obj) storing)
+                                  (libc/printf ",")
+                                  (do_print (get <form> symbol   obj) storing)
                                   (libc/printf ")")))
       ((= type <fixed>)         (let ()
                                   (libc/printf "Fixed(")
@@ -1358,7 +1361,7 @@
 (define-subr (subr/cons 2)   (new-<pair> (k/car -args-) (k/cadr -args-)))
 (define-subr (subr/string 1) (new-<string>-of-length (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
 (define-subr subr/array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
-(define-subr (subr/form 1)   (new-<form> (k/car -args-)))
+(define-subr subr/form       (new-<form> (k/car -args-) (k/cadr -args-)))
 
 (define-subr (subr/allocate 2)
   (let ((type (get/head -args-))

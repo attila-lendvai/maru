@@ -279,7 +279,7 @@
 (define-structure <_array>      ())
 (define-structure <array>       (size _array))
 (define-structure <expr>        (defn env))
-(define-structure <form>        (function))
+(define-structure <form>        (function symbol)) ; these are expander lambda's
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_imp _name))
 (define-structure <module>      (symbols env))
