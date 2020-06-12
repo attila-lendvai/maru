@@ -81,6 +81,9 @@
 (define-form copy-oops (from to wordcount)
   `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
 
+(define-form move-oops (from to wordcount)
+  `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
+
 (define-form size-of-structure (type)
   (structure-field-count (eval type)))
 
@@ -118,7 +121,7 @@
 
 (define-externs
   abort exit
-  malloc free memset memcpy
+  malloc free memset memcpy memmove
   stdout stderr printf fprintf sprintf
   strlen strcmp strdup strtoul getc ungetc putc
   fopen fdopen fclose fflush fscanf)
@@ -438,9 +441,11 @@
     obj))
 
 (define-function new-<array> (size)
-  (let ((arr (new-object <array> (size-of-structure <array>))))
+  (let ((cap (or size 1))
+        (arr (new-object <array> (size-of-structure <array>))))
     (gc/protect (arr)
-      (set (<array>-_array arr) (new-object <_array> size))
+      (set (<array>-size arr)   (new-<long> size))
+      (set (<array>-_array arr) (new-object <_array> cap))
       arr)))
 
 (define-function new-<expr> (defn env)
@@ -863,32 +868,51 @@
 
 (define-function k/array-length (obj)
   (safety 1 (or (is <array> obj) (fatal1 "k/array-length: called with object of type %d" (get/type obj))))
-  (and (is <array> obj)
-       (let ((_arr (get <array> _array obj)))
-         (let ((wordsize (bytes-to-words (gc/object-size _arr))))
-           wordsize))))
+  (get/long (get <array> size obj)))
 
 (define-function k/array-at (obj idx)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
-       (let* ((elts (get <array> _array obj))
-              (wordsize (bytes-to-words (gc/object-size elts))))
-         (and (<= 0 idx) (< idx wordsize)
-              (oop-at elts idx)))))
+       (let ((elements (get <array> _array obj))
+             (size     (get/long (get <array> size obj))))
+         (and (<= 0 idx)
+              (< idx size)
+              (oop-at elements idx)))))
 
 (define-function k/set-array-at (obj idx val)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/set-array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _array obj))
-              (wordsize (bytes-to-words (gc/object-size elts))))
+              (size (get/long (get <array> size obj)))
+              (cap  (bytes-to-words (gc/object-size elts))))
          (and (<= 0 idx)
               (let ()
-                (or (< idx wordsize)
-                    (let* ((newsize (max (+ idx 1) (* wordsize 2)))
-                           (oops  (new-object <_array> newsize)))
-                      (copy-oops elts oops wordsize)
-                      (set elts (put <array> _array obj oops))))
+                (or (< idx cap)
+                    (let ()
+                      (while (not (< idx cap))
+                        (set cap (* cap 2)))
+                      (let ((new-elts (new-object <_array> cap)))
+                        (gc/protect (new-elts) ; note: it's not really necessary here, because we store it before any new allocation
+                          (copy-oops elts new-elts size)
+                          (set elts (put <array> _array obj new-elts))))))
+                (unless (< idx size)
+                  ;; record the largest ever written index + 1 (aka size) in the size slot
+                  (put <array> size obj (new-<long> (+ 1 idx))))
                 (set-oop-at elts idx val))))))
+
+(define-function k/array-append (array val)
+  (k/set-array-at array (k/array-length array) val))
+
+(define-function k/array-insert (obj index value)
+  (let ((len (k/array-length obj)))
+    (k/array-append obj value)         ; ensure we have enough room
+    (and (< index len)
+         (let* ((elts (get <array> _array obj))
+                (src (+ elts (words-to-bytes index))))
+           (move-oops src
+                      (+ src (words-to-bytes 1))
+                      (- len index)))))
+  (k/set-array-at obj index value))
 
 (define-function k/concat-list (head tail)
   (if (is <pair> head)
