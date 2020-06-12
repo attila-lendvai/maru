@@ -1244,6 +1244,19 @@
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 
+;; KLUDGE FIXME FILE* pointer is stuffed into a long. it won't necessarily work with tagged immediate longs.
+(define-subr (subr/open 1)
+  (let ((path (k/car -args-)))
+    (or (is <string> path) (fatal "subr/open: non-string path argument"))
+    (let ((stream (libc/fopen (get/string path) "rb")))
+      (and stream (new-<long> stream)))))
+
+(define-subr (subr/close 1)
+  (let ((arg (k/car -args-)))
+    (or (is <long> arg) (fatal "subr/close: non-integer argument"))
+    (libc/fclose (get/long arg))
+    arg))
+
 (define-subr subr/dump
   (while (is <pair> -args-)
     (k/dump (get/head -args-))
@@ -1584,6 +1597,8 @@
   (instantiate-subr  "string"                subr/string             module)
   (instantiate-subr  "array"                 subr/array              module)
   (instantiate-subr  "form"                  subr/form               module)
+  (instantiate-subr  "open"                  subr/open               module)
+  (instantiate-subr  "close"                 subr/close              module)
   (instantiate-subr  "allocate"              subr/allocate           module)
   (instantiate-subr  "type-of"               subr/type-of            module)
   (instantiate-subr  "string?"               subr/string?            module)
