@@ -320,7 +320,7 @@
       (let ((flags (<header>-flags ptr)))
         (if (& flags (<header>-flags-mark))
             (let ()
-              (safety 2 (or (not (= 0 (<header>-type ptr))) (fatal1 "gc/sweep: object with zero type %p" ptr)))
+              (safety 3 (and (= 0 (<header>-type ptr)) (fatal1 "gc/sweep: encountered an object with zero type %p" ptr)))
               (set nused (+ nused (<header>-size ptr)))
               (set nobjs (+ nobjs 1))
               (set (<header>-flags ptr) (^ flags (<header>-flags-mark))))
