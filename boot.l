@@ -323,26 +323,8 @@
 
 (define %structure-fields       (array))
 (define %structure-field-counts (array))
-
-(define-function %make-accessor (name fields offset)
-  (when fields
-    (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-             (list 'oop-at self ,offset))
-          (%make-accessor name (cdr fields) (+ 1 offset)))))
-
-(define-function %make-accessors (name fields)
-  (%make-accessor name fields 0))
-
-(define-form define-structure (name fields)
-  (let ((type (%allocate-type name)))
-    (set-array-at %structure-field-counts type (list-length fields))
-    (set-array-at %structure-fields       type fields)
-    `(let ()
-       (define ,name ,type)
-       ,@(%make-accessors name fields))))
-
-(define-function new (type)
-  (allocate type (structure-field-count type)))
+(define %structure-bases	(array))
+(define %structure-derivatives	(array))
 
 (define-function structure-field-count (type)
   (array-at %structure-field-counts type))
@@ -357,6 +339,89 @@
     (or (and (pair? list)
              i)
         (error "structure-field-index has failed for type "type", field-name "field-name))))
+
+;; TODO naming? fields-of-structure? or type-field-count above?
+(define-function fields-of-type (type)
+  (array-at %structure-fields type))
+
+(define-function sanity-check-structure-fields (name fields)
+  (let ((f fields))
+    (while (pair? f)
+      (and (memq (car f) (cdr f))
+           (error "field '"(car f)"' multiply-defined in structure: "name" "fields))
+      (set f (cdr f)))))
+
+(define-function inherits-from (type base)
+  (and type
+       (or (= type base)
+           (inherits-from (array-at %structure-bases type) base))))
+
+(define-function %typecheck (type object)
+  (or (= type (type-of object))
+      (inherits-from (type-of object) type)
+      (error "type check failed for field accessor: expected "
+             type" "(name-of-type type)", got "
+             (type-of object)" "(name-of-type (type-of object))))
+  object)
+
+(define-function %accessor (name)
+  ;; KLUDGE? TODO understand and reinstate?
+  ;; (if (= ?_ (string-at (symbol->string name) 0))
+  ;;     'long-at
+  ;;   'oop-at)
+  'oop-at)
+
+(define-function %make-safe-accessor (name fields offset)
+  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
+                      (list ',(%accessor (car fields))
+                            (list '%typecheck ',name self)
+                            ,offset))
+                   (%make-accessor name (cdr fields) (+ 1 offset)))))
+
+(define-function %make-unsafe-accessor (name fields offset)
+  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
+                      (list ',(%accessor (car fields))
+                            self
+                            ,offset))
+                   (%make-accessor name (cdr fields) (+ 1 offset)))))
+
+(define %make-accessor %make-unsafe-accessor)
+;; TODO
+;; (if (> (optimised) 0)
+;;     %make-unsafe-accessor
+;;   %make-safe-accessor)
+
+(define-function %make-accessors (name fields)
+  (%make-accessor name fields 0))
+
+(define-form define-structure (name fields)
+  (let ((type (%allocate-type name))
+        (field-count (list-length fields)))
+    (sanity-check-structure-fields name fields)
+    (set-array-at %structure-field-counts type field-count)
+    (set-array-at %structure-fields       type fields)
+    `(let ()
+       (define ,name ,type)
+       ,@(%make-accessors name fields)
+       ,type)))
+
+(define-form new (type . inits)
+  (let ((i -1))
+    `(let* ((_type_ ,type)
+            (_self_ (allocate _type_ (structure-field-count _type_))))
+       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+       _self_)))
+
+(define-function %make-make-inits (prefix inits)
+  (and inits
+       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
+             (%make-make-inits prefix (cdr inits)))))
+
+(define-form make (type . inits)
+  `(let ((self (new ,type)))
+     (with-instance-accessors ,type
+       ,@(%make-make-inits (concat-symbol type '-) inits)
+       self)))
 
 ;;; built-in types
 
