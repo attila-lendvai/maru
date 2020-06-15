@@ -202,6 +202,16 @@
          ,@(make-unprotectors vars)
          __answer__))))
 
+(define-form gc/let* (inits . prog)
+  (let ((gc/let*/1))
+    (set gc/let*/1 (lambda (inits prog)
+                     (if (pair? inits)
+                         `((let (,(car inits))
+                             (gc/protect (,(caar inits))
+                               ,@(gc/let*/1 (cdr inits) prog))))
+                       prog)))
+    (car (gc/let*/1 inits prog))))
+
 ;; opaque objects are black boxes for the gc.
 (define-function gc/new-object/opaque (type bytesize)
   (safety 1 (k/assert (not (= 0 type)) "gc/new-object/opaque: called with zero type"))
@@ -384,6 +394,9 @@
 (bootstrap-type <form>)
 (bootstrap-type <fixed>)
 (bootstrap-type <subr>)
+(bootstrap-type <variable>)
+(bootstrap-type <env>)
+(bootstrap-type <context>)
 (bootstrap-type <module>)
 
 ;;;
@@ -480,6 +493,15 @@
       (set (<subr>-_name obj) _name)
       obj)))
 
+(define-function new-<variable> (name value env index)
+  (let ((obj (gc/new-object <variable> (size-of-structure <variable>))))
+    (gc/protect (obj)
+      (set (<variable>-name  obj) name)
+      (set (<variable>-value obj) value)
+      (set (<variable>-env   obj) env)
+      (set (<variable>-index obj) (new-<long> index))
+      obj)))
+
 (define-function new-<module> ()
   (let ((obj (gc/new-object <module> (words-to-bytes (size-of-structure <module>)))))
     (gc/protect (obj)
@@ -530,6 +552,47 @@
 
 (define-form get/string		(obj)		`(get <string> _bits ,obj))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
+
+(define-function new-<env> (parent level offset)
+  (let ((obj (gc/new-object <env> (size-of-structure <env>))))
+    (gc/protect (obj)
+      (set (<env>-parent   obj) parent)
+      (set (<env>-level    obj) (new-<long> (if parent (+ (get/long (get <env> level parent)) level) 0)))
+      (set (<env>-offset   obj) (new-<long> offset))
+      (set (<env>-bindings obj) (new-<array> 0))
+      obj)))
+
+(define-function new-base-<context> (home caller env)
+  (let ((obj (gc/new-object <context> (size-of-structure <context>))))
+    (gc/protect (obj)
+      (set (<context>-home     obj) home)
+      (set (<context>-env      obj) env)
+      (set (<context>-bindings obj) (new-<array> 0))
+      obj)))
+
+;; (define-function new-<context> (home caller env)
+;;   (let ((obj (gc/new-object <env> (size-of-structure <context>))))
+;;     (gc/protect (obj)
+;;       (set (<context>-home     obj) home)
+;;       (set (<context>-env      obj) env)
+;;       (set (<context>-bindings obj) (new-<array> 0))
+;;       obj)))
+
+(define-function new-<context> (home caller env)
+  (let ((obj ()))
+    (if (and caller (set obj (get <context> callee caller)))
+        (let ()
+          (put <context> home obj home)
+          (put <context> env  obj env))
+      (set obj (new-base-<context> home caller env))
+      (and caller (put <context> callee caller obj)))
+    obj))
+
+(define-function global? (var)
+  (let ((env (get <variable> env var)))
+    (and env (= 0 (get/long (get <env> level env))))))
+
+;;; ----------------------------------------------------------------
 
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
                                          ( = ?\t c)                     ; ht
@@ -839,6 +902,16 @@
                                   (do_print (get <fixed> function obj) storing)
                                   (libc/printf ")")))
       ((= type <subr>)          (libc/printf "Subr(%s)" (get <subr> _name obj)))
+      ((= type <variable>)      (let ((env (get <variable> env obj)))
+                                  (do_print (get <variable> name obj) storing)
+                                  (and env
+                                       (libc/printf ".%d+%d"
+                                                    (get/long (get <env> level (get <variable> env obj)))
+                                                    (get/long (get <variable> index obj))))))
+      ((= type <env>)           (let ()
+                                  (libc/printf "Env<%d>" (get/long (get <env> level obj)))))
+      ((= type <context>)       (let ()
+                                  (libc/printf "Context<>")))
       (else                     (libc/printf "<type:%d>" type)))))
 
 (define-function k/print (obj) (do_print obj 0))        (define-function k/println (obj) (do_print obj 0) (libc/printf "\n"))

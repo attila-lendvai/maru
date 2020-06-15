@@ -5,3 +5,7 @@
 ;;;
 
 (warn "--- boostrapping: host extras\n")
+
+(define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
+(define-structure <env>		(parent level offset bindings stable))
+(define-structure <context>	(home env bindings callee pc))
