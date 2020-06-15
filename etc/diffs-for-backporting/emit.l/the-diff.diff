@@ -1,6 +1,6 @@
 --- minimal	2020-06-11 09:29:50.398370169 +0200
 +++ latest	2020-06-11 09:28:32.422001816 +0200
-@@ -1,18 +1,30 @@
+@@ -1,18 +1,28 @@
 -#!./eval
 +(require "osdefs.k")
  
@@ -26,8 +26,6 @@
 +    (set (<variable>-index self) index)
 +    self))
 +
-+(define-function variable? (obj) (= <variable> (type-of obj)))
-+
 +(define-function environment (parent)
 +  (let ((self (new <env>)))
 +    (set (<env>-parent   self) parent)
@@ -39,15 +37,6 @@
  ;;; EXTERN
  
  (define-structure <extern> (name stub))
-@@ -75,7 +87,7 @@
- 	 (sname (symbol->string opsym))
- 	 (tname (string->type-name sname)))
-     `(let ()
--       ,@(if (not (assq opsym *globals*)) `((define-instruction ,opsym)))
-+       ,@(if (not (defined? opsym *globals*)) `((define-instruction ,opsym)))
-        (define-multimethod emit ((,tname op) ,@(%define-emit-params 1 (cdr op-args))) ,@body))))
- 
- (define-function digit-for (c)
 @@ -108,9 +120,13 @@
        
  ;;; IA32 -- OPERANDS
@@ -68,7 +57,7 @@
  
  ;;; 
  
--(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
+-(define-structure <compiler> (env   param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
 +(define-structure <compiler> (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
  
 -(define-function compiler (env)
