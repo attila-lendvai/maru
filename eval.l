@@ -522,11 +522,11 @@
      (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
 
 ;; shorthands (and optimizations)
-(define-form is/long  (obj)     `(is <long> ,obj))
-(define-form get/long (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <long> '_bits))     `(get <long> _bits ,obj)))
-(define-form get/head (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'head))      `(get <pair> head ,obj)))
-(define-form get/tail (obj)     (if (< safety-level 4)     `(oop-at ,obj ,(structure-field-index <pair> 'tail))      `(get <pair> tail ,obj)))
-(define-form put/tail (obj val) (if (< safety-level 4) `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val) `(put <pair> tail ,obj ,val)))
+(define-form is/long		(obj)		`(is <long> ,obj))
+(define-form get/long		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <long> '_bits))		`(get <long> _bits ,obj)))
+(define-form get/head		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'head))		`(get <pair> head ,obj)))
+(define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'tail))		`(get <pair> tail ,obj)))
+(define-form put/tail		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
 
 (define-form get/string		(obj)		`(get <string> _bits ,obj))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))

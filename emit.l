@@ -110,8 +110,7 @@
   (let* ((op-name (car op-args))
          (type-name (symbol->type-name op-name)))
     `(let ()
-       ;; TODO factor out DEFINED?
-       ,@(unless (assq op-name (<module>-env (current-module)))
+       ,@(unless (defined? op-name)
            `((define-instruction ,op-name)))
        (define-multimethod emit ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
          ,@body))))

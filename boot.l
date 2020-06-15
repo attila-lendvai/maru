@@ -437,14 +437,18 @@
 (define-structure <pair>        (head tail))
 (define-structure <_array>      ())
 (define-structure <array>       (size _array))
-(define-structure <expr>        (defn env))
+(define-structure <expr>        (name defn env))			(define-function expr? (obj) (= <expr> (type-of obj)))
 (define-structure <form>        (function symbol)) ; these are expander lambda's
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_name _imp _sig _profile))
-(define-structure <module>      (symbols env))
 (define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
+(define-structure <module>      (symbols env))
+
+;; TODO replace with a subr primitive as in the piumarta branch?
+(define-function defined? (name)
+  (and (assq name (<module>-env (current-module))) 't))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
@@ -520,6 +524,8 @@
 
 (define-structure <selector> (name methods default))
 
+(define-function selector? (obj) (= <selector> (type-of obj)))
+
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
@@ -548,9 +554,8 @@
     (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
 
 (define-form define-method (selector type args . body)
-  (if (symbol? args)
-      `(add-method ,selector ',type ',(cons 'self args) ',body)
-      `(add-method ,selector ',type '(self ,@args) ',body)))
+  (or (defined? selector) (eval `(define-selector ,selector)))
+  `(add-method ,selector ,type ',(cons 'self args) ',body))
 
 ;;; print
 
@@ -649,6 +654,7 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
+  (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm)))
   (if types
       (let ((methods (or (<generic>-methods mm)
                          (set (<generic>-methods mm) (array 32)))))
@@ -663,6 +669,7 @@
 (define-form define-multimethod (method typed-args . body)
   (let ((args  (map cadr typed-args))
         (types (map car  typed-args)))
+    (or (defined? method) (eval (list 'define-generic method)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
 (define-apply <generic> (self . arguments)
@@ -727,10 +734,101 @@
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
-       (let ((,var (car _list_))) ,@body)
+       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
        (set _list_ (cdr _list_)))))
 
+(define-form alist-do (var alist . body)
+  `(let ((_list_ ,alist))
+     (while _list_
+       (let*  ((,var (cdar _list_))) ,@body)
+       (set _list_ (cdr _list_)))))
+
+(define-function %generic-do (get len var col body)
+  `(let* ((_col_ ,col)
+          (_idx_ 0)
+          (_end_ (,len _col_)))
+     (while (< _idx_ _end_)
+       (let* ((,var (,get _col_ _idx_))) ,@body)
+       (set _idx_ (+ _idx_ 1)))))
+
+(define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
+
+(define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
+
+;; TODO reinstate
+;; (define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
+;; (define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
+;; (define-method for-each <string> (function)	(string-do _elt_ self (function _elt_)))
+
+(define-function for-each-with (collection function value)
+  (for-each collection (lambda (x) (function x value))))
+
+(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
+(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
+
+(define-form until (condition . body)
+  `(while (not ,condition) ,@body))
+
+(define-form list-detect (name list expr)
+  `(let ((_ ())
+         (__ ,list))
+     (while (and __ (not _))
+       (let* ((,name (car __)))
+         (and ,expr (set _ (car __)))
+         (set __ (cdr __))))
+     _))
+
+(define-form array-detect (name arr expr)
+  `(let* ((_ ())
+          (_a ,arr)
+          (_l (array-length _a)))
+     (for (_i 0 _l)
+       (let ((,name (array-at _a _i)))
+         (and ,expr (let () (set _ ,name) (set _i _l)))))
+     _))
+
+(define-function %loop-inits (bindings)
+  (and bindings
+       (cons (list (caar bindings) (cadar bindings))
+             (%loop-inits (cdr bindings)))))
+
+(define-function %loop-steps (bindings)
+  (and bindings
+       (cons (list 'set (caar bindings) (caddar bindings))
+             (%loop-steps (cdr bindings)))))
+
+(define-form loop (bindings test . body)
+  `(let ,(%loop-inits bindings)
+     (while ,test
+       ,@body
+       ,@(%loop-steps bindings))))
+
 ;;; conversion
+
+(define-function string->number-base (str radix)
+  (let ((n 0)
+        (i 0)
+        (l (string-length str))
+        (s 1))
+    (while (and (< i l) (= ?- (string-at str i)))
+      (set s (- s))
+      (set i (+ i 1)))
+    (while (< i l)
+      (let* ((c (string-at str i))
+             (d (cond
+                  ((and (<= ?0 c) (<= c ?9))	      (- c ?0) )
+                  ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
+                  ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
+                  (else				radix          ))))
+        (if (< d radix)
+            (let ()
+              (set n (+ (* radix n) d))
+              (set i (+ i 1)))
+          (set l i))))
+    (* s n)))
+
+(define-function string->number (str)
+  (string->number-base str 10))
 
 (define-function array->string (arr lim)
   (let ((ind 0)
@@ -739,3 +837,84 @@
       (set-string-at str ind (array-at arr ind))
       (set ind (+ 1 ind)))
     str))
+
+(define-function array->list (arr)
+  (let* ((ind (array-length arr))
+         (lst ()))
+    (while (<= 0 (set ind (- ind 1)))
+      (set lst (cons (array-at arr ind) lst)))
+    lst))
+
+(define-function list->string (list)
+  (let* ((len (list-length list))
+         (str (string len))
+         (idx 0))
+    (while (< idx len)
+      (set-string-at str idx (car list))
+      (set idx (+ idx 1))
+      (set list (cdr list)))
+    str))
+
+(define-function character->string (c)
+  (let ((s (string 1)))
+    (set-string-at s 0 c) s))
+
+(define-function array-append-all (a s)
+  (string-do e s (array-append a e))
+  s)
+
+;;; sorting and searching
+
+(define-function %partition (items at set-at compare left pivot right)
+  (let ((index left)
+        (value (at items pivot)))
+    (set-at items pivot (at items right))
+    (set-at items right value)
+    (for (i left right)
+      (and (compare (at items i) value)
+           (let ((item (at items i)))
+             (set-at items i (at items index))
+             (set-at items index item)
+             (set index (+ index 1)))))
+    (set value (at items index))
+    (set-at items index (at items right))
+    (set-at items right value)
+    index))
+
+(define-function %sort (items at set-at compare left right)
+  (and (< left right)
+       (let* ((pivot (/ (+ left right) 2))
+              (index (%partition items at set-at compare left pivot right)))
+         (%sort items at set-at compare left (- index 1))
+         (%sort items at set-at compare (+ index 1) right))))
+
+(define-function array-sort (items . options)
+  (%sort items array-at set-array-at (or (car options) <) 0 (- (array-length items) 1))
+  items)
+
+(define-function string-sort (items . options)
+  (%sort items string-at set-string-at (or (car options) <) 0 (- (string-length items) 1))
+  items)
+
+(define-function %search (items length at obj compare)
+  (let ((lo 0)
+        (hi (- (length items) 1))
+        (ix ()))
+    (while (<= lo hi)
+      (let* ((m (/ (+ lo hi) 2))
+             (s (at items m))
+             (c (compare obj s)))
+        (cond
+          ((< c 0)	(set hi (- m 1)))
+          ((> c 0)	(set lo (+ m 1)))
+          (else		(let () (set ix m) (set lo (+ hi 1)))))))
+    ix))
+
+(define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
+(define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
+
+(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
+(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
+(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
