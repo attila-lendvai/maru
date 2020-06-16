@@ -563,7 +563,7 @@
 				  (printf "Array(")
 				  (for (i 0 len)
 				    (and i (printf " "))
-				    (do_print (k_array_at obj i)))
+				    (do_print (k_array_at obj i) storing))
 				  (printf ")")))
       ((= type <expr>)		(let ()
 				  (printf "Expr(")
@@ -581,7 +581,7 @@
 				  (printf ")")))
       ((= type <subr>)		(printf "Subr(%s)" (get <subr> _name obj)))
       ((= type <variable>)	(let ((env (get <variable> env obj)))
- 				  (do_print (get <variable> name obj))
+				  (do_print (get <variable> name obj) storing)
 				  (and env
 				       (printf ".%d+%d"
 					       (get_long (get <env> level (get <variable> env obj)))
@@ -819,7 +819,7 @@
 				  (if (= ?@ d)
 				      (read_quote s_unquote_splicing stream)
 				    (ungetc d stream)
-				    (read_quote s_unquote)))))
+				    (read_quote s_unquote stream)))))
 	((is_letter c)	(return (read_symbol c stream)))
 	((= ?\( c)	(return (read_list ?\) stream)))	((= ?\) c)	(return (let () (ungetc c stream) DONE)))
 	((= ?\[ c)	(return (read_list ?\] stream)))	((= ?\] c)	(return (let () (ungetc c stream) DONE)))
