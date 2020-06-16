@@ -6,7 +6,7 @@ Maru is a programming language. It's a tiny, self-hosting lisp dialect:
 a symbolic expression evaluator that can compile its own implementation language,
 in less than 2000 LoC.
 
-This repo is also the place of exploration in the land of bootstrapping
+This repo is also a place of exploration in the land of bootstrapping
 and computing system development. I'm planning to introduce simpler languages
 into the bootstrap process; e.g. develop
 [a trivial stack machine based language](https://github.com/nagydani/seedling/)
@@ -57,15 +57,15 @@ If you want to use such a new language feature in its own implementation,
 then you need to *bootstrap* it:
 
 1) first implement the support for it in your compiler, and produce
-   an executable that already supports this new version of the language
-2) then you can start using this feature, and now you may even rewrite the
-   implementation of this feature, and use/assume this feature in it.
+   an executable that can already compile this new version of the language
+2) after that you can start using this feature, and now you may even rewrite the
+   implementation of this very feature, and use/assume this feature in it.
 
 It's a confusing enough process, so it makes sense to fork the codebase at the point between 1) and 2).
-Strictly speaking, checking out a specific prior commit would be enough for bootstrapping,
+Strictly speaking, checking out and building a specific prior commit would be enough for bootstrapping,
 but you may want to harmonize the build system, or you need to `git cherry-pick` some fixes into 1),
 and sometimes the implementation of the new feature simply requires two parallel, wildly diverged
-instances of the codebase, until the feature is fully implemented/debugged.
+instances of the codebase, until the feature is fully implemented/debugged/bootstrapped.
 But once it's working fine, the old branch becomes irrelevant/stale, except for:
 
 - didactic purposes (easier to follow how a language grows)
