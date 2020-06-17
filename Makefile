@@ -13,8 +13,9 @@ all: eval
 eval: $(BUILD)/eval2
 	cp $(BUILD)/eval2 ./eval
 
-test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3.s
+test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3
 	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s
+	$(DIFF) $(BUILD)/eval2.stripped $(BUILD)/eval3.stripped
 
 $(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l eval.l
 	time $(BOOT_EVAL_PATH)/eval		\
@@ -34,6 +35,7 @@ $(BUILD)/eval3.s: $(BUILD)/eval2 boot.l emit.l eval.l
 
 $(BUILD)/%: $(BUILD)/%.s
 	$(CC) $(CFLAGS) -o $@ $<
+	strip $@ -o $@.stripped
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
