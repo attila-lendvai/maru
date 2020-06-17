@@ -3,3 +3,5 @@
 (warn "--- boostrapping: early\n")
 
 (switch-to-slave-module)
+
+(warn "--- boostrapping: boot.l\n")

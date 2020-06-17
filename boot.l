@@ -157,6 +157,18 @@
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
 
+(define-form define-macro (name args . body)
+  `(define-form ,name ,args (cons 'let (cons () (macro-expand (zip-assocs ',args (list ,@args)) ',body)))))
+
+(define-function macro-expand (bindings exp)
+  (if (pair? exp)
+      (cons (macro-expand bindings (car exp))
+            (macro-expand bindings (cdr exp)))
+    (if (symbol? exp)
+        (let ((a (assq exp bindings)))
+          (if a (cdr a) exp))
+      exp)))
+
 (define-function list-length (list)
   (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)
   (if (pair? list)
@@ -441,24 +453,26 @@
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
 (define-structure <undefined>   ())
-(define-structure <long>        (_bits))				(define-function long? (self) (= <long> (type-of self)))
+(define-structure <long>        (_bits))
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))
 (define-structure <pair>        (head tail))
 (define-structure <_array>      ())
 (define-structure <array>       (size _array))
 (define-structure <expr>        (name defn env))			(define-function expr? (obj) (= <expr> (type-of obj)))
-(define-structure <form>        (function symbol)) ; these are expander lambda's
+(define-structure <form>        (function symbol))      ; these are expander lambda's
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_name _imp _sig _profile))
-(define-structure <variable>	(name value env index type))		(define-function variable? (obj) (= <variable> (type-of obj)))
+(define-structure <variable>	(name value env index type))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 (define-structure <module>      (symbols env))
 
+(define-function long?		(obj)	(= <long>	(type-of obj)))
 ;; TODO replace with a subr primitive as in the piumarta branch?
 (define-function defined? (name)
   (and (assq name (<module>-env (current-module))) 't))
+(define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
@@ -614,6 +628,21 @@
         (print " ")))
   (print ")"))
 
+(define-method do-dump <pair> ()
+  (if (= *globals* (cdr self)) ;; TODO is this still needed?
+      (print "*globals*")
+    (let ()
+      (print "(")
+      (while self
+        (if (pair? self)
+            (dump (car self))
+          (let ()
+            (print ". ")
+            (print self)))
+        (if (set self (cdr self))
+            (print " ")))
+      (print ")"))))
+
 (define-function dump-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
@@ -632,19 +661,19 @@
             (if (set arg (cdr arg))
                 (print " ")))
           (print ")"))
-      (print arg))
+      (dump arg))
     found))
 
-(define *backtrace*
-  (lambda (stack depth)
-    (let ((posn (array)))
-      (while (>= (set depth (- depth 1)) 0)
-        (let ((here (array-at stack depth)))
-          (print "  " depth "\t")
-          (dump-until posn here)
-          (print "\n")
-          (set posn here))))
-    (exit 0)))
+;; (define *backtrace*
+;;   (lambda (stack depth)
+;;     (let ((posn (array)))
+;;       (while (>= (set depth (- depth 1)) 0)
+;;         (let ((here (array-at stack depth)))
+;;           (print "  " depth "\t")
+;;           (dump-until posn here)
+;;           (print "\n")
+;;           (set posn here))))
+;;     (exit 0)))
 
 ;;; generic/multimethod (dispatch on the type of all arguments)
 

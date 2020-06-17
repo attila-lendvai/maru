@@ -588,7 +588,7 @@
       (and caller (put <context> callee caller obj)))
     obj))
 
-(define-function global? (var)
+(define-function global-variable? (var)
   (let ((env (get <variable> env var)))
     (and env (= 0 (get/long (get <env> level env))))))
 
@@ -875,7 +875,7 @@
                                           (libc/printf "\\%03o" c))
                                         (set i (+ 1 i)))
                                       (libc/printf "\"")))))
-      ((= type <symbol>)        (libc/printf "%s" (get <symbol> _bits obj)))
+      ((= type <symbol>)        (libc/printf "%s" (get/symbol obj)))
       ((= type <pair>)          (let ()
                                   (libc/printf "(")
                                   (while (is <pair> obj)
@@ -894,20 +894,20 @@
                                     (do_print (k/array-at obj i) storing))
                                   (libc/printf ")")))
       ((= type <expr>)          (let ()
-                                  (libc/printf "Expr(")
-                                  (do_print (k/car (get <expr> defn obj)) storing)
-                                  (libc/printf ")")))
+                                  (libc/printf "Expr<")
+                                  (do_print (k/cadr (get <expr> defn obj)) storing)
+                                  (libc/printf ">")))
       ((= type <form>)          (let ()
-                                  (libc/printf "Form(")
+                                  (libc/printf "Form<")
                                   (do_print (get <form> function obj) storing)
                                   (libc/printf ",")
                                   (do_print (get <form> symbol   obj) storing)
-                                  (libc/printf ")")))
+                                  (libc/printf ">")))
       ((= type <fixed>)         (let ()
-                                  (libc/printf "Fixed(")
+                                  (libc/printf "Fixed<")
                                   (do_print (get <fixed> function obj) storing)
-                                  (libc/printf ")")))
-      ((= type <subr>)          (libc/printf "Subr(%s)" (get <subr> _name obj)))
+                                  (libc/printf ">")))
+      ((= type <subr>)          (libc/printf "Subr<%s>" (get <subr> _name obj)))
       ((= type <variable>)      (let ((env (get <variable> env obj)))
                                   (do_print (get <variable> name obj) storing)
                                   (and env
@@ -994,16 +994,16 @@
 (define-function k/array-append (array val)
   (k/set-array-at array (k/array-length array) val))
 
-(define-function k/array-insert (obj index value)
-  (let ((len (k/array-length obj)))
-    (k/array-append obj value)         ; ensure we have enough room
+(define-function k/array-insert (array index value)
+  (let ((len (k/array-length array)))
+    (k/array-append array value)         ; ensure we have enough room
     (and (< index len)
-         (let* ((elts (get <array> _array obj))
+         (let* ((elts (get <array> _array array))
                 (src (+ elts (words-to-bytes index))))
            (move-oops src
                       (+ src (words-to-bytes 1))
                       (- len index)))))
-  (k/set-array-at obj index value))
+  (k/set-array-at array index value))
 
 (define-function k/concat-list (head tail)
   (if (is <pair> head)
@@ -1624,6 +1624,7 @@
       (k/error "LOOKUP-ENV-ENTRY failed for '"name"' in module "module)))
 
 (define-function populate-module-with-primitives (module)
+  (debug (libc/printf "populate-module-with-primitives on %p\n" module))
   (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
   ;; the predefined primitives of the language
   (let ((tmp)
@@ -1709,6 +1710,7 @@
   )
 
 (define-function capture-well-known-vm-values ()
+  (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (set symbol/t                      (intern* "t"                *module*))
   (set symbol/dot                    (intern* "."                *module*))
@@ -1736,15 +1738,17 @@
 
   (gc/initialise)
 
+  (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
+  (gc/push-root (address-of *backtrace-stack*))
   (safety 4 (set gc/frequency 1))
 
   (debug (libc/printf "gc initialized\n"))
 
-  (set *module* (new-<module>))          (gc/push-root (address-of *module*))
+  (set *module* (new-<module>))
 
   (debug (libc/printf "*module* initialized\n"))
 
-  (set *backtrace-stack* (new-<array> 32))     (gc/push-root (address-of *backtrace-stack*))
+  (set *backtrace-stack* (new-<array> 32))
 
   (debug (libc/printf "populating *module*\n"))
 
