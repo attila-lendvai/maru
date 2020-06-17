@@ -102,10 +102,10 @@ whose semantics they depend on. IOW, the `maru.2` stage is built using the
 `eval` executable, `boot.l`, and `emit.l` of the previous stage (`maru.1`).
 
 During the build the previous stage is `git checkout`'ed locally under `./build/`
-and its build process is invoked in that directory (note that short of caching
+and its own build process is invoked in that directory (note that short of caching
 the build output, which is planned, this potentially becomes a
-recursive process until a stage is reached that can be compiled with an
-assumed external dependency; e.g. gcc building the stage 0 eval.c).
+recursive process until a stage is reached that can be built using some
+assumed external dependency; e.g. GCC building an eval.c).
 
 My plan is not only to grow, but also to *shrink* the languages (i.e. try to introduce
 "negative" bootstrap stages). This will be part of the collaboration with
@@ -117,7 +117,7 @@ TL;DR: From the default branch (currently `maru.3`) invoke `make test-bootstrap`
 
 **Linux:**
 
-You need support for compiling and running 32bit C code. On Debian based x64 systems:
+Currently you need support for compiling and running 32bit C code. On Debian based x64 systems:
 
 ```
 sudo apt-get install gcc-multilib
@@ -155,13 +155,28 @@ a repo and a maintainer.
 
 ## Status
 
-There are 3 stages now, introducing non-trivial features. The repo structure seems to slowly mature.
+### Maru's status
 
-A short-term TODO:
+The compiler in `emit.l` currently emits an `eval.s` text file. Therefore, for now, a
+C toolchain is required for a full circle of bootstrap. With the addition of an IA-32
+assembler this requirement can be eliminated; i.e. there's no inherent external
+dependency in the codebase (besides the services that `libc` provides).
+
+Backporting of the latest from the `piumarta` branch is in progress.
+
+Assorted TODO:
+- revive all the goodies in the `piumarta` branch, but in a structured way
+- become agnostic of the machine word size (support 64bit)
+- generate LLVM output
+
+### Build system status
+
+There are 3 Maru stages/branches now, introducing non-trivial features. The repo structure seems to slowly mature.
+
+Assorted TODO:
 - capture the emitted `eval.s` files and check them into the repo; add makefile targets
-that use them, regenerate them, compare them (to "short circuit" the bootstrap process).
-- revive all the goodies in the `piumarta` branch, but in a structured way.
-- generate LLVM output; support 64bit.
+that use them, regenerate them, compare them (to "short circuit" the bootstrap process)
+- rewrite the build process in Maru; eliminate dependency on makefiles
 
 ### History
 
@@ -184,22 +199,21 @@ Their annual reports:
 
 The `piumarta` branch of this git repo is a conversion of Ian Piumarta's Mercurial
 repo that was once available at http://piumarta.com/hg/maru/. To the best of my knowledge
-this is latest publically available state of Ian's work. The `piumarta` branch will be
-left untouched, but the plan is to eventually revive most of the goodies from this branch,
-but in a more organized and approachable manner, and also paying attention to the
+this is the latest publically available state of Ian's work. This repo was full of
+assorted code, probably driving the VPRI demos.
+
+The `piumarta` branch will be left stale (modulo small fixes and cleanups).
+My plan is to eventually revive most of the goodies from this branch, but in a
+more organized and approachable manner, and also paying attention to the
 bootstrapping issues.
 
-Ian published another Mercurial repo somewhere halfway in the commit history,
-with only a few commits. I assume that it was meant to hold a minimal version
-of Maru that can already self-host, but is not tailored to accommodate for the VPRI demos.
-I started out my work from this minimal repo (hence the divergence between the
-git branch histories).
+Ian published another Mercurial repo somewhere halfway in the commit history
+with only a couple of commits from around 2011. I assume that it was meant to hold
+the minimal/historical version of Maru that can already self-host. I started out
+my work from this minimal repo (hence the divergence between the `piumarta` and
+the `maru.x` branches in this repo).
 
 **This repo will receive forced pushes** (i.e.
-`git push -f` to rewrite git history (except the `piumarta` branch)) until I come up with
+**`git push -f`** to rewrite git history (except the `piumarta` branch)) until I come up with
 a build setup that nicely facilitates bootstrapping in multiple, parallel bootstrapping
 paths of language development.
-
-There were two Mercurial repositories, one for the VPRI demos, and one for the
-minimal self-hosting Maru (? it's just an assumption of mine). I based my work
-on top of the minimal repo, which was created by Ian in 2011.
