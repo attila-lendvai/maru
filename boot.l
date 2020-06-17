@@ -5,17 +5,27 @@
 (define primitive/print print)
 (define primitive/dump  dump)
 
-(define error/nested
+(define error)
+
+(define error/nested/2
   (lambda args
     (set error abort) ; let's give up in case of more recursive errors
-    (primitive/print "\nNESTED ERROR: ")
+    (primitive/print "\nNESTED ERROR LEVEL 2: ")
     (apply primitive/print args)
     (primitive/print "\n")
     (abort)))
 
-(define error
+(define error/nested/1
   (lambda args
-    (set error error/nested) ; in case a nested error happens while reporting
+    (set error error/nested/2)
+    (primitive/print "\nNESTED ERROR LEVEL 1: ")
+    (apply primitive/print args)
+    (primitive/print "\n")
+    (abort)))
+
+(set error
+  (lambda args
+    (set error error/nested/1) ; in case a nested error happens while reporting
     (primitive/print "\nerror: ")
     (apply print args)
     (primitive/print "\n")
