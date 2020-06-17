@@ -19,6 +19,7 @@ test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3.s
 $(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l bootstrapping/*.l boot.l eval.l
 	time $(BOOT_EVAL_PATH)/eval		\
 		$(BOOT_EVAL_PATH)/boot.l	\
+		bootstrapping/prepare.l		\
 		bootstrapping/host-extras.l	\
 		bootstrapping/early.l		\
 		boot.l				\
@@ -28,7 +29,7 @@ $(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PA
 		eval.l				\
 			>$(BUILD)/eval1.s || { touch --date=2000-01-01 $(BUILD)/eval1.s; exit 42; }
 
-$(BUILD)/eval2.s: $(BUILD)/eval1  boot.l emit.l bootstrapping/*.l eval.l
+$(BUILD)/eval2.s: $(BUILD)/eval1 boot.l emit.l bootstrapping/*.l eval.l
 	$(call bootstrap,$(BUILD)/eval1,$(BUILD)/eval2.s)
 	$(DIFF) $(BUILD)/eval1.s $(BUILD)/eval2.s >$(BUILD)/eval2.diff || true
 
@@ -77,6 +78,7 @@ distclean:
 define bootstrap
  time $(1)				\
 	boot.l				\
+	bootstrapping/prepare.l		\
 	bootstrapping/early.l		\
 	boot.l				\
 	bootstrapping/late.l		\
