@@ -1,8 +1,0 @@
-(define-constant SDL_WINDOW_FULLSCREEN 1)
-(define-constant SDL_WINDOW_SHOWN 4)
-(define-constant SDL_INIT_VIDEO 32)
-(define-constant SDL_KEYUP 769)
-(define-constant SDL_MOUSEBUTTONDOWN 1025)
-(define-constant SDL_MOUSEBUTTONUP 1026)
-(define-constant SDL_MOUSEMOTION 1024)
-(define-constant SDLK_ESCAPE 27)
