@@ -13,7 +13,7 @@ all: eval
 eval: $(BUILD)/eval2
 	cp $(BUILD)/eval2 ./eval
 
-test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3
+test-bootstrap: $(BUILD)/eval1 $(BUILD)/eval2 $(BUILD)/eval3
 	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s
 	$(DIFF) $(BUILD)/eval2.stripped $(BUILD)/eval3.stripped
 
@@ -25,11 +25,13 @@ $(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PA
 		eval.l				\
 			>$(BUILD)/eval1.s || { touch --date=2000-01-01 $(BUILD)/eval1.s; exit 42; }
 
-$(BUILD)/eval2.s: $(BUILD)/eval1  boot.l emit.l eval.l
+$(BUILD)/eval2.s: boot.l emit.l eval.l
+	$(MAKE) $(BUILD)/eval1
 	$(call bootstrap,$(BUILD)/eval1,$(BUILD)/eval2.s)
 	$(DIFF) $(BUILD)/eval1.s $(BUILD)/eval2.s >$(BUILD)/eval2.diff || true
 
-$(BUILD)/eval3.s: $(BUILD)/eval2 boot.l emit.l eval.l
+$(BUILD)/eval3.s: boot.l emit.l eval.l
+	$(MAKE) $(BUILD)/eval2
 	$(call bootstrap,$(BUILD)/eval2,$(BUILD)/eval3.s)
 	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s >$(BUILD)/eval3.diff || true
 
