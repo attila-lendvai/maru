@@ -122,7 +122,10 @@
 ;;;
 (compile-begin)
 
-(define-constant +done+ -4) ; NOTE: be careful when introducing tagged immediates!
+;; TODO we need a value here that k/read cannot ever return.
+;;      get some unique identity, something along the lines of:
+;;      (define k/+done+ (address-of k/+done+))
+(define-constant k/+done+ -4) ; NOTE: be careful when introducing tagged immediates!
 
 (define *backtrace-stack*     0)
 (define *backtrace-index*     0)
@@ -931,7 +934,7 @@
          (tail head)
          (elt  ()))
     (gc/protect (head elt)
-      (while (and (!= +done+ (set elt (k/read stream)))
+      (while (and (!= k/+done+ (set elt (k/read stream)))
                   (!= symbol/dot elt))
         (set elt (new-<pair> elt ()))
         (set tail (put/tail tail elt)))
@@ -943,7 +946,7 @@
 
 (define-function read_quote (prefix stream)
   (let ((qobj (k/read stream)))
-    (when (= +done+ qobj)
+    (when (= k/+done+ qobj)
       (k/error "EOF while reading quoted literal"))
     (gc/protect (qobj)
       (set qobj (new-<pair> qobj ()))
@@ -967,15 +970,15 @@
                                     (libc/ungetc d stream)
                                     (read_quote symbol/unquote stream)))))
         ((is_letter c)  (return (read_symbol c stream)))
-        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) +done+)))
-        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) +done+)))
-        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) +done+)))
+        ((= ?\( c)      (return (read_list ?\) stream)))        ((= ?\) c)      (return (let () (libc/ungetc c stream) k/+done+)))
+        ((= ?\[ c)      (return (read_list ?\] stream)))        ((= ?\] c)      (return (let () (libc/ungetc c stream) k/+done+)))
+        ((= ?\{ c)      (return (read_list ?\} stream)))        ((= ?\} c)      (return (let () (libc/ungetc c stream) k/+done+)))
         ((is_digit10 c) (return (read_number c stream)))
         ((= ?\; c)      (while (and (!= ?\n (set c (libc/getc stream)))
                                     (!= ?\r c)
                                     (!= libc/EOF c))))
         ((= ?\" c)      (return (read_string c stream)))
-        ((= c libc/EOF) (return +done+)) ; TODO use feof and ferror to check whether it's an error, or a true libc/EOF
+        ((= c libc/EOF) (return k/+done+)) ; TODO use feof and ferror to check whether it's an error, or a true libc/EOF
         (else           (fatal1 "illegal character: %c" c))))))
 )
 ;;;
@@ -1733,7 +1736,7 @@
       (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
       (while (let ()
                (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/fflush libc/stdout))
-               (!= +done+ (set res (k/read stream))))
+               (!= k/+done+ (set res (k/read stream))))
         (let ((env (new-<env> (get/globals *module*) 1 0)))
           (gc/protect (env)
             (and (> *arg/verbose* 0) (libc/printf ";;; ") (k/dumpln res))
