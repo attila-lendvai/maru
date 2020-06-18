@@ -393,28 +393,34 @@
 ;;;
 ;;; types and their kernel accessors
 ;;; ----------------------------------------------------------------
+;;;
+;;; types are represented at runtime as integers upfrom 0.
+;;; <undefined> doesn't need to be denoted by zero.
+;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
 
-;; NOTE: types are represented at runtime as integers (starting with 0 as <undefined>).
-;;       the subr's here in eval.l encode/implement the behavior of the primitive types.
-;; TODO get rid of these by using something like a symbol-macro that turns the references into literal integers.
-(define-form bootstrap-type (type-name)
-  `(define-constant ,type-name ,(eval type-name)))
+(define-form bootstrap-types type-names
+  `(let ()
+     ,@(map (lambda (type-name)
+              `(define-constant ,type-name ,(eval type-name)))
+            type-names)))
 
-(bootstrap-type <undefined>)
-(bootstrap-type <long>)
-(bootstrap-type <string>)
-(bootstrap-type <symbol>)
-(bootstrap-type <pair>)
-(bootstrap-type <_array>)
-(bootstrap-type <array>)
-(bootstrap-type <expr>)
-(bootstrap-type <form>)
-(bootstrap-type <fixed>)
-(bootstrap-type <subr>)
-(bootstrap-type <variable>)
-(bootstrap-type <env>)
-(bootstrap-type <context>)
-(bootstrap-type <module>)
+;; level-shift the ids of some types that we will need to denote in the target
+(bootstrap-types
+ <undefined>
+ <long>
+ <string>
+ <symbol>
+ <pair>
+ <_array>
+ <array>
+ <expr>
+ <form>
+ <fixed>
+ <subr>
+ <variable>
+ <env>
+ <context>
+ <module>)
 
 (define-form is (type arg)
   `(let ((__arg__ ,arg))
