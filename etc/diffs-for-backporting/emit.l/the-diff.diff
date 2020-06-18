@@ -1,6 +1,6 @@
 --- minimal	2020-06-11 09:29:50.398370169 +0200
 +++ latest	2020-06-11 09:28:32.422001816 +0200
-@@ -1,18 +1,28 @@
+@@ -1,15 +1,9 @@
 -#!./eval
 +(require "osdefs.k")
  
@@ -18,22 +18,22 @@
  
  (define-function align (alignment value)	(& (- alignment) (+ (- alignment 1) value )))
  
-+(define-function variable (name value env index)
-+  (let ((self (new <variable>)))
-+    (set (<variable>-name  self) name)
-+    (set (<variable>-value self) value)
-+    (set (<variable>-env   self) env)
-+    (set (<variable>-index self) index)
-+    self))
-+
-+(define-function environment (parent)
-+  (let ((self (new <env>)))
-+    (set (<env>-parent   self) parent)
-+    (set (<env>-level    self) (if parent (<env>-level  parent) 0))
-+    (set (<env>-offset   self) 0)
-+    (set (<env>-bindings self) (array))
-+    self))
-+
+(define-function variable (name value env index)
+  (let ((self (new <variable>)))
+    (set (<variable>-name  self) name)
+    (set (<variable>-value self) value)
+    (set (<variable>-env   self) env)
+    (set (<variable>-index self) index)
+    self))
+
+(define-function environment (parent)
+  (let ((self (new <env>)))
+    (set (<env>-parent   self) parent)
+    (set (<env>-level    self) (if parent (<env>-level  parent) 0))
+    (set (<env>-offset   self) 0)
+    (set (<env>-bindings self) (array))
+    self))
+
  ;;; EXTERN
  
  (define-structure <extern> (name stub))
@@ -53,108 +53,7 @@
  
  (define-operand LABEL (name) 	__PREFIX__(mangle-label (<LABEL>-name self)))
  (define-operand GI32 (name)	(<GI32>-name self))
-@@ -240,11 +260,11 @@
- 
- ;;; 
- 
--(define-structure <compiler> (env   param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
-+(define-structure <compiler> (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
- 
--(define-function compiler (env)
-+(define-function compiler (level)
-   (let ((self (new <compiler>)))
--    (set (<compiler>-env self) env)
-+    (set (<compiler>-level	   self) level)
-     (set (<compiler>-param-counter self) 0)
-     (set (<compiler>-arg-counter self) 0)
-     (set (<compiler>-arg-limit self) 0)
-@@ -298,14 +318,13 @@
- (define-method gen <undefined>	(comp)	(gen comp LOAD (LI32 0)))
- (define-method gen <long>	(comp)	(gen comp LOAD (LI32 self)))
- 
--(define-method gen <symbol> (comp)
--  (let ((value (cdr (assq self (<compiler>-env comp)))))
--    (or value (error "gen: undefined variable: " self))
-+(define-method gen <variable> (comp)
-+  (let ((value (<variable>-value self)))
-     (if (extern? value)
--	(gen comp LOAD (GI32 (LABEL (concat-symbol self '$stub))))
-+	(gen comp LOAD (GI32 (LABEL (concat-symbol (<variable>-name self) '$stub))))
-       (if (temp? value)
- 	  (gen comp LOAD value)
--	  (gen comp LOAD (GI32 (LABEL self)))))))
-+	  (gen comp LOAD (GI32 (LABEL (<variable>-name self))))))))
- 
- (define-method gen <string> (comp)
-   (let ((label (LABEL (temp-label-name))))
-@@ -363,21 +382,16 @@
-      (,oop-at         ,OOP-AT) (,string-at         ,CHR-AT))
-     ((,set-oop-at ,SET-OOP-AT) (,set-string-at ,SET-CHR-AT))	; ternary
-     )))
- 
- (define-function gen-let-binding (binding comp)
--  (let ((name (car binding))
--	(temp (gen-tmp-prog (cdr binding) comp)))
--    ;x;(print "COMPILER ENV " (<compiler>-env comp))
--    (set (<compiler>-env comp) (cons (cons name temp) (<compiler>-env comp)))
--    ;x;(println " -> " (<compiler>-env comp))
--    temp))
-+  (let ((var (car binding))
-+	(tmp (gen-tmp-prog (cdr binding) comp)))
-+    (set (<variable>-value var) tmp)))
- 
- (define-function gen-let (expr comp)
--  (let ((outer (<compiler>-env comp))
--	(temps (map-with gen-let-binding (cadr expr) comp)))
--    (list-do stmt (cddr expr) (gen stmt comp))
--    (list-do temp temps (free-temp comp temp))
--    (set (<compiler>-env comp) outer)))
-+  (let ((temps (map-with gen-let-binding (caddr expr) comp)))
-+    (list-do stmt (cdddr expr) (gen stmt comp))
-+    (list-do temp temps (free-temp comp temp))))
- 
- (define-function gen-and (expr comp)
-   (let ((done (LABEL (temp-label-name))))
-@@ -422,26 +436,24 @@
-     (gen comp BT body)))
- 
- (define-function gen-set (expr comp)
--  (let ((name (cadr  expr))
--	(valu (caddr expr)))
--    (gen valu comp)
--    (let ((var (cdr (assq name (<compiler>-env comp)))))
--      (or var (error "set: undefined variable: "name))
--      (if (temp? var)
--	  (gen comp STORE var)
--	(gen comp STORE (GI32 (LABEL name)))))))
-+  (let* ((var (cadr expr))
-+	 (val (<variable>-value var)))
-+    (gen (caddr expr) comp)
-+    (if (temp? val)
-+	(gen comp STORE val)
-+      (gen comp STORE (GI32 (LABEL (<variable>-name var)))))))
- 
- (define-function gen-return (expr comp)
-   (list-do stmt (cdr expr) (gen stmt comp))
-   (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
- 
- (define-function gen-address-of (expr comp)
--  (let ((name (cadr expr)))
--    (or (symbol? name) (error "address-of: non-identifier argument: "name))
--    (let ((var (cdr (assq name (<compiler>-env comp)))))
--      (if (temp? var)
--	  (gen comp ADDR var)
--	(gen comp ADDR (GI32 (LABEL name)))))))
-+  (let ((var (cadr expr)))
-+    (or (variable? var) (error "address-of: non-variable argument: "var))
-+    (let ((val (<variable>-value var)))
-+      (if (temp? val)
-+	  (gen comp ADDR val)
-+	(gen comp ADDR (GI32 (LABEL (<variable>-name var))))))))
- 
- (define forms (list
-   (cons  let		gen-let)
-@@ -450,18 +465,27 @@
+@@ -450,9 +465,18 @@
    (cons  if	 	gen-if)
    (cons  while		gen-while)
    (cons  set	 	gen-set)
@@ -173,64 +72,15 @@
 +		(gen comp DEFLABEL (LABEL (temp-label-name)))))))
    (let* ((head  (car self))
  	 (arity (- (list-length self) 1))
--	 (op    (cadr (assq head (array-at operators arity)))))
-+	 (op    (and (variable? head) (cadr (assq (<variable>-value head) (array-at operators arity))))))
+	 (op    (and (variable? head) (cadr (assq (<variable>-value head) (array-at operators arity))))))
      (if op
  	((array-at generators arity) op (cdr self) comp)
        (if (set op (cdr (assq head forms)))
  	  (op self comp)
--	(let ((tmps (map-with gen-tmp (cdr self) comp))
-+	(let* ((tmps (map-with gen-tmp (cdr self) comp))
+	(let* ((tmps (map-with gen-tmp (cdr self) comp))
  	      (args (map-with gen-arg (cdr self) comp))
  	      (func (gen (car self) comp))
  	      (narg (list-length args)))
-@@ -491,9 +515,9 @@
-     (gen comp TEXT)))
- 
- (define-method gen-definition <extern> (name comp)
--  (let ((nlabel (LABEL                name        ))
--	(slabel (LABEL (concat-symbol name '$stub))))
--    (if __MACH__
-+  (let ((nlabel (LABEL                self.name        ))
-+	(slabel (LABEL (concat-symbol self.name '$stub))))
-+    (if (defined? '__MACH__)
- 	(let ()
- 	  (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
- 	  (gen comp DEFLABEL slabel)
-@@ -505,22 +529,21 @@
-       (gen comp LONG nlabel)
-       (gen comp TEXT))))
- 
--(define-function gen-param (name comp)
--  (let ((param (new-param comp)))
--    (set (<compiler>-env comp) (cons (cons name param) (<compiler>-env comp)))
--    param))
--
- (define-method gen-definition <form> (name comp)
-   (gen comp COMMENT (list "form "name)))
- 
-+(define-function gen-param (var comp)
-+  ;;(print "gen-param ") (dumpln var)
-+  (set (<variable>-value var) (new-param comp)))
-+
- (define-method gen-definition <expr> (name ocomp)
-   (let* ((main (= 'main name))
- 	 (defn (<expr>-defn self))
--	 (body (cdr defn))
--	 (comp (compiler (<compiler>-env ocomp)))
-+	 (body (cddr defn))
-+	 (comp (compiler (+ 1 (<compiler>-level ocomp))))
- 	 (tnam (if main (LABEL name) (LABEL (temp-label-name))))
- 	 (vnam (if main ()           (LABEL name)))
--	 (params (map-with gen-param (car defn) comp)))
-+	 (params (map-with gen-param (cadr defn) comp)))
-     (list-do e body (gen e comp))
-     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
- 	   (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
-	   (frm-size (align 16 (+ tmp-size 8))))
-       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
-       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
-       (emit TEXT)
 @@ -546,17 +569,23 @@
  
  ;;; 

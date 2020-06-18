@@ -362,6 +362,7 @@
 (define %structure-derivatives	(array))
 
 (define-function structure-field-count (type)
+  (assert (<= type %last-type) "structure-field-count for undefined type " type)
   (array-at %structure-field-counts type))
 
 (define-function structure-field-index (type field-name)
@@ -467,7 +468,7 @@
 ;; for the built-in types in boot.l merely fill in some missing parts. types
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
-(define-structure <undefined>   ())
+(define-structure <undefined>   ()) ; NOTE: it doesn't need to be the first one (to be denoted by 0 at runtime)
 (define-structure <long>        (_bits))
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))

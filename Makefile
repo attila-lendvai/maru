@@ -17,7 +17,7 @@ test-bootstrap: $(BUILD)/eval2 $(BUILD)/eval3
 	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s
 	$(DIFF) $(BUILD)/eval2.stripped $(BUILD)/eval3.stripped
 
-$(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l bootstrapping/*.l boot.l eval.l
+$(BUILD)/eval1.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l bootstrapping/*.l eval.l boot.l
 	time $(BOOT_EVAL_PATH)/eval		\
 		$(BOOT_EVAL_PATH)/boot.l	\
 		bootstrapping/prepare.l		\
