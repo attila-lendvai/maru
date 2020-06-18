@@ -135,18 +135,11 @@
                        (if (pair? object)
                            (qq-element object)
                          (list 'quote object))))
-      (if bootstrapping?
-          (lambda (expr)
-            (qq-object expr))
-        (lambda (env expr)
-            (qq-object expr))))))
+      (lambda (env expr)
+        (qq-object expr)))))
 
-(if bootstrapping?
-(define define-form (form (lambda (name args . body)
-                            `(define ,name (form (lambda ,args ,@body))))))
 (define define-form (form (lambda (env name args . body)
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
-)
 
 (define-form when (test . body)
   `(and ,test (let () ,@body)))
@@ -160,12 +153,8 @@
   `(unless ,test
      (error ,@args)))
 
-(if bootstrapping?
-(define-form define-constant (name value)
-  `(define ,name ,value))
 (define-form define-constant (name value)
   `(define ,name (form () (lambda args ',value))))
-)
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -596,11 +585,9 @@
   (assert (symbol? name) "define-selector: name is not a symbol")
   (let ((var (defined? name)))
     (if var
-        (if bootstrapping?
-            (error name" is already defined as non-selector")
-            (if (selector? (<variable>-value var))
-                (list 'quote <variable>-value var)
-              (error name" is already defined as non-selector: " (<variable>-value var))))
+        (if (selector? (<variable>-value var))
+            (list 'quote <variable>-value var)
+          (error name" is already defined as non-selector: " (<variable>-value var)))
       (let ()
         (or default (set default `(args (error "selector '"',name
                                                "' has no method for "(type-name-of (car args))
@@ -609,19 +596,12 @@
 
 (define-selector add-method)
 
-(if bootstrapping?
-(<selector>-add-method add-method <selector>
-  (lambda (self type args body)
-    (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
 (<selector>-add-method add-method <selector>
   (lambda (self type args body)
     (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors ,type ,@body))))))
-)
 
 (define-form define-method (selector type args . body)
-  (unless bootstrapping?
-    ;; i have no idea why this is causing an error, but the bootstrap works without it, so... let's move on.
-    (or (defined? selector) (eval `(define-selector ,selector))))
+  (or (defined? selector) (eval `(define-selector ,selector)))
   `(add-method ,selector ,type ',(cons 'self args) ',body))
 
 ;;; print
@@ -837,13 +817,12 @@
 
 (define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
 
-;; TODO this should work in the next stage
-;; (define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
-;; (define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
-;; (define-method for-each <string> (function)	(string-do _elt_ self (function _elt_)))
+(define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
+(define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
+(define-method for-each <string> (function)	(string-do _elt_ self (function _elt_)))
 
-;; (define-function for-each-with (collection function value)
-;;   (for-each collection (lambda (x) (function x value))))
+(define-function for-each-with (collection function value)
+  (for-each collection (lambda (x) (function x value))))
 
 (define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
 (define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
