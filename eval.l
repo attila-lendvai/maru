@@ -1072,7 +1072,7 @@
         (libc/printf "%3d: " i)
         (k/dumpln (k/array-at *backtrace-stack* i))
         (libc/flush-streams)))
-    (libc/exit 1)))
+    (libc/abort)))
 
 ;;; ----------------------------------------------------------------
 
