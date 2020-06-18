@@ -157,12 +157,13 @@ a repo and a maintainer.
 
 ### Maru's status
 
+Backporting of the latest from the `piumarta` branch is done: it should be
+semantically equivalent with the `eval.l` in Piumarta's latest.
+
 The compiler in `emit.l` currently emits an `eval.s` text file. Therefore, for now, a
 C toolchain is required for a full circle of bootstrap. With the addition of an IA-32
 assembler this requirement can be eliminated; i.e. there's no inherent external
 dependency in the codebase (besides the services that `libc` provides).
-
-Backporting of the latest from the `piumarta` branch is in progress.
 
 Assorted TODO:
 - revive all the goodies in the `piumarta` branch, but in a structured way
@@ -171,7 +172,7 @@ Assorted TODO:
 
 ### Build system status
 
-There are 3 Maru stages/branches now, introducing non-trivial features. The repo structure seems to slowly mature.
+There are 4 Maru stages/branches now, introducing non-trivial features. The repo structure seems to slowly mature.
 
 Assorted TODO:
 - capture the emitted `eval.s` files and check them into the repo; add makefile targets
