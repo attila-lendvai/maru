@@ -1052,6 +1052,11 @@
         (k/define sym val)
         val))))
 
+(define-subr defined?
+  (let ((name (k/car args))
+        (env (or (k/cadr args) (<module>-env *module*))))
+    (and (k/assq name env) symbol/t)))
+
 (define-subr lambda
   (new-<expr> args env))
 
@@ -1497,6 +1502,7 @@
   (instantiate-fixed-subr "and"              subr/and    module)
   (instantiate-fixed-subr "quote"            subr/quote  module)
 
+  (instantiate-subr  "defined?"              subr/defined?           module)
   (instantiate-subr  "not"                   subr/not                module)
   (instantiate-subr  "&"                     subr/bitand             module)
   (instantiate-subr  "|"                     subr/bitor              module)
