@@ -548,6 +548,10 @@
 
 (define-selector gen-definition)
 
+(define-method gen-definition <undefined> (name comp)
+  ;; deal with (define foo) empty forward definitions used by the next stage
+  (gen-definition 0 name comp))
+
 (define-method gen-definition <long> (name comp)
   (gen comp DATA)
   (gen comp DEFLABEL (LABEL name))
