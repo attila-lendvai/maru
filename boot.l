@@ -1,5 +1,8 @@
 ;;; This is the minimum "standard library" that is needed/used while bootstrapping
 
+(if bootstrapping?
+    (warn "boot.l speaking; we're in bootstrapping mode\n"))
+
 (define list (lambda args args))
 
 (define primitive/print print)
@@ -132,11 +135,18 @@
                        (if (pair? object)
                            (qq-element object)
                          (list 'quote object))))
-      (lambda (expr)
-        (qq-object expr)))))
+      (if bootstrapping?
+          (lambda (expr)
+            (qq-object expr))
+        (lambda (env expr)
+            (qq-object expr))))))
 
+(if bootstrapping?
 (define define-form (form (lambda (name args . body)
                             `(define ,name (form (lambda ,args ,@body))))))
+(define define-form (form (lambda (env name args . body)
+                            `(define ,name (form (lambda (*env* ,@args) ,@body))))))
+)
 
 (define-form when (test . body)
   `(and ,test (let () ,@body)))
@@ -150,9 +160,12 @@
   `(unless ,test
      (error ,@args)))
 
+(if bootstrapping?
 (define-form define-constant (name value)
-  ;; for now this is merely a maker of intention.
   `(define ,name ,value))
+(define-form define-constant (name value)
+  `(define ,name (form () (lambda args ',value))))
+)
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -393,6 +406,8 @@
   ;;   'oop-at)
   'oop-at)
 
+(define %make-accessor) ;; forward
+
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
                       (list ',(%accessor (car fields))
@@ -407,7 +422,7 @@
                             ,offset))
                    (%make-accessor name (cdr fields) (+ 1 offset)))))
 
-(define %make-accessor %make-unsafe-accessor)
+(set %make-accessor %make-unsafe-accessor)
 ;; TODO
 ;; (if (> (optimised) 0)
 ;;     %make-unsafe-accessor
@@ -459,19 +474,17 @@
 (define-structure <pair>        (head tail))
 (define-structure <_array>      ())
 (define-structure <array>       (size _array))
-(define-structure <expr>        (name defn env))			(define-function expr? (obj) (= <expr> (type-of obj)))
+(define-structure <expr>        (name defn ctx))        ; NOTE: defn is: (env formals . prog)
 (define-structure <form>        (function symbol))      ; these are expander lambda's
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_name _imp _sig _profile))
 (define-structure <variable>	(name value env index type))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
-(define-structure <module>      (symbols env))
+(define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
 
 (define-function long?		(obj)	(= <long>	(type-of obj)))
-;; TODO replace with a subr primitive as in the piumarta branch?
-(define-function defined? (name)
-  (and (assq name (<module>-env (current-module))) 't))
+(define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
 (define-function fixed (fun)
@@ -514,7 +527,7 @@
         (set idx (+ idx 1))))
     var))
 
-(define-function global? (var)        (= 0 (<env>-level (<variable>-env var))))
+(define-function global-variable? (var)        (= 0 (<env>-level (<variable>-env var))))
 
 ;;; local syntax
 
@@ -550,8 +563,17 @@
 
 (define-function selector? (obj) (= <selector> (type-of obj)))
 
+(define-function <selector>-inherit (methods type)
+  (let ((method ())
+        (probe  type))
+    (while (and (set probe (array-at %structure-bases probe))
+                (not (set method (array-at methods probe)))))
+    ;; (and method (set (array-at methods type) method))	; copy down the method for performance
+    method))
+
 (define-apply <selector> (self . arguments)
   (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
+             (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
          arguments))
 
@@ -563,22 +585,42 @@
     self))
 
 (define-function <selector>-add-method (self type method)
+  (and (expr? method)
+       (or (<expr>-name method)
+           (set (<expr>-name method)
+                (concat-symbol (array-at %type-names type) (concat-symbol '. (<selector>-name self))))))
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)
-  (or default (set default `(args (error "cannot apply selector '"',name
-                                         "' to type '"(array-at %type-names (type-of (car args)))
-                                         "': "(cons (car args) (map name-of-type (map type-of (cdr args))))))))
-  `(define ,name (selector ',name (lambda ,@default))))
+  (assert (symbol? name) "define-selector: name is not a symbol")
+  (let ((var (defined? name)))
+    (if var
+        (if bootstrapping?
+            (error name" is already defined as non-selector")
+            (if (selector? (<variable>-value var))
+                (list 'quote <variable>-value var)
+              (error name" is already defined as non-selector: " (<variable>-value var))))
+      (let ()
+        (or default (set default `(args (error "selector '"',name
+                                               "' has no method for "(type-name-of (car args))
+                                               ": "(cons (car args) (map type-name-of (cdr args)))))))
+        `(define ,name (selector ',name (lambda ,@default)))))))
 
 (define-selector add-method)
 
+(if bootstrapping?
 (<selector>-add-method add-method <selector>
   (lambda (self type args body)
     (<selector>-add-method self (eval type) (eval `(lambda ,args ,@body)))))
+(<selector>-add-method add-method <selector>
+  (lambda (self type args body)
+    (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors ,type ,@body))))))
+)
 
 (define-form define-method (selector type args . body)
-  (or (defined? selector) (eval `(define-selector ,selector)))
+  (unless bootstrapping?
+    ;; i have no idea why this is causing an error, but the bootstrap works without it, so... let's move on.
+    (or (defined? selector) (eval `(define-selector ,selector))))
   `(add-method ,selector ,type ',(cons 'self args) ',body))
 
 ;;; print
@@ -794,13 +836,13 @@
 
 (define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
 
-;; TODO reinstate
+;; TODO this should work in the next stage
 ;; (define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
 ;; (define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
 ;; (define-method for-each <string> (function)	(string-do _elt_ self (function _elt_)))
 
-(define-function for-each-with (collection function value)
-  (for-each collection (lambda (x) (function x value))))
+;; (define-function for-each-with (collection function value)
+;;   (for-each collection (lambda (x) (function x value))))
 
 (define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
 (define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))

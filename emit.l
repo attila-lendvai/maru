@@ -285,18 +285,18 @@
 
 ;;;
 
-(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
+(define-structure <compiler> (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
 
-(define-function compiler (env)
+(define-function compiler (level)
   (let ((self (new <compiler>)))
-    (set (<compiler>-env self) env)
-    (set (<compiler>-param-counter self) 0)
-    (set (<compiler>-arg-counter self) 0)
-    (set (<compiler>-arg-limit self) 0)
-    (set (<compiler>-tmp-counter self) 0)
-    (set (<compiler>-tmp-limit self) 0)
-    (set (<compiler>-asm self) (array))
-    (set (<compiler>-pc self) 0)
+    (set (<compiler>-level		self) level)
+    (set (<compiler>-param-counter	self) 0)
+    (set (<compiler>-arg-counter	self) 0)
+    (set (<compiler>-arg-limit		self) 0)
+    (set (<compiler>-tmp-counter	self) 0)
+    (set (<compiler>-tmp-limit		self) 0)
+    (set (<compiler>-asm		self) (array))
+    (set (<compiler>-pc			self) 0)
     self))
 
 (define-function new-param (comp)
@@ -344,13 +344,12 @@
 (define-method gen <undefined>  (comp)  (gen comp LOAD (LI32 0)))
 (define-method gen <long>       (comp)  (gen comp LOAD (LI32 self)))
 
-(define-method gen <symbol> (comp)
-  (let ((value (cdr (assq self (<compiler>-env comp)))))
-    (or value (error "gen: undefined variable: " self))
+(define-method gen <variable> (comp)
+  (let ((value (<variable>-value self)))
     (cond
       ((temp? value)   (gen comp LOAD value))
       ((extern? value) (gen comp LOAD (GI32 (LABEL (extern->label value)))))
-      (else            (gen comp LOAD (GI32 (LABEL self)))))))
+      (else            (gen comp LOAD (GI32 (LABEL (<variable>-name self))))))))
 
 (define-method gen <string> (comp)
   (let ((label (LABEL (temp-label-name))))
@@ -434,19 +433,14 @@
             table))))
 
 (define-function gen-let-binding (binding comp)
-  (let ((name (car binding))
-        (temp (gen-tmp-prog (cdr binding) comp)))
-    ;x;(print "COMPILER ENV " (<compiler>-env comp))
-    (set (<compiler>-env comp) (cons (cons name temp) (<compiler>-env comp)))
-    ;x;(println " -> " (<compiler>-env comp))
-    temp))
+  (let ((var (car binding))
+        (tmp (gen-tmp-prog (cdr binding) comp)))
+    (set (<variable>-value var) tmp)))
 
 (define-function gen-let (expr comp)
-  (let ((outer (<compiler>-env comp))
-        (temps (map-with gen-let-binding (cadr expr) comp)))
-    (list-do stmt (cddr expr) (gen stmt comp))
-    (list-do temp temps (free-temp comp temp))
-    (set (<compiler>-env comp) outer)))
+  (let ((temps (map-with gen-let-binding (caddr expr) comp)))
+    (list-do stmt (cdddr expr) (gen stmt comp))
+    (list-do temp temps (free-temp comp temp))))
 
 (define-function gen-and (expr comp)
   (let ((done (LABEL (temp-label-name))))
@@ -486,15 +480,13 @@
     (gen comp BT body)))
 
 (define-function gen-set (expr comp)
-  (let ((name (cadr  expr))
-        (value-form (caddr expr)))
-    (gen value-form comp)
-    (let ((var (cdr (assq name (<compiler>-env comp)))))
-      (or var (error "set: undefined variable: " name))
-      (cond
-        ((temp? var)   (gen comp STORE var))
-        ((extern? var) (gen comp STORE (GI32 (LABEL (extern->label var)))))
-        (else          (gen comp STORE (GI32 (LABEL name))))))))
+  (let* ((var (cadr expr))
+         (val (<variable>-value var)))
+    (gen (caddr expr) comp)
+    (cond
+      ((temp? val)   (gen comp STORE val))
+      ((extern? val) (gen comp STORE (GI32 (LABEL (extern->label val))))) ; TODO maybe this shouldn't even be supported?
+      (else          (gen comp STORE (GI32 (LABEL (<variable>-name var))))))))
 
 (define-function gen-lambda (expr comp)
   (error "gen: lambda forms are not supported"))
@@ -504,12 +496,12 @@
   (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
 
 (define-function gen-address-of (expr comp)
-  (let ((name (cadr expr)))
-    (or (symbol? name) (error "address-of: non-identifier argument: "name))
-    (let ((var (cdr (assq name (<compiler>-env comp)))))
-      (if (temp? var)
-          (gen comp ADDR var)
-        (gen comp ADDR (GI32 (LABEL name)))))))
+  (let ((var (cadr expr)))
+    (or (variable? var) (error "address-of: non-variable argument: "var))
+    (let ((val (<variable>-value var)))
+      (if (temp? val)
+          (gen comp ADDR val)
+        (gen comp ADDR (GI32 (LABEL (<variable>-name var))))))))
 
 (define forms (list
   (cons (slave-value slave:let)            gen-let)
@@ -526,25 +518,28 @@
   (let* ((fn-name (car self))
          (args    (cdr self))
          (arity   (list-length args))
-         (op      (cadr (assq fn-name (array-at operators arity)))))
+         (op      (and (variable? fn-name)
+                       (cadr (assq (<variable>-value fn-name) (array-at operators arity))))))
     (if op
         ((array-at generators arity) op args comp)
       (if (set op (cdr (assq fn-name forms)))
           (op self comp)
         (let* ((tmp-locs (map-with gen-tmp args comp))
                (arg-locs (map-with gen-arg args comp))
-               (op       (cdr (assq fn-name (<compiler>-env comp))))
-               (op-type  (type-of op)))
-          (if (= <expr> op-type)
-              (let* ((defn   (<expr>-defn op))
-                     (params (car defn)))
-              ;; TODO this is broken, at least for dotted lists
-              (when (pair? params) ; ignore (lambda args ...) format, e.g. println
-                (let ((nparam (list-length params)))
-                  (or (= nparam arity)
-                      (error "gen: calling " op
-                             " with the wrong number of arguments: " args
-                             ", expecting " nparam))))))
+               ;;(op       (cdr (assq fn-name (<compiler>-env comp))))
+               ;;(op-type  (type-of op))
+               )
+          ;; TODO this is useful, reinstate
+          ;; (if (= <expr> op-type)
+          ;;     (let* ((defn   (<expr>-defn op))
+          ;;            (params (car defn)))
+          ;;     ;; TODO this is broken, at least for dotted lists
+          ;;     (when (pair? params) ; ignore (lambda args ...) format, e.g. println
+          ;;       (let ((nparam (list-length params)))
+          ;;         (or (= nparam arity)
+          ;;             (error "gen: calling " op
+          ;;                    " with the wrong number of arguments: " args
+          ;;                    ", expecting " nparam))))))
           (gen fn-name comp)
           (map2-with gen-move tmp-locs arg-locs comp)
           (free-temps comp tmp-locs)
@@ -572,7 +567,7 @@
     (gen comp TEXT)))
 
 (define-method gen-definition <extern> (name comp)
-  (let ((extern-label (LABEL (<extern>-name self)))
+  (let ((extern-label (LABEL self.name))
         (our-label    (LABEL (extern->label self))))
     (if __MACH__
         (let ()
@@ -586,21 +581,19 @@
       (gen comp LONG extern-label)
       (gen comp TEXT))))
 
-(define-function gen-param (name comp)
-  (let ((param (new-param comp)))
-    (set (<compiler>-env comp) (cons (cons name param) (<compiler>-env comp)))
-    param))
-
 (define-method gen-definition <form> (name comp)
   (gen comp COMMENT (list "form "name)))
+
+(define-function gen-param (var comp)
+  (set (<variable>-value var) (new-param comp)))
 
 (define-method gen-definition <expr> (name ocomp)
   (let* ((main? (= 'slave:main name))
          (defn (<expr>-defn self))
-         (body (cdr defn))
-         (comp (compiler (<compiler>-env ocomp)))
+         (body (cddr defn))
+         (comp (compiler (+ 1 (<compiler>-level ocomp))))
          (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
-         (params (map-with gen-param (car defn) comp)))
+         (params (map-with gen-param (cadr defn) comp)))
     (list-do e body
       (gen e comp))
     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
@@ -629,14 +622,18 @@
 
 ;;;
 
-(define-function gen-env-to (env limit)
-  (let ((comp (compiler env)))
-    (while (not (= (caar env) limit))
-      (println "## defn " (caar env))
-      (warn (caar env) ", ")
-      ;x;(println (<expr>-defn (cdar env)))
-      (gen-definition (cdar env) (caar env) comp)
-      (set env (cdr env)))
+(define-function gen-env (env)
+  (warn "begin compiling\n")
+  (let* ((vars  (<env>-bindings env))
+         (comp  (compiler 0))
+         (index (array-length vars)))
+    (while (<= 0 (set index (- index 1)))
+      (let* ((var (array-at vars index))
+             (name  (<variable>-name  var))
+             (value (<variable>-value var)))
+        (println "## defn " name)
+        (warn name ", ")
+        (gen-definition value name comp)))
     (warn "\n")
     (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
 
@@ -645,14 +642,13 @@
 ;;;
 (switch-to-slave-module)
 
-(define-form compile-begin ()
-  '(define compile-environment-marker ()))
+(define-function compile-begin ()
+  (set *globals* (environment *globals*)))
 
 (define-function compile-end ()
-  (warn "begin compiling\n")
-  (eval-in-module host '(host:gen-env-to
-                         (host:cdr (host:<module>-env host:slave))
-                         (host:quote compile-environment-marker))))
+  (let ((env *globals*))
+    (set *globals* (<env>-parent env))
+    (eval-in-module host `(host:gen-env (host:quote ,env)))))
 
 (define-form define-externs args
   `(let ()
