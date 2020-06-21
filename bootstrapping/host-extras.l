@@ -7,3 +7,6 @@
 (warn "--- boostrapping: host extras\n")
 
 (eval-in-module slave '(slave:define slave:bootstrapping? (slave:quote slave:t)))
+
+(define-method gen-definition <undefined> (name comp)
+  (gen-definition 0 name comp))

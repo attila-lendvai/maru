@@ -550,6 +550,9 @@
 
 (define-selector gen-definition)
 
+(define-method gen-definition <undefined> (name comp)
+  (gen-definition 0 name comp))
+
 (define-method gen-definition <long> (name comp)
   (gen comp DATA)
   (gen comp DEFLABEL (LABEL name))
