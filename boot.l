@@ -3,6 +3,17 @@
 (if bootstrapping?
     (warn "boot.l speaking; we're in bootstrapping mode\n"))
 
+(if bootstrapping?
+    (let ()
+      (define *command-line-arguments* '())
+      (define *verbosity* 0)
+      (define *optimised* 1)))
+
+(if (> *optimised* 0)
+    (warn "boot.l speaking; we're in optimised mode\n"))
+
+(define unit-testing? '(t))
+
 (define list (lambda args args))
 
 (define primitive/print print)
@@ -412,11 +423,9 @@
                             ,offset))
                    (%make-accessor name (cdr fields) (+ 1 offset)))))
 
-(set %make-accessor %make-unsafe-accessor)
-;; TODO
-;; (if (> (optimised) 0)
-;;     %make-unsafe-accessor
-;;   %make-safe-accessor)
+(set %make-accessor (if (> *optimised* 0)
+                        %make-unsafe-accessor
+                      %make-safe-accessor))
 
 (define-function %make-accessors (name fields)
   (%make-accessor name fields 0))
@@ -781,6 +790,17 @@
       (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
     (or a b)))
 
+;;; sequences
+
+(define-method length <string> ()		(string-length self))
+(define-method length <array> ()		(array-length self))
+
+(define-method at <string> (index)		(string-at self index))
+(define-method at <array> (index)		(array-at self index))
+
+(define-method set-at <string> (index value)	(set-string-at self index value))
+(define-method set-at <array> (index value)	(set-array-at self index value))
+
 ;;; iteration
 
 (define-form for (var-init-limit-step . body)
@@ -979,3 +999,90 @@
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
 
 (define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
+
+;;; structural equality
+
+(define equal ()) ;; forward
+
+(define-function equal-lists (a b)
+  (and (equal (car a) (car b))
+       (equal (cdr a) (cdr b))))
+
+(set equal (lambda (a b)
+  (or (= a b)
+      (and (pair? a)
+           (pair? b)
+           (equal-lists a b)))))
+
+;;; unit testing
+
+(define-form unit-fail (expr)
+  `(error "UNIT FAIL "unit-name": "',expr))
+
+(define-form unit-assert (expr)
+  `(or ,expr (unit-fail ,expr)))
+
+(define-form unit-test (name . body)
+  (and unit-testing?
+       `(let ((unit-name ,name))
+          ,@body)))
+
+;;; namespace
+
+(define-form define-namespace (name parent)	`(define ,name (environment ,parent)))
+
+(define-form namespace (name)			`(set *globals* ,name))
+
+;;; command line
+
+(define *load-path*)
+
+(and (= "-L" (car *command-line-arguments*))
+     (let ()
+       (pop *command-line-arguments*)
+       (set *load-path* (pop *command-line-arguments*))))
+
+;; TODO rename
+(define-form next-argument () '(pop *command-line-arguments*))
+
+;;; load/save
+
+(define-function pval (expr)
+  (and (> *verbosity* 0) (println expr))
+  (let ((result (eval expr)))
+    (and (> *verbosity* 1) (println "=> "result))
+    result))
+
+;; (define-function find-and-read (name)
+;;   (or (and *load-path* (read (concat-string *load-path* name)))
+;;       (read name)))
+
+;; (define-function load (name)
+;;   (let ((exps (find-and-read name)))
+;;     (or exps (error "file not found or empty: "name))
+;;     (list-do expr exps (pval expr))))
+
+(define *loaded*)
+
+;; (define-function require (name)
+;;   (or (member? name *loaded*)
+;;       (let ()
+;;         (push *loaded* name)
+;;         (load name))))
+
+;; (define-function contents-to-file-named (string path . options)
+;;   (let ((f (or (open path "w")
+;;                (error "cannot open for writing: "path)))
+;;         (p (or (car options) putc)))
+;;     (for (i 0 (length string)) (p (at string i) f))
+;;     (close f)))
+
+;; (define-function contents-of-file-named (path)
+;;   (let ((f (or (open path)
+;;                (error "cannot open for reading: "path)))
+;;         (s (array))
+;;         (c))
+;;     (while (set c (getc f))
+;;       (array-append s c))
+;;     (close f)
+;;     (array->string s)))

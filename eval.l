@@ -460,14 +460,20 @@
 
 ;; shorthands (and optimizations)
 (define-form is/long		(obj)		`(is <long> ,obj))
-(define-form get/globals	(obj)		`(get <variable> value (get <module> globals ,obj)))
+(define-form get/globals	()		`(get <variable> value (get <module> globals *module*)))
+(define-form get/globals*	(obj)		`(get <variable> value (get <module> globals ,obj)))
 (define-form get/long		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <long> '_bits))		`(get <long> _bits ,obj)))
 (define-form get/head		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'head))		`(get <pair> head ,obj)))
+(define-form put/head		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'head) ,val)	`(put <pair> head ,obj ,val)))
 (define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'tail))		`(get <pair> tail ,obj)))
 (define-form put/tail		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
 
 (define-form get/string		(obj)		`(get <string> _bits ,obj))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
+
+(define-form put/variable-value	(var val)	`(put <variable> value
+                                                      (k/env/find-variable (get/globals) (intern ,var))
+                                                      ,val))
 
 (define-function k/car		(list)		(and (is <pair> list) (get/head list)))
 (define-function k/cdr		(list)		(and (is <pair> list) (get/tail list)))
@@ -547,6 +553,7 @@
 ;;; ----------------------------------------------------------------
 
 (define *arg/verbose* 0)
+(define *arg/optimised*		0)
 
 ;; Some of the state of the Maru VM being implemented needs to be
 ;; captured/known by the code implementing it in the target VM.
@@ -810,7 +817,7 @@
         (let ((module-name (libc/malloc (+ 1 idx))))
           (libc/memcpy module-name cstr idx)
           (set (string-at module-name idx) 0)
-          (let ((submod (k/env/lookup (get/globals module) (intern* module-name module))))
+          (let ((submod (k/env/lookup (get/globals* module) (intern* module-name module))))
             (unless (is <module> submod)
               (fatal2 "intern: '%s' is found, but it's not a module while interning %s" module-name cstr))
             (libc/free module-name)
@@ -1226,7 +1233,7 @@
 					    (set tail (new-<pair> env tail)))))
             ;; TODO this defines the variable in the encode phase, even if the code is not executed in the end.
             ;; i doubt it's the intended behavior... investigate!
-	    ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals *module*) (k/car tail))))
+	    ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
 	    ((= head fixed-subr/set)	(let ((var (k/env/find-variable env (k/car tail))))
@@ -1365,7 +1372,7 @@
 
 (define-subr (subr/defined? 1)
   (let ((name (k/car -args-))
-        (env (or (k/cadr -args-) (get/globals *module*))))
+        (env (or (k/cadr -args-) (get/globals))))
     (k/env/find-variable env name)))
 
 (define-subr subr/lambda
@@ -1562,7 +1569,7 @@
 
 (define-subr subr/eval
   (let ((x (k/car -args-))
-        (e (or (k/cadr -args-) (new-<env> (get/globals *module*) 1 0))))
+        (e (or (k/cadr -args-) (new-<env> (get/globals) 1 0))))
     (gc/protect (x e)
       (let ((c (new-base-<context> () () e)))
         (gc/protect (c)
@@ -1727,7 +1734,7 @@
     (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
     (k/set-current-module new-module)
-    (let ((env (get/globals new-module)))
+    (let ((env (get/globals* new-module)))
       (gc/let* ((result form)
                 (ctx (new-base-<context> () () env)))
         (debug (libc/printf "eval-in-module: k/expand\n"))
@@ -1750,7 +1757,7 @@
       (while (let ()
                (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/fflush libc/stdout))
                (!= k/+done+ (set res (k/read stream))))
-        (let ((env (new-<env> (get/globals *module*) 1 0)))
+        (let ((env (new-<env> (get/globals) 1 0)))
           (gc/protect (env)
             (and (> *arg/verbose* 0) (libc/printf ";;; ") (k/dumpln res))
             (set res (k/expand res env))					(and (> *arg/verbose* 2) (libc/printf "expd--> ") (k/dumpln res))
@@ -1768,26 +1775,34 @@
 (define-function instantiate-subr (name imp module)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
-      (k/env/define (get/globals module) (intern* name module) tmp))))
+      (k/env/define (get/globals* module) (intern* name module) tmp))))
 
 (define-function instantiate-fixed-subr (name imp module)
   (let ((tmp (new-<subr> imp name)))
     (gc/protect (tmp)
       (set tmp (new-<fixed> tmp))
-      (k/env/define (get/globals module) (intern* name module) tmp))))
+      (k/env/define (get/globals* module) (intern* name module) tmp))))
 
 (set populate-module-with-primitives (lambda (module)
   (debug (libc/printf "populate-module-with-primitives on %p\n" module))
   (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
   ;; the predefined primitives of the language
-  (let ((env (get/globals module)))
-    (k/env/define env (intern* "*input*"	module) ())
-    (k/env/define env (intern* "*expanders*"	module) (new-<array> 0))
-    (k/env/define env (intern* "*encoders*"	module) (new-<array> 0))
-    (k/env/define env (intern* "*evaluators*"	module) (new-<array> 0))
-    (k/env/define env (intern* "*applicators*"	module) (new-<array> 0))
+  (let ((env (get/globals* module))
+        (tmp))
+    (gc/protect (tmp)
+				;;(k/env/define env (intern* "*input*"			module) ())
+				(k/env/define env (intern* "*command-line-arguments*"	module) ())
+      (set tmp (new-<long> 0))	(k/env/define env (intern* "*verbosity*"		module) tmp)
+      (set tmp (new-<long> 0))	(k/env/define env (intern* "*optimised*"		module) tmp)
 
-    (k/env/define env (intern* "bootstrapping?" module) ()) ;; TODO can be deleted/replaced in the next iteration when defined? will be availabe
+      ;; TODO this can be deleted/replaced in the next iteration when defined? will be availabe
+      ;; obstacle: (define foo ...) will create the variable __at expand time__, so defined? is kinda broken
+      (k/env/define env (intern* "bootstrapping?" module) ())
+
+      (set tmp (new-<array> 0))	(k/env/define env (intern* "*expanders*"		module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (intern* "*encoders*"			module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (intern* "*evaluators*"		module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (intern* "*applicators*"		module) tmp))
 
     (instantiate-fixed-subr "define"           subr/define module)
     (instantiate-fixed-subr "lambda"           subr/lambda module)
@@ -1872,7 +1887,7 @@
   (set symbol/unquote_splicing       (intern "unquote-splicing"))
   (set symbol/*module*               (intern "*module*"))
 
-  (let ((global-env (get/globals *module*)))
+  (let ((global-env (get/globals)))
     (set expanders         (k/env/find-variable global-env (intern "*expanders*")))
     (set encoders          (k/env/find-variable global-env (intern "*encoders*")))
     (set evaluators        (k/env/find-variable global-env (intern "*evaluators*")))
@@ -1922,26 +1937,48 @@
 
   (debug (libc/printf "start processing argv\n"))
 
-  (let ((i 1))
-    (while (< i argc)
-      (let ((arg (oop-at argv i)))
-        (cond
-          ((not (libc/strcmp arg "-v"))
-           (set *arg/verbose* (+ 1 *arg/verbose*)))
-          ((not (libc/strcmp arg "-c"))
-           (unless (> argc 0)
-             (fatal "-c requires an argument"))
-           (set i (+ i 1))
-           (let* ((cstr (oop-at argv i))
-                  (sym (intern cstr))
-                  (form (new-<pair> sym ())))
-             (k/eval form (get/globals *module*))))
-          (else
-           (let ((stream (libc/fopen arg "r")))
-             (or stream (fatal1 "no such file: %s" arg))
-             (repl_stream stream)
-             (libc/fclose stream)))))
-      (set i (+ i 1))))
+  ;; *command-line-arguments*
+  (let ((cla-var (k/env/find-variable (get/globals) (intern "*command-line-arguments*"))))
+    ;; initialize *cla*
+    (let ((tmp))
+      (gc/protect (tmp)
+        (while (< 0 (set argc (- argc 1)))
+          (set tmp (new-<pair> () tmp))
+          (put/head tmp (new-<string>-from-cstring (oop-at argv argc))))
+        (put <variable> value cla-var tmp)))
+
+    ;; process *cla*
+    (let ((cla))
+      (while (is <pair> (set cla (get <variable> value cla-var)))
+        (let ((arg-string	(get/head cla))
+              (arg		(get/string arg-string)))
+          (gc/protect (arg-string)
+            (put <variable> value cla-var (set cla (get/tail cla))) ; (pop cla)
+            (cond
+              ((not (libc/strcmp arg "-v"))
+               (set *arg/verbose* (+ 1 *arg/verbose*))
+               (put/variable-value "*verbosity*" (new-<long> *arg/verbose*)))
+              ((not (libc/strcmp arg "-O"))
+               (set *arg/optimised* (+ 1 *arg/optimised*))
+               (put/variable-value "*optimised*" (new-<long> *arg/optimised*)))
+              ((not (libc/strcmp arg "-"))
+               (repl_stream libc/stdin))
+              ((not (libc/strcmp arg "-c"))
+               (unless (is <pair> cla)
+                 (fatal "-c requires an argument"))
+               (set arg-string (get/head cla))
+               (set arg (get/string arg-string))
+               (put <variable> value cla-var (set cla (get/tail cla))) ; (pop cla)
+               (let* ((sym (intern arg))
+                      (form (new-<pair> sym ())))
+                 (gc/protect (form)
+                   (k/eval form (get/globals)))))
+              (else
+               (let ((stream (libc/fopen arg "r")))
+                 (or stream (fatal1 "no such file: %s" arg))
+                 (repl_stream stream)
+                 (libc/fclose stream)))))))))
+
   (libc/flush-streams)
   (and (> *arg/verbose* 0)
        (let ()
