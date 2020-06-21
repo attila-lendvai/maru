@@ -154,8 +154,14 @@
 ;;; error handling
 ;;; ----------------------------------------------------------------
 
-(define die) ; forward
 (define k/print) ; forward
+(define print-backtrace) ; forward
+
+(define-function die ()
+  (libc/fprintf libc/stderr "\nDIE called at depth %d, printing a backtrace to stdout and exiting with exit code 1...\n" *backtrace-index*)
+  (libc/flush-streams)
+  (print-backtrace)
+  (libc/abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; K/ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
@@ -1063,16 +1069,13 @@
 (define-function k/dump		(obj) (do_print obj 1))
 (define-function k/dumpln	(obj) (do_print obj 1) (libc/printf "\n"))
 
-(set die
+(set print-backtrace
   (lambda ()
-    (libc/fprintf libc/stderr "\nDIE called at depth %d, printing a backtrace to stdout and exiting with exit code 1...\n" *backtrace-index*)
-    (libc/flush-streams)
     (let ((i *backtrace-index*))
       (while (<= 0 (set i (- i 1)))
         (libc/printf "%3d: " i)
         (k/dumpln (k/array-at *backtrace-stack* i))
-        (libc/flush-streams)))
-    (libc/abort)))
+        (libc/flush-streams)))))
 
 ;;; ----------------------------------------------------------------
 
@@ -1508,6 +1511,7 @@
       (else                     (and (!= lhs rhs) symbol/t)))))
 
 (define-subr (subr/abort 0)
+  (print-backtrace)
   (libc/flush-streams)
   (libc/abort))
 
