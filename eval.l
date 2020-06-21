@@ -1217,7 +1217,10 @@
            (type (get/type arg)))
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get <string> _bits arg)))
-        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get <symbol> _bits arg)))))
+        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get <symbol> _bits arg)))
+        (else
+         ;; TODO
+         (libc/fprintf libc/stderr "<unable to print this to stderr>"))))
     (set args (get_tail args))))
 
 (define-subr apply-<expr>
