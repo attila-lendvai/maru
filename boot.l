@@ -397,7 +397,7 @@
       (inherits-from (type-of object) type)
       (error "type check failed for field accessor: expected "
              type" "(name-of-type type)", got "
-             (type-of object)" "(name-of-type (type-of object))))
+             (type-of object)" "(type-name-of object)))
   object)
 
 (define-function %accessor (name)
@@ -587,7 +587,7 @@
   (and (expr? method)
        (or (<expr>-name method)
            (set (<expr>-name method)
-                (concat-symbol (array-at %type-names type) (concat-symbol '. (<selector>-name self))))))
+                (concat-symbol (name-of-type type) (concat-symbol '. (<selector>-name self))))))
   (set-array-at (<selector>-methods self) type method))
 
 (define-form define-selector (name . default)

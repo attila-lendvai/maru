@@ -472,7 +472,7 @@
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
 (define-form put/variable-value	(var val)	`(put <variable> value
-                                                      (k/env/find-variable (get/globals) (intern ,var))
+                                                      (k/env/lookup-variable (get/globals) (intern ,var))
                                                       ,val))
 
 (define-function k/car		(list)		(and (is <pair> list) (get/head list)))
@@ -552,16 +552,22 @@
 ;;; global state of the VM
 ;;; ----------------------------------------------------------------
 
-(define *arg/verbose* 0)
+(define *arg/verbose*		0)
 (define *arg/optimised*		0)
 
 ;; Some of the state of the Maru VM being implemented needs to be
 ;; captured/known by the code implementing it in the target VM.
-;; Only one of these is essential: *module*, the rest could be looked
-;; up each time; i.e. they're just optimization or debug helpers.
-(define *module* 0)
+;; Only the first one of these is essential: *module*, the rest could
+;; be looked up each time; i.e. they're just optimization or debug helpers.
+(define *module*		0)
 
-;; the well-known symbols that we need to reference (they will be initialized at start)
+;; optimization: we cache these definitions from the env of the Maru VM
+;; to avoid looking them up a gazillion times.
+(define *expanders*               0)
+(define *encoders*                0)
+(define *evaluators*              0)
+(define *applicators*             0)
+
 (define symbol/t                     0)
 (define symbol/dot                   0)
 (define symbol/define                0)
@@ -571,12 +577,6 @@
 (define symbol/unquote               0)
 (define symbol/unquote_splicing      0)
 (define symbol/*module*              0)
-
-;; for optimization: we cache these definitions from the env
-(define expanders               0)
-(define encoders                0)
-(define evaluators              0)
-(define applicators             0)
 
 (define fixed-subr/quote        0)
 (define fixed-subr/lambda       0)
@@ -694,9 +694,9 @@
   (let ((env (get <variable> env var)))
     (and env (= 0 (get/long (get <env> level env))))))
 
-(define-function k/env/find-variable (env name)
-  (safety 1 (k/assert (is <env> env)     "k/env/find-variable: env is not an <env>: "env))
-  (safety 1 (k/assert (is <symbol> name) "k/env/find-variable: name is not a <symbol>: "name))
+(define-function k/env/lookup-variable (env name)
+  (safety 1 (k/assert (is <env> env)     "k/env/lookup-variable: env is not an <env>: "env))
+  (safety 1 (k/assert (is <symbol> name) "k/env/lookup-variable: name is not a <symbol>: "name))
   (while env
     (let* ((bindings (get <env> bindings env))
            (index    (k/array-length bindings))
@@ -707,8 +707,8 @@
                (return var)))))
     (set env (get <env> parent env))))
 
-(define-function k/env/lookup (env name)
-  (let ((var (k/env/find-variable env name)))
+(define-function k/env/variable-value (env name)
+  (let ((var (k/env/lookup-variable env name)))
     (if var
         (get <variable> value var)
       (fatal1 "undefined variable: %s" (get/symbol name)))))
@@ -817,7 +817,7 @@
         (let ((module-name (libc/malloc (+ 1 idx))))
           (libc/memcpy module-name cstr idx)
           (set (string-at module-name idx) 0)
-          (let ((submod (k/env/lookup (get/globals* module) (intern* module-name module))))
+          (let ((submod (k/env/variable-value (get/globals* module) (intern* module-name module))))
             (unless (is <module> submod)
               (fatal2 "intern: '%s' is found, but it's not a module while interning %s" module-name cstr))
             (libc/free module-name)
@@ -1130,7 +1130,7 @@
       ((= type <expr>)		(k/apply-expr fun arguments ctx))
       ((= type <fixed>)		(k/apply (get <fixed> function fun) arguments ctx))
       ((= type <subr>)		((get <subr> _imp fun) arguments ctx))
-      (else			(let ((ap (k/array-at (get <variable> value applicators) (get/type fun))))
+      (else			(let ((ap (k/array-at (get <variable> value *applicators*) (get/type fun))))
 				  (if ap
 				      (let ((args arguments))
 					(gc/protect (args)
@@ -1149,7 +1149,7 @@
      (let ((head (k/expand (get/head exp) env)))
        (gc/push-root (address-of head))
        (when (is <symbol> head)
-         (let ((val (k/env/find-variable env head)))
+         (let ((val (k/env/lookup-variable env head)))
            (and (is <variable> val) (set val (get <variable> value val)))
            (and (is <form> val)
                 (let ((fn (get <form> function val)))
@@ -1176,7 +1176,7 @@
          (gc/pop-root (address-of tail))
          (gc/pop-root (address-of head)))))
     ((is <symbol> exp)
-     (let ((val (k/env/find-variable env exp)))
+     (let ((val (k/env/lookup-variable env exp)))
           (and (is <variable> val) (set val (get <variable> value val)))
           (and (is <form> val)
                (let ((fn (get <form> symbol val)))
@@ -1187,7 +1187,7 @@
                           (set args (k/apply fn args ()))
                           (set exp (k/expand args env)))))))))
     (else ; consult the *expanders* array to see if there's any custom expander for this type
-     (let ((fn (k/array-at (get <variable> value expanders) (get/type exp))))
+     (let ((fn (k/array-at (get <variable> value *expanders*) (get/type exp))))
         (and fn
              (let ((args (new-<pair> exp ())))
                (gc/protect (args)
@@ -1236,14 +1236,15 @@
 	    ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-	    ((= head fixed-subr/set)	(let ((var (k/env/find-variable env (k/car tail))))
+            ;; TODO this fails while expanding a branch that is _not_ taken at the end at runtime
+	    ((= head fixed-subr/set)	(let ((var (k/env/lookup-variable env (k/car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
 	    ((!= head fixed-subr/quote)	(set tail (enlist tail env))))
 	  (set exp (new-<pair> head tail))))
     (if (is <symbol> exp)
-	(let ((val (k/env/find-variable env exp)))
+	(let ((val (k/env/lookup-variable env exp)))
 	  (or val (fatal1 "undefined variable: %s" (get/symbol exp)))
 	  (set exp val)
 	  (if (global-variable? exp)
@@ -1253,7 +1254,7 @@
 	    (let ((venv (get <variable> env exp)))
 	      (or (= (get/long (get <env> level venv)) (get/long (get <env> level env)))
 		  (put <env> stable venv symbol/t)))))
-      (let ((fn (k/array-at (get <variable> value encoders) (get/type exp))))
+      (let ((fn (k/array-at (get <variable> value *encoders*) (get/type exp))))
 	(and fn
 	     (let ((args (new-<pair> env ())))
 	       (gc/protect (args)
@@ -1311,7 +1312,7 @@
                                     (debug (libc/printf "k/eval of pair, returning with head ") (k/dumpln head))
 				    head)))
       ((= type <symbol>)	(k/error "symbol in eval?")) ;; TODO xxx
-      (else			(let ((ev (k/array-at (get <variable> value evaluators) (get/type exp))))
+      (else			(let ((ev (k/array-at (get <variable> value *evaluators*) (get/type exp))))
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
 					 (gc/protect (args)
@@ -1373,7 +1374,7 @@
 (define-subr (subr/defined? 1)
   (let ((name (k/car -args-))
         (env (or (k/cadr -args-) (get/globals))))
-    (k/env/find-variable env name)))
+    (k/env/lookup-variable env name)))
 
 (define-subr subr/lambda
   (new-<expr> -args- -ctx-))
@@ -1750,7 +1751,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function repl_stream (stream)
-  ;; TODO (put <variable> value input (new-<long> stream))
+  ;; (put/variable-value "*input*" (new-<long> stream))
   (let ((res ()))
     (gc/protect (res)
       (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
@@ -1888,18 +1889,18 @@
   (set symbol/*module*               (intern "*module*"))
 
   (let ((global-env (get/globals)))
-    (set expanders         (k/env/find-variable global-env (intern "*expanders*")))
-    (set encoders          (k/env/find-variable global-env (intern "*encoders*")))
-    (set evaluators        (k/env/find-variable global-env (intern "*evaluators*")))
-    (set applicators       (k/env/find-variable global-env (intern "*applicators*")))
+    (set *expanders*	(k/env/lookup-variable global-env (intern "*expanders*")))
+    (set *encoders*	(k/env/lookup-variable global-env (intern "*encoders*")))
+    (set *evaluators*	(k/env/lookup-variable global-env (intern "*evaluators*")))
+    (set *applicators*	(k/env/lookup-variable global-env (intern "*applicators*")))
 
-    (k/assert (and (is <variable> expanders) (is <variable> encoders) (is <variable> evaluators) (is <variable> applicators)) "capture-well-known-vm-values: assert 1")
+    (k/assert (and (is <variable> *expanders*) (is <variable> *encoders*) (is <variable> *evaluators*) (is <variable> *applicators*)) "capture-well-known-vm-values: assert 1")
 
-    (set fixed-subr/quote  (k/env/lookup global-env (intern "quote")))
-    (set fixed-subr/lambda (k/env/lookup global-env (intern "lambda")))
-    (set fixed-subr/let    (k/env/lookup global-env (intern "let")))
-    (set fixed-subr/define (k/env/lookup global-env (intern "define")))
-    (set fixed-subr/set    (k/env/lookup global-env (intern "set")))
+    (set fixed-subr/quote  (k/env/variable-value global-env (intern "quote")))
+    (set fixed-subr/lambda (k/env/variable-value global-env (intern "lambda")))
+    (set fixed-subr/let    (k/env/variable-value global-env (intern "let")))
+    (set fixed-subr/define (k/env/variable-value global-env (intern "define")))
+    (set fixed-subr/set    (k/env/variable-value global-env (intern "set")))
 
     (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "capture-well-known-vm-values: assert 2"))
 
@@ -1938,7 +1939,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/find-variable (get/globals) (intern "*command-line-arguments*"))))
+  (let ((cla-var (k/env/lookup-variable (get/globals) (intern "*command-line-arguments*"))))
     ;; initialize *cla*
     (let ((tmp))
       (gc/protect (tmp)
@@ -1953,7 +1954,7 @@
         (let ((arg-string	(get/head cla))
               (arg		(get/string arg-string)))
           (gc/protect (arg-string)
-            (put <variable> value cla-var (set cla (get/tail cla))) ; (pop cla)
+            (put <variable> value cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
             (cond
               ((not (libc/strcmp arg "-v"))
                (set *arg/verbose* (+ 1 *arg/verbose*))
@@ -1968,7 +1969,7 @@
                  (fatal "-c requires an argument"))
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
-               (put <variable> value cla-var (set cla (get/tail cla))) ; (pop cla)
+               (put <variable> value cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
                (let* ((sym (intern arg))
                       (form (new-<pair> sym ())))
                  (gc/protect (form)
