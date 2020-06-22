@@ -433,8 +433,11 @@
             table))))
 
 (define-function gen-let-binding (binding comp)
+  (unless (pair? binding)
+    (set binding (list binding)))
   (let ((var (car binding))
         (tmp (gen-tmp-prog (cdr binding) comp)))
+    (assert (= (type-of var) <variable>) "gen-let-binding: encountered a non-variable: " var)
     (set (<variable>-value var) tmp)))
 
 (define-function gen-let (expr comp)
