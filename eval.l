@@ -214,6 +214,7 @@
                (set result (cons `(gc/pop-root (address-of ,(car vars))) result))
                (set vars (cdr vars)))
              result))))
+    (assert (pair? vars) "the proper syntax is (gc/protect (var1 var2 ...) ...)")
     `(let ()
        ,@(make-protectors vars)
        (let ((__answer__ ,@prog))
