@@ -482,8 +482,16 @@
                                                          var)
                                                       ,val))
 
-(define-function k/car		(list)		(and (is <pair> list) (get/head list)))
-(define-function k/cdr		(list)		(and (is <pair> list) (get/tail list)))
+(define-function k/car (list)
+  (when list
+    (k/assert (is <pair> list) "k/car called on non-list: " list)
+    (get/head list)))
+
+(define-function k/cdr (list)
+  (when list
+    (k/assert (is <pair> list) "k/cdr called on non-list: " list)
+    (get/tail list)))
+
 (define-function k/caar		(list)		(k/car (k/car list)))
 (define-function k/cadr		(list)		(k/car (k/cdr list)))
 (define-function k/cddr		(list)		(k/cdr (k/cdr list)))
