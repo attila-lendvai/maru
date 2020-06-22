@@ -110,7 +110,7 @@
     `(set (<header>-magic-marker ,header) ,marker)))
 
 (define-form <header>-flags-used   ()     1)
-(define-form <header>-flags-opaque ()     2)
+(define-form <header>-flags-opaque ()     2) ; opaque objects are considered black boxes by the GC
 (define-form <header>-flags-mark   ()     4)
 
 (define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
@@ -311,7 +311,7 @@
                (or (& flags (<header>-flags-opaque))
                    (let ((index (bytes-to-words (<header>-size header))))
                      (gc/debug (libc/printf "mark %p wordsize %d type %d\n" header index (<header>-type header)))
-                     (safety 2 (or (not (= 0 (<header>-type header))) (fatal1 "gc/mark-and-trace: object with zero type %p" header)))
+                     (safety 2 (or (not (= 0 (<header>-type header))) (fatal1 "gc/mark-and-trace: encountered an object with zero type %p" header)))
                      (while index
                        (set index (- index 1))
                        (gc/debug (libc/printf "@%d %p\n" index (header-of (oop-at obj index))))
@@ -533,10 +533,9 @@
                     (let ()
                       (while (not (< idx cap))
                         (set cap (* cap 2)))
-                      (let ((new-elts (new-object <_array> cap)))
-                        (gc/protect (new-elts) ; note: it's not really necessary here, because we store it before any new allocation
-                          (copy-oops elts new-elts size)
-                          (set elts (put <array> _array obj new-elts))))))
+                      (gc/let* ((new-elts (new-object <_array> cap))) ; note: gc/protect it's not strictly necessary here, because we store it before any new allocation
+                        (copy-oops elts new-elts size)
+                        (set elts (put <array> _array obj new-elts)))))
                 (unless (< idx size)
                   ;; record the largest ever written index + 1 (aka size) in the size slot
                   (put <array> size obj (new-<long> (+ 1 idx))))
@@ -620,6 +619,7 @@
       obj)))
 
 (define-function new-<symbol> (cstr)
+  ;; NOTE: strdup is malloc; if we assume that symbols never get collected, then we can allocate an opaque object for symbols.
   (let ((obj (new-object/opaque <symbol> (words-to-bytes (size-of-structure <symbol>)))))
     (set (<symbol>-_bits obj) (libc/strdup cstr))
     obj))
@@ -1233,14 +1233,14 @@
 	    (tail (get/tail exp)))
 	(gc/protect (head tail)
 	  (cond
-	    ((= head fixed-subr/let)	(let ((args (k/cadr exp)))
+	    ((= head fixed-subr/let)	(let ((bindings (k/cadr exp)))
 					  (gc/protect (env)
 					    (set env (new-<env> env 0 (get/long (get <env> offset env))))
-					    (while (is <pair> args)
-					      (let ((var (get/head args)))
-						(and (is <pair> var) (set var (get/head var)))
-						(k/env/define env var ())
-						(set args (get/tail args))))
+					    (while (is <pair> bindings)
+					      (let ((var-name (get/head bindings)))
+						(and (is <pair> var-name) (set var-name (get/head var-name)))
+						(k/env/define env var-name ())
+						(set bindings (get/tail bindings))))
 					    (set tail (enlist tail env))
 					    (set tail (new-<pair> env tail)))))
 	    ((= head fixed-subr/lambda)	(let ((args (k/cadr exp)))
@@ -2005,6 +2005,10 @@
 
   (gc/initialise)
 
+  (safety 4 (set gc/frequency 1))
+
+  (debug (libc/printf "gc initialized\n"))
+
   (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
   (gc/push-root (address-of k/+done+))
 
@@ -2014,10 +2018,6 @@
   (gc/push-root (address-of fixed-subr/lambda))
   (gc/push-root (address-of fixed-subr/let))
   (gc/push-root (address-of fixed-subr/define))
-
-  (safety 4 (set gc/frequency 1))
-
-  (debug (libc/printf "gc initialized\n"))
 
   (set *module* (new-<module>))
 
@@ -2035,12 +2035,11 @@
   ;; *command-line-arguments*
   (let ((cla-var (k/env/lookup-variable (get/globals) (intern "*command-line-arguments*"))))
     ;; initialize *cla*
-    (let ((tmp))
-      (gc/protect (tmp)
-        (while (< 0 (set argc (- argc 1)))
-          (set tmp (new-<pair> () tmp))
-          (put/head tmp (new-<string>-from-cstring (oop-at argv argc))))
-        (put <variable> value cla-var tmp)))
+    (gc/let* (tmp)
+      (while (< 0 (set argc (- argc 1)))
+        (set tmp (new-<pair> () tmp))
+        (put/head tmp (new-<string>-from-cstring (oop-at argv argc))))
+      (put <variable> value cla-var tmp))
 
     ;; process *cla*
     (let ((cla))
