@@ -1,41 +1,5 @@
 --- minimal.edited	2020-06-10 21:48:28.476932444 +0200
 +++ latest	2020-06-10 20:52:05.778511341 +0200
-@@ -42,6 +47,10 @@
- (define abort	(extern	'abort))
- (define exit	(extern	'exit))
- (define malloc	(extern	'malloc))
- 
-+(define arguments		0)
-+(define input			0)
-+(define stdin			0)
-+(define stdout			0)
- (define stderr			0)
- 
-(define gc_quantum		65504)
-(define gc_frequency		65536)
- 
- (define gc_objects_live		0)
- (define gc_bytes_used		0)
-@@ -80,6 +93,8 @@
- (define trace_stack	0)
- (define trace_depth	0)
- 
-+(define die) ;; forward
-+
- (define-function fatal (reason)		(printf "\neval.k: %s\n" reason) (exit 1))
- 
- (define-function fatal1 (fmt arg)	(printf "\neval.k: ") (printf fmt arg)		(printf "\n") (die))
-@@ -281,9 +303,10 @@
- (define f_quote			0)
- (define f_lambda		0)
- (define f_let			0)
- (define f_define		0)
- 
- (define opt_verbose		0)
-+(define opt_optimised		0)
- 
- (define-function new-bits (type size)
-   (let ((obj (gc_malloc_atomic size)))
 @@ -524,7 +630,8 @@
  					 ( = ?_  c)			; _
  				    (and (<= ?a  c) (<= c ?z))		; a b c d e f g h i j k l m n o p q r s t u v w x y z
@@ -46,59 +10,7 @@
  
  (define-function new_buffer ()
    (let ((buf (malloc (size-of-structure <buffer>))))
-@@ -1022,6 +1270,51 @@
-   (let ((status (and (is_long (k_car args)) (get_long (k_car args)))))
-     (exit status)))
- 
-+(define-function subr_getc (args ctx)
-+  (let ((arg (k_car args)))
-+    (or arg (set arg (get <variable> value input)))
-+    (or (is_long arg) (fatal "non-integer stream id in getc"))
-+    (let ((c (getc (get_long arg))))
-+      (and (>= c 0)
-+	   (new-<long> c)))))
-+
-+(define-function subr_putc (args ctx)
-+  (let ((arg (k_car args))
-+	(obj (k_cadr args)))
-+    (or arg (set arg (get <variable> value input)))
-+    (or (is_long arg) (fatal "non-integer stream id in putc"))
-+    (or (is_long obj) (fatal "non-integer character in putc"))
-+    (new-<long> (putc (get_long arg)))))
-+
-+(define-function subr_format (args ctx)
-+  (arity2 "format" args)
-+  (let ((ofmt (k_car args))
-+	(oarg (k_cadr args)))
-+    (or (is <string> ofmt) (fatal "non-string format"))
-+    (let ((fmt (get <string> _bits ofmt))
-+	  (typ (get-type oarg))
-+	  (arg ()))
-+      (cond
-+	((= typ <undefined>))
-+	((= typ <long>)		(set arg (get_long oarg)))
-+	((= typ <string>)	(set arg (get <string> _bits oarg)))
-+	((= typ <symbol>)	(set arg (get <symbol> _bits oarg)))
-+	(else			(set arg oarg)))
-+      (let ((size 100) (p) (np))
-+	(or (set p (malloc size) (return ())))
-+	(while 1
-+	  (let ((n (snprintf p size fmt arg)))
-+	    (and (<= 0 n) (< n size)
-+		 (let ((ans (new-<string> p)))
-+		   (free p)
-+		   (return ans)))
-+	    (set size (* size 2)))
-+	  (or (set np (realloc p size))
-+	      (let ()
-+		(free p)
-+		(return "out of memory")))
-+	  (set p np))))))
-+
- (define-function subr_dump (args ctx)
-   (while (is <pair> args)
-     (k_dump (get_head args))
-@@ -1165,36 +1486,65 @@
+@@ -1165,9 +1486,19 @@
  	       (free buf)
  	       result))))))
  
@@ -116,122 +28,25 @@
 +	(set opt_optimised (get_long arg))
 +      (new-<long> opt_optimised))))
 +
-+(define-function subr_read (args ctx)
-+  (if (= () args)
-+      (let ((obj (k_read stdin)))
-+	(and (= DONE obj) (set obj ()))
-+	obj)
-+    (let ((arg (k_car args)))
-+      (or (is <string> arg) (fatal1 "read: non-String argument: " arg))
-+      (let* ((path   (get <string> _bits arg))
-+	     (stream (fopen path "r")))
-+	(if stream
-+	    (let* ((head (new-<pair> () ()))
-+		   (tail head)
-+		   (obj  ()))
-+	      (gc-protect (head obj)
-+	        (while (!= DONE (set obj (k_read stream)))
-+		  (set tail (set_tail tail (new-<pair> obj ())))))
-+	      (fclose stream)
-+	      (get_tail head))
-+	  ())))))
  
  ;;; ----------------------------------------------------------------
  
  
- (define-function define-subr (name imp)
-   (let ((tmp (new-<subr> imp name)))
-     (gc-protect (tmp)
-       (k_env_define (get <variable> value globals) (intern name) tmp))))
- 
- (define-function define-fsubr (name imp)
-   (let ((tmp (new-<subr> imp name)))
-     (gc-protect (tmp)
-       (set tmp (new-<fixed> tmp))
-       (k_env_define (get <variable> value globals) (intern name) tmp))))
- 
- (define-function main (argc argv)
-   (set stdin  (fdopen 0 "r"))
-   (set stdout (fdopen 1 "a"))
-   (set stderr (fdopen 2 "a"))
- 
-   (gc_initialise)		(gcdebug (set gc_frequency 1))
- 
-   (set symbols (new-<array> 0))						(gc_push_root (address-of symbols))
- 
-   (set s_t			(intern "t"))
-   (set s_dot			(intern "."))
-   (set s_set			(intern "set"))
-   (set s_define			(intern "define"))
-   (set s_lambda			(intern "lambda"))
-   (set s_let			(intern "let"))
-   (set s_quote			(intern "quote"))
-@@ -1252,20 +1609,23 @@
-   (define-subr  "<="			subr_le)
-   (define-subr  "!="			subr_ne)
-   (define-subr  "="			subr_eq)
-   (define-subr  ">"			subr_gt)
-   (define-subr  "abort"			subr_abort)
-   (define-subr  "exit"			subr_exit)
-+  (define-subr  "format"		subr_format)
-   (define-subr  "dump"			subr_dump)
-   (define-subr  "print"			subr_print)
-   (define-subr  "warn"			subr_warn)
-   (define-subr  "apply"			subr_apply)
-   (define-subr  "eval"			subr_eval)
-   (define-subr  "encode"		subr_encode)
-   (define-subr  "expand"		subr_expand)
-   (define-subr  "cons"			subr_cons)
-   (define-subr  "string"		subr_string)
-   (define-subr  "array"			subr_array)
-   (define-subr  "form"			subr_form)
-+  (define-subr  "getc"			subr_getc)
-+  (define-subr  "putc"			subr_putc)
-   (define-subr  "allocate"		subr_allocate)
-   (define-subr  "type-of"		subr_type_of)
-   (define-subr  "string?"		subr_stringP)
-@@ -1283,20 +1650,37 @@
+@@ -1283,9 +1650,10 @@
    (define-subr  "string->symbol"	subr_string_symbol)
    (define-subr  "symbol->string"	subr_symbol_string)
    (define-subr  "long->string"		subr_long_string)
 -  (define-subr  "current-environment"	subr_current_environment)
 +  (define-subr  "verbose"		subr_verbose)
 +  (define-subr  "optimised"		subr_optimised)
-+  (define-subr  "read"			subr_read)
+   (define-subr  "read"			subr_read)
  
-+  (let ((tmp ()))
-+    (gc-protect (tmp)
-+      (while (< 0 (set argc (- argc 1)))
-+	(set tmp (new-<pair> () tmp))
-+	(set_head tmp (new-<string> (oop-at argv argc))))
-+      (set arguments (k_env_define (get <variable> value globals) (intern "*arguments*") tmp))))
-+
+  (let ((tmp ()))
+    (gc-protect (tmp)
+      (while (< 0 (set argc (- argc 1)))
+	(set tmp (new-<pair> () tmp))
+	(set_head tmp (new-<string> (oop-at argv argc))))
+      (set arguments (k_env_define (get <variable> value globals) (intern "*arguments*") tmp))))
+
  
    (set trace_stack (new-<array> 32))				(gc_push_root (address-of trace_stack))
- 
--  (while (set argc (- argc 1))
--    (set argv (+ argv 4))
--    (let ((arg (oop-at argv 0)))
-+  (k_env_define (get <variable> value globals) (intern "*backtrace*") ())
-+
-+  (while (is <pair> (get <variable> value arguments))
-+    (let* ((argl (get <variable> value arguments))
-+	   (args (get_head argl))
-+	   (arg  (get <string> _bits args)))
-+      (gc-protect (args)
-+        (put <variable> value arguments (get_tail argl))
-       (cond
- 	((not (strcmp arg "-v"))	(set opt_verbose (+ 1 opt_verbose)))
--	(else				(let ((stream (fopen (oop-at argv 0) "r")))
--					  (or stream (fatal1 "no such file: %s" (oop-at argv 0)))
-+	  ((not (strcmp arg "-O"))	(set opt_optimised (+ 1 opt_optimised)))
-+	  ((not (strcmp arg "-"))		(repl_stream stdin))
-+	  (else				(let ((stream (fopen arg "r")))
-+					  (or stream (fatal1 "no such file: %s" arg))
- 					  (repl_stream stream)
--					  (fclose stream))))))
-+					  (fclose stream)))))))
-+
-   (and (> opt_verbose 0)
-        (let ()
- 	 (gc_gcollect)
