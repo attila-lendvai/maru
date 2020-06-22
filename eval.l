@@ -290,7 +290,8 @@
               (set (<header>-flags ptr) (^ flags (<header>-flags-mark))))
           (gc/debug (libc/printf "collect %p size %d\n" ptr (<header>-size ptr)))
           (set nfree (+ nfree (<header>-size ptr)))
-          (set (<header>-flags ptr) 0)))
+          (set (<header>-flags ptr) 0)
+          (set (<header>-type ptr) 0)))
       (and (= gc/memory-base (set ptr (<header>-next ptr)))
            (set ptr 0)))
     (set gc/objects-live nobjs)
@@ -370,7 +371,6 @@
                   (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (k/assert (& (<header>-flags-used) (<header>-flags (header-of obj))) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (initialize-header-magic-marker (header-of obj)))
-                  (safety 3 (set (<header>-type (header-of obj)) -42))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (%p), size %d\n" (header-of obj) obj (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
@@ -414,6 +414,7 @@
 ;; level-shift the ids of some types that we will need to denote in the target
 (bootstrap-types
  <undefined>
+ <data>
  <long>
  <string>
  <symbol>
@@ -607,9 +608,7 @@
   (let ((str (new-object <string> (size-of-structure <string>))))
     (gc/protect (str)
       (set (<string>-size  str) (new-<long> len))
-      ;; TODO use new-object/opaque with type <data>
-      (set (<string>-_bits str) (gc/allocate-opaque (+ len 1))) ; +1 is for the terminal zero
-      (safety 3 (set (<header>-type (header-of (<string>-_bits str))) -43))
+      (set (<string>-_bits str) (new-object/opaque <data> (+ len 1))) ; +1 is for the terminal zero
       str)))
 
 (define-function new-<string>-from-cstring (cstr)

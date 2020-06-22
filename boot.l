@@ -485,6 +485,7 @@
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 (define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
+(define-structure <data>        ()) ; some blob; used for stuff like the _bits of <string>
 
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
