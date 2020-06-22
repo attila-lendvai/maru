@@ -122,10 +122,7 @@
 ;;;
 (compile-begin)
 
-;; TODO we need a value here that k/read cannot ever return.
-;;      get some unique identity, something along the lines of:
-;;      (define k/+done+ (address-of k/+done+))
-(define-constant k/+done+ -4) ; NOTE: be careful when introducing tagged immediates!
+(define k/+done+) ; we need a unique value that k/read cannot ever read from any source file; will be initialized at startup
 
 (define *backtrace-stack*     0)
 (define *backtrace-index*     0)
@@ -1796,6 +1793,8 @@
       (set tmp (new-<long> 0))	(k/env/define env (intern* "*verbosity*"		module) tmp)
       (set tmp (new-<long> 0))	(k/env/define env (intern* "*optimised*"		module) tmp)
 
+      (k/env/define env (intern* "+done+" module) k/+done+)
+
       ;; TODO this can be deleted/replaced in the next iteration when defined? will be availabe
       ;; obstacle: (define foo ...) will create the variable __at expand time__, so defined? is kinda broken
       (k/env/define env (intern* "bootstrapping?" module) ())
@@ -1913,6 +1912,9 @@
   (set libc/stderr (oop-at libc/stderr 0))
 
   (gc/initialise)
+
+  (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
+  (gc/push-root (address-of k/+done+))
 
   (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
   (gc/push-root (address-of *backtrace-stack*))
