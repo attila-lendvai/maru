@@ -1703,6 +1703,26 @@
                (libc/free buf)
                result))))))
 
+(define-subr subr/read
+  (if (= () -args-)
+      (let ((obj (k/read libc/stdin)))
+        (and (= k/+done+ obj) (set obj ()))
+        obj)
+    (let ((arg (k/car -args-)))
+      (or (is <string> arg) (fatal1 "read: non-String argument: " arg))
+      (let* ((path   (get/string arg))
+             (stream (libc/fopen path "r")))
+        (if stream
+            (let* ((head (new-<pair> () ()))
+                   (tail head)
+                   (obj  ()))
+              (gc/protect (head obj)
+                (while (!= k/+done+ (set obj (k/read stream)))
+                  (set tail (put/tail tail (new-<pair> obj ())))))
+              (libc/fclose stream)
+              (get/tail head))
+          ())))))
+
 (define-subr (subr/current-module 0)
   *module*)
 
@@ -1846,6 +1866,7 @@
     (instantiate-subr  "form"                  subr/form               module)
     (instantiate-subr  "open"                  subr/open               module)
     (instantiate-subr  "close"                 subr/close              module)
+    (instantiate-subr	"read"			subr/read		module)
     (instantiate-subr  "allocate"              subr/allocate           module)
     (instantiate-subr  "type-of"               subr/type-of            module)
     (instantiate-subr  "string?"               subr/string?            module)
