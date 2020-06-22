@@ -646,6 +646,7 @@
 (switch-to-slave-module)
 
 (define-function compile-begin ()
+  (set *force-bootstrap-structure-accessors* 't) ; we need accessors to be a simple oop-at, understood by the compiler
   (set *globals* (environment *globals*)))
 
 (define-function compile-end ()

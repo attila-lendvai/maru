@@ -400,6 +400,8 @@
              (type-of object)" "(type-name-of object)))
   object)
 
+(define *force-bootstrap-structure-accessors* '()) ; expand only an oop-at, which is directly understood by the compiler
+
 (define-function %accessor (name)
   ;; KLUDGE? TODO understand and reinstate?
   ;; (if (= ?_ (string-at (symbol->string name) 0))
@@ -412,7 +414,9 @@
 (define-function %make-safe-accessor (name fields offset)
   (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
                       (list ',(%accessor (car fields))
-                            (list '%typecheck ',name self)
+                            (if *force-bootstrap-structure-accessors*
+                                self
+                                (list '%typecheck ',name self))
                             ,offset))
                    (%make-accessor name (cdr fields) (+ 1 offset)))))
 
