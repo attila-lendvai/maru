@@ -138,8 +138,8 @@
 
 (define-externs ;; TODO undo that it's libc/ specific
   abort exit
-  malloc free memset memcpy memmove
-  stdin stdout stderr printf fprintf sprintf
+  malloc free realloc memset memcpy memmove
+  stdin stdout stderr printf fprintf sprintf snprintf
   strlen strcmp strdup strtoul getc ungetc putc
   fopen fdopen fclose fflush fscanf)
 
@@ -468,8 +468,15 @@
 (define-form get/string		(obj)		`(get <string> _bits ,obj))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
+(define-form get/variable-value	(var)		`(get <variable> value
+                                                      ,(if (string? var)
+                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                         var)))
+
 (define-form put/variable-value	(var val)	`(put <variable> value
-                                                      (k/env/lookup-variable (get/globals) (intern ,var))
+                                                      ,(if (string? var)
+                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                         var)
                                                       ,val))
 
 (define-function k/car		(list)		(and (is <pair> list) (get/head list)))
@@ -556,30 +563,30 @@
 ;; captured/known by the code implementing it in the target VM.
 ;; Only the first one of these is essential: *module*, the rest could
 ;; be looked up each time; i.e. they're just optimization or debug helpers.
-(define *module*		0)
+(define *module*)
 
 ;; optimization: we cache these definitions from the env of the Maru VM
 ;; to avoid looking them up a gazillion times.
-(define *expanders*               0)
-(define *encoders*                0)
-(define *evaluators*              0)
-(define *applicators*             0)
+(define var/*expanders*)
+(define var/*encoders*)
+(define var/*evaluators*)
+(define var/*applicators*)
+(define var/*input*)
 
-(define symbol/t                     0)
-(define symbol/dot                   0)
-(define symbol/define                0)
-(define symbol/set                   0)
-(define symbol/quote                 0)
-(define symbol/quasiquote            0)
-(define symbol/unquote               0)
-(define symbol/unquote_splicing      0)
-(define symbol/*module*              0)
+(define symbol/t)
+(define symbol/dot)
+(define symbol/define)
+(define symbol/set)
+(define symbol/quote)
+(define symbol/quasiquote)
+(define symbol/unquote)
+(define symbol/unquote_splicing)
 
-(define fixed-subr/quote        0)
-(define fixed-subr/lambda       0)
-(define fixed-subr/let          0)
-(define fixed-subr/define       0)
-(define fixed-subr/set          0)
+(define fixed-subr/quote)
+(define fixed-subr/lambda)
+(define fixed-subr/let)
+(define fixed-subr/define)
+(define fixed-subr/set)
 
 ;;;
 ;;; instantiation
@@ -703,6 +710,11 @@
           (and (= name (get <variable> name var))
                (return var)))))
     (set env (get <env> parent env))))
+
+(define-function k/env/lookup-variable-or-die (env name)
+  (let ((var (k/env/lookup-variable env name)))
+    (or (and var (is <variable> var)) (fatal1 "k/env/lookup-variable-or-die failed for %s" (get/symbol name)))
+    var))
 
 (define-function k/env/variable-value (env name)
   (let ((var (k/env/lookup-variable env name)))
@@ -1127,7 +1139,7 @@
       ((= type <expr>)		(k/apply-expr fun arguments ctx))
       ((= type <fixed>)		(k/apply (get <fixed> function fun) arguments ctx))
       ((= type <subr>)		((get <subr> _imp fun) arguments ctx))
-      (else			(let ((ap (k/array-at (get <variable> value *applicators*) (get/type fun))))
+      (else			(let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
 				  (if ap
 				      (let ((args arguments))
 					(gc/protect (args)
@@ -1184,7 +1196,7 @@
                           (set args (k/apply fn args ()))
                           (set exp (k/expand args env)))))))))
     (else ; consult the *expanders* array to see if there's any custom expander for this type
-     (let ((fn (k/array-at (get <variable> value *expanders*) (get/type exp))))
+     (let ((fn (k/array-at (get/variable-value var/*expanders*) (get/type exp))))
         (and fn
              (let ((args (new-<pair> exp ())))
                (gc/protect (args)
@@ -1251,7 +1263,7 @@
 	    (let ((venv (get <variable> env exp)))
 	      (or (= (get/long (get <env> level venv)) (get/long (get <env> level env)))
 		  (put <env> stable venv symbol/t)))))
-      (let ((fn (k/array-at (get <variable> value *encoders*) (get/type exp))))
+      (let ((fn (k/array-at (get/variable-value var/*encoders*) (get/type exp))))
 	(and fn
 	     (let ((args (new-<pair> env ())))
 	       (gc/protect (args)
@@ -1309,7 +1321,7 @@
                                     (debug (libc/printf "k/eval of pair, returning with head ") (k/dumpln head))
 				    head)))
       ((= type <symbol>)	(k/error "symbol in eval?")) ;; TODO xxx
-      (else			(let ((ev (k/array-at (get <variable> value *evaluators*) (get/type exp))))
+      (else			(let ((ev (k/array-at (get/variable-value var/*evaluators*) (get/type exp))))
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
 					 (gc/protect (args)
@@ -1540,6 +1552,52 @@
     (libc/fclose (get/long arg))
     arg))
 
+(define-subr subr/getc
+  (let ((arg (k/car -args-)))
+    (or arg (set arg (get/variable-value var/*input*)))
+    (or (is/long arg) (fatal "non-integer stream id in getc"))
+    (let ((c (libc/getc (get/long arg))))
+      (and (>= c 0)
+           (new-<long> c)))))
+
+(define-subr subr/putc
+  (let ((arg (k/car -args-))
+        (obj (k/cadr -args-)))
+    (or arg (set arg (get/variable-value var/*input*)))
+    (or (is/long arg) (fatal "non-integer stream id in putc"))
+    (or (is/long obj) (fatal "non-integer character in putc"))
+    (new-<long> (libc/putc (get/long arg)))))
+
+(define-subr (subr/format 2)
+  (let ((ofmt (k/car -args-))
+        (oarg (k/cadr -args-)))
+    (or (is <string> ofmt) (fatal "non-string format"))
+    (let ((fmt (get/string ofmt))
+          (typ (get/type oarg))
+          (arg ()))
+      (cond
+        ((= typ <undefined>))
+        ((= typ <long>)		(set arg (get/long oarg)))
+        ((= typ <string>)	(set arg (get/string oarg)))
+        ((= typ <symbol>)	(set arg (get/symbol oarg)))
+        (else			(set arg oarg)))
+      (let ((size 100)
+            (p)
+            (np))
+        (or (set p (libc/malloc size) (return "out of memory")))
+        (while 1
+          (let ((n (libc/snprintf p size fmt arg)))
+            (and (<= 0 n) (< n size)
+                 (let ((ans (new-<string>-from-cstring p)))
+                   (libc/free p)
+                   (return ans)))
+            (set size (* size 2)))
+          (or (set np (libc/realloc p size))
+              (let ()
+                (libc/free p)
+                (return "out of memory")))
+          (set p np))))))
+
 (define-subr subr/dump
   (while (is <pair> -args-)
     (k/dump (get/head -args-))
@@ -1768,7 +1826,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function repl_stream (stream)
-  ;; (put/variable-value "*input*" (new-<long> stream))
+  (put/variable-value var/*input* (new-<long> stream))
   (let ((res ()))
     (gc/protect (res)
       (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
@@ -1808,7 +1866,7 @@
   (let ((env (get/globals* module))
         (tmp))
     (gc/protect (tmp)
-				;;(k/env/define env (intern* "*input*"			module) ())
+				(k/env/define env (intern* "*input*"			module) ())
 				(k/env/define env (intern* "*command-line-arguments*"	module) ())
       (set tmp (new-<long> 0))	(k/env/define env (intern* "*verbosity*"		module) tmp)
       (set tmp (new-<long> 0))	(k/env/define env (intern* "*optimised*"		module) tmp)
@@ -1866,6 +1924,9 @@
     (instantiate-subr  "form"                  subr/form               module)
     (instantiate-subr  "open"                  subr/open               module)
     (instantiate-subr  "close"                 subr/close              module)
+    (instantiate-subr	"getc"			subr/getc		module)
+    (instantiate-subr	"putc"			subr/putc		module)
+    (instantiate-subr	"format"		subr/format		module)
     (instantiate-subr	"read"			subr/read		module)
     (instantiate-subr  "allocate"              subr/allocate           module)
     (instantiate-subr  "type-of"               subr/type-of            module)
@@ -1906,15 +1967,13 @@
   (set symbol/quasiquote             (intern "quasiquote"))
   (set symbol/unquote                (intern "unquote"))
   (set symbol/unquote_splicing       (intern "unquote-splicing"))
-  (set symbol/*module*               (intern "*module*"))
 
   (let ((global-env (get/globals)))
-    (set *expanders*	(k/env/lookup-variable global-env (intern "*expanders*")))
-    (set *encoders*	(k/env/lookup-variable global-env (intern "*encoders*")))
-    (set *evaluators*	(k/env/lookup-variable global-env (intern "*evaluators*")))
-    (set *applicators*	(k/env/lookup-variable global-env (intern "*applicators*")))
-
-    (k/assert (and (is <variable> *expanders*) (is <variable> *encoders*) (is <variable> *evaluators*) (is <variable> *applicators*)) "capture-well-known-vm-values: assert 1")
+    (set var/*expanders*	(k/env/lookup-variable-or-die global-env (intern "*expanders*")))
+    (set var/*encoders*		(k/env/lookup-variable-or-die global-env (intern "*encoders*")))
+    (set var/*evaluators*	(k/env/lookup-variable-or-die global-env (intern "*evaluators*")))
+    (set var/*applicators*	(k/env/lookup-variable-or-die global-env (intern "*applicators*")))
+    (set var/*input*		(k/env/lookup-variable-or-die global-env (intern "*input*")))
 
     (set fixed-subr/quote  (k/env/variable-value global-env (intern "quote")))
     (set fixed-subr/lambda (k/env/variable-value global-env (intern "lambda")))
