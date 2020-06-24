@@ -1809,7 +1809,7 @@
   ())
 
 (define-subr (subr/create-module 0)
-  (let ((module (new-<module>)))
+  (gc/let* ((module (new-<module>)))
     (populate-module-with-primitives module)
     module))
 
