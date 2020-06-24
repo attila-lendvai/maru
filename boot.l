@@ -490,6 +490,11 @@
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
+;; TODO the following few definitions need fixing:
+;; While the host is running us, we need to shadow our FIXED definition with that of the host
+;; (so that it instantiates the <fixed> that the host's level-shifted code understands).
+;; Our <fixed> is just a random, meaningless struct for the host while we are being bootstrapped.
+;; to reproduce the bug: put <data> before <fixed>, so that the slave and the host disagree on the type id
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
     (set (<fixed>-function self) fun)
