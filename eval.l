@@ -1887,6 +1887,7 @@
       ;; TODO this can be deleted/replaced in the next iteration when defined? will be availabe
       ;; obstacle: (define foo ...) will create the variable __at expand time__, so defined? is kinda broken
       (k/env/define env (intern* "bootstrapping?" module) ())
+      (k/env/define env (intern* "evolving?" module) ())
 
       (set tmp (new-<array> 0))	(k/env/define env (intern* "*expanders*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (intern* "*encoders*"			module) tmp)

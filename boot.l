@@ -1,16 +1,11 @@
 ;;; This is the minimum "standard library" that is needed/used while bootstrapping
 
 (if bootstrapping?
-    (warn "boot.l speaking; we're in bootstrapping mode\n"))
-
-(if bootstrapping?
     (let ()
-      (define *command-line-arguments* '())
-      (define *verbosity* 0)
-      (define *optimised* 1)))
-
-(if (> *optimised* 0)
-    (warn "boot.l speaking; we're in optimised mode\n"))
+      (warn "boot.l speaking; we're bootstrapping")
+      (if evolving?
+          (warn "; we're evolving"))
+      (warn "\n")))
 
 (define unit-testing? '(t))
 

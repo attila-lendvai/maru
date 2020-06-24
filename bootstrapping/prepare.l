@@ -17,6 +17,10 @@
 ;; NOTE: we are in the slave module now, and the following forms will be read/interned into the slave.
 ;; NOTE: the slave module doesn't have boot.l loaded at this point, we only have the primitives.
 
+;; The variable bootstrapping? denotes that the process is underway in which a host loads a slave into an isolated module,
+;; and then compiles the definitions to the target (does the level-shift).
+(define bootstrapping? 't)
+
 (define switch-to-host-module
     (lambda ()
       ;;(warn "--- switching to the host  module\n")
