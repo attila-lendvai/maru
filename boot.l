@@ -387,10 +387,10 @@
        (or (= type base)
            (inherits-from (array-at %structure-bases type) base))))
 
-(define-function %typecheck (type object)
+(define-function %typecheck (type field-name object)
   (or (= type (type-of object))
       (inherits-from (type-of object) type)
-      (error "type check failed for field accessor: expected "
+      (error "type check failed for field accessor: " field-name ", expected "
              type" "(name-of-type type)", got "
              (type-of object)" "(type-name-of object)))
   object)
@@ -407,20 +407,24 @@
 (define %make-accessor) ;; forward
 
 (define-function %make-safe-accessor (name fields offset)
-  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-                      (list ',(%accessor (car fields))
-                            (if *force-bootstrap-structure-accessors*
-                                self
-                                (list '%typecheck ',name self))
-                            ,offset))
-                   (%make-accessor name (cdr fields) (+ 1 offset)))))
+  (when fields
+    (let ((field-name (car fields)))
+      (cons `(define-form ,(concat-symbol name (concat-symbol '- field-name)) (self)
+               (list ',(%accessor field-name)
+                     (if *force-bootstrap-structure-accessors*
+                         self
+                       (list '%typecheck ',name '',field-name self))
+                     ,offset))
+            (%make-accessor name (cdr fields) (+ 1 offset))))))
 
 (define-function %make-unsafe-accessor (name fields offset)
-  (if fields (cons `(define-form ,(concat-symbol name (concat-symbol '- (car fields))) (self)
-                      (list ',(%accessor (car fields))
-                            self
-                            ,offset))
-                   (%make-accessor name (cdr fields) (+ 1 offset)))))
+  (when fields
+    (let ((field-name (car fields)))
+      (cons `(define-form ,(concat-symbol name (concat-symbol '- field-name)) (self)
+               (list ',(%accessor field-name)
+                     self
+                     ,offset))
+            (%make-accessor name (cdr fields) (+ 1 offset))))))
 
 (set %make-accessor (if (> *optimised* 0)
                         %make-unsafe-accessor
