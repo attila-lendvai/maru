@@ -474,8 +474,8 @@
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))
 (define-structure <pair>        (head tail))
-(define-structure <_array>      ())
-(define-structure <array>       (size _array))
+(define-structure <data>        ())			; some blob; used for stuff like the _bits of <string>
+(define-structure <array>       (size _bits))
 (define-structure <expr>        (name defn ctx))        ; NOTE: defn is: (env formals . prog)
 (define-structure <form>        (function symbol))      ; these are expander lambda's
 (define-structure <fixed>       (function))
@@ -484,7 +484,6 @@
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 (define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
-(define-structure <data>        ()) ; some blob; used for stuff like the _bits of <string>
 
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))

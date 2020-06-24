@@ -419,7 +419,6 @@
  <string>
  <symbol>
  <pair>
- <_array>
  <array>
  <expr>
  <form>
@@ -516,7 +515,7 @@
 (define-function k/array-at (obj idx)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
-       (let ((elements (get <array> _array obj))
+       (let ((elements (get <array> _bits obj))
              (size     (get/long (get <array> size obj))))
          (and (<= 0 idx)
               (< idx size)
@@ -525,7 +524,7 @@
 (define-function k/set-array-at (obj idx val)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/set-array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
-       (let* ((elts (get <array> _array obj))
+       (let* ((elts (get <array> _bits obj))
               (size (get/long (get <array> size obj)))
               (cap  (bytes-to-words (gc/object-size elts))))
          (and (<= 0 idx)
@@ -534,9 +533,9 @@
                     (let ()
                       (while (not (< idx cap))
                         (set cap (* cap 2)))
-                      (gc/let* ((new-elts (new-object <_array> cap))) ; note: gc/protect it's not strictly necessary here, because we store it before any new allocation
+                      (gc/let* ((new-elts (new-object <data> cap))) ; note: gc/protect it's not strictly necessary here, because we store it before any new allocation
                         (copy-oops elts new-elts size)
-                        (set elts (put <array> _array obj new-elts)))))
+                        (set elts (put <array> _bits obj new-elts)))))
                 (unless (< idx size)
                   ;; record the largest ever written index + 1 (aka size) in the size slot
                   (put <array> size obj (new-<long> (+ 1 idx))))
@@ -549,7 +548,7 @@
   (let ((len (k/array-length array)))
     (k/array-append array value)         ; ensure we have enough room
     (and (< index len)
-         (let* ((elts (get <array> _array array))
+         (let* ((elts (get <array> _bits array))
                 (src (+ elts (words-to-bytes index))))
            (move-oops src
                       (+ src (words-to-bytes 1))
@@ -628,7 +627,7 @@
         (arr (new-object <array> (size-of-structure <array>))))
     (gc/protect (arr)
       (set (<array>-size arr)   (new-<long> size))
-      (set (<array>-_array arr) (new-object <_array> cap))
+      (set (<array>-_bits arr)  (new-object <data> cap))
       arr)))
 
 (define-function new-<expr> (defn ctx)
@@ -715,7 +714,7 @@
   (while env
     (let* ((bindings (get <env> bindings env))
            (index    (k/array-length bindings))
-           (vars     (get <array> _array bindings))) ; KLUDGE? early optimization?
+           (vars     (get <array> _bits bindings))) ; KLUDGE? early optimization?
       (while (<= 0 (set index (- index 1)))
         (let ((var (oop-at vars index)))
           (and (= name (get <variable> name var))
