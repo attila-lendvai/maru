@@ -13,7 +13,8 @@
 (define-method gen-definition <undefined> (name comp)
   (gen-definition 0 name comp))
 
+;; these are new variables that are defined by the evolved eval.l
 (eval-in-module slave '(slave:let ()
                         (slave:define slave:*command-line-arguments* ())
                         (slave:define slave:*verbosity* 0)
-                        (slave:define slave:*optimised* 1)))
+                        (slave:define slave:*optimised* 0)))
