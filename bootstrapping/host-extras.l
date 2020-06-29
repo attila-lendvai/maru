@@ -17,4 +17,7 @@
 (eval-in-module slave '(slave:let ()
                         (slave:define slave:*command-line-arguments* ())
                         (slave:define slave:*verbosity* 0)
-                        (slave:define slave:*optimised* 0)))
+                        (slave:define slave:*optimised* 0)
+                        (slave:define slave:read)
+                        (slave:define slave:getc)
+                        (slave:define slave:putc)))
