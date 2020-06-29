@@ -360,9 +360,13 @@
   (assert (<= type %last-type) "structure-field-count for undefined type " type)
   (array-at %structure-field-counts type))
 
+;; TODO naming? fields-of-structure? or type-field-count above?
+(define-function fields-of-type (type)
+  (array-at %structure-fields type))
+
 (define-function structure-field-index (type field-name)
   (let ((i 0)
-        (list (array-at %structure-fields type)))
+        (list (fields-of-type type)))
     (while (and (pair? list)
                 (not (= field-name (car list))))
       (set list (cdr list))
@@ -370,10 +374,6 @@
     (or (and (pair? list)
              i)
         (error "structure-field-index has failed for type "type", field-name "field-name))))
-
-;; TODO naming? fields-of-structure? or type-field-count above?
-(define-function fields-of-type (type)
-  (array-at %structure-fields type))
 
 (define-function sanity-check-structure-fields (name fields)
   (let ((f fields))
@@ -583,7 +583,7 @@
              (make-instance-accessors name (cdr fields) (+ i 1)))))
 
 (define-form with-instance-accessors (type . body)
-  `(with-forms ,(make-instance-accessors type (array-at %structure-fields (eval type)) 0)
+  `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
     (let () ,@body)))
 
 ;;; selector/method (single dispatch on the type of the first argument)

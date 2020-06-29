@@ -136,7 +136,8 @@
 
 (define-constant libc/EOF -1)
 
-(define-externs ;; TODO undo that it's libc/ specific
+;; TODO this unconditionally prefixes every extern with libc/
+(define-externs
   abort exit
   malloc free realloc memset memcpy memmove
   stdin stdout stderr printf fprintf sprintf snprintf
@@ -510,13 +511,13 @@
     obj))
 
 (define-function k/string-length (obj)		(get/long (get <string> size obj)))
-(define-function k/array-length	(obj)		(get/long (get <array> size obj)))
+(define-function k/array-length  (obj)		(get/long (get <array> size obj)))
 
 (define-function k/array-at (obj idx)
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
        (let ((elements (get <array> _bits obj))
-             (size     (get/long (get <array> size obj))))
+             (size     (k/array-length obj)))
          (and (<= 0 idx)
               (< idx size)
               (oop-at elements idx)))))
@@ -525,7 +526,7 @@
   (safety 1 (or (and (is <array> obj) (<= 0 idx)) (fatal2 "k/set-array-at: called with object of type %d, and index %d" (get/type obj) idx)))
   (and (is <array> obj)
        (let* ((elts (get <array> _bits obj))
-              (size (get/long (get <array> size obj)))
+              (size (k/array-length obj))
               (cap  (bytes-to-words (gc/object-size elts))))
          (and (<= 0 idx)
               (let ()
