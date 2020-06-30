@@ -142,7 +142,7 @@
   malloc free realloc memset memcpy memmove
   stdin stdout stderr printf fprintf sprintf snprintf
   strlen strcmp strdup strtoul getc ungetc putc
-  fopen fdopen fclose fflush fscanf)
+  fopen fdopen fclose fflush fscanf feof)
 
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
@@ -1017,7 +1017,9 @@
                                     (!= ?\r c)
                                     (!= libc/EOF c))))
         ((= ?\" c)      (return (read_string c stream)))
-        ((= c libc/EOF) (return k/+done+)) ; TODO use feof and ferror to check whether it's an error, or a true libc/EOF
+        ((= c libc/EOF) (if (libc/feof stream)
+                            (return k/+done+)
+                          (fatal "error while reading from libc stream")))
         (else           (fatal1 "illegal character: %c" c))))))
 )
 ;;;
