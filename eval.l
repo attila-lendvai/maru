@@ -1032,7 +1032,7 @@
   (debug/identities (libc/printf "{%p}" obj))
   (let ((type (get/type obj)))
     (cond
-      ((= type <undefined>)     (libc/printf "nil"))
+      ((= type <undefined>)     (libc/printf "()"))
       ((= type <long>)          (libc/printf "%d" (get/long obj)))
       ((= type <string>)        (let ((bits (get/string obj)))
                                   (if (not storing)
