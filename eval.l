@@ -2037,7 +2037,7 @@
   ;; *command-line-arguments*
   (let ((cla-var (k/env/lookup-variable (get/globals) (intern "*command-line-arguments*"))))
     ;; initialize *cla*
-    (gc/let* (tmp)
+    (gc/let* ((tmp ()))
       (while (< 0 (set argc (- argc 1)))
         (set tmp (new-<pair> () tmp))
         (put/head tmp (new-<string>-from-cstring (oop-at argv argc))))
