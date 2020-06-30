@@ -63,6 +63,14 @@ $(BOOT_EVAL_PATH)/eval:
 		git checkout --quiet $(PREVIOUS_STAGE)
 	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
+$(BUILD)/peg.l: $(BUILD)/eval2 source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
+	$(BUILD)/eval2 boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
+		|| { touch --date=2000-01-01 $(BUILD)/peg.l; exit 42; }
+#	mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
+
+source/parsing/peg.l: $(BUILD)/peg.l
+	cp $(BUILD)/peg.l source/parsing/peg.l
+
 stats:
 	cat boot.l emit.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 	cat eval.l			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l

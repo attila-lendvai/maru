@@ -36,10 +36,10 @@
 
 (define-form match-first exprs		`(or ,@exprs))
 
-(define-function %match-all (exprs)
-  (if (pair? exprs)
-      `(and ,(car exprs) ,(%match-all (cdr exprs)))
-    1))
+;; (define-function %match-all (exprs)
+;;   (if (pair? exprs)
+;;       `(and ,(car exprs) ,(%match-all (cdr exprs)))
+;;     1))
 
 (define-form match-all exprs
   `(match-save
