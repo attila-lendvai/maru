@@ -1078,6 +1078,32 @@
 
 ;;; load/save
 
+;; KLUDGE the following is not well designed, they are here just to remain compatible with the original eval.l for the time being
+(define-function open (path)
+  (assert (= <string> (type-of path)) "open: non-string path argument: " path)
+  ;; TODO error handling
+  (libc/fopen path))
+
+(define-function close (stream)
+  (assert (= <long> (type-of stream)) "close: non-integer argument: " stream)
+  ;; TODO error handling
+  (libc/fclose stream))
+
+(define-function getc (stream)
+  (assert (= <long> (type-of stream)) "getc: non-integer argument: " stream)
+  ;; TODO error handling
+  (libc/fgetc stream))
+
+(define-function putc (stream char)
+  (assert (= <long> (type-of stream)) "putc: non-integer stream argument: " stream)
+  (assert (= <long> (type-of char))   "putc: non-integer char argument: " char)
+  ;; TODO error handling
+  (libc/fputc stream char))
+
+(define-function format (fmt arg)
+  (assert (= <string> (type-of fmt)) "format: non-string fmt argument: " fmt)
+  (libc/format fmt arg))
+
 (define-function pval (expr)
   (and (> *verbosity* 0) (println expr))
   (let ((result (eval expr)))
