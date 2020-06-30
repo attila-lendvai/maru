@@ -599,7 +599,7 @@
         (if bootstrapping?
             (error name" is already defined as non-selector")
             (if (selector? (<variable>-value var))
-                (list 'quote <variable>-value var)
+                (list 'quote (<variable>-value var))
               (error name" is already defined as non-selector: " (<variable>-value var))))
       (let ()
         (or default (set default `(args (error "selector '"',name
