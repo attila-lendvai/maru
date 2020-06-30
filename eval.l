@@ -1120,7 +1120,7 @@
     module))
 
 (define-function k/apply-expr (fun arguments ctx)
-  (and (< 2 *arg/verbose*) (let () (libc/printf "  A  ")  (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ")  (k/dumpln ctx) (libc/fflush libc/stdout)))
+  (and (< 2 *arg/verbose*) (let () (libc/printf "  A  ")  (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ")  (k/dumpln ctx) (libc/flush-streams)))
   (let* ((args    arguments)
          (defn    (get <expr> defn fun))
          (env     (k/car defn))
@@ -1307,7 +1307,7 @@
     obj))
 
 (set k/eval (lambda (exp ctx)
-  (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/fflush libc/stdout)))
+  (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
   (let ((type (get/type exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -1783,6 +1783,7 @@
       (or (is <string> arg) (fatal1 "read: non-String argument: " arg))
       (let* ((path   (get/string arg))
              (stream (libc/fopen path "r")))
+        ;; TODO error handling
         (if stream
             (let* ((head (new-<pair> () ()))
                    (tail head)
@@ -1844,7 +1845,7 @@
     (gc/protect (res)
       (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
       (while (let ()
-               (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/fflush libc/stdout))
+               (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/flush-streams))
                (!= k/+done+ (set res (k/read stream))))
         (let ((env (new-<env> (get/globals) 1 0)))
           (gc/protect (env)
@@ -2044,7 +2045,7 @@
       (put <variable> value cla-var tmp))
 
     ;; process *cla*
-    (let ((cla))
+    (let (cla)
       (while (is <pair> (set cla (get <variable> value cla-var)))
         (let ((arg-string	(get/head cla))
               (arg		(get/string arg-string)))

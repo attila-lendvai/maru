@@ -792,7 +792,8 @@
   `(set ,list (cons ,element ,list)))
 
 (define-form pop (list)
-  `(let* ((_list_ ,list) (_head_ (car _list_)))
+  `(let* ((_list_ ,list)
+          (_head_ (car _list_)))
      (set ,list (cdr _list_))
      _head_))
 
@@ -1072,9 +1073,6 @@
      (let ()
        (pop *command-line-arguments*)
        (set *load-path* (pop *command-line-arguments*))))
-
-;; TODO rename
-(define-form next-argument () '(pop *command-line-arguments*))
 
 ;;; load/save
 

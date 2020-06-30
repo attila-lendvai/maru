@@ -367,7 +367,7 @@
     (gen comp STORE temp)
     temp))
 
-(define-function gen-tmp (expr comp)
+(define-function gen-expr-into-temp (expr comp)
   (gen expr comp)
   (let ((temp (alloc-temp comp)))
     (gen comp STORE temp)
@@ -387,14 +387,14 @@
   (gen comp op))
 
 (define-function generate-binary (op args comp)
-  (let ((tmp (gen-tmp (cadr args) comp)))
+  (let ((tmp (gen-expr-into-temp (cadr args) comp)))
     (gen (car  args) comp)
     (free-temp comp tmp)
     (gen comp op tmp)))
 
 (define-function generate-ternary (op args comp)
-  (let ((tmp2 (gen-tmp (caddr args) comp))
-        (tmp1 (gen-tmp (cadr  args) comp)))
+  (let ((tmp2 (gen-expr-into-temp (caddr args) comp))
+        (tmp1 (gen-expr-into-temp (cadr  args) comp)))
     (gen (car  args) comp)
     (free-temp comp tmp1)
     (free-temp comp tmp2)
@@ -527,7 +527,7 @@
         ((array-at generators arity) op args comp)
       (if (set op (cdr (assq fn-name forms)))
           (op self comp)
-        (let* ((tmp-locs (map-with gen-tmp args comp))
+        (let* ((tmp-locs (map-with gen-expr-into-temp args comp))
                (arg-locs (map-with gen-arg args comp))
                ;;(op       (cdr (assq fn-name (<compiler>-env comp))))
                ;;(op-type  (type-of op))
@@ -619,12 +619,11 @@
            (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
     (unless main?
-      (let ()
-        (gen ocomp DATA)
-        (gen ocomp GLOBAL (LABEL name))
-        (gen ocomp DEFLABEL (LABEL name))
-        (gen ocomp LONG entry-label)
-        (gen ocomp TEXT)))))
+      (gen ocomp DATA)
+      (gen ocomp GLOBAL (LABEL name))
+      (gen ocomp DEFLABEL (LABEL name))
+      (gen ocomp LONG entry-label)
+      (gen ocomp TEXT))))
 
 ;;;
 

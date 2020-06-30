@@ -1,5 +1,9 @@
-;(define-function peg-invoke-rule (rule name parser)
-;  (rule parser))
+;;;
+;;; This file contains expansions for the forms that are referenced in the peg.g file.
+;;;
+
+;;(define-function peg-invoke-rule (rule name parser)
+;;  (rule parser))
 
 (define-form match-save (exp)	`(let ((pos (<parser-stream>-position self.source))) ,exp))
 (define-form match-ok ()	`(set (<parser-stream>-position self.source) pos))

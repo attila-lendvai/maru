@@ -1,4 +1,10 @@
 # -*- fundamental -*-
+#
+# This is the grammar for the Parsing Expression Grammar (PEG),
+# written in itself; i.e. written in the formal language that it describes.
+#
+# https://en.wikipedia.org/wiki/Parsing_expression_grammar
+#
 
 equals    	= "=" space ;
 blank		= [\t ] ;

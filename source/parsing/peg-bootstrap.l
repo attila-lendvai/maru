@@ -191,7 +191,7 @@
       (and (RULE comma)	    (RULE sexpr)	(set self.result (list 'unquote		 self.result)))))
 
 (define-rule atom
-  (cond 
+  (cond
     ((RULE lparen)				(let ((ans))
 						  (or (RULE expression) (error "expression expected after ("))
 						  (set ans self.result)
@@ -345,7 +345,7 @@
 
 ;;;----------------
 
-(progress "parsing peg grammar definition")
+(progress "parsing PEG grammar definition with the bootstrap parser")
 
 ;;(define BEG (grammar '<peg> '<parser> ()))
 
@@ -373,7 +373,7 @@
 
 (define GEN (peg-compile-rules '<peg> BEG))
 
-(progress "reparsing grammar definition")
+(progress "reparsing grammar definition with the compiled parser")
 
 (define PEG)
 
