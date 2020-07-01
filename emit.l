@@ -356,7 +356,8 @@
     (gen comp TEXT)
     (gen comp LOAD label)))
 
-(define-function gen-tmp-prog (prog comp)
+(define-function gen-prog-into-temp (prog comp)
+  (assert (pair? prog) "gen-prog-into-temp: prog is empty") ; against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   (while (pair? prog)
     (gen (car prog) comp)
     (set prog (cdr prog)))
@@ -430,10 +431,14 @@
             table))))
 
 (define-function gen-let-binding (binding comp)
+  ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
+  ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
   (unless (pair? binding)
-    (set binding (list binding)))
+    (set binding (list binding ())))
+  (unless (cdr binding)
+    (set binding (list (car binding) ())))
   (let ((var (car binding))
-        (tmp (gen-tmp-prog (cdr binding) comp)))
+        (tmp (gen-prog-into-temp (cdr binding) comp)))
     (assert (= (type-of var) <variable>) "gen-let-binding: encountered a non-variable: " var)
     (set (<variable>-value var) tmp)))
 
