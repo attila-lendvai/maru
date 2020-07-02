@@ -35,8 +35,11 @@
 ;;;          e.g. k/apply vs. subr/apply (which uses k/apply in its
 ;;;          implementation).
 ;;;
-;;; k/ prefix means that it's the kernel version of something that
-;;;    also exist in the Maru semantic space.
+;;; k/ prefix means that it's something that is part of the kernel of the
+;;;    codebase, i.e. the stuff that implements the Maru vm. Often it's
+;;;    necessary to distinguish a name that exists both in the Maru vm,
+;;;    and in the kernel (e.g. car and k/car). It's not exhasutive, i.e.
+;;;    not all that is part of the kernel is prefixed with k/.
 ;;;
 ;;; slave  - The Maru vm that is being bootstrapped and will
 ;;;          spring to life when the result of the level-shift
@@ -1587,7 +1590,7 @@
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 
-;; KLUDGE FIXME FILE* pointer is stuffed into a long. it won't necessarily work with tagged immediate longs.
+;; KLUDGE FIXME FILE* pointer is stuffed into a long. it won't necessarily work with tagged immediate longs. see repl-stream also.
 (define-subr (libc/fopen 1)
   (let ((path (k/car -args-)))
     (let ((stream (libc/fopen (get/string path) "rb")))
