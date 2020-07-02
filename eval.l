@@ -428,6 +428,7 @@
 ;; level-shift the ids of some types that we will need to denote in the target
 (bootstrap-types
  <undefined>
+ <target-vm-pointer>
  <data>
  <long>
  <string>
@@ -483,6 +484,9 @@
 (define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'tail))		`(get <pair> tail ,obj)))
 (define-form put/tail		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
 
+(define-form is/tptr		(obj)		`(is <target-vm-pointer> ,obj))
+(define-form get/tptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
+
 (define-form get/string		(obj)		`(get <string> _bits ,obj))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
@@ -515,6 +519,11 @@
 (define-function new-<long> (bits)
   (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
     (set (<long>-_bits obj) bits)
+    obj))
+
+(define-function new-<target-vm-pointer> (bits)
+  (let ((obj (new-object/opaque <target-vm-pointer> (words-to-bytes (size-of-structure <target-vm-pointer>)))))
+    (set (<target-vm-pointer>-_bits obj) bits)
     obj))
 
 (define-function new-<pair> (head tail)
@@ -1595,22 +1604,20 @@
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 
-;; KLUDGE FIXME FILE* pointer is stuffed into a long. it won't necessarily work with tagged immediate longs. see repl-stream also.
 (define-subr (libc/fopen 1)
   (let ((path (k/car -args-)))
     (let ((stream (libc/fopen (get/string path) "rb")))
-      (and stream (new-<long> stream)))))
+      (and stream (new-<target-vm-pointer> stream)))))
 
 (define-subr (libc/fclose 1)
   (let ((stream (k/car -args-)))
-    (libc/fclose (get/long stream))
+    (libc/fclose (get/tptr stream))
     ()))
 
 (define-subr libc/fgetc
   (let ((stream (k/car -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
-    (or (is/long stream) (fatal "subr/libc/fgetc: non-integer stream id"))
-    (let ((c (libc/fgetc (get/long stream))))
+    (let ((c (libc/fgetc (get/tptr stream))))
       (and (>= c 0)
            (new-<long> c)))))
 
@@ -1618,9 +1625,7 @@
   (let ((stream (k/car -args-))
         (obj (k/cadr -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
-    (or (is/long stream) (fatal "subr/libc/fputc: non-integer stream id"))
-    (or (is/long obj) (fatal "subr/libc/fputc: non-integer character"))
-    (new-<long> (libc/fputc (get/long stream) (get/long obj)))))
+    (new-<long> (libc/fputc (get/tptr stream) (get/long obj)))))
 
 (define-subr (libc/format 2)
   (let ((ofmt (k/car -args-))
@@ -1655,8 +1660,7 @@
 (define-subr repl-stream
   (let ((stream (k/car -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
-    (or (is/long stream) (fatal "repl-stream: non-integer stream"))
-    (k/repl-stream (get/long stream))))
+    (k/repl-stream (get/tptr stream))))
 
 (define-subr dump
   (while (is <pair> -args-)

@@ -505,6 +505,7 @@
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 (define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
+(define-structure <target-vm-pointer> (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
 
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
