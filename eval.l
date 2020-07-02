@@ -1355,6 +1355,29 @@
 				  exp)))))
      )
 
+(define-function k/repl-stream (stream)
+  (put/variable-value var/*input* (new-<long> stream))
+  (let ((res ()))
+    (gc/protect (res)
+      (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
+      (while (let ()
+               (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/flush-streams))
+               (!= k/+done+ (set res (k/read stream))))
+        (let ((env (new-<env> (get/globals) 1 0)))
+          (gc/protect (env)
+            (and (> *arg/verbose* 0) (libc/printf ";;; ") (k/dumpln res))
+            (set res (k/expand res env))					(and (> *arg/verbose* 2) (libc/printf "expd--> ") (k/dumpln res))
+            (set res (k/encode res env))					(and (> *arg/verbose* 2) (libc/printf "encd--> ") (k/dumpln res))
+            (let ((ctx (new-base-<context> () () env)))
+              (gc/protect (ctx)
+                (set res (k/eval res ctx))					(and (> *arg/verbose* 1) (libc/printf "eval--> ") (k/dumpln res))
+                (if (= libc/stdin stream)
+                    (k/dumpln res)
+                  (and (> *arg/verbose* 0) (libc/printf ";;; => ") (k/dumpln res))))))))
+      (and (= libc/stdin stream)
+           (libc/printf "\nmorituri te salutant\n")))
+    res))
+
 ;;;
 ;;; the subr's
 ;;;
@@ -1621,6 +1644,12 @@
                 (return "out of memory")))
           (set p np))))))
 
+(define-subr repl-stream
+  (let ((stream (k/car -args-)))
+    (or stream (set stream (get/variable-value var/*input*)))
+    (or (is/long stream) (fatal "repl-stream: non-integer stream"))
+    (k/repl-stream (get/long stream))))
+
 (define-subr dump
   (while (is <pair> -args-)
     (k/dump (get/head -args-))
@@ -1784,6 +1813,7 @@
                (libc/free buf)
                result))))))
 
+;; TODO is this the actual primitive that we want to publish? maybe a just read-form?
 (define-subr read
   (if (= () -args-)
       (let ((obj (k/read libc/stdin)))
@@ -1848,29 +1878,6 @@
         result))))
 
 ;;; ----------------------------------------------------------------
-
-(define-function repl_stream (stream)
-  (put/variable-value var/*input* (new-<long> stream))
-  (let ((res ()))
-    (gc/protect (res)
-      (or (= libc/stdin stream) (libc/fscanf stream "#!%*[^\012\015]"))
-      (while (let ()
-               (and (= libc/stdin stream) (libc/fprintf libc/stdout ".") (libc/flush-streams))
-               (!= k/+done+ (set res (k/read stream))))
-        (let ((env (new-<env> (get/globals) 1 0)))
-          (gc/protect (env)
-            (and (> *arg/verbose* 0) (libc/printf ";;; ") (k/dumpln res))
-            (set res (k/expand res env))					(and (> *arg/verbose* 2) (libc/printf "expd--> ") (k/dumpln res))
-            (set res (k/encode res env))					(and (> *arg/verbose* 2) (libc/printf "encd--> ") (k/dumpln res))
-            (let ((ctx (new-base-<context> () () env)))
-              (gc/protect (ctx)
-                (set res (k/eval res ctx))				(and (> *arg/verbose* 1) (libc/printf "eval--> ") (k/dumpln res))
-                (if (= libc/stdin stream)
-                    (k/dumpln res)
-                  (and (> *arg/verbose* 0) (libc/printf ";;; => ") (k/dumpln res))))))))
-      (and (= libc/stdin stream)
-           (libc/printf "\nmorituri te salutant\n")))
-    res))
 
 (define-function %instantiate-subr (name imp fixed? module)
   (gc/let* ((tmp (new-<subr> imp name)))
@@ -2001,7 +2008,7 @@
                (set *arg/optimised* (+ 1 *arg/optimised*))
                (put/variable-value "*optimised*" (new-<long> *arg/optimised*)))
               ((not (libc/strcmp arg "-"))
-               (repl_stream libc/stdin))
+               (k/repl-stream libc/stdin))
               ((not (libc/strcmp arg "-c"))
                (unless (is <pair> cla)
                  (fatal "-c requires an argument"))
@@ -2015,7 +2022,7 @@
               (else
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
-                 (repl_stream stream)
+                 (k/repl-stream stream)
                  (libc/fclose stream)))))))))
 
   (libc/flush-streams)
