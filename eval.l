@@ -81,6 +81,12 @@
 (define-form align-to-words (value)
   `(& -4 (+ 3 ,value)))
 
+(define-constant target-boolean/true  1)
+(define-constant target-boolean/false 0)
+
+(define-function target-boolean (value)
+  (if value target-boolean/true target-boolean/false))
+
 (define-form malloc-oops (wordcount)
   `(libc/malloc (words-to-bytes ,wordcount)))
 
@@ -1095,10 +1101,10 @@
       (else                     (libc/printf "<type:%d>" type)))))
 
 (set k/print (lambda (obj) (do_print obj 0)))
-(define-function k/println	(obj) (do_print obj 0) (libc/printf "\n"))
+(define-function k/println	(obj) (do_print obj target-boolean/false) (libc/printf "\n"))
 
-(define-function k/dump		(obj) (do_print obj 1))
-(define-function k/dumpln	(obj) (do_print obj 1) (libc/printf "\n"))
+(define-function k/dump		(obj) (do_print obj target-boolean/true))
+(define-function k/dumpln	(obj) (do_print obj target-boolean/true) (libc/printf "\n"))
 
 (set print-backtrace
   (lambda ()
