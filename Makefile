@@ -53,20 +53,9 @@ $(BUILD)/%: $(BUILD)/%.s
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
 	mkdir -p $(BUILD)
-# we need to create the local branches because git clone doesn't do that for us,
-# and the makefile cannot locally git checkout the branches into build/.
-# i know, this solution is nonsense! patches or suggestions are very welcome for a better alternative.
-# the issue: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
-	@git show-ref --verify --quiet refs/heads/maru.0.c99 || git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99
-	@git show-ref --verify --quiet refs/heads/maru.1     || git branch --quiet --track maru.1     remotes/origin/maru.1
-	@git show-ref --verify --quiet refs/heads/maru.2     || git branch --quiet --track maru.2     remotes/origin/maru.2
-	@git show-ref --verify --quiet refs/heads/maru.3     || git branch --quiet --track maru.3     remotes/origin/maru.3
-	@git clone --local . $(BUILD)/$(PREVIOUS_STAGE) && \
-		cd "$(BUILD)/$(PREVIOUS_STAGE)" && \
-		git branch --quiet --track maru.0.c99 remotes/origin/maru.0.c99 && \
-		git branch --quiet --track maru.1     remotes/origin/maru.1 && \
-		git branch --quiet --track maru.2     remotes/origin/maru.2 && \
-		git checkout --quiet $(PREVIOUS_STAGE)
+# after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
+	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
+	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
 	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
 
 $(BUILD)/peg.l: $(BUILD)/eval2 source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
