@@ -160,7 +160,7 @@
      (error ,@args)))
 
 (define-form define-constant (name value)
-  `(define ,name (form () (lambda args ',value))))
+  `(define ,name (form () (lambda args ,value))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
