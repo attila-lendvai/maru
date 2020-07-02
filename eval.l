@@ -121,6 +121,8 @@
 
 (define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
 
+(define *subr-registry* ()) ; define-subr collects them here at compile time
+
 ;;;
 ;;;
 ;;; Actual artifacts that are meant to be level-shifted into the target
@@ -1360,9 +1362,11 @@
   (unless (pair? name-and-props)
     (set name-and-props (list name-and-props)))
   (let ((name (car name-and-props))
-        (arity (car (cdr name-and-props))))
+        (arity (cadr name-and-props))
+        (fixed? (caddr name-and-props)))
     (assert (symbol? name))
-    `(define-function ,name (-args- -ctx-)
+    (push *subr-registry* (list name arity fixed?))
+    `(define-function ,(concat-symbol 'subr/ name) (-args- -ctx-)
        ,@(when arity
            `((safety 1 (,(concat-symbol 'arity (string->symbol (long->string arity)))
                          (new-<string>-from-cstring ,(symbol->string name))
@@ -1391,7 +1395,7 @@
            (= () (get/tail (get/tail (get/tail args)))))
       (k/error "Operator '" op "' expected 3 arguments, got: " args)))
 
-(define-subr subr/define
+(define-subr (define () fixed)
   (let ((var (k/car -args-)))
     (unless (is <variable> var)
       ;; FIXME? use k/error? why the dumpln? test it...
@@ -1401,15 +1405,15 @@
     (let ((val (k/eval (k/cadr -args-) -ctx-)))
       (put <variable> value var val))))
 
-(define-subr (subr/defined? 1)
+(define-subr (defined? 1)
   (let ((name (k/car -args-))
         (env (or (k/cadr -args-) (get/globals))))
     (k/env/lookup-variable env name)))
 
-(define-subr subr/lambda
+(define-subr (lambda () fixed)
   (new-<expr> -args- -ctx-))
 
-(define-subr subr/let
+(define-subr (let () fixed)
   (let* ((tmp      ())
          (bindings (k/cadr -args-))
          (locals   (get <context> bindings -ctx-))
@@ -1432,7 +1436,7 @@
         (set body (get/tail body))))
     tmp))
 
-(define-subr (subr/set 2)
+(define-subr (set 2 fixed)
   ;;(printf "SET ") (k/print args) (libc/printf " IN ") (k/println -ctx-)
   (let ((var (k/car -args-)))
     (or (is <variable> var)
@@ -1451,7 +1455,7 @@
             (set delta (- delta 1)))
           (k/set-array-at (get <context> bindings -ctx-) (get/long (get <variable> index var)) val))))))
 
-(define-subr subr/while
+(define-subr (while () fixed)
   (let ((tst  (k/car -args-))
         (prog -args-))
     (while (k/eval tst -ctx-)
@@ -1459,7 +1463,7 @@
         (while (is <pair> (set body (k/cdr body)))
           (k/eval (get/head body) -ctx-))))))
 
-(define-subr subr/if
+(define-subr (if () fixed)
   (if (k/eval (k/car  -args-) -ctx-)
       (k/eval (k/cadr -args-) -ctx-)
     (let ((ans ()))
@@ -1468,14 +1472,14 @@
         (set ans (k/eval (get/head -args-) -ctx-)))
       ans)))
 
-(define-subr subr/or
+(define-subr (or () fixed)
   (let ((ans ()))
     (while (is <pair> -args-)
       (and (set ans (k/eval (get/head -args-) -ctx-))
            (return ans))
       (set -args- (get/tail -args-)))))
 
-(define-subr subr/and
+(define-subr (and () fixed)
   (let ((ans symbol/t))
     (while (is <pair> -args-)
       (or (set ans (k/eval (get/head -args-) -ctx-))
@@ -1483,13 +1487,13 @@
       (set -args- (get/tail -args-)))
     ans))
 
-(define-subr (subr/quote 1)
+(define-subr (quote 1 fixed)
   (k/car -args-))
 
-(define-subr (subr/not 1)
+(define-subr (not 1)
   (if (k/car -args-) () symbol/t))
 
-(define-subr subr/long/substract
+(define-subr -
   (safety 1 (or (and (k/car -args-) (not (k/cddr -args-))) (k/error "operator '-' expected 1 or 2 arguments, got: " -args-)))
   (let ((lhs (get/head -args-))
         (rhs (get/tail -args-)))
@@ -1501,36 +1505,36 @@
       (safety 1 (or (is/long lhs) (k/error "non-numeric argument: (- "lhs")")))
       (new-<long> (- (get/long lhs))))))
 
-(define-form define-binary (op name)
-  `(define-subr (,name 2)
+(define-form define-binary (op)
+  `(define-subr (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
-(define-binary &  subr/bitand)
-(define-binary |  subr/bitor)
-(define-binary ^  subr/bitxor)
-(define-binary +  subr/long/add)
-(define-binary *  subr/long/multiply)
-(define-binary /  subr/long/divide)
-(define-binary << subr/long/shift-left)
-(define-binary >> subr/long/shift-right)
+(define-binary &)
+(define-binary |)
+(define-binary ^)
+(define-binary +)
+(define-binary *)
+(define-binary /)
+(define-binary <<)
+(define-binary >>)
 
-(define-form define-relation (op name)
-  `(define-subr (,name 2)
+(define-form define-relation (op)
+  `(define-subr (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string name)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (and (,op (get/long lhs) (get/long rhs))
             symbol/t))))
 
-(define-relation <  subr/relation/less)
-(define-relation <= subr/relation/less-or-equal)
-(define-relation >= subr/relation/greater-or-equal)
-(define-relation >  subr/relation/greater)
+(define-relation <)
+(define-relation <=)
+(define-relation >=)
+(define-relation >)
 
-(define-subr (subr/relation/equal 2)
+(define-subr (= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
@@ -1539,7 +1543,7 @@
       ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
       (else                     (and (= lhs rhs) symbol/t)))))
 
-(define-subr (subr/relation/not-equal 2)
+(define-subr (!= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
@@ -1548,12 +1552,12 @@
       ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
       (else                     (and (!= lhs rhs) symbol/t)))))
 
-(define-subr (subr/abort 0)
+(define-subr (abort 0)
   (print-backtrace)
   (libc/flush-streams)
   (libc/abort))
 
-(define-subr (subr/exit 1)
+(define-subr (exit 1)
   (let ((arg (k/car -args-)))
     (or (is/long arg)
         (k/error "argument to subr_exit is not a <long>: " arg))
@@ -1561,17 +1565,17 @@
     (libc/exit (get/long arg))))
 
 ;; KLUDGE FIXME FILE* pointer is stuffed into a long. it won't necessarily work with tagged immediate longs.
-(define-subr (subr/libc/fopen 1)
+(define-subr (libc/fopen 1)
   (let ((path (k/car -args-)))
     (let ((stream (libc/fopen (get/string path) "rb")))
       (and stream (new-<long> stream)))))
 
-(define-subr (subr/libc/fclose 1)
+(define-subr (libc/fclose 1)
   (let ((stream (k/car -args-)))
     (libc/fclose (get/long stream))
     ()))
 
-(define-subr subr/libc/fgetc
+(define-subr libc/fgetc
   (let ((stream (k/car -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
     (or (is/long stream) (fatal "subr/libc/fgetc: non-integer stream id"))
@@ -1579,7 +1583,7 @@
       (and (>= c 0)
            (new-<long> c)))))
 
-(define-subr subr/libc/fputc
+(define-subr libc/fputc
   (let ((stream (k/car -args-))
         (obj (k/cadr -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
@@ -1587,7 +1591,7 @@
     (or (is/long obj) (fatal "subr/libc/fputc: non-integer character"))
     (new-<long> (libc/fputc (get/long stream) (get/long obj)))))
 
-(define-subr (subr/libc/format 2)
+(define-subr (libc/format 2)
   (let ((ofmt (k/car -args-))
         (oarg (k/cadr -args-)))
     (or (is <string> ofmt) (fatal "subr/libc/format: non-string format"))
@@ -1617,17 +1621,17 @@
                 (return "out of memory")))
           (set p np))))))
 
-(define-subr subr/dump
+(define-subr dump
   (while (is <pair> -args-)
     (k/dump (get/head -args-))
     (set -args- (get/tail -args-))))
 
-(define-subr subr/print
+(define-subr print
   (while (is <pair> -args-)
     (k/print (get/head -args-))
     (set -args- (get/tail -args-))))
 
-(define-subr subr/warn
+(define-subr warn
   (while (is <pair> -args-)
     (let* ((arg  (get/head -args-))
            (type (get/type arg)))
@@ -1639,10 +1643,10 @@
          (libc/fprintf libc/stderr "<unable to print this to stderr>"))))
     (set -args- (get/tail -args-))))
 
-(define-subr (subr/apply 2)
+(define-subr (apply 2)
   (k/apply (k/car -args-) (k/cadr -args-) -ctx-))
 
-(define-subr subr/eval
+(define-subr eval
   (let ((x (k/car -args-))
         (e (or (k/cadr -args-) (new-<env> (get/globals) 1 0))))
     (gc/protect (x e)
@@ -1652,88 +1656,88 @@
           (set x (k/encode x e))
           (k/eval x c))))))
 
-(define-subr subr/encode
+(define-subr encode
   (k/encode (k/car -args-)
             (or (k/cadr -args-)
                 (get <context> env -ctx-))))
 
-(define-subr subr/expand
+(define-subr expand
   (k/expand (k/car -args-)
             (or (k/cadr -args-)
                 (get <context> env -ctx-))))
 
-(define-subr subr/cons       (new-<pair> (k/car -args-) (k/cadr -args-)))
-(define-subr (subr/string 1) (new-<string>-of-length (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
-(define-subr subr/array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
-(define-subr subr/form       (new-<form> (k/car -args-) (k/cadr -args-)))
+(define-subr cons       (new-<pair> (k/car -args-) (k/cadr -args-)))
+(define-subr (string 1) (new-<string>-of-length (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
+(define-subr array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
+(define-subr form       (new-<form> (k/car -args-) (k/cadr -args-)))
 
-(define-subr (subr/allocate 2)
+(define-subr (allocate 2)
   (let ((type (get/head -args-))
         (size (get/head (get/tail -args-))))
     (safety 1 (k/assert (is/long type) "allocate: invalid type "type))
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
     (new-object (get/long type) (get/long size))))
 
-(define-subr (subr/type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
-(define-subr (subr/string? 1) (and (is <string> (k/car -args-)) symbol/t))
-(define-subr (subr/symbol? 1) (and (is <symbol> (k/car -args-)) symbol/t))
-(define-subr (subr/pair? 1)   (and (is <pair>   (k/car -args-)) symbol/t))
-(define-subr (subr/array? 1)  (and (is <array>  (k/car -args-)) symbol/t))
-(define-subr (subr/car 1)     (k/car (k/car -args-)))
-(define-subr (subr/cdr 1)     (k/cdr (k/car -args-)))
+(define-subr (type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
+(define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/t))
+(define-subr (symbol? 1) (and (is <symbol> (k/car -args-)) symbol/t))
+(define-subr (pair? 1)   (and (is <pair>   (k/car -args-)) symbol/t))
+(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/t))
+(define-subr (car 1)     (k/car (k/car -args-)))
+(define-subr (cdr 1)     (k/cdr (k/car -args-)))
 
-(define-subr (subr/set-car 2)
+(define-subr (set-car 2)
   (let ((obj (k/car -args-)))
     (and (is <pair> obj)
          (put <pair> head obj (k/cadr -args-)))))
 
-(define-subr (subr/set-cdr 2)
+(define-subr (set-cdr 2)
   (let ((obj (k/car -args-)))
     (and (is <pair> obj)
          (put <pair> tail obj (k/cadr -args-)))))
 
-(define-subr (subr/oop-at 2)
+(define-subr (oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
     (safety 1 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (oop-at obj (get/long idx))))
 
-(define-subr (subr/set-oop-at 3)
+(define-subr (set-oop-at 3)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
     (safety 1 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (set-oop-at obj (get/long idx) val)))
 
-(define-subr (subr/array-length 1)
+(define-subr (array-length 1)
   (new-<long> (k/array-length (k/car -args-))))
 
-(define-subr (subr/array-at 2)
+(define-subr (array-at 2)
   (let ((arr (get/head -args-))
         (idx (get/head (get/tail -args-))))
     (safety 1 (k/assert (and (is <array> arr) (is/long idx))))
     (k/array-at arr (get/long idx))))
 
-(define-subr (subr/set-array-at 3)
+(define-subr (set-array-at 3)
   (let ((arr (get/head -args-))
         (idx (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
     (safety 1 (k/assert (and (is <array> arr) (is/long idx))))
     (k/set-array-at arr (get/long idx) val)))
 
-(define-subr (subr/array-insert 3)
+(define-subr (array-insert 3)
   (let ((arr (get/head -args-))
         (idx (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
     (safety 1 (k/assert (and (is <array> arr) (is/long idx))))
     (k/array-insert arr (get/long idx) val)))
 
-(define-subr (subr/string-length 1)
+(define-subr (string-length 1)
   (let ((arg (k/car -args-)))
     (safety 1 (k/assert (is <string> arg)))
     (get <string> size arg)))
 
-(define-subr (subr/string-at 2)
+(define-subr (string-at 2)
   (let ((arr (get/head -args-))
         (arg (get/head (get/tail -args-))))
     (safety 1 (k/assert (and (is <string> arr) (is/long arg))))
@@ -1742,7 +1746,7 @@
            (< idx (k/string-length arr))
            (new-<long> (string-at (get/string arr) idx))))))
 
-(define-subr (subr/set-string-at 3)
+(define-subr (set-string-at 3)
   (let ((arr (get/head -args-))
         (arg (get/head (get/tail -args-)))
         (val (get/head (get/tail (get/tail -args-)))))
@@ -1755,21 +1759,21 @@
              (set-string-at (get/string arr) idx (get/long val))
              val)))))
 
-(define-subr (subr/string->symbol 1)
+(define-subr (string->symbol 1)
   (let ((arg (k/car -args-)))
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
            (intern (get/string arg))))))
 
-(define-subr (subr/symbol->string 1)
+(define-subr (symbol->string 1)
   (let ((arg (k/car -args-)))
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
            (new-<string>-from-cstring (get <symbol> _bits arg))))))
 
-(define-subr (subr/long->string 1)
+(define-subr (long->string 1)
   (let ((arg (k/car -args-)))
     (if (is <string> arg)
         arg
@@ -1780,7 +1784,7 @@
                (libc/free buf)
                result))))))
 
-(define-subr subr/read
+(define-subr read
   (if (= () -args-)
       (let ((obj (k/read libc/stdin)))
         (and (= k/+done+ obj) (set obj ()))
@@ -1801,7 +1805,7 @@
               (get/tail head))
           ())))))
 
-(define-subr (subr/current-module 0)
+(define-subr (current-module 0)
   *module*)
 
 (define capture-well-known-vm-values) ; forward
@@ -1812,18 +1816,18 @@
   (set *module* module)
   (capture-well-known-vm-values))
 
-(define-subr (subr/set-current-module 1)
+(define-subr (set-current-module 1)
   (let ((module (k/car -args-)))
     (safety 1 (k/assert (is <module> module) "set-current-module: called with not a <module>: "module))
     (k/set-current-module module))
   ())
 
-(define-subr (subr/create-module 0)
+(define-subr (create-module 0)
   (gc/let* ((module (new-<module>)))
     (populate-module-with-primitives module)
     module))
 
-(define-subr (subr/eval-in-module 2)
+(define-subr (eval-in-module 2)
   (let ((new-module (k/car -args-))
         (form (k/cadr -args-))
         (previous-module *module*))
@@ -1868,16 +1872,20 @@
            (libc/printf "\nmorituri te salutant\n")))
     res))
 
-(define-function instantiate-subr (name imp module)
-  (let ((tmp (new-<subr> imp name)))
-    (gc/protect (tmp)
-      (k/env/define (get/globals* module) (intern* name module) tmp))))
+(define-function %instantiate-subr (name imp fixed? module)
+  (gc/let* ((tmp (new-<subr> imp name)))
+    (when fixed?
+      (set tmp (new-<fixed> tmp)))
+    (k/env/define (get/globals* module) (intern* name module) tmp)))
 
-(define-function instantiate-fixed-subr (name imp module)
-  (let ((tmp (new-<subr> imp name)))
-    (gc/protect (tmp)
-      (set tmp (new-<fixed> tmp))
-      (k/env/define (get/globals* module) (intern* name module) tmp))))
+(define-form instantiate-subrs ()
+  (let ((result ()))
+    (list-do entry *subr-registry*
+      (let* ((name (car entry))
+             (impl-name (concat-symbol 'subr/ name))
+             (fixed? (caddr entry)))
+        (push result `(%instantiate-subr ,(symbol->string name) ,impl-name ,(target-boolean fixed?) module))))
+    `(let () ,@result)))
 
 (set populate-module-with-primitives (lambda (module)
   (debug (libc/printf "populate-module-with-primitives on %p\n" module))
@@ -1903,79 +1911,7 @@
       (set tmp (new-<array> 0))	(k/env/define env (intern* "*evaluators*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (intern* "*applicators*"		module) tmp))
 
-    (instantiate-fixed-subr "define"           subr/define module)
-    (instantiate-fixed-subr "lambda"           subr/lambda module)
-    (instantiate-fixed-subr "let"              subr/let    module)
-    (instantiate-fixed-subr "set"              subr/set    module)
-    (instantiate-fixed-subr "while"            subr/while  module)
-    (instantiate-fixed-subr "if"               subr/if     module)
-    (instantiate-fixed-subr "or"               subr/or     module)
-    (instantiate-fixed-subr "and"              subr/and    module)
-    (instantiate-fixed-subr "quote"            subr/quote  module)
-
-    (instantiate-subr  "defined?"              subr/defined?           module)
-    (instantiate-subr  "not"                   subr/not                module)
-    (instantiate-subr  "&"                     subr/bitand             module)
-    (instantiate-subr  "|"                     subr/bitor              module)
-    (instantiate-subr  "^"                     subr/bitxor             module)
-    (instantiate-subr  "+"                     subr/long/add           module)
-    (instantiate-subr  "-"                     subr/long/substract     module)
-    (instantiate-subr  "*"                     subr/long/multiply      module)
-    (instantiate-subr  "/"                     subr/long/divide        module)
-    (instantiate-subr  "<<"                    subr/long/shift-left    module)
-    (instantiate-subr  ">>"                    subr/long/shift-right   module)
-    (instantiate-subr  "<"                     subr/relation/less      module)
-    (instantiate-subr  "<="                    subr/relation/less-or-equal module)
-    (instantiate-subr  "!="                    subr/relation/not-equal module)
-    (instantiate-subr  "="                     subr/relation/equal     module)
-    (instantiate-subr  ">="                    subr/relation/greater-or-equal module)
-    (instantiate-subr  ">"                     subr/relation/greater   module)
-    (instantiate-subr  "abort"                 subr/abort              module)
-    (instantiate-subr  "exit"                  subr/exit               module)
-    (instantiate-subr  "dump"                  subr/dump               module)
-    (instantiate-subr  "print"                 subr/print              module)
-    (instantiate-subr  "warn"                  subr/warn               module)
-    (instantiate-subr  "apply"                 subr/apply              module)
-    (instantiate-subr  "eval"                  subr/eval               module)
-    (instantiate-subr  "encode"                subr/encode             module)
-    (instantiate-subr  "expand"                subr/expand             module)
-    (instantiate-subr  "cons"                  subr/cons               module)
-    (instantiate-subr  "string"                subr/string             module)
-    (instantiate-subr  "array"                 subr/array              module)
-    (instantiate-subr  "form"                  subr/form               module)
-    (instantiate-subr	"libc/fopen"		subr/libc/fopen		module)
-    (instantiate-subr	"libc/fclose"		subr/libc/fclose	module)
-    (instantiate-subr	"libc/fgetc"		subr/libc/fgetc		module)
-    (instantiate-subr	"libc/fputc"		subr/libc/fputc		module)
-    (instantiate-subr	"libc/format"		subr/libc/format	module)
-    (instantiate-subr	"read"			subr/read		module)
-    (instantiate-subr  "allocate"              subr/allocate           module)
-    (instantiate-subr  "type-of"               subr/type-of            module)
-    (instantiate-subr  "string?"               subr/string?            module)
-    (instantiate-subr  "symbol?"               subr/symbol?            module)
-    (instantiate-subr  "pair?"                 subr/pair?              module)
-    (instantiate-subr  "array?"                subr/array?             module)
-    (instantiate-subr  "car"                   subr/car                module)
-    (instantiate-subr  "set-car"               subr/set-car            module)
-    (instantiate-subr  "cdr"                   subr/cdr                module)
-    (instantiate-subr  "set-cdr"               subr/set-cdr            module)
-    (instantiate-subr  "oop-at"                subr/oop-at             module)
-    (instantiate-subr  "set-oop-at"            subr/set-oop-at         module)
-    (instantiate-subr  "array-length"          subr/array-length       module)
-    (instantiate-subr  "array-at"              subr/array-at           module)
-    (instantiate-subr  "set-array-at"          subr/set-array-at       module)
-    (instantiate-subr  "array-insert"          subr/array-insert       module)
-    (instantiate-subr  "string-length"         subr/string-length      module)
-    (instantiate-subr  "string-at"             subr/string-at          module)
-    (instantiate-subr  "set-string-at"         subr/set-string-at      module)
-    (instantiate-subr  "string->symbol"        subr/string->symbol     module)
-    (instantiate-subr  "symbol->string"        subr/symbol->string     module)
-    (instantiate-subr  "long->string"          subr/long->string       module)
-    (instantiate-subr  "current-module"        subr/current-module     module)
-    (instantiate-subr  "set-current-module"    subr/set-current-module module)
-    (instantiate-subr  "create-module"         subr/create-module      module)
-    (instantiate-subr  "eval-in-module"        subr/eval-in-module     module)
-    )))
+    (instantiate-subrs))))
 
 (set capture-well-known-vm-values (lambda ()
   (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
