@@ -135,8 +135,7 @@
                (and (<= ?A c) (<= c ?Z))
                (and (<= ?0 c) (<= c ?9)))
            (putnext c))
-          ((or (= ?/ c)
-               (= ?- c)
+          ((or (= ?- c)
                (= ?_ c))
            (putnext ?_))
           (else
