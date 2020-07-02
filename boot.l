@@ -511,7 +511,7 @@
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
-;; KLUDGE fake defunct slot accessors for source position
+;; KLUDGE fake defunct slot accessors for source position to remain compatible
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
 
@@ -519,7 +519,8 @@
 ;; While the host is running us, we need to shadow our FIXED definition with that of the host
 ;; (so that it instantiates the <fixed> that the host's level-shifted code understands).
 ;; Our <fixed> is just a random, meaningless struct for the host while we are being bootstrapped.
-;; to reproduce the bug: put <data> before <fixed>, so that the slave and the host disagree on the type id
+;; to reproduce the bug: put <data> before <fixed>, so that the slave and the host disagree on the type id of <fixed>
+;; TODO same applies to long? and company, plus all the careless use of <type-names> on the macro level
 (define-function fixed (fun)
   (let ((self (new <fixed>)))
     (set (<fixed>-function self) fun)
@@ -650,7 +651,7 @@
 ;;; print
 
 (define-selector do-print (arg) (primitive/print arg))
-(define-selector do-dump  (arg) (do-print arg))
+(define-selector do-dump  (arg) (do-print arg)) ; TODO why not primitive/dump?
 
 (define print
   (lambda args
@@ -879,9 +880,6 @@
 (define-function for-each-with (collection function value)
   (for-each collection (lambda (x) (function x value))))
 
-(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
-(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
-
 (define-form until (condition . body)
   `(while (not ,condition) ,@body))
 
@@ -918,6 +916,17 @@
      (while ,test
        ,@body
        ,@(%loop-steps bindings))))
+
+;;; math
+
+(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
+(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
+
+(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
+(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
+(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
 
 ;;; conversion
 
@@ -1029,12 +1038,6 @@
 
 (define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
 (define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
-
-(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
-(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
-(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
-
-(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
 
 ;;; structural equality
 

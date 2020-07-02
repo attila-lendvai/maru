@@ -393,28 +393,12 @@
     (set (<header>-flags (header-of obj)) (+ <header>-flags/used <header>-flags/opaque))
     obj))
 
-;; opaque objects are black boxes for the gc.
-(define-function new-object/opaque (type bytesize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type"))
-  (let* ((obj (gc/allocate-opaque bytesize))
-         (header (header-of obj)))
-    (set (<header>-type header) type)
-    obj))
-
-;; from the gc's pov objects are oop vectors
-(define-function new-object (type wordsize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
-  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
-         (header (header-of obj)))
-    (set (<header>-type header) type)
-    obj))
-
 ;;;
 ;;; types and their kernel accessors
 ;;; ----------------------------------------------------------------
 ;;;
 ;;; types are represented at runtime as integers upfrom 0.
-;;; <undefined> doesn't need to be denoted by zero.
+;;; <undefined> doesn't necessarily need to be denoted by zero.
 ;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
 
 (define-form bootstrap-types type-names
@@ -515,6 +499,20 @@
 (define-function k/cadr		(list)		(k/car (k/cdr list)))
 (define-function k/cddr		(list)		(k/cdr (k/cdr list)))
 (define-function k/caddr	(list)		(k/car (k/cdr (k/cdr list))))
+
+(define-function new-object (type wordsize)
+  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
+  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    obj))
+
+(define-function new-object/opaque (type bytesize)
+  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type"))
+  (let* ((obj (gc/allocate-opaque bytesize))
+         (header (header-of obj)))
+    (set (<header>-type header) type)
+    obj))
 
 (define-function new-<long> (bits)
   (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
@@ -773,6 +771,7 @@
 (define-function k/env/define (env name value)
   (safety 1 (k/assert (is <env> env) "k/env/define: env arg is not of type env: "env))
   (safety 1 (k/assert (is <symbol> name) "k/env/define: name arg is not of type symbol: "name))
+  (debug (libc/printf "k/env/define called, name is %s\n" (get/symbol name)))
   (let ((var (k/env/ensure-variable env name)))
     (put <variable> value var value)
     var))
@@ -1049,6 +1048,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function do_print (obj storing)
+  ;; NOTE: be prepared to handle uninitialized objects!
   (debug/identities (libc/printf "{%p}" obj))
   (let ((type (get/type obj)))
     (cond
@@ -1959,6 +1959,9 @@
 
   (debug (libc/printf "gc initialized\n"))
 
+  (k/assert (= <long> (get/type (new-<long> 42))) "get/type for <long> is broken")
+  (k/assert (= 42     (get/long (new-<long> 42))) "get/long is broken")
+
   (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
   (gc/push-root (address-of k/+done+))
 
@@ -2024,7 +2027,7 @@
                  (libc/fclose stream)))))))))
 
   (libc/flush-streams)
-  (and (> *arg/verbose* 0)
+  (and (< 0 *arg/verbose*)
        (let ()
          (gc/collect)
          (libc/printf "GC: %d objects in %d bytes, %d free\n" gc/objects-live gc/bytes-used gc/bytes-free)))
