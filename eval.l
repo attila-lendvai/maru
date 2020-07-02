@@ -118,11 +118,9 @@
   (define-form initialize-header-magic-marker (header)
     `(set (<header>-magic-marker ,header) ,marker)))
 
-(define-form <header>-flags-used   ()     1)
-(define-form <header>-flags-opaque ()     2) ; opaque objects are considered black boxes by the GC
-(define-form <header>-flags-mark   ()     4)
-
-(define-form <header>-flags-used+opaque () (+ (<header>-flags-used) (<header>-flags-opaque)))
+(define-constant <header>-flags/used	1)
+(define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects
+(define-constant <header>-flags/mark	4)
 
 (define *subr-registry* ()) ; define-subr collects them here at compile time
 
@@ -296,12 +294,12 @@
     (while ptr
       (gc/debug (libc/printf "sweep? %d %p + %d\n" (<header>-flags ptr) ptr (<header>-size ptr)))
       (let ((flags (<header>-flags ptr)))
-        (if (& flags (<header>-flags-mark))
+        (if (& flags <header>-flags/mark)
             (let ()
               (safety 3 (and (= 0 (<header>-type ptr)) (fatal1 "gc/sweep: encountered an object with zero type %p" ptr)))
               (set nused (+ nused (<header>-size ptr)))
               (set nobjs (+ nobjs 1))
-              (set (<header>-flags ptr) (^ flags (<header>-flags-mark))))
+              (set (<header>-flags ptr) (^ flags <header>-flags/mark)))
           (gc/debug (libc/printf "collect %p size %d\n" ptr (<header>-size ptr)))
           (set nfree (+ nfree (<header>-size ptr)))
           (set (<header>-flags ptr) 0)
@@ -319,11 +317,11 @@
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
          (safety 3 (or (valid-header-magic-marker? header)  (fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
-         (safety 1 (or (& (<header>-flags-used) flags)      (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
-         (or (& flags (<header>-flags-mark))
+         (safety 1 (or (& <header>-flags/used flags)      (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
+         (or (& flags <header>-flags/mark)
              (let ()
-               (set (<header>-flags header) (| flags (<header>-flags-mark)))
-               (or (& flags (<header>-flags-opaque))
+               (set (<header>-flags header) (| flags <header>-flags/mark))
+               (or (& flags <header>-flags/opaque)
                    (let ((index (bytes-to-words (<header>-size header))))
                      (gc/debug (libc/printf "mark %p wordsize %d type %d\n" header index (<header>-type header)))
                      (safety 2 (or (not (= 0 (<header>-type header))) (fatal1 "gc/mark-and-trace: encountered an object with zero type %p" header)))
@@ -376,14 +374,14 @@
                     (set (<header>-size  chunk) requested-size)
                     (set (<header>-next  chunk) split)
                     (set chunk-size requested-size)))
-                (set (<header>-flags chunk) (<header>-flags-used))
+                (set (<header>-flags chunk) <header>-flags/used)
                 (set gc/memory-last chunk)
                 (gc/debug (libc/printf "alloc chunk %p\n" chunk))
                 (let ((obj (+ chunk (size-of-<header>))))
                   (libc/memset obj 0 chunk-size)
                   (set gc/alloc-count (+ gc/alloc-count 1))
                   (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
-                  (safety 4 (k/assert (& (<header>-flags-used) (<header>-flags (header-of obj))) "gc/allocate: was about to return with an object whose USED flag is unset"))
+                  (safety 4 (k/assert (& <header>-flags/used (<header>-flags (header-of obj))) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (initialize-header-magic-marker (header-of obj)))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (%p), size %d\n" (header-of obj) obj (gc/object-size obj)))
                   (return obj)))))
@@ -392,7 +390,7 @@
 
 (define-function gc/allocate-opaque (size)
   (let ((obj (gc/allocate size)))
-    (set (<header>-flags (header-of obj)) (<header>-flags-used+opaque))
+    (set (<header>-flags (header-of obj)) (+ <header>-flags/used <header>-flags/opaque))
     obj))
 
 ;; opaque objects are black boxes for the gc.
@@ -456,7 +454,7 @@
      (if __arg__
          (let ((header (header-of __arg__)))
            (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" __arg__)))
-           (safety 1 (or (& (<header>-flags-used) (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" __arg__)))
+           (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" __arg__)))
            (<header>-type (header-of __arg__)))
        <undefined>)))
 
