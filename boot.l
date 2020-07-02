@@ -343,6 +343,9 @@
   (set-array-at %type-names %last-type name)
   %last-type)
 
+(define-form define-type (name)
+  `(define ,name ,(%allocate-type name)))
+
 (define-function name-of-type (type)
   (array-at %type-names type))
 
@@ -487,12 +490,12 @@
 ;; for the built-in types in boot.l merely fill in some missing parts. types
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
-(define-structure <undefined>   ()) ; NOTE: it doesn't need to be the first one (to be denoted by 0 at runtime)
+(define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
+(define-type		<data>)					; some blob; used for stuff like the _bits of <string> and <array>
 (define-structure <long>        (_bits))
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))
 (define-structure <pair>        (head tail))
-(define-structure <data>        ())			; some blob; used for stuff like the _bits of <string>
 (define-structure <array>       (size _bits))
 (define-structure <expr>        (name defn ctx))        ; NOTE: defn is: (env formals . prog)
 (define-structure <form>        (function symbol))      ; these are expander lambda's
