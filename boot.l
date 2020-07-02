@@ -1105,12 +1105,6 @@
   (assert (= <string> (type-of fmt)) "format: non-string fmt argument: " fmt)
   (libc/format fmt arg))
 
-(define-function pval (expr)
-  (and (> *verbosity* 0) (println expr))
-  (let ((result (eval expr)))
-    (and (> *verbosity* 1) (println "=> "result))
-    result))
-
 (define-function find-and-read (name)
   (or (and *load-path* (read (concat-string *load-path* name)))
       (read name)))
@@ -1118,7 +1112,7 @@
 (define-function load (name)
   (let ((exps (find-and-read name)))
     (or exps (error "file not found or empty: "name))
-    (list-do expr exps (pval expr))))
+    (list-do expr exps (eval expr))))
 
 (define *loaded*)
 
