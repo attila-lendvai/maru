@@ -1038,12 +1038,16 @@
       ((= type <subr>)          (libc/printf "Subr<%s>" (get <subr> _name obj)))
       ((= type <variable>)      (let ((env (get <variable> env obj)))
                                   (do_print (get <variable> name obj) storing)
-                                  (and env
-                                       (libc/printf ".%d+%d"
-                                                    (get/long (get <env> level (get <variable> env obj)))
-                                                    (get/long (get <variable> index obj))))))
-      ((= type <env>)           (let ()
-                                  (libc/printf "Env<%d,%d>" (get/long (get <env> level obj)) (k/array-length (get <env> bindings obj)))))
+                                  (when env
+                                    (libc/printf ".")
+                                    (do_print (get <env> level env) storing)
+                                    (libc/printf "+")
+                                    (do_print (get <variable> index obj) storing))))
+      ((= type <env>)           (let ((level (get <env> level obj))
+                                      (bindings (get <env> bindings obj)))
+                                  (if (and level bindings)
+                                      (libc/printf "Env<%d,%d>" (get/long level) (k/array-length bindings))
+                                      (libc/printf "Env<>"))))
       ((= type <context>)       (let ()
                                   (libc/printf "Context<>")))
       (else                     (libc/printf "<type:%d>" type)))))
