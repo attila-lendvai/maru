@@ -71,18 +71,47 @@
 ;;;  - () is the false value, and is mapped to 0 in the target. Its type is the <undefined> type.
 ;;;
 
+(define-constant target-word-size/bits	32)
+(define-constant target-word-size/bytes	(/ target-word-size/bits 8))
+
 (define-form bytes-to-words (value)
   (if (long? value)
-      (>> value 2)
-    `(>> ,value 2)))
+      (/  value  target-word-size/bytes)
+     `(/ ,value ,target-word-size/bytes)))
 
 (define-form words-to-bytes (value)
   (if (long? value)
-      (<< value 2)
-    `(<< ,value 2)))
+      (* value   target-word-size/bytes)
+     `(* ,value ,target-word-size/bytes)))
 
-(define-form align-to-words (value)
-  `(& -4 (+ 3 ,value)))
+(define-constant immediate-type/max-tag-width	(let ((result 0))
+                                                  (array-do x %immediate-type/tag-widths
+                                                    (when x
+                                                      (set result (max result x))))
+                                                  result))
+
+(when (< target-word-size/bytes
+         (<< 1 immediate-type/max-tag-width))
+  (warn "immediate-type/max-tag-width ("immediate-type/max-tag-width") will force a stronger alignment for OOP's than what the target word size demands\n"))
+
+(define-constant oop/alignment-in-bytes		(max target-word-size/bytes (<< 1 immediate-type/max-tag-width)))
+(define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
+(define-constant oop/payload-mask		(- oop/alignment-in-bytes))
+(define-constant oop/tag-mask			(^ oop/payload-mask -1))
+
+;;(warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n")
+
+(define-form oop/align (value)
+  `(& (+ ,value ,oop/align-padding) ,oop/payload-mask))
+
+(define-form aligned-to-oop? (ptr)
+  `(= 0 (& ,ptr ,oop/tag-mask)))
+
+(define-form oop? (word)
+  `(aligned-to-oop? ,word))
+
+(define-form immediate? (word)
+  `(not (oop? ,word)))
 
 (define-constant target-boolean/true  1)
 (define-constant target-boolean/false 0)
@@ -253,6 +282,7 @@
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
     (gc/debug (libc/printf "heap growth %p size %d %d/%d\n" ptr size gc/alloc-count gc/frequency))
+    (k/assert (aligned-to-oop? ptr) "gc/acquire-new-heap-space: aligned-to-oop? has failed for ptr "ptr)
     ptr))
 
 (define-function gc/initialise ()
@@ -313,6 +343,7 @@
 
 (define-function gc/mark-and-trace (obj)
   (and obj
+       (not (immediate? obj))
        (let* ((header (header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
@@ -344,7 +375,7 @@
 
 (define-function gc/allocate (requested-size)
   (gc/debug (libc/printf "gc/allocate %d\n" requested-size))
-  (set requested-size (align-to-words requested-size))
+  (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
   (and (= gc/alloc-count gc/frequency)
        (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
@@ -426,21 +457,30 @@
  <context>
  <module>)
 
-(define-form is (type arg)
-  `(let ((__arg__ ,arg))
-     (and __arg__
-          (let ((header (header-of __arg__)))
-            (safety 3 (or (valid-header-magic-marker? header) (fatal1 "is: encountered an untagged pointer: %p" __arg__)))
-            (= ,type (<header>-type header))))))
+(define-form %get/type ()
+  `(define-function get/type (word)
+     (cond
+       ((not word)	<undefined>)
+       ((oop? word)	(let ((header (header-of word)))
+                          (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" word)))
+                          (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" word)))
+                          (<header>-type header)))
+       ((immediate? word) (cond
+                            ,@(let ((conds ()))
+                                (for (type 0 (array-length %immediate-type/tag-values))
+                                  (when (immediate-type? type)
+                                    (let* ((tag-value (immediate-type/tag-value type))
+                                           (tag-width (immediate-type/tag-width type))
+                                           (tag-mask  (^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
+                                      (push conds `((= ,tag-value (& word ,tag-mask)) ,type)))))
+                                conds)
+                            (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" word))))
+       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" word)))))
 
-(define-form get/type (arg)
-  `(let ((__arg__ ,arg))
-     (if __arg__
-         (let ((header (header-of __arg__)))
-           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" __arg__)))
-           (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" __arg__)))
-           (<header>-type (header-of __arg__)))
-       <undefined>)))
+(%get/type)
+
+(define-form is (type word)
+  `(= ,type (get/type ,word)))
 
 (define-function %type-check-failed (exp act)
   (fatal2 "type error: expected %d, got %d" exp act))
@@ -462,7 +502,9 @@
 
 (define-form is/long		(obj)		`(is <long> ,obj))
 (define-form is/pair		(obj)		`(is <pair> ,obj))
-(define-form get/long		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <long> '_bits))		`(get <long> _bits ,obj)))
+(if (immediate-type? <long>)
+    (define-form get/long	(obj)		`(>> ,obj ,(immediate-type/tag-width <long>)))
+    (define-form get/long	(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <long> '_bits))		`(get <long> _bits ,obj))))
 (define-form get/head		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'head))		`(get <pair> head ,obj)))
 (define-form put/head		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'head) ,val)	`(put <pair> head ,obj ,val)))
 (define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'tail))		`(get <pair> tail ,obj)))
@@ -504,6 +546,7 @@
   (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
   (let* ((obj (gc/allocate (words-to-bytes wordsize)))
          (header (header-of obj)))
+    (k/assert (aligned-to-oop? obj) "new-object: gc/allocate returned not aligned-to-oop? {%p}\n" obj)
     (set (<header>-type header) type)
     obj))
 
@@ -514,10 +557,18 @@
     (set (<header>-type header) type)
     obj))
 
-(define-function new-<long> (bits)
-  (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
-    (set (<long>-_bits obj) bits)
-    obj))
+(define-form %new-<long> ()
+  (if (immediate-type? <long>)
+      `(define-form new-<long> (bits)
+         ;; TODO fix nested backquotes finally
+         (list '+ (list '<< bits ,(immediate-type/tag-width <long>))
+               ,(immediate-type/tag-value <long>)))
+    `(define-function new-<long> (bits)
+       (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
+         (set (<long>-_bits obj) bits)
+         obj))))
+
+(%new-<long>)
 
 (define-function new-<target-vm-pointer> (bits)
   (let ((obj (new-object/opaque <target-vm-pointer> (words-to-bytes (size-of-structure <target-vm-pointer>)))))

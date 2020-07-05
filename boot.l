@@ -352,6 +352,29 @@
 (define-function type-name-of (obj)
   (name-of-type (type-of obj)))
 
+;;; immediate
+
+(define %immediate-type/tag-values (array 8))
+(define %immediate-type/tag-widths (array 8))
+
+(define-form define-immediate-type (name tag-width tag-value)
+  (set tag-width (eval tag-width))
+  (set tag-value (eval tag-value))
+  (assert (and (< 0 tag-width) (< 0 tag-value)) "define-immediate-type: illegal tag-width or tag-value for type " name)
+  (let ((type (%allocate-type name)))
+    (set (array-at %immediate-type/tag-values type) tag-value)
+    (set (array-at %immediate-type/tag-widths type) tag-width)
+    `(define ,name ,type)))
+
+(define-function immediate-type/tag-value (type)
+  (array-at %immediate-type/tag-values type))
+
+(define-function immediate-type/tag-width (type)
+  (array-at %immediate-type/tag-widths type))
+
+(define-function immediate-type? (type)
+  (and (immediate-type/tag-value type) 't))
+
 ;;; structure
 
 (define %structure-fields       (array))
@@ -492,7 +515,8 @@
 ;; corollary: the two files must agree, both in the order and in the field layout.
 (define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
 (define-type		<data>)					; some blob; used for stuff like the _bits of <string> and <array>
-(define-structure <long>        (_bits))
+(define-immediate-type	<long> 1 1)
+;;(define-structure <long>        (_bits))
 (define-structure <string>      (size _bits))
 (define-structure <symbol>      (_bits))
 (define-structure <pair>        (head tail))
