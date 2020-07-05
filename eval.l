@@ -1683,9 +1683,10 @@
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
+        ((= type <long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
         (else
          ;; TODO
-         (libc/fprintf libc/stderr "<unable to print this to stderr>"))))
+         (libc/fprintf libc/stderr "<unable to print {%p} of type %d>" arg type))))
     (set -args- (get/tail -args-))))
 
 (define-subr (apply 2)
