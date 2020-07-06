@@ -134,11 +134,10 @@
 ;; the header of heap objects
 (eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
-(define-form size-of-<header> ()
-  (words-to-bytes (size-of-structure <header>)))
+(define-constant size-of-<header> (words-to-bytes (size-of-structure <header>)))
 
 (define-form header-of (arg)
-  `(- ,arg ,(size-of-<header>)))
+  `(- ,arg ,size-of-<header>))
 
 (let ((marker 233495534)) ; 0xDEADBEE, it's just an easy to recognize token without any meaning
   (define-form valid-header-magic-marker? (header)
@@ -278,7 +277,7 @@
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (libc/malloc size)))
     (or ptr (fatal "out of memory"))
-    (set (<header>-size  ptr) (- size (size-of-<header>)))
+    (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
     (gc/debug (libc/printf "heap growth %p size %d %d/%d\n" ptr size gc/alloc-count gc/frequency))
@@ -380,7 +379,7 @@
        (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
          (chunk first)
-         (total-size (+ requested-size (size-of-<header>))))
+         (total-size (+ requested-size size-of-<header>)))
     (while 1
       (while
         (let ()
@@ -388,10 +387,10 @@
           (when (= 0 (<header>-flags chunk))
             (let ((chunk-size (<header>-size chunk)))
               (while (and (= 0 (<header>-flags (<header>-next chunk)))
-                          (= (<header>-next chunk) (+ chunk (+ (size-of-<header>) chunk-size))))
+                          (= (<header>-next chunk) (+ chunk (+ size-of-<header> chunk-size))))
                 (let ((next (<header>-next chunk)))
                   (set (<header>-next chunk) (<header>-next next))
-                  (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ (size-of-<header>) (<header>-size next)))))
+                  (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ size-of-<header> (<header>-size next)))))
                   (and (= next gc/memory-last) (set gc/memory-last chunk))))
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk
@@ -408,7 +407,7 @@
                 (set (<header>-flags chunk) <header>-flags/used)
                 (set gc/memory-last chunk)
                 (gc/debug (libc/printf "alloc chunk %p\n" chunk))
-                (let ((obj (+ chunk (size-of-<header>))))
+                (let ((obj (+ chunk size-of-<header>)))
                   (libc/memset obj 0 chunk-size)
                   (set gc/alloc-count (+ gc/alloc-count 1))
                   (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
@@ -417,7 +416,7 @@
                   (gc/debug (libc/printf "gc/allocate: returning with %p (%p), size %d\n" (header-of obj) obj (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
-      (gc/grow-heap (max (+ (size-of-<header>) requested-size) gc/quantum)))))
+      (gc/grow-heap (max (+ size-of-<header> requested-size) gc/quantum)))))
 
 (define-function gc/allocate-opaque (size)
   (let ((obj (gc/allocate size)))
