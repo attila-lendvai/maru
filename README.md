@@ -56,8 +56,8 @@ A language evolves by the introduction of new features (optimizations, new primi
 If you want to use such a new language feature in its own implementation,
 then you need to *bootstrap* it:
 
-1) first implement the support for it in your compiler, and produce
-   an executable that can already compile this new version of the language
+1) first implement the support for it in your compiler and/or eval, and produce
+   an executable that can already compile and/or eval this new version of the language
 2) after that you can start using this feature, and now you may even rewrite the
    implementation of this very feature, and use/assume this feature in it.
 
@@ -113,7 +113,7 @@ Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 ### Build instructions
 
-TL;DR: From the default branch (currently `maru.3`) invoke `make test-bootstrap`.
+TL;DR: From the default branch invoke `make test-bootstrap`.
 
 **Linux:**
 
@@ -139,16 +139,16 @@ Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru
 
 * Programming badly needs better foundations, and Maru is part of this exploration.
 The foundations should get smaller, simpler, more self-contained, and more approachable
-for people who set out to learn programming.
+by people who set out to learn programming.
 
-* We lose a lot of value by not capturing the growth of a language into repo branches
-and formally encoded build instructions. They are useful both for educational purposes,
+* We lose a lot of value by not capturing the history of the growth of a language, including
+the formal encoding of its build instructions. They are useful both for educational purposes,
 and also for practical reasons: to have a minimal *seed* that is very simple to
 port to a new architecture, and then have a self-contained, formal bootstrap process that
-can automatically "grow" the entire system on top of that freshly layed, tiny foundation.
+can automatically "grow" an entire computing system on top of that freshly laid, tiny foundation.
 
 * Maru is very small: in about 1700 lines of code it can self-host
-(with about 2300 LoC of throwaway C code for the bootstrap).
+(with about 2300 LoC of throwaway C code for the initial bootstrap).
 
 * Ian seems to have stopped working on Maru, but it's an interesting piece of code that deserves
 a repo and a maintainer.
@@ -163,21 +163,23 @@ semantically equivalent with the `eval.l` in Piumarta's latest.
 The compiler in `emit.l` currently emits an `eval.s` text file. Therefore, for now, a
 C toolchain is required for a full circle of bootstrap. With the addition of an IA-32
 assembler this requirement can be eliminated; i.e. there's no inherent external
-dependency in the codebase (besides the services that `libc` provides).
+dependency in the codebase (the basic IO and memory management services
+of `libc` will be made pluggable).
 
 Assorted TODO:
 - revive all the goodies in the `piumarta` branch, but in a structured way
-- become agnostic of the machine word size (support 64bit)
 - generate LLVM output
+- compile to, and bootstrap on the bare metal of some interesting target
 
 ### Build system status
 
-There are 4 Maru stages/branches now, introducing non-trivial features. The repo structure seems to slowly mature.
+There are several Maru stages/branches now, introducing non-trivial features.
+The repo structure seems to slowly mature.
 
 Assorted TODO:
 - capture the emitted `eval.s` files and check them into the repo; add makefile targets
 that use them, regenerate them, compare them (to "short circuit" the bootstrap process)
-- rewrite the build process in Maru; eliminate dependency on makefiles
+- rewrite the build process in Maru; eliminate dependency on GNU Make
 
 ### History
 
