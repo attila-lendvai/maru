@@ -16,6 +16,7 @@ eval: $(BUILD)/eval2
 test-bootstrap: $(BUILD)/eval1 $(BUILD)/eval2 $(BUILD)/eval3
 	$(DIFF) $(BUILD)/eval2.s $(BUILD)/eval3.s
 	$(DIFF) $(BUILD)/eval2.stripped $(BUILD)/eval3.stripped
+	$(BUILD)/eval2 boot.l
 
 # eval1 is the first version of us that was built by the previous stage.
 # some functionality may be broken in this one.
