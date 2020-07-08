@@ -611,24 +611,6 @@
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
 
-(when evolving?
-  ;; While the host is running us, we need to shadow our FIXED definition with that of the host
-  ;; (so that it instantiates the <fixed> that the host's level-shifted code understands).
-  ;; Our <fixed> is just a random, meaningless struct for the host while we are being bootstrapped.
-  ;; to reproduce the bug: reorganize the type definitions so that the slave and the host disagree
-  ;; on the type id of <fixed>
-  (define-function fixed (fun)
-    (let ((self (new <fixed>)))
-      (set (<fixed>-function self) fun)
-      self))
-  (define-function environment (parent)
-    (let ((self (new <env>)))
-      (set (<env>-parent   self) parent)
-      (set (<env>-level    self) (<env>-level  parent))
-      (set (<env>-offset   self) (<env>-offset parent))
-      (set (<env>-bindings self) (array))
-      self)))
-
 ;; (define-function environment-find (env name)
 ;;   (let* ((bindings (<env>-bindings env))
 ;;          (offset   (<env>-offset   env))
@@ -667,11 +649,8 @@
              (make-instance-accessors name (cdr fields) (+ i 1)))))
 
 (define-form with-instance-accessors (type . body)
-  (if evolving?
-      `(let ()
-         ,@body)
-      `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
-         (let () ,@body))))
+  `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
+    (let () ,@body)))
 
 ;;; selector/method (single dispatch on the type of the first argument)
 
