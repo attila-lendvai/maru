@@ -540,6 +540,7 @@
 (define-function k/cadr		(list)		(k/car (k/cdr list)))
 (define-function k/cddr		(list)		(k/cdr (k/cdr list)))
 (define-function k/caddr	(list)		(k/car (k/cdr (k/cdr list))))
+(define-function k/cadddr	(list)		(k/car (k/cdr (k/cdr (k/cdr list)))))
 
 (define-function new-object (type wordsize)
   (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
@@ -1572,6 +1573,31 @@
 
 (define-subr (not 1)
   (if (k/car -args-) () symbol/t))
+
+(define-subr (fixed 1)
+  (new-<fixed> (k/car -args-)))
+
+(define-subr (variable 4)
+  (new-<variable> (k/car -args-) (k/cadr -args-) (k/caddr -args-) (k/cadddr -args-)))
+
+(define-subr (environment 1)
+  (let ((parent (k/car -args-)))
+    (k/assert (is <env> parent))
+    (new-<env> parent 0 (get/long (get <env> offset parent)))))
+
+(define-subr (environment-define 3)
+  (let ((env   (k/car -args-))
+        (name  (k/cadr -args-))
+        (value (k/caddr -args-)))
+    (k/assert (is <env> env))
+    (k/assert (is <symbol> name))
+    (let* ((bindings (get <env> bindings env))
+           (offset (get/long (get <env> offset env)))
+           (var (new-<variable> name value env offset)))
+      (gc/protect (var)
+        (put <env> offset env (new-<long> (+ offset 1)))
+        (k/array-append bindings var)
+        var))))
 
 (define-subr -
   (safety 1 (or (and (k/car -args-) (not (k/cddr -args-))) (k/error "operator '-' expected 1 or 2 arguments, got: " -args-)))

@@ -26,3 +26,7 @@
                         (slave:define slave:libc/fgetc)
                         (slave:define slave:libc/fputc)
                         (slave:define slave:libc/format)))
+
+(eval-in-module slave '(slave:let ()
+                        (slave:define slave:environment        (slave:lambda args (slave:eval (slave:quote (slave:error "bootstrap stub called: environment\n"))) (slave:abort)))
+                        (slave:define slave:environment-define (slave:lambda args (slave:eval (slave:quote (slave:error "bootstrap stub called: environment-define\n")))))))

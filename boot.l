@@ -525,12 +525,14 @@
 (define-structure <form>        (function symbol))      ; these are expander lambda's
 (define-structure <fixed>       (function))
 (define-structure <subr>        (_name _imp _sig _profile))
-(define-structure <variable>	(name value env index type))
+(define-structure <variable>	(name value env index))
 (define-structure <env>		(parent level offset bindings stable))
 (define-structure <context>	(home env bindings callee pc))
 (define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
 (define-structure <target-vm-pointer> (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
 
+;; TODO these check for the slave types, i.e. they won't be true for e.g. an integer read by the host's reader.
+;; find out how to deal with this in a fool proof way.
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
@@ -539,51 +541,34 @@
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
 
-;; TODO the following few definitions need fixing:
-;; While the host is running us, we need to shadow our FIXED definition with that of the host
-;; (so that it instantiates the <fixed> that the host's level-shifted code understands).
-;; Our <fixed> is just a random, meaningless struct for the host while we are being bootstrapped.
-;; to reproduce the bug: put <data> before <fixed>, so that the slave and the host disagree on the type id of <fixed>
-;; TODO same applies to long? and company, plus all the careless use of <type-names> on the macro level
-(define-function fixed (fun)
-  (let ((self (new <fixed>)))
-    (set (<fixed>-function self) fun)
-    self))
+(when evolving?
+  ;; While the host is running us, we need to shadow our FIXED definition with that of the host
+  ;; (so that it instantiates the <fixed> that the host's level-shifted code understands).
+  ;; Our <fixed> is just a random, meaningless struct for the host while we are being bootstrapped.
+  ;; to reproduce the bug: reorganize the type definitions so that the slave and the host disagree
+  ;; on the type id of <fixed>
+  (define-function fixed (fun)
+    (let ((self (new <fixed>)))
+      (set (<fixed>-function self) fun)
+      self))
+  (define-function environment (parent)
+    (let ((self (new <env>)))
+      (set (<env>-parent   self) parent)
+      (set (<env>-level    self) (<env>-level  parent))
+      (set (<env>-offset   self) (<env>-offset parent))
+      (set (<env>-bindings self) (array))
+      self)))
 
-(define-function variable (name value env index . opt-type)
-  (let ((self (new <variable>)))
-    (set (<variable>-name  self) name)
-    (set (<variable>-value self) value)
-    (set (<variable>-env   self) env)
-    (set (<variable>-index self) index)
-    (set (<variable>-type  self) (car opt-type))
-    self))
-
-(define-function environment (parent)
-  (let ((self (new <env>)))
-    (set (<env>-parent   self) parent)
-    (set (<env>-level    self) (<env>-level  parent))
-    (set (<env>-offset   self) (<env>-offset parent))
-    (set (<env>-bindings self) (array))
-    self))
-
-(define-function environment-define (env name value)
-  (let* ((bindings (<env>-bindings env))
-         (offset   (<env>-offset   env))
-         (var      (variable name value env offset)))
-    (set (<env>-offset env) (+ offset 1))
-    (array-append bindings var)))
-
-(define-function environment-find (env name)
-  (let* ((bindings (<env>-bindings env))
-         (offset   (<env>-offset   env))
-         (var      ())
-         (idx      0))
-    (while (and (not var) (< idx offset))
-      (if (= name (<variable>-name (array-at bindings idx)))
-          (set var (array-at bindings idx))
-        (set idx (+ idx 1))))
-    var))
+;; (define-function environment-find (env name)
+;;   (let* ((bindings (<env>-bindings env))
+;;          (offset   (<env>-offset   env))
+;;          (var      ())
+;;          (idx      0))
+;;     (while (and (not var) (< idx offset))
+;;       (if (= name (<variable>-name (array-at bindings idx)))
+;;           (set var (array-at bindings idx))
+;;         (set idx (+ idx 1))))
+;;     var))
 
 (define-function global-variable? (var)        (= 0 (<env>-level (<variable>-env var))))
 
@@ -612,8 +597,11 @@
              (make-instance-accessors name (cdr fields) (+ i 1)))))
 
 (define-form with-instance-accessors (type . body)
-  `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
-    (let () ,@body)))
+  (if evolving?
+      `(let ()
+         ,@body)
+      `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
+         (let () ,@body))))
 
 ;;; selector/method (single dispatch on the type of the first argument)
 
