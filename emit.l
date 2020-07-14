@@ -49,7 +49,7 @@
 
 ;;; EXTERN
 
-(define-structure <extern> (name stub))
+(define-record <extern> () (name stub))
 
 (define-function extern (name)
   (assert (= <string> (type-of name)) "extern called with a non-string: " name)
@@ -71,7 +71,7 @@
 
 (define-form define-operand (name fields . printing)
   (let ((type-name (symbol->type-name name)))
-    (eval `(define-structure ,type-name ,fields))
+    (eval `(define-record ,type-name () ,fields))
     (eval `(define-function ,name ,fields
              (let ((self (new ,type-name)))
                ,@(define-operand/make-setters type-name fields)
@@ -83,7 +83,7 @@
 (define-form define-instruction (name)
   (let ((type-name (symbol->type-name name)))
     `(let ()
-       (define-structure ,type-name ())
+       (define-type ,type-name)
        (define-method do-print ,type-name () (print ,(symbol->string name)))
        (define ,name (new ,type-name)))))
 
@@ -284,7 +284,7 @@
 
 ;;;
 
-(define-structure <compiler> (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
+(define-record <compiler> () (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
 
 (define-function compiler (level)
   (let ((self (new <compiler>)))
@@ -559,6 +559,10 @@
 
 (define-method gen-definition <undefined> (name comp)
   (gen-definition 0 name comp))
+
+(define-method gen-definition <type> (name comp)
+  ;; let's ignore define-record's inside begin-compile and end-compile
+  )
 
 (define-method gen-definition <long> (name comp)
   (gen comp DATA)

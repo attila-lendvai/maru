@@ -272,11 +272,6 @@
       (op (car list) (foldr op value (cdr list)))
     value))
 
-(define-form define-expand (type args . body)   `(set-array-at *expanders*   ,type (lambda ,args ,@body)))
-(define-form define-encode (type args . body)   `(set-array-at *encoders*    ,type (lambda ,args ,@body)))
-(define-form define-eval   (type args . body)   `(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
-(define-form define-apply  (type args . body)   `(set-array-at *applicators* ,type (lambda ,args ,@body)))
-
 ;;; let*
 
 (define-function %let*getters (vars getter rest)
@@ -403,209 +398,313 @@
            (pair? b)
            (equal-lists a b)))))
 
-;;; type information
+;;;
+;;; types
+;;;
 
-(define %type-names     (array 16))
-(define %last-type      -1)
+;; type-id-of returns the type-id that the target VM is working with,
+;; i.e. the "level-shifted name" of the type (an integer).
+;; the new type-of that we are defining here will return a maru record holding
+;; the metadata for that type (i.e. its name, type-id, etc). the <foo>
+;; definitions are also holding full maru type objects now.
+(define type-id-of type-of)
 
-(define-function %allocate-type (name)
-  (set %last-type (+ 1 %last-type))
-  (set-array-at %type-names %last-type name)
-  %last-type)
+(define %first-type-id		1) ; i.e. the first allocated type will be 1 (so that we can assert for non-zero type in the gc)
+(define %last-type-id		(- %first-type-id 1))
+(define %types			(array 16))
 
-(define-form define-type (name)
-  `(define ,name ,(%allocate-type name)))
+(define-form types-do (var . body)
+  `(for (__i__ %first-type-id %last-type-id)
+     (let ((,var (array-at %types __i__)))
+       ,@body)))
+
+(define %type-id-map/host->slave (when bootstrapping? (array 16)))
+
+(define-function %allocate-type-id ()
+  (set %last-type-id (+ 1 %last-type-id)))
+
+(if bootstrapping?
+    ;; allocate-type-id is defined in bootstrapping/early.l to allocate a type id from the host
+    (define-function allocate-type-id/slave ()
+      (%allocate-type-id))
+    (define-function allocate-type-id ()
+      (%allocate-type-id)))
+
+(define *force-trivial-accessors* '()) ; expand to only a single oop-at, which is understood by the compiler
+
+(define-function %make-accessor (type-id type-name slot-names offset typecheck?)
+  (let ((slot-name (car slot-names)))
+    `(define-form ,(concat-symbol type-name (concat-symbol '- slot-name)) (obj)
+       (if (and ',typecheck?
+                (not *force-trivial-accessors*))
+           (list 'slot-value ',type-id '',slot-name obj ,offset)
+         (list 'oop-at obj ,offset)))))
+
+(define-function %make-accessors (type-id type-name slot-names offset typecheck?)
+  (when slot-names
+    (cons (%make-accessor  type-id type-name slot-names offset typecheck?)
+          (%make-accessors type-id type-name (cdr slot-names) (+ 1 offset) typecheck?))))
+
+;; KLUDGE forward definitions to avoid the need for excessinve use of eval for the conditional bootstrap stuff
+(define <type>-slave-id)
+(define set-<type>-slave-id)
+
+;; these are internal stuff needed for the bootstrap
+(define type-id-of-<type>		(allocate-type-id))
+(define type-id-of-<record>		(allocate-type-id))
+(define slots-of-<type>			(concat-list '(id name) (when bootstrapping? '(slave-id))))
+(define slots-of-<record>		'(super direct-slots effective-slots))
+
+;; define non-typechecking accessors for <type> and <record> to help us while we instantiate these two types.
+(eval `(let ()
+         ,@(%make-accessors type-id-of-<type>	'<type>		slots-of-<type>		0				())
+         ,@(%make-accessors type-id-of-<record>	'<record>	slots-of-<record>	(list-length slots-of-<type>)	())))
+
+(assert <type>-name)
+
+(define-function register-type (type)
+  (if bootstrapping?
+      ;; while bootstrapping we instantiate types in the host (so that we can use e.g. method dispatch),
+      ;; and keep an additional host->slave map and a slave-id slot.
+      (let ((slave-id (allocate-type-id/slave)))
+        (set (array-at %type-id-map/host->slave (<type>-id type)) slave-id)
+        (set (<type>-slave-id type) slave-id)
+        (set (array-at %types slave-id) type)
+        (eval `(register-type/host ,type)))
+    (set (array-at %types (<type>-id type)) type)))
+
+(define-function %instantiate-type (type-name type-id type-type-id slot-count)
+  (let ((type-obj (allocate type-type-id slot-count)))
+    (set (<type>-id	type-obj)	type-id)
+    (set (<type>-name	type-obj)	type-name)
+    (register-type type-obj)
+    (eval `(define ,type-name ,type-obj))
+    type-obj))
+
+(define-function %instantiate-record (type-name type-id super direct-slots)
+  (let ((type-obj (%instantiate-type type-name type-id type-id-of-<record> (+ (list-length slots-of-<type>)
+                                                                              (list-length slots-of-<record>)))))
+    (set (<record>-super		type-obj)		super)
+    (set (<record>-direct-slots		type-obj)		direct-slots)
+    (set (<record>-effective-slots	type-obj)		'not-yet-bootstrapped)))
+
+(%instantiate-record '<type>		type-id-of-<type>	()	slots-of-<type>)	(when (< 0 *verbosity*) (warn "<type> is bootstrapped: " <type> "\n"))
+(%instantiate-record '<record>		type-id-of-<record>	<type>	slots-of-<record>)	(when (< 0 *verbosity*) (warn "<record> is bootstrapped: " <record> "\n"))
+
+(assert (or (not bootstrapping?)
+            (and (> (<type>-id <type>) 5)   (> (type-id-of <type>) 5)
+                 (> (<type>-id <record>) 5) (> (type-id-of <record>) 5)
+                 (= (type-id-of <type>) (<type>-id <record>)))))
+
+(define-function type-object-for (type-id)
+  (or (array-at %types (if bootstrapping?
+                           (let ((slave-id (array-at %type-id-map/host->slave type-id)))
+                             ;; we could make this smarter and only remap slave type ids when necessary...
+                             ;; but do we want to? wouldn't that hide some nasty bugs?
+                             (assert slave-id "type-object-for: no host->slave mapping exists for host type-id: " type-id)
+                             slave-id)
+                         type-id))
+      (error "type-object-for has failed for type id "type-id", known types are: "%types)))
+
+(define-function type-of (obj)
+  (type-object-for (type-id-of obj)))
 
 (define-function name-of-type (type)
-  (array-at %type-names type))
+  (<type>-name type))
 
 (define-function type-name-of (obj)
   (name-of-type (type-of obj)))
 
-;;; immediate
+(define-function record-inherits-from? (type super)
+  (and type
+       (or (= type super)
+           (record-inherits-from? (<record>-super type) super))))
 
-(define %immediate-type/tag-values (array 8))
-(define %immediate-type/tag-widths (array 8))
+(define-function subtype? (subtype supertype)
+  (assert (and subtype supertype))
+  (or (= subtype supertype)
+      (and (subtype? (type-of subtype) <record>)
+           (record-inherits-from? subtype supertype))))
 
-(define-form define-immediate-type (name tag-width tag-value)
-  (set tag-width (eval tag-width))
-  (set tag-value (eval tag-value))
-  (assert (and (< 0 tag-width) (< 0 tag-value)) "define-immediate-type: illegal tag-width or tag-value for type " name)
-  (let ((type (%allocate-type name)))
-    (set (array-at %immediate-type/tag-values type) tag-value)
-    (set (array-at %immediate-type/tag-widths type) tag-width)
-    `(define ,name ,type)))
+(assert (subtype? (type-of <type>) <record>))
+(assert (subtype? <record> <type>))
 
-(define-function immediate-type/tag-value (type)
-  (array-at %immediate-type/tag-values type))
+;; now that <type> and <record> is instantiated, we can implement type checking in the accessors.
+;; let's also redefine the basic accessors that we have defined earlier.
+(define-function %accessor-typecheck (expected-type-id slot-name object)
+  (unless (= (type-id-of object) expected-type-id)
+    (let ((expected-type (type-object-for expected-type-id))
+          (actual-type (type-of object)))
+      (unless (subtype? actual-type expected-type)
+        ;; (warn "about to process an %accessor-typecheck failure, which may fail to properly print the error output\nslot name is "slot-name", expected-type-id is "expected-type-id", object's actual type id is "(type-id-of object)"\n")
+        (error "type check failed for record slot accessor: expected type "expected-type", slot name "slot-name", got " actual-type)))))
 
-(define-function immediate-type/tag-width (type)
-  (array-at %immediate-type/tag-widths type))
+(define-function slot-value (expected-type-id slot-name object offset)
+  (%accessor-typecheck expected-type-id slot-name object)
+  (oop-at object offset))
 
-(define-function immediate-type? (type)
-  (and (immediate-type/tag-value type) 't))
+(define-function set-slot-value (expected-type-id slot-name object offset value)
+  (%accessor-typecheck expected-type-id slot-name object)
+  (set-oop-at object offset value))
 
-;;; structure
-
-(define %structure-fields       (array))
-(define %structure-field-counts (array))
-(define %structure-bases	(array))
-(define %structure-derivatives	(array))
-
-(define-function structure-field-count (type)
-  (assert (<= type %last-type) "structure-field-count for undefined type " type)
-  (array-at %structure-field-counts type))
-
-;; TODO naming? fields-of-structure? or type-field-count above?
-(define-function fields-of-type (type)
-  (array-at %structure-fields type))
-
-(define-function structure-field-index (type field-name)
-  (let ((i 0)
-        (list (fields-of-type type)))
-    (while (and (pair? list)
-                (not (= field-name (car list))))
-      (set list (cdr list))
-      (set i (+ i 1)))
-    (or (and (pair? list)
-             i)
-        (error "structure-field-index has failed for type "type", field-name "field-name))))
-
-(define-function sanity-check-structure-fields (name fields)
-  (let ((f fields))
+(define-function sanity-check-record-slots (record slots)
+  (let ((f slots))
     (while (pair? f)
       (and (memq (car f) (cdr f))
-           (error "field '"(car f)"' multiply-defined in structure: "name" "fields))
+           (error "slot '"(car f)"' multiply-defined in record: "record" "slots))
       (set f (cdr f)))))
 
-(define-function inherits-from (type base)
+(define-function %record/compute-effective-slots (type)
   (and type
-       (or (= type base)
-           (inherits-from (array-at %structure-bases type) base))))
+       (concat-list (%record/compute-effective-slots (<record>-super type))
+                    (<record>-direct-slots type))))
 
-(define-function %typecheck (type field-name object)
-  (or (= type (type-of object))
-      (inherits-from (type-of object) type)
-      (error "type check failed for field accessor: " field-name ", expected "
-             type" "(name-of-type type)", got "
-             (type-of object)" "(type-name-of object)))
-  object)
+(define-function record/compute-effective-slots (type)
+  ;;(print "record/compute-effective-slots for type " (<type>-name type) " of type " (<type>-name (type-of type)) " ?= <record>" (= type <record>) "\n") ; TODO delme
+  (assert (subtype? (type-of type) <record>))
+  (let ((slots (%record/compute-effective-slots type)))
+    (sanity-check-record-slots type slots)
+    slots))
 
-(define *force-trivial-accessors* '()) ; expand only an oop-at, which is directly understood by the compiler
+(set (<record>-effective-slots <type>)		(record/compute-effective-slots <type>))
+(set (<record>-effective-slots <record>)	(record/compute-effective-slots <record>))
 
-(define-function %accessor (name)
-  ;; KLUDGE? TODO understand and reinstate?
-  ;; (if (= ?_ (string-at (symbol->string name) 0))
-  ;;     'long-at
-  ;;   'oop-at)
-  'oop-at)
+(assert (equal slots-of-<type> (<record>-effective-slots <type>)))
+(assert (equal (concat-list slots-of-<type> slots-of-<record>) (<record>-effective-slots <record>)))
 
-(define %make-accessor) ;; forward
+(define-function record/effective-slot-count (type)
+  (list-length (<record>-effective-slots type)))
 
-(define-function %make-safe-accessor (name fields offset)
-  (when fields
-    (let ((field-name (car fields)))
-      (cons `(define-form ,(concat-symbol name (concat-symbol '- field-name)) (self)
-               (list ',(%accessor field-name)
-                     (if *force-trivial-accessors*
-                         self
-                       (list '%typecheck ',name '',field-name self))
-                     ,offset))
-            (%make-accessor name (cdr fields) (+ 1 offset))))))
+(define-function type/slot-count-of-instances (type)
+  (cond
+    ((subtype? (type-of type) <record>)	(record/effective-slot-count type))
+    ((subtype? (type-of type) <type>)	0)
+    (else				(error "type/slot-count-of-instances: called with something unexpected: " type))))
 
-(define-function %make-unsafe-accessor (name fields offset)
-  (when fields
-    (let ((field-name (car fields)))
-      (cons `(define-form ,(concat-symbol name (concat-symbol '- field-name)) (self)
-               (list ',(%accessor field-name)
-                     self
-                     ,offset))
-            (%make-accessor name (cdr fields) (+ 1 offset))))))
+(define-function %make-record-accessors (type)
+  (assert (subtype? (type-of type) <record>))
+  (%make-accessors (<type>-id type)
+                   (<type>-name type)
+                   (<record>-direct-slots type)
+                   (or (and (<record>-super type)
+                            (record/effective-slot-count (<record>-super type)))
+                       0)
+                   (= 0 *optimised*)))
 
-(set %make-accessor (if (> *optimised* 0)
-                        %make-unsafe-accessor
-                      %make-safe-accessor))
+;; redefine the preliminary bootstrap accessors with full featured ones
+(eval `(let ()
+         ,@(%make-record-accessors <type>)
+         ,@(%make-record-accessors <record>)))
 
-(define-function %make-accessors (name fields)
-  (%make-accessor name fields 0))
+(when (< 0 *verbosity*) (warn "type bootstrap finished\n"))
 
-(define-form define-structure (name fields)
-  (let ((type (%allocate-type name))
-        (field-count (list-length fields)))
-    (sanity-check-structure-fields name fields)
-    (set-array-at %structure-field-counts type field-count)
-    (set-array-at %structure-fields       type fields)
-    `(let ()
-       (define ,name ,type)
-       ,@(%make-accessors name fields)
-       ,type)))
+;;; at this point the type registry is bootstrapped, containing two types: <type> and <record>
 
-(define-form new (type . inits)
-  (let ((i -1))
-    `(let* ((_type_ ,type)
-            (_self_ (allocate _type_ (structure-field-count _type_))))
-       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
-       _self_)))
+(assert (= (type-of <type>)	<record>))
+(assert (= (type-of <record>)	<record>))
 
-(define-function %make-make-inits (prefix inits)
-  (and inits
-       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-             (%make-make-inits prefix (cdr inits)))))
+(assert (= (if bootstrapping? 3 2) (list-length (<record>-effective-slots <type>))))
+(assert (= (+ 3 (list-length (<record>-effective-slots <type>))) (list-length (<record>-effective-slots <record>))))
 
-(define-form make (type . inits)
-  `(let ((self (new ,type)))
-     (with-instance-accessors ,type
-       ,@(%make-make-inits (concat-symbol type '-) inits)
-       self)))
+(define-function new-type-instance (name type)
+  (assert (subtype? type <type>))
+  (let ((id (allocate-type-id))
+        (result (allocate (<type>-id type) (type/slot-count-of-instances type))))
+    (set (<type>-name	result) name)
+    (set (<type>-id	result) id)
+    (register-type result)
+    result))
+
+(define-function new-<type> (name)
+  (new-type-instance name <type>))
+
+(define-form define-type (name)
+  (let ((type (new-<type> name)))
+    ;; TODO we want this to be defined already when the upcoming forms get expanded. but it feels like a kludge...
+    (eval `(define ,name ,type))
+    `(define ,name ,type)))
+
+(define-function new-<record> (name super slots)
+  (assert (or (not super) (and (not (pair? super)) (subtype? (type-of super) <record>))))
+  (let ((type (new-type-instance name <record>)))
+    (set (<record>-super		type) super)
+    (set (<record>-direct-slots		type) slots)
+    (set (<record>-effective-slots	type) (record/compute-effective-slots type))
+    type))
+
+(define-form define-record (name super slots)
+  (let ((record-type (new-<record> name (eval super) slots)))
+    (eval `(define ,name ,record-type))
+    `(let ((type-obj ,record-type))
+       (define ,name type-obj)
+       ,@(%make-record-accessors record-type)
+       type-obj)))
+
+;;; immediate type
+
+(define-record <immediate-type> <type> (tag-value tag-width))
+
+(define-function new-<immediate-type> (name tag-value tag-width)
+  (assert (and (< 0 tag-width) (< 0 tag-value)) "new-<immediate-type>: illegal tag-width or tag-value for type " name)
+  (let ((type (new-type-instance name <immediate-type>)))
+    (set (<immediate-type>-tag-value	type) tag-value)
+    (set (<immediate-type>-tag-width	type) tag-width)
+    type))
+
+(define-form define-immediate-type (name tag-width tag-value)
+  `(define ,name ,(new-<immediate-type> name (eval tag-width) (eval tag-value))))
+
+(define-function immediate-type? (type)
+  (subtype? (type-of type) <immediate-type>))
+
+;;; classes
 
 (define-form define-class (name basis fields)
-  (let ((base (eval basis)))
-    (set fields (concat-list (fields-of-type base) fields))
-    (sanity-check-structure-fields name fields)
-    (let ((type   (%allocate-type name))
-          ;;(offset (list-length (array-at %structure-fields base)))
-          (size   (list-length fields)))
-      (set (array-at %structure-field-counts type) size)
-      (set (array-at %structure-fields       type) fields)
-      (set (array-at %structure-bases        type) base)
-      (let ((derived (or (array-at %structure-derivatives base)
-                         (set (array-at %structure-derivatives base) (array)))))
-        (array-append derived type))
-      `(let ()
-         (define ,name ,type)
-         ,@(%make-accessors name fields)
-         ,type))))
+  ;; TODO source-level compatibility. decide whether to delme.
+  `(define-record ,name ,basis ,fields))
 
 ;;; built-in types
 
 ;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
-;; what actually happens is encoded in eval.l, and the define-structure forms
+;; what actually happens is encoded in eval.l, and the define-record forms
 ;; for the built-in types in boot.l merely fill in some missing parts. types
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
 (define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
 (define-type		<data>)					; some blob; used for stuff like the _bits of <string> and <array>
 (define-immediate-type	<long> 1 1)
-;;(define-structure <long>        (_bits))
-(define-structure <string>      (size _bits))
-(define-structure <symbol>      (_bits))
-(define-structure <pair>        (head tail))
-(define-structure <array>       (size _bits))
-(define-structure <expr>        (name defn ctx))        ; NOTE: defn is: (env formals . prog)
-(define-structure <form>        (function symbol))      ; these are expander lambda's
-(define-structure <fixed>       (function))
-(define-structure <subr>        (_name _imp _sig _profile))
-(define-structure <variable>	(name value env index))
-(define-structure <env>		(parent level offset bindings stable))
-(define-structure <context>	(home env bindings callee pc))
-(define-structure <module>      (symbols globals)) ; globals is the <variable> that holds '*globals*
-(define-structure <target-vm-pointer> (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
+;;(define-record <long>			() (_bits))
+(define-record <array>			() (size _bits))
+(define-record <expr>			() (name defn ctx))        ; NOTE: defn is: (env formals . prog)
+(define-record <form>			() (function symbol))      ; these are expander lambda's
+(define-record <fixed>			() (function))
+(define-record <subr>			() (_name _imp _sig _profile))
+(define-record <variable>		() (name value env index))
+(define-record <env>			() (parent level offset bindings stable))
+(define-record <context>		() (home env bindings callee pc))
+(define-record <module>			() (symbols globals)) ; globals is the <variable> that holds '*globals*
+(define-record <target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
+(define-record <string>			() (size _bits))
+(define-record <symbol>			() (_bits))
+(define-record <pair>			() (head tail))
 
-;; TODO these check for the slave types, i.e. they won't be true for e.g. an integer read by the host's reader.
-;; find out how to deal with this in a fool proof way.
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
+
+(when bootstrapping?
+  ;; let's map the following host types to their respective slave equivalents
+  ;; so that type-of on one of their instances will return the slave type object.
+  ;; this is mainly needed to interact with the data that the host's reader returns
+  ;; e.g. to be able to specialize methods on them while in the bootstrap process.
+  (list-do entry `(("" ,<string>) (42 ,<long>) (t ,<symbol>) ((1) ,<pair>))
+    (apply (lambda (instance type)
+             (set (array-at %type-id-map/host->slave (type-id-of instance))
+                  (<type>-slave-id type))
+             (assert (= (type-of instance) type)))
+           entry))
+  ;; (print %type-id-map/host->slave "\n" %types "\n")
+  )
 
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible
 (define-function <pair>-source (x) ())
@@ -623,6 +722,11 @@
 ;;     var))
 
 (define-function global-variable? (var)        (= 0 (<env>-level (<variable>-env var))))
+
+(define-form define-expand (type args . body)   `(set-array-at *expanders*   ,(<type>-id (eval type)) (lambda ,args ,@body)))
+(define-form define-encode (type args . body)   `(set-array-at *encoders*    ,(<type>-id (eval type)) (lambda ,args ,@body)))
+(define-form define-eval   (type args . body)   `(set-array-at *evaluators*  ,(<type>-id (eval type)) (lambda ,args ,@body)))
+(define-form define-apply  (type args . body)   `(set-array-at *applicators* ,(<type>-id (eval type)) (lambda ,args ,@body)))
 
 ;;; local syntax
 
@@ -643,31 +747,60 @@
 
 ;;; field accesors
 
-(define-function make-instance-accessors (name fields i)
-  (and (pair? fields)
-       (cons `(,(concat-symbol 'self. (car fields)) () ((name) (list 'oop-at 'self ,i)))
-             (make-instance-accessors name (cdr fields) (+ i 1)))))
+(define-function make-instance-accessors (name slots i)
+  (and (pair? slots)
+       (cons `(,(concat-symbol 'self. (car slots)) () ((name) (list 'oop-at 'self ,i)))
+             (make-instance-accessors name (cdr slots) (+ i 1)))))
 
 (define-form with-instance-accessors (type . body)
-  `(with-forms ,(make-instance-accessors type (fields-of-type (eval type)) 0)
-    (let () ,@body)))
+  ;; TODO audit its use wrt <type>s (as opposed to <record>s). maybe do the filtering for <record>s at its point of use.
+  (let ((type-object (eval type)))
+    `(with-forms ,(when (subtype? (type-of type-object) <record>)
+                    (make-instance-accessors type (<record>-effective-slots type-object) 0))
+       (let () ,@body))))
+
+(define-form new (type . inits)
+  (set type (eval type))
+  (let ((i -1))
+    ;; TODO singletons for types whose instances have no slots?
+    `(let* ((_self_ (allocate ,(<type>-id type) ,(type/slot-count-of-instances type))))
+       ;; TODO the usefulness of this is questionable... delme and rename make to new?
+       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+       _self_)))
+
+(define-function %make-make-inits (prefix inits)
+  (and inits
+       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
+             (%make-make-inits prefix (cdr inits)))))
+
+(define-form make (type . inits)
+  `(let ((self (new ,type)))
+     (with-instance-accessors ,type
+       ,@(%make-make-inits (concat-symbol type '-) inits)
+       self)))
 
 ;;; selector/method (single dispatch on the type of the first argument)
 
-(define-structure <selector> (name methods default))
+(define-record <selector> () (name methods default))
 
 (define-function selector? (obj) (= <selector> (type-of obj)))
 
 (define-function <selector>-inherit (methods type)
-  (let ((method ())
-        (probe  type))
-    (while (and (set probe (array-at %structure-bases probe))
-                (not (set method (array-at methods probe)))))
-    ;; (and method (set (array-at methods type) method))	; copy down the method for performance
-    method))
+  (when (subtype? (type-of type) <record>)
+    (let ((method ())
+          (probe  type))
+      (while (and (set probe (<record>-super probe))
+                  (not (set method (array-at methods (<type>-id probe))))))
+      ;; (and method (set (array-at methods type) method))	; copy down the method for performance
+      method)))
 
 (define-apply <selector> (self . arguments)
-  (apply (or (array-at (<selector>-methods self) (type-of (car arguments)))
+  ;; NOTE if we wanted to be super precise while bootstrapping, then this should be
+  ;; (<type>-id (type-of (car arguments))), so that type-of can map the host type to
+  ;; that of the slave. but this causes a major slowdown, and is not needed, because
+  ;; emit.l is loaded into the host, so the dispatches in it work as expected.
+  ;; same applies to generics.
+  (apply (or (array-at (<selector>-methods self) (type-id-of (car arguments)))
              (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
          arguments))
@@ -680,11 +813,13 @@
     self))
 
 (define-function <selector>-add-method (self type method)
-  (and (expr? method)
-       (or (<expr>-name method)
-           (set (<expr>-name method)
-                (concat-symbol (name-of-type type) (concat-symbol '. (<selector>-name self))))))
-  (set-array-at (<selector>-methods self) type method))
+  (unless bootstrapping? ; TODO this should be less restrictive and only check for evolving?, but that doesn't work.
+    ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
+    (and (expr? method)
+         (or (<expr>-name method)
+             (set (<expr>-name method)
+                  (concat-symbol (name-of-type type) (concat-symbol '. (<selector>-name self)))))))
+  (set-array-at (<selector>-methods self) (<type>-id type) method))
 
 (define-form define-selector (name . default)
   (assert (symbol? name) "define-selector: name is not a symbol")
@@ -743,6 +878,7 @@
 (define-method do-dump  <string> ()     (primitive/dump self))
 (define-method do-dump  <array> ()      (primitive/dump self))
 (define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
+(define-method do-print <type> ()	(print "<"(<type>-name self)" "(<type>-id self)">"))
 
 (define-method do-print <pair> ()
   (print "(")
@@ -805,7 +941,7 @@
 
 ;;; generic/multimethod (dispatch on the type of all arguments)
 
-(define-structure <generic> (name methods default))
+(define-record <generic> () (name methods default))
 
 (define-function generic (name default)
   (let ((self (new <generic>)))
@@ -821,16 +957,19 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
-  (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm)))
+  (unless evolving?
+    ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
+    (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm))))
   (if types
       (let ((methods (or (<generic>-methods mm)
                          (set (<generic>-methods mm) (array 32)))))
         (while (cdr types)
-          (let ((type (eval (car types))))
-            (set methods (or (array-at methods type)
-                             (set (array-at methods type) (array 32)))))
+          (let* ((type (eval (car types)))
+                 (type-id (<type>-id type)))
+            (set methods (or (array-at methods type-id)
+                             (set (array-at methods type-id) (array 32)))))
           (set types (cdr types)))
-        (set (array-at methods (eval (car types))) method))
+        (set (array-at methods (<type>-id (eval (car types)))) method))
     (set (<generic>-methods mm) method)))
 
 (define-form define-multimethod (method typed-args . body)
@@ -843,7 +982,8 @@
   (let ((method (<generic>-methods self))
         (arg     arguments))
     (while arg
-      (set method (array-at method (type-of (car arg))))
+      ;; see NOTE at define-apply <selector>
+      (set method (array-at method (type-id-of (car arg))))
       (set arg (cdr arg)))
     (if (and method (not (array? method)))
         (apply method arguments)

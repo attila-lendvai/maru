@@ -86,11 +86,11 @@
       (* value   target-word-size/bytes)
      `(* ,value ,target-word-size/bytes)))
 
-(define-constant immediate-type/max-tag-width	(let ((result 0))
-                                                  (array-do x %immediate-type/tag-widths
-                                                    (when x
-                                                      (set result (max result x))))
-                                                  result))
+(define-constant immediate-type/max-tag-width	(let ((res 0))
+                                                  (types-do type
+                                                    (when (immediate-type? type)
+                                                      (set res (max res (<immediate-type>-tag-width type)))))
+                                                  res))
 
 (when (< target-word-size/bytes
          (<< 1 immediate-type/max-tag-width))
@@ -130,13 +130,13 @@
 (define-form move-oops (from to wordcount)
   `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
 
-(define-form size-of-structure (type)
-  (structure-field-count (eval type)))
-
 ;; the header of heap objects
-(eval `(define-structure <header> (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
+(eval `(define-record <header> () (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
-(define-constant size-of-<header> (words-to-bytes (size-of-structure <header>)))
+(define-form byte-size-of (type)
+  (words-to-bytes (record/effective-slot-count (eval type))))
+
+(define-constant size-of-<header> (byte-size-of <header>))
 
 (define-form header-of (arg)
   `(- ,arg ,size-of-<header>))
@@ -153,6 +153,20 @@
 (define-constant <header>-flags/mark	4)
 
 (define *subr-registry* ()) ; define-subr collects them here at compile time
+
+;; TODO get rid of this by representing the metadata of strucure fields as full objects that hold the offset
+(define-function record-slot-index (type slot-name)
+  (let ((i 0)
+        (list (<record>-effective-slots type)))
+    (while (and (pair? list)
+                (not (= slot-name (car list))))
+      (set list (cdr list))
+      (set i (+ i 1)))
+    (or (and (pair? list)
+             i)
+        (error "record-slot-index has failed for type "type", slot-name "slot-name))))
+
+(define-record <buffer> () (contents size position))
 
 ;;;
 ;;;
@@ -223,6 +237,138 @@
             args)
      (libc/printf "\n")
      (die)))
+
+;;;
+;;; types and their kernel accessors
+;;; ----------------------------------------------------------------
+;;;
+;;; types are represented at runtime as integers upfrom 0.
+;;; <undefined> doesn't necessarily need to be denoted by zero.
+;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
+
+(define-form %level-shift-types type-names
+  (println "# Types in the host:")
+  (eval-in-module host (if evolving?
+                           '(host:println "# " host:%type-names)
+                           '(host:let ()
+                             (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
+                             ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
+                             ;;(host:println "# " host:%types)
+                             ;; it only started to happen after i have installed the register-type/host call that
+                             ;; registers the type objects that the slave creates back into the host vm, and
+                             ;; added the do-print specialization on <array>.
+                             ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
+                             ;; longer to get the segfault.
+                             )))
+  (println "\n# Slave types are as follows:\n# host id	slave id	type name")
+  (types-do type
+    (println "# "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
+  (println)
+  `(let ()
+     ,@(map (lambda (type-name)
+              (let ((type (eval type-name)))
+                ;; level-shift the maru type object to an integer in the target vm
+                `(define-constant ,(concat-symbol 'k/ type-name) ,(<type>-slave-id type))))
+            type-names)))
+
+;; level-shift the ids of some types that we will need to denote in the target.
+;; NOTE: <type> and <record> are not needed in the level-shifted code, they are
+;; built on top of the other abstractions in boot.l.
+(%level-shift-types
+ <undefined>
+ <target-vm-pointer>
+ <data>
+ <long>
+ <string>
+ <symbol>
+ <pair>
+ <array>
+ <expr>
+ <form>
+ <fixed>
+ <subr>
+ <variable>
+ <env>
+ <context>
+ <module>)
+
+(define-form %get/type ()
+  `(define-function get/type (ptr)
+     (cond
+       ((not ptr)	k/<undefined>)
+       ((oop? ptr)	(let ((header (header-of ptr)))
+                          (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
+                          (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
+                          (<header>-type header)))
+       ((immediate? ptr) (cond
+                           ,@(let ((conds ()))
+                               (types-do type
+                                 (when (immediate-type? type)
+                                   (let* ((tag-value	(<immediate-type>-tag-value type))
+                                          (tag-width	(<immediate-type>-tag-width type))
+                                          (tag-mask	(^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
+                                     (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(concat-symbol 'k/ (<type>-name type)))))))
+                               conds)
+                           (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
+       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
+
+(%get/type)
+
+(define-form is (type ptr)
+  `(= ,(concat-symbol 'k/ type) (get/type ,ptr)))
+
+(define-function %type-check (obj exp-type)
+  (let ((act-type (get/type obj)))
+    (or (= exp-type act-type)
+        (fatal2 "kernel get/put type error: expected type id %d, got %d" exp-type act-type))))
+
+;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
+(define-form get (type-name slot object)
+  (let ((type (eval type-name)))
+    `(let ((__obj__ ,object))
+       (safety 2 (%type-check __obj__ ,(concat-symbol 'k/ type-name)))
+       ;; we could use the accessors, too:
+       ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
+       (oop-at __obj__ ,(record-slot-index type slot)))))
+
+(define-form put (type-name slot object value)
+  (let ((type (eval type-name)))
+    `(let ((__obj__ ,object))
+       (safety 2 (%type-check __obj__ ,(concat-symbol 'k/ type-name)))
+       ;; we could use the accessors, too:
+       ;; (set (,(concat-symbol (concat-symbol type-name '-) slot) __obj__) ,value)
+       (set (oop-at __obj__ ,(record-slot-index type slot)) ,value))))
+
+;; shorthands (and optimizations)
+(define-form get/globals	()		`(get <variable> value (get <module> globals *module*)))
+(define-form get/globals*	(obj)		`(get <variable> value (get <module> globals ,obj)))
+
+(define-form is/long		(obj)		`(is <long> ,obj))
+(define-form is/pair		(obj)		`(is <pair> ,obj))
+(if (immediate-type? <long>)
+    (define-form get/long	(obj)		`(>> ,obj ,(<immediate-type>-tag-width <long>)))
+    (define-form get/long	(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(record-slot-index <long> '_bits))	`(get <long> _bits ,obj))))
+(define-form get/head		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(record-slot-index <pair> 'head))	`(get <pair> head ,obj)))
+(define-form put/head		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'head) ,val)	`(put <pair> head ,obj ,val)))
+(define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(record-slot-index <pair> 'tail))	`(get <pair> tail ,obj)))
+(define-form put/tail		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
+
+(define-form is/tptr		(obj)		`(is <target-vm-pointer> ,obj))
+(define-form get/tptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
+
+(define-form get/string		(obj)		`(get <string> _bits ,obj))
+(define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
+
+(define-form get/variable-value	(var)		`(get <variable> value
+                                                      ,(if (string? var)
+                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                         var)))
+
+(define-form put/variable-value	(var val)	`(put <variable> value
+                                                      ,(if (string? var)
+                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                         var)
+                                                      ,val))
 
 ;;;
 ;;; GC
@@ -427,109 +573,6 @@
     (set (<header>-flags (header-of obj)) (+ <header>-flags/used <header>-flags/opaque))
     obj))
 
-;;;
-;;; types and their kernel accessors
-;;; ----------------------------------------------------------------
-;;;
-;;; types are represented at runtime as integers upfrom 0.
-;;; <undefined> doesn't necessarily need to be denoted by zero.
-;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
-
-(define-form bootstrap-types type-names
-  `(let ()
-     ,@(map (lambda (type-name)
-              `(define-constant ,type-name ,(eval type-name)))
-            type-names)))
-
-;; level-shift the ids of some types that we will need to denote in the target
-(bootstrap-types
- <undefined>
- <target-vm-pointer>
- <data>
- <long>
- <string>
- <symbol>
- <pair>
- <array>
- <expr>
- <form>
- <fixed>
- <subr>
- <variable>
- <env>
- <context>
- <module>)
-
-(define-form %get/type ()
-  `(define-function get/type (word)
-     (cond
-       ((not word)	<undefined>)
-       ((oop? word)	(let ((header (header-of word)))
-                          (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" word)))
-                          (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" word)))
-                          (<header>-type header)))
-       ((immediate? word) (cond
-                            ,@(let ((conds ()))
-                                (for (type 0 (array-length %immediate-type/tag-values))
-                                  (when (immediate-type? type)
-                                    (let* ((tag-value (immediate-type/tag-value type))
-                                           (tag-width (immediate-type/tag-width type))
-                                           (tag-mask  (^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
-                                      (push conds `((= ,tag-value (& word ,tag-mask)) ,type)))))
-                                conds)
-                            (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" word))))
-       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" word)))))
-
-(%get/type)
-
-(define-form is (type word)
-  `(= ,type (get/type ,word)))
-
-(define-function %type-check-failed (exp act)
-  (fatal2 "type error: expected %d, got %d" exp act))
-
-;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers"
-(define-form get (type field object)
-  `(let ((__obj__ ,object))
-     (safety 2 (let ((t (get/type __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
-     (,(concat-symbol (concat-symbol type '-) field) __obj__)))
-
-(define-form put (type field object value)
-  `(let ((__obj__ ,object))
-     (safety 2 (let ((t (get/type __obj__))) (or (= ,type t) (%type-check-failed ,type t))))
-     (set (,(concat-symbol (concat-symbol type '-) field) __obj__) ,value)))
-
-;; shorthands (and optimizations)
-(define-form get/globals	()		`(get <variable> value (get <module> globals *module*)))
-(define-form get/globals*	(obj)		`(get <variable> value (get <module> globals ,obj)))
-
-(define-form is/long		(obj)		`(is <long> ,obj))
-(define-form is/pair		(obj)		`(is <pair> ,obj))
-(if (immediate-type? <long>)
-    (define-form get/long	(obj)		`(>> ,obj ,(immediate-type/tag-width <long>)))
-    (define-form get/long	(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <long> '_bits))		`(get <long> _bits ,obj))))
-(define-form get/head		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'head))		`(get <pair> head ,obj)))
-(define-form put/head		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'head) ,val)	`(put <pair> head ,obj ,val)))
-(define-form get/tail		(obj)		(if (< safety-level 3)		`(oop-at ,obj ,(structure-field-index <pair> 'tail))		`(get <pair> tail ,obj)))
-(define-form put/tail		(obj val)	(if (< safety-level 3)	    `(set-oop-at ,obj ,(structure-field-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
-
-(define-form is/tptr		(obj)		`(is <target-vm-pointer> ,obj))
-(define-form get/tptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
-
-(define-form get/string		(obj)		`(get <string> _bits ,obj))
-(define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
-
-(define-form get/variable-value	(var)		`(get <variable> value
-                                                      ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
-                                                         var)))
-
-(define-form put/variable-value	(var val)	`(put <variable> value
-                                                      ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
-                                                         var)
-                                                      ,val))
-
 (define-function k/car (list)
   (when list
     (k/assert (is/pair list) "k/car called on non-list: " list)
@@ -546,42 +589,59 @@
 (define-function k/caddr	(list)		(k/car (k/cdr (k/cdr list))))
 (define-function k/cadddr	(list)		(k/car (k/cdr (k/cdr (k/cdr list)))))
 
-(define-function new-object (type wordsize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type"))
-  (let* ((obj (gc/allocate (words-to-bytes wordsize)))
+(define-function %new-object (type bytesize)
+  (debug (libc/printf "new-object type %d bytesize %d\n" type bytesize))
+  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type id"))
+  (let* ((obj (gc/allocate bytesize))
          (header (header-of obj)))
     (k/assert (aligned-to-oop? obj) "new-object: gc/allocate returned not aligned-to-oop? {%p}\n" obj)
     (set (<header>-type header) type)
     (debug (libc/printf "new-object returning %p\n" obj))
     obj))
 
-(define-function new-object/opaque (type bytesize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type"))
+(define-function %new-object/opaque (type bytesize)
+  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type id"))
   (let* ((obj (gc/allocate-opaque bytesize))
          (header (header-of obj)))
     (set (<header>-type header) type)
     obj))
 
+(define-form new-object (type wordsize)
+  `(%new-object ,(<type>-slave-id (eval type)) (words-to-bytes ,wordsize)))
+
+(define-form new-object/opaque (type wordsize)
+  `(%new-object/opaque ,(<type>-slave-id (eval type)) (words-to-bytes ,wordsize)))
+
+(define-form new-record-instance (type)
+  (set type (eval type))
+  (assert (subtype? (type-of type) <record>))
+  `(%new-object ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
+
+(define-form new-record-instance/opaque (type)
+  (set type (eval type))
+  (assert (subtype? (type-of type) <record>))
+  `(%new-object/opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
+
 (define-form %new-<long> ()
   (if (immediate-type? <long>)
       `(define-form new-<long> (bits)
          ;; TODO fix nested backquotes finally
-         (list '+ (list '<< bits ,(immediate-type/tag-width <long>))
-               ,(immediate-type/tag-value <long>)))
+         (list '+ (list '<< bits ,(<immediate-type>-tag-width <long>))
+               ,(<immediate-type>-tag-value <long>)))
     `(define-function new-<long> (bits)
-       (let ((obj (new-object/opaque <long> (words-to-bytes (size-of-structure <long>)))))
+       (let ((obj (new-record-instance/opaque <long>)))
          (set (<long>-_bits obj) bits)
          obj))))
 
 (%new-<long>)
 
 (define-function new-<target-vm-pointer> (bits)
-  (let ((obj (new-object/opaque <target-vm-pointer> (words-to-bytes (size-of-structure <target-vm-pointer>)))))
+  (let ((obj (new-record-instance/opaque <target-vm-pointer>)))
     (set (<target-vm-pointer>-_bits obj) bits)
     obj))
 
 (define-function new-<pair> (head tail)
-  (let ((obj (new-object <pair> (size-of-structure <pair>))))
+  (let ((obj (new-record-instance <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
     obj))
@@ -681,86 +741,77 @@
 ;;; ----------------------------------------------------------------
 
 (define-function new-<string>-of-length (len)
-  (let ((str (new-object <string> (size-of-structure <string>))))
-    (gc/protect (str)
-      (set (<string>-size  str) (new-<long> len))
-      (set (<string>-_bits str) (new-object/opaque <data> (+ len 1))) ; +1 is for the terminal zero
-      str)))
+  (gc/let* ((str (new-record-instance <string>)))
+    (put <string> size  str (new-<long> len))
+    (put <string> _bits str (new-object/opaque <data> (+ len 1))) ; +1 is for the terminal zero
+    str))
 
 (define-function new-<string>-from-cstring (cstr)
-  (let ((len (libc/strlen cstr)))
-    (let ((obj (new-<string>-of-length len))) ; also deals with the cstring terminal zero
-      (libc/memcpy (<string>-_bits obj) cstr len)
-      obj)))
+  (let* ((len (libc/strlen cstr))
+         (obj (new-<string>-of-length len)))
+    (libc/memcpy (get <string> _bits obj) cstr len)
+    obj))
 
 (define-function new-<symbol> (cstr)
-  ;; NOTE: strdup is malloc; if we assume that symbols never get collected, then we can allocate an opaque object for symbols.
-  (let ((obj (new-object/opaque <symbol> (words-to-bytes (size-of-structure <symbol>)))))
-    (set (<symbol>-_bits obj) (libc/strdup cstr))
+  ;; TODO mimic strings, make symbols gc-able
+  (let ((obj (new-record-instance/opaque <symbol>)))
+    (put <symbol> _bits obj (libc/strdup cstr))
     obj))
 
 (define-function new-<array> (size)
-  (let ((cap (or size 1))
-        (arr (new-object <array> (size-of-structure <array>))))
-    (gc/protect (arr)
-      (set (<array>-size arr)   (new-<long> size))
-      (set (<array>-_bits arr)  (new-object <data> cap))
-      arr)))
+  (gc/let* ((arr (new-record-instance <array>)))
+    (put <array> size arr   (new-<long> size))
+    (put <array> _bits arr  (new-object <data> (or size 1))) ; TODO this is kinda random. why not just go with the size here?
+    arr))
 
 (define-function new-<expr> (defn ctx)
-  (let ((obj (new-object <expr> (size-of-structure <expr>))))
-    (set (<expr>-defn obj) defn)
-    (set (<expr>-ctx  obj) ctx )
+  (let ((obj (new-record-instance <expr>)))
+    (put <expr> defn obj defn)
+    (put <expr> ctx  obj ctx )
     obj))
 
 (define-function new-<form> (fn sym)
-  (let ((obj (new-object <form> (size-of-structure <form>))))
-    (gc/protect (obj)
-      (set (<form>-function obj) fn)
-      (set (<form>-symbol   obj) sym)
-      obj)))
+  (let ((obj (new-record-instance <form>)))
+    (put <form> function obj fn)
+    (put <form> symbol   obj sym)
+    obj))
 
 (define-function new-<fixed> (fn)
-  (let ((obj (new-object <fixed> (size-of-structure <fixed>))))
-    (gc/protect (obj)
-      (set (<fixed>-function obj) fn)
-      obj)))
+  (let ((obj (new-record-instance <fixed>)))
+    (put <fixed> function obj fn)
+    obj))
 
 (define-function new-<subr> (_imp _name)
-  (let ((obj (new-object/opaque <subr> (words-to-bytes (size-of-structure <subr>)))))
-    (gc/protect (obj)
-      (set (<subr>-_imp  obj) _imp )
-      (set (<subr>-_name obj) _name)
-      obj)))
+  (let ((obj (new-record-instance/opaque <subr>)))
+    (put <subr> _imp  obj _imp )
+    (put <subr> _name obj _name)
+    obj))
 
 (define-function new-<variable> (name value env index)
-  (let ((obj (new-object <variable> (size-of-structure <variable>))))
-    (gc/protect (obj)
-      (set (<variable>-name  obj) name)
-      (set (<variable>-value obj) value)
-      (set (<variable>-env   obj) env)
-      (set (<variable>-index obj) (new-<long> index))
-      obj)))
+  (gc/let* ((obj (new-record-instance <variable>)))
+    (put <variable> name  obj name)
+    (put <variable> value obj value)
+    (put <variable> env   obj env)
+    (put <variable> index obj (new-<long> index))
+    obj))
 
 (define-function new-<env> (parent level offset)
-  (let ((obj (new-object <env> (size-of-structure <env>))))
-    (gc/protect (obj)
-      (set (<env>-parent   obj) parent)
-      (set (<env>-level    obj) (new-<long> (if parent (+ (get/long (get <env> level parent)) level) 0)))
-      (set (<env>-offset   obj) (new-<long> offset))
-      (set (<env>-bindings obj) (new-<array> 0))
-      obj)))
+  (gc/let* ((obj (new-record-instance <env>)))
+    (put <env> parent   obj parent)
+    (put <env> level    obj (new-<long> (if parent (+ (get/long (get <env> level parent)) level) 0)))
+    (put <env> offset   obj (new-<long> offset))
+    (put <env> bindings obj (new-<array> 0))
+    obj))
 
 (define-function new-base-<context> (home caller env)
-  (let ((obj (new-object <context> (size-of-structure <context>))))
-    (gc/protect (obj)
-      (set (<context>-home     obj) home)
-      (set (<context>-env      obj) env)
-      (set (<context>-bindings obj) (new-<array> 0))
-      obj)))
+  (gc/let* ((obj (new-record-instance <context>)))
+    (put <context> home     obj home)
+    (put <context> env      obj env)
+    (put <context> bindings obj (new-<array> 0))
+    obj))
 
 ;; (define-function new-<context> (home caller env)
-;;   (let ((obj (new-object <env> (size-of-structure <context>))))
+;;   (let ((obj (new-record-instance <env>)))
 ;;     (gc/protect (obj)
 ;;       (set (<context>-home     obj) home)
 ;;       (set (<context>-env      obj) env)
@@ -864,10 +915,8 @@
                                          ( = ?|  c)                     ; |
                                          ( = ?~  c)))                   ; ~
 
-(define-structure <buffer> (contents size position))
-
 (define-function new_buffer ()
-  (let ((buf (libc/malloc (words-to-bytes (size-of-structure <buffer>)))))
+  (let ((buf (libc/malloc (byte-size-of <buffer>))))
     (set (<buffer>-contents buf) (libc/malloc 32))
     (set (<buffer>-size     buf) 32)
     (set (<buffer>-position buf) 0)
@@ -921,7 +970,7 @@
             (return (intern* (+ 1 (+ cstr idx)) submod)))))
       (set idx (+ 1 idx))))
   ;; no module is denoted in cstr (anymore); it's just a symbol to be at this point
-  (let ((symbols (<module>-symbols module)))
+  (let ((symbols (get <module> symbols module)))
     (let ((lo 0)
           (hi (- (k/array-length symbols) 1)))
     (while (<= lo hi)
@@ -1018,7 +1067,7 @@
            (while (is_digit16 (set c (libc/fgetc stream))) (buffer_append buf c))))
     (libc/ungetc c stream)
     (buffer_append buf 0)
-    (let ((result (libc/strtoul (<buffer>-contents buf) 0 0)))
+    (let ((result (libc/strtoul (buffer_contents buf) 0 0)))
       (buffer_delete buf)
       (new-<long> (if neg (- result) result)))))
 
@@ -1029,7 +1078,7 @@
       (set c (libc/fgetc stream)))
     (libc/ungetc c stream)
     (buffer_append buf 0)
-    (let ((result (intern (<buffer>-contents buf))))
+    (let ((result (intern (buffer_contents buf))))
       (buffer_delete buf)
       result)))
 
@@ -1041,7 +1090,7 @@
         (k/error "unterminated string literal"))
       (buffer_append buf c))
     (buffer_append buf 0)
-    (let ((result (new-<string>-from-cstring (<buffer>-contents buf))))
+    (let ((result (new-<string>-from-cstring (buffer_contents buf))))
       (buffer_delete buf)
       result)))
 
@@ -1108,9 +1157,9 @@
   (debug/identities (libc/printf "{%p}" obj))
   (let ((type (get/type obj)))
     (cond
-      ((= type <undefined>)     (libc/printf "()"))
-      ((= type <long>)          (libc/printf "%d" (get/long obj)))
-      ((= type <string>)        (let ((bits (get/string obj)))
+      ((= type k/<undefined>)   (libc/printf "()"))
+      ((= type k/<long>)        (libc/printf "%d" (get/long obj)))
+      ((= type k/<string>)      (let ((bits (get/string obj)))
                                   (if (not storing)
                                       (libc/printf "%s" bits)
                                     (let ((i 0)
@@ -1125,8 +1174,8 @@
                                           (libc/printf "\\%03o" c))
                                         (set i (+ 1 i)))
                                       (libc/printf "\"")))))
-      ((= type <symbol>)        (libc/printf "%s" (get/symbol obj)))
-      ((= type <pair>)          (let ()
+      ((= type k/<symbol>)      (libc/printf "%s" (get/symbol obj)))
+      ((= type k/<pair>)        (let ()
                                   (libc/printf "(")
                                   (while (is/pair obj)
                                     (do_print (get/head obj) storing)
@@ -1137,40 +1186,40 @@
                                          (libc/printf " . ")
                                          (do_print obj storing)))
                                   (libc/printf ")")))
-      ((= type <array>)         (let ((len (k/array-length obj)))
+      ((= type k/<array>)       (let ((len (k/array-length obj)))
                                   (libc/printf "Array(")
                                   (for (i 0 len)
                                     (and i (libc/printf " "))
                                     (do_print (k/array-at obj i) storing))
                                   (libc/printf ")")))
-      ((= type <expr>)          (let ()
+      ((= type k/<expr>)        (let ()
                                   (libc/printf "Expr<")
                                   (do_print (k/cadr (get <expr> defn obj)) storing)
                                   (libc/printf ">")))
-      ((= type <form>)          (let ()
+      ((= type k/<form>)        (let ()
                                   (libc/printf "Form<")
                                   (do_print (get <form> function obj) storing)
                                   (libc/printf ",")
                                   (do_print (get <form> symbol   obj) storing)
                                   (libc/printf ">")))
-      ((= type <fixed>)         (let ()
+      ((= type k/<fixed>)       (let ()
                                   (libc/printf "Fixed<")
                                   (do_print (get <fixed> function obj) storing)
                                   (libc/printf ">")))
-      ((= type <subr>)          (libc/printf "Subr<%s>" (get <subr> _name obj)))
-      ((= type <variable>)      (let ((env (get <variable> env obj)))
+      ((= type k/<subr>)        (libc/printf "Subr<%s>" (get <subr> _name obj)))
+      ((= type k/<variable>)    (let ((env (get <variable> env obj)))
                                   (do_print (get <variable> name obj) storing)
                                   (when env
                                     (libc/printf ".")
                                     (do_print (get <env> level env) storing)
                                     (libc/printf "+")
                                     (do_print (get <variable> index obj) storing))))
-      ((= type <env>)           (let ((level (get <env> level obj))
+      ((= type k/<env>)         (let ((level (get <env> level obj))
                                       (bindings (get <env> bindings obj)))
                                   (if (and level bindings)
                                       (libc/printf "Env<%d,%d>" (get/long level) (k/array-length bindings))
                                       (libc/printf "Env<>"))))
-      ((= type <context>)       (let ()
+      ((= type k/<context>)     (let ()
                                   (libc/printf "Context<>")))
       (else                     (libc/printf "<type:%d>" type)))))
 
@@ -1193,10 +1242,12 @@
 (define k/eval) ; forward
 
 (define-function new-<module> ()
-  (gc/let* ((module (new-object <module> (words-to-bytes (size-of-structure <module>))))
+  (debug (libc/printf "new-<module>\n"))
+  (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0)))
     (set (<module>-symbols module)	(new-<array> 0))
     (set (<module>-globals module)	(k/env/define env (intern* "*globals*" module) env))
+    (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
 
 (define-function k/apply-expr (fun arguments ctx)
@@ -1231,16 +1282,26 @@
   (k/assert fun "k/apply: fun is nil")
   (let ((type (get/type fun)))
     (cond
-      ((= type <expr>)		(k/apply-expr fun arguments ctx))
-      ((= type <fixed>)		(k/apply (get <fixed> function fun) arguments ctx))
-      ((= type <subr>)		((get <subr> _imp fun) arguments ctx))
+      ((= type k/<expr>)	(k/apply-expr fun arguments ctx))
+      ((= type k/<fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
+      ((= type k/<subr>)
+       (let ((imp (get <subr> _imp fun)))
+         ;; TODO FIXME ((get <subr> _imp fun) arguments ctx) it should/could be this, but without using a local var it gets miscompiled
+         ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
+         ;; +	movl	_25type_check, %eax
+         ;; +	movl	36(%esp), %ecx
+         ;; +	movl	%ecx, 8(%esp)
+         ;; +	movl	40(%esp), %ecx
+         ;; +	movl	%ecx, 12(%esp)
+         ;; +	call	*%eax
+         (imp arguments ctx)))
       (else			(let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
 				  (if ap
 				      (let ((args arguments))
 					(gc/protect (args)
 					  (set args (new-<pair> fun args))
 					  (k/apply ap args ctx)))
-				    (k/error "cannot apply: " fun)))))))
+				      (k/error "cannot apply: " fun)))))))
 
 ;;; ----------------------------------------------------------------
 
@@ -1390,10 +1451,10 @@
   (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
   (let ((type (get/type exp)))
     (cond
-      ((= type <undefined>)	exp)
-      ((= type <long>)		exp)
-      ((= type <string>)	exp)
-      ((= type <variable>)	(if (global-variable? exp)
+      ((= type k/<undefined>)	exp)
+      ((= type k/<long>)	exp)
+      ((= type k/<string>)	exp)
+      ((= type k/<variable>)	(if (global-variable? exp)
 				    (get <variable> value exp)
 				  (let ((delta (- (get/long (get <env> level (get <context>  env ctx)))
 					      (get/long (get <env> level (get <variable> env exp))))))
@@ -1401,7 +1462,7 @@
 				      (set ctx (get <context> home ctx))
 				      (set delta (- delta 1)))
 				    (k/array-at (get <context> bindings ctx) (get/long (get <variable> index exp))))))
-      ((= type <pair>)		(let ((raw-head (get/head exp)))
+      ((= type k/<pair>)	(let ((raw-head (get/head exp)))
                                   (debug (libc/printf "k/eval of pair, raw-head (of type %d) is " (get/type raw-head)) (k/dumpln raw-head))
 				  (gc/let* ((head (k/eval raw-head ctx)))
                                     (debug (libc/printf "k/eval of pair, head eval'ed to ") (k/dumpln head))
@@ -1415,7 +1476,7 @@
 				    (set *backtrace-index* (- *backtrace-index* 1))
                                     (debug (libc/printf "k/eval of pair, returning with head ") (k/dumpln head))
 				    head)))
-      ((= type <symbol>)	(k/error "symbol in eval?")) ;; TODO xxx
+      ((= type k/<symbol>)	(k/error "symbol in eval?")) ;; TODO xxx
       (else			(let ((ev (k/array-at (get/variable-value var/*evaluators*) (get/type exp))))
 				  (and ev
 				       (let ((args (new-<pair> exp ())))
@@ -1650,8 +1711,8 @@
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type <long>)          (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)        (and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
+      ((= type k/<long>)        (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type k/<string>)      (and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
       (else                     (and (= lhs rhs) symbol/t)))))
 
 (define-subr (!= 2)
@@ -1659,8 +1720,8 @@
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type <long>)          (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)        (and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
+      ((= type k/<long>)        (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type k/<string>)      (and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
       (else                     (and (!= lhs rhs) symbol/t)))))
 
 (define-subr (abort 0)
@@ -1706,10 +1767,10 @@
           (typ (get/type oarg))
           (arg ()))
       (cond
-        ((= typ <undefined>))
-        ((= typ <long>)		(set arg (get/long oarg)))
-        ((= typ <string>)	(set arg (get/string oarg)))
-        ((= typ <symbol>)	(set arg (get/symbol oarg)))
+        ((= typ k/<undefined>))
+        ((= typ k/<long>)	(set arg (get/long oarg)))
+        ((= typ k/<string>)	(set arg (get/string oarg)))
+        ((= typ k/<symbol>)	(set arg (get/symbol oarg)))
         (else			(set arg oarg)))
       (let ((size 100)
             (p)
@@ -1748,9 +1809,9 @@
     (let* ((arg  (get/head -args-))
            (type (get/type arg)))
       (cond
-        ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
-        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
-        ((= type <long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
+        ((= type k/<string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
+        ((= type k/<symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
+        ((= type k/<long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
         (else
          ;; TODO
          (libc/fprintf libc/stderr "<unable to print {%p} of type %d>" arg type))))
@@ -1783,7 +1844,7 @@
         (size (get/head (get/tail -args-))))
     (safety 1 (k/assert (is/long type) "allocate: invalid type "type))
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
-    (new-object (get/long type) (get/long size))))
+    (%new-object (get/long type) (words-to-bytes (get/long size)))))
 
 (define-subr (type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
 (define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/t))
@@ -2031,8 +2092,8 @@
 
   (debug (libc/printf "gc initialized\n"))
 
-  (k/assert (= <long> (get/type (new-<long> 42))) "get/type for <long> is broken")
-  (k/assert (= 42     (get/long (new-<long> 42))) "get/long is broken")
+  (k/assert (= k/<long> (get/type (new-<long> 42))) "get/type for <long> is broken")
+  (k/assert (= 42       (get/long (new-<long> 42))) "get/long is broken")
 
   (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
   (gc/push-root (address-of k/+done+))
