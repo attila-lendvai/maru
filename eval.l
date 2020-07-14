@@ -8,7 +8,8 @@
 ;;
 ;; you can enable safety and debugging features here
 ;;
-(define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "assertion failed")))))
+;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
+(define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
 ;(define-form debug		prog		`(let () ,@prog))
 ;(define-form debug/identities	prog		`(let () ,@prog))
 ;(define-form gc/debug		prog		`(let () ,@prog))
@@ -68,7 +69,8 @@
 ;;;
 ;;; Implementation details:
 ;;;
-;;;  - () is the false value, and is mapped to 0 in the target. Its type is the <undefined> type.
+;;;  - () is the false value, and is mapped to 0 in the target. Its type is the <undefined> type,
+;;;    which is denoted in the target by some integer assigned as per the type definition order.
 ;;;
 
 (define-constant target-word-size/bits	32)
@@ -384,14 +386,16 @@
       (while
         (let ()
           (gc/debug (libc/printf "alloc? %d %p %p [%p] %d >= %d %d\n" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) requested-size (<= requested-size (<header>-size chunk))))
-          (when (= 0 (<header>-flags chunk))
+          (when (= 0 (<header>-flags chunk)) ;; i.e. free chunk
             (let ((chunk-size (<header>-size chunk)))
               (while (and (= 0 (<header>-flags (<header>-next chunk)))
                           (= (<header>-next chunk) (+ chunk (+ size-of-<header> chunk-size))))
+                ;; merge all consecutive free chunks
                 (let ((next (<header>-next chunk)))
                   (set (<header>-next chunk) (<header>-next next))
                   (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ size-of-<header> (<header>-size next)))))
                   (and (= next gc/memory-last) (set gc/memory-last chunk))))
+              ;; TODO ? total-size includes the header while chunk-size is only the size of the payload space
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk
                 (gc/debug (libc/printf "chunk-size %d\n" chunk-size))
@@ -548,6 +552,7 @@
          (header (header-of obj)))
     (k/assert (aligned-to-oop? obj) "new-object: gc/allocate returned not aligned-to-oop? {%p}\n" obj)
     (set (<header>-type header) type)
+    (debug (libc/printf "new-object returning %p\n" obj))
     obj))
 
 (define-function new-object/opaque (type bytesize)
@@ -1169,7 +1174,7 @@
                                   (libc/printf "Context<>")))
       (else                     (libc/printf "<type:%d>" type)))))
 
-(set k/print (lambda (obj) (do_print obj 0)))
+(set k/print (lambda (obj) (do_print obj target-boolean/false)))
 (define-function k/println	(obj) (do_print obj target-boolean/false) (libc/printf "\n"))
 
 (define-function k/dump		(obj) (do_print obj target-boolean/true))
@@ -1784,7 +1789,7 @@
 (define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/t))
 (define-subr (symbol? 1) (and (is <symbol> (k/car -args-)) symbol/t))
 (define-subr (pair? 1)   (and (is <pair>   (k/car -args-)) symbol/t))
-(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/t))
+(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/t)) ; TODO move to boot.l?
 (define-subr (car 1)     (k/car (k/car -args-)))
 (define-subr (cdr 1)     (k/cdr (k/car -args-)))
 
@@ -2038,6 +2043,8 @@
   (gc/push-root (address-of fixed-subr/lambda))
   (gc/push-root (address-of fixed-subr/let))
   (gc/push-root (address-of fixed-subr/define))
+
+  (debug (libc/printf "initializing *module*\n"))
 
   (set *module* (new-<module>))
 

@@ -156,8 +156,7 @@
 (define-form assert (test . args)
   (unless args
     (set args (list "assertion failed: " `(quote ,test))))
-  `(unless ,test
-     (error ,@args)))
+  `(or ,test (error ,@args)))
 
 (define-form define-constant (name value)
   `(define ,name (form () (lambda args ,value))))
@@ -332,6 +331,77 @@
                ,(%cond (cdr clauses))))))))
 
 (define-form cond clauses (%cond clauses))
+
+;;; basic iteration
+
+(define-form for (var-init-limit-step . body)
+  (let ((var       (car    var-init-limit-step)    )
+        (init      (cadr   var-init-limit-step)    )
+        (limit     (caddr  var-init-limit-step)    )
+        (step  (or (cadddr var-init-limit-step) 1)))
+    `(let ((,var ,init) (_limit_ ,limit))
+       (while (< ,var _limit_)
+         ,@body
+         (set ,var (+ ,var ,step))))))
+
+(define-form list-do (var list . body)
+  `(let ((_list_ ,list))
+     (while _list_
+       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
+       (set _list_ (cdr _list_)))))
+
+(define-function %generic-do (get len var col body)
+  `(let* ((_col_ ,col)
+          (_idx_ 0)
+          (_end_ (,len _col_)))
+     (while (< _idx_ _end_)
+       (let* ((,var (,get _col_ _idx_))) ,@body)
+       (set _idx_ (+ _idx_ 1)))))
+
+(define-form array-do	(var arr . body)	(%generic-do array-at  array-length  var arr body))
+(define-form string-do	(var str . body)	(%generic-do string-at string-length var str body))
+
+(define-form until (condition . body)
+  `(while (not ,condition) ,@body))
+
+(define-form list-detect (name list expr)
+  `(let ((_ ())
+         (__ ,list))
+     (while (and __ (not _))
+       (let* ((,name (car __)))
+         (and ,expr (set _ (car __)))
+         (set __ (cdr __))))
+     _))
+
+(define-form array-detect (name arr expr)
+  `(let* ((_ ())
+          (_a ,arr)
+          (_l (array-length _a)))
+     (for (_i 0 _l)
+       (let ((,name (array-at _a _i)))
+         (and ,expr (let () (set _ ,name) (set _i _l)))))
+     _))
+
+;; TODO use key-var value-var instead?
+;; (define-form alist-do (var alist . body)
+;;   `(let ((_list_ ,alist))
+;;      (while _list_
+;;        (let*  ((,var (cdar _list_))) ,@body)
+;;        (set _list_ (cdr _list_)))))
+
+;;; structural equality
+
+(define equal ()) ;; forward
+
+(define-function equal-lists (a b)
+  (and (equal (car a) (car b))
+       (equal (cdr a) (cdr b))))
+
+(set equal (lambda (a b)
+  (or (= a b)
+      (and (pair? a)
+           (pair? b)
+           (equal-lists a b)))))
 
 ;;; type information
 
@@ -849,41 +919,7 @@
 (define-method set-at <string> (index value)	(set-string-at self index value))
 (define-method set-at <array> (index value)	(set-array-at self index value))
 
-;;; iteration
-
-(define-form for (var-init-limit-step . body)
-  (let ((var       (car    var-init-limit-step)    )
-        (init      (cadr   var-init-limit-step)    )
-        (limit     (caddr  var-init-limit-step)    )
-        (step  (or (cadddr var-init-limit-step) 1)))
-    `(let ((,var ,init) (_limit_ ,limit))
-       (while (< ,var _limit_)
-         ,@body
-         (set ,var (+ ,var ,step))))))
-
-(define-form list-do (var list . body)
-  `(let ((_list_ ,list))
-     (while _list_
-       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
-       (set _list_ (cdr _list_)))))
-
-(define-form alist-do (var alist . body)
-  `(let ((_list_ ,alist))
-     (while _list_
-       (let*  ((,var (cdar _list_))) ,@body)
-       (set _list_ (cdr _list_)))))
-
-(define-function %generic-do (get len var col body)
-  `(let* ((_col_ ,col)
-          (_idx_ 0)
-          (_end_ (,len _col_)))
-     (while (< _idx_ _end_)
-       (let* ((,var (,get _col_ _idx_))) ,@body)
-       (set _idx_ (+ _idx_ 1)))))
-
-(define-form array-do (var arr . body)	(%generic-do array-at array-length var arr body))
-
-(define-form string-do (var str . body)	(%generic-do string-at string-length var str body))
+;;; generic iteration
 
 (define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
 (define-method for-each <array>  (function)	(array-do  _elt_ self (function _elt_)))
@@ -891,27 +927,6 @@
 
 (define-function for-each-with (collection function value)
   (for-each collection (lambda (x) (function x value))))
-
-(define-form until (condition . body)
-  `(while (not ,condition) ,@body))
-
-(define-form list-detect (name list expr)
-  `(let ((_ ())
-         (__ ,list))
-     (while (and __ (not _))
-       (let* ((,name (car __)))
-         (and ,expr (set _ (car __)))
-         (set __ (cdr __))))
-     _))
-
-(define-form array-detect (name arr expr)
-  `(let* ((_ ())
-          (_a ,arr)
-          (_l (array-length _a)))
-     (for (_i 0 _l)
-       (let ((,name (array-at _a _i)))
-         (and ,expr (let () (set _ ,name) (set _i _l)))))
-     _))
 
 (define-function %loop-inits (bindings)
   (and bindings
@@ -1050,20 +1065,6 @@
 
 (define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
 (define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
-
-;;; structural equality
-
-(define equal ()) ;; forward
-
-(define-function equal-lists (a b)
-  (and (equal (car a) (car b))
-       (equal (cdr a) (cdr b))))
-
-(set equal (lambda (a b)
-  (or (= a b)
-      (and (pair? a)
-           (pair? b)
-           (equal-lists a b)))))
 
 ;;; unit testing
 
