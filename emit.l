@@ -651,13 +651,15 @@
 ;;;
 (switch-to-slave-module)
 
-(define-function compile-begin ()
-  (set *globals* (eval-in-module host `(host:environment ,*globals*))))
+(define-form compile-begin ()
+  (set *force-trivial-accessors* 't)
+  `(set *globals* (eval-in-module host `(host:environment ,*globals*))))
 
-(define-function compile-end ()
-  (let ((env *globals*))
-    (set *globals* (eval-in-module host `(host:<env>-parent ,env)))
-    (eval-in-module host `(host:gen-env (host:quote ,env)))))
+(define-form compile-end ()
+  (set *force-trivial-accessors* ())
+  '(let ((env *globals*))
+     (set *globals* (eval-in-module host `(host:<env>-parent ,env)))
+     (eval-in-module host `(host:gen-env (host:quote ,env)))))
 
 (define-form define-externs args
   `(let ()

@@ -421,7 +421,7 @@
              (type-of object)" "(type-name-of object)))
   object)
 
-(define *force-bootstrap-structure-accessors* '()) ; expand only an oop-at, which is directly understood by the compiler
+(define *force-trivial-accessors* '()) ; expand only an oop-at, which is directly understood by the compiler
 
 (define-function %accessor (name)
   ;; KLUDGE? TODO understand and reinstate?
@@ -437,7 +437,7 @@
     (let ((field-name (car fields)))
       (cons `(define-form ,(concat-symbol name (concat-symbol '- field-name)) (self)
                (list ',(%accessor field-name)
-                     (if *force-bootstrap-structure-accessors*
+                     (if *force-trivial-accessors*
                          self
                        (list '%typecheck ',name '',field-name self))
                      ,offset))
