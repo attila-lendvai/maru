@@ -907,6 +907,13 @@
             (print " ")))
       (print ")"))))
 
+(define-method do-print <array> ()
+  (print "Array(")
+  (for (i 0 (array-length self))
+    (when (< 0 i) (print " "))
+    (print (array-at self i)))
+  (print ")"))
+
 (define-function dump-until (target arg)
   (let ((found (= target arg)))
     (if (pair? arg)
