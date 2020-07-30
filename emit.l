@@ -17,12 +17,15 @@
 ;;;     go astray because "foo" will be emitted as a null terminated string of
 ;;;     ascii bytes (instead of a Maru object of type <string>).
 ;;;   - probaby more
-;;;   - see the globals 'operators' and 'forms' for the list of specially
+;;;   - see +special-operators+ and +special-forms+ for the list of specially
 ;;;     handled constructs
 ;;;
 ;;; Naming:
-;;;   - EMIT: directly emits into the output stream
-;;;   - GEN: collects instructions into a compiler object for later emission
+;;;   - EMIT: emit instructions into the output stream
+;;;   - GEN:  like EMIT, but collect instructions into a buffer for later emission
+;;;   - -foo- is an implicit var in the lexenv
+;;;   - +foo+ is a constant
+;;;   - *foo* is a global
 
 (switch-to-slave-module)
 
@@ -42,7 +45,7 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
-(define-function align (alignment value)        (& (- alignment) (+ (- alignment 1) value )))
+(define-function align (alignment value)        (& (- alignment) (+ (- alignment 1) value)))
 
 (define-form slave-value (form)
   `(eval-in-module slave ',form))
@@ -89,9 +92,11 @@
 
 ;;; DEFINE-EMIT
 
-(define-generic emit op-args
-  ;; EMIT directly emits into the output stream (c.f. with GEN that records)
-  (error "no emit defined for: " op-args))
+(define-form emit args
+  `(emit-instruction ,@args))
+
+(define-generic emit-instruction op-args
+  (error "no emit-instruction defined for: " op-args))
 
 (define-function %define-emit-param-name (index)
   (string->symbol (concat-string "$" (long->string index))))
@@ -107,7 +112,7 @@
     `(let ()
        ,@(unless (defined? op-name)
            `((define-instruction ,op-name)))
-       (define-multimethod emit ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
+       (define-multimethod emit-instruction ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
          ,@body))))
 
 (define-function mangle-label (name)
@@ -118,7 +123,7 @@
          (outdex  0)
          (putnext (lambda (c)
                     (set-array-at mangled outdex c)
-                    (set outdex (+ outdex 1))))
+                    (incr outdex)))
          (digit-for (lambda (c)
                       (if (< c 10)
                           (+ c ?0)
@@ -137,14 +142,14 @@
            (putnext ?_)
            (putnext (digit-for (>> c  4)))
            (putnext (digit-for (&  c 15))))))
-      (set index (+ 1 index)))
+      (incr index))
     (array->string mangled)))
 
 ;;; IA32 -- OPERANDS
 
 (let ((counter 0))
   (define-function temp-label-name ()
-    (concat-string "L_" (long->string (set counter (+ counter 1))))))
+    (concat-string "L_" (long->string (incr counter)))))
 
 (define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
 ;; global, literal, and temp pointers
@@ -292,6 +297,17 @@
     (set (<compiler>-gen-buffer-index	self) 0)
     self))
 
+(define-function %save-into-gen-buffer (-c- . args)
+  (set-array-at (<compiler>-gen-buffer -c-) (<compiler>-gen-buffer-index -c-) args)
+  (incr (<compiler>-gen-buffer-index -c-)))
+
+(define-form gen args
+  `(%save-into-gen-buffer -c- ,@args))
+
+(define-function emit-gen-buffer (-c-)
+  (for (i 0 (<compiler>-gen-buffer-index -c-))
+    (apply emit-instruction (array-at (<compiler>-gen-buffer -c-) i))))
+
 (define-function new-param (comp)
   (let* ((i (<compiler>-param-counter comp))
          (t (TI32 i)))
@@ -324,84 +340,68 @@
 (define-function free-temp (comp temp)          (push (<compiler>-temps comp) temp))
 (define-function free-temps (comp temps)        (list-do temp temps (free-temp comp temp)))
 
-;;; GEN
+;;; COMPILE
 
-(define-selector gen)
+(define-form comp (obj)
+  `(compile ,obj -c-))
 
-(define-method gen <compiler> args
-  ;; GEN collects the instructions to be EMIT'ed at a later time
-  ;;(print "## insn ") (dumpln args)
-  (set-array-at (<compiler>-gen-buffer self) (<compiler>-gen-buffer-index self) args)
-  (set (<compiler>-gen-buffer-index self) (+ 1 (<compiler>-gen-buffer-index self))))
+(define-selector compile)
 
-(define-function emit-gen-buffer (comp)
-  (for (i 0 (<compiler>-gen-buffer-index comp))
-    (apply emit (array-at (<compiler>-gen-buffer comp) i))))
+(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 0)))
+(define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
-(define-method gen <undefined>  (comp)  (gen comp LOAD (LI32 0)))
-(define-method gen <long>       (comp)  (gen comp LOAD (LI32 self)))
-
-(define-method gen <variable> (comp)
+(define-method compile <variable> (-c-)
   (let ((value (<variable>-value self)))
     (cond
-      ((temp? value)   (gen comp LOAD value))
-      ((extern? value) (gen comp LOAD (GI32 (LABEL (extern->label value)))))
-      (else            (gen comp LOAD (GI32 (LABEL (<variable>-name self))))))))
+      ((temp? value)   (gen LOAD value))
+      ((extern? value) (gen LOAD (GI32 (LABEL (extern->label value)))))
+      (else            (gen LOAD (GI32 (LABEL (<variable>-name self))))))))
 
-(define-method gen <string> (comp)
+(define-method compile <string> (-c-)
   (let ((label (LABEL (temp-label-name))))
-    (gen comp DATA)
-    (gen comp DEFLABEL label)
-    (gen comp ASCIZ self)
-    (gen comp TEXT)
-    (gen comp LOAD label)))
+    (gen DATA)
+    (gen DEFLABEL label)
+    (gen ASCIZ self)
+    (gen TEXT)
+    (gen LOAD label)))
 
-(define-function gen-prog-into-temp (prog comp)
-  (assert (pair? prog) "gen-prog-into-temp: prog is empty") ; against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
+(define-function compile/prog-into-temp (prog -c-)
+  (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   (while (pair? prog)
-    (gen (car prog) comp)
+    (comp (car prog))
     (set prog (cdr prog)))
-  (let ((temp (alloc-temp comp)))
-    (gen comp STORE temp)
+  (let ((temp (alloc-temp -c-)))
+    (gen STORE temp)
     temp))
 
-(define-function gen-expr-into-temp (expr comp)
-  (gen expr comp)
-  (let ((temp (alloc-temp comp)))
-    (gen comp STORE temp)
+(define-function compile/expr-into-temp (expr -c-)
+  (comp expr)
+  (let ((temp (alloc-temp -c-)))
+    (gen STORE temp)
     temp))
 
-(define-function gen-arg (expr comp)
-  (new-arg comp))
+(define-function compile/unary-operator (op args -c-)
+  (comp (car args))
+  (gen op))
 
-(define-function gen-move (a b comp)
-  (gen comp MOVE a b))
+(define-function compile/binary-operator (op args -c-)
+  (let ((tmp (compile/expr-into-temp (cadr args) -c-)))
+    (comp (car args))
+    (free-temp -c- tmp)
+    (gen op tmp)))
 
-(define-function generate-nullary (op args comp)
-  (gen comp op))
+(define-function compile/ternary-operator (op args -c-)
+  (let ((tmp2 (compile/expr-into-temp (caddr args) -c-))
+        (tmp1 (compile/expr-into-temp (cadr  args) -c-)))
+    (comp (car args))
+    (free-temp -c- tmp1)
+    (free-temp -c- tmp2)
+    (gen op tmp1 tmp2)))
 
-(define-function generate-unary (op args comp)
-  (gen (car args) comp)
-  (gen comp op))
-
-(define-function generate-binary (op args comp)
-  (let ((tmp (gen-expr-into-temp (cadr args) comp)))
-    (gen (car  args) comp)
-    (free-temp comp tmp)
-    (gen comp op tmp)))
-
-(define-function generate-ternary (op args comp)
-  (let ((tmp2 (gen-expr-into-temp (caddr args) comp))
-        (tmp1 (gen-expr-into-temp (cadr  args) comp)))
-    (gen (car  args) comp)
-    (free-temp comp tmp1)
-    (free-temp comp tmp2)
-    (gen comp op tmp1 tmp2)))
-
-(define generators (list->array (list generate-nullary generate-unary generate-binary generate-ternary)))
+(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
 ;; a vector of assoc lists indexed by operator arity
-(define operators
+(define +special-operators+
     (let ((table
            `(;; nullary
              ()
@@ -430,7 +430,7 @@
                    arity-line))
             table))))
 
-(define-function gen-let-binding (binding comp)
+(define-function compile/let-binding (binding comp)
   ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
   ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
   (unless (pair? binding)
@@ -438,101 +438,105 @@
   (unless (cdr binding)
     (set binding (list (car binding) ())))
   (let ((var (car binding))
-        (tmp (gen-prog-into-temp (cdr binding) comp)))
-    (assert (= (type-of var) <variable>) "gen-let-binding: encountered a non-variable: " var)
+        (tmp (compile/prog-into-temp (cdr binding) comp)))
+    (assert (= (type-of var) <variable>) "compile/let-binding: encountered a non-variable: " var)
     (set (<variable>-value var) tmp)))
 
-(define-function gen-let (expr comp)
-  (let ((temps (map-with gen-let-binding (caddr expr) comp)))
-    (list-do stmt (cdddr expr) (gen stmt comp))
-    (list-do temp temps (free-temp comp temp))))
+(define-function compile/let (expr -c-)
+  (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
+    (list-do stmt (cdddr expr)
+      (comp stmt))
+    (list-do temp temps
+      (free-temp -c- temp))))
 
-(define-function gen-and (expr comp)
+(define-function compile/and (expr -c-)
   (let ((done (LABEL (temp-label-name))))
     (set expr (cdr expr))
     (while expr
-      (gen (car expr) comp)
-      (and (set expr (cdr expr)) (gen comp BF done)))
-    (gen comp DEFLABEL done)))
+      (comp (car expr))
+      (and (set expr (cdr expr)) (gen BF done)))
+    (gen DEFLABEL done)))
 
-(define-function gen-or (expr comp)
+(define-function compile/or (expr -c-)
   (let ((done (LABEL (temp-label-name))))
     (set expr (cdr expr))
     (while expr
-      (gen (car expr) comp)
-      (and (set expr (cdr expr)) (gen comp BT done)))
-    (gen comp DEFLABEL done)))
+      (comp (car expr))
+      (and (set expr (cdr expr)) (gen BT done)))
+    (gen DEFLABEL done)))
 
-(define-function gen-if (expr comp)
+(define-function compile/if (expr -c-)
   (let ((a (LABEL (temp-label-name)))
         (b (LABEL (temp-label-name))))
-    (gen (cadr expr) comp)
-    (gen comp BF a)
-    (gen (caddr expr) comp)
-    (gen comp BR b)
-    (gen comp DEFLABEL a)
-    (list-do stmt (cdddr expr) (gen stmt comp))
-    (gen comp DEFLABEL b)))
+    (comp (cadr expr))
+    (gen BF a)
+    (comp (caddr expr))
+    (gen BR b)
+    (gen DEFLABEL a)
+    (list-do stmt (cdddr expr)
+      (comp stmt))
+    (gen DEFLABEL b)))
 
-(define-function gen-while (expr comp)
+(define-function compile/while (expr -c-)
   (let ((body (LABEL (temp-label-name)))
         (test (LABEL (temp-label-name))))
-    (gen comp BR test)
-    (gen comp DEFLABEL body)
+    (gen BR test)
+    (gen DEFLABEL body)
     (list-do stmt (cddr expr)
-      (and stmt (gen stmt comp)))
-    (gen comp DEFLABEL test)
-    (gen (cadr expr) comp)
-    (gen comp BT body)))
+      (and stmt (comp stmt)))
+    (gen DEFLABEL test)
+    (comp (cadr expr))
+    (gen BT body)))
 
-(define-function gen-set (expr comp)
+(define-function compile/set (expr -c-)
   (let* ((var (cadr expr))
          (val (<variable>-value var)))
-    (gen (caddr expr) comp)
+    (comp (caddr expr))
     (cond
-      ((temp? val)   (gen comp STORE val))
-      ((extern? val) (gen comp STORE (GI32 (LABEL (extern->label val))))) ; TODO maybe this shouldn't even be supported?
-      (else          (gen comp STORE (GI32 (LABEL (<variable>-name var))))))))
+      ((temp? val)   (gen STORE val))
+      ((extern? val) (gen STORE (GI32 (LABEL (extern->label val))))) ; TODO maybe this shouldn't even be supported?
+      (else          (gen STORE (GI32 (LABEL (<variable>-name var))))))))
 
-(define-function gen-lambda (expr comp)
+(define-function compile/lambda (expr comp)
   (error "gen: lambda forms are not supported"))
 
-(define-function gen-return (expr comp)
-  (list-do stmt (cdr expr) (gen stmt comp))
-  (gen comp BR (or (<compiler>-epilogue comp) (set (<compiler>-epilogue comp) (LABEL (temp-label-name))))))
+(define-function compile/return (expr -c-)
+  (list-do stmt (cdr expr)
+    (comp stmt))
+  (gen BR (or (<compiler>-epilogue -c-) (set (<compiler>-epilogue -c-) (LABEL (temp-label-name))))))
 
-(define-function gen-address-of (expr comp)
+(define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
     (let ((val (<variable>-value var)))
       (if (temp? val)
-          (gen comp ADDR val)
-        (gen comp ADDR (GI32 (LABEL (<variable>-name var))))))))
+          (gen ADDR val)
+        (gen ADDR (GI32 (LABEL (<variable>-name var))))))))
 
-(define forms (list
-  (cons (slave-value slave:let)            gen-let)
-  (cons (slave-value slave:and)            gen-and)
-  (cons (slave-value slave:or)             gen-or)
-  (cons (slave-value slave:if)             gen-if)
-  (cons (slave-value slave:while)          gen-while)
-  (cons (slave-value slave:set)            gen-set)
-  (cons (slave-value slave:lambda)         gen-lambda)
-  (cons (slave-value slave:return)         gen-return)
-  (cons (slave-value slave:address-of)     gen-address-of)))
+(define +special-forms+ (list
+  (cons (slave-value slave:let)            compile/let)
+  (cons (slave-value slave:and)            compile/and)
+  (cons (slave-value slave:or)             compile/or)
+  (cons (slave-value slave:if)             compile/if)
+  (cons (slave-value slave:while)          compile/while)
+  (cons (slave-value slave:set)            compile/set)
+  (cons (slave-value slave:lambda)         compile/lambda)
+  (cons (slave-value slave:return)         compile/return)
+  (cons (slave-value slave:address-of)     compile/address-of)))
 
-(define-method gen <pair> (comp)
+(define-method compile <pair> (-c-)
   (let* ((fn-name (car self))
          (args    (cdr self))
          (arity   (list-length args))
          (op      (and (variable? fn-name)
-                       (cadr (assq (<variable>-value fn-name) (array-at operators arity))))))
+                       (cadr (assq (<variable>-value fn-name) (array-at +special-operators+ arity))))))
     (if op
-        ((array-at generators arity) op args comp)
-      (if (set op (cdr (assq fn-name forms)))
-          (op self comp)
-        (let* ((tmp-locs (map-with gen-expr-into-temp args comp))
-               (arg-locs (map-with gen-arg args comp))
-               ;;(op       (cdr (assq fn-name (<compiler>-env comp))))
+        ((array-at +operator-compilers+ arity) op args -c-)
+      (if (set op (cdr (assq fn-name +special-forms+)))
+          (op self -c-)
+        (let* ((tmp-locs (map-with compile/expr-into-temp args -c-))
+               (arg-locs (map (lambda (_) (new-arg -c-)) args))
+               ;;(op       (cdr (assq fn-name (<compiler>-env -c-))))
                ;;(op-type  (type-of op))
                )
           ;; TODO this is useful, reinstate
@@ -546,107 +550,107 @@
           ;;             (error "gen: calling " op
           ;;                    " with the wrong number of arguments: " args
           ;;                    ", expecting " nparam))))))
-          (gen fn-name comp)
-          (map2-with gen-move tmp-locs arg-locs comp)
-          (free-temps comp tmp-locs)
-          (free-args  comp arg-locs)
-          (gen comp CALL arity))))))
+          (comp fn-name)
+          (map (lambda (a b) (gen MOVE a b)) tmp-locs arg-locs)
+          (free-temps -c- tmp-locs)
+          (free-args  -c- arg-locs)
+          (gen CALL arity))))))
 
-;;; GEN-DEFINITION
+;;; COMPILE-DEFINITION
 
-(define-selector gen-definition)
+(define-selector compile-definition)
 
-(define-method gen-definition <undefined> (name comp)
-  (gen-definition 0 name comp))
+(define-method compile-definition <undefined> (name comp)
+  (compile-definition 0 name comp))
 
-(define-method gen-definition <type> (name comp)
-  ;; let's ignore define-record's inside begin-compile and end-compile
+(define-method compile-definition <type> (name comp)
+  ;; type definitions produce no level-shifted artifacts
   )
 
-(define-method gen-definition <long> (name comp)
-  (gen comp DATA)
-  (gen comp DEFLABEL (LABEL name))
-  (gen comp LONG self)
-  (gen comp TEXT))
+(define-method compile-definition <long> (name -c-)
+  (gen DATA)
+  (gen DEFLABEL (LABEL name))
+  (gen LONG self)
+  (gen TEXT))
 
-;; (define-method gen-definition <string> (name comp)
+;; (define-method compile-definition <string> (name -c-)
 ;;   (let ((temp (LABEL (temp-label-name))))
-;;     (gen comp DATA)
-;;     (gen comp DEFLABEL temp)
-;;     (gen comp ASCIZ self)
-;;     (gen comp ALIGN 4)
-;;     (gen comp DEFLABEL (LABEL name))
-;;     (gen comp LONG temp)
-;;     (gen comp TEXT)))
+;;     (gen DATA)
+;;     (gen DEFLABEL temp)
+;;     (gen ASCIZ self)
+;;     (gen ALIGN 4)
+;;     (gen DEFLABEL (LABEL name))
+;;     (gen LONG temp)
+;;     (gen TEXT)))
 
-(define-method gen-definition <extern> (name comp)
+(define-method compile-definition <extern> (name -c-)
   (let ((extern-label (LABEL self.name))
         (our-label    (LABEL (extern->label self))))
     (if __MACH__
         (let ()
-          (gen comp SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-          (gen comp DEFLABEL our-label)
-          (gen comp INDIRECT extern-label)
-          (gen comp LONG 0)
-          (gen comp TEXT))
-      (gen comp DATA)
-      (gen comp DEFLABEL our-label)
-      (gen comp LONG extern-label)
-      (gen comp TEXT))))
+          (gen SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
+          (gen DEFLABEL our-label)
+          (gen INDIRECT extern-label)
+          (gen LONG 0)
+          (gen TEXT))
+      (gen DATA)
+      (gen DEFLABEL our-label)
+      (gen LONG extern-label)
+      (gen TEXT))))
 
-(define-method gen-definition <form> (name comp)
-  (gen comp COMMENT (list "form "name)))
+(define-method compile-definition <form> (name -c-)
+  (gen COMMENT (list "form "name)))
 
-(define-function gen-param (var comp)
-  (set (<variable>-value var) (new-param comp)))
-
-(define-method gen-definition <expr> (name ocomp)
+(define-method compile-definition <expr> (name parent-comp)
   (let* ((main? (= 'slave:main name))
          (defn (<expr>-defn self))
          (body (cddr defn))
-         (comp (compiler (+ 1 (<compiler>-level ocomp))))
+         (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
-         (params (map-with gen-param (cadr defn) comp)))
+         (init-param (lambda (var)
+                       (set (<variable>-value var) (new-param -c-))))
+         (params (map init-param (cadr defn))))
     (list-do e body
-      (and e (gen e comp)))
-    (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
-           (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
+      (and e (comp e)))
+    (let* ((arg-size (align 16             (<compiler>-arg-limit -c-) ))
+           (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit -c-))))
            (frm-size (align 16 (+ tmp-size 8))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps comp))
+      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
       (emit TEXT)
       (when main?
         (emit GLOBAL entry-label))
       (emit DEFLABEL entry-label)
-      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
+      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit -c-)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
-      (emit-gen-buffer comp)
-      (and (<compiler>-epilogue comp)
-           (emit DEFLABEL (<compiler>-epilogue comp)))
+      (emit-gen-buffer -c-)
+      (and (<compiler>-epilogue -c-)
+           (emit DEFLABEL (<compiler>-epilogue -c-)))
       (emit LEAVE (- frm-size 8)))
     (unless main?
-      (gen ocomp DATA)
-      (gen ocomp GLOBAL (LABEL name))
-      (gen ocomp DEFLABEL (LABEL name))
-      (gen ocomp LONG entry-label)
-      (gen ocomp TEXT))))
+      (let ((-c- parent-comp))
+        (gen DATA)
+        (gen GLOBAL (LABEL name))
+        (gen DEFLABEL (LABEL name))
+        (gen LONG entry-label)
+        (gen TEXT)))))
 
 ;;;
 
-(define-function gen-env (env)
+(define-function compile-env (env)
   (warn "begin compiling\n")
   (let* ((vars  (<env>-bindings env))
-         (comp  (compiler 0))
-         (index (array-length vars)))
-    (while (<= 0 (set index (- index 1)))
+         (index (array-length vars))
+         (-c-  (compiler 0)))
+    (while (<= 0 (decr index))
       (let* ((var (array-at vars index))
              (name  (<variable>-name  var))
              (value (<variable>-value var)))
-        (println "## defn " name)
+        (emit COMMENT (list "defn " name))
         (warn name ", ")
-        (gen-definition value name comp)))
+        (compile-definition value name -c-)))
     (warn "\n")
-    (emit-gen-buffer comp)))
+    (emit-gen-buffer -c-)))
 
 ;;;
 ;;; definitions visible in the slave
@@ -661,7 +665,7 @@
   (set *force-trivial-accessors* ())
   '(let ((env *globals*))
      (set *globals* (eval-in-module host `(host:<env>-parent ,env)))
-     (eval-in-module host `(host:gen-env (host:quote ,env)))))
+     (eval-in-module host `(host:compile-env (host:quote ,env)))))
 
 (define-form define-externs args
   `(let ()
