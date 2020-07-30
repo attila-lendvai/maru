@@ -89,11 +89,6 @@
   ;; EMIT directly emits into the output stream (c.f. with GEN that records)
   (error "no emit defined for: " op-args))
 
-(define-multimethod emit ((<pair> program))
-  (while program
-    (apply emit (car program))
-    (set program (cdr program))))
-
 (define-function %define-emit-param-name (index)
   (string->symbol (concat-string "$" (long->string index))))
 
@@ -238,7 +233,6 @@
 (define-emit    (BT LABEL)			(println "	cmpl	$0, %eax")
 						(println "	jne	"$1))
 
-(define-emit    (CALL LABEL)			(println "	call	"$1))
 (define-emit    (CALL long)			(println "	call	*%eax"))
 
 (define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
@@ -278,18 +272,18 @@
 
 ;;;
 
-(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue asm pc section))
+(define-structure <compiler> (env param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue gen-buffer gen-buffer-index))
 
 (define-function compiler (env)
   (let ((self (new <compiler>)))
     (set (<compiler>-env self) env)
-    (set (<compiler>-param-counter self) 0)
-    (set (<compiler>-arg-counter self) 0)
-    (set (<compiler>-arg-limit self) 0)
-    (set (<compiler>-tmp-counter self) 0)
-    (set (<compiler>-tmp-limit self) 0)
-    (set (<compiler>-asm self) (array))
-    (set (<compiler>-pc self) 0)
+    (set (<compiler>-param-counter	self) 0)
+    (set (<compiler>-arg-counter	self) 0)
+    (set (<compiler>-arg-limit		self) 0)
+    (set (<compiler>-tmp-counter	self) 0)
+    (set (<compiler>-tmp-limit		self) 0)
+    (set (<compiler>-gen-buffer		self) (array))
+    (set (<compiler>-gen-buffer-index	self) 0)
     self))
 
 (define-function new-param (comp)
@@ -331,8 +325,12 @@
 (define-method gen <compiler> args
   ;; GEN collects the instructions to be EMIT'ed at a later time
   ;;(print "## insn ") (dumpln args)
-  (set-array-at (<compiler>-asm self) (<compiler>-pc self) args)
-  (set (<compiler>-pc self) (+ 1 (<compiler>-pc self))))
+  (set-array-at (<compiler>-gen-buffer self) (<compiler>-gen-buffer-index self) args)
+  (set (<compiler>-gen-buffer-index self) (+ 1 (<compiler>-gen-buffer-index self))))
+
+(define-function emit-gen-buffer (comp)
+  (for (i 0 (<compiler>-gen-buffer-index comp))
+    (apply emit (array-at (<compiler>-gen-buffer comp) i))))
 
 (define-method gen <undefined>  (comp)  (gen comp LOAD (LI32 0)))
 (define-method gen <long>       (comp)  (gen comp LOAD (LI32 self)))
@@ -473,7 +471,8 @@
         (test (LABEL (temp-label-name))))
     (gen comp BR test)
     (gen comp DEFLABEL body)
-    (list-do stmt (cddr expr) (gen stmt comp))
+    (list-do stmt (cddr expr)
+      (and stmt (gen stmt comp)))
     (gen comp DEFLABEL test)
     (gen (cadr expr) comp)
     (gen comp BT body)))
@@ -558,15 +557,15 @@
   (gen comp LONG self)
   (gen comp TEXT))
 
-(define-method gen-definition <string> (name comp)
-  (let ((temp (LABEL (temp-label-name))))
-    (gen comp DATA)
-    (gen comp DEFLABEL temp)
-    (gen comp ASCIZ self)
-    (gen comp ALIGN 4)
-    (gen comp DEFLABEL (LABEL name))
-    (gen comp LONG temp)
-    (gen comp TEXT)))
+;; (define-method gen-definition <string> (name comp)
+;;   (let ((temp (LABEL (temp-label-name))))
+;;     (gen comp DATA)
+;;     (gen comp DEFLABEL temp)
+;;     (gen comp ASCIZ self)
+;;     (gen comp ALIGN 4)
+;;     (gen comp DEFLABEL (LABEL name))
+;;     (gen comp LONG temp)
+;;     (gen comp TEXT)))
 
 (define-method gen-definition <extern> (name comp)
   (let ((extern-label (LABEL (<extern>-name self)))
@@ -599,7 +598,7 @@
          (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
          (params (map-with gen-param (car defn) comp)))
     (list-do e body
-      (gen e comp))
+      (and e (gen e comp)))
     (let* ((arg-size (align 16             (<compiler>-arg-limit comp) ))
            (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit comp))))
            (frm-size (align 16 (+ 8 tmp-size))))
@@ -611,8 +610,7 @@
       (emit DEFLABEL entry-label)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit comp)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
-      (for (i 0 (<compiler>-pc comp))
-        (apply emit (array-at (<compiler>-asm comp) i)))
+      (emit-gen-buffer comp)
       (and (<compiler>-epilogue comp)
            (emit DEFLABEL (<compiler>-epilogue comp)))
       (emit LEAVE (- frm-size 8)))
@@ -634,7 +632,7 @@
       ;x;(println (<expr>-defn (cdar env)))
       (gen-definition (cdar env) (caar env) comp)
       (set env (cdr env)))
-    (for (i 0 (<compiler>-pc comp)) (apply emit (array-at (<compiler>-asm comp) i)))))
+    (for (i 0 (<compiler>-gen-buffer-index comp)) (apply emit (array-at (<compiler>-gen-buffer comp) i)))))
 
 ;;;
 ;;; definitions visible in the slave
