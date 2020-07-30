@@ -383,7 +383,7 @@
 (define-apply <generic> (self . arguments)
   (let ((method (<generic>-methods self))
         (arg     arguments))
-    (while arg
+    (while (and arg method)
       (set method (array-at method (type-of (car arg))))
       (set arg (cdr arg)))
     (if (and method (not (array? method)))
