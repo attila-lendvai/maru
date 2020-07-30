@@ -2115,6 +2115,6 @@
 
   (libc/fprintf libc/stderr "%d objects in %d bytes, %d free\n" gc/objects-live gc/bytes-used gc/bytes-free)
   (libc/flush-streams)
-  0)
+  (return 0))
 
 (compile-end)
