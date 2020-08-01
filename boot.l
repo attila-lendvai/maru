@@ -182,6 +182,14 @@
           (if a (cdr a) exp))
       exp)))
 
+;;; list
+
+(define-function first	(list)	(car list))
+(define-function second	(list)	(cadr list))
+(define-function third	(list)	(caddr list))
+
+(define-function rest	(list)	(cdr list))
+
 (define-function list-length (list)
   (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)
   (if (pair? list)
@@ -190,6 +198,31 @@
           (set len (+ len 1)))
         len)
     0))
+
+(define-form push (list element)
+  `(set ,list (cons ,element ,list)))
+
+(define-form pop (list)
+  `(let* ((_list_ ,list)
+          (_head_ (car _list_)))
+     (set ,list (cdr _list_))
+     _head_))
+
+(define-function member? (key list)
+  (while (and (pair? list) (!= key (car list)))
+    (set list (cdr list)))
+  (car list))
+
+(define-function list-reverse! (head)
+  (let ((curr head)
+        (prev ())
+        (next ()))
+    (while curr
+      (set next (cdr curr))
+      (set-cdr curr prev)
+      (set prev curr)
+      (set curr next))
+    prev))
 
 (define %list->array
   (lambda (list index)
@@ -278,6 +311,14 @@
       (op (car list) (foldr op value (cdr list)))
     value))
 
+(define-function zip lists
+  (apply map list lists))
+
+(define-function zip-assocs (a b)
+  (if (and (pair? a) (pair? b))
+      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
+    (or a b)))
+
 (define-form define-expand (type args . body)   `(set-array-at *expanders*   ,type (lambda ,args ,@body)))
 (define-form define-encode (type args . body)   `(set-array-at *encoders*    ,type (lambda ,args ,@body)))
 (define-form define-eval   (type args . body)   `(set-array-at *evaluators*  ,type (lambda ,args ,@body)))
@@ -289,9 +330,9 @@
   (if (pair? vars)
       (cons (list (car vars) (list 'car getter))
             (%let*getters (cdr vars) (list 'cdr getter) rest))
-    (if (symbol? vars)
-        (cons (list vars getter) rest)
-      rest)))
+      (if (symbol? vars)
+          (cons (list vars getter) rest)
+          rest)))
 
 (define-function %let*unpack (vars val rest)
     (cons (cons '_%let_values_ val)
@@ -532,8 +573,10 @@
 
 ;;; local syntax
 
-(define-function make-with-form (args-body)
-  (and args-body `(lambda (*env* ,@(car args-body)) ,@(cdr args-body))))
+(define-function make-with-form (args-and-body)
+  (and args-and-body
+       `(lambda (*env* ,@(car args-and-body))
+          ,@(cdr args-and-body))))
 
 (define-form with-forms (bindings . body)
   (let ((env (environment *env*)))
@@ -766,40 +809,6 @@
         (if default
             (apply default arguments)
           (error "no method in "(<generic>-name self)" corresponding to "arguments))))))
-
-;;; list
-
-(define-form push (list element)
-  `(set ,list (cons ,element ,list)))
-
-(define-form pop (list)
-  `(let* ((_list_ ,list) (_head_ (car _list_)))
-     (set ,list (cdr _list_))
-     _head_))
-
-(define-function member? (key list)
-  (while (and (pair? list) (!= key (car list)))
-    (set list (cdr list)))
-  (car list))
-
-(define-function list-reverse! (head)
-  (let ((curr head)
-        (prev ())
-        (next ()))
-    (while curr
-      (set next (cdr curr))
-      (set-cdr curr prev)
-      (set prev curr)
-      (set curr next))
-    prev))
-
-(define-function zip lists
-  (apply map list lists))
-
-(define-function zip-assocs (a b)
-  (if (and (pair? a) (pair? b))
-      (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
-    (or a b)))
 
 ;;; iteration
 
