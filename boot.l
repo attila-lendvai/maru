@@ -345,6 +345,10 @@
        (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
        (set _list_ (cdr _list_)))))
 
+(define-form times-do (count . body)
+  `(for (__i__ 0 ,count)
+     ,@body))
+
 (define-function %generic-do (get len var col body)
   `(let* ((_col_ ,col)
           (_idx_ 0)
