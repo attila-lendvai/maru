@@ -631,17 +631,17 @@
 
 (define print
   (lambda args
-    (while (pair? args)
-      (do-print (car args))
-      (set args (cdr args)))
+    (let ((l args))
+      (while (pair? l)
+        (do-print (pop l))))
     (car args)))
 
 (define dump
   (lambda args
-    (while (pair? args)
-      (do-dump (car args))
-      (set args (cdr args)))
-    (car args)))
+    (let ((l args))
+      (while (pair? l)
+        (do-dump (pop l)))
+      (car args))))
 
 (define println
   (lambda args
