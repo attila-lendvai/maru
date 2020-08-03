@@ -1404,6 +1404,7 @@
             ;; TODO this fails while expanding a branch that is _not_ taken at the end at runtime
 	    ((= head fixed-subr/set)	(let ((var (k/env/lookup-variable env (k/car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
+                                          (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
 	    ((!= head fixed-subr/quote)	(set tail (enlist tail env))))
@@ -1775,7 +1776,8 @@
       (let ((size 100)
             (p)
             (np))
-        (or (set p (libc/malloc size) (return "out of memory")))
+        (or (set p (libc/malloc size))
+            (return "out of memory"))
         (while 1
           (let ((n (libc/snprintf p size fmt arg)))
             (and (<= 0 n) (< n size)
