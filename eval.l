@@ -1483,7 +1483,7 @@
       (set lst (get/tail lst))
       (set count (- count 1)))
     (or (and (= 0 count) (not lst))
-        (k/error "Operator '" op "' expected "arity" argument, got: " args))))
+        (k/error "Operator '" op "' called with the wrong number of arguments: " args))))
 
 (define-subr (define () fixed)
   (let ((var (k/car -args-)))
