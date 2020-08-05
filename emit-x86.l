@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; This is a compiler that targets static IA-32, aka x86 assembly, using the gcc toolchain.
+;;; This is a compiler that emits IA-32 text, aka x86 assembly, using the gcc toolchain.
 ;;;
 ;;; Status: it should successfully compile eval.l into eval.s,
 ;;; that in turn can be compiled by the gcc toolchain into an executable eval binary.
@@ -27,13 +27,6 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(switch-to-slave-module)
-
-(define return      (fixed (lambda args (error "(return) encountered in interpreted code"))))
-(define address-of  (fixed (lambda args (error "(address-of) encountered in interpreted code"))))
-
-(switch-to-host-module)
-
 (define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
 (define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
 (define __LINUX__ '(X)) ; non-nil for Linux, Cygwin, etc. (external symbols have no underscore prefix)
@@ -42,28 +35,11 @@
 
 (define __PREFIX__ (if __LINUX__ "" "_"))
 
-(define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
-(define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
+(let ((word-size (slave-value slave:target-word-size/bits)))
+  (unless (= 32 word-size)
+    (error "The x86 compiler backend doesn't support target word size " word-size)))
 
 (define-function align (alignment value)        (& (- alignment) (+ (- alignment 1) value)))
-
-(define-form slave-value (form)
-  `(eval-in-module slave ',form))
-
-;;; EXTERN
-
-(define-record <extern> () (name stub))
-
-(define-function extern (name)
-  (assert (= <string> (type-of name)) "extern called with a non-string: " name)
-  (let ((self (new <extern>)))
-    (set (<extern>-name self) name)
-    self))
-
-(define-function extern? (obj) (= <extern> (type-of obj)))
-
-(define-function extern->label (extern)
-  (concat-symbol (<extern>-name extern) '_stub))
 
 ;;; DEFINE-OPERAND
 
@@ -147,15 +123,14 @@
 
 ;;; IA32 -- OPERANDS
 
-(let ((counter 0))
-  (define-function temp-label-name ()
-    (concat-string "L_" (long->string (incr counter)))))
-
 (define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
 ;; global, literal, and temp pointers
 (define-operand GI32 (name)     (<GI32>-name self))
 (define-operand LI32 (value)    (<LI32>-value self))
 (define-operand TI32 (offset)   (<TI32>-offset self)"(%esp)")
+
+(define-function UNIQUE-LABEL ()
+  (LABEL (unique-name "L_")))
 
 (define-function temp? (obj)    (= <TI32> (type-of obj)))
 
@@ -245,6 +220,7 @@
 						(println "	jne	"$1))
 
 (define-emit    (CALL long)			(println "	call	*%eax"))
+(define-emit    (CALL LABEL)			(println "	call	"$1))
 
 (define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
@@ -353,12 +329,11 @@
 (define-method compile <variable> (-c-)
   (let ((value (<variable>-value self)))
     (cond
-      ((temp? value)   (gen LOAD value))
-      ((extern? value) (gen LOAD (GI32 (LABEL (extern->label value)))))
-      (else            (gen LOAD (GI32 (LABEL (<variable>-name self))))))))
+      ((temp? value)			(gen LOAD value))
+      (else				(gen LOAD (GI32 (LABEL (<variable>-name self))))))))
 
 (define-method compile <string> (-c-)
-  (let ((label (LABEL (temp-label-name))))
+  (let ((label (UNIQUE-LABEL)))
     (gen DATA)
     (gen DEFLABEL label)
     (gen ASCIZ self)
@@ -450,7 +425,7 @@
       (free-temp -c- temp))))
 
 (define-function compile/and (expr -c-)
-  (let ((done (LABEL (temp-label-name))))
+  (let ((done (UNIQUE-LABEL)))
     (set expr (cdr expr))
     (while expr
       (comp (car expr))
@@ -458,7 +433,7 @@
     (gen DEFLABEL done)))
 
 (define-function compile/or (expr -c-)
-  (let ((done (LABEL (temp-label-name))))
+  (let ((done (UNIQUE-LABEL)))
     (set expr (cdr expr))
     (while expr
       (comp (car expr))
@@ -466,8 +441,8 @@
     (gen DEFLABEL done)))
 
 (define-function compile/if (expr -c-)
-  (let ((a (LABEL (temp-label-name)))
-        (b (LABEL (temp-label-name))))
+  (let ((a (UNIQUE-LABEL))
+        (b (UNIQUE-LABEL)))
     (comp (cadr expr))
     (gen BF a)
     (comp (caddr expr))
@@ -478,8 +453,8 @@
     (gen DEFLABEL b)))
 
 (define-function compile/while (expr -c-)
-  (let ((body (LABEL (temp-label-name)))
-        (test (LABEL (temp-label-name))))
+  (let ((body (UNIQUE-LABEL))
+        (test (UNIQUE-LABEL)))
     (gen BR test)
     (gen DEFLABEL body)
     (list-do stmt (cddr expr)
@@ -494,7 +469,6 @@
     (comp (caddr expr))
     (cond
       ((temp? val)   (gen STORE val))
-      ((extern? val) (gen STORE (GI32 (LABEL (extern->label val))))) ; TODO maybe this shouldn't even be supported?
       (else          (gen STORE (GI32 (LABEL (<variable>-name var))))))))
 
 (define-function compile/lambda (expr comp)
@@ -503,7 +477,8 @@
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (gen BR (or (<compiler>-epilogue -c-) (set (<compiler>-epilogue -c-) (LABEL (temp-label-name))))))
+  (gen BR (or (<compiler>-epilogue -c-)
+              (set (<compiler>-epilogue -c-) (UNIQUE-LABEL)))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -525,36 +500,49 @@
   (cons (slave-value slave:address-of)     compile/address-of)))
 
 (define-method compile <pair> (-c-)
-  (let* ((fn-name (car self))
-         (args    (cdr self))
-         (arity   (list-length args))
-         (op      (and (variable? fn-name)
-                       (cadr (assq (<variable>-value fn-name) (array-at +special-operators+ arity))))))
-    (if op
-        ((array-at +operator-compilers+ arity) op args -c-)
-      (if (set op (cdr (assq fn-name +special-forms+)))
-          (op self -c-)
-        (let* ((tmp-locs (map-with compile/expr-into-temp args -c-))
-               (arg-locs (map (lambda (_) (new-arg -c-)) args))
-               ;;(op       (cdr (assq fn-name (<compiler>-env -c-))))
-               ;;(op-type  (type-of op))
-               )
-          ;; TODO this is useful, reinstate
-          ;; (if (= <expr> op-type)
-          ;;     (let* ((defn   (<expr>-defn op))
-          ;;            (params (car defn)))
-          ;;     ;; TODO this is broken, at least for dotted lists
-          ;;     (when (pair? params) ; ignore (lambda args ...) format, e.g. println
-          ;;       (let ((nparam (list-length params)))
-          ;;         (or (= nparam arity)
-          ;;             (error "gen: calling " op
-          ;;                    " with the wrong number of arguments: " args
-          ;;                    ", expecting " nparam))))))
-          (comp fn-name)
-          (map (lambda (a b) (gen MOVE a b)) tmp-locs arg-locs)
-          (free-temps -c- tmp-locs)
-          (free-args  -c- arg-locs)
-          (gen CALL arity))))))
+  (let* ((op		(first self))
+         (op-is-a-var	(variable? op))
+         (args		(rest self))
+         (arity		(list-length args))
+         (handler	()))
+    (cond
+      ((set handler (and op-is-a-var
+                         (cadr (assq (<variable>-value op) (array-at +special-operators+ arity)))))
+       ((array-at +operator-compilers+ arity) handler args -c-))
+      ((set handler (cdr (assq op +special-forms+)))
+       (handler self -c-))
+      (else
+       (let* ((tmp-locs (map-with compile/expr-into-temp args -c-))
+              (arg-locs (map (lambda (_) (new-arg -c-)) args))
+              (n-params ()))
+         ;; set up the stack for the call
+         (map (lambda (a b) (gen MOVE a b)) tmp-locs arg-locs)
+         (free-temps -c- tmp-locs)
+         (free-args  -c- arg-locs)
+         ;; gen the call itself
+         (cond
+           ((and op-is-a-var
+                 (global-variable? op))
+            (let ((value (<variable>-value op)))
+              (cond
+                ((expr? value)
+                 (comp op)
+                 (gen CALL arity)
+                 (set n-params (<expr>-n-required-parameters value)))
+                ((= (type-of value) <foreign-function>)
+                 (gen CALL (LABEL (<foreign-function>-name value)))
+                 (unless (<foreign-function>-vararg? value)
+                   (set n-params (list-length (<foreign-function>-parameter-types value)))))
+                (else
+                 (error "Don't know how to emit call to global value "value", in variable "op)))
+              (when (and n-params
+                         (not (= n-params arity)))
+                (error "compile: calling " value
+                       " with the wrong number of arguments: " args
+                       ", while expecting " n-params))))
+           (else
+            (comp op)
+            (gen CALL arity))))))))
 
 ;;; COMPILE-DEFINITION
 
@@ -574,7 +562,7 @@
   (gen TEXT))
 
 ;; (define-method compile-definition <string> (name -c-)
-;;   (let ((temp (LABEL (temp-label-name))))
+;;   (let ((temp (UNIQUE-LABEL)))
 ;;     (gen DATA)
 ;;     (gen DEFLABEL temp)
 ;;     (gen ASCIZ self)
@@ -583,20 +571,9 @@
 ;;     (gen LONG temp)
 ;;     (gen TEXT)))
 
-(define-method compile-definition <extern> (name -c-)
-  (let ((extern-label (LABEL self.name))
-        (our-label    (LABEL (extern->label self))))
-    (if __MACH__
-        (let ()
-          (gen SECTION "__IMPORT,__pointers,non_lazy_symbol_pointers")
-          (gen DEFLABEL our-label)
-          (gen INDIRECT extern-label)
-          (gen LONG 0)
-          (gen TEXT))
-      (gen DATA)
-      (gen DEFLABEL our-label)
-      (gen LONG extern-label)
-      (gen TEXT))))
+(define-method compile-definition <foreign-function> (name -c-)
+  ;; we don't need to emit anything, it will be handled at the call site
+  )
 
 (define-method compile-definition <form> (name -c-)
   (gen COMMENT (list "form "name)))
@@ -640,10 +617,9 @@
 (define-function compile-env (env)
   (warn "begin compiling\n")
   (let* ((vars  (<env>-bindings env))
-         (index (array-length vars))
          (-c-  (compiler 0)))
-    (while (<= 0 (decr index))
-      (let* ((var (array-at vars index))
+    (for (i 0 (array-length vars))
+      (let* ((var   (array-at vars i))
              (name  (<variable>-name  var))
              (value (<variable>-value var)))
         (emit COMMENT (list "defn " name))
@@ -651,25 +627,3 @@
         (compile-definition value name -c-)))
     (warn "\n")
     (emit-gen-buffer -c-)))
-
-;;;
-;;; definitions visible in the slave
-;;;
-(switch-to-slave-module)
-
-(define-form compile-begin ()
-  (set *force-trivial-accessors* 't)
-  `(set *globals* (eval-in-module host `(host:environment ,*globals*))))
-
-(define-form compile-end ()
-  (set *force-trivial-accessors* ())
-  '(let ((env *globals*))
-     (set *globals* (eval-in-module host `(host:<env>-parent ,env)))
-     (eval-in-module host `(host:compile-env (host:quote ,env)))))
-
-(define-form define-externs args
-  `(let ()
-     ,@(map (lambda (libc-name)
-              (let ((maru-name (concat-symbol 'libc/ libc-name)))
-                `(define ,maru-name (eval-in-module host (list 'host:extern ,(symbol->string libc-name))))))
-            args)))

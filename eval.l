@@ -73,19 +73,6 @@
 ;;;    which is denoted in the target by some integer assigned as per the type definition order.
 ;;;
 
-(define-constant target-word-size/bits	32)
-(define-constant target-word-size/bytes	(/ target-word-size/bits 8))
-
-(define-form bytes-to-words (value)
-  (if (long? value)
-      (/  value  target-word-size/bytes)
-     `(/ ,value ,target-word-size/bytes)))
-
-(define-form words-to-bytes (value)
-  (if (long? value)
-      (* value   target-word-size/bytes)
-     `(* ,value ,target-word-size/bytes)))
-
 (define-constant immediate-type/max-tag-width	(let ((res 0))
                                                   (types-do type
                                                     (when (immediate-type? type)
@@ -114,13 +101,6 @@
 
 (define-form immediate? (word)
   `(not (oop? ,word)))
-
-;; TODO these should go earlier, and be used in emit.l
-(define-constant target-boolean/true  1)
-(define-constant target-boolean/false 0)
-
-(define-function target-boolean (value)
-  (if value target-boolean/true target-boolean/false))
 
 (define-form malloc-oops (wordcount)
   `(libc/malloc (words-to-bytes ,wordcount)))
@@ -188,17 +168,22 @@
 ;;; libc externs
 ;;; ----------------------------------------------------------------
 
-(define-constant libc/EOF -1)
+(unless evolving?
+  (define libc/stdin)
+  (define libc/stdout)
+  (define libc/stderr))
 
-;; TODO this unconditionally prefixes every extern with libc/
-(define-externs
-  abort exit
-  malloc free realloc memset memcpy memmove
-  stdin stdout stderr
-  printf fprintf sprintf snprintf
-  strlen strcmp strdup strtoul
-  fgetc ungetc fputc
-  fopen fdopen fclose fflush fscanf feof)
+(if evolving?
+    (define-externs
+        abort exit
+      malloc free realloc memset memcpy memmove
+      stdin stdout stderr
+      printf fprintf sprintf snprintf
+      strlen strcmp strdup strtoul
+      fgetc ungetc fputc
+      fopen fdopen fclose fflush fscanf feof)
+(define-foreign-functions/libc)
+)
 
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
@@ -2095,13 +2080,23 @@
 
   (debug (libc/printf "capture-well-known-vm-values is done\n"))))
 
+(define-form %stdio-init ()
+  (if evolving?
+      `(let ()
+         (set libc/stdin  (oop-at libc/stdin 0))
+         (set libc/stdout (oop-at libc/stdout 0))
+         (set libc/stderr (oop-at libc/stderr 0)))
+    `(let ()
+       (set libc/stdin  (libc/fdopen 0 "r"))
+       (set libc/stdout (libc/fdopen 1 "a"))
+       (set libc/stderr (libc/fdopen 2 "a"))
+       (libc/setbuf libc/stdout 0)
+       (libc/setbuf libc/stderr 0))))
+
 (define-function main (argc argv)
   (debug (libc/printf "alive\n"))
 
-  ;; we need to dereference them once
-  (set libc/stdin  (oop-at libc/stdin 0))
-  (set libc/stdout (oop-at libc/stdout 0))
-  (set libc/stderr (oop-at libc/stderr 0))
+  (%stdio-init)
 
   (gc/initialise)
 
