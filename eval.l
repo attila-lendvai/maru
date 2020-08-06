@@ -166,7 +166,7 @@
              i)
         (error "record-slot-index has failed for type "type", slot-name "slot-name))))
 
-(define-record <buffer> () (contents size position))
+(define-record <buffer> () (contents capacity position))
 
 ;;;
 ;;;
@@ -918,7 +918,7 @@
 (define-function new_buffer ()
   (let ((buf (libc/malloc (byte-size-of <buffer>))))
     (set (<buffer>-contents buf) (libc/malloc 32))
-    (set (<buffer>-size     buf) 32)
+    (set (<buffer>-capacity buf) 32)
     (set (<buffer>-position buf) 0)
     buf))
 
@@ -927,15 +927,15 @@
   (libc/free buf))
 
 (define-function buffer_grow (buf)
-  (let* ((size     (<buffer>-size buf))
+  (let* ((size     (<buffer>-capacity buf))
          (contents (libc/malloc (* 2 size))))
     (libc/memcpy contents (<buffer>-contents buf) size)
     (libc/free (<buffer>-contents buf))
     (set (<buffer>-contents buf) contents)
-    (set (<buffer>-size buf) (* 2 size))))
+    (set (<buffer>-capacity buf) (* 2 size))))
 
 (define-function buffer_append (buf c)
-  (and (= (<buffer>-position buf) (<buffer>-size buf))
+  (and (= (<buffer>-position buf) (<buffer>-capacity buf))
        (buffer_grow buf))
   (let ((posn (<buffer>-position buf)))
     (set-string-at (<buffer>-contents buf) posn c)
@@ -950,7 +950,7 @@
 
 (define-function buffer_contents (buf)
   (buffer_append buf 0)
-  (set (<buffer>-position buf) (- (<buffer>-position buf) 1))
+  (decr (<buffer>-position buf))
   (<buffer>-contents buf))
 
 (define-function intern* (cstr module)
@@ -1066,7 +1066,6 @@
            (buffer_append buf c)
            (while (is_digit16 (set c (libc/fgetc stream))) (buffer_append buf c))))
     (libc/ungetc c stream)
-    (buffer_append buf 0)
     (let ((result (libc/strtoul (buffer_contents buf) 0 0)))
       (buffer_delete buf)
       (new-<long> (if neg (- result) result)))))
@@ -1077,7 +1076,6 @@
       (buffer_append buf c)
       (set c (libc/fgetc stream)))
     (libc/ungetc c stream)
-    (buffer_append buf 0)
     (let ((result (intern (buffer_contents buf))))
       (buffer_delete buf)
       result)))
@@ -1089,7 +1087,6 @@
       (when (= libc/EOF c)
         (k/error "unterminated string literal"))
       (buffer_append buf c))
-    (buffer_append buf 0)
     (let ((result (new-<string>-from-cstring (buffer_contents buf))))
       (buffer_delete buf)
       result)))
