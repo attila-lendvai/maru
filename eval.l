@@ -1366,25 +1366,23 @@
     (k/expand list env))))
 
 (define enlist) ; forward
+(define k/encode) ; forward
 
-(define-function k/encode (exp env)
-  (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
-  (if (is/pair exp)
-      (let ((head (k/encode (get/head exp) env))
-	    (tail (get/tail exp)))
-	(gc/protect (head tail)
-	  (cond
-	    ((= head fixed-subr/let)	(let ((bindings (k/cadr exp)))
+(define-function k/encode/pair (exp env)
+  (gc/let* ((head (k/encode (get/head exp) env))
+            (tail (get/tail exp)))
+    (cond
+      ((= head fixed-subr/let)		(let ((bindings (k/cadr exp)))
 					  (gc/protect (env)
 					    (set env (new-<env> env 0 (get/long (get <env> offset env))))
 					    (while (is/pair bindings)
 					      (let ((var-name (get/head bindings)))
-						(and (is/pair var-name) (set var-name (get/head var-name)))
-						(k/env/define env var-name ())
-						(set bindings (get/tail bindings))))
+					        (and (is/pair var-name) (set var-name (get/head var-name)))
+					        (k/env/define env var-name ())
+					        (set bindings (get/tail bindings))))
 					    (set tail (enlist tail env))
 					    (set tail (new-<pair> env tail)))))
-	    ((= head fixed-subr/lambda)	(let ((args (k/cadr exp)))
+      ((= head fixed-subr/lambda)	(let ((args (k/cadr exp)))
 					  (gc/protect (env)
 					    (set env (new-<env> env 1 0))
 					    (while (is/pair args)
@@ -1393,38 +1391,51 @@
 					    (and args (k/env/define env args ()))
 					    (set tail (enlist tail env))
 					    (set tail (new-<pair> env tail)))))
-            ;; TODO this defines the variable in the encode phase, even if the code is not executed in the end.
-            ;; i doubt it's the intended behavior... investigate!
-	    ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
+      ;; TODO this defines the variable in the encode phase, even if the code is not executed in the end.
+      ;; i doubt it's the intended behavior... investigate!
+      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-            ;; TODO this fails while expanding a branch that is _not_ taken at the end at runtime
-	    ((= head fixed-subr/set)	(let ((var (k/env/lookup-variable env (k/car tail))))
+      ;; TODO this fails while expanding a branch that is _not_ taken at the end at runtime
+      ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (k/car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
-                                          (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
+					  (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-	    ((!= head fixed-subr/quote)	(set tail (enlist tail env))))
-	  (set exp (new-<pair> head tail))))
-    (if (is <symbol> exp)
-	(let ((val (k/env/lookup-variable env exp)))
-	  (or val (fatal1 "undefined variable: %s" (get/symbol exp)))
-	  (set exp val)
-	  (if (global-variable? exp)
-	      (let ((v (get <variable> value exp)))
-		(and (or (is <form> v) (is <fixed> v))
-		     (set exp v)))
-	    (let ((venv (get <variable> env exp)))
-	      (or (= (get/long (get <env> level venv)) (get/long (get <env> level env)))
-		  (put <env> stable venv symbol/t)))))
-      (let ((fn (k/array-at (get/variable-value var/*encoders*) (get/type exp))))
-	(and fn
-	     (let ((args (new-<pair> env ())))
-	       (gc/protect (args)
-		 (set args (new-<pair> exp args))
-		 (debug (libc/printf "APPLY ENCODER\n... ") (k/print fn) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
-		 (set exp (k/apply fn args ()))))))))
+      ((!= head fixed-subr/quote)	(set tail (enlist tail env))))
+    ;; return value
+    (new-<pair> head tail)))
+
+(define-function k/encode/symbol (exp env)
+  (let ((val (k/env/lookup-variable env exp)))
+    (or val (fatal1 "undefined variable: %s" (get/symbol exp)))
+    (set exp val)
+    (if (global-variable? exp)
+        (let ((val (get <variable> value exp)))
+          (when (or (is <form> val)
+                    (is <fixed> val))
+            (set exp val)))
+      (let ((venv (get <variable> env exp)))
+        (unless (= (get/long (get <env> level venv))
+                   (get/long (get <env> level env)))
+            (put <env> stable venv symbol/t)))))
   exp)
+
+(define-function k/encode/other (exp env)
+  (let ((fn (k/array-at (get/variable-value var/*encoders*) (get/type exp))))
+    (when fn
+      (gc/let* ((args (new-<pair> env ())))
+        (set args (new-<pair> exp args))
+        (debug (libc/printf "APPLY ENCODER\n... ") (k/print fn) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
+        (set exp (k/apply fn args ())))))
+  exp)
+
+(define-function k/encode (exp env)
+  (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
+  (cond
+    ((is/pair exp)	(k/encode/pair		exp env))
+    ((is <symbol> exp)	(k/encode/symbol	exp env))
+    (else		(k/encode/other		exp env))))
 
 (set enlist (lambda (list env)
   (if (is/pair list)
