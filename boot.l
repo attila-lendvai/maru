@@ -159,7 +159,7 @@
   `(or ,test (error ,@args)))
 
 (define-form define-constant (name value)
-  `(define ,name (form () (lambda __args__ ,value))))
+  `(define ,name (form () (lambda _ ,value))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -720,7 +720,7 @@
 (define-immediate-type	<long> 1 1)
 ;;(define-record <long>			() (_bits))
 (define-record <array>			() (size _bits))
-(define-record <expr>			() (name defn ctx))        ; NOTE: defn is: (env formals . prog)
+(define-record <expr>			() (name defn ctx))        ; NOTE: defn is: (env formals . prog). name is informal for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
 (define-record <fixed>			() (function))
 (define-record <subr>			() (_name _imp _sig _profile))
@@ -844,10 +844,14 @@
 (define-apply <selector> (self . arguments)
   ;; NOTE if we wanted to be super precise while bootstrapping, then this should be
   ;; (<type>-id (type-of (car arguments))), so that type-of can map the host type to
-  ;; that of the slave. but this causes a major slowdown, and is not needed, because
-  ;; emit.l is loaded into the host, so the dispatches in it work as expected.
+  ;; that of the slave. this causes a major slowdown though, and it's probably not needed,
+  ;; because emit.l is loaded into the host, so the type dispatches in it work as expected.
+  ;; the fast version is: (type-id-of (car arguments))
   ;; same applies to generics.
-  (apply (or (array-at (<selector>-methods self) (type-id-of (car arguments)))
+  (apply (or (array-at (<selector>-methods self)
+                       (type-id-of (car arguments)) ; faster version
+                       ;;(<type>-id (type-of (car arguments))) ; more correct version
+                       )
              (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
          arguments))

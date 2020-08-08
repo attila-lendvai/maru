@@ -53,11 +53,11 @@ $(BUILD)/%: $(BUILD)/%.s
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
-	mkdir -p $(BUILD)
+	mkdir --parents $(BUILD)
 # after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
 	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
-	$(MAKE) -C $(BUILD)/$(PREVIOUS_STAGE)
+	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE)
 
 $(BUILD)/peg.l: $(BUILD)/eval2 source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
 	$(BUILD)/eval2 boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \

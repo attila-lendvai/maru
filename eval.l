@@ -115,6 +115,7 @@
 (define-form immediate? (word)
   `(not (oop? ,word)))
 
+;; TODO these should go earlier, and be used in emit.l
 (define-constant target-boolean/true  1)
 (define-constant target-boolean/false 0)
 
@@ -247,23 +248,23 @@
 ;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
 
 (define-form %level-shift-types type-names
-  (println "# Types in the host:")
-  (eval-in-module host (if evolving?
-                           '(host:println "# " host:%type-names)
-                           '(host:let ()
-                             (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
-                             ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
-                             ;;(host:println "# " host:%types)
-                             ;; it only started to happen after i have installed the register-type/host call that
-                             ;; registers the type objects that the slave creates back into the host vm, and
-                             ;; added the do-print specialization on <array>.
-                             ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
-                             ;; longer to get the segfault.
-                             )))
-  (println "\n# Slave types are as follows:\n# host id	slave id	type name")
-  (types-do type
-    (println "# "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
-  (println)
+  ;; (println "# Types in the host:")
+  ;; (eval-in-module host (if evolving?
+  ;;                          '(host:println "# " host:%type-names)
+  ;;                          '(host:let ()
+  ;;                            (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
+  ;;                            ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
+  ;;                            ;;(host:println "# " host:%types)
+  ;;                            ;; it only started to happen after i have installed the register-type/host call that
+  ;;                            ;; registers the type objects that the slave creates back into the host vm, and
+  ;;                            ;; added the do-print specialization on <array>.
+  ;;                            ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
+  ;;                            ;; longer to get the segfault.
+  ;;                            )))
+  ;; (println "\n# Slave types are as follows:\n# host id	slave id	type name")
+  ;; (types-do type
+  ;;   (println "# "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
+  ;; (println)
   `(let ()
      ,@(map (lambda (type-name)
               (let ((type (eval type-name)))
@@ -457,7 +458,8 @@
 (define-function gc/grow-heap (size)
   (let ((new-block (gc/acquire-new-heap-space size)))
     (set (<header>-next new-block) (<header>-next gc/memory-last))
-    (set (<header>-next gc/memory-last) new-block)))
+    (set (<header>-next gc/memory-last) new-block)
+    new-block))
 
 (define-function gc/object-size (obj)
   (<header>-size (header-of obj)))
@@ -1282,15 +1284,17 @@
       ((= type k/<expr>)	(k/apply-expr fun arguments ctx))
       ((= type k/<fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
       ((= type k/<subr>)
+       ;; TODO FIXME it sould be this:
+       ;; ((get <subr> _imp fun) arguments ctx)
+       ;; but without using a local var it gets miscompiled by the x86 backend
+       ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
+       ;; +	movl	_25type_check, %eax
+       ;; +	movl	36(%esp), %ecx
+       ;; +	movl	%ecx, 8(%esp)
+       ;; +	movl	40(%esp), %ecx
+       ;; +	movl	%ecx, 12(%esp)
+       ;; +	call	*%eax
        (let ((imp (get <subr> _imp fun)))
-         ;; TODO FIXME ((get <subr> _imp fun) arguments ctx) it should/could be this, but without using a local var it gets miscompiled
-         ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
-         ;; +	movl	_25type_check, %eax
-         ;; +	movl	36(%esp), %ecx
-         ;; +	movl	%ecx, 8(%esp)
-         ;; +	movl	40(%esp), %ecx
-         ;; +	movl	%ecx, 12(%esp)
-         ;; +	call	*%eax
          (imp arguments ctx)))
       (else			(let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
 				  (if ap
@@ -1647,6 +1651,7 @@
   (k/car -args-))
 
 (define-subr (not 1)
+  ;; TODO wouldn't it be nicer if we returned here something that self-evaluates?
   (if (k/car -args-) () symbol/t))
 
 (define-subr (fixed 1)
@@ -1715,6 +1720,7 @@
 (define-relation >=)
 (define-relation >)
 
+;; FIXME strcmp is broken for strings that contain zeros
 (define-subr (= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
@@ -1939,6 +1945,7 @@
 
 (define-subr (string->symbol 1)
   (let ((arg (k/car -args-)))
+    ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
@@ -1946,6 +1953,7 @@
 
 (define-subr (symbol->string 1)
   (let ((arg (k/car -args-)))
+    ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
@@ -2091,6 +2099,8 @@
   (debug (libc/printf "capture-well-known-vm-values is done\n"))))
 
 (define-function main (argc argv)
+  (debug (libc/printf "alive\n"))
+
   ;; we need to dereference them once
   (set libc/stdin  (oop-at libc/stdin 0))
   (set libc/stdout (oop-at libc/stdout 0))
