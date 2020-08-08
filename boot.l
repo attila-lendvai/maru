@@ -897,7 +897,7 @@
 
 ;;; print
 
-(define-selector do-print (arg) (primitive/print arg))
+(define-selector do-print (arg) (primitive/print "<"(type-name-of arg)" "(type-id-of arg)">"))
 (define-selector do-dump  (arg) (do-print arg)) ; TODO why not primitive/dump?
 
 (define print
@@ -926,8 +926,19 @@
     (primitive/print "\n")
     (car args)))
 
-(define-method do-dump  <string> ()     (primitive/dump self))
-(define-method do-dump  <array> ()      (primitive/dump self))
+(define-method do-print <undefined>	()	(primitive/print self))
+(define-method do-print <string>	()	(primitive/print self))
+(define-method do-print <symbol>	()	(primitive/print self))
+(define-method do-print <long>		()	(primitive/print self))
+(define-method do-print <array>		()	(primitive/print self))
+(define-method do-print <variable>	()	(primitive/print self))
+
+(define-method do-dump  <undefined>	()	(primitive/dump self))
+(define-method do-dump  <string>	()	(primitive/dump self))
+(define-method do-print <symbol>	()	(primitive/dump self))
+(define-method do-print <long>		()	(primitive/dump self))
+(define-method do-dump  <array>		()	(primitive/dump self))
+
 (define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
 (define-method do-print <type> ()	(print "<"(<type>-name self)" "(<type>-id self)">"))
 
