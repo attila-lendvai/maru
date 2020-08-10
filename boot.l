@@ -103,7 +103,7 @@
 (define concat-strings
   (lambda args
     (let ((result (car args)))
-      (while (string? (car (set args (cdr args))))
+      (while (set args (cdr args))
         (set result (concat-string result (car args))))
       result)))
 
