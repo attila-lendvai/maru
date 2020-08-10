@@ -1,6 +1,29 @@
-# Maru (stage 5)
+# Maru (stage 6)
 
 > **NOTE:** This readme focuses on the aspects of this stage that are relevant for bootstrapping the next stage.
 > The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
 
 ## Assorted smaller changes
+
+## Stats
+
+This stage started out with:
+```
+Backend x86:
+
+cat boot.l emit-early.l emit-x86.l emit-late.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1445
+cat eval.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1571
+cat boot.l emit-early.l emit-x86.l emit-late.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+2988
+
+Backend llvm:
+
+cat boot.l emit-early.l emit-llvm.l emit-late.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1695
+cat eval.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1571
+cat boot.l emit-early.l emit-llvm.l emit-late.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+3235
+```

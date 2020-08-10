@@ -171,22 +171,11 @@
 ;;; libc externs
 ;;; ----------------------------------------------------------------
 
-(unless evolving?
-  (define libc/stdin)
-  (define libc/stdout)
-  (define libc/stderr))
+(define libc/stdin)
+(define libc/stdout)
+(define libc/stderr)
 
-(if evolving?
-    (define-externs
-        abort exit
-      malloc free realloc memset memcpy memmove
-      stdin stdout stderr
-      printf fprintf sprintf snprintf
-      strlen strcmp strdup strtoul
-      fgetc ungetc fputc
-      fopen fdopen fclose fflush fscanf feof)
 (define-foreign-functions/libc)
-)
 
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
@@ -237,22 +226,20 @@
 ;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
 
 (define-form %level-shift-types type-names
-  ;; (println "# Types in the host:")
-  ;; (eval-in-module host (if evolving?
-  ;;                          '(host:println "# " host:%type-names)
-  ;;                          '(host:let ()
-  ;;                            (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
-  ;;                            ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
-  ;;                            ;;(host:println "# " host:%types)
-  ;;                            ;; it only started to happen after i have installed the register-type/host call that
-  ;;                            ;; registers the type objects that the slave creates back into the host vm, and
-  ;;                            ;; added the do-print specialization on <array>.
-  ;;                            ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
-  ;;                            ;; longer to get the segfault.
-  ;;                            )))
-  ;; (println "\n# Slave types are as follows:\n# host id	slave id	type name")
+  ;; (println "; Types in the host:")
+  ;; (eval-in-module host '(host:let ()
+  ;;                        (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
+  ;;                        ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
+  ;;                        ;;(host:println "; " host:%types)
+  ;;                        ;; it only started to happen after i have installed the register-type/host call that
+  ;;                        ;; registers the type objects that the slave creates back into the host vm, and
+  ;;                        ;; added the do-print specialization on <array>.
+  ;;                        ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
+  ;;                        ;; longer to get the segfault.
+  ;;                        ))
+  ;; (println "\n; Slave types are as follows:\n; host id	slave id	type name")
   ;; (types-do type
-  ;;   (println "# "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
+  ;;   (println "; "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
   ;; (println)
   `(let ()
      ,@(map (lambda (type-name)
@@ -2097,23 +2084,14 @@
 
   (debug (libc/printf "capture-well-known-vm-values is done\n"))))
 
-(define-form %stdio-init ()
-  (if evolving?
-      `(let ()
-         (set libc/stdin  (oop-at libc/stdin 0))
-         (set libc/stdout (oop-at libc/stdout 0))
-         (set libc/stderr (oop-at libc/stderr 0)))
-    `(let ()
-       (set libc/stdin  (libc/fdopen 0 "r"))
-       (set libc/stdout (libc/fdopen 1 "a"))
-       (set libc/stderr (libc/fdopen 2 "a"))
-       (libc/setbuf libc/stdout 0)
-       (libc/setbuf libc/stderr 0))))
-
 (define-function main (argc argv)
   (debug (libc/printf "alive\n"))
 
-  (%stdio-init)
+  (set libc/stdin  (libc/fdopen 0 "r"))
+  (set libc/stdout (libc/fdopen 1 "a"))
+  (set libc/stderr (libc/fdopen 2 "a"))
+  (libc/setbuf libc/stdout 0)
+  (libc/setbuf libc/stderr 0)
 
   (gc/initialise)
 
