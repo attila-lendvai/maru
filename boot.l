@@ -1,4 +1,7 @@
+;;; -*- mode: lisp; coding: us-ascii -*-
+;;;
 ;;; This is the minimum "standard library" that is needed/used while bootstrapping
+;;;
 
 (if bootstrapping?
     (let ()
@@ -726,7 +729,7 @@
 (define-immediate-type	<long> 1 1)
 ;;(define-record <long>			() (_bits))
 (define-record <array>			() (size _bits))
-(define-record <expr>			() (name defn ctx))        ; NOTE: defn is: (env formals . prog). name is informal for debugging purposes.
+(define-record <expr>			() (name defn ctx))        ; TODO: defn is: (env formals . prog), parse it into separate slots? name is informal for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
 (define-record <fixed>			() (function))
 (define-record <subr>			() (_name _imp _sig _profile))

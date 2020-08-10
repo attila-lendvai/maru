@@ -1,4 +1,7 @@
-;;; The Maru VM, written in a subset of Maru.
+;;; -*- mode: lisp; coding: us-ascii -*-
+;;;
+;;; The Maru VM, written in a dialect of Maru.
+;;;
 
 (define-form k/assert		prog ())
 (define-form debug		prog ())
@@ -16,7 +19,7 @@
 
 ;; This variable controls the amount of safety features compiled
 ;; into the runtime, at the cost of execution speed.
-(define safety-level 3)
+(define safety-level 1)
 
 (define-form safety (level . prog)
   (when (<= level safety-level)
@@ -200,6 +203,7 @@
   (libc/fprintf libc/stderr "\nDIE called at depth %d, printing a backtrace to stdout and exiting with exit code 1...\n" *backtrace-index*)
   (libc/flush-streams)
   (print-backtrace)
+  (libc/flush-streams)
   (libc/abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
@@ -482,7 +486,7 @@
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p flags %d size %d type %d\n" header flags (<header>-size header) (<header>-type header)))
          (safety 3 (or (valid-header-magic-marker? header)  (fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
-         (safety 1 (or (& <header>-flags/used flags)      (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
+         (safety 1 (or (& <header>-flags/used flags)        (fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
          (or (& flags <header>-flags/mark)
              (let ()
                (set (<header>-flags header) (| flags <header>-flags/mark))
@@ -843,7 +847,7 @@
   (let ((var (k/env/lookup-variable env name)))
     (if var
         (get <variable> value var)
-      (fatal1 "undefined variable: %s" (get/symbol name)))))
+      (fatal1 "undefined variable in env/variable-value: %s" (get/symbol name)))))
 
 (define-function k/env/ensure-variable (env name)
   (safety 1 (k/assert (is <env> env)		"k/env/ensure-variable: env arg is not of type env: "env))
@@ -1377,12 +1381,12 @@
 					    (and args (k/env/define new-env args ()))
 					    (set tail (enlist tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
-      ;; TODO this defines the variable in the encode phase, even if the code is not executed in the end.
+      ;; TODO this defines the variable in the encode phase, even if the code doesn't get executed in the end.
       ;; i doubt it's the intended behavior... investigate!
       ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
 					  (set tail (enlist (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-      ;; TODO this fails while expanding a branch that is _not_ taken at the end at runtime
+      ;; TODO and then this errors while expand'ing an if branch that is _not_ taken at the end at runtime
       ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (k/car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
 					  (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
@@ -1394,7 +1398,7 @@
 
 (define-function k/encode/symbol (exp env)
   (let ((val (k/env/lookup-variable env exp)))
-    (or val (fatal1 "undefined variable: %s" (get/symbol exp)))
+    (or val (fatal1 "undefined variable in encode: %s" (get/symbol exp)))
     (set exp val)
     (if (global-variable? exp)
         (let ((val (get <variable> value exp)))
@@ -2150,14 +2154,19 @@
           (gc/protect (arg-string tmp)
             (put <variable> value cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
             (cond
+              ;; -v
               ((not (libc/strcmp arg "-v"))
                (set *arg/verbose* (+ 1 *arg/verbose*))
                (set tmp (new-<long> *arg/verbose*))
                (put/variable-value "*verbosity*" tmp))
+
+              ;; -O
               ((not (libc/strcmp arg "-O"))
                (set *arg/optimised* (+ 1 *arg/optimised*))
                (set tmp (new-<long> *arg/optimised*))
                (put/variable-value "*optimised*" tmp))
+
+              ;; -
               ((not (libc/strcmp arg "-"))
                (k/repl-stream libc/stdin))
 
