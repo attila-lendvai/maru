@@ -176,6 +176,36 @@
           (if a (cdr a) exp))
       exp)))
 
+;;; let*
+
+(define-function %let*getters (vars getter rest)
+  (if (pair? vars)
+      (cons (list (car vars) (list 'car getter))
+            (%let*getters (cdr vars) (list 'cdr getter) rest))
+    (if (symbol? vars)
+        (cons (list vars getter) rest)
+      rest)))
+
+(define-function %let*unpack (vars val rest)
+    (cons (cons '_%let_values_ val)
+          (%let*getters vars '_%let_values_ rest)))
+
+(define-function %let*bindings (bindings)
+  (if (pair? bindings)
+      (let ((var     (caar bindings))
+            (val     (cdar bindings)))
+        (if (pair? var)
+            (%let*unpack var val (%let*bindings (cdr bindings)))
+          (cons (cons var val) (%let*bindings (cdr bindings)))))))
+
+(define-function %let* (bindings body)
+  (if (pair? (cdr bindings))
+      `(let (,(car bindings)) ,(%let* (cdr bindings) body))
+    `(let ,bindings ,@body)))
+
+(define-form let* bindings-body
+  (%let* (%let*bindings (car bindings-body)) (cdr bindings-body)))
+
 ;;; list
 
 (define-function first	(list)	(car list))
@@ -312,36 +342,6 @@
   (if (and (pair? a) (pair? b))
       (cons (cons (car a) (car b)) (zip-assocs (cdr a) (cdr b)))
     (or a b)))
-
-;;; let*
-
-(define-function %let*getters (vars getter rest)
-  (if (pair? vars)
-      (cons (list (car vars) (list 'car getter))
-            (%let*getters (cdr vars) (list 'cdr getter) rest))
-    (if (symbol? vars)
-        (cons (list vars getter) rest)
-      rest)))
-
-(define-function %let*unpack (vars val rest)
-    (cons (cons '_%let_values_ val)
-          (%let*getters vars '_%let_values_ rest)))
-
-(define-function %let*bindings (bindings)
-  (if (pair? bindings)
-      (let ((var     (caar bindings))
-            (val     (cdar bindings)))
-        (if (pair? var)
-            (%let*unpack var val (%let*bindings (cdr bindings)))
-          (cons (cons var val) (%let*bindings (cdr bindings)))))))
-
-(define-function %let* (bindings body)
-  (if (pair? (cdr bindings))
-      `(let (,(car bindings)) ,(%let* (cdr bindings) body))
-    `(let ,bindings ,@body)))
-
-(define-form let* bindings-body
-  (%let* (%let*bindings (car bindings-body)) (cdr bindings-body)))
 
 ;;; cond
 
