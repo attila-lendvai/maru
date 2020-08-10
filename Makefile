@@ -210,6 +210,8 @@ $(BUILD)/%: $(BUILD)/%.ll
 ###
 ### Tests
 ###
+TEST_EVAL	= $(BUILD_llvm)/eval2
+
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend))
 
 # TODO backend duplication
@@ -222,3 +224,25 @@ test-bootstrap-llvm: $(BUILD_llvm)/eval3
 	$(DIFF) $(BUILD_llvm)/eval2.$(ASM_FILE_EXT_llvm) $(BUILD_llvm)/eval3.$(ASM_FILE_EXT_llvm)
 	$(DIFF) $(BUILD_llvm)/eval2.stripped $(BUILD_llvm)/eval3.stripped
 	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_llvm)/eval2 boot.l -
+
+test-compiler: $(foreach backend,${BACKENDS},test-compiler-$(backend))
+
+# TODO backend duplication
+test-compiler-x86: $(BUILD_x86)/compiler-test
+	$(BUILD_x86)/compiler-test
+
+test-compiler-llvm: $(BUILD_llvm)/compiler-test
+	$(BUILD_llvm)/compiler-test
+
+# TODO backend duplication
+$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): tests/compiler-tests.l $(EMIT_FILES_x86)
+	$(call ensure-built,$(TEST_EVAL))
+	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
+
+$(BUILD_llvm)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
+	@mkdir --parents $(BUILD_llvm)
+	$(call ensure-built,$(TEST_EVAL))
+	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_llvm)/compiler-test.$(ASM_FILE_EXT_llvm))
+
+test-interpreter: $(TEST_EVAL) boot.l tests/interpreter-tests.l
+	$(TEST_EVAL) boot.l tests/interpreter-tests.l
