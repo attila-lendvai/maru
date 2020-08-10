@@ -237,6 +237,12 @@
     (set list (cdr list)))
   (car list))
 
+(define-function list-reverse (lst)
+  (let ((result ()))
+    (while (pair? lst)
+      (push result (pop lst)))
+    result))
+
 (define-function list-reverse! (head)
   (let ((curr head)
         (prev ())
