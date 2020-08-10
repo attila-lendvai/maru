@@ -2165,16 +2165,43 @@
                (put/variable-value "*optimised*" tmp))
               ((not (libc/strcmp arg "-"))
                (k/repl-stream libc/stdin))
-              ((not (libc/strcmp arg "-c"))
+
+              ;; --call to call a function
+              ((not (libc/strcmp arg "--call"))
                (unless (is/pair cla)
-                 (fatal "-c requires an argument"))
+                 (fatal "--call requires an argument"))
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
                (put <variable> value cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
                (let* ((sym (intern arg))
                       (form (new-<pair> sym ())))
                  (gc/protect (form)
-                   (k/eval form (get/globals)))))
+                   (k/expand-encode-eval form (get/globals)))))
+
+              ;; --define to define a variable
+              ((not (libc/strcmp arg "--define"))
+               (unless (and (is/pair cla)
+                            (is/pair (get/tail cla)))
+                 (fatal "--define requires two arguments"))
+               (let ((var (k/car  cla))
+                     (val (k/cadr cla)))
+                 (put <variable> value cla-var (set cla (get/tail (get/tail cla)))) ; (pop *command-line-arguments*) x 2
+                 ;; convert to long when possible
+                 (let* ((cstr	(get/string val))
+                        (endptr	cstr)
+                        (i	(libc/strtoul cstr (address-of endptr) 0)))
+                   ;; TODO investigate: why the hell does this behave differently than the at the other call site of strtoul?
+                   ;; (when (or (not (= -1 i))
+                   ;;           (= 0 (libc/strcmp cstr "-1")))
+                   ;;   (set val (new-<long> i)))
+                   (when (= 0 (string-at endptr 0))
+                     (set val (new-<long> i))))
+                 (gc/let* ((form (new-<pair> val ())))
+                   (set form (new-<pair> (intern (get/string var)) form))
+                   (set form (new-<pair> symbol/define form))
+                   (k/expand-encode-eval form (get/globals)))))
+
+              ;; read file as a program
               (else
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
