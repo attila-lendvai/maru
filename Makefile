@@ -239,11 +239,11 @@ $(BUILD)/%: $(BUILD)/%.s
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir --parents $(@D)
-	$(LLC) -filetype=obj -o $@.o $<
+	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
 	$(CLANG) --target=$(TARGET_llvm) -o $@ $@.o
 # the rest is just informational
 	@-$(STRIP) $@ -o $@.stripped
-	@-$(LLC) -filetype=asm -o $@.opt.s $<
+	@-$(LLC) -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
 #	$(CLANG) --target=$(TARGET_llvm) -S -o $@.clang.s $<
 
 ###

@@ -12,8 +12,8 @@
 ;;; the target's configuration
 ;;;
 (define-constant target-word-size/bits		(eval-in-module host 'host:makefile/target-word-size))
-(define-constant target-triplet			(eval-in-module host 'host:makefile/target-triplet))
 (define-constant target-is-little-endian	target-boolean/true)
+;;(define-constant target-triplet			(eval-in-module host 'host:makefile/target-triplet))
 
 ;;;
 ;;; useful utils and constants
