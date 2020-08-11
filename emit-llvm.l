@@ -780,6 +780,7 @@
                                (= '%ptr param-type))
                            (push new-arg-regs arg)
                          (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
+                           ;; TODO check for value range issues?
                            (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
                            (push new-arg-regs cast-reg))))
                      ;; gen the call itself
@@ -898,7 +899,7 @@
          (-c-  (compiler 0)))
     (let (;(target-triplet	(slave-value slave:target-triplet))
           (word-size		(slave-value slave:target-word-size/bits)))
-      (warn "Compiling for word size: " word-size " bits")
+      (warn "\nCompiling for word size: " word-size " bits\n\n")
       ;;(assert (string?	target-triplet))
       (assert (long?	word-size))
       ;; our output is less specific, so allow the makefile, or whoever builds the

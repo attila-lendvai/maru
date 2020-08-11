@@ -733,7 +733,7 @@
 
 ;;; ----------------------------------------------------------------
 
-(define exlist) ; forward
+(define k/expand/list) ; forward
 
 (define-function k/expand (exp env)
   (debug (libc/printf "k/expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
@@ -755,7 +755,7 @@
                          (return head)))))))
        (let ((tail (get/tail exp)))
          (gc/push-root (address-of tail))
-         (or (= head symbol/quote) (set tail (exlist tail env)))
+         (or (= head symbol/quote) (set tail (k/expand/list tail env)))
          ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
          (and (= symbol/set head)
               (is/pair (k/car  tail))
@@ -787,16 +787,14 @@
                  (set exp (k/apply fn args ()))))))))
   exp)
 
-(set exlist (lambda (list env)
+(set k/expand/list (lambda (list env)
   (if (is/pair list)
-      (let ((head (k/expand (get/head list) env)))
-        (gc/protect (head)
-          (let ((tail (exlist (get/tail list) env)))
-            (gc/protect (tail)
-              (new-<pair> head tail)))))
+      (gc/let* ((head (k/expand		(get/head list) env))
+                (tail (k/expand/list	(get/tail list) env)))
+        (new-<pair> head tail))
     (k/expand list env))))
 
-(define enlist) ; forward
+(define k/encode/list) ; forward
 (define k/encode) ; forward
 
 (define-function k/encode/pair (exp env)
@@ -810,7 +808,7 @@
 					        (and (is/pair var-name) (set var-name (get/head var-name)))
 					        (k/env/define new-env var-name ())
 					        (set bindings (get/tail bindings))))
-					    (set tail (enlist tail new-env))
+					    (set tail (k/encode/list tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
       ((= head fixed-subr/lambda)	(let ((args (k/cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 1 0)))
@@ -818,20 +816,20 @@
 					      (k/env/define new-env (get/head args) ())
 					      (set args (get/tail args)))
 					    (and args (k/env/define new-env args ()))
-					    (set tail (enlist tail new-env))
+					    (set tail (k/encode/list tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
       ;; TODO this defines the variable in the encode phase, even if the code doesn't get executed in the end.
       ;; i doubt it's the intended behavior... investigate!
       ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
-					  (set tail (enlist (k/cdr tail) env))
+					  (set tail (k/encode/list (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
       ;; TODO and then this errors while expand'ing an if branch that is _not_ taken at the end at runtime
       ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (k/car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
 					  (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
-					  (set tail (enlist (k/cdr tail) env))
+					  (set tail (k/encode/list (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-      ((!= head fixed-subr/quote)	(set tail (enlist tail env))))
+      ((!= head fixed-subr/quote)	(set tail (k/encode/list tail env))))
     ;; return value
     (new-<pair> head tail)))
 
@@ -866,23 +864,19 @@
     ((is <symbol> exp)	(k/encode/symbol	exp env))
     (else		(k/encode/other		exp env))))
 
-(set enlist (lambda (list env)
+(set k/encode/list (lambda (list env)
   (if (is/pair list)
-      (let ((head (k/encode (get/head list) env)))
-        (gc/protect (head)
-          (let ((tail (enlist (get/tail list) env)))
-            (gc/protect (tail)
-              (new-<pair> head tail)))))
+      (gc/let* ((head (k/encode		(get/head list) env))
+                (tail (k/encode/list	(get/tail list) env)))
+        (new-<pair> head tail))
     (k/encode list env)))
 )
 
-(define-function evlist (obj ctx)
+(define-function k/eval/list (obj ctx)
   (if (is/pair obj)
-      (let ((head (k/eval (get/head obj) ctx)))
-        (gc/protect (head)
-          (let ((tail (evlist (get/tail obj) ctx)))
-            (gc/protect (tail)
-              (new-<pair> head tail)))))
+      (gc/let* ((head (k/eval		(get/head obj) ctx))
+                (tail (k/eval/list	(get/tail obj) ctx)))
+        (new-<pair> head tail))
     obj))
 
 (set k/eval (lambda (exp ctx)
@@ -908,7 +902,7 @@
 				    (set *backtrace-index* (+ *backtrace-index* 1))
 				    (set head (if (is <fixed> head)
 						  (k/apply (get <fixed> function head) (get/tail exp) ctx)
-						(let ((args (evlist (get/tail exp) ctx)))
+						(let ((args (k/eval/list (get/tail exp) ctx)))
 						  (gc/protect (args)
 						    (k/apply head args ctx)))))
 				    (set *backtrace-index* (- *backtrace-index* 1))

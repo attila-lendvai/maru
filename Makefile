@@ -31,7 +31,6 @@ TARGET_OS	= gnu
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
-# The LLVM target's word size must be in sync with the constant in emit-early.l!
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
 
@@ -227,7 +226,7 @@ endef
 ###
 $(BUILD)/peg.l: source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
 	$(call ensure-built,$(TEST_EVAL))
-	$(TEST_EVAL) boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
+	$(TIME) $(TEST_EVAL) boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
 		|| { touch --date=2000-01-01 $(BUILD)/peg.l; exit 42; }
 #	mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
 

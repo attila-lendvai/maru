@@ -627,7 +627,7 @@
 
 (define-function record/compute-effective-slots (type)
   ;;(print "record/compute-effective-slots for type " (<type>-name type) " of type " (<type>-name (type-of type)) " ?= <record>" (= type <record>) "\n") ; TODO delme
-  (assert (subtype? (type-of type) <record>))
+  (assert (subtype? (type-of type) <record>) "record/compute-effective-slots called with a non-record type " type)
   (let ((slots (%record/compute-effective-slots type)))
     (sanity-check-record-slots type slots)
     slots))
@@ -648,7 +648,7 @@
     (else				(error "type/slot-count-of-instances: called with something unexpected: " type))))
 
 (define-function %make-record-accessors (type)
-  (assert (subtype? (type-of type) <record>))
+  (assert (subtype? (type-of type) <record>) "%make-record-accessors called with a non-record type " type)
   (%make-accessors (<type>-id type)
                    (<type>-name type)
                    (<record>-direct-slots type)
@@ -905,13 +905,12 @@
   (let ((var (defined? name)))
     (if var
         (if (selector? (<variable>-value var))
-            (list 'quote (<variable>-value var))
+            `(quote ,(<variable>-value var))
           (error name" is already defined as non-selector: " (<variable>-value var)))
-      (let ()
-        (or default (set default `(args (error "selector '"',name
-                                               "' has no method for "(type-name-of (car args))
-                                               ": "(cons (car args) (map type-name-of (cdr args)))))))
-        `(define ,name (selector ',name (lambda ,@default)))))))
+      (or default (set default `(args (error "selector '"',name
+                                             "' has no method for "(type-name-of (car args))
+                                             ": "(cons (car args) (map type-name-of (cdr args)))))))
+      `(define ,name (selector ',name (lambda ,@default))))))
 
 (define-selector add-method)
 
