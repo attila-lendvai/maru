@@ -793,9 +793,11 @@
                         (and *compiler-verbose* (gen COMMENT (list "	void FFI call return value")))
                         (gen LOAD (LITERAL 0) 0))
                        (else
-                        (when (< (llvm-type-bitsize return-type)
-                                 (slave-value slave:target-word-size/bits))
-                          (gen SEXT return-type '%word))
+                        (let ((bitsize		(llvm-type-bitsize return-type))
+                              (target-word-size	(slave-value slave:target-word-size/bits)))
+                          (cond
+                            ((< bitsize target-word-size)	(gen SEXT return-type '%word))
+                            ((> bitsize target-word-size)	(error "This shouldn't happen: (> bitsize target-word-size) for FFI type " return-type))))
                         (gen INTTOPTR '%word))))
                    (unless (<foreign-function>-vararg? value)
                      (set n-params (list-length param-types)))))
