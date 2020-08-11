@@ -820,10 +820,10 @@
        (let () ,@body))))
 
 (define-form new (type . inits)
-  (set type (eval type))
   (let ((i -1))
     ;; TODO singletons for types whose instances have no slots?
-    `(let* ((_self_ (allocate ,(<type>-id type) ,(type/slot-count-of-instances type))))
+    `(let* ((_type_ ,type)
+            (_self_ (allocate (<type>-id _type_) (type/slot-count-of-instances _type_))))
        ;; TODO the usefulness of this is questionable... delme and rename make to new?
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
