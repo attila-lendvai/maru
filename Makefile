@@ -152,8 +152,9 @@ $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
 # TODO change eval1 to llvm in the next stage (grep token: bootstrapping?)
-$(BITCODE_DIR)/eval2.ll: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
+$(BITCODE_DIR)/eval2.ll: boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
 	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR) # delme, too
+	$(call ensure-built,$(BUILD_x86)/eval1)
 	$(call compile-llvm,$(BUILD_x86)/eval1,eval.l,$(BITCODE_DIR)/eval2.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
