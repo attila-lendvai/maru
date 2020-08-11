@@ -269,27 +269,25 @@
  <context>
  <module>)
 
-(define-form %get/type ()
-  `(define-function get/type (ptr)
-     (cond
-       ((not ptr)	k/<undefined>)
-       ((oop? ptr)	(let ((header (header-of ptr)))
+(eval-at-expand
+ `(define-function get/type (ptr)
+    (cond
+      ((not ptr)	k/<undefined>)
+      ((oop? ptr)	(let ((header (header-of ptr)))
                           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
-       ((immediate? ptr) (cond
-                           ,@(let ((conds ()))
-                               (types-do type
-                                 (when (immediate-type? type)
-                                   (let* ((tag-value	(<immediate-type>-tag-value type))
-                                          (tag-width	(<immediate-type>-tag-width type))
-                                          (tag-mask	(^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
-                                     (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(concat-symbol 'k/ (<type>-name type)))))))
-                               conds)
-                           (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
-       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
-
-(%get/type)
+      ((immediate? ptr) (cond
+                          ,@(let ((conds ()))
+                              (types-do type
+                                (when (immediate-type? type)
+                                  (let* ((tag-value	(<immediate-type>-tag-value type))
+                                         (tag-width	(<immediate-type>-tag-width type))
+                                         (tag-mask	(^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
+                                    (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(concat-symbol 'k/ (<type>-name type)))))))
+                              conds)
+                          (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
+      (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
 
 (define-form is (type ptr)
   `(= ,(concat-symbol 'k/ type) (get/type ,ptr)))
@@ -600,18 +598,13 @@
   (assert (subtype? (type-of type) <record>))
   `(%new-object/opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
 
-(define-form %new-<long> ()
+(define-form new-<long> (bits)
   (if (immediate-type? <long>)
-      `(define-form new-<long> (bits)
-         ;; TODO fix nested backquotes finally
-         (list '+ (list '<< bits ,(<immediate-type>-tag-width <long>))
-               ,(<immediate-type>-tag-value <long>)))
-    `(define-function new-<long> (bits)
-       (let ((obj (new-record-instance/opaque <long>)))
-         (set (<long>-_bits obj) bits)
-         obj))))
-
-(%new-<long>)
+      `(+ (<< ,bits ,(<immediate-type>-tag-width <long>))
+          ,(<immediate-type>-tag-value <long>))
+    `(let ((obj (new-record-instance/opaque <long>)))
+       (set (<long>-_bits obj) ,bits)
+       obj)))
 
 (define-function new-<target-vm-pointer> (bits)
   (let ((obj (new-record-instance/opaque <target-vm-pointer>)))

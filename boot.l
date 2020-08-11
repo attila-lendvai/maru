@@ -150,6 +150,10 @@
 (define define-form (form (lambda (env name args . body)
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
+;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
+(define-form eval-at-expand body
+  (eval `(let () ,@body)))
+
 (define-form when (test . body)
   `(and ,test (let () ,@body)))
 
