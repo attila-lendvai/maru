@@ -1,6 +1,6 @@
 ;; (define %make-accessor %make-unsafe-accessor)
 
-(define-structure <*end-of-stream-marker*> ())
+(define-type <*end-of-stream-marker*>)
 
 (define *end* (new <*end-of-stream-marker*>))
 
@@ -35,7 +35,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <string-stream> (string size position))
+(define-record <string-stream> () (string size position))
 
 (define-function string-stream (string)
   (let ((self (new <string-stream>)))
@@ -79,7 +79,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <list-stream> (source))
+(define-record <list-stream> () (source))
 
 (define-function list-stream (source)
   (let ((self (new <list-stream>)))
@@ -116,7 +116,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <input-stream> (source pending srcpos))
+(define-record <input-stream> () (source pending srcpos))
 
 (define-function input-stream (source path)
   (let ((self (new <input-stream>)))
@@ -176,7 +176,7 @@
 ;(define <token>-value car)	(define set-<token>-value set-car)
 ;(define <token>-tail  cdr)	(define set-<token>-tail  set-cdr)
 
-(define-structure <token> (value tail position notes index))
+(define-record <token> () (value tail position notes index))
 
 (define-function new-<token> () (new <token>))
 
@@ -199,7 +199,7 @@
 ;(define <token>-value car)	(define set-<token>-value set-car)
 ;(define <token>-tail  cdr)	(define set-<token>-tail  set-cdr)
 
-(define-structure <group> (first last))
+(define-record <group> () (first last))
 
 (define-function group ()
   (let ((self  (new <group>))
@@ -324,7 +324,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <parser-stream> (source position index))
+(define-record <parser-stream> () (source position index))
 
 ;;(define-function parser-stream (source)
 ;;  (let ((self (new <parser-stream>)))
@@ -490,7 +490,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <parser-input-stream> (source))
+(define-record <parser-input-stream> () (source))
 
 (define-function parser-input-stream (source)	(new <parser-input-stream> source))
 
@@ -501,7 +501,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <rule> (name body recursive?))
+(define-record <rule> () (name body recursive?))
 
 (define-function new-<rule> (name body)
   (let ((self (new <rule>)))
@@ -514,7 +514,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <grammar> (name base fields rules type))
+(define-record <grammar> () (name base fields rules type))
 
 (define-method do-print <grammar> ()
   (print "Grammar["(<grammar>-name self)":"(<grammar>-base self)(<grammar>-fields self)"]={\n")
@@ -668,7 +668,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define-structure <parser> (source result position))
+(define-record <parser> () (source result position))
 
 (define-function parser (type stream)
   (let ((self (new type)))
@@ -733,7 +733,7 @@
 (define *inner* '(*inner*))
 (define *recur* '(*recur*))
 
-(define-structure <memo> (state result position))
+(define-record <memo> () (state result position))
 
 (define-method do-print <memo> ()
   (print "<memo:"self.state">"))

@@ -9,7 +9,7 @@
 
 (progress "defining bootstrap parser")
 
-(define-structure <begpeg> (result))
+(define-record <begpeg> () (result))
 
 (define-form define-rule (rule . body)
   (let ((name (concat-symbol '$ rule)))
@@ -379,14 +379,14 @@
 
 (define-function peg (stream name)
   (let ((self (new <peg>)))
-    (set (<peg>-source       self) stream)
+    (set (<parser>-source    self) stream)
     (set (<peg>-grammar-name self) name)
     self))
 
 (let* ((s (parser-stream (string-stream peg-grammar-string)))
        (p (peg s '<peg>)))
   (while ($definition p)
-    (set PEG (cons (<peg>-result p) PEG)))
+    (set PEG (cons (<parser>-result p) PEG)))
   ($space p)
   (and (!= *end* (parser-stream-peek s)) (error "syntax error in PEG near: "(parser-stream-context s))))
 
