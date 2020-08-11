@@ -35,8 +35,11 @@ TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
 
-# use this eval to execute any tests or code generation from the makefile
+# use this eval to execute any tests or code generation from the makefile.
+# in order of speed, as of this writing.
+#TEST_EVAL	= build/llvm/i686-pc-linux-gnu/eval2
 TEST_EVAL	= $(BUILD_llvm)/eval2
+#TEST_EVAL	= $(BUILD_x86)/eval2
 
 ##
 ## internal variables
@@ -83,6 +86,8 @@ HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 EMIT_FILES_x86	= emit-early.l emit-x86.l emit-late.l
 EMIT_FILES_llvm	= emit-early.l emit-llvm.l emit-late.l
 
+EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l subrs.l arrays.l)
+
 .SUFFIXES:					# disable all built-in rules
 
 all: eval
@@ -99,9 +104,9 @@ stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
 $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 	@echo -e '\nBackend $(BLUE)$*$(RESET):\n'
-	cat boot.l $(EMIT_FILES_$*)		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l $(EMIT_FILES_$*) eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l $(EMIT_FILES_$*)			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat $(EVALUATOR_FILES)				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	cat boot.l $(EMIT_FILES_$*) $(EVALUATOR_FILES)	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
 
 ###
 ### eval and bootstrapping
@@ -119,7 +124,7 @@ eval-llvm: $(BUILD_llvm)/eval2
 
 # eval1 is the first version of us that gets built by the previous stage.
 # some functionality may be broken in this one. this is when we are 'evolving'.
-$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
+$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) boot.l
 	@mkdir --parents $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
@@ -132,10 +137,10 @@ $(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
 		--define makefile/target-triplet   $(TARGET_x86)	\
 		--define makefile/target-word-size 32			\
 		$(EMIT_FILES_x86)					\
-		eval.l							\
+		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
-$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
+$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) boot.l
 	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
@@ -148,27 +153,27 @@ $(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
 		--define makefile/target-triplet   $(TARGET_llvm)	\
 		--define makefile/target-word-size $(TARGET_WORD_SIZE_llvm)	\
 		$(EMIT_FILES_llvm)					\
-		eval.l							\
+		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
 # eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
 # eval2 should implement the semantics encoded by the sources of this stage.
-$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/*.l eval.l
-	$(call compile-x86,$(BUILD_x86)/eval1,eval.l,$(BUILD_x86)/eval2.s)
+$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$(BUILD_x86)/eval2.s)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
-	$(call compile-llvm,$(BUILD_llvm)/eval1,eval.l,$(BITCODE_DIR)/eval2.ll)
+$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$(BITCODE_DIR)/eval2.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 # eval3 is just a test, it's the result of yet another bootstrap iteration, based off of eval2 this time.
 # eval3.s should be the exact same file as the output of the previous iteration, namely eval2.s.
-$(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) bootstrapping/*.l eval.l
-	$(call compile-x86,$(BUILD_x86)/eval2,eval.l,$(BUILD_x86)/eval3.s)
+$(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-x86,$(BUILD_x86)/eval2,source/evaluator/eval.l,$(BUILD_x86)/eval3.s)
 	@-$(DIFF) $(BUILD_x86)/eval2.s $(BUILD_x86)/eval3.s >$(BUILD_x86)/eval3.s.diff
 
-$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
-	$(call compile-llvm,$(BUILD_llvm)/eval2,eval.l,$(BITCODE_DIR)/eval3.ll)
+$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-llvm,$(BUILD_llvm)/eval2,source/evaluator/eval.l,$(BITCODE_DIR)/eval3.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval2.ll $(BITCODE_DIR)/eval3.ll >$(BITCODE_DIR)/eval3.ll.diff
 
 $(HOST_DIR)/eval:
