@@ -1,5 +1,13 @@
 ;;; This is the minimum "standard library" that is needed/used while bootstrapping
 
+;; NOTE define is implemented so that it unconditionally defines the variable
+;; at expand time, therefore we need to "hide" it inside a quote.
+(if (not (defined? 'bootstrapping?))
+    (eval '(define bootstrapping? ())))
+
+(if (not (defined? 'evolving?))
+    (eval '(define evolving? ())))
+
 (if bootstrapping?
     (let ()
       (warn "boot.l speaking; we're bootstrapping")
