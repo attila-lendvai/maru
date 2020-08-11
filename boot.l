@@ -719,6 +719,7 @@
 
 (define-form define-class (name basis fields)
   ;; TODO source-level compatibility. decide whether to delme.
+  ;; TODO accessor regression: there used to be <peg>-result, not there's only <parser>-result
   `(define-record ,name ,basis ,fields))
 
 ;;; built-in types
@@ -728,10 +729,16 @@
 ;; for the built-in types in boot.l merely fill in some missing parts. types
 ;; are represented internally as successive integers.
 ;; corollary: the two files must agree, both in the order and in the field layout.
+
+;; TODO maybe: type objects should be serialized into the compiled binary and this
+;; should be wrapped in a big (eval-at-expand (if bootstrapping? ...)). this would also
+;; reflect the fact that editing these and bringing it out of sync with the
+;; level-shifted binary is not an option without grave consequences.
+;; such a setup would hopefully simplify the bootstrapping dance above
 (define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
 (define-type		<data>)					; some blob; used for stuff like the _bits of <string> and <array>
 (define-immediate-type	<long> 1 1)
-;;(define-record <long>			() (_bits))
+;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
 (define-record <array>			() (size _bits))
 (define-record <expr>			() (name defn ctx))        ; TODO: defn is: (env formals . prog), parse it into separate slots? name is informal for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
@@ -1269,17 +1276,17 @@
   (libc/fopen path))
 
 (define-function close (stream)
-  (assert (= <long> (type-of stream)) "close: non-integer argument: " stream)
+  (assert (= <target-vm-pointer> (type-of stream)) "close: inappropriate argument: " stream)
   ;; TODO error handling
   (libc/fclose stream))
 
 (define-function getc (stream)
-  (assert (= <long> (type-of stream)) "getc: non-integer argument: " stream)
+  (assert (= <target-vm-pointer> (type-of stream)) "getc: inappropriate argument: " stream)
   ;; TODO error handling
   (libc/fgetc stream))
 
 (define-function putc (stream char)
-  (assert (= <long> (type-of stream)) "putc: non-integer stream argument: " stream)
+  (assert (= <target-vm-pointer> (type-of stream)) "putc: inappropriate stream argument: " stream)
   (assert (= <long> (type-of char))   "putc: non-integer char argument: " char)
   ;; TODO error handling
   (libc/fputc stream char))
