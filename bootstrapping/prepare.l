@@ -21,6 +21,11 @@
 ;; and then compiles the definitions to the target (does the level-shift).
 (define bootstrapping? 't)
 
+;; The variable evolving? denotes that the host running the bootstrapping process is
+;; the previous stage, i.e. an earlier version of us. It will be set in host-extras.l
+;; if it gets loaded.
+(define evolving? ())
+
 (define switch-to-host-module
     (lambda ()
       ;;(warn "--- switching to the host  module\n")

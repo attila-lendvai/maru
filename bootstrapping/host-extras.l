@@ -6,6 +6,5 @@
 
 (warn "--- boostrapping: host extras\n")
 
-;; The variable evolving? denotes that the host running the bootstrapping process is
-;; the previous stage, i.e. not fully compatible with us.
-(eval-in-module slave '(slave:define slave:evolving?      (slave:quote slave:t)))
+;; Mark the fact that we are evolving from the previous stage.
+(eval-in-module slave '(slave:set slave:evolving? (slave:quote slave:t)))
