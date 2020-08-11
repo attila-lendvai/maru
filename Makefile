@@ -17,7 +17,9 @@
 ##
 ## configuration
 ##
-BACKENDS	= x86 llvm
+
+# backends to build
+BACKENDS		= x86 llvm
 
 LLVM_VERSION	= 8
 LLVM_ARGS	= -O3
@@ -31,6 +33,9 @@ TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
 
+# use this eval to execute any tests or code generation from the makefile
+TEST_EVAL	= $(BUILD_llvm)/eval2
+
 ##
 ## internal variables
 ##
@@ -41,12 +46,15 @@ MAKEFLAGS	+= --warn-undefined-variables --output-sync
 TARGET_CPU_llvm	= $(firstword $(subst -, ,$(TARGET_llvm)))
 
 ifeq ($(TARGET_CPU_llvm),x86_64)
-  TARGET_WORD_SIZE_llvm = 64
+  TARGET_WORD_SIZE_llvm	= 64
+  BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
 else ifeq ($(TARGET_CPU_llvm),i686)
-  TARGET_WORD_SIZE_llvm = 32
+  TARGET_WORD_SIZE_llvm	= 32
+  BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
 else
   $(error "Couldn't extract the target's word size from the llvm triplet '$(TARGET_llvm)'. Extracted CPU: '$(TARGET_CPU_llvm)'")
 endif
+
 
 # see https://stackoverflow.com/a/20983251/14464
 RED		= $(shell tput setaf 1)
@@ -68,7 +76,7 @@ BUILD		= build
 
 BUILD_x86	= $(BUILD)/x86/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm/$(TARGET_llvm)
-BOOT_EVAL_PATH	= $(BUILD)/$(PREVIOUS_STAGE)
+HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 
 EMIT_FILES_x86	= emit-early.l emit-x86.l emit-late.l
 EMIT_FILES_llvm	= emit-early.l emit-llvm.l emit-late.l
@@ -107,21 +115,35 @@ eval-llvm: $(BUILD_llvm)/eval2
 	cp $< $@
 	cp $< eval
 
-# eval1 is the first version of us that was built by the previous stage.
-# some functionality may be broken in this one.
-$(BUILD_x86)/eval1.s: $(BOOT_EVAL_PATH)/eval bootstrapping/*.l eval.l boot.l
+# eval1 is the first version of us that gets built by the previous stage.
+# some functionality may be broken in this one. this is when we are 'evolving'.
+$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
 	@mkdir --parents $(BUILD_x86)
-	$(TIME) $(BOOT_EVAL_PATH)/eval		\
-		$(BOOT_EVAL_PATH)/boot.l	\
-		bootstrapping/prepare.l		\
-		bootstrapping/host-extras.l	\
-		bootstrapping/early.l		\
-		boot.l				\
-		bootstrapping/slave-extras.l	\
-		bootstrapping/late.l		\
-		$(BOOT_EVAL_PATH)/emit.l	\
-		eval.l				\
-			>$(BUILD_x86)/eval1.s || { touch --date=2000-01-01 $(BUILD_x86)/eval1.s; exit 42; }
+	$(TIME) $(HOST_DIR)/eval					\
+		$(HOST_DIR)/boot.l					\
+		bootstrapping/prepare.l					\
+		bootstrapping/host-extras.l				\
+		bootstrapping/early.l					\
+		boot.l							\
+		bootstrapping/slave-extras.l				\
+		bootstrapping/late.l					\
+		$(HOST_DIR)/emit.l					\
+		eval.l							\
+			>$@ || { touch --date=2000-01-01 $@; exit 42; }
+
+$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
+	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
+	$(TIME) $(HOST_DIR)/eval					\
+		$(HOST_DIR)/boot.l					\
+		bootstrapping/prepare.l					\
+		bootstrapping/host-extras.l				\
+		bootstrapping/early.l					\
+		boot.l							\
+		bootstrapping/slave-extras.l				\
+		bootstrapping/late.l					\
+		$(HOST_DIR)/emit.l					\
+		eval.l							\
+			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
 # eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
 # eval2 should implement the semantics encoded by the sources of this stage.
@@ -130,10 +152,10 @@ $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
 # TODO change eval1 to llvm in the next stage (grep token: bootstrapping?)
-$(BUILD_llvm)/eval2.ll: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
-	@mkdir --parents $(BUILD_llvm) # delme, too
-	$(call compile-llvm,$(BUILD_x86)/eval1,eval.l,$(BUILD_llvm)/eval2.ll)
-	@-$(DIFF) $(BUILD_llvm)/eval1.ll $(BUILD_llvm)/eval2.ll >$(BUILD_llvm)/eval2.ll.diff
+$(BITCODE_DIR)/eval2.ll: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
+	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR) # delme, too
+	$(call compile-llvm,$(BUILD_x86)/eval1,eval.l,$(BITCODE_DIR)/eval2.ll)
+	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 # eval3 is just a test, it's the result of yet another bootstrap iteration, based off of eval2 this time.
 # eval3.s should be the exact same file as the output of the previous iteration, namely eval2.s.
@@ -141,17 +163,20 @@ $(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) bootstrapping/
 	$(call compile-x86,$(BUILD_x86)/eval2,eval.l,$(BUILD_x86)/eval3.s)
 	@-$(DIFF) $(BUILD_x86)/eval2.s $(BUILD_x86)/eval3.s >$(BUILD_x86)/eval3.s.diff
 
-$(BUILD_llvm)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
-	$(call compile-llvm,$(BUILD_llvm)/eval2,eval.l,$(BUILD_llvm)/eval3.ll)
-	@-$(DIFF) $(BUILD_llvm)/eval2.ll $(BUILD_llvm)/eval3.ll >$(BUILD_llvm)/eval3.ll.diff
+$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
+	$(call compile-llvm,$(BUILD_llvm)/eval2,eval.l,$(BITCODE_DIR)/eval3.ll)
+	@-$(DIFF) $(BITCODE_DIR)/eval2.ll $(BITCODE_DIR)/eval3.ll >$(BITCODE_DIR)/eval3.ll.diff
 
-$(BOOT_EVAL_PATH)/eval:
+$(HOST_DIR)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
 	@mkdir --parents $(BUILD)
 # after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
 	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
-	$(MAKE) --jobs=1 --directory=$(BUILD)/$(PREVIOUS_STAGE)
+# a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
+	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
+# make sure our paralellism doesn't spread downwards from here. those makefiles are not tested, and there's notthing to paralellize there anyway.
+	$(MAKE) --jobs=1 --directory=$(BUILD)/$(PREVIOUS_STAGE) eval
 
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
@@ -166,7 +191,7 @@ define compile-x86
 	--define makefile/target-word-size 32			\
 	$(EMIT_FILES_x86)		\
 	$(2)				\
-	>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
+		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
 endef
 
 define compile-llvm
@@ -192,8 +217,9 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/peg.l: eval source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
-	./eval boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
+$(BUILD)/peg.l: source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
+	$(call ensure-built,$(TEST_EVAL))
+	$(TEST_EVAL) boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
 		|| { touch --date=2000-01-01 $(BUILD)/peg.l; exit 42; }
 #	mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
 
@@ -204,22 +230,22 @@ source/parsing/peg.l: $(BUILD)/peg.l
 ### Pattern rules
 ###
 $(BUILD)/%: $(BUILD)/%.s
+	@mkdir --parents $(@D)
 	$(CC) -m32 -o $@ $<
 	@-$(STRIP) $@ -o $@.stripped
 
-$(BUILD)/%: $(BUILD)/%.ll
-	$(LLC) -filetype=obj -o $@.o $@.ll
+$(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
+	@mkdir --parents $(@D)
+	$(LLC) -filetype=obj -o $@.o $<
 	$(CLANG) --target=$(TARGET_llvm) -o $@ $@.o
 # the rest is just informational
 	@-$(STRIP) $@ -o $@.stripped
-	@-$(LLC) -filetype=asm -o $@.opt.s $@.ll
+	@-$(LLC) -filetype=asm -o $@.opt.s $<
 #	$(CLANG) --target=$(TARGET_llvm) -S -o $@.clang.s $<
 
 ###
 ### Tests
 ###
-TEST_EVAL	= $(BUILD_llvm)/eval2
-
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend))
 
 # TODO backend duplication
@@ -229,7 +255,7 @@ test-bootstrap-x86: $(BUILD_x86)/eval3
 	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_x86)/eval2 boot.l -
 
 test-bootstrap-llvm: $(BUILD_llvm)/eval3
-	$(DIFF) $(BUILD_llvm)/eval2.$(ASM_FILE_EXT_llvm) $(BUILD_llvm)/eval3.$(ASM_FILE_EXT_llvm)
+	$(DIFF) $(BITCODE_DIR)/eval2.$(ASM_FILE_EXT_llvm) $(BITCODE_DIR)/eval3.$(ASM_FILE_EXT_llvm)
 	$(DIFF) $(BUILD_llvm)/eval2.stripped $(BUILD_llvm)/eval3.stripped
 	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_llvm)/eval2 boot.l -
 
@@ -247,10 +273,10 @@ $(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): tests/compiler-tests.l $(EMIT_FI
 	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
-$(BUILD_llvm)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
+$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
 	@mkdir --parents $(BUILD_llvm)
 	$(call ensure-built,$(TEST_EVAL))
-	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_llvm)/compiler-test.$(ASM_FILE_EXT_llvm))
+	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
 test-interpreter: $(TEST_EVAL) boot.l tests/interpreter-tests.l
 	$(TEST_EVAL) boot.l tests/interpreter-tests.l
