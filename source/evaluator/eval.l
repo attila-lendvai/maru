@@ -379,12 +379,12 @@
 
 (define-form get/variable-value	(var)		`(get <variable> value
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                           `(k/env/lookup-variable (get/globals) (k/intern ,var))
                                                          var)))
 
 (define-form put/variable-value	(var val)	`(put <variable> value
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (intern ,var))
+                                                           `(k/env/lookup-variable (get/globals) (k/intern ,var))
                                                          var)
                                                       ,val))
 
@@ -617,8 +617,8 @@
     (put <variable> value var value)
     var))
 
-(define-function intern* (cstr module)
-  (safety 1 (k/assert (is <module> module) "intern called with not a module " module))
+(define-function k/intern* (cstr module)
+  (safety 1 (k/assert (is <module> module) "k/intern called with not a module " module))
   ;; deal with ?: syntax for denoting modules
   (let ((len (libc/strlen cstr))
         (idx 0))
@@ -627,11 +627,11 @@
         (let ((module-name (libc/malloc (+ 1 idx))))
           (libc/memcpy module-name cstr idx)
           (set (string-at module-name idx) 0)
-          (let ((submod (k/env/variable-value (get/globals* module) (intern* module-name module))))
+          (let ((submod (k/env/variable-value (get/globals* module) (k/intern* module-name module))))
             (unless (is <module> submod)
-              (fatal2 "intern: '%s' is found, but it's not a module while interning %s" module-name cstr))
+              (fatal2 "k/intern: '%s' is found, but it's not a module while interning %s" module-name cstr))
             (libc/free module-name)
-            (return (intern* (+ 1 (+ cstr idx)) submod)))))
+            (return (k/intern* (+ 1 (+ cstr idx)) submod)))))
       (set idx (+ 1 idx))))
   ;; no module is denoted in cstr (anymore); it's just a symbol to be at this point
   (let ((symbols (get <module> symbols module)))
@@ -650,8 +650,8 @@
       (k/array-insert symbols lo sym)
       sym))))
 
-(define-function intern (cstr)
-  (intern* cstr *module*))
+(define-function k/intern (cstr)
+  (k/intern* cstr *module*))
 
 (require "source/evaluator/reader.l")
 
@@ -763,7 +763,7 @@
               (let ((buf (new_buffer)))
                 (buffer_append_all buf "set-")
                 (buffer_append_all buf (get/symbol (get/head (get/head tail))))
-                (set head (intern (buffer_contents buf)))
+                (set head (k/intern (buffer_contents buf)))
                 (set tail (k/concat-list (get/tail (get/head tail)) (get/tail tail)))))
          (set exp (new-<pair> head tail))
          (gc/pop-root (address-of tail))
@@ -953,7 +953,7 @@
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0)))
     (set (<module>-symbols module)	(new-<array> 0))
-    (set (<module>-globals module)	(k/env/define env (intern* "*globals*" module) env))
+    (set (<module>-globals module)	(k/env/define env (k/intern* "*globals*" module) env))
     (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
 
@@ -968,7 +968,7 @@
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
-    (k/env/define (get/globals* module) (intern* name module) tmp)))
+    (k/env/define (get/globals* module) (k/intern* name module) tmp)))
 
 (define-form instantiate-subrs ()
   (let ((result ()))
@@ -986,44 +986,44 @@
   (let ((env (get/globals* module))
         (tmp))
     (gc/protect (tmp)
-				(k/env/define env (intern* "*input*"			module) ())
-				(k/env/define env (intern* "*command-line-arguments*"	module) ())
-      (set tmp (new-<long> 0))	(k/env/define env (intern* "*verbosity*"		module) tmp)
-      (set tmp (new-<long> 0))	(k/env/define env (intern* "*optimised*"		module) tmp)
+				(k/env/define env (k/intern* "*input*"			module) ())
+				(k/env/define env (k/intern* "*command-line-arguments*"	module) ())
+      (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*verbosity*"		module) tmp)
+      (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*optimised*"		module) tmp)
 
-      (k/env/define env (intern* "+done+" module) k/+done+)
+      (k/env/define env (k/intern* "+done+" module) k/+done+)
 
-      (set tmp (new-<array> 0))	(k/env/define env (intern* "*expanders*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (intern* "*encoders*"			module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (intern* "*evaluators*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (intern* "*applicators*"		module) tmp))
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*expanders*"		module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*encoders*"			module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*evaluators*"		module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp))
 
     (instantiate-subrs))))
 
 (set capture-well-known-vm-values (lambda ()
   (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
-  (set symbol/t                      (intern "t"))
-  (set symbol/dot                    (intern "."))
-  (set symbol/define                 (intern "define"))
-  (set symbol/set                    (intern "set"))
-  (set symbol/quote                  (intern "quote"))
-  (set symbol/quasiquote             (intern "quasiquote"))
-  (set symbol/unquote                (intern "unquote"))
-  (set symbol/unquote_splicing       (intern "unquote-splicing"))
+  (set symbol/t                      (k/intern "t"))
+  (set symbol/dot                    (k/intern "."))
+  (set symbol/define                 (k/intern "define"))
+  (set symbol/set                    (k/intern "set"))
+  (set symbol/quote                  (k/intern "quote"))
+  (set symbol/quasiquote             (k/intern "quasiquote"))
+  (set symbol/unquote                (k/intern "unquote"))
+  (set symbol/unquote_splicing       (k/intern "unquote-splicing"))
 
   (let ((global-env (get/globals)))
-    (set var/*expanders*	(k/env/lookup-variable-or-die global-env (intern "*expanders*")))
-    (set var/*encoders*		(k/env/lookup-variable-or-die global-env (intern "*encoders*")))
-    (set var/*evaluators*	(k/env/lookup-variable-or-die global-env (intern "*evaluators*")))
-    (set var/*applicators*	(k/env/lookup-variable-or-die global-env (intern "*applicators*")))
-    (set var/*input*		(k/env/lookup-variable-or-die global-env (intern "*input*")))
+    (set var/*expanders*	(k/env/lookup-variable-or-die global-env (k/intern "*expanders*")))
+    (set var/*encoders*		(k/env/lookup-variable-or-die global-env (k/intern "*encoders*")))
+    (set var/*evaluators*	(k/env/lookup-variable-or-die global-env (k/intern "*evaluators*")))
+    (set var/*applicators*	(k/env/lookup-variable-or-die global-env (k/intern "*applicators*")))
+    (set var/*input*		(k/env/lookup-variable-or-die global-env (k/intern "*input*")))
 
-    (set fixed-subr/quote  (k/env/variable-value global-env (intern "quote")))
-    (set fixed-subr/lambda (k/env/variable-value global-env (intern "lambda")))
-    (set fixed-subr/let    (k/env/variable-value global-env (intern "let")))
-    (set fixed-subr/define (k/env/variable-value global-env (intern "define")))
-    (set fixed-subr/set    (k/env/variable-value global-env (intern "set")))
+    (set fixed-subr/quote  (k/env/variable-value global-env (k/intern "quote")))
+    (set fixed-subr/lambda (k/env/variable-value global-env (k/intern "lambda")))
+    (set fixed-subr/let    (k/env/variable-value global-env (k/intern "let")))
+    (set fixed-subr/define (k/env/variable-value global-env (k/intern "define")))
+    (set fixed-subr/set    (k/env/variable-value global-env (k/intern "set")))
 
     (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "capture-well-known-vm-values: assert 2"))
 
@@ -1073,7 +1073,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/lookup-variable (get/globals) (intern "*command-line-arguments*"))))
+  (let ((cla-var (k/env/lookup-variable (get/globals) (k/intern "*command-line-arguments*"))))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
@@ -1113,7 +1113,7 @@
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
                (put <variable> value cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
-               (let* ((sym (intern arg))
+               (let* ((sym (k/intern arg))
                       (form (new-<pair> sym ())))
                  (gc/protect (form)
                    (k/expand-encode-eval form (get/globals)))))
@@ -1137,7 +1137,7 @@
                    (when (= 0 (string-at endptr 0))
                      (set val (new-<long> i))))
                  (gc/let* ((form (new-<pair> val ())))
-                   (set form (new-<pair> (intern (get/string var)) form))
+                   (set form (new-<pair> (k/intern (get/string var)) form))
                    (set form (new-<pair> symbol/define form))
                    (k/expand-encode-eval form (get/globals)))))
 

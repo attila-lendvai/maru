@@ -417,7 +417,7 @@
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
-           (intern (get/string arg))))))
+           (k/intern (get/string arg))))))
 
 (define-subr (symbol->string 1)
   (let ((arg (k/car -args-)))

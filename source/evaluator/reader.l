@@ -128,7 +128,7 @@
       (buffer_append buf c)
       (set c (libc/fgetc stream)))
     (libc/ungetc c stream)
-    (let ((result (intern (buffer_contents buf))))
+    (let ((result (k/intern (buffer_contents buf))))
       (buffer_delete buf)
       result)))
 
