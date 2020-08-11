@@ -10,6 +10,7 @@
 #  make test-bootstrap-llvm || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
+#  make TARGET_llvm=i686-pc-linux-gnu test-bootstrap-llvm || beep
 #
 # the makefile parallelism is mostly only between the backends.
 
@@ -78,9 +79,11 @@ all: eval
 
 clean:
 	rm -rf $(BUILD)/x86 $(BUILD)/llvm eval $(foreach backend,${BACKENDS},eval-$(backend))
+	git checkout $(BUILD) || true
 
 distclean: clean
 	rm -rf $(BUILD)
+	git checkout $(BUILD) || true
 
 stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
@@ -93,11 +96,16 @@ $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 ###
 ### eval and bootstrapping
 ###
-eval: $(foreach backend,${BACKENDS},$(BUILD_$(backend))/eval2)
-# NOTE ./eval will be the last one in BACKENDS that actually got built, which is llvm as of now
-	@for x in $(foreach backend,${BACKENDS},$(BUILD_$(backend))/eval2); do	\
-		cp $${x} eval;								\
-	done
+eval: $(foreach backend,${BACKENDS},eval-$(backend))
+# NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
+
+eval-x86: $(BUILD_x86)/eval2
+	cp $< $@
+	cp $< eval
+
+eval-llvm: $(BUILD_llvm)/eval2
+	cp $< $@
+	cp $< eval
 
 # eval1 is the first version of us that was built by the previous stage.
 # some functionality may be broken in this one.
