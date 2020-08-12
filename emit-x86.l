@@ -238,21 +238,21 @@
 
 (define-emit    (COMMENT pair)			(print "## ") (apply println $1))
 
-(define-emit    (CHR-AT TI32)			(println "	movl	"$1", %ecx")
+(define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
 						(println "	xorl	%eax, %eax")
 						(println "	movb	(%ecx), %al"))
 
-(define-emit    (SET-CHR-AT TI32 TI32)		(println "	movl	"$1", %ecx")
+(define-emit    (STORE-I8 TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
 						(println "	movl	"$2", %eax")
 						(println "	movb	%al, (%ecx)"))
 
-(define-emit    (OOP-AT TI32)			(println "	movl	"$1", %ecx")
+(define-emit    (LOAD-OOP TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx, 4), %ecx")
 						(println "	movl	(%ecx), %eax"))
 
-(define-emit    (SET-OOP-AT TI32 TI32)		(println "	movl	"$1", %ecx")
+(define-emit    (STORE-OOP TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx, 4), %ecx")
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
@@ -387,9 +387,11 @@
               (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
               (slave:<< ,SLA) (slave:>>  ,SRA)
-              (slave:oop-at     ,OOP-AT)     (slave:string-at     ,CHR-AT))
+              (slave:string-at		,LOAD-I8)
+              (slave:oop-at		,LOAD-OOP))
              ;; ternary
-             ((slave:set-oop-at ,SET-OOP-AT) (slave:set-string-at ,SET-CHR-AT)))))
+             ((slave:set-string-at	,STORE-I8)
+              (slave:set-oop-at		,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)

@@ -479,16 +479,34 @@
            (pair? b)
            (equal-lists a b)))))
 
+;;; math
+
+(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
+(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
+
+(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
+(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
+(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
+
 ;;;
 ;;; types
 ;;;
+;;;
+;;; type-id-of: returns the type-id that the target VM is working with,
+;;; i.e. the "level-shifted name" of the type (an integer).
+;;;
+;;; type-of: returns a maru record holding the metadata for that type
+;;; (i.e. its name, type-id, etc).
+;;;
+;;; the <foo> global definitions are also holding full maru type objects.
+;;;
+;;; NOTE we store the extra type id in a slave-id slot (as opposed to
+;;; a host-id slot) so that most things in the host keeps working
+;;; because <type>-id of a slave type instance returns the host type id.
 
-;; type-id-of returns the type-id that the target VM is working with,
-;; i.e. the "level-shifted name" of the type (an integer).
-;; the new type-of that we are defining here will return a maru record holding
-;; the metadata for that type (i.e. its name, type-id, etc). the <foo>
-;; definitions are also holding full maru type objects now.
-(define type-id-of type-of)
+(define type-id-of type-of) ; we will replace type-of later
 
 (define %first-type-id		1) ; i.e. the first allocated type will be 1 (so that we can assert for non-zero type in the gc)
 (define %last-type-id		(- %first-type-id 1))
@@ -554,7 +572,7 @@
         (eval `(register-type/host ,type)))
     (set (array-at %types (<type>-id type)) type)))
 
-(define-function %instantiate-type (type-name type-id type-type-id slot-count)
+(define-function %bootstrap-type (type-name type-id type-type-id slot-count)
   (let ((type-obj (allocate type-type-id slot-count)))
     (set (<type>-id	type-obj)	type-id)
     (set (<type>-name	type-obj)	type-name)
@@ -562,15 +580,15 @@
     (eval `(define ,type-name ,type-obj))
     type-obj))
 
-(define-function %instantiate-record (type-name type-id super direct-slots)
-  (let ((type-obj (%instantiate-type type-name type-id type-id-of-<record> (+ (list-length slots-of-<type>)
-                                                                              (list-length slots-of-<record>)))))
+(define-function %bootstrap-record (type-name type-id super direct-slots)
+  (let ((type-obj (%bootstrap-type type-name type-id type-id-of-<record> (+ (list-length slots-of-<type>)
+                                                                            (list-length slots-of-<record>)))))
     (set (<record>-super		type-obj)		super)
     (set (<record>-direct-slots		type-obj)		direct-slots)
     (set (<record>-effective-slots	type-obj)		'not-yet-bootstrapped)))
 
-(%instantiate-record '<type>		type-id-of-<type>	()	slots-of-<type>)	(when (< 0 *verbosity*) (warn "<type> is bootstrapped: " <type> "\n"))
-(%instantiate-record '<record>		type-id-of-<record>	<type>	slots-of-<record>)	(when (< 0 *verbosity*) (warn "<record> is bootstrapped: " <record> "\n"))
+(%bootstrap-record '<type>		type-id-of-<type>	()	slots-of-<type>)	(when (< 0 *verbosity*) (warn "<type> is bootstrapped: " <type> "\n"))
+(%bootstrap-record '<record>		type-id-of-<record>	<type>	slots-of-<record>)	(when (< 0 *verbosity*) (warn "<record> is bootstrapped: " <record> "\n"))
 
 (assert (or (not bootstrapping?)
             (and (> (<type>-id <type>) 5)   (> (type-id-of <type>) 5)
@@ -580,7 +598,7 @@
 (define-function type-object-for (type-id)
   (or (array-at %types (if bootstrapping?
                            (let ((slave-id (array-at %type-id-map/host->slave type-id)))
-                             ;; we could make this smarter and only remap slave type ids when necessary...
+                             ;; we could make this smarter and only do the remap when there's an entry...
                              ;; but do we want to? wouldn't that hide some nasty bugs?
                              (assert slave-id "type-object-for: no host->slave mapping exists for host type-id: " type-id)
                              slave-id)
@@ -742,7 +760,7 @@
 
 (define-form define-class (name basis fields)
   ;; TODO source-level compatibility. decide whether to delme.
-  ;; TODO accessor regression: there used to be <peg>-result, not there's only <parser>-result
+  ;; TODO accessor regression: there used to be <peg>-result, now there's only a <parser>-result (inheritance)
   `(define-record ,name ,basis ,fields))
 
 ;;; built-in types
@@ -763,6 +781,7 @@
 (define-immediate-type	<long> 1 1)
 ;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
 (define-record <array>			() (size _bits))
+(define-record <string>			() (size _bits))
 (define-record <expr>			() (name defn ctx))        ; TODO: defn is: (env formals . prog), parse it into separate slots? name is informal for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
 (define-record <fixed>			() (function))
@@ -772,7 +791,6 @@
 (define-record <context>		() (home env bindings callee pc))
 (define-record <module>			() (symbols globals)) ; globals is the <variable> that holds '*globals*
 (define-record <target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
-(define-record <string>			() (size _bits))
 (define-record <symbol>			() (_bits))
 (define-record <pair>			() (head tail))
 
@@ -893,7 +911,7 @@
   ;; same applies to generics.
   (apply (or (array-at (<selector>-methods self)
                        (type-id-of (car arguments)) ; faster version
-                       ;;(<type>-id (type-of (car arguments))) ; more correct version
+                       ;;(<type>-id (type-of (car arguments))) ; more correct version that considers the type mappings while bootstrapping
                        )
              (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
@@ -1138,17 +1156,6 @@
      (while ,test
        ,@body
        ,@(%loop-steps bindings))))
-
-;;; math
-
-(define-form incr (lval . options)	`(set ,lval (+ ,lval ,(or (car options) 1))))
-(define-form decr (lval . options)	`(set ,lval (- ,lval ,(or (car options) 1))))
-
-(define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
-(define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
-(define-function sum (a . rest)	(list-do b rest (incr a b)) a)
-
-(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
 
 ;;; conversion
 

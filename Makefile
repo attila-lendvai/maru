@@ -253,7 +253,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 ###
 ### Tests
 ###
-test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend))
+test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-interpreter
 
 # TODO backend duplication
 test-bootstrap-x86: $(BUILD_x86)/eval3

@@ -4,7 +4,8 @@
 
 (switch-to-slave-module)
 
-;; use the host vm's type machinery to be able to instantiate stuff while we are being bootstrapped
+;; integrate with the host vm's type machinery to instantiate slave objects
+;; in the framework of the host's type machinery while we are being bootstrapped.
 (define allocate-type-id
     (lambda ()
       (eval-in-module host '(host:allocate-type-id))))

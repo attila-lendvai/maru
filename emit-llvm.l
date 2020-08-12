@@ -425,14 +425,22 @@
 (define-arithmetic-instruction SLA "shl")
 (define-arithmetic-instruction SRA "ashr")
 
-(define-instruction BYTE-AT	(t 5 t)
+;; args: baseptr, index
+(define-instruction LOAD-I8	(t 5 t)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %ptr")))
 
-(define-instruction SET-BYTE-AT	(t 6 t)
+(define-instruction LOAD-OOP	(t 4 t)
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
+				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
+				(println "	"$reg4" = load %ptr, %ptr* "$reg3)))
+
+;; args: baseptr, index, value
+(define-instruction STORE-I8	(t 6 t)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
@@ -441,13 +449,7 @@
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
 				(println "	"$reg6" = inttoptr %word "$reg5" to %ptr")))
 
-(define-instruction OOP-AT	(t 4 t)
-  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
-				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
-				(println "	"$reg4" = load %ptr, %ptr* "$reg3)))
-
-(define-instruction SET-OOP-AT	(t 4 t)
+(define-instruction STORE-OOP	(t 4 t)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
 				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
@@ -714,19 +716,18 @@
               (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
               (slave:<< ,SLA) (slave:>>  ,SRA)
-              (slave:oop-at ,OOP-AT)
-              (slave:string-at ,BYTE-AT))
+              (slave:string-at		,LOAD-I8)
+              (slave:oop-at		,LOAD-OOP))
              ;; ternary
-             ((slave:set-oop-at ,SET-OOP-AT)
-              (slave:set-string-at ,SET-BYTE-AT)
-              ))))
+             ((slave:set-string-at	,STORE-I8)
+              (slave:set-oop-at		,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-module slave op-name)))
-                       ;; NOTE this is not (slave-value slave:<subr>), because it's the eval.exe of the
-                       ;; previous stage that instantiates these subr's, and it instantiates them
+                       ;; NOTE this is not (slave-value slave:<subr>), because it's the host eval.exe
+                       ;; that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
                        ;; see here at runtime).
@@ -864,6 +865,8 @@
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
                              formal-params)))
+    (and *compiler-verbose* (print "; compiling fn "name", body: ") (dumpln body))
+
     (list-do e body
       (comp e))
 
