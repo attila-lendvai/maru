@@ -25,6 +25,11 @@
   (when (<= level safety-level)
     `(let () ,@prog)))
 
+(define-constant track-backtrace? (or t (< 0 safety-level)))
+
+;; to detect infinite recursion before a sigsegv tells us so.
+(define-constant +maximum-call-stack-depth+ 10000)
+
 ;;;
 ;;; Naming convention in this file:
 ;;;
@@ -132,6 +137,11 @@
   (define-form initialize-header-magic-marker (header)
     `(set (<header>-magic-marker ,header) ,marker)))
 
+(define-form valid-maru-value? (obj)
+  `(let ((__obj__ ,obj))
+     (or (immediate? __obj__)
+         (valid-header-canary? (header-of __obj__)))))
+
 (define-constant <header>-flags/used	1)
 (define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects
 (define-constant <header>-flags/mark	4)
@@ -152,6 +162,8 @@
 
 ;; TODO FIXME this crashes the gc when inside (compile-begin)
 (define-record <buffer> () (contents capacity position))
+
+(define-record <call-frame> () (callee-designator callee arguments))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -189,8 +201,9 @@
 
 (define k/+done+) ; we need a unique value that k/read cannot ever read from any source file; will be initialized at startup
 
-(define *backtrace-stack*	0)
-(define *backtrace-index*	0)
+(define *call-stack-index*	0)
+(when-at-expand track-backtrace?
+  (define *call-stack*		0))
 
 (define *arg/verbose*		0)
 (define *arg/optimised*		0)
@@ -217,6 +230,8 @@
 (define symbol/quasiquote)
 (define symbol/unquote)
 (define symbol/unquote_splicing)
+(define symbol/encode)
+(define symbol/apply)
 
 (define fixed-subr/quote)
 (define fixed-subr/lambda)
@@ -232,7 +247,7 @@
 (define print-backtrace) ; forward
 
 (define-function die ()
-  (libc/fprintf libc/stderr "\nDIE called at depth %d, printing a backtrace to stdout and exiting with exit code 1...\n" *backtrace-index*)
+  (libc/fprintf libc/stderr "\nDIE called...\n")
   (libc/flush-streams)
   (print-backtrace)
   (libc/flush-streams)
@@ -310,7 +325,8 @@
  <variable>
  <env>
  <context>
- <module>)
+ <module>
+ <call-frame>)
 
 (eval-at-expand
  `(define-function get/type (ptr)
@@ -661,13 +677,64 @@
 
 (require "source/evaluator/printer.l")
 
+;;;
+;;; backtrace
+;;; ----------------------------------------------------------------
+
+(define-form with-new-call-frame (args . body)
+  (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
+                             (fatal1 "infinite recursion guard triggered at call depth %ld" *call-stack-index*))))
+    `(let ((__result__ ,(if track-backtrace?
+                            `(let ((-call-frame- (%new-call-frame ,@args)))
+                               ,call-depth-check
+                               ,@body)
+                          `(let ()
+                             ,call-depth-check
+                             ,@body))))
+       (decr *call-stack-index*)
+       (when (<= 0 *call-stack-index*)
+         ;; gc optimization: clear the now unused call-frame
+         (let ((self (k/array-at *call-stack* *call-stack-index*)))
+           ;; TODO clean up the situation with with-instance-accessors
+           (with-instance-accessors <call-frame>
+             (set self.callee-designator	())
+             (set self.callee			())
+             (set self.arguments		()))))
+       (debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
+       __result__)))
+
+(when-at-expand track-backtrace?
+  (define-function %new-call-frame (callee-designator callee args)
+    (safety 3 (unless (or (not callee-designator)	(valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
+    (safety 3 (unless (or (not callee)			(valid-maru-value? callee))		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
+    (let ((self (k/array-at *call-stack* *call-stack-index*)))
+      (if self
+          (k/assert (is <call-frame> self) "%new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type self))
+        (set self (new-record-instance <call-frame>))
+        (k/set-array-at *call-stack* *call-stack-index* self))
+      ;; TODO clean up the situation with with-instance-accessors
+      (with-instance-accessors <call-frame>
+        (set self.callee-designator	callee-designator)
+        (set self.callee		callee)
+        (set self.arguments		args))
+      self)))
+
 (set print-backtrace
   (lambda ()
-    (let ((i *backtrace-index*))
-      (while (<= 0 (set i (- i 1)))
-        (libc/printf "%3d: " i)
-        (k/dumpln (k/array-at *backtrace-stack* i))
-        (libc/flush-streams)))))
+    (if-at-expand track-backtrace?
+        (let ((i *call-stack-index*))
+          (while (<= 0 (decr i))
+            (let ((call-frame (k/array-at *call-stack* i)))
+              (libc/printf "%3ld: " i)
+	      (k/dumpln (<call-frame>-callee-designator call-frame))
+              (awhen (<call-frame>-callee call-frame)
+                (libc/printf "\tcallee: ")
+	        (k/dumpln it))
+              (awhen (<call-frame>-arguments call-frame)
+                (libc/printf "\targs: ")
+	        (k/dumpln it))
+              (libc/flush-streams))))
+      (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %d\n" *call-stack-index*))))
 
 ;;;
 ;;; eval
@@ -703,33 +770,34 @@
         result))))
 
 (define-function k/apply (fun arguments ctx)
-  ;;(libc/printf "  %02d " *backtrace-index*) (k/dumpln fun)
   (debug (libc/printf "k/apply, function ") (k/dump fun) (libc/printf ", arguments: ") (k/dump arguments) (libc/printf "\n"))
-  (k/assert fun "k/apply: fun is nil")
-  (let ((type (get/type fun)))
-    (cond
-      ((= type k/<expr>)	(k/apply-expr fun arguments ctx))
-      ((= type k/<fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
-      ((= type k/<subr>)
-       ;; TODO FIXME it sould be this:
-       ;; ((get <subr> _imp fun) arguments ctx)
-       ;; but without using a local var it gets miscompiled by the x86 backend
-       ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
-       ;; +	movl	_25type_check, %eax
-       ;; +	movl	36(%esp), %ecx
-       ;; +	movl	%ecx, 8(%esp)
-       ;; +	movl	40(%esp), %ecx
-       ;; +	movl	%ecx, 12(%esp)
-       ;; +	call	*%eax
-       (let ((imp (get <subr> _imp fun)))
-         (imp arguments ctx)))
-      (else			(let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
-				  (if ap
-				      (let ((args arguments))
-					(gc/protect (args)
-					  (set args (new-<pair> fun args))
-					  (k/apply ap args ctx)))
-				      (k/error "cannot apply: " fun)))))))
+  (safety 1 (k/assert fun "k/apply: fun is nil"))
+  (with-new-call-frame (fun symbol/apply arguments)
+    (let ((type (get/type fun)))
+      (cond
+        ((= type k/<expr>)	(k/apply-expr fun arguments ctx))
+        ((= type k/<fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
+        ((= type k/<subr>)
+         ;; TODO FIXME it sould be this:
+         ;; ((get <subr> _imp fun) arguments ctx)
+         ;; but without using a local var it gets miscompiled by the x86 backend
+         ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
+         ;; +	movl	_25type_check, %eax
+         ;; +	movl	36(%esp), %ecx
+         ;; +	movl	%ecx, 8(%esp)
+         ;; +	movl	40(%esp), %ecx
+         ;; +	movl	%ecx, 12(%esp)
+         ;; +	call	*%eax
+         (let ((imp (get <subr> _imp fun)))
+           (imp arguments ctx)))
+        (else
+         (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
+           (if ap
+               (let ((args arguments))
+                 (gc/protect (args)
+                   (set args (new-<pair> fun args))
+                   (k/apply ap args ctx)))
+             (k/error "cannot apply: " fun))))))))
 
 ;;; ----------------------------------------------------------------
 
@@ -737,6 +805,7 @@
 
 (define-function k/expand (exp env)
   (debug (libc/printf "k/expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
+  ;; TODO add a with-new-call-frame
   (cond
     ((is/pair exp)
      (let ((head (k/expand (get/head exp) env)))
@@ -859,10 +928,15 @@
 
 (define-function k/encode (exp env)
   (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
-  (cond
-    ((is/pair exp)	(k/encode/pair		exp env))
-    ((is <symbol> exp)	(k/encode/symbol	exp env))
-    (else		(k/encode/other		exp env))))
+  (with-new-call-frame (exp symbol/encode ())
+    (debug (libc/printf "k/encode is dispatching on type %ld\n" (get/type exp)))
+    (cond
+      ((is/pair exp)		(when-at-expand track-backtrace?
+                                  (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
+				  (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
+				(k/encode/pair		exp env))
+      ((is <symbol> exp)	(k/encode/symbol	exp env))
+      (else			(k/encode/other		exp env)))))
 
 (set k/encode/list (lambda (list env)
   (if (is/pair list)
@@ -879,6 +953,34 @@
         (new-<pair> head tail))
     obj))
 
+(define-function k/eval/with-backtrace (type exp ctx)
+  (with-new-call-frame (() () ())
+    (cond
+      ((= type k/<pair>)
+       (when-at-expand track-backtrace?
+         (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
+         (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
+       (gc/let* ((evaled-head (k/eval (get/head exp) ctx)))
+         (debug (libc/printf "k/eval of pair, head eval'ed to ") (k/dumpln evaled-head))
+         (when-at-expand track-backtrace?
+           (set (<call-frame>-callee -call-frame-) evaled-head))
+	 (if (is <fixed> evaled-head)
+	     (k/apply (get <fixed> function evaled-head) (get/tail exp) ctx)
+	   (gc/let* ((args (k/eval/list (get/tail exp) ctx)))
+             (when-at-expand track-backtrace?
+               (set (<call-frame>-arguments -call-frame-) args))
+             (k/apply evaled-head args ctx)))))
+      (else
+       (when-at-expand track-backtrace?
+         (set (<call-frame>-callee-designator -call-frame-) exp))
+       (let ((evaluator (k/array-at (get/variable-value var/*evaluators*) type)))
+	 (if evaluator
+	     (gc/let* ((args (new-<pair> exp ())))
+	       (when-at-expand track-backtrace?
+                 (set (<call-frame>-callee -call-frame-) evaluator))
+	       (k/apply evaluator args ctx))
+           exp))))))
+
 (set k/eval (lambda (exp ctx)
   (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
   (let ((type (get/type exp)))
@@ -894,31 +996,9 @@
 				      (set ctx (get <context> home ctx))
 				      (set delta (- delta 1)))
 				    (k/array-at (get <context> bindings ctx) (get/long (get <variable> index exp))))))
-      ((= type k/<pair>)	(let ((raw-head (get/head exp)))
-                                  (debug (libc/printf "k/eval of pair, raw-head (of type %d) is " (get/type raw-head)) (k/dumpln raw-head))
-				  (gc/let* ((head (k/eval raw-head ctx)))
-                                    (debug (libc/printf "k/eval of pair, head eval'ed to ") (k/dumpln head))
-				    (k/set-array-at *backtrace-stack* *backtrace-index* exp)
-				    (set *backtrace-index* (+ *backtrace-index* 1))
-				    (set head (if (is <fixed> head)
-						  (k/apply (get <fixed> function head) (get/tail exp) ctx)
-						(let ((args (k/eval/list (get/tail exp) ctx)))
-						  (gc/protect (args)
-						    (k/apply head args ctx)))))
-				    (set *backtrace-index* (- *backtrace-index* 1))
-                                    (debug (libc/printf "k/eval of pair, returning with head ") (k/dumpln head))
-				    head)))
-      ((= type k/<symbol>)	(k/error "symbol in eval?")) ;; TODO xxx
-      (else			(let ((ev (k/array-at (get/variable-value var/*evaluators*) (get/type exp))))
-				  (and ev
-				       (let ((args (new-<pair> exp ())))
-					 (gc/protect (args)
-					   (k/set-array-at *backtrace-stack* *backtrace-index* exp)
-					   (set *backtrace-index* (+ *backtrace-index* 1))
-					   (set exp (k/apply ev args ctx))
-					   (set *backtrace-index* (- *backtrace-index* 1)))))
-				  exp)))))
-     )
+      ((= type k/<symbol>)	(k/error "symbol in eval?")) ;; TODO is this an assert? make it look less KLUDGEy...
+      (else			(k/eval/with-backtrace type exp ctx)))))
+)
 
 (define-function k/expand-encode-eval (form env)
   (gc/let* ((x form)
@@ -1014,6 +1094,8 @@
   (set symbol/quasiquote             (k/intern "quasiquote"))
   (set symbol/unquote                (k/intern "unquote"))
   (set symbol/unquote_splicing       (k/intern "unquote-splicing"))
+  (set symbol/encode                 (k/intern "encode"))
+  (set symbol/apply                  (k/intern "apply"))
 
   (let ((global-env (get/globals)))
     (set var/*expanders*	(k/env/lookup-variable-or-die global-env (k/intern "*expanders*")))
@@ -1054,7 +1136,6 @@
   (gc/push-root (address-of k/+done+))
 
   (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
-  (gc/push-root (address-of *backtrace-stack*))
   (gc/push-root (address-of fixed-subr/quote))		; precautionary, in case someone redefines them and they get removed from the env.
   (gc/push-root (address-of fixed-subr/lambda))
   (gc/push-root (address-of fixed-subr/let))
@@ -1066,7 +1147,9 @@
 
   (debug (libc/printf "*module* initialized\n"))
 
-  (set *backtrace-stack* (new-<array> 32))
+  (when-at-expand track-backtrace?
+    (gc/push-root (address-of *call-stack*))
+    (set *call-stack* (new-<array> 32)))
 
   (debug (libc/printf "populating *module*\n"))
 
