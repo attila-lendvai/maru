@@ -162,6 +162,16 @@
 (define-form eval-at-expand body
   (eval `(let () ,@body)))
 
+(define-form if-at-expand (cond true-form false-form)
+  (if (eval cond)
+      true-form
+    false-form))
+
+(define-form when-at-expand (cond . true-forms)
+  (if (eval cond)
+      `(let ()
+         ,@true-forms)))
+
 (define-form when (test . body)
   `(and ,test (let () ,@body)))
 
