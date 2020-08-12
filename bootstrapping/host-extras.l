@@ -8,3 +8,8 @@
 
 ;; Mark the fact that we are evolving from the previous stage.
 (eval-in-module slave '(slave:set slave:evolving? (slave:quote slave:t)))
+
+;;;
+;;; Definitions that are needed to enable our host to bootstrap us.
+;;;
+(eval-in-module slave '(slave:define slave:t (slave:quote slave:t)))

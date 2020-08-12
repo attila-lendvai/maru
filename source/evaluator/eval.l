@@ -954,6 +954,9 @@
             (env    (new-<env> () 0 0)))
     (set (<module>-symbols module)	(new-<array> 0))
     (set (<module>-globals module)	(k/env/define env (k/intern* "*globals*" module) env))
+    (let ((t-symbol (k/intern* "t" module)))
+      ;; make sure the symbol t evaluates to itself
+      (k/env/define env t-symbol t-symbol))
     (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
 
