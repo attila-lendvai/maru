@@ -119,6 +119,12 @@
 (define-form move-oops (from to wordcount)
   `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
 
+(define-form copy-bytes (from to count)
+  `(libc/memcpy ,to ,from ,count))
+
+(define-form move-bytes (from to count)
+  `(libc/memmove ,to ,from ,count))
+
 ;; the header of heap objects
 (eval `(define-record <header> () (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
 
