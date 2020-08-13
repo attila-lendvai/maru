@@ -175,6 +175,11 @@
 (define-form when (test . body)
   `(and ,test (let () ,@body)))
 
+(define-form awhen (test . body)
+  `(let ((it ,test))
+     (when it
+       ,@body)))
+
 (define-form unless (test . body)
   `(or ,test (let () ,@body)))
 
