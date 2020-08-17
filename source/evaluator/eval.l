@@ -717,7 +717,7 @@
       (if self
           (k/assert (is <call-frame> self) "%new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type self))
         (set self (new-record-instance <call-frame>))
-        (k/set-array-at *call-stack* *call-stack-index* self))
+        (set (k/array-at *call-stack* *call-stack-index*) self))
       ;; TODO clean up the situation with with-instance-accessors
       (with-instance-accessors <call-frame>
         (set self.callee-designator	callee-designator)
@@ -758,11 +758,11 @@
             (args   arguments))
         (while (is/pair formals)
           (or (is/pair args) (k/error "too few arguments for "fun": "arguments))
-          (k/set-array-at locals (get/long (get <variable> index (get/head formals))) (get/head args))
+          (set (k/array-at locals (get/long (get <variable> index (get/head formals)))) (get/head args))
           (set formals (get/tail formals))
           (set args    (get/tail args)))
         (when (is <variable> formals)
-          (k/set-array-at locals (get/long (get <variable> index formals)) args)
+          (set (k/array-at locals (get/long (get <variable> index formals))) args)
           (set args ()))
         (when args
           (k/error "too many arguments for "fun": "arguments)))

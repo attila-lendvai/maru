@@ -4,7 +4,7 @@
   (let ((vector-type (concat-symbols '< basename '>))
         (length-name (concat-symbols 'k/ basename '-length))
         (getter-name (concat-symbols 'k/ basename '-at))
-        (setter-name (concat-symbols 'k/set- basename '-at))
+        (setter-name (concat-symbols 'set-k/ basename '-at))
         (append-name (concat-symbols 'k/ basename '-append))
         (insert-name (concat-symbols 'k/ basename '-insert)))
     `(let ()

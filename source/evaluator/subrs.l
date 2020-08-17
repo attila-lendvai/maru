@@ -56,7 +56,7 @@
               (while (is/pair prog)
                 (set tmp (k/eval (get/head prog) -ctx-))
                 (set prog (get/tail prog)))
-              (k/set-array-at locals (get/long (get <variable> index var)) tmp))))
+              (set (k/array-at locals (get/long (get <variable> index var))) tmp))))
         (set bindings (get/tail bindings)))
       (set tmp ())
       (while (is/pair body)
@@ -81,7 +81,7 @@
           (while (< 0 delta)
             (set -ctx- (get <context> home -ctx-))
             (set delta (- delta 1)))
-          (k/set-array-at (get <context> bindings -ctx-) (get/long (get <variable> index var)) val))))))
+          (set (k/array-at (get <context> bindings -ctx-) (get/long (get <variable> index var))) val))))))
 
 (define-subr (while () fixed)
   (let ((tst  (k/car -args-))
@@ -385,16 +385,16 @@
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-))))
         (val (get/head (get/tail (get/tail -args-)))))
-    (k/set-array-at arr idx val)))
+    (set (k/array-at arr idx) val)))
 
 (define-subr (set-string-at 3)
   (let* ((arr (get/head -args-))
          (idx (get/long (get/head (get/tail -args-))))
          (val (get/long (get/head (get/tail (get/tail -args-))))))
-    ;; NOTE k/set-string-at happily extends the string with a gap of zeores, so
+    ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
     (safety 1 (k/assert (<= idx (k/string-length arr))))
-    (k/set-string-at arr idx val)))
+    (set (k/string-at arr idx) val)))
 
 (define-subr (array-insert 3)
   (let ((arr (get/head -args-))
