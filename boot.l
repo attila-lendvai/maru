@@ -517,17 +517,16 @@
      (let ((,var (array-at %types __i__)))
        ,@body)))
 
-(define %type-id-map/host->slave (when bootstrapping? (array 16)))
+(if-at-expand bootstrapping?
+    (let ()
+      (define %type-id-map/host->slave (array 16))
 
-(define-function %allocate-type-id ()
-  (set %last-type-id (+ 1 %last-type-id)))
+      ;; allocate-type-id is defined in bootstrapping/early.l to allocate a type id from the host
+      (define-function allocate-type-id/slave ()
+        (incr %last-type-id)))
 
-(if bootstrapping?
-    ;; allocate-type-id is defined in bootstrapping/early.l to allocate a type id from the host
-    (define-function allocate-type-id/slave ()
-      (%allocate-type-id))
-    (define-function allocate-type-id ()
-      (%allocate-type-id)))
+  (define-function allocate-type-id ()
+    (incr %last-type-id)))
 
 (define *force-trivial-accessors* '()) ; expand to only a single oop-at, which is understood by the compiler
 
@@ -562,14 +561,14 @@
 (assert <type>-name)
 
 (define-function register-type (type)
-  (if bootstrapping?
+  (if-at-expand bootstrapping?
       ;; while bootstrapping we instantiate types in the host (so that we can use e.g. method dispatch),
       ;; and keep an additional host->slave map and a slave-id slot.
       (let ((slave-id (allocate-type-id/slave)))
         (set (array-at %type-id-map/host->slave (<type>-id type)) slave-id)
         (set (<type>-slave-id type) slave-id)
         (set (array-at %types slave-id) type)
-        (eval `(register-type/host ,type)))
+        (register-type/host type))
     (set (array-at %types (<type>-id type)) type)))
 
 (define-function %bootstrap-type (type-name type-id type-type-id slot-count)
@@ -596,7 +595,7 @@
                  (= (type-id-of <type>) (<type>-id <record>)))))
 
 (define-function type-object-for (type-id)
-  (or (array-at %types (if bootstrapping?
+  (or (array-at %types (if-at-expand bootstrapping?
                            (let ((slave-id (array-at %type-id-map/host->slave type-id)))
                              ;; we could make this smarter and only do the remap when there's an entry...
                              ;; but do we want to? wouldn't that hide some nasty bugs?
@@ -798,7 +797,7 @@
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
-(when bootstrapping?
+(when-at-expand bootstrapping?
   ;; let's map the following host types to their respective slave equivalents
   ;; so that type-of on one of their instances will return the slave type object.
   ;; this is mainly needed to interact with the data that the host's reader returns
@@ -925,7 +924,7 @@
     self))
 
 (define-function <selector>-add-method (self type method)
-  (unless bootstrapping? ; TODO this should be less restrictive and only check for evolving?, but that doesn't work.
+  (when-at-expand (not bootstrapping?)
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
     (and (expr? method)
          (or (<expr>-name method)
@@ -1086,7 +1085,7 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
-  (unless evolving?
+  (when-at-expand (not bootstrapping?)
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
     (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm))))
   (if types
