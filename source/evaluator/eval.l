@@ -647,23 +647,7 @@
     (put <variable> value var value)
     var))
 
-(define-function k/intern* (cstr module)
-  (safety 1 (k/assert (is <module> module) "k/intern called with not a module " module))
-  ;; deal with ?: syntax for denoting modules
-  (let ((len (libc/strlen cstr))
-        (idx 0))
-    (while (< idx len)
-      (when (= ?: (string-at cstr idx))
-        (let ((module-name (libc/malloc (+ 1 idx))))
-          (libc/memcpy module-name cstr idx)
-          (set (string-at module-name idx) 0)
-          (let ((submod (k/env/variable-value (get/globals* module) (k/intern* module-name module))))
-            (unless (is <module> submod)
-              (fatal2 "k/intern: '%s' is found, but it's not a module while interning %s" module-name cstr))
-            (libc/free module-name)
-            (return (k/intern* (+ 1 (+ cstr idx)) submod)))))
-      (set idx (+ 1 idx))))
-  ;; no module is denoted in cstr (anymore); it's just a symbol to be at this point
+(define-function %intern (cstr module)
   (let ((symbols (get <module> symbols module)))
     (let ((lo 0)
           (hi (- (k/array-length symbols) 1)))
@@ -679,6 +663,29 @@
     (gc/let* ((sym (new-<symbol> cstr)))
       (k/array-insert symbols lo sym)
       sym))))
+
+(define-function k/intern* (cstr module)
+  (safety 1 (k/assert (is <module> module) "k/intern called with not a module " module))
+  ;; deal with ?: syntax for denoting modules
+  (let ((len (libc/strlen cstr))
+        (idx 0))
+    (while (< idx len)
+      (when (= ?: (string-at cstr idx))
+        (let ((submod-name (libc/malloc (+ 1 idx))))
+          (libc/memcpy submod-name cstr idx)
+          (set (string-at submod-name idx) 0)
+          (let* ((submod-var	(k/env/lookup-variable (get/globals* module) (k/intern* submod-name module)))
+                 (submod	(and submod-var (get <variable> value submod-var))))
+            (when (and submod-var
+                       (not (is <module> submod)))
+              (fatal2 "k/intern: while interning '%s', '%s' was found, but it's not a <module>" cstr submod-name))
+            (libc/free submod-name)
+            (if submod
+                (return (k/intern* (+ 1 (+ cstr idx)) submod))
+              (return (%intern cstr module))))))
+      (set idx (+ 1 idx))))
+  ;; no module is denoted in cstr (anymore); it's just a symbol to be interned at this point
+  (%intern cstr module))
 
 (define-function k/intern (cstr)
   (k/intern* cstr *module*))
