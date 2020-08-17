@@ -162,10 +162,10 @@
 (define-form eval-at-expand body
   (eval `(let () ,@body)))
 
-(define-form if-at-expand (cond true-form false-form)
+(define-form if-at-expand (cond true-form . false-forms)
   (if (eval cond)
       true-form
-    false-form))
+    `(let () ,@false-forms)))
 
 (define-form when-at-expand (cond . true-forms)
   (if (eval cond)
