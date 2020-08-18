@@ -169,11 +169,6 @@
              i)
         (error "record-slot-index has failed for type "type", slot-name "slot-name))))
 
-;; TODO FIXME types inside (compile-begin) put the host into an infinite recursion
-(define-record <buffer> () (contents capacity position))
-
-(define-record <call-frame> () (callee-designator callee arguments))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Actual artifacts that are meant to be level-shifted into the target
@@ -285,63 +280,17 @@
      (die)))
 
 ;;;
-;;; types and their kernel accessors
+;;; types and their kernel accessors (get, put, is)
 ;;;
-;;; types are represented at runtime as integers upfrom 0.
+;;; unsurprisingly, types are represented in the target as integers.
 ;;; <undefined> doesn't necessarily need to be denoted by zero.
-;;; the subr's here in eval.l encode/implement the behavior of the primitive types.
+;;; the subr's encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
-
-(define-form %level-shift-types type-names
-  ;; NOTE this will print gibberish with the "fast" version of the single dispatching selector
-  ;; (println "; Types in the host:")
-  ;; (eval-in-module host '(host:let ()
-  ;;                        (host:primitive/print "# " host:%types "\n") ; a KLUDGE alternative that works
-  ;;                        ;; TODO FIXME investigate: this brings down the gc in the host with a stack overflow:
-  ;;                        ;;(host:println "; " host:%types)
-  ;;                        ;; it only started to happen after i have installed the register-type/host call that
-  ;;                        ;; registers the type objects that the slave creates back into the host vm, and
-  ;;                        ;; added the do-print specialization on <array>.
-  ;;                        ;; it's probably a stack overflow, because after an ulimit -s 100000 it takes much
-  ;;                        ;; longer to get the segfault.
-  ;;                        ))
-  ;; (println "\n; Slave types are as follows:\n; host id	slave id	type name")
-  ;; (types-do type
-  ;;   (println "; "(<type>-id type)"		"(<type>-slave-id type)"		"(<type>-name type)))
-  ;; (println)
-  `(let ()
-     ,@(map (lambda (type-name)
-              (let ((type (eval type-name)))
-                ;; level-shift the maru type object to an integer in the target vm
-                `(define-constant ,(concat-symbol 'k/ type-name) ,(<type>-slave-id type))))
-            type-names)))
-
-;; level-shift the ids of some types that we will need to denote in the target.
-;; NOTE: <type> and <record> are not needed in the level-shifted code, they are
-;; built on top of the other abstractions in boot.l.
-(%level-shift-types
- <undefined>
- <target-vm-pointer>
- <data>
- <long>
- <string>
- <symbol>
- <pair>
- <array>
- <expr>
- <form>
- <fixed>
- <subr>
- <variable>
- <env>
- <context>
- <module>
- <call-frame>)
 
 (eval-at-expand
  `(define-function get/type (ptr)
     (cond
-      ((not ptr)	k/<undefined>)
+      ((not ptr)	<undefined>)
       ((oop? ptr)	(let ((header (header-of ptr)))
                           (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
@@ -353,13 +302,13 @@
                                   (let* ((tag-value	(<immediate-type>-tag-value type))
                                          (tag-width	(<immediate-type>-tag-width type))
                                          (tag-mask	(^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
-                                    (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(concat-symbol 'k/ (<type>-name type)))))))
+                                    (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(<type>-name type))))))
                               conds)
                           (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
 
 (define-form is (type ptr)
-  `(= ,(concat-symbol 'k/ type) (get/type ,ptr)))
+  `(= ,type (get/type ,ptr)))
 
 (define-function %type-check (obj exp-type)
   (let ((act-type (get/type obj)))
@@ -370,7 +319,7 @@
 (define-form get (type-name slot object)
   (let ((type (eval type-name)))
     `(let ((__obj__ ,object))
-       (safety 2 (%type-check __obj__ ,(concat-symbol 'k/ type-name)))
+       (safety 2 (%type-check __obj__ ,type-name))
        ;; we could use the accessors, too:
        ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
        (oop-at __obj__ ,(record-slot-index type slot)))))
@@ -378,7 +327,7 @@
 (define-form put (type-name slot object value)
   (let ((type (eval type-name)))
     `(let ((__obj__ ,object))
-       (safety 2 (%type-check __obj__ ,(concat-symbol 'k/ type-name)))
+       (safety 2 (%type-check __obj__ ,type-name))
        ;; we could use the accessors, too:
        ;; (set (,(concat-symbol (concat-symbol type-name '-) slot) __obj__) ,value)
        (set (oop-at __obj__ ,(record-slot-index type slot)) ,value))))
@@ -702,6 +651,8 @@
 ;;; backtrace
 ;;; ----------------------------------------------------------------
 
+(define-record <call-frame> () (callee-designator callee arguments))
+
 (define-form with-new-call-frame (args . body)
   (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
                              (fatal1 "infinite recursion guard triggered at call depth %ld" *call-stack-index*))))
@@ -796,9 +747,9 @@
   (with-new-call-frame (fun symbol/apply arguments)
     (let ((type (get/type fun)))
       (cond
-        ((= type k/<expr>)	(k/apply-expr fun arguments ctx))
-        ((= type k/<fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
-        ((= type k/<subr>)
+        ((= type <expr>)	(k/apply-expr fun arguments ctx))
+        ((= type <fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
+        ((= type <subr>)
          ;; TODO FIXME it sould be this:
          ;; ((get <subr> _imp fun) arguments ctx)
          ;; but without using a local var it gets miscompiled by the x86 backend
@@ -977,7 +928,7 @@
 (define-function k/eval/with-backtrace (type exp ctx)
   (with-new-call-frame (() () ())
     (cond
-      ((= type k/<pair>)
+      ((= type <pair>)
        (when-at-expand track-backtrace?
          (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
          (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
@@ -1006,10 +957,10 @@
   (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
   (let ((type (get/type exp)))
     (cond
-      ((= type k/<undefined>)	exp)
-      ((= type k/<long>)	exp)
-      ((= type k/<string>)	exp)
-      ((= type k/<variable>)	(if (global-variable? exp)
+      ((= type <undefined>)	exp)
+      ((= type <long>)		exp)
+      ((= type <string>)	exp)
+      ((= type <variable>)	(if (global-variable? exp)
 				    (get <variable> value exp)
 				  (let ((delta (- (get/long (get <env> level (get <context>  env ctx)))
 					      (get/long (get <env> level (get <variable> env exp))))))
@@ -1017,7 +968,7 @@
 				      (set ctx (get <context> home ctx))
 				      (set delta (- delta 1)))
 				    (k/array-at (get <context> bindings ctx) (get/long (get <variable> index exp))))))
-      ((= type k/<symbol>)	(k/error "symbol in eval?")) ;; TODO is this an assert? make it look less KLUDGEy...
+      ((= type <symbol>)	(k/error "symbol in eval?")) ;; TODO is this an assert? make it look less KLUDGEy...
       (else			(k/eval/with-backtrace type exp ctx)))))
 )
 
@@ -1150,8 +1101,8 @@
 
   (debug (libc/printf "gc initialized\n"))
 
-  (k/assert (= k/<long> (get/type (new-<long> 42))) "get/type for <long> is broken")
-  (k/assert (= 42       (get/long (new-<long> 42))) "get/long is broken")
+  (k/assert (= <long>	(get/type (new-<long> 42))) "get/type for <long> is broken")
+  (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
 
   (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
   (gc/push-root (address-of k/+done+))

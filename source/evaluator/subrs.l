@@ -194,8 +194,8 @@
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type k/<long>)        (and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type k/<string>)      (and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
+      ((= type <long>)		(and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
       (else                     (and (= lhs rhs) symbol/t)))))
 
 (define-subr (!= 2)
@@ -203,8 +203,8 @@
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type k/<long>)        (and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type k/<string>)      (and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
+      ((= type <long>)		(and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
+      ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
       (else                     (and (!= lhs rhs) symbol/t)))))
 
 (define-subr (abort 0)
@@ -250,10 +250,10 @@
           (typ (get/type oarg))
           (arg ()))
       (cond
-        ((= typ k/<undefined>))
-        ((= typ k/<long>)	(set arg (get/long oarg)))
-        ((= typ k/<string>)	(set arg (get/string oarg)))
-        ((= typ k/<symbol>)	(set arg (get/symbol oarg)))
+        ((= typ <undefined>))
+        ((= typ <long>)		(set arg (get/long oarg)))
+        ((= typ <string>)	(set arg (get/string oarg)))
+        ((= typ <symbol>)	(set arg (get/symbol oarg)))
         (else			(set arg oarg)))
       (let ((size 100)
             (p)
@@ -293,9 +293,9 @@
     (let* ((arg  (get/head -args-))
            (type (get/type arg)))
       (cond
-        ((= type k/<string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
-        ((= type k/<symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
-        ((= type k/<long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
+        ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
+        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
+        ((= type <long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
         (else
          ;; TODO
          (libc/fprintf libc/stderr "<unable to print {%p} of type %d>" arg type))))

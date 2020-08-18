@@ -2,8 +2,7 @@
 ;;;
 ;;; A simple memory buffer with dynamic reallocation, based on malloc
 
-;; TODO FIXME this crashes the gc when inside (compile-begin)
-;;(define-record <buffer> () (contents capacity position))
+(define-record <buffer> () (contents capacity position))
 
 (define-function new_buffer ()
   (let ((buf (libc/malloc (byte-size-of <buffer>))))
