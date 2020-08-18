@@ -129,7 +129,7 @@
   `(libc/memmove ,to ,from ,count))
 
 ;; the header of heap objects
-(eval `(define-record <header> () (,@(when (<= 3 safety-level) (list 'magic-marker)) size flags next type)))
+(eval `(define-record <header> () (,@(when (<= 3 safety-level) '(canary)) size flags next type)))
 
 (define-form byte-size-of (type)
   (words-to-bytes (record/effective-slot-count (eval type))))
@@ -140,11 +140,11 @@
   `(- ,arg ,size-of-<header>))
 
 (let ((marker 233495534)) ; 0xDEADBEE, it's just an easy to recognize token without any meaning
-  (define-form valid-header-magic-marker? (header)
-    `(= (<header>-magic-marker ,header) ,marker))
+  (define-form valid-header-canary? (header)
+    `(= (<header>-canary ,header) ,marker))
 
-  (define-form initialize-header-magic-marker (header)
-    `(set (<header>-magic-marker ,header) ,marker)))
+  (define-form initialize-header-canary (header)
+    `(set (<header>-canary ,header) ,marker)))
 
 (define-form valid-maru-value? (obj)
   `(let ((__obj__ ,obj))
@@ -292,7 +292,7 @@
     (cond
       ((not ptr)	<undefined>)
       ((oop? ptr)	(let ((header (header-of ptr)))
-                          (safety 3 (or (valid-header-magic-marker? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
+                          (safety 3 (or (valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
       ((immediate? ptr) (cond
