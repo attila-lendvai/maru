@@ -90,11 +90,11 @@
                                                       (set res (max res (<immediate-type>-tag-width type)))))
                                                   res))
 
-(when (< target-word-size/bytes
+(when (< target/word-size-in-bytes
          (<< 1 immediate-type/max-tag-width))
   (warn "immediate-type/max-tag-width ("immediate-type/max-tag-width") will force a stronger alignment for OOP's than what the target word size demands\n"))
 
-(define-constant oop/alignment-in-bytes		(max target-word-size/bytes (<< 1 immediate-type/max-tag-width)))
+(define-constant oop/alignment-in-bytes		(max target/word-size-in-bytes (<< 1 immediate-type/max-tag-width)))
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
 (define-constant oop/tag-mask			(^ oop/payload-mask -1))
@@ -968,7 +968,7 @@
 				      (set ctx (get <context> home ctx))
 				      (set delta (- delta 1)))
 				    (k/array-at (get <context> bindings ctx) (get/long (get <variable> index exp))))))
-      ((= type <symbol>)	(k/error "symbol in eval?")) ;; TODO is this an assert? make it look less KLUDGEy...
+      ((= type <symbol>)	(k/error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(k/eval/with-backtrace type exp ctx)))))
 )
 
@@ -1052,7 +1052,7 @@
       (k/env/define env (k/intern* "+done+" module) k/+done+)
 
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*expanders*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*encoders*"			module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*encoders*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*evaluators*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp))
 

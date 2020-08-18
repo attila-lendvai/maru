@@ -49,5 +49,5 @@
                           (- size idx)))))
          (,setter-name obj idx value)))))
 
-(define-vector-like array	oop-at		copy-oops	target-word-size/bytes)
+(define-vector-like array	oop-at		copy-oops	target/word-size-in-bytes)
 (define-vector-like string	string-at	copy-bytes	1)

@@ -501,10 +501,6 @@
 ;;; (i.e. its name, type-id, etc).
 ;;;
 ;;; the <foo> global definitions are also holding full maru type objects.
-;;;
-;;; NOTE we store the extra type id in a slave-id slot (as opposed to
-;;; a host-id slot) so that most things in the host keeps working
-;;; because <type>-id of a slave type instance returns the host type id.
 
 (define type-id-of type-of) ; we will replace type-of later
 (set type-of 'not-yet-bootstrapped)

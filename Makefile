@@ -134,7 +134,7 @@ $(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) boot
 		bootstrapping/slave-extras.l				\
 		bootstrapping/late.l					\
 		--define makefile/target-triplet   $(TARGET_x86)	\
-		--define makefile/target-word-size 32			\
+		--define makefile/target/word-size-in-bits 32		\
 		$(EMIT_FILES_x86)					\
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
@@ -150,7 +150,7 @@ $(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) b
 		bootstrapping/slave-extras.l				\
 		bootstrapping/late.l					\
 		--define makefile/target-triplet   $(TARGET_llvm)	\
-		--define makefile/target-word-size $(TARGET_WORD_SIZE_llvm)	\
+		--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
 		$(EMIT_FILES_llvm)					\
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
@@ -194,8 +194,8 @@ define compile-x86
 	bootstrapping/early.l		\
 	boot.l				\
 	bootstrapping/late.l		\
-	--define makefile/target-triplet   $(TARGET_x86)	\
-	--define makefile/target-word-size 32			\
+	--define makefile/target-triplet   $(TARGET_x86)		\
+	--define makefile/target/word-size-in-bits 32			\
 	$(EMIT_FILES_x86)		\
 	$(2)				\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
@@ -208,8 +208,8 @@ define compile-llvm
 	bootstrapping/early.l		\
 	boot.l				\
 	bootstrapping/late.l		\
-	--define makefile/target-triplet   $(TARGET_llvm)		\
-	--define makefile/target-word-size $(TARGET_WORD_SIZE_llvm)	\
+	--define makefile/target-triplet   $(TARGET_llvm)				\
+	--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)		\
 	$(EMIT_FILES_llvm)		\
 	$(2)				\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
@@ -253,7 +253,10 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 ###
 ### Tests
 ###
-test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-interpreter
+run: $(TEST_EVAL)
+	rlwrap $(TEST_EVAL) boot.l -
+
+test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 
 # TODO backend duplication
 test-bootstrap-x86: $(BUILD_x86)/eval3
@@ -285,5 +288,5 @@ $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT
 	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
-test-interpreter: $(TEST_EVAL) boot.l tests/interpreter-tests.l
-	$(TEST_EVAL) boot.l tests/interpreter-tests.l
+test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
+	$(TEST_EVAL) boot.l tests/evaluator-tests.l
