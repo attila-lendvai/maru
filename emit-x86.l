@@ -329,8 +329,13 @@
 (define-method compile <variable> (-c-)
   (let ((value (<variable>-value self)))
     (cond
-      ((temp? value)			(gen LOAD value))
-      (else				(gen LOAD (GI32 (LABEL (<variable>-name self))))))))
+      ((temp? value)
+       (gen LOAD value))
+      ((and (global-variable? self)
+            (subtype? (type-of value) <type>))
+       (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+      (else
+       (gen LOAD (GI32 (LABEL (<variable>-name self))))))))
 
 (define-method compile <string> (-c-)
   (let ((label (UNIQUE-LABEL)))
@@ -550,12 +555,10 @@
 
 (define-selector compile-definition)
 
-(define-method compile-definition <undefined> (name comp)
-  (compile-definition 0 name comp))
-
-(define-method compile-definition <type> (name comp)
-  ;; type definitions produce no level-shifted artifacts
-  )
+(define-method compile-definition <form>		(name -c-)	(gen COMMENT (list "form "name)))
+(define-method compile-definition <type>		(name -c-)	(gen COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
+(define-method compile-definition <foreign-function>	(name -c-)	(gen COMMENT (list "foreign function "name))) ; it will be handled at the call site
 
 (define-method compile-definition <long> (name -c-)
   (gen DATA)
@@ -572,13 +575,6 @@
 ;;     (gen DEFLABEL (LABEL name))
 ;;     (gen LONG temp)
 ;;     (gen TEXT)))
-
-(define-method compile-definition <foreign-function> (name -c-)
-  ;; we don't need to emit anything, it will be handled at the call site
-  )
-
-(define-method compile-definition <form> (name -c-)
-  (gen COMMENT (list "form "name)))
 
 (define-method compile-definition <expr> (name parent-comp)
   (let* ((main? (= 'slave:main name))

@@ -525,7 +525,10 @@
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))
       ((temp? value)		(gen LOAD value ()))
-      ((global-variable? self)	(gen LOAD (GLOBAL (<variable>-name self)) value))
+      ((global-variable? self)	(if (subtype? (type-of value) <type>)
+                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
+                                    (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0)
+                                  (gen LOAD (GLOBAL (<variable>-name self)) value)))
       (else			(error "compile of <variable> failed for " (<variable>-name self) ", holding value " value)))))
 
 (define-function compile/set (expr -c-)
@@ -817,21 +820,11 @@
 
 (define-selector compile-definition)
 
-(define-method compile-definition <undefined> (name comp)
-  (compile-definition 0 name comp))
-
-;; (define-method compile-definition <type> (name comp)
-;;   ;; type definitions produce no level-shifted artifacts
-;;   )
-
-(define-method compile-definition <long> (name -c-)
-  (gen DEFINE (GLOBAL name) self))
-
-(define-method compile-definition <foreign-function> (name -c-)
-  (emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
-
-(define-method compile-definition <form> (name -c-)
-  (gen COMMENT (list "form "name)))
+(define-method compile-definition <form>		(name -c-)	(gen COMMENT (list "form "name)))
+(define-method compile-definition <type>		(name -c-)	(gen COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
+(define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
+(define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 
 (define-function emit/function-prologue (name params)
   (print "define %ptr "name"(")
