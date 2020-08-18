@@ -507,6 +507,7 @@
 ;;; because <type>-id of a slave type instance returns the host type id.
 
 (define type-id-of type-of) ; we will replace type-of later
+(set type-of 'not-yet-bootstrapped)
 
 (define %first-type-id		1) ; i.e. the first allocated type will be 1 (so that we can assert for non-zero type in the gc)
 (define %last-type-id		(- %first-type-id 1))
@@ -519,11 +520,15 @@
 
 (if-at-expand bootstrapping?
     (let ()
-      (define %type-id-map/host->slave (array 16))
+      ;; integrate with the host vm's type machinery to instantiate slave objects
+      ;; in the framework of the host while we are being bootstrapped.
+      (define-function allocate-type-id ()
+        (eval-in-module host '(host:allocate-type-id)))
 
-      ;; allocate-type-id is defined in bootstrapping/early.l to allocate a type id from the host
       (define-function allocate-type-id/slave ()
-        (incr %last-type-id)))
+        (incr %last-type-id))
+
+      (define %type-id-map/host->slave (array 16)))
 
   (define-function allocate-type-id ()
     (incr %last-type-id)))
@@ -543,69 +548,110 @@
     (cons (%make-accessor  type-id type-name slot-names offset typecheck?)
           (%make-accessors type-id type-name (cdr slot-names) (+ 1 offset) typecheck?))))
 
-;; KLUDGE forward definitions to avoid the need for excessinve use of eval for the conditional bootstrap stuff
-(define <type>-slave-id)
-(define set-<type>-slave-id)
+(define <type>)
+(define <record>)
 
-;; these are internal stuff needed for the bootstrap
-(define type-id-of-<type>		(allocate-type-id))
-(define type-id-of-<record>		(allocate-type-id))
-(define slots-of-<type>			(concat-list '(id name) (when bootstrapping? '(slave-id))))
-(define slots-of-<record>		'(super direct-slots effective-slots))
+(if-at-expand bootstrapping?
+    (let ()
+      (define type-id-of-<type>		(eval-in-module host '(host:<type>-id host:<type>)))
+      (define type-id-of-<record>	(eval-in-module host '(host:<type>-id host:<record>)))
+      (define slots-of-<type>		(eval-in-module host '(host:<record>-direct-slots host:<type>)))
+      (define slots-of-<record>		(eval-in-module host '(host:<record>-direct-slots host:<record>))))
 
-;; define non-typechecking accessors for <type> and <record> to help us while we instantiate these two types.
+  (define type-id-of-<type>		(allocate-type-id))
+  (define type-id-of-<record>		(allocate-type-id))
+  (define slots-of-<type>		'(id name))
+  (define slots-of-<record>		'(super direct-slots effective-slots)))
+
+;; define temporary, non-typechecking accessors for <type> and <record>
 (eval `(let ()
          ,@(%make-accessors type-id-of-<type>	'<type>		slots-of-<type>		0				())
          ,@(%make-accessors type-id-of-<record>	'<record>	slots-of-<record>	(list-length slots-of-<type>)	())))
 
 (assert <type>-name)
 
-(define-function register-type (type)
-  (if-at-expand bootstrapping?
-      ;; while bootstrapping we instantiate types in the host (so that we can use e.g. method dispatch),
-      ;; and keep an additional host->slave map and a slave-id slot.
+(if-at-expand bootstrapping?
+;;;
+;;; bootstrap is happening, i.e. <type> and <record> is mapped into the slave from the host in early.l
+;;;
+    (let ()
+      (set <type>	(eval-in-module host 'host:<type>))
+      (set <record>	(eval-in-module host 'host:<record>))
+
       (let ((slave-id (allocate-type-id/slave)))
-        (set (array-at %type-id-map/host->slave (<type>-id type)) slave-id)
-        (set (<type>-slave-id type) slave-id)
-        (set (array-at %types slave-id) type)
-        (register-type/host type))
-    (set (array-at %types (<type>-id type)) type)))
+        (set (array-at %type-id-map/host->slave (<type>-id <type>)) slave-id)
+        (set (array-at %types slave-id) <type>))
 
-(define-function %bootstrap-type (type-name type-id type-type-id slot-count)
-  (let ((type-obj (allocate type-type-id slot-count)))
-    (set (<type>-id	type-obj)	type-id)
-    (set (<type>-name	type-obj)	type-name)
-    (register-type type-obj)
-    (eval `(define ,type-name ,type-obj))
-    type-obj))
+      (let ((slave-id (allocate-type-id/slave)))
+        (set (array-at %type-id-map/host->slave (<type>-id <record>)) slave-id)
+        (set (array-at %types slave-id) <record>))
 
-(define-function %bootstrap-record (type-name type-id super direct-slots)
-  (let ((type-obj (%bootstrap-type type-name type-id type-id-of-<record> (+ (list-length slots-of-<type>)
-                                                                            (list-length slots-of-<record>)))))
-    (set (<record>-super		type-obj)		super)
-    (set (<record>-direct-slots		type-obj)		direct-slots)
-    (set (<record>-effective-slots	type-obj)		'not-yet-bootstrapped)))
+      (define-function <type>-slave-id (type)
+        (let* ((type-id  (<type>-id type))
+               (slave-id (array-at %type-id-map/host->slave type-id)))
+          (assert slave-id "no host->slave mapping exists for host type-id: " type-id "?!")
+          slave-id))
 
-(%bootstrap-record '<type>		type-id-of-<type>	()	slots-of-<type>)	(when (< 0 *verbosity*) (warn "<type> is bootstrapped: " <type> "\n"))
-(%bootstrap-record '<record>		type-id-of-<record>	<type>	slots-of-<record>)	(when (< 0 *verbosity*) (warn "<record> is bootstrapped: " <record> "\n"))
+      (define-function register-type (type)
+        ;; while bootstrapping we instantiate types in the host (so that we can use e.g. method dispatch),
+        ;; and keep an additional host-id->slave-id map.
+        (let ((slave-id	(allocate-type-id/slave))
+              (host-id	(<type>-id type)))
+          (set (array-at %type-id-map/host->slave host-id) slave-id)
+          (set (array-at %types slave-id) type)
+          (eval-in-module host `(host:register-type (host:quote ,type)))))
 
-(assert (or (not bootstrapping?)
-            (and (> (<type>-id <type>) 5)   (> (type-id-of <type>) 5)
-                 (> (<type>-id <record>) 5) (> (type-id-of <record>) 5)
-                 (= (type-id-of <type>) (<type>-id <record>)))))
+      (define-function type-object-for-id (type-id)
+        (or (array-at %types (let ((slave-id (array-at %type-id-map/host->slave type-id)))
+                               ;; we could make this smarter and only do the remap when there's an entry...
+                               ;; but do we want to? wouldn't that hide some nasty bugs?
+                               (assert slave-id "type-object-for-id: no host->slave mapping exists for host type-id: " type-id)
+                               slave-id))
+            (error "type-object-for-id has failed for type id "type-id", known types are: "%types))))
+;;;
+;;; we are not being bootstrapped, therefore we need to instantiate <type> and <record> ourselves
+;;;
+  (define-function register-type (type)
+    (set (array-at %types (<type>-id type)) type))
 
-(define-function type-object-for (type-id)
-  (or (array-at %types (if-at-expand bootstrapping?
-                           (let ((slave-id (array-at %type-id-map/host->slave type-id)))
-                             ;; we could make this smarter and only do the remap when there's an entry...
-                             ;; but do we want to? wouldn't that hide some nasty bugs?
-                             (assert slave-id "type-object-for: no host->slave mapping exists for host type-id: " type-id)
-                             slave-id)
-                         type-id))
-      (error "type-object-for has failed for type id "type-id", known types are: "%types)))
+  (define-function type-object-for-id (type-id)
+    (or (array-at %types type-id)
+        (error "type-object-for-id has failed for type id "type-id", known types are: "%types)))
+
+  (define-function %bootstrap-type (type-name type-id type-type-id slot-count)
+    (let ((type-obj (allocate type-type-id slot-count)))
+      (set (<type>-id	type-obj)	type-id)
+      (set (<type>-name	type-obj)	type-name)
+      (register-type type-obj)
+      type-obj))
+
+  (define-function %bootstrap-record (type-name type-id super direct-slots)
+    (let ((type-obj (%bootstrap-type type-name type-id type-id-of-<record> (+ (list-length slots-of-<type>)
+                                                                              (list-length slots-of-<record>)))))
+      (set (<record>-super		type-obj)		super)
+      (set (<record>-direct-slots	type-obj)		direct-slots)
+      (set (<record>-effective-slots	type-obj)		'not-yet-bootstrapped)
+      type-obj))
+
+  (set <type>	(%bootstrap-record '<type>		type-id-of-<type>	()	slots-of-<type>))
+  (set <record>	(%bootstrap-record '<record>		type-id-of-<record>	<type>	slots-of-<record>)))
+
+(assert (and <type> <record>))
+(assert (= (<type>-id <type>) %first-type-id))
+(assert (= (<type>-id <record>) (+ %first-type-id 1)))
+
+(assert (= (type-object-for-id (<type>-id <type>)) <type>))
+(assert (= (type-object-for-id (<type>-id <record>)) <record>))
+
+(when (< 0 *verbosity*)
+  (warn "<type> is bootstrapped: "	<type>		", id: "	(<type>-id <type>)"\n")
+  (warn "<record> is bootstrapped: "	<record>	", id: "	(<type>-id <record>)"\n"))
 
 (define-function type-of (obj)
-  (type-object-for (type-id-of obj)))
+  (type-object-for-id (type-id-of obj)))
+
+(assert (= (type-of <type>) <record>))
+(assert (= (type-of <record>) <record>))
 
 (define-function name-of-type (type)
   (<type>-name type))
@@ -631,7 +677,7 @@
 ;; let's also redefine the basic accessors that we have defined earlier.
 (define-function %accessor-typecheck (expected-type-id slot-name object)
   (unless (= (type-id-of object) expected-type-id)
-    (let ((expected-type (type-object-for expected-type-id))
+    (let ((expected-type (type-object-for-id expected-type-id))
           (actual-type (type-of object)))
       (unless (subtype? actual-type expected-type)
         ;; (warn "about to process an %accessor-typecheck failure, which may fail to properly print the error output\nslot name is "slot-name", expected-type-id is "expected-type-id", object's actual type id is "(type-id-of object)"\n")
@@ -664,8 +710,9 @@
     (sanity-check-record-slots type slots)
     slots))
 
-(set (<record>-effective-slots <type>)		(record/compute-effective-slots <type>))
-(set (<record>-effective-slots <record>)	(record/compute-effective-slots <record>))
+(when-at-expand (not bootstrapping?)
+  (set (<record>-effective-slots <type>)	(record/compute-effective-slots <type>))
+  (set (<record>-effective-slots <record>)	(record/compute-effective-slots <record>)))
 
 (assert (equal slots-of-<type> (<record>-effective-slots <type>)))
 (assert (equal (concat-list slots-of-<type> slots-of-<record>) (<record>-effective-slots <record>)))
@@ -701,7 +748,7 @@
 (assert (= (type-of <type>)	<record>))
 (assert (= (type-of <record>)	<record>))
 
-(assert (= (if bootstrapping? 3 2) (list-length (<record>-effective-slots <type>))))
+(assert (= 2 (list-length (<record>-effective-slots <type>))))
 (assert (= (+ 3 (list-length (<record>-effective-slots <type>))) (list-length (<record>-effective-slots <record>))))
 
 (define-function new-type-instance (name type)
