@@ -82,8 +82,8 @@ BUILD_x86	= $(BUILD)/x86/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 
-EMIT_FILES_x86	= emit-early.l emit-x86.l emit-late.l
-EMIT_FILES_llvm	= emit-early.l emit-llvm.l emit-late.l
+EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
+EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l subrs.l arrays.l)
 
@@ -123,32 +123,32 @@ eval-llvm: $(BUILD_llvm)/eval2
 
 # eval1 is the first version of us that gets built by the previous stage.
 # some functionality may be broken in this one. this is when we are 'evolving'.
-$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) boot.l
+$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) boot.l
 	@mkdir --parents $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
-		bootstrapping/prepare.l					\
-		bootstrapping/host-extras.l				\
-		bootstrapping/early.l					\
+		source/bootstrapping/prepare.l				\
+		source/bootstrapping/host-extras.l			\
+		source/bootstrapping/early.l				\
 		boot.l							\
-		bootstrapping/slave-extras.l				\
-		bootstrapping/late.l					\
+		source/bootstrapping/slave-extras.l			\
+		source/bootstrapping/late.l				\
 		--define makefile/target-triplet   $(TARGET_x86)	\
 		--define makefile/target/word-size-in-bits 32		\
 		$(EMIT_FILES_x86)					\
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
-$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) boot.l
+$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) boot.l
 	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
-		bootstrapping/prepare.l					\
-		bootstrapping/host-extras.l				\
-		bootstrapping/early.l					\
+		source/bootstrapping/prepare.l				\
+		source/bootstrapping/host-extras.l			\
+		source/bootstrapping/early.l				\
 		boot.l							\
-		bootstrapping/slave-extras.l				\
-		bootstrapping/late.l					\
+		source/bootstrapping/slave-extras.l			\
+		source/bootstrapping/late.l				\
 		--define makefile/target-triplet   $(TARGET_llvm)	\
 		--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
 		$(EMIT_FILES_llvm)					\
@@ -157,21 +157,21 @@ $(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l $(EVALUATOR_FILES) b
 
 # eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
 # eval2 should implement the semantics encoded by the sources of this stage.
-$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$(BUILD_x86)/eval2.s)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$(BITCODE_DIR)/eval2.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 # eval3 is just a test, it's the result of yet another bootstrap iteration, based off of eval2 this time.
 # eval3.s should be the exact same file as the output of the previous iteration, namely eval2.s.
-$(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-x86,$(BUILD_x86)/eval2,source/evaluator/eval.l,$(BUILD_x86)/eval3.s)
 	@-$(DIFF) $(BUILD_x86)/eval2.s $(BUILD_x86)/eval3.s >$(BUILD_x86)/eval3.s.diff
 
-$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-llvm,$(BUILD_llvm)/eval2,source/evaluator/eval.l,$(BITCODE_DIR)/eval3.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval2.ll $(BITCODE_DIR)/eval3.ll >$(BITCODE_DIR)/eval3.ll.diff
 
@@ -188,30 +188,30 @@ $(HOST_DIR)/eval:
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(1)				\
-	boot.l				\
-	bootstrapping/prepare.l		\
-	bootstrapping/early.l		\
-	boot.l				\
-	bootstrapping/late.l		\
-	--define makefile/target-triplet   $(TARGET_x86)		\
-	--define makefile/target/word-size-in-bits 32			\
-	$(EMIT_FILES_x86)		\
-	$(2)				\
+  $(TIME) $(1)									\
+	boot.l									\
+	source/bootstrapping/prepare.l						\
+	source/bootstrapping/early.l						\
+	boot.l									\
+	source/bootstrapping/late.l						\
+	--define makefile/target-triplet $(TARGET_x86)				\
+	--define makefile/target/word-size-in-bits 32				\
+	$(EMIT_FILES_x86)							\
+	$(2)									\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
 endef
 
 define compile-llvm
-  $(TIME) $(1)				\
-	boot.l				\
-	bootstrapping/prepare.l		\
-	bootstrapping/early.l		\
-	boot.l				\
-	bootstrapping/late.l		\
-	--define makefile/target-triplet   $(TARGET_llvm)				\
-	--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)		\
-	$(EMIT_FILES_llvm)		\
-	$(2)				\
+  $(TIME) $(1)									\
+	boot.l									\
+	source/bootstrapping/prepare.l						\
+	source/bootstrapping/early.l						\
+	boot.l									\
+	source/bootstrapping/late.l						\
+	--define makefile/target-triplet   $(TARGET_llvm)			\
+	--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
+	$(EMIT_FILES_llvm)							\
+	$(2)									\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
 endef
 
