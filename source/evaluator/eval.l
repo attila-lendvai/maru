@@ -353,7 +353,7 @@
 (define-form is/tptr		(obj)		`(is <target-vm-pointer> ,obj))
 (define-form get/tptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
 
-(define-form get/string		(obj)		`(get <string> _bits ,obj))
+(define-form get/string		(obj)		`(get <string> _bits (k/string-ensure-zero-terminated ,obj)))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
 (define-form get/variable-value	(var)		`(get <variable> value
@@ -389,38 +389,15 @@
 
 (require "source/evaluator/gc.l")
 
-(define-function %new-object (type bytesize)
-  (debug (libc/printf "new-object type %d bytesize %d\n" type bytesize))
-  (safety 1 (k/assert (not (= 0 type)) "new-object: called with zero type id"))
-  (let* ((obj (gc/allocate bytesize))
-         (header (header-of obj)))
-    (k/assert (aligned-to-oop? obj) "new-object: gc/allocate returned not aligned-to-oop? {%p}\n" obj)
-    (set (<header>-type header) type)
-    (debug (libc/printf "new-object returning %p\n" obj))
-    obj))
-
-(define-function %new-object/opaque (type bytesize)
-  (safety 1 (k/assert (not (= 0 type)) "new-object/opaque: called with zero type id"))
-  (let* ((obj (gc/allocate-opaque bytesize))
-         (header (header-of obj)))
-    (set (<header>-type header) type)
-    obj))
-
-(define-form new-object (type wordsize)
-  `(%new-object ,(<type>-slave-id (eval type)) (words-to-bytes ,wordsize)))
-
-(define-form new-object/opaque (type wordsize)
-  `(%new-object/opaque ,(<type>-slave-id (eval type)) (words-to-bytes ,wordsize)))
-
 (define-form new-record-instance (type)
   (set type (eval type))
   (assert (subtype? (type-of type) <record>))
-  `(%new-object ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
+  `(gc/allocate ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
 
 (define-form new-record-instance/opaque (type)
   (set type (eval type))
   (assert (subtype? (type-of type) <record>))
-  `(%new-object/opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
+  `(gc/allocate-opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
 
 (define-form new-<long> (bits)
   (if (immediate-type? <long>)
@@ -444,7 +421,8 @@
 (define-function new-<string>-of-length (len)
   (gc/let* ((str (new-record-instance <string>)))
     (put <string> size  str (new-<long> len))
-    (put <string> _bits str (new-object/opaque <data> (+ len 1))) ; +1 is for the terminal zero
+    (when (> len 0)
+      (put <string> _bits str (gc/allocate-opaque <data> len)))
     str))
 
 (define-function new-<string>-from-cstring (cstr)
@@ -454,15 +432,18 @@
     obj))
 
 (define-function new-<symbol> (cstr)
-  ;; TODO mimic strings, make symbols gc-able
-  (let ((obj (new-record-instance/opaque <symbol>)))
-    (put <symbol> _bits obj (libc/strdup cstr))
-    obj))
+  (let ((len (libc/strlen cstr)))    ; +1 is for the zero termination
+    (gc/let* ((obj  (new-record-instance <symbol>))
+              (bits (gc/allocate-opaque <data> (+ len 1))))
+      (libc/memcpy bits cstr (+ len 1))
+      (put <symbol> _bits obj bits)
+      obj)))
 
 (define-function new-<array> (size)
   (gc/let* ((arr (new-record-instance <array>)))
-    (put <array> size arr   (new-<long> size))
-    (put <array> _bits arr  (new-object <data> (or size 1))) ; TODO this is kinda random. why not just go with the size here?
+    (put <array> size arr (new-<long> size))
+    (when (> size 0)
+      (put <array> _bits arr (gc/allocate <data> (words-to-bytes size))))
     arr))
 
 (define-function new-<expr> (defn ctx)
@@ -617,21 +598,20 @@
   (safety 1 (k/assert (is <module> module) "k/intern called with not a module " module))
   ;; deal with ?: syntax for denoting modules
   (let ((len (libc/strlen cstr))
-        (idx 0))
+        (idx 0)
+        (submod ()))
     (while (< idx len)
       (when (= ?: (string-at cstr idx))
-        (let ((submod-name (libc/malloc (+ 1 idx))))
+        (gc/let* ((submod-name (gc/allocate-opaque <data> (+ idx 1))))
           (libc/memcpy submod-name cstr idx)
-          (set (string-at submod-name idx) 0)
-          (let* ((submod-var	(k/env/lookup-variable (get/globals* module) (k/intern* submod-name module)))
-                 (submod	(and submod-var (get <variable> value submod-var))))
-            (when (and submod-var
-                       (not (is <module> submod)))
-              (fatal2 "k/intern: while interning '%s', '%s' was found, but it's not a <module>" cstr submod-name))
-            (libc/free submod-name)
-            (if submod
-                (return (k/intern* (+ 1 (+ cstr idx)) submod))
-              (return (%intern cstr module))))))
+          (set (string-at submod-name idx) ?\x00)
+          (awhen (k/env/lookup-variable (get/globals* module) (k/intern* submod-name module))
+            (set submod (get <variable> value it))
+            (unless (is <module> submod)
+              (fatal2 "k/intern: while interning '%s', '%s' was found, but it's not a <module>" cstr submod-name))))
+        (return (if submod
+                    (k/intern* (+ 1 (+ cstr idx)) submod)
+                  (%intern cstr module))))
       (set idx (+ 1 idx))))
   ;; no module is denoted in cstr (anymore); it's just a symbol to be interned at this point
   (%intern cstr module))

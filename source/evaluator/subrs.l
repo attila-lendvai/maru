@@ -328,7 +328,7 @@
         (size (get/head (get/tail -args-))))
     (safety 1 (k/assert (is/long type) "allocate: invalid type "type))
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
-    (%new-object (get/long type) (words-to-bytes (get/long size)))))
+    (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
 (define-subr (type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
 (define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/t))
@@ -385,28 +385,32 @@
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-))))
         (val (get/head (get/tail (get/tail -args-)))))
-    (set (k/array-at arr idx) val)))
+    (set (k/array-at arr idx) val)
+    val))
 
 (define-subr (set-string-at 3)
   (let* ((arr (get/head -args-))
          (idx (get/long (get/head (get/tail -args-))))
-         (val (get/long (get/head (get/tail (get/tail -args-))))))
+         (val (get/head (get/tail (get/tail -args-)))))
     ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
     (safety 1 (k/assert (<= idx (k/string-length arr))))
-    (set (k/string-at arr idx) val)))
+    (set (k/string-at arr idx) (get/long val))
+    val))
 
 (define-subr (array-insert 3)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-))))
         (val (get/head (get/tail (get/tail -args-)))))
-    (k/array-insert arr idx val)))
+    (k/array-insert arr idx val)
+    val))
 
 (define-subr (string-insert 3)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-))))
-        (val (get/long (get/head (get/tail (get/tail -args-))))))
-    (k/string-insert arr idx val)))
+        (val (get/head (get/tail (get/tail -args-)))))
+    (k/string-insert arr idx (get/long val))
+    val))
 
 (define-subr (string->symbol 1)
   (let ((arg (k/car -args-)))

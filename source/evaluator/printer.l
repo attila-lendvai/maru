@@ -7,7 +7,8 @@
     (cond
       ((= type <undefined>)	(libc/printf "()"))
       ((= type <long>)		(libc/printf "%d" (get/long obj)))
-      ((= type <string>)	(let ((bits (get/string obj)))
+      ((= type <string>)	(k/string-ensure-zero-terminated obj)
+				(let ((bits (get/string obj)))
                                   (if (not storing)
                                       (libc/printf "%s" bits)
                                     (let ((i 0)
