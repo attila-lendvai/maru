@@ -323,19 +323,22 @@
 
 (define-selector compile)
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 0)))
+(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (slave-value slave:target-boolean/false))))
 (define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
 (define-method compile <variable> (-c-)
-  (let ((value (<variable>-value self)))
+  (let ((value self.value))
     (cond
       ((temp? value)
        (gen LOAD value))
       ((and (global-variable? self)
+            (= 'slave:t self.name))
+       (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
+      ((and (global-variable? self)
             (subtype? (type-of value) <type>))
        (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
       (else
-       (gen LOAD (GI32 (LABEL (<variable>-name self))))))))
+       (gen LOAD (GI32 (LABEL self.name)))))))
 
 (define-method compile <string> (-c-)
   (let ((label (UNIQUE-LABEL)))

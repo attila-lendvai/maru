@@ -517,19 +517,28 @@
 
 (define-selector compile)
 
-(define-method compile <undefined>	(-c-)	(gen LOAD (LITERAL 0) 0))
-(define-method compile <long>		(-c-)	(gen LOAD (LITERAL self) self))
+(define-method compile <undefined> (-c-)
+  (let ((false (slave-value slave:target-boolean/false)))
+    (gen LOAD (LITERAL false) false)))
+
+(define-method compile <long> (-c-)
+  (gen LOAD (LITERAL self) self))
 
 (define-method compile <variable> (-c-)
-  (let ((value (<variable>-value self)))
+  (let ((value self.value))
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))
       ((temp? value)		(gen LOAD value ()))
-      ((global-variable? self)	(if (subtype? (type-of value) <type>)
-                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                    (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0)
-                                  (gen LOAD (GLOBAL (<variable>-name self)) value)))
-      (else			(error "compile of <variable> failed for " (<variable>-name self) ", holding value " value)))))
+      ((global-variable? self)	(cond
+                                  ((= 'slave:t self.name)
+                                   (let ((target-true (slave-value slave:target-boolean/true)))
+                                     (gen LOAD (LITERAL target-true) target-true)))
+                                  ((subtype? (type-of value) <type>)
+                                   ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
+                                   (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
+                                  (else
+                                   (gen LOAD (GLOBAL self.name) value))))
+      (else			(error "compile of <variable> failed for " self.name ", holding value " value)))))
 
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))
