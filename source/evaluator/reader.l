@@ -152,13 +152,12 @@
         (fatal1 "missing closing '%c' delimiter while reading list" delim)))))
 
 (define-function read_quote (prefix stream)
-  (let ((qobj (k/read stream)))
+  (gc/let* ((qobj (k/read stream)))
     (when (= k/+done+ qobj)
       (k/error "EOF while reading quoted literal"))
-    (gc/protect (qobj)
-      (set qobj (new-<pair> qobj ()))
-      (set qobj (new-<pair> prefix qobj))
-      qobj)))
+    (set qobj (new-<pair> qobj ()))
+    (set qobj (new-<pair> prefix qobj))
+    qobj))
 
 (set k/read (lambda (stream)
   (while 1

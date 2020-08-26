@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define gc/quantum              (* 50 1024))
+(define gc/minimum-growth-unit	(* 50 1024))
 (define gc/frequency            32768)
 
 (define gc/objects-live         0)
@@ -175,10 +175,11 @@
                   (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (k/assert (& <header>-flags/used (<header>-flags header)) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (initialize-header-canary header))
-                  (gc/debug (libc/printf "gc/allocate: returning with %p (header: %p), size %d\n" obj header (gc/object-size obj)))
+                  (gc/debug (libc/printf "gc/allocate: returning with %p (header: %p), type %ld, size %ld\n" obj header (<header>-type header) (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
-      (gc/grow-heap (max (+ size-of-<header> requested-size) gc/quantum)))))
+      (gc/grow-heap (max (+ size-of-<header> requested-size)
+                         gc/minimum-growth-unit)))))
 
 (define-function gc/allocate-opaque (type requested-size)
   (let* ((obj (gc/allocate type requested-size))
@@ -194,6 +195,7 @@
 
 (define-function gc/push-root (ptr)
   (gc/debug (libc/printf "gc/push-root %d at %p\n" gc/root-count ptr))
+  (safety 3 (valid-maru-value? ptr))
   (set (oop-at gc/roots gc/root-count) ptr)
   (incr gc/root-count)
   ;; make sure that there's always space for the next root because otherwise our call to gc/allocate
@@ -209,7 +211,7 @@
   (set (oop-at gc/roots gc/root-count) ()))
 
 (define-function gc/initialise ()
-  (let ((ptr (gc/acquire-new-heap-space gc/quantum)))
+  (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
     (set gc/memory-base ptr)
     (set gc/memory-last ptr))
   (gc/grow-root-vector))

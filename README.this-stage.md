@@ -4,6 +4,8 @@
 > The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
 
 ## Assorted smaller changes
+ - more detailed backtraces
+ - the symbol true now evaluates to itself. it was just too much hassle not to have a self-evaluating true value.
 
 ## Stats
 
