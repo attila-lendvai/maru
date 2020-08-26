@@ -194,8 +194,6 @@
 ;;; utils
 ;;; ----------------------------------------------------------------
 
-(require "source/evaluator/buffer.l")
-
 (define-function max (a b)
   (if (> a b) a b))
 
@@ -515,6 +513,7 @@
 ;;; ----------------------------------------------------------------
 
 (require "source/evaluator/arrays.l")
+(require "source/evaluator/buffer.l")
 
 (define-function k/concat-list (head tail)
   (if (is/pair head)
@@ -781,7 +780,7 @@
          (and (= symbol/set head)
               (is/pair (k/car  tail))
               (is <symbol> (k/caar tail))
-              (let ((buf (new-<buffer>)))
+              (gc/let* ((buf (new-<buffer>)))
                 (buffer/append-all buf "set-")
                 (buffer/append-all buf (get/symbol (get/head (get/head tail))))
                 (set head (k/intern (buffer/contents buf)))
