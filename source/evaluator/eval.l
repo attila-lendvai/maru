@@ -114,9 +114,6 @@
 (define-form immediate? (word)
   `(not (oop? ,word)))
 
-(define-form malloc-oops (wordcount)
-  `(libc/malloc (words-to-bytes ,wordcount)))
-
 (define-form copy-oops (from to wordcount)
   `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
 
