@@ -420,7 +420,7 @@
     (if (is <string> arg)
         arg
       (and (is <symbol> arg)
-           (new-<string>-from-cstring (get <symbol> _bits arg))))))
+           (new-<string>-from-cstring (get/symbol arg))))))
 
 (define-subr (long->string 1)
   (let ((arg (k/car -args-)))

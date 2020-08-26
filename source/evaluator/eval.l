@@ -22,6 +22,7 @@
 ;; 1: checks that are cheap
 ;; 2: consider their costs...
 ;; 3: catch my bug!
+;; 4: run a gc before every allocation
 (define-constant safety-level 1)
 
 (define-form safety (level . prog)
@@ -131,10 +132,7 @@
 ;; the header of heap objects
 (eval `(define-record <header> () (,@(when (<= 3 safety-level) '(canary)) size flags next type)))
 
-(define-form byte-size-of (type)
-  (words-to-bytes (record/effective-slot-count (eval type))))
-
-(define-constant size-of-<header> (byte-size-of <header>))
+(define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
 
 (define-form header-of (arg)
   `(- ,arg ,size-of-<header>))
@@ -870,6 +868,7 @@
 
 (define-function k/encode/other (exp env)
   (let ((fn (k/array-at (get/variable-value var/*encoders*) (get/type exp))))
+    (debug (libc/printf "k/encode/other looked up fn: ") (k/println fn))
     (when fn
       (gc/let* ((args (new-<pair> env ())))
         (set args (new-<pair> exp args))
@@ -1117,10 +1116,13 @@
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
-        (while (< 0 (set idx (- idx 1)))
+        (while (< 0 (decr idx))
+          (debug (libc/printf "processing argv %ld = %s\n" idx (oop-at argv idx)))
           (set tmp (new-<pair> () tmp))
           (put/head tmp (new-<string>-from-cstring (oop-at argv idx)))))
       (put <variable> value cla-var tmp))
+
+    (debug (libc/printf "*command-line-arguments* is initialized\n"))
 
     ;; process *cla*
     (let (cla tmp)
@@ -1148,6 +1150,7 @@
 
               ;; --call to call a function
               ((not (libc/strcmp arg "--call"))
+               (debug (libc/printf "processing a --call\n"))
                (unless (is/pair cla)
                  (fatal "--call requires an argument"))
                (set arg-string (get/head cla))
@@ -1160,6 +1163,7 @@
 
               ;; --define to define a variable
               ((not (libc/strcmp arg "--define"))
+               (debug (libc/printf "processing a --define\n"))
                (unless (and (is/pair cla)
                             (is/pair (get/tail cla)))
                  (fatal "--define requires two arguments"))
@@ -1183,6 +1187,7 @@
 
               ;; read file as a program
               (else
+               (debug (libc/printf "reading file %s\n" arg))
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
                  (k/repl-stream stream)

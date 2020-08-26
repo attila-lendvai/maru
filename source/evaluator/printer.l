@@ -10,15 +10,15 @@
       ((= type <string>)	(k/string-ensure-zero-terminated obj)
 				(let ((bits (get/string obj)))
                                   (if (not storing)
-                                      (libc/printf "%s" bits)
+                                      (libc/printf "%s" bits) ; this way we don't need to worry about possible %'s in the string
                                     (let ((i 0)
                                           (c 0))
                                       (libc/printf "\"")
                                       (while (set c (string-at bits i))
                                         (if (and (<= 32 c) (<= c 126))
                                             (cond
-                                              ((= c ?\")        (libc/printf "\\\""))
-                                              ((= c ?\\)        (libc/printf "\\\\"))
+                                              ((= c ?\")        (libc/printf "\\\"")) ; \"
+                                              ((= c ?\\)        (libc/printf "\\\\")) ; \\
                                               (else             (libc/printf "%c" c)))
                                           (libc/printf "\\%03o" c))
                                         (set i (+ 1 i)))

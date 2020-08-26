@@ -95,21 +95,21 @@
 
 (define concat-string
   (lambda (x y)
-    (let ((a (string-length x))
-          (b (string-length y)))
-      (let ((s (string (+ a b)))
-            (i 0)
-            (j 0))
-        (while (< i a)
-          (set-string-at s j (string-at x i))
-          (set i (+ i 1))
-          (set j (+ j 1)))
-        (set i 0)
-        (while (< i b)
-          (set-string-at s j (string-at y i))
-          (set i (+ i 1))
-          (set j (+ j 1)))
-        s))))
+    (let ((x-len (string-length x))
+          (y-len (string-length y)))
+      (let ((res (string (+ x-len y-len)))
+            (res-idx 0))
+        (let ((i 0))
+          (while (< i x-len)
+            (set-string-at res res-idx (string-at x i))
+            (set i (+ i 1))
+            (set res-idx (+ res-idx 1))))
+        (let ((i 0))
+          (while (< i y-len)
+            (set-string-at res res-idx (string-at y i))
+            (set i (+ i 1))
+            (set res-idx (+ res-idx 1))))
+        res))))
 
 (define concat-strings
   (lambda args
@@ -411,7 +411,8 @@
         (init      (cadr   var-init-limit-step)    )
         (limit     (caddr  var-init-limit-step)    )
         (step  (or (cadddr var-init-limit-step) 1)))
-    `(let ((,var ,init) (_limit_ ,limit))
+    `(let ((,var ,init)
+           (_limit_ ,limit))
        (while (< ,var _limit_)
          ,@body
          (set ,var (+ ,var ,step))))))
@@ -819,7 +820,7 @@
 ;; level-shifted binary is not an option without grave consequences.
 ;; such a setup would hopefully simplify the bootstrapping dance above
 (define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
-(define-type		<data>)					; some blob; used for stuff like the _bits of <string> and <array>
+(define-type		<data>)					; some internal blob; used for stuff like the _bits of <string> and <array>
 (define-immediate-type	<long> 1 1)
 ;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
 (define-record <array>			() (size _bits))
@@ -969,10 +970,10 @@
 (define-function <selector>-add-method (self type method)
   (when-at-expand (not bootstrapping?)
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
-    (and (expr? method)
-         (or (<expr>-name method)
-             (set (<expr>-name method)
-                  (concat-symbol (name-of-type type) (concat-symbol '. (<selector>-name self)))))))
+    (when (and (expr? method)
+               (not (<expr>-name method)))
+      (set (<expr>-name method)
+           (concat-symbols (name-of-type type) '. (<selector>-name self)))))
   (set-array-at (<selector>-methods self) (<type>-id type) method))
 
 (define-form define-selector (name . default)
