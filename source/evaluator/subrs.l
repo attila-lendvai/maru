@@ -256,22 +256,16 @@
         ((= typ <symbol>)	(set arg (get/symbol oarg)))
         (else			(set arg oarg)))
       (let ((size 100)
-            (p)
-            (np))
-        (or (set p (libc/malloc size))
-            (return "out of memory"))
-        (while 1
-          (let ((n (libc/snprintf p size fmt arg)))
-            (and (<= 0 n) (< n size)
-                 (let ((ans (new-<string>-from-cstring p)))
-                   (libc/free p)
-                   (return ans)))
-            (set size (* size 2)))
-          (or (set np (libc/realloc p size))
-              (let ()
-                (libc/free p)
-                (return "out of memory")))
-          (set p np))))))
+            (result ()))
+        (gc/let* ((buf ()))
+          (while (not result)
+            (set buf (gc/allocate-opaque <data> size))
+            (let ((n (libc/snprintf buf size fmt arg)))
+              (if (and (<= 0 n)
+                       (< n size))
+                  (set result (new-<string>-from-cstring buf))
+                (set size (* size 2))))))
+        result))))
 
 (define-subr repl-stream
   (let ((stream (k/car -args-)))
@@ -430,14 +424,10 @@
 
 (define-subr (long->string 1)
   (let ((arg (k/car -args-)))
-    (if (is <string> arg)
-        arg
-      (and (is/long arg)
-           (let ((buf (libc/malloc 32)))
-             (libc/sprintf buf "%ld" (get/long arg))
-             (let ((result (new-<string>-from-cstring buf)))
-               (libc/free buf)
-               result))))))
+    (k/assert (is/long arg))
+    (let ((buf (gc/allocate-opaque <data> 32))) ; safe up until 64 bits
+      (libc/sprintf buf "%ld" (get/long arg))
+      (new-<string>-from-cstring buf))))
 
 ;; TODO is this the actual primitive that we want to publish? maybe a just read-form?
 (define-subr read
