@@ -95,10 +95,10 @@
 
 (define-function read_number (c stream)
   (gc/let* ((buf (new-<buffer>)))
-    (let ((negative?	target-boolean/false)
+    (let ((negative?	false)
           (base		10))
       (if (= ?- c)
-          (set negative? target-boolean/true)
+          (set negative? true)
         (buffer/append buf c))
       (while (is_digit10 (set c (libc/fgetc stream)))
         (buffer/append buf c))

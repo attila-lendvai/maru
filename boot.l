@@ -1089,7 +1089,7 @@
                 (if (dump-until target (car arg))
                     (let ()
                       (if (cdr arg) (print " ..."))
-                      (set found 't)
+                      (set found true)
                       (set arg ())))
               (let ()
                 (print ". ")

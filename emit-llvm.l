@@ -78,7 +78,7 @@
     (while (< index length)
       (let ((c (string-at str index)))
         (when (char-needs-wrapping? c)
-          (set wrap-result? 't))
+          (set wrap-result? true))
         (if (legal-char? c)
             (putnext c)
           (putnext ?\\)
@@ -96,7 +96,7 @@
 
 (define-function llvm/escape-string (str . with-zero)
   (%llvm-escape str
-                (lambda _ 't) ; always wrap it in double quotes
+                (lambda _ true) ; always wrap it in double quotes
                 ;; TODO this felxibility may be unnecessary; duplicate code below
                 (lambda (c)
                   (and (<= 32 c) (<= c 127)
@@ -241,7 +241,7 @@
 ;;;
 ;;;
 (define-function emit-llvm-fn-type (return-type param-types vararg?)
-  (let ((first? 't))
+  (let ((first? true))
     (print return-type " (")
     (list-do param-type (if vararg?
                             (concat-list param-types (list "..."))
@@ -262,13 +262,13 @@
 
 (define-instruction DEFINE	()
   ;; ((GLOBAL string)		(let ((length (+ 1 (string-length $2))))
-  ;;       			  (println $1".c = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 't))
+  ;;       			  (println $1".c = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))
   ;;       			  (println $1"   = private unnamed_addr global %ptr bitcast([" length " x i8]* getelementptr([" length " x i8], [" length " x i8]* "$1".c) to %ptr)")))
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
-				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 't))))
+				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
   ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)"))
   ((GLOBAL foreign-function)	(print "declare " (ffi-type->llvm-type (<foreign-function>-return-type $2)) " "$1"(")
-				(let ((first? 't)
+				(let ((first? true)
 				      (param-types (<foreign-function>-parameter-types $2)))
                                   (list-do param-type (if (<foreign-function>-vararg? $2)
                                                           (concat-list param-types (list "..."))
@@ -332,7 +332,7 @@
         (emit-llvm-fn-type return-type param-types vararg?) ; LLVM only demands a full type when calling a vararg fn
       (print return-type))              ; short version
     (print " "name"(")
-    (map (let ((first? 't))
+    (map (let ((first? true))
            (lambda (arg)
              (let ((param-type (or (pop param-types) '%ptr)))
                ;; TODO FIXME this ... situation is messy
@@ -518,8 +518,8 @@
 (define-selector compile)
 
 (define-method compile <undefined> (-c-)
-  (let ((false (slave-value slave:target-boolean/false)))
-    (gen LOAD (LITERAL false) false)))
+  (let ((false-value (slave-value slave:target-boolean/false)))
+    (gen LOAD (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
   (gen LOAD (LITERAL self) self))
@@ -530,9 +530,9 @@
       ((local? value)		(set (<compiler>-current-value -c-) value))
       ((temp? value)		(gen LOAD value ()))
       ((global-variable? self)	(cond
-                                  ((= 'slave:t self.name)
-                                   (let ((target-true (slave-value slave:target-boolean/true)))
-                                     (gen LOAD (LITERAL target-true) target-true)))
+                                  ((= 'slave:true self.name)
+                                   (let ((true-value (slave-value slave:target-boolean/true)))
+                                     (gen LOAD (LITERAL true-value) true-value)))
                                   ((subtype? (type-of value) <type>)
                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
                                    (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
@@ -837,7 +837,7 @@
 
 (define-function emit/function-prologue (name params)
   (print "define %ptr "name"(")
-  (let ((first? 't))
+  (let ((first? true))
     (list-do param params
       (if first?
           (set first? ())

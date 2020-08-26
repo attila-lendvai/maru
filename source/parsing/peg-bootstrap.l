@@ -29,11 +29,11 @@
   (or (and (OBJECT ?\n)
 	   (let ()
 	     (while (OBJECT ?\r))
-	     't))
+	     true))
       (and (OBJECT ?\r)
 	   (let ()
 	     (while (OBJECT ?\n))
-	     't))))
+	     true))))
 
 (define-rule comment
   (if (OBJECT ?\#)
@@ -41,11 +41,11 @@
 	(while (and (parser-stream-peek _)
 		    (not (RULE eol)))
 	  (parser-stream-next _))
-	't)))
+	true)))
 
 (define-rule space
   (while (or (RULE blank) (RULE eol) (RULE comment)))
-  't)
+  true)
 
 (define-rule equals	(and (OBJECT ?=) (RULE space)))
 (define-rule bar	(and (OBJECT ?|) (RULE space)))
@@ -184,7 +184,7 @@
 	     (while (RULE sexpr) (group-append ans self.result))
 	     (or (RULE rparen) (error ") expected in list near: "(parser-stream-context _)))
 	     (set self.result (group->list! ans))
-	     't))
+	     true))
       (and (RULE quotesgl)  (RULE sexpr)	(set self.result (list 'quote		 self.result)))
       (and (RULE backquote) (RULE sexpr)	(set self.result (list 'quasiquote	 self.result)))
       (and (RULE commaat)   (RULE sexpr)	(set self.result (list 'unquote-splicing self.result)))

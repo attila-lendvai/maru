@@ -72,8 +72,8 @@
                                   (libc/printf "Context<>")))
       (else                     (libc/printf "<type:%d>" type)))))
 
-(set k/print (lambda (obj) (do_print obj target-boolean/false)))
-(define-function k/println	(obj) (do_print obj target-boolean/false) (libc/printf "\n"))
+(set k/print (lambda (obj) (do_print obj false)))
+(define-function k/println	(obj) (do_print obj false) (libc/printf "\n"))
 
-(define-function k/dump		(obj) (do_print obj target-boolean/true))
-(define-function k/dumpln	(obj) (do_print obj target-boolean/true) (libc/printf "\n"))
+(define-function k/dump		(obj) (do_print obj true))
+(define-function k/dumpln	(obj) (do_print obj true) (libc/printf "\n"))

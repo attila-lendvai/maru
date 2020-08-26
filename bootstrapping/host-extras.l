@@ -7,9 +7,10 @@
 (warn "--- boostrapping: host extras\n")
 
 ;; Mark the fact that we are evolving from the previous stage.
-(eval-in-module slave '(slave:set slave:evolving? (slave:quote slave:t)))
+(eval-in-module slave '(slave:set slave:evolving? (slave:quote slave:true)))
 
 ;;;
-;;; Definitions that are needed to enable our host to bootstrap us.
+;;; Temporary definitions that are needed to enable our host to bootstrap us.
 ;;;
-(eval-in-module slave '(slave:define slave:t (slave:quote slave:t)))
+(eval-in-module slave '(slave:define slave:true (slave:quote slave:true)))
+(define true 'true)

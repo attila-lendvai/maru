@@ -6,7 +6,7 @@
 (switch-to-slave-module)
 
 (define-form compile-begin ()
-  (set *force-trivial-accessors* 't)
+  (set *force-trivial-accessors* true)
   `(set *globals* (eval-in-module host `(host:environment ,*globals*))))
 
 (define-form compile-end ()

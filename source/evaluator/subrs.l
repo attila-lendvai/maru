@@ -108,7 +108,7 @@
       (set -args- (get/tail -args-)))))
 
 (define-subr (and () fixed)
-  (let ((ans symbol/t))
+  (let ((ans symbol/true))
     (while (is/pair -args-)
       (or (set ans (k/eval (get/head -args-) -ctx-))
           (return ()))
@@ -119,8 +119,7 @@
   (k/car -args-))
 
 (define-subr (not 1)
-  ;; TODO wouldn't it be nicer if we returned here something that self-evaluates?
-  (if (k/car -args-) () symbol/t))
+  (if (k/car -args-) () symbol/true))
 
 (define-subr (fixed 1)
   (new-<fixed> (k/car -args-)))
@@ -181,7 +180,7 @@
            (rhs (get/head (get/tail -args-))))
        (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (and (,op (get/long lhs) (get/long rhs))
-            symbol/t))))
+            symbol/true))))
 
 (define-relation <)
 (define-relation <=)
@@ -194,18 +193,18 @@
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type <long>)		(and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t))
-      (else                     (and (= lhs rhs) symbol/t)))))
+      ((= type <long>)		(and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
+      (else                     (and (= lhs rhs) symbol/true)))))
 
 (define-subr (!= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
          (type (get/type lhs)))
     (cond
-      ((= type <long>)		(and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/t))
-      ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/t)
-      (else                     (and (!= lhs rhs) symbol/t)))))
+      ((= type <long>)		(and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
+      (else                     (and (!= lhs rhs) symbol/true)))))
 
 (define-subr (abort 0)
   (print-backtrace)
@@ -325,10 +324,10 @@
     (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
 (define-subr (type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
-(define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/t))
-(define-subr (symbol? 1) (and (is <symbol> (k/car -args-)) symbol/t))
-(define-subr (pair? 1)   (and (is <pair>   (k/car -args-)) symbol/t))
-(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/t)) ; TODO move to boot.l?
+(define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/true))
+(define-subr (symbol? 1) (and (is <symbol> (k/car -args-)) symbol/true))
+(define-subr (pair? 1)   (and (is <pair>   (k/car -args-)) symbol/true))
+(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/true)) ; TODO move to boot.l?
 (define-subr (car 1)     (k/car (k/car -args-)))
 (define-subr (cdr 1)     (k/cdr (k/car -args-)))
 
@@ -469,9 +468,7 @@
   ())
 
 (define-subr (create-module 0)
-  (gc/let* ((module (new-<module>)))
-    (populate-module-with-primitives module)
-    module))
+  (new-<module>))
 
 (define-subr (eval-in-module 2)
   (let ((new-module (k/car -args-))

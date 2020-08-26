@@ -332,7 +332,7 @@
       ((temp? value)
        (gen LOAD value))
       ((and (global-variable? self)
-            (= 'slave:t self.name))
+            (= 'slave:true self.name))
        (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
       ((and (global-variable? self)
             (subtype? (type-of value) <type>))

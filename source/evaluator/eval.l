@@ -29,7 +29,7 @@
   (when (<= level safety-level)
     `(let () ,@prog)))
 
-(define-constant track-backtrace? (or t (< 0 safety-level)))
+(define-constant track-backtrace? (or true (< 0 safety-level)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -219,7 +219,7 @@
 (define var/*applicators*)
 (define var/*input*)
 
-(define symbol/t)
+(define symbol/true)
 (define symbol/dot)
 (define symbol/define)
 (define symbol/set)
@@ -863,7 +863,7 @@
       (let ((venv (get <variable> env exp)))
         (unless (= (get/long (get <env> level venv))
                    (get/long (get <env> level env)))
-          (put <env> stable venv symbol/t)))))
+          (put <env> stable venv symbol/true)))))
   exp)
 
 (define-function k/encode/other (exp env)
@@ -981,15 +981,17 @@
          (libc/printf "\nmorituri te salutant\n"))
     res))
 
+(define populate-module-with-primitives) ; forward
+
 (define-function new-<module> ()
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0)))
     (set (<module>-symbols module)	(new-<array> 0))
     (set (<module>-globals module)	(k/env/define env (k/intern* "*globals*" module) env))
-    (let ((t-symbol (k/intern* "t" module)))
-      ;; make sure the symbol t evaluates to itself
-      (k/env/define env t-symbol t-symbol))
+
+    (populate-module-with-primitives module)
+
     (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
 
@@ -1019,9 +1021,8 @@
   (debug (libc/printf "populate-module-with-primitives on %p\n" module))
   (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
   ;; the predefined primitives of the language
-  (let ((env (get/globals* module))
-        (tmp))
-    (gc/protect (tmp)
+  (let ((env (get/globals* module)))
+    (gc/let* ((tmp))
 				(k/env/define env (k/intern* "*input*"			module) ())
 				(k/env/define env (k/intern* "*command-line-arguments*"	module) ())
       (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*verbosity*"		module) tmp)
@@ -1034,12 +1035,16 @@
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*evaluators*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp))
 
+    (let ((symbol/true (k/intern* "true" module)))
+      ;; make sure the symbol true evaluates to itself
+      (k/env/define env symbol/true symbol/true))
+
     (instantiate-subrs))))
 
 (set capture-well-known-vm-values (lambda ()
   (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
-  (set symbol/t                      (k/intern "t"))
+  (set symbol/true                   (k/intern "true"))
   (set symbol/dot                    (k/intern "."))
   (set symbol/define                 (k/intern "define"))
   (set symbol/set                    (k/intern "set"))
@@ -1094,19 +1099,16 @@
   (gc/push-root (address-of fixed-subr/let))
   (gc/push-root (address-of fixed-subr/define))
 
-  (debug (libc/printf "initializing *module*\n"))
-
-  (set *module* (new-<module>))
-
-  (debug (libc/printf "*module* initialized\n"))
+  (debug (libc/printf "initializing *call-stack*\n"))
 
   (when-at-expand track-backtrace?
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (new-<array> 32)))
 
-  (debug (libc/printf "populating *module*\n"))
+  (debug (libc/printf "initializing *module*\n"))
 
-  (populate-module-with-primitives *module*)
+  (set *module* (new-<module>))
+
   (capture-well-known-vm-values)
 
   (debug (libc/printf "start processing argv\n"))
