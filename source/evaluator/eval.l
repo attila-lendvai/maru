@@ -638,14 +638,15 @@
                              ,call-depth-check
                              ,@body))))
        (decr *call-stack-index*)
-       (when (<= 0 *call-stack-index*)
-         ;; gc optimization: clear the now unused call-frame
-         (let ((self (k/array-at *call-stack* *call-stack-index*)))
-           ;; TODO clean up the situation with with-instance-accessors
-           (with-instance-accessors <call-frame>
-             (set self.callee-designator	())
-             (set self.callee			())
-             (set self.arguments		()))))
+       ,(when track-backtrace?
+          '(when (<= 0 *call-stack-index*)
+            ;; gc optimization: clear the now unused call-frame
+            ;; TODO clean up the situation with with-instance-accessors
+            (let ((self (k/array-at *call-stack* *call-stack-index*)))
+              (with-instance-accessors <call-frame>
+                (set self.callee-designator	())
+                (set self.callee		())
+                (set self.arguments		())))))
        (debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
        __result__)))
 
@@ -653,17 +654,19 @@
   (define-function %new-call-frame (callee-designator callee args)
     (safety 3 (unless (or (not callee-designator)	(valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
     (safety 3 (unless (or (not callee)			(valid-maru-value? callee))		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
-    (let ((self (k/array-at *call-stack* *call-stack-index*)))
-      (if self
-          (k/assert (is <call-frame> self) "%new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type self))
-        (set self (new-record-instance <call-frame>))
-        (set (k/array-at *call-stack* *call-stack-index*) self))
+    (let ((frame (k/array-at *call-stack* *call-stack-index*)))
+      (if frame
+          (safety 1 (k/assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type frame)))
+        (gc/let* ((new-frame (new-record-instance <call-frame>)))
+          (set (k/array-at *call-stack* *call-stack-index*) new-frame)
+          (set frame new-frame)))
       ;; TODO clean up the situation with with-instance-accessors
-      (with-instance-accessors <call-frame>
-        (set self.callee-designator	callee-designator)
-        (set self.callee		callee)
-        (set self.arguments		args))
-      self)))
+      (let ((self frame))
+        (with-instance-accessors <call-frame>
+          (set self.callee-designator	callee-designator)
+          (set self.callee		callee)
+          (set self.arguments		args)))
+      frame)))
 
 (set print-backtrace
   (lambda ()
