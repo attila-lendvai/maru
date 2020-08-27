@@ -34,7 +34,7 @@
       (put <variable> value var val))))
 
 (define-subr (defined? 1)
-  (let ((name (k/car -args-))
+  (let ((name (get/head -args-))
         (env (or (k/cadr -args-) (get/globals))))
     (k/env/lookup-variable env name)))
 
@@ -66,14 +66,13 @@
 
 (define-subr (set 2 fixed)
   ;;(printf "SET ") (k/print args) (libc/printf " IN ") (k/println -ctx-)
-  (let ((var (k/car -args-)))
-    (or (is <variable> var)
-        (let ()
-          ;; FIXME? use k/error? why the dumpln? test it... was: (k/error "undefined variable: (set "-args-")")
-          (libc/printf "\ncannot set undefined variable: ")
-          (k/dumpln var)
-          (fatal "aborting")))
-    (let ((val (k/eval (k/cadr -args-) -ctx-)))
+  (let ((var (get/head -args-)))
+    (unless (is <variable> var)
+      ;; FIXME? use k/error? why the dumpln? test it... was: (k/error "undefined variable: (set "-args-")")
+      (libc/printf "\ncannot set undefined variable: ")
+      (k/dumpln var)
+      (fatal "aborting"))
+    (let ((val (k/eval (get/head (get/tail -args-)) -ctx-)))
       (if (global-variable? var)
           (put <variable> value var val)
         (let ((delta (- (get/long (get <env> level (get <context>  env -ctx-)))
@@ -116,26 +115,29 @@
     ans))
 
 (define-subr (quote 1 fixed)
-  (k/car -args-))
+  (get/head -args-))
 
 (define-subr (not 1)
-  (if (k/car -args-) () symbol/true))
+  (if (get/head -args-) () symbol/true))
 
 (define-subr (fixed 1)
-  (new-<fixed> (k/car -args-)))
+  (new-<fixed> (get/head -args-)))
 
 (define-subr (variable 4)
-  (new-<variable> (k/car -args-) (k/cadr -args-) (k/caddr -args-) (k/cadddr -args-)))
+  (new-<variable> (get/head -args-)
+                  (get/head (set -args- (get/tail -args-)))
+                  (get/head (set -args- (get/tail -args-)))
+                  (get/head (get/tail -args-))))
 
 (define-subr (environment 1)
-  (let ((parent (k/car -args-)))
+  (let ((parent (get/head -args-)))
     (k/assert (is <env> parent))
     (new-<env> parent 0 (get/long (get <env> offset parent)))))
 
 (define-subr (environment-define 3)
-  (let ((env   (k/car -args-))
-        (name  (k/cadr -args-))
-        (value (k/caddr -args-)))
+  (let ((env   (get/head -args-))
+        (name  (get/head (set -args- (get/tail -args-))))
+        (value (get/head (get/tail -args-))))
     (k/assert (is <env> env))
     (k/assert (is <symbol> name))
     (let* ((bindings (get <env> bindings env))
@@ -212,38 +214,36 @@
   (libc/abort))
 
 (define-subr (exit 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     (or (is/long arg)
         (k/error "argument to subr_exit is not a <long>: " arg))
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 
 (define-subr (libc/fopen 1)
-  (let ((path (k/car -args-)))
+  (let ((path (get/head -args-)))
     (let ((stream (libc/fopen (get/string path) "rb")))
       (and stream (new-<target-vm-pointer> stream)))))
 
 (define-subr (libc/fclose 1)
-  (let ((stream (k/car -args-)))
+  (let ((stream (get/head -args-)))
     (libc/fclose (get/tptr stream))
     ()))
 
-(define-subr libc/fgetc
-  (let ((stream (k/car -args-)))
-    (or stream (set stream (get/variable-value var/*input*)))
-    (let ((c (libc/fgetc (get/tptr stream))))
-      (and (>= c 0)
-           (new-<long> c)))))
+(define-subr (libc/fgetc 1)
+  (let ((stream	(get/head -args-))
+        (c	(libc/fgetc (get/tptr stream))))
+    (and (>= c 0)
+         (new-<long> c))))
 
-(define-subr libc/fputc
-  (let ((stream (k/car -args-))
-        (obj (k/cadr -args-)))
-    (or stream (set stream (get/variable-value var/*input*)))
+(define-subr (libc/fputc 2)
+  (let ((stream (get/head -args-))
+        (obj	(get/head (get/tail -args-))))
     (new-<long> (libc/fputc (get/tptr stream) (get/long obj)))))
 
 (define-subr (libc/format 2)
-  (let ((ofmt (k/car -args-))
-        (oarg (k/cadr -args-)))
+  (let ((ofmt (get/head -args-))
+        (oarg (get/head (get/tail -args-))))
     (or (is <string> ofmt) (fatal "subr/libc/format: non-string format"))
     (let ((fmt (get/string ofmt))
           (typ (get/type oarg))
@@ -266,9 +266,9 @@
                 (set size (* size 2))))))
         result))))
 
-(define-subr repl-stream
-  (let ((stream (k/car -args-)))
-    (or stream (set stream (get/variable-value var/*input*)))
+(define-subr (repl-stream 1)
+  (let ((stream (get/head -args-)))
+    ;;(or stream (set stream (get/variable-value var/*input*)))
     (k/repl-stream (get/tptr stream))))
 
 (define-subr dump
@@ -295,7 +295,7 @@
     (set -args- (get/tail -args-))))
 
 (define-subr (apply 2)
-  (k/apply (k/car -args-) (k/cadr -args-) -ctx-))
+  (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
 (define-subr eval
   (gc/let* ((e (or (k/cadr -args-) (new-<env> (get/globals) 1 0))))
@@ -312,7 +312,7 @@
                 (get <context> env -ctx-))))
 
 (define-subr cons       (new-<pair> (k/car -args-) (k/cadr -args-)))
-(define-subr (string 1) (new-<string>-of-length (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
+(define-subr (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
 (define-subr array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
 (define-subr form       (new-<form> (k/car -args-) (k/cadr -args-)))
 
@@ -323,23 +323,24 @@
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
     (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
-(define-subr (type-of 1) (and -args- (new-<long> (get/type (k/car -args-)))))
-(define-subr (string? 1) (and (is <string> (k/car -args-)) symbol/true))
-(define-subr (symbol? 1) (and (is <symbol> (k/car -args-)) symbol/true))
-(define-subr (pair? 1)   (and (is <pair>   (k/car -args-)) symbol/true))
-(define-subr (array? 1)  (and (is <array>  (k/car -args-)) symbol/true)) ; TODO move to boot.l?
-(define-subr (car 1)     (k/car (k/car -args-)))
-(define-subr (cdr 1)     (k/cdr (k/car -args-)))
+(define-subr (type-of 1) (new-<long> (get/type (get/head -args-))))
+(define-subr (string? 1) (and (is <string> (get/head -args-)) symbol/true))
+(define-subr (symbol? 1) (and (is <symbol> (get/head -args-)) symbol/true))
+(define-subr (pair? 1)   (and (is <pair>   (get/head -args-)) symbol/true))
+(define-subr (array? 1)  (and (is <array>  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
+(define-subr (car 1)     (k/car (get/head -args-)))
+(define-subr (cdr 1)     (k/cdr (get/head -args-)))
 
 (define-subr (set-car 2)
-  (let ((obj (k/car -args-)))
+  (let ((obj (get/head -args-)))
+    ;; TODO assert the type
     (and (is/pair obj)
-         (put <pair> head obj (k/cadr -args-)))))
+         (put <pair> head obj (get/head (get/tail -args-))))))
 
 (define-subr (set-cdr 2)
-  (let ((obj (k/car -args-)))
+  (let ((obj (get/head -args-)))
     (and (is/pair obj)
-         (put <pair> tail obj (k/cadr -args-)))))
+         (put <pair> tail obj (get/head (get/tail -args-))))))
 
 (define-subr (oop-at 2)
   (let ((obj (get/head -args-))
@@ -349,18 +350,18 @@
 
 (define-subr (set-oop-at 3)
   (let ((obj (get/head -args-))
-        (idx (get/head (get/tail -args-)))
-        (val (get/head (get/tail (get/tail -args-)))))
+        (idx (get/head (set -args- (get/tail -args-))))
+        (val (get/head (get/tail -args-))))
     (safety 1 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (set-oop-at obj (get/long idx) val)))
 
 (define-subr (array-length 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     (safety 1 (k/assert (is <array> arg)))
     (get <array> size arg)))
 
 (define-subr (string-length 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     (safety 1 (k/assert (is <string> arg)))
     (get <string> size arg)))
 
@@ -376,15 +377,15 @@
 
 (define-subr (set-array-at 3)
   (let ((arr (get/head -args-))
-        (idx (get/long (get/head (get/tail -args-))))
-        (val (get/head (get/tail (get/tail -args-)))))
+        (idx (get/long (get/head (set -args- (get/tail -args-)))))
+        (val (get/head (get/tail -args-))))
     (set (k/array-at arr idx) val)
     val))
 
 (define-subr (set-string-at 3)
   (let* ((arr (get/head -args-))
-         (idx (get/long (get/head (get/tail -args-))))
-         (val (get/head (get/tail (get/tail -args-)))))
+         (idx (get/long (get/head (set -args- (get/tail -args-)))))
+         (val (get/head (get/tail -args-))))
     ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
     (safety 1 (k/assert (<= idx (k/string-length arr))))
@@ -393,20 +394,20 @@
 
 (define-subr (array-insert 3)
   (let ((arr (get/head -args-))
-        (idx (get/long (get/head (get/tail -args-))))
-        (val (get/head (get/tail (get/tail -args-)))))
+        (idx (get/long (get/head (set -args- (get/tail -args-)))))
+        (val (get/head (get/tail -args-))))
     (k/array-insert arr idx val)
     val))
 
 (define-subr (string-insert 3)
   (let ((arr (get/head -args-))
-        (idx (get/long (get/head (get/tail -args-))))
-        (val (get/head (get/tail (get/tail -args-)))))
+        (idx (get/long (get/head (set -args- (get/tail -args-)))))
+        (val (get/head (get/tail -args-))))
     (k/string-insert arr idx (get/long val))
     val))
 
 (define-subr (string->symbol 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (is <symbol> arg)
         arg
@@ -414,7 +415,7 @@
            (k/intern (get/string arg))))))
 
 (define-subr (symbol->string 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (is <string> arg)
         arg
@@ -422,7 +423,7 @@
            (new-<string>-from-cstring (get/symbol arg))))))
 
 (define-subr (long->string 1)
-  (let ((arg (k/car -args-)))
+  (let ((arg (get/head -args-)))
     (k/assert (is/long arg))
     (let ((buf (gc/allocate-opaque <data> 32))) ; safe up until 64 bits
       (libc/sprintf buf "%ld" (get/long arg))
@@ -454,7 +455,7 @@
   *module*)
 
 (define-subr (set-current-module 1)
-  (let ((module (k/car -args-)))
+  (let ((module (get/head -args-)))
     (safety 1 (k/assert (is <module> module) "set-current-module: called with not a <module>: "module))
     (k/set-current-module module))
   ())
@@ -463,8 +464,8 @@
   (new-<module>))
 
 (define-subr (eval-in-module 2)
-  (let ((new-module (k/car -args-))
-        (form (k/cadr -args-))
+  (let ((new-module (get/head -args-))
+        (form (get/head (get/tail -args-)))
         (previous-module *module*))
     (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
