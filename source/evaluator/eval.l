@@ -726,19 +726,7 @@
       (cond
         ((= type <expr>)	(k/apply-expr fun arguments ctx))
         ((= type <fixed>)	(k/apply (get <fixed> function fun) arguments ctx))
-        ((= type <subr>)
-         ;; TODO FIXME it sould be this:
-         ;; ((get <subr> _imp fun) arguments ctx)
-         ;; but without using a local var it gets miscompiled by the x86 backend
-         ;; see 8(%esp) and 12(%esp), they should be 0 and 4.
-         ;; +	movl	_25type_check, %eax
-         ;; +	movl	36(%esp), %ecx
-         ;; +	movl	%ecx, 8(%esp)
-         ;; +	movl	40(%esp), %ecx
-         ;; +	movl	%ecx, 12(%esp)
-         ;; +	call	*%eax
-         (let ((imp (get <subr> _imp fun)))
-           (imp arguments ctx)))
+        ((= type <subr>)	((get <subr> _imp fun) arguments ctx))
         (else
          (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
            (if ap

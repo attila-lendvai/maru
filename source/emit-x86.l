@@ -431,8 +431,7 @@
   (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
     (list-do stmt (cdddr expr)
       (comp stmt))
-    (list-do temp temps
-      (free-temp -c- temp))))
+    (free-temps -c- temps)))
 
 (define-function compile/and (expr -c-)
   (let ((done (UNIQUE-LABEL)))
@@ -511,48 +510,61 @@
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
-         (op-is-a-var	(variable? op))
+         (op-is-a-var?	(variable? op))
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
     (cond
-      ((set handler (and op-is-a-var
+      ((set handler (and op-is-a-var?
                          (cadr (assq (<variable>-value op) (array-at +special-operators+ arity)))))
        ((array-at +operator-compilers+ arity) handler args -c-))
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))
       (else
-       (let* ((tmp-locs (map-with compile/expr-into-temp args -c-))
-              (arg-locs (map (lambda (_) (new-arg -c-)) args))
-              (n-params ()))
-         ;; set up the stack for the call
-         (map (lambda (a b) (gen MOVE a b)) tmp-locs arg-locs)
-         (free-temps -c- tmp-locs)
-         (free-args  -c- arg-locs)
-         ;; gen the call itself
-         (cond
-           ((and op-is-a-var
-                 (global-variable? op))
-            (let ((value (<variable>-value op)))
-              (cond
-                ((expr? value)
-                 (comp op)
-                 (gen CALL arity)
-                 (set n-params (<expr>-n-required-parameters value)))
-                ((= (type-of value) <foreign-function>)
-                 (gen CALL (LABEL (<foreign-function>-name value)))
-                 (unless (<foreign-function>-vararg? value)
-                   (set n-params (list-length (<foreign-function>-parameter-types value)))))
-                (else
-                 (error "Don't know how to emit call to global value "value", in variable "op)))
-              (when (and n-params
-                         (not (= n-params arity)))
-                (error "compile: calling " value
-                       " with the wrong number of arguments: " args
-                       ", while expecting " n-params))))
-           (else
-            (comp op)
-            (gen CALL arity))))))))
+       (let ((ff-name ())
+             (op-is-simple? ())
+             (arg-tmps (map-with compile/expr-into-temp args -c-)))
+         (when (and op-is-a-var?
+                    (global-variable? op))
+           (let ((value		(<variable>-value op))
+                 (n-params	()))
+             (cond
+               ((expr? value)
+                (set op-is-simple? true)
+                (set n-params (<expr>-n-required-parameters value)))
+               ((= (type-of value) <foreign-function>)
+                (set ff-name (<foreign-function>-name value))
+                (unless (<foreign-function>-vararg? value)
+                  (set n-params (list-length (<foreign-function>-parameter-types value)))))
+               (else
+                (error "Don't know how to emit call to global value "value", in variable "op)))
+             (when (and n-params
+                        (not (= n-params arity)))
+               (error "compile: calling " value
+                      " with the wrong number of arguments: " args
+                      ", while expecting " n-params))))
+
+         (let ((op-tmp (unless (or op-is-simple?
+                                   ff-name)
+                         (compile/expr-into-temp op -c-)))
+               (arg-locs (map (lambda (_) (new-arg -c-)) args)))
+           ;; set up the stack for the call
+           (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
+           (free-temps -c- arg-tmps)
+
+           (cond
+             (ff-name
+              (gen CALL (LABEL ff-name)))
+             (op-is-simple?
+              (comp op)
+              (gen CALL arity))
+             (else
+              (gen LOAD op-tmp)
+              (gen CALL arity)))
+
+           (free-args  -c- arg-locs)
+           (when op-tmp
+             (free-temp -c- op-tmp))))))))
 
 ;;; COMPILE-DEFINITION
 
