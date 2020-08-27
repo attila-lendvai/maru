@@ -173,7 +173,7 @@
          ,@true-forms)))
 
 (define-form when (test . body)
-  `(and ,test (let () ,@body)))
+  `(if ,test (let () ,@body)))
 
 (define-form awhen (test . body)
   `(let ((it ,test))
@@ -181,7 +181,7 @@
        ,@body)))
 
 (define-form unless (test . body)
-  `(or ,test (let () ,@body)))
+  `(if ,test () ,@body))
 
 (define-form assert (test . args)
   (unless args
