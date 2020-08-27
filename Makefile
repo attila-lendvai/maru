@@ -93,6 +93,9 @@ distclean: clean
 	rm -rf $(BUILD)
 	git checkout $(BUILD) || true
 
+veryclean: clean
+	rm -rf $(BUILD)
+
 stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
 $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
