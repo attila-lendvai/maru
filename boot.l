@@ -149,10 +149,10 @@
 )
 
 (define-form when (test . body)
-  `(and ,test (let () ,@body)))
+  `(if ,test (let () ,@body)))
 
 (define-form unless (test . body)
-  `(or ,test (let () ,@body)))
+  `(if ,test () ,@body))
 
 (define-form assert (test . args)
   (unless args
