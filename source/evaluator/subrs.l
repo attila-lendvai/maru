@@ -453,14 +453,6 @@
 (define-subr (current-module 0)
   *module*)
 
-(define capture-well-known-vm-values) ; forward
-(define populate-module-with-primitives) ; forward
-
-(define-function k/set-current-module (module)
-  (debug (libc/printf "k/set-current-module {%p}\n" module))
-  (set *module* module)
-  (capture-well-known-vm-values))
-
 (define-subr (set-current-module 1)
   (let ((module (k/car -args-)))
     (safety 1 (k/assert (is <module> module) "set-current-module: called with not a <module>: "module))

@@ -41,8 +41,6 @@
     ((and (<= ?A c) (<= c ?Z))  (- c (- ?A 10)))
     (else                       (fatal1 "illegal digit in character escape: %c" c))))
 
-(define k/read) ; forward
-
 (define-function read_char (c stream)
   (if (= ?\\ c)
       (let ()
@@ -159,7 +157,7 @@
     (set qobj (new-<pair> prefix qobj))
     qobj))
 
-(set k/read (lambda (stream)
+(define-function k/read (stream)
   (while 1
     (let ((c (libc/fgetc stream)))
       (cond
@@ -188,4 +186,3 @@
                             (return k/+done+)
                           (fatal "error while reading from libc stream")))
         (else           (fatal1 "illegal character: %c" c))))))
-)

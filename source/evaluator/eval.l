@@ -172,6 +172,19 @@
 (compile-begin)
 
 ;;;
+;;; some forward definitions to relax the error handler
+;;; ----------------------------------------------------------------
+(define print-backtrace)
+(define populate-module-with-primitives)
+(define capture-well-known-vm-values)
+(define k/print)
+(define k/read)
+(define k/encode/list)
+(define k/encode)
+(define k/expand/list)
+(define k/eval)
+
+;;;
 ;;; libc
 ;;; ----------------------------------------------------------------
 
@@ -240,9 +253,6 @@
 ;;;
 ;;; error handling
 ;;; ----------------------------------------------------------------
-
-(define k/print) ; forward
-(define print-backtrace) ; forward
 
 (define-function die ()
   (libc/fprintf libc/stderr "\nDIE called...\n")
@@ -669,28 +679,25 @@
           (set self.arguments		args)))
       frame)))
 
-(set print-backtrace
-  (lambda ()
-    (if-at-expand track-backtrace?
-        (let ((i *call-stack-index*))
-          (while (<= 0 (decr i))
-            (let ((call-frame (k/array-at *call-stack* i)))
-              (libc/printf "%3ld: " i)
-	      (k/dumpln (<call-frame>-callee-designator call-frame))
-              (awhen (<call-frame>-callee call-frame)
-                (libc/printf "\tcallee: ")
-	        (k/dumpln it))
-              (awhen (<call-frame>-arguments call-frame)
-                (libc/printf "\targs: ")
-	        (k/dumpln it))
-              (libc/flush-streams))))
-      (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %d\n" *call-stack-index*))))
+(define-function print-backtrace ()
+  (if-at-expand track-backtrace?
+      (let ((i *call-stack-index*))
+        (while (<= 0 (decr i))
+          (let ((call-frame (k/array-at *call-stack* i)))
+            (libc/printf "%3ld: " i)
+	    (k/dumpln (<call-frame>-callee-designator call-frame))
+            (awhen (<call-frame>-callee call-frame)
+              (libc/printf "\tcallee: ")
+	      (k/dumpln it))
+            (awhen (<call-frame>-arguments call-frame)
+              (libc/printf "\targs: ")
+	      (k/dumpln it))
+            (libc/flush-streams))))
+    (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %d\n" *call-stack-index*)))
 
 ;;;
 ;;; eval
 ;;; ----------------------------------------------------------------
-
-(define k/eval) ; forward
 
 (define-function k/apply-expr (fun arguments parent-ctx)
   (and (< 2 *arg/verbose*) (let () (libc/printf "  A  ")  (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ")  (k/dumpln parent-ctx) (libc/flush-streams)))
@@ -738,8 +745,6 @@
              (k/error "cannot apply: " fun))))))))
 
 ;;; ----------------------------------------------------------------
-
-(define k/expand/list) ; forward
 
 (define-function k/expand (exp env)
   (debug (libc/printf "k/expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
@@ -797,15 +802,12 @@
                (set result (k/apply fn args ()))))))))
     result))
 
-(set k/expand/list (lambda (list env)
+(define-function k/expand/list (list env)
   (if (is/pair list)
       (gc/let* ((head (k/expand		(get/head list) env))
                 (tail (k/expand/list	(get/tail list) env)))
         (new-<pair> head tail))
-    (k/expand list env))))
-
-(define k/encode/list) ; forward
-(define k/encode) ; forward
+    (k/expand list env)))
 
 (define-function k/encode/pair (exp env)
   (gc/let* ((head (k/encode (get/head exp) env))
@@ -877,13 +879,12 @@
       ((is <symbol> exp)	(k/encode/symbol	exp env))
       (else			(k/encode/other		exp env)))))
 
-(set k/encode/list (lambda (list env)
+(define-function k/encode/list (list env)
   (if (is/pair list)
       (gc/let* ((head (k/encode		(get/head list) env))
                 (tail (k/encode/list	(get/tail list) env)))
         (new-<pair> head tail))
     (k/encode list env)))
-)
 
 (define-function k/eval/list (obj ctx)
   (if (is/pair obj)
@@ -920,7 +921,7 @@
 	       (k/apply evaluator args ctx))
            exp))))))
 
-(set k/eval (lambda (exp ctx)
+(define-function k/eval (exp ctx)
   (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
   (let ((type (get/type exp)))
     (cond
@@ -937,7 +938,7 @@
 				    (k/array-at (get <context> bindings ctx) (get/long (get <variable> index exp))))))
       ((= type <symbol>)	(k/error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(k/eval/with-backtrace type exp ctx)))))
-)
+
 
 (define-function k/expand-encode-eval (form env)
   (gc/let* ((x form)
@@ -970,8 +971,6 @@
          (libc/printf "\nmorituri te salutant\n"))
     res))
 
-(define populate-module-with-primitives) ; forward
-
 (define-function new-<module> ()
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
@@ -983,6 +982,11 @@
 
     (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
+
+(define-function k/set-current-module (module)
+  (debug (libc/printf "k/set-current-module {%p}\n" module))
+  (set *module* module)
+  (capture-well-known-vm-values))
 
 ;;;
 ;;; the subr's
@@ -1006,7 +1010,7 @@
         (push result `(%instantiate-subr ,(symbol->string name) ,impl-name ,(target-boolean fixed?) module))))
     `(let () ,@result)))
 
-(set populate-module-with-primitives (lambda (module)
+(define-function populate-module-with-primitives (module)
   (debug (libc/printf "populate-module-with-primitives on %p\n" module))
   (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
   ;; the predefined primitives of the language
@@ -1028,9 +1032,9 @@
       ;; make sure the symbol true evaluates to itself
       (k/env/define env symbol/true symbol/true))
 
-    (instantiate-subrs))))
+    (instantiate-subrs)))
 
-(set capture-well-known-vm-values (lambda ()
+(define-function capture-well-known-vm-values ()
   (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (set symbol/true                   (k/intern "true"))
@@ -1060,7 +1064,7 @@
 
     (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "capture-well-known-vm-values: assert 2"))
 
-  (debug (libc/printf "capture-well-known-vm-values is done\n"))))
+  (debug (libc/printf "capture-well-known-vm-values is done\n")))
 
 (define-function main (argc argv)
   (debug (libc/printf "alive\n"))
