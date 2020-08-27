@@ -45,6 +45,8 @@ TEST_EVAL	= $(BUILD_llvm)/eval2
 ##
 PREVIOUS_STAGE	= maru.5
 
+PREVIOUS_STAGE_EXTRA_TARGETS ?=
+
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
 
 TARGET_CPU_llvm	= $(firstword $(subst -, ,$(TARGET_llvm)))
@@ -98,6 +100,9 @@ clean:
 distclean: clean
 	rm -rf $(BUILD)
 	git checkout $(BUILD) || true
+
+veryclean:
+	rm -rf $(BUILD)
 
 stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
@@ -183,7 +188,7 @@ $(HOST_DIR)/eval:
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
 # a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
 	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
-	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) eval-$(PREVIOUS_STAGE_BACKEND)
+	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval-$(PREVIOUS_STAGE_BACKEND)
 
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
@@ -257,6 +262,11 @@ run: $(TEST_EVAL)
 	rlwrap $(TEST_EVAL) boot.l -
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
+
+# don't use any compiled output that was checked into the repo,
+# i.e. run the entire bootstrap process all the way from stage 0
+test-bootstrap-recursively:
+	$(MAKE) PREVIOUS_STAGE_EXTRA_TARGETS=veryclean veryclean test-bootstrap
 
 # TODO backend duplication
 test-bootstrap-x86: $(BUILD_x86)/eval3
