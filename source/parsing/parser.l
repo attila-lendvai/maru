@@ -1,11 +1,5 @@
 ;; (define %make-accessor %make-unsafe-accessor)
 
-(define-type <*end-of-stream-marker*>)
-
-(define *end* (new <*end-of-stream-marker*>))
-
-(define-method do-print <*end-of-stream-marker*> () (print "<*end-of-stream-marker*>"))
-
 (define-selector $at-end)
 (define-selector $peek)
 (define-selector $next)
@@ -51,7 +45,7 @@
   (let ((pos self.position))
     (if (< pos self.size)
 	(string-at self.string pos)
-      *end*)))
+      +end+)))
 
 (define-method $next <string-stream> ()
   (let ((pos self.position))
@@ -59,7 +53,7 @@
 	(let ((value (string-at self.string pos)))
 	  (set self.position (+ pos 1))
 	  value)
-      *end*)))
+      +end+)))
 
 (unit-test "<string-stream>"
   (let ((s (string-stream "xhello"))
@@ -67,10 +61,10 @@
 	(a (array)))					(unit-assert (= ?x ($peek s)))
 							(unit-assert (= ?x ($next s)))
 							(unit-assert (= ?h ($peek s)))
-    (while (!= *end* (set c ($next s)))
+    (while (!= +end+ (set c ($next s)))
       (array-append a c))				(unit-assert (= "hello" (array->string a)))
-							(unit-assert (= *end* ($peek s)))
-							(unit-assert (= *end* ($next s)))))
+							(unit-assert (= +end+ ($peek s)))
+							(unit-assert (= +end+ ($next s)))))
 
 (define-method $source-position <undefined> ())
 
@@ -92,14 +86,14 @@
 (define-method $peek <list-stream> ()
   (if self.source
       (car self.source)
-    *end*))
+    +end+))
 
 (define-method $next <list-stream> ()
   (if self.source
       (let ((value (car self.source)))
 	(set self.source (cdr self.source))
 	value)
-    *end*))
+    +end+))
 
 (unit-test "<list-stream>"
   (let ((s (list-stream '(?x ?h ?e (l (l)) () ?o)))
@@ -107,10 +101,10 @@
 	(a (array)))					(unit-assert (= ?x ($peek s)))
 							(unit-assert (= ?x ($next s)))
 							(unit-assert (= ?h ($peek s)))
-    (while (!= *end* (set c ($next s)))
+    (while (!= +end+ (set c ($next s)))
       (array-append a c))				(unit-assert (equal '(?h ?e (l (l)) () ?o) (array->list a)))
-							(unit-assert (= *end* ($peek s)))
-							(unit-assert (= *end* ($next s)))))
+							(unit-assert (= +end+ ($peek s)))
+							(unit-assert (= +end+ ($next s)))))
 
 (define-method $source-position <list-stream> () ())
 
@@ -137,8 +131,8 @@
 		  (set self.pending c))
 	      ;;(or (= self.source *input*) (close self.source)) ;; the caller should close the stream
 	      (set self.source ())
-	      (set self.pending *end*)))
-	(set self.pending *end*))))
+	      (set self.pending +end+)))
+	(set self.pending +end+))))
 
 (define-method $next <input-stream> ()
   (let ((c ($peek self)))
@@ -158,7 +152,7 @@
 ;; (define-function contents-of-file-named (name)
 ;;   (input-stream-up-to (input-stream (or (open name)
 ;; 					(error "no such file: "name))
-;; 				    name) *end*))
+;; 				    name) +end+))
 
 ;; (unit-test "<input-stream>"
 ;;   (let ((s (input-stream *input*))
@@ -340,7 +334,7 @@
     self))
 
 (define-function parser-stream-at-end (self)
-  (and (= *end* (<token>-value (<parser-stream>-position self)))))
+  (and (= +end+ (<token>-value (<parser-stream>-position self)))))
 
 (define-function parser-stream-peek-token (self)
   (<parser-stream>-position self))
@@ -350,7 +344,7 @@
 
 (define-function parser-stream-next-token (self)
   (let ((here (<parser-stream>-position self)))
-    (or (= *end* (<token>-value here))
+    (or (= +end+ (<token>-value here))
 	(let ((tail (<token>-tail here)))
 	  (set (<parser-stream>-position self)
 	       (or tail (set (<token>-tail here)
@@ -375,7 +369,7 @@
        (parser-stream-next self)))
 
 (define-function parser-stream-match-any (self)
-  (and (!= *end* (parser-stream-peek self))
+  (and (!= +end+ (parser-stream-peek self))
        (parser-stream-next self)))
 
 (define-function make-class (s)
@@ -425,12 +419,12 @@
   (let ((a (array))
 	(p (<parser-stream>-position self)))
     (while (and (<token>-tail (parser-stream-peek-token self))
-		(!= *end* (parser-stream-peek self))
+		(!= +end+ (parser-stream-peek self))
 		(!= ?\n   (parser-stream-peek self))
 		(!= ?\r   (parser-stream-peek self)))
       (array-append a (parser-stream-next self)))
     (for (i 0 32)
-      (if (and (!= *end* (parser-stream-peek self))
+      (if (and (!= +end+ (parser-stream-peek self))
 	       (!= ?\n   (parser-stream-peek self))
 	       (!= ?\r   (parser-stream-peek self)))
 	  (array-append a (parser-stream-next self))
@@ -443,12 +437,12 @@
   (let ((a (array))
 	(p (<parser-stream>-position self)))
     (while (and (<token>-tail (parser-stream-peek-token self))
-		(!= *end* (parser-stream-peek self)))
+		(!= +end+ (parser-stream-peek self)))
       (array-append a (parser-stream-next self)))
     (and (> (array-length a) 0)
 	 (string-do c "[31;1m<!>[30;0m" (array-append a c)))
     (for (i 0 32)
-      (if (!= *end* (parser-stream-peek self))
+      (if (!= +end+ (parser-stream-peek self))
 	  (array-append a (parser-stream-next self))
 	(string-do c "[34;1m<EOF>[30;0m" (array-append a c))
 	(set i 999)))
@@ -467,19 +461,19 @@
 								(unit-assert (= ?x (parser-stream-next s)))
 								(unit-assert (= ?h (parser-stream-peek s)))
     (let ((p (<parser-stream>-position s)))
-      (while (!= *end* (set c (parser-stream-next s)))
-	(array-append a c))					(unit-assert (= *end* (parser-stream-peek s)))
-								(unit-assert (= *end* (parser-stream-next s)))
+      (while (!= +end+ (set c (parser-stream-next s)))
+	(array-append a c))					(unit-assert (= +end+ (parser-stream-peek s)))
+								(unit-assert (= +end+ (parser-stream-next s)))
       (set (<parser-stream>-position s) p)			(unit-assert (= ?h (parser-stream-peek s)))
 								(unit-assert (= ?h (parser-stream-next s)))
       (parser-stream-push s ?r)					(unit-assert (= ?r (parser-stream-peek s)))
       (parser-stream-push s ?o)					(unit-assert (= ?o (parser-stream-peek s)))
       (parser-stream-push s ?m)					(unit-assert (= ?m (parser-stream-peek s)))
-      (while (!= *end* (set c (parser-stream-next s)))
+      (while (!= +end+ (set c (parser-stream-next s)))
 	(array-append a c))					(unit-assert (= "hellomorello" (array->string a)))
       (set (<parser-stream>-position s) p)			(unit-assert (= ?h (parser-stream-peek s)))
 								(unit-assert (= ?h (parser-stream-next s)))
-      (while (!= *end* (set c (parser-stream-next s)))
+      (while (!= +end+ (set c (parser-stream-next s)))
 	(array-append a c))					(unit-assert (= "hellomorelloello" (array->string a)))
       (parser-stream-push s (list 'and "strings!" (list 'and (list 'lists))))
       (parser-stream-push s 'symbols)
@@ -495,8 +489,8 @@
 (define-function parser-input-stream (source)	(new <parser-input-stream> source))
 
 (define-method $at-end <parser-input-stream>		() ($at-end self.source))
-(define-method $peek <parser-input-stream>		() (or ($peek self.source) *end*))
-(define-method $next <parser-input-stream>		() (or ($next self.source) *end*))
+(define-method $peek <parser-input-stream>		() (or ($peek self.source) +end+))
+(define-method $next <parser-input-stream>		() (or ($next self.source) +end+))
 (define-method $source-position <parser-input-stream>	() ($source-position self.source))
 
 ;;;----------------------------------------------------------------

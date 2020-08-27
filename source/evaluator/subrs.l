@@ -433,7 +433,7 @@
 (define-subr read
   (if (= () -args-)
       (let ((obj (k/read libc/stdin)))
-        (and (= k/+done+ obj) (set obj ()))
+        (and (= k/+end+ obj) (set obj ()))
         obj)
     (let ((arg (k/car -args-)))
       (or (is <string> arg) (fatal1 "read: non-String argument: " arg))
@@ -445,7 +445,7 @@
                    (tail head)
                    (obj  ()))
               (gc/protect (head obj)
-                (while (!= k/+done+ (set obj (k/read stream)))
+                (while (!= k/+end+ (set obj (k/read stream)))
                   (set tail (put/tail tail (new-<pair> obj ())))))
               (libc/fclose stream)
               (get/tail head))

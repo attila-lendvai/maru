@@ -358,7 +358,7 @@
     (set BEG (cons (<begpeg>-result p) BEG)))
   ;;(println)
   ($space p _)
-  (and (!= *end* (parser-stream-peek _)) (error "syntax error in BEG near: "(parser-stream-context _)))
+  (and (!= +end+ (parser-stream-peek _)) (error "syntax error in BEG near: "(parser-stream-context _)))
   )
 
 ;;(progress "generating compiled parser")
@@ -388,7 +388,7 @@
   (while ($definition p)
     (set PEG (cons (<parser>-result p) PEG)))
   ($space p)
-  (and (!= *end* (parser-stream-peek s)) (error "syntax error in PEG near: "(parser-stream-context s))))
+  (and (!= +end+ (parser-stream-peek s)) (error "syntax error in PEG near: "(parser-stream-context s))))
 
 (progress "comparing output")
 

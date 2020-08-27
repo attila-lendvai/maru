@@ -90,7 +90,7 @@
 (define-form match-class (str)	`(set self.result (parser-stream-match-class self.source ,(make-class str))))
 (define-form match-string (str)	`(set self.result (parser-stream-match-string self.source ,str)))
 (define-form match-object (obj)	`(and (= ',obj (parser-stream-peek self.source)) (set self.result (parser-stream-next self.source))))
-(define-form match-any ()	'(and (!= *end* (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 1)))
+(define-form match-any ()	'(and (!= +end+ (parser-stream-peek self.source)) (let () (set self.result (parser-stream-next self.source)) 1)))
 
 (define-form make-span (exp)
   `(let ((pos (<parser-stream>-position self.source)))

@@ -209,7 +209,7 @@
 ;;; global state
 ;;; ----------------------------------------------------------------
 
-(define k/+done+) ; we need a unique value that k/read cannot ever read from any source file; will be initialized at startup
+(define k/+end+) ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
 
 (define *call-stack-index*	0)
 (when-at-expand track-backtrace?
@@ -959,7 +959,7 @@
              (when (= libc/stdin stream)
                (libc/printf ".")
                (libc/flush-streams))
-             (!= k/+done+ (set res (k/read stream))))
+             (!= k/+end+ (set res (k/read stream))))
       (gc/let* ((env (new-<env> (get/globals) 1 0)))
         (set res (k/expand-encode-eval res env))
         (when (= libc/stdin stream)
@@ -1021,12 +1021,13 @@
       (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*verbosity*"		module) tmp)
       (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*optimised*"		module) tmp)
 
-      (k/env/define env (k/intern* "+done+" module) k/+done+)
-
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*expanders*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*encoders*"		module) tmp)
       (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*evaluators*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp))
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp)
+
+      ;; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
+      (set tmp (new-<symbol> "+end+")) (k/env/define env (k/intern* "+end+" module) tmp))
 
     (let ((symbol/true (k/intern* "true" module)))
       ;; make sure the symbol true evaluates to itself
@@ -1050,6 +1051,8 @@
   (set symbol/apply                  (k/intern "apply"))
 
   (let ((global-env (get/globals)))
+    (set k/+end+ (k/env/lookup-variable-or-die global-env (k/intern "+end+")))
+
     (set var/*expanders*	(k/env/lookup-variable-or-die global-env (k/intern "*expanders*")))
     (set var/*encoders*		(k/env/lookup-variable-or-die global-env (k/intern "*encoders*")))
     (set var/*evaluators*	(k/env/lookup-variable-or-die global-env (k/intern "*evaluators*")))
@@ -1083,9 +1086,6 @@
 
   (k/assert (= <long>	(get/type (new-<long> 42))) "get/type for <long> is broken")
   (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
-
-  (set k/+done+ (new-<symbol> "+done+")) ; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
-  (gc/push-root (address-of k/+done+))
 
   (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
   (gc/push-root (address-of fixed-subr/quote))		; precautionary, in case someone redefines them and they get removed from the env.
