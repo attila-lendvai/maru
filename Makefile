@@ -29,7 +29,6 @@ TARGET_OS	= gnu
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
-# The LLVM target's word size must be in sync with the constant in emit-early.l!
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
 
@@ -78,8 +77,8 @@ BUILD_x86	= $(BUILD)/x86/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 
-EMIT_FILES_x86	= emit-early.l emit-x86.l emit-late.l
-EMIT_FILES_llvm	= emit-early.l emit-llvm.l emit-late.l
+EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
+EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 .SUFFIXES:					# disable all built-in rules
 
@@ -192,7 +191,7 @@ define compile-x86
 	boot.l				\
 	bootstrapping/late.l		\
 	--define makefile/target-triplet   $(TARGET_x86)	\
-	--define makefile/target-word-size 32			\
+	--define makefile/target/word-size-in-bits 32		\
 	$(EMIT_FILES_x86)		\
 	$(2)				\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
@@ -205,8 +204,8 @@ define compile-llvm
 	bootstrapping/early.l		\
 	boot.l				\
 	bootstrapping/late.l		\
-	--define makefile/target-triplet   $(TARGET_llvm)		\
-	--define makefile/target-word-size $(TARGET_WORD_SIZE_llvm)	\
+	--define makefile/target-triplet $(TARGET_llvm)				\
+	--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
 	$(EMIT_FILES_llvm)		\
 	$(2)				\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
