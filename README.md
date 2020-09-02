@@ -2,17 +2,17 @@
 
 ## What
 
-Maru is a programming language. It's a tiny, self-hosting lisp dialect:
-a symbolic expression evaluator that can compile its own implementation language,
-in less than 2000 LoC.
+Maru is a programming language. It's a
+[self-hosting](https://en.wikipedia.org/wiki/Self-hosting_(compilers)), yet tiny lisp dialect:
+a symbolic expression evaluator that can compile its own implementation language
+to [machine code](https://en.wikipedia.org/wiki/Machine_code), in less than 2000 LoC.
 
 This repo is also a place of exploration in the land of bootstrapping
 and computing system development. I'm planning to introduce simpler languages
-into the bootstrap process; e.g. develop
+into the bootstrap process; e.g. develop/incorporate
 [a trivial stack machine based language](https://github.com/nagydani/seedling/)
 that can be used to bootstrap Maru directly onto the raw metal, without
-assuming a C compiler toolchain, or even an Operating System, and with
-minimal effort.
+assuming a C compiler toolchain, or even an Operating System.
 
 > Maru is in particular trying to be malleable at the very lowest levels,
 > so any special interest that cannot be accommodated easily within the common
@@ -41,12 +41,11 @@ In other words, `eval.l` is a
 for the language it is written in.
 
 * `emit.l` contains a compiler from s-expressions to [IA-32](https://en.wikipedia.org/wiki/IA-32) (x86)
-machine code or [LLVM](https://llvm.org/) IR, written in the s-expression language. This compiler can be thought of as a
+machine code and [LLVM](https://llvm.org/) IR, written in the s-expression language. This compiler can be thought of as a
 semantics-preserving "level shift" from s-expressions to IA-32 machine code, letting the metacircular
 evaluator in `eval.l` escape from "infinite metacircular regression" to a language grounded in hardware.
-A possible metaphor of this is a "host universe" that, when compiling the abstract to the concrete,
-provides you with a set of axiomatic foundations you can build upon. Other possible such
-"host universes" are e.g. C99 or LLVM.
+A possible metaphor of this is a "target universe" that, when compiling the abstract to the concrete,
+provides you with a set of axiomatic foundations to build upon.
 
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
 written in the s-expression language.
@@ -56,27 +55,28 @@ written in the s-expression language.
 #### Overview - bootstrap stages
 
 A language evolves by the introduction of new features (optimizations, new primitives, etc).
-If you want to use such a new language feature in its own implementation,
+If you want to use such a novel language feature in its own implementation,
 then you need to *bootstrap* it:
 
-1) first implement the support for it in your compiler and/or eval, and produce
+1) first, implement the support for it in your compiler and/or eval, and produce
    an executable that can already compile and/or eval this new version of the language
-2) after that you can start using this feature, and now you may even rewrite the
+2) after that, you can start using this feature, and now you may even rewrite the
    implementation of this very feature, and use/assume this feature in its own
    implementation.
 
 It's a confusing enough process, so it makes sense to fork the codebase at the point between 1) and 2).
-Strictly speaking, checking out and building a specific prior commit would be enough for bootstrapping,
+Strictly speaking, checking out and building a specific prior commit would be enough to provide an
+executable to execute the bootstrap process,
 but you may want to harmonize the build system, or you need to `git cherry-pick` some fixes into 1),
 and sometimes the implementation of the new feature simply requires two parallel, wildly diverged
 instances of the codebase, until the feature is fully implemented/debugged/bootstrapped.
 But once it's working fine, the old branch becomes irrelevant/stale, except for:
 
-- didactic purposes (easier to follow how a language grows)
+- didactic purposes (to make it easier to follow how a language grows)
 - aesthetics (cherry-picking or backporting changes wouldn't be possible without having separate branches)
 - "Oh God, we have lost all the executables!" -- bootstrap again all the way up from the C implementation
 
-> NOTE: do not confuse this notion of a *stage* (as in developmental stages) with e.g.
+> NOTE: do not confuse this notion of a *stage* (as in 'developmental stages') with e.g.
 > [the 3 bootstrap stages while compiling GCC](https://gcc.gnu.org/install/build.html).
 > Our notion is an endless iterative process of evolving the language.
 > Suggestions for a better nomenclature are welcome!
@@ -84,7 +84,7 @@ But once it's working fine, the old branch becomes irrelevant/stale, except for:
 #### Repo layout
 
 The developmental stages of the language are kept in separate git branches. When a new stage is opened,
-this readme is replaced in the old branch to only document what's new/relevant for that stage.
+this readme is replaced in the old branch to only document what's new/relevant for that specific stage.
 
 Naming convention of the branches (no `master`):
 
@@ -96,14 +96,25 @@ parent language, from which this "bootstrap sprout" grows out:
 `[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
 the bootstrap implementation written in C.
 
-The bootstrap process in general is planned to be like this: stage `n` requests
-the/a parent stage (typically stage `(n-1)` of the same language) to compile an
-`eval` executable. Then it uses that executable to compile itself (and provide
-the foundations for stage `(n+1)`).
+The bootstrap process in general is the following:
+ - stage `n` checks out and builds its parent/hosting stage under `build/` (typically stage
+   `(n-1)` of the same language) to acquire an `eval` executable.
+
+ - using that executable it compiles a version of itself that can already
+   load and run the codebase in stage `n`, but the resulting executable may not be
+   fully functional (in this phase the `evolving?` variable is true). It's called
+   `eval1` in the build process.
+
+ - then it uses the resulting, potentially only semi-functional `eval1` executable to
+   once again compile itself, which will yield the final, fully functional `eval2` executable.
+
+ - optionally, the `test-bootstrap` makefile target runs one more cycle to produce `eval3`,
+   and checks if the compiled output is identical with that of the previous step.
 
 The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`
-whose semantics they depend on. IOW, the `maru.2` stage is built using the
-`eval` executable, `boot.l`, and `emit.l` of the previous stage (`maru.1`).
+whose semantics they are assuming, i.e. the `eval1` executable of the `maru.2`
+stage is built using the `eval` executable, `boot.l`, and `emit.l` of the previous,
+`maru.1` stage.
 
 During the build the previous stage is `git checkout`'ed locally under `./build/`,
 and its own build process is invoked in that directory. Note that short of caching
@@ -119,12 +130,11 @@ Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 Starting with `maru.5`, the LLVM IR output (`eval2.ll`) is pushed to the repo under
 `build/`. This effectively short-circuits the recursive bootstrap process by
-producing an executable by directly compiling the checked-in `eval2.ll` with `llc`
-(when invoking the LLVM backend using e.g. `make eval-llvm`).
+straight away producing an executable by compiling the checked-in `eval2.ll` using `llc`
+(see `make eval-llvm`).
 
-Deleting these files (`make clean` retains them), or changing the sources will
-force a normal bootstrap process relying on the previous stage (potentially
-recursive).
+Deleting these files (note that `make clean` retains them), or touching the sources will
+force a normal bootstrap process building the previous stage(s).
 
 ### Build instructions
 
@@ -143,7 +153,7 @@ sudo apt-get install gcc-multilib
 ```
 
 Patches are welcome for dealing with other platforms, including the extension of this readme.
-The LLVM backend should work even on untested targets, but I only test it on Linux.
+The LLVM backend should work even on untested targets, but I only test it on Linux for now.
 
 ## Who
 
@@ -165,7 +175,7 @@ You are very welcome to contribute, but beware that until further notice
 eventually when I settle with
 a build setup that nicely facilitates bootstrapping multiple, parallel paths of
 language development. Please make sure that you open a branch for your work,
-and/or you are ready for some `git fetch` and `git rebase`.
+and/or that you are ready for some `git fetch` and `git rebase`.
 
 ## Why
 
@@ -181,17 +191,22 @@ port to a new architecture, and then have a self-contained, formal bootstrap pro
 can automatically "grow" an entire computing system on top of that freshly laid, tiny foundation.
 
 * Maru is very small: in about 1700 lines of code in the `maru.1` branch it can self-host
-(plus around 2300 LoC of throwaway C code for the initial bootstrap).
+(plus around 2300 LoC of throwaway C code for the initial step).
 
 * Ian seems to have stopped working on Maru, but it's an interesting piece of code that deserves
 a repo and a maintainer.
+
+* This work is full of puzzles that are a whole lot of fun to resolve!
 
 ## Status
 
 ### Maru's status
 
-Backporting of the latest from the `piumarta` branch is done: it should be
-semantically equivalent with the `eval.l` in Piumarta's latest.
+Backporting of the latest from the `piumarta` branch is done: the latest branch should be
+semantically equivalent with the `eval.l` that resides in the Piumarta branch, although
+we have arrived to this state on a different path: Ian has kept `eval.c` and `eval.l`
+semantically in sync, while I have bootstrapped the needed changes from an earlier
+version of `eval.l`, starting out from, and abandoning a simpler `eval.c` at my first step.
 
 There are several Maru stages/branches now, introducing non-trivial features.
 
@@ -205,7 +220,7 @@ Assorted TODO:
 - revive all the goodies in the `piumarta` branch, but in a structured way
 - replace the hand-written parser in `eval.l` with something generated by the
   [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) generator
-- compile to, and bootstrap on the bare metal of some interesting target
+- compile to, and bootstrap on the bare metal of some interesting target (C64? an ARM board?)
 - rewrite the build process in Maru; eliminate dependency on GNU Make
 
 ### History
@@ -242,3 +257,10 @@ with only a couple of commits from around 2011. I assume that it was meant to ho
 the minimal/historical version of Maru that can already self-host. I started out
 my work from this minimal repo (hence the divergence between the `piumarta` and
 the `maru.x` branches in this repo).
+
+#### Other repos
+
+There are a few different copies/versions of Maru online. Here are the ones
+that I know about and contain non-trivial work:
+
+- [github.com/melvinzhang/maru](https://github.com/melvinzhang/maru)
