@@ -258,24 +258,24 @@
 ;; NOTE shifting right is signed
 (define-test compile/oop-at/1
     (>> (oop-at "0123456789abcdefghijklmnopqrst" 0)
-        (- target-word-size/bits 32))
+        (- target/word-size-in-bits 32))
   (cond
-    ((= 32 target-word-size/bits)
-     (if target-is-little-endian 0x33323130 0x30313233))
+    ((= 32 target/word-size-in-bits)
+     (if target/little-endian? 0x33323130 0x30313233))
     ;; TODO add read-time eval for this?
-    ;; ((= 64 target-word-size/bits)
-    ;;  (if target-is-little-endian 0x3736353433323130 0x303132334353637))
-    ((= 64 target-word-size/bits)
-     (if target-is-little-endian 0x37363534 0x3031323))))
+    ;; ((= 64 target/word-size-in-bits)
+    ;;  (if target/little-endian? 0x3736353433323130 0x303132334353637))
+    ((= 64 target/word-size-in-bits)
+     (if target/little-endian? 0x37363534 0x3031323))))
 
 (define-test compile/oop-at/2
     (>> (oop-at "0z0000x01z1111x12z2222x23z3333x3" 1)
-        (- target-word-size/bits 32))
+        (- target/word-size-in-bits 32))
   (cond
-    ((= 32 target-word-size/bits)
-     (if target-is-little-endian 0x30783030 0x30307830))
-    ((= 64 target-word-size/bits)
-     (if target-is-little-endian 0x31783131 0x317a3131))))
+    ((= 32 target/word-size-in-bits)
+     (if target/little-endian? 0x30783030 0x30307830))
+    ((= 64 target/word-size-in-bits)
+     (if target/little-endian? 0x31783131 0x317a3131))))
 
 (define-test compile/set-oop-at/1
     (let* ((buf (libc/strdup "0123456789abcdefghijklmnopqrst"))
@@ -283,13 +283,13 @@
       (set (oop-at buf 1) value)
       (libc/strcmp buf
                    (cond
-                     ((= 32 target-word-size/bits)
-                      (if target-is-little-endian
+                     ((= 32 target/word-size-in-bits)
+                      (if target/little-endian?
                           "0123kuk189abcdefghijklmnopqrst"
                         "01231kuk89abcdefghijklmnopqrst"))
-                     ((= 64 target-word-size/bits)
+                     ((= 64 target/word-size-in-bits)
                       ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if target-is-little-endian
+                      (if target/little-endian?
                           "01234567kuk1"
                         "TODO fill me in")))))
   0)
@@ -302,13 +302,13 @@
       (libc/puts buf)
       (libc/strcmp buf
                    (cond
-                     ((= 32 target-word-size/bits)
-                      (if target-is-little-endian
+                     ((= 32 target/word-size-in-bits)
+                      (if target/little-endian?
                           "01234567kuk1cdefghijklmnopqrst"
                         "012345671kukcdefghijklmnopqrst"))
-                     ((= 64 target-word-size/bits)
+                     ((= 64 target/word-size-in-bits)
                       ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if target-is-little-endian
+                      (if target/little-endian?
                           "0123456789abcdefkuk1"
                         "TODO fill me in")))))
   0)

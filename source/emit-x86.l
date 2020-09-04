@@ -35,7 +35,7 @@
 
 (define __PREFIX__ (if __LINUX__ "" "_"))
 
-(let ((word-size (slave-value slave:target-word-size/bits)))
+(let ((word-size (slave-value slave:target/word-size-in-bits)))
   (unless (= 32 word-size)
     (error "The x86 compiler backend doesn't support target word size " word-size)))
 

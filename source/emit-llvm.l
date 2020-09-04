@@ -30,7 +30,7 @@
 (define *compiler-verbose* '()) ; NOTE this will break the output due to multiline string literals escape the ; prefixing
 
 (define *ffi-type->llvm-type*
-    (let ((word-size (slave-value slave:target-word-size/bits)))
+    (let ((word-size (slave-value slave:target/word-size-in-bits)))
       (cond
         ((= 32 word-size)
          '((slave:*		%ptr)
@@ -54,7 +54,7 @@
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
   (cond
-    ((= type '%ptr)	(slave-value slave:target-word-size/bits))
+    ((= type '%ptr)	(slave-value slave:target/word-size-in-bits))
     ((= type 'void)	())
     (else
      (let ((entry	(assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
@@ -793,7 +793,7 @@
                         (gen LOAD (LITERAL 0) 0))
                        (else
                         (when (< (llvm-type-bitsize return-type)
-                                 (slave-value slave:target-word-size/bits))
+                                 (slave-value slave:target/word-size-in-bits))
                           (gen SEXT return-type '%word))
                         (gen INTTOPTR '%word))))
                    (unless (<foreign-function>-vararg? value)
@@ -897,7 +897,7 @@
   (let* ((vars  (<env>-bindings env))
          (-c-  (compiler 0)))
     (let (;(target-triplet	(slave-value slave:target-triplet))
-          (word-size		(slave-value slave:target-word-size/bits)))
+          (word-size		(slave-value slave:target/word-size-in-bits)))
       (warn "Compiling for word size: " word-size " bits")
       ;;(assert (string?	target-triplet))
       (assert (long?	word-size))

@@ -13,18 +13,18 @@
 
 ;; these definitions have been moved into emit-early.l, so we need to
 ;; provide them when we are evolving from a previous stage.
-(define-constant target-word-size/bits	32)
-(define-constant target-word-size/bytes	(/ target-word-size/bits 8))
+(define-constant target/word-size-in-bits	32)
+(define-constant target/word-size-in-bytes	(/ target/word-size-in-bits 8))
 
 (define-form bytes-to-words (value)
   (if (long? value)
-      (/  value  target-word-size/bytes)
-     `(/ ,value ,target-word-size/bytes)))
+      (/  value  target/word-size-in-bytes)
+     `(/ ,value ,target/word-size-in-bytes)))
 
 (define-form words-to-bytes (value)
   (if (long? value)
-      (* value   target-word-size/bytes)
-     `(* ,value ,target-word-size/bytes)))
+      (* value   target/word-size-in-bytes)
+     `(* ,value ,target/word-size-in-bytes)))
 
 (define-constant target-boolean/true  1)
 (define-constant target-boolean/false 0)

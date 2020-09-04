@@ -11,24 +11,24 @@
 ;;;
 ;;; the target's configuration
 ;;;
-(define-constant target-word-size/bits		(eval-in-module host 'host:makefile/target/word-size-in-bits))
-(define-constant target-is-little-endian	target-boolean/true)
-;;(define-constant target-triplet			(eval-in-module host 'host:makefile/target-triplet))
+(define-constant target/word-size-in-bits	(eval-in-module host 'host:makefile/target/word-size-in-bits))
+(define-constant target/little-endian?		target-boolean/true)
+;;(define-constant target-triplet		(eval-in-module host 'host:makefile/target-triplet))
 
 ;;;
 ;;; useful utils and constants
 ;;;
-(define-constant target-word-size/bytes	(/ target-word-size/bits 8))
+(define-constant target/word-size-in-bytes	(/ target/word-size-in-bits 8))
 
 (define-form bytes-to-words (value)
   (if (long? value)
-      (/  value  target-word-size/bytes)
-     `(/ ,value ,target-word-size/bytes)))
+      (/  value  target/word-size-in-bytes)
+     `(/ ,value ,target/word-size-in-bytes)))
 
 (define-form words-to-bytes (value)
   (if (long? value)
-      (* value   target-word-size/bytes)
-     `(* ,value ,target-word-size/bytes)))
+      (* value   target/word-size-in-bytes)
+     `(* ,value ,target/word-size-in-bytes)))
 
 ;; stubs for the special operators
 (define return      (fixed (lambda args (error "(return) encountered in interpreted code"))))
