@@ -94,7 +94,7 @@ EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l r
 all: eval
 
 clean:
-	rm -rf $(BUILD)/x86 $(BUILD)/llvm eval $(foreach backend,${BACKENDS},eval-$(backend))
+	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend)) eval $(foreach backend,${BACKENDS},eval-$(backend))
 	git checkout $(BUILD) || true
 
 distclean: clean
@@ -128,7 +128,9 @@ eval-llvm: $(BUILD_llvm)/eval2
 
 # eval1 is the first version of us that gets built by the previous stage.
 # some functionality may be broken in this one. this is when we are 'evolving'.
-$(BUILD_x86)/eval1.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) boot.l
+# stage 6 note: in this stage we skip the eval1 step and compile eval2 straight away
+# by using the eval.exe of the previous stage to execute our version of the compiler.
+$(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir --parents $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
@@ -144,7 +146,7 @@ $(BUILD_x86)/eval1.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
-$(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) boot.l
+$(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
@@ -162,13 +164,13 @@ $(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_F
 
 # eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
 # eval2 should implement the semantics encoded by the sources of this stage.
-$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$(BUILD_x86)/eval2.s)
-	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
+# $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+# 	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$(BUILD_x86)/eval2.s)
+# 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$(BITCODE_DIR)/eval2.ll)
-	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
+# $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+# 	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$(BITCODE_DIR)/eval2.ll)
+# 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 # eval3 is just a test, it's the result of yet another bootstrap iteration, based off of eval2 this time.
 # eval3.s should be the exact same file as the output of the previous iteration, namely eval2.s.
