@@ -15,8 +15,8 @@ test-bootstrap: eval .force
 	time ./eval boot.l emit.l eval.l >$(BUILD)/eval2.s 
 	diff -u $(BUILD)/eval.s $(BUILD)/eval2.s
 
-$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l eval.l
-	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l $(BOOT_EVAL_PATH)/emit.l eval.l >$(BUILD)/eval.s || touch -t 200011220102 $(BUILD)/eval.s
+$(BUILD)/eval.s: $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit.l eval.l
+	time $(BOOT_EVAL_PATH)/eval $(BOOT_EVAL_PATH)/boot.l emit.l eval.l >$(BUILD)/eval.s || touch -t 200011220102 $(BUILD)/eval.s
 
 $(BOOT_EVAL_PATH)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
