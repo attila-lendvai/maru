@@ -593,13 +593,12 @@
 
 (define-method compile-definition <expr> (name parent-comp)
   (let* ((main? (= 'slave:main name))
-         (defn (<expr>-defn self))
-         (body (cddr defn))
+         (body (<expr>-body self))
          (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
-         (params (map init-param (cadr defn))))
+         (params (map init-param (<expr>-parameters self))))
     (list-do e body
       (and e (comp e)))
     (let* ((arg-size (align 16             (<compiler>-arg-limit -c-) ))

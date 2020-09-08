@@ -87,18 +87,17 @@
 
 ;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
 (define-function <expr>-n-required-parameters (op)
-  (let* ((defn		(<expr>-defn op))
-         (formals	(second defn))
-         (n-params	()))
+  (let ((params		(<expr>-parameters op))
+        (n-params	()))
     (cond
-      ((not formals))                   ; (lambda () ...)
-      ((symbol? formals))               ; (lambda args ...)
-      ((pair? formals)
+      ((not params))                   ; (lambda () ...)
+      ((symbol? params))               ; (lambda args ...)
+      ((pair? params)
        (set n-params 1)
-       (while (pair? (set formals (rest formals)))
+       (while (pair? (set params (rest params)))
          (incr n-params))
-       (when (symbol? formals)          ; (lambda (arg1 . rest) ...)
+       (when (symbol? params)          ; (lambda (arg1 . rest) ...)
          (set n-params ())))
       (else
-       (error "<expr>-n-required-parameters: error parsing <expr> " op ", formal-parameters " formals)))
+       (error "<expr>-n-required-parameters: error parsing <expr> " op ", parameters " params)))
     n-params))

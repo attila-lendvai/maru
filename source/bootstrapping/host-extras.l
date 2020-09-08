@@ -14,3 +14,12 @@
 ;;;
 (eval-in-module slave '(slave:define slave:true (slave:quote slave:true)))
 (define true 'true)
+
+;; we have changed the layout of <expr> to contain the parsed elements of what used to be a list in the defn slot.
+;; we need to provide the new API/accessors when the previous stage is running our compiler and passing it <expr>'s
+;; that are instantiated with the old layout.
+(define-function <expr>-parameters (obj)
+  (second (<expr>-defn obj)))
+
+(define-function <expr>-body (obj)
+  (cddr (<expr>-defn obj)))

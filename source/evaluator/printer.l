@@ -43,7 +43,7 @@
                                   (libc/printf ")")))
       ((= type <expr>)		(let ()
                                   (libc/printf "Expr<")
-                                  (do_print (k/cadr (get <expr> defn obj)) storing)
+                                  (do_print (get <expr> parameters obj) storing)
                                   (libc/printf ">")))
       ((= type <form>)		(let ()
                                   (libc/printf "Form<")

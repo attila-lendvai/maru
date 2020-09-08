@@ -298,9 +298,7 @@
   ((TEMP	undefined)	(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL	long)		(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL	undefined)	(println "	"$reg1" = load %ptr, %ptr* "$1))
-  ((GLOBAL	expr)		(let* ((defn		(<expr>-defn $2))
-                                       (formal-params	(second defn))
-                                       (param-types	(map (lambda _ '%ptr) formal-params)))
+  ((GLOBAL	expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2))))
                                   (print "	"$reg1" = bitcast ")
                                   (emit-llvm-fn-type '%ptr param-types ())
                                   (println "* "$1" to %ptr"))))
@@ -789,7 +787,7 @@
                          (param-lst	param-types))
                      (while (set arg (pop arg-lst))
                        (set param-type (ffi-type->llvm-type (pop param-lst)))
-                       (if (or (= ()    param-type) ; vararg calls have more args than formals
+                       (if (or (= ()    param-type) ; vararg calls have more args than params
                                (= '%ptr param-type))
                            (push new-arg-regs arg)
                          (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
@@ -854,19 +852,18 @@
 (define-constant +function-parameters-are-read-only+ ())
 
 (define-method compile-definition <expr> (name parent-comp)
-  (let* ((defn		(<expr>-defn self))
-         (formal-params	(second defn))
-         (body		(cddr defn))
-         (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
+  (let* ((-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
+         (parameters	(<expr>-parameters self))
+         (body		(<expr>-body self))
          (init-param	(lambda (var)
                           (set (<variable>-value var)
                                (if +function-parameters-are-read-only+
                                    (LOCAL (<variable>-name var))
                                  (alloc-temp -c-)))))
-         (params	(map init-param formal-params))
+         (params	(map init-param parameters))
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
-                             formal-params)))
+                             parameters)))
     (and *compiler-verbose* (print "; compiling fn "name", body: ") (dumpln body))
 
     (list-do e body

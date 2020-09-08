@@ -825,7 +825,7 @@
 ;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
 (define-record <array>			() (size _bits))
 (define-record <string>			() (size _bits))
-(define-record <expr>			() (name defn ctx))        ; TODO: defn is: (env formals . prog), parse it into separate slots? name is informal for debugging purposes.
+(define-record <expr>			() (parameters body env ctx name))	; name is informal, only for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
 (define-record <fixed>			() (function))
 (define-record <subr>			() (_name _imp _sig _profile))
