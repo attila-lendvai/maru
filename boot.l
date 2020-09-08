@@ -372,7 +372,7 @@
     value))
 
 (define-function zip lists
-  (apply map list lists))
+  (apply map (cons list lists)))
 
 (define-function zip-assocs (a b)
   (if (and (pair? a) (pair? b))
