@@ -6,7 +6,7 @@
 This is the first stage of Maru, written in C. The `eval.c` in this branch brings to life the first iteration of the Maru universe.
 
 This C code may be thrown away once `eval.l` in the next stage is first successfully compiled to asm
-and produces an eval executable that is functional enough to run the compiler and reproduce itself.
+and an eval executable is produced that is functional enough to run the compiler and reproduce itself.
 
 There are some reasons to keep this around, though:
 - didactics
