@@ -231,19 +231,19 @@
 
 (define-subr (libc/fclose 1)
   (let ((stream (get/head -args-)))
-    (libc/fclose (get/tptr stream))
+    (libc/fclose (get/tvmptr stream))
     ()))
 
 (define-subr (libc/fgetc 1)
   (let ((stream	(get/head -args-))
-        (c	(libc/fgetc (get/tptr stream))))
+        (c	(libc/fgetc (get/tvmptr stream))))
     (and (>= c 0)
          (new-<long> c))))
 
 (define-subr (libc/fputc 2)
   (let ((stream (get/head -args-))
         (obj	(get/head (get/tail -args-))))
-    (new-<long> (libc/fputc (get/tptr stream) (get/long obj)))))
+    (new-<long> (libc/fputc (get/tvmptr stream) (get/long obj)))))
 
 (define-subr (libc/format 2)
   (let ((ofmt (get/head -args-))
@@ -273,7 +273,7 @@
 (define-subr (repl-stream 1)
   (let ((stream (get/head -args-)))
     ;;(or stream (set stream (get/variable-value var/*input*)))
-    (k/repl-stream (get/tptr stream))))
+    (k/repl-stream (get/tvmptr stream))))
 
 (define-subr dump
   (while (is/pair -args-)

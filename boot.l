@@ -820,11 +820,11 @@
 ;; level-shifted binary is not an option without grave consequences.
 ;; such a setup would hopefully simplify the bootstrapping dance above
 (define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
-(define-type		<data>)					; some internal blob; used for stuff like the _bits of <string> and <array>
+(define-type		<data>)					; some internal blob; used for stuff like the elements of <string> and <array>
 (define-immediate-type	<long> 1 1)
 ;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
-(define-record <array>			() (size _bits))
-(define-record <string>			() (size _bits))
+(define-record <array>			() (size elements))
+(define-record <string>			() (size elements))
 (define-record <expr>			() (parameters body env ctx name))	; name is informal, only for debugging purposes.
 (define-record <form>			() (function symbol))      ; these are expander lambda's
 (define-record <fixed>			() (function))

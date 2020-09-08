@@ -354,10 +354,10 @@
 (define-form get/tail		(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <pair> 'tail))	`(get <pair> tail ,obj)))
 (define-form put/tail		(obj val)	(if (< safety-level 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'tail) ,val)	`(put <pair> tail ,obj ,val)))
 
-(define-form is/tptr		(obj)		`(is <target-vm-pointer> ,obj))
-(define-form get/tptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
+;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
+(define-form get/tvmptr		(obj)		`(get <target-vm-pointer> _bits ,obj))
 
-(define-form get/string		(obj)		`(get <string> _bits (k/string-ensure-zero-terminated ,obj)))
+(define-form get/string		(obj)		`(get <string> elements (k/string-ensure-zero-terminated ,obj)))
 (define-form get/symbol		(obj)		`(get <symbol> _bits ,obj))
 
 (define-form get/variable-value	(var)		`(get <variable> value
@@ -426,13 +426,13 @@
   (gc/let* ((str (new-record-instance <string>)))
     (put <string> size  str (new-<long> len))
     (when (> len 0)
-      (put <string> _bits str (gc/allocate-opaque <data> len)))
+      (put <string> elements str (gc/allocate-opaque <data> len)))
     str))
 
 (define-function new-<string>-from-cstring (cstr)
   (let* ((len (libc/strlen cstr))
          (obj (new-<string>-of-length len)))
-    (libc/memcpy (get <string> _bits obj) cstr len)
+    (libc/memcpy (get <string> elements obj) cstr len)
     obj))
 
 (define-function new-<symbol> (cstr)
@@ -447,7 +447,7 @@
   (gc/let* ((arr (new-record-instance <array>)))
     (put <array> size arr (new-<long> size))
     (when (> size 0)
-      (put <array> _bits arr (gc/allocate <data> (words-to-bytes size))))
+      (put <array> elements arr (gc/allocate <data> (words-to-bytes size))))
     arr))
 
 (define-function new-<expr> (parameters body env ctx)
@@ -543,8 +543,8 @@
   (while env
     (let* ((bindings (get <env> bindings env))
            (index    (k/array-length bindings))
-           (vars     (get <array> _bits bindings))) ; KLUDGE? early optimization?
-      (while (<= 0 (set index (- index 1)))
+           (vars     (get <array> elements bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
+      (while (<= 0 (decr index))
         (let ((var (oop-at vars index)))
           (and (= name (get <variable> name var))
                (return var)))))
