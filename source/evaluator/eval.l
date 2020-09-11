@@ -1084,8 +1084,11 @@
   (set libc/stdin  (libc/fdopen 0 "r"))
   (set libc/stdout (libc/fdopen 1 "a"))
   (set libc/stderr (libc/fdopen 2 "a"))
+
   (libc/setbuf libc/stdout 0)
-  (libc/setbuf libc/stderr 0)
+  ;; (when-at-expand (not (= target/os "darwin"))
+  ;;   ;; TODO investigate: when enabled this crashes any following fprintf's to stderr on darwin
+  ;;   (libc/setbuf libc/stderr 0))
 
   (gc/initialise)
 

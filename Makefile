@@ -10,7 +10,7 @@
 #  make test-bootstrap-llvm || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
-#  make TARGET_llvm=i686-pc-linux-gnu test-bootstrap-llvm || beep
+#  make TARGET_MACHINE=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
 #
 # the makefile parallelism is mostly only between the backends.
 
@@ -24,7 +24,7 @@ BACKENDS		= x86 llvm
 PREVIOUS_STAGE_BACKEND	= llvm
 
 HOST_OS		= $(shell uname -s)
-TARGET_MACHINE	= $(shell uname -m)
+TARGET_MACHINE	?= $(shell uname -m)
 
 # tested to work with LLVM version 8-11
 ifeq ($(HOST_OS),Linux)
@@ -44,8 +44,8 @@ LLVM_ARGS	= -O3
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
-#TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
-TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
+TARGET_llvm	?= $(TARGET_MACHINE)-$(TARGET_VENDOR)-$(TARGET_OS)
+#TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
 # use this eval to execute any tests or code generation from the makefile.
 # in order of speed, as of this writing.
@@ -70,9 +70,8 @@ ifeq ($(TARGET_MACHINE_llvm),x86_64)
 else ifeq ($(TARGET_MACHINE_llvm),i686)
   BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
 else
-  $(error "Couldn't extract the target's word size from the llvm triplet '$(TARGET_llvm)'. Extracted CPU: '$(TARGET_MACHINE_llvm)'")
+  $(error "Couldn't extract the target's word size from TARGET_MACHINE_llvm '$(TARGET_MACHINE_llvm)'.")
 endif
-
 
 # see https://stackoverflow.com/a/20983251/14464
 RED		= $(shell tput setaf 1)
@@ -80,12 +79,13 @@ GREEN		= $(shell tput setaf 2)
 BLUE		= $(shell tput setaf 4)
 RESET		= $(shell tput sgr0)
 
+BACKDATE_FILE	= touch -t 200012312359
+
 LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
 LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
 CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
 DIFF		= diff --unified --ignore-all-space
 STRIP		= strip
-TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
 
 ASM_FILE_EXT_x86	= s
 ASM_FILE_EXT_llvm	= ll
@@ -157,7 +157,7 @@ $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_x86)					\
 		source/evaluator/eval.l					\
-			>$@ || { touch --date=2000-01-01 $@; exit 42; }
+			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 $(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
@@ -174,7 +174,7 @@ $(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_F
 		--define target/os			$(TARGET_OS)			\
 		$(EMIT_FILES_llvm)					\
 		source/evaluator/eval.l					\
-			>$@ || { touch --date=2000-01-01 $@; exit 42; }
+			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
 # eval2 should implement the semantics encoded by the sources of this stage.
@@ -220,7 +220,7 @@ define compile-x86
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
 	$(2)									\
-		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
+		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
 endef
 
 define compile-llvm
@@ -235,7 +235,7 @@ define compile-llvm
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
 	$(2)									\
-		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
+		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
 endef
 
 # This "function" is useful when you need an eval executable, but you don't want to
@@ -250,7 +250,7 @@ endef
 $(BUILD)/peg.l: source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
 	$(call ensure-built,$(TEST_EVAL))
 	$(TIME) $(TEST_EVAL) boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
-		|| { touch --date=2000-01-01 $(BUILD)/peg.l; exit 42; }
+		|| { $(BACKDATE_FILE) $(BUILD)/peg.l; exit 42; }
 #	mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
 
 source/parsing/peg.l: $(BUILD)/peg.l

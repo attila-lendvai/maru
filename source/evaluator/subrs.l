@@ -296,7 +296,8 @@
         (else
          ;; TODO
          (libc/fprintf libc/stderr "<unable to print {%p} of type %d>" arg type))))
-    (set -args- (get/tail -args-))))
+    (set -args- (get/tail -args-)))
+  (libc/flush-streams))
 
 (define-subr (apply 2)
   (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
