@@ -23,16 +23,27 @@ BACKENDS		= x86 llvm
 # use this backend of the previous stage when it needs to be built.
 PREVIOUS_STAGE_BACKEND	= llvm
 
-LLVM_VERSION	= 8
-LLVM_ARGS	= -O3
+HOST_OS	= $(shell uname -s)
 
-TARGET_VENDOR	= pc-linux
-TARGET_OS	= gnu
+# tested to work with LLVM version 8-11
+ifeq ($(HOST_OS),Linux)
+  LLVM_VERSION	= -8
+  TARGET_VENDOR	= pc-linux
+  TARGET_OS	= gnu
+  TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
+else ifeq ($(HOST_OS),Darwin)
+  LLVM_VERSION	=
+  TARGET_VENDOR	= apple
+  TARGET_OS	= darwin$(shell uname -r)
+  TIME		= time
+endif
+
+LLVM_ARGS	= -O3
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
-TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
+TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
 # use this eval to execute any tests or code generation from the makefile.
 # in order of speed, as of this writing.
@@ -68,9 +79,9 @@ GREEN		= $(shell tput setaf 2)
 BLUE		= $(shell tput setaf 4)
 RESET		= $(shell tput sgr0)
 
-LLC		= llc-$(LLVM_VERSION) $(LLVM_ARGS)
-LLVM_OPT	= opt-$(LLVM_VERSION) $(LLVM_ARGS)
-CLANG		= clang-$(LLVM_VERSION) $(LLVM_ARGS)
+LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
+LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
+CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
 DIFF		= diff --unified --ignore-all-space
 STRIP		= strip
 TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
@@ -131,7 +142,7 @@ eval-llvm: $(BUILD_llvm)/eval2
 # stage 6 note: in this stage we skip the eval1 step and compile eval2 straight away
 # by using the eval.exe of the previous stage to execute our version of the compiler.
 $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
-	@mkdir --parents $(BUILD_x86)
+	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
@@ -147,7 +158,7 @@ $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
 $(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
-	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
+	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
@@ -184,7 +195,7 @@ $(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) source/bo
 
 $(HOST_DIR)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
-	@mkdir --parents $(BUILD)
+	@mkdir -p $(BUILD)
 # after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
 	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
@@ -244,12 +255,12 @@ source/parsing/peg.l: $(BUILD)/peg.l
 ### Pattern rules
 ###
 $(BUILD)/%: $(BUILD)/%.s
-	@mkdir --parents $(@D)
+	@mkdir -p $(@D)
 	$(CC) -m32 -o $@ $<
 	@-$(STRIP) $@ -o $@.stripped
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
-	@mkdir --parents $(@D)
+	@mkdir -p $(@D)
 	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
 	$(CLANG) --target=$(TARGET_llvm) -o $@ $@.o
 # the rest is just informational
@@ -296,7 +307,7 @@ $(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): tests/compiler-tests.l $(EMIT_FI
 	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
 $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
-	@mkdir --parents $(BUILD_llvm)
+	@mkdir -p $(BUILD_llvm)
 	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
