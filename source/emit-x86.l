@@ -27,15 +27,15 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(define __MACH__  '( )) ; non-nil for Darwin / Mac OS X   (deal with the convoluted ABI)
-(define __UNIX__  '( )) ; nin-nil for Unix, MinGW, etc.   (external symbols have underscore prefix)
-(define __LINUX__ '(X)) ; non-nil for Linux, Cygwin, etc. (external symbols have no underscore prefix)
+(define-constant +label-prefix+ (cond
+                                  ((= target/os "darwin") "_")
+                                  (else "")))
 
-;;;----------------------------------------------------------------
+(define-constant +call-frame-alignmet+ (cond
+                                         ((= target/os "darwin") 16)
+                                         (else (/ target/word-size-in-bits 8))))
 
-(define __PREFIX__ (if __LINUX__ "" "_"))
-
-(let ((word-size (slave-value slave:target/word-size-in-bits)))
+(let ((word-size target/word-size-in-bits))
   (unless (= 32 word-size)
     (error "The x86 compiler backend doesn't support target word size " word-size)))
 
@@ -123,7 +123,7 @@
 
 ;;; IA32 -- OPERANDS
 
-(define-operand LABEL (name)    __PREFIX__ (mangle-label (<LABEL>-name self)))
+(define-operand LABEL (name)    +label-prefix+ (mangle-label (<LABEL>-name self)))
 ;; global, literal, and temp pointers
 (define-operand GI32 (name)     (<GI32>-name self))
 (define-operand LI32 (value)    (<LI32>-value self))
@@ -601,9 +601,10 @@
          (params (map init-param (<expr>-parameters self))))
     (list-do e body
       (and e (comp e)))
-    (let* ((arg-size (align 16             (<compiler>-arg-limit -c-) ))
-           (tmp-size (align 16 (+ arg-size (<compiler>-tmp-limit -c-))))
-           (frm-size (align 16 (+ tmp-size 8))))
+    ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
+    (let* ((arg-size (align +call-frame-alignmet+             (<compiler>-arg-limit -c-) ))
+           (tmp-size (align +call-frame-alignmet+ (+ arg-size (<compiler>-tmp-limit -c-))))
+           (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
       (emit TEXT)

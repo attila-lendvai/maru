@@ -1,5 +1,11 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-constant target/word-size-in-bits (cond
+                                            ((= target/machine "x86_64")	64)
+                                            ((= target/machine "i686")		32)
+                                            ((= target/machine "i386")		32)
+                                            (else (error "Couldn't extract word size from machine id "target/machine))))
+
 (switch-to-slave-module)
 
 (define-constant target-boolean/true  1)
@@ -13,9 +19,12 @@
 ;;;
 ;;; the target's configuration
 ;;;
-(define-constant target/word-size-in-bits	(eval-in-module host 'host:makefile/target/word-size-in-bits))
-(define-constant target/little-endian?		true)
-;;(define-constant target-triplet		(eval-in-module host 'host:makefile/target-triplet))
+(define-constant target/machine			(eval-in-module host 'host:target/machine))
+(define-constant target/vendor			(eval-in-module host 'host:target/vendor))
+(define-constant target/os			(eval-in-module host 'host:target/os))
+(define-constant target/word-size-in-bits	(eval-in-module host 'host:target/word-size-in-bits))
+;;(define-constant target/little-endian?		true)
+;;(define-constant target-triplet			(concat-strings target/machine "-" target/vendor "-" target/os))
 
 ;;;
 ;;; useful utils and constants

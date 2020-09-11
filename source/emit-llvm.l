@@ -30,20 +30,19 @@
 (define *compiler-verbose* '()) ; NOTE this will break the output due to multiline string literals escape the ; prefixing
 
 (define *ffi-type->llvm-type*
-    (let ((word-size (slave-value slave:target/word-size-in-bits)))
-      (cond
-        ((= 32 word-size)
-         '((slave:*		%ptr)
-           (slave:int		i32)
-           (slave:long		i32)
-           (slave:unsigned-long	i32)
-           (slave:size_t	i32)))
-        ((= 64 word-size)
-         '((slave:*		%ptr)
-           (slave:int		i32)
-           (slave:long		i64)
-           (slave:unsigned-long	i64)
-           (slave:size_t	i32))))))
+    (cond
+      ((= 32 target/word-size-in-bits)
+       '((slave:*		%ptr)
+         (slave:int		i32)
+         (slave:long		i32)
+         (slave:unsigned-long	i32)
+         (slave:size_t	i32)))
+      ((= 64 target/word-size-in-bits)
+       '((slave:*		%ptr)
+         (slave:int		i32)
+         (slave:long		i64)
+         (slave:unsigned-long	i64)
+         (slave:size_t	i32)))))
 
 (define-function ffi-type->llvm-type (type)
   (let ((entry (assq type *ffi-type->llvm-type*)))
@@ -54,7 +53,7 @@
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
   (cond
-    ((= type '%ptr)	(slave-value slave:target/word-size-in-bits))
+    ((= type '%ptr)	target/word-size-in-bits)
     ((= type 'void)	())
     (else
      (let ((entry	(assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
@@ -804,11 +803,10 @@
                         (and *compiler-verbose* (gen COMMENT (list "	void FFI call return value")))
                         (gen LOAD (LITERAL 0) 0))
                        (else
-                        (let ((bitsize		(llvm-type-bitsize return-type))
-                              (target-word-size	(slave-value slave:target/word-size-in-bits)))
+                        (let ((bitsize (llvm-type-bitsize return-type)))
                           (cond
-                            ((< bitsize target-word-size)	(gen SEXT return-type '%word))
-                            ((> bitsize target-word-size)	(error "This shouldn't happen: (> bitsize target-word-size) for FFI type " return-type))))
+                            ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
+                            ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
                         (gen INTTOPTR '%word))))
                    (unless (<foreign-function>-vararg? value)
                      (set n-params (list-length param-types)))))
@@ -902,7 +900,7 @@
   (let* ((vars  (<env>-bindings env))
          (-c-  (compiler 0)))
     (let (;(target-triplet	(slave-value slave:target-triplet))
-          (word-size		(slave-value slave:target/word-size-in-bits)))
+          (word-size		target/word-size-in-bits))
       (warn "\nCompiling for word size: " word-size " bits\n\n")
       ;;(assert (string?	target-triplet))
       (assert (long?	word-size))

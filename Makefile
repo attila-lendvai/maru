@@ -23,18 +23,20 @@ BACKENDS		= x86 llvm
 # use this backend of the previous stage when it needs to be built.
 PREVIOUS_STAGE_BACKEND	= llvm
 
-HOST_OS	= $(shell uname -s)
+HOST_OS		= $(shell uname -s)
+TARGET_MACHINE	= $(shell uname -m)
 
 # tested to work with LLVM version 8-11
 ifeq ($(HOST_OS),Linux)
   LLVM_VERSION	= -8
-  TARGET_VENDOR	= pc-linux
-  TARGET_OS	= gnu
+  TARGET_VENDOR	?= linux
+  TARGET_OS	?= gnu
   TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
-  TARGET_VENDOR	= apple
-  TARGET_OS	= darwin$(shell uname -r)
+  TARGET_VENDOR	?= apple
+  #TARGET_OS	?= darwin$(shell uname -r)
+  TARGET_OS	?= darwin
   TIME		= time
 endif
 
@@ -60,16 +62,15 @@ PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
 
-TARGET_CPU_llvm	= $(firstword $(subst -, ,$(TARGET_llvm)))
+TARGET_MACHINE_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
+TARGET_MACHINE_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
-ifeq ($(TARGET_CPU_llvm),x86_64)
-  TARGET_WORD_SIZE_llvm	= 64
+ifeq ($(TARGET_MACHINE_llvm),x86_64)
   BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
-else ifeq ($(TARGET_CPU_llvm),i686)
-  TARGET_WORD_SIZE_llvm	= 32
+else ifeq ($(TARGET_MACHINE_llvm),i686)
   BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
 else
-  $(error "Couldn't extract the target's word size from the llvm triplet '$(TARGET_llvm)'. Extracted CPU: '$(TARGET_CPU_llvm)'")
+  $(error "Couldn't extract the target's word size from the llvm triplet '$(TARGET_llvm)'. Extracted CPU: '$(TARGET_MACHINE_llvm)'")
 endif
 
 
@@ -151,8 +152,9 @@ $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
-		--define makefile/target-triplet   $(TARGET_x86)	\
-		--define makefile/target/word-size-in-bits 32		\
+		--define target/machine			$(TARGET_MACHINE_x86)	\
+		--define target/vendor			$(TARGET_VENDOR)	\
+		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_x86)					\
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
@@ -167,8 +169,9 @@ $(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_F
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
-		--define makefile/target-triplet   $(TARGET_llvm)	\
-		--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
+		--define target/machine			$(TARGET_MACHINE_llvm)		\
+		--define target/vendor			$(TARGET_VENDOR)		\
+		--define target/os			$(TARGET_OS)			\
 		$(EMIT_FILES_llvm)					\
 		source/evaluator/eval.l					\
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
@@ -212,8 +215,9 @@ define compile-x86
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define makefile/target-triplet $(TARGET_x86)				\
-	--define makefile/target/word-size-in-bits 32				\
+	--define target/machine			$(TARGET_MACHINE_x86)		\
+	--define target/vendor			$(TARGET_VENDOR)		\
+	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
 	$(2)									\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
@@ -226,8 +230,9 @@ define compile-llvm
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define makefile/target-triplet   $(TARGET_llvm)			\
-	--define makefile/target/word-size-in-bits $(TARGET_WORD_SIZE_llvm)	\
+	--define target/machine			$(TARGET_MACHINE_llvm)		\
+	--define target/vendor			$(TARGET_VENDOR)		\
+	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
 	$(2)									\
 		>$(3) || { touch --date=2000-01-01 $(3); exit 42; }
