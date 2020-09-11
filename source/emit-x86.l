@@ -236,7 +236,7 @@
 (define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	movl	%ecx, "$2))
 
-(define-emit    (COMMENT pair)			(print "## ") (apply println $1))
+(define-emit    (COMMENT pair)			(when *compiler-verbose* (print "## ") (apply println $1)))
 
 (define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")

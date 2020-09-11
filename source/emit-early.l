@@ -1,5 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; NOTE for debugging only, because this breaks the output due to e.g. multiline string literals escaping from the line comment prefix char
+(define *compiler-verbose* '())
+
 (define-constant target/word-size-in-bits (cond
                                             ((= target/machine "x86_64")	64)
                                             ((= target/machine "i686")		32)

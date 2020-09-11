@@ -27,8 +27,6 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(define *compiler-verbose* '()) ; NOTE this will break the output due to multiline string literals escape the ; prefixing
-
 (define *ffi-type->llvm-type*
     (cond
       ((= 32 target/word-size-in-bits)
@@ -252,8 +250,8 @@
     (print ")")))
 
 (define-instruction COMMENT	()
-  ;;((string)			(print "; ") (println $1))
-  ((pair)			(print "; ") (apply println $1)))
+  ;;((string)			(when *compiler-verbose* (print "; ") (println $1)))
+  ((pair)			(when *compiler-verbose* (print "; ") (apply println $1))))
 
 (define-instruction INLINE	()
   ((string)			(print $1))
@@ -460,7 +458,7 @@
 
 (define-function %gen (-c- factory args)
   (let ((instr (factory)))
-    (and *compiler-verbose* (println "; GEN of "instr", args: " args))
+    (emit COMMENT (list "GEN of "instr", args: " args))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
     ;; instantiate the regs
@@ -486,13 +484,13 @@
     (when (< 0 idx)
       (first (array-at (<compiler>-gen-buffer -c-) idx)))))
 
-(define-function emit-gen-buffer (comp)
-  (for (i 0 (+ 1 (<compiler>-gen-buffer-index comp)))
-    (let* ((entry (array-at (<compiler>-gen-buffer comp) i))
+(define-function emit-gen-buffer (-c-)
+  (for (i 0 (+ 1 (<compiler>-gen-buffer-index -c-)))
+    (let* ((entry (array-at (<compiler>-gen-buffer -c-) i))
            (instr (first entry))
            (args (rest entry)))
-      (and *compiler-verbose* (println "; EMIT-INSTRUCTION of "instr", args: "args))
-      (apply emit-instruction (cons comp (cons instr args))))))
+      (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args))
+      (apply emit-instruction (cons -c- (cons instr args))))))
 
 (define-function new-temp (comp)
   (TEMP (incr (<compiler>-temp-counter comp))))
@@ -508,7 +506,7 @@
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
-     ,(and *compiler-verbose* `(println "; COMPILE of " __obj__))
+     (emit COMMENT (list "COMPILE of "__obj__))
      (compile __obj__ -c-)
      (<compiler>-current-value -c-)))
 
@@ -761,7 +759,7 @@
        (handler self -c-))
       (else
        (let ((arg-regs (map (lambda (arg)
-                              (and *compiler-verbose* (gen COMMENT (list "arg " arg)))
+                              (gen COMMENT (list "arg " arg))
                               (comp arg)
                               (<compiler>-current-value -c-))
                             args)))
@@ -776,7 +774,7 @@
                  (set n-params (<expr>-n-required-parameters value)))
                 ((= (type-of value) <foreign-function>)
                  (let ((param-types	(<foreign-function>-parameter-types value)))
-                   (and *compiler-verbose* (gen COMMENT (list "	casting FFI args")))
+                   (gen COMMENT (list "	casting FFI args"))
                    ;; for FFI calls we need to cast the non-pointer llvm args
                    ;; using ptrtoint to the specific llvm type.
                    (let ((param-type	())
@@ -800,7 +798,7 @@
                      (cond
                        ((= '%ptr return-type)) ; all good
                        ((= 'slave:void return-type)
-                        (and *compiler-verbose* (gen COMMENT (list "	void FFI call return value")))
+                        (gen COMMENT (list "	void FFI call return value"))
                         (gen LOAD (LITERAL 0) 0))
                        (else
                         (let ((bitsize (llvm-type-bitsize return-type)))
@@ -862,7 +860,7 @@
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
                              parameters)))
-    (and *compiler-verbose* (print "; compiling fn "name", body: ") (dumpln body))
+    (emit COMMENT (list "compiling fn "name", body: " body))
 
     (list-do e body
       (comp e))
@@ -913,7 +911,7 @@
       (let* ((var   (array-at vars i))
              (name  (<variable>-name  var))
              (value (<variable>-value var)))
-        (and *compiler-verbose* (emit COMMENT (list "defn " name)))
+        (emit COMMENT (list "defn " name))
         (warn name ", ")
         (compile-definition value name -c-)))
     (warn "\n")
