@@ -664,12 +664,11 @@
        ,(when feature/backtrace
           '(when (<= 0 *call-stack-index*)
             ;; gc optimization: clear the now unused call-frame
-            ;; TODO clean up the situation with with-instance-accessors
-            (let ((self (k/array-at *call-stack* *call-stack-index*)))
-              (with-instance-accessors <call-frame>
-                (set self.callee-designator	())
-                (set self.callee		())
-                (set self.arguments		())))))
+            (let ((frame (k/array-at *call-stack* *call-stack-index*)))
+              (with-instance-accessors frame <call-frame>
+                (set frame.callee-designator	())
+                (set frame.callee		())
+                (set frame.arguments		())))))
        (debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
        __result__)))
 
@@ -683,12 +682,10 @@
         (gc/let* ((new-frame (new-record-instance <call-frame>)))
           (set (k/array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
-      ;; TODO clean up the situation with with-instance-accessors
-      (let ((self frame))
-        (with-instance-accessors <call-frame>
-          (set self.callee-designator	callee-designator)
-          (set self.callee		callee)
-          (set self.arguments		args)))
+      (with-instance-accessors frame <call-frame>
+        (set frame.callee-designator	callee-designator)
+        (set frame.callee		callee)
+        (set frame.arguments		args))
       frame)))
 
 (define-function print-backtrace ()

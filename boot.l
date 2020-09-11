@@ -683,13 +683,13 @@
         ;; (warn "about to process an %accessor-typecheck failure, which may fail to properly print the error output\nslot name is "slot-name", expected-type-id is "expected-type-id", object's actual type id is "(type-id-of object)"\n")
         (error "type check failed for record slot accessor: expected type "expected-type", slot name "slot-name", got " actual-type)))))
 
-(define-function slot-value (expected-type-id slot-name object offset)
+(define-function slot-value (expected-type-id slot-name object slot-index)
   (%accessor-typecheck expected-type-id slot-name object)
-  (oop-at object offset))
+  (oop-at object slot-index))
 
-(define-function set-slot-value (expected-type-id slot-name object offset value)
+(define-function set-slot-value (expected-type-id slot-name object slot-index value)
   (%accessor-typecheck expected-type-id slot-name object)
-  (set-oop-at object offset value))
+  (set-oop-at object slot-index value))
 
 (define-function sanity-check-record-slots (record slots)
   (let ((f slots))
@@ -883,35 +883,40 @@
 ;;; local syntax
 
 (define-function make-with-form (args-and-body)
-  (and args-and-body
-       `(lambda (*env* ,@(car args-and-body))
-          ,@(cdr args-and-body))))
+  (when args-and-body
+    `(lambda (*env* ,@(car args-and-body))
+       ,@(cdr args-and-body))))
 
 (define-form with-forms (bindings . body)
   (let ((env (environment *env*)))
-    (while bindings
-      (let* ((binding (car   bindings))
-             (name    (car   binding))
-             (fun     (cadr  binding))
-             (var     (caddr binding))
-             (exp     (list 'form (make-with-form fun) (make-with-form var))))
-        (environment-define env (caar bindings) (eval exp *env*))
-        (set bindings (cdr bindings))))
-    (cons 'let (cons () (map-with expand body env)))))
+    (list-do binding bindings
+      (let* ((name    (first  binding))
+             (fun     (second binding))
+             (var     (third  binding))
+             (exp     `(form ,(make-with-form fun) ,(make-with-form var))))
+        (environment-define env name (eval exp *env*))))
+    `(let ()
+       ,@(map-with expand body env))))
 
 ;;; field accesors
 
-(define-function make-instance-accessors (name slots i)
-  (and (pair? slots)
-       (cons `(,(concat-symbol 'self. (car slots)) () ((slot-name) (list 'oop-at 'self ,i)))
-             (make-instance-accessors name (cdr slots) (+ i 1)))))
+(define-function make-instance-accessors (var-name type-id slots i)
+  (when (pair? slots)
+    (cons `(,(concat-symbols var-name '. (car slots))
+             ()
+             ((slot-name)
+              (if *force-trivial-accessors*
+                  (list 'oop-at ',var-name ,i)
+                (list 'slot-value ',type-id (list 'quote slot-name) ',var-name ,i))))
+          (make-instance-accessors var-name type-id (cdr slots) (+ i 1)))))
 
-(define-form with-instance-accessors (type . body)
-  ;; TODO audit its use wrt <type>s (as opposed to <record>s). maybe do the filtering for <record>s at its point of use.
+(define-form with-instance-accessors (var-name type . body)
   (let ((type-object (eval type)))
-    `(with-forms ,(when (subtype? (type-of type-object) <record>)
-                    (make-instance-accessors type (<record>-effective-slots type-object) 0))
-       (let () ,@body))))
+    (if (subtype? (type-of type-object) <record>)
+        `(with-forms ,(make-instance-accessors var-name (<type>-id type-object) (<record>-effective-slots type-object) 0)
+           ,@body)
+      `(let ()
+         ,@body))))
 
 (define-form new (type . inits)
   (let ((i -1))
@@ -929,7 +934,7 @@
 
 (define-form make (type . inits)
   `(let ((self (new ,type)))
-     (with-instance-accessors ,type
+     (with-instance-accessors self ,type
        ,@(%make-make-inits (concat-symbol type '-) inits)
        self)))
 
@@ -996,7 +1001,7 @@
 
 (<selector>-add-method add-method <selector>
   (lambda (self type args body)
-    (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors ,type ,@body))))))
+    (<selector>-add-method self type (eval `(lambda ,args (with-instance-accessors self ,type ,@body))))))
 
 (define-form define-method (selector type args . body)
   (or (defined? selector) (eval `(define-selector ,selector)))

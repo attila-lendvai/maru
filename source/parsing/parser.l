@@ -733,7 +733,7 @@
   (print "<memo:"self.state">"))
 
 (define-function memo-set (self state result position)
-  (with-instance-accessors <memo>
+  (with-instance-accessors self <memo>
     (set self.result   result)
     (set self.position position)
     (set self.state    state)))
