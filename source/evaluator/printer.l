@@ -6,7 +6,7 @@
   (let ((type (get/type obj)))
     (cond
       ((= type <undefined>)	(libc/printf "()"))
-      ((= type <long>)		(libc/printf "%d" (get/long obj)))
+      ((= type <long>)		(libc/printf "%ld" (get/long obj)))
       ((= type <string>)	(k/string-ensure-zero-terminated obj)
 				(let ((bits (get/string obj)))
                                   (if (not storing)
@@ -66,11 +66,11 @@
       ((= type <env>)		(let ((level (get (<env> level) obj))
                                       (bindings (get (<env> bindings) obj)))
                                   (if (and level bindings)
-                                      (libc/printf "Env<%d,%d>" (get/long level) (k/array-length bindings))
+                                      (libc/printf "Env<%ld,%ld>" (get/long level) (k/array-length bindings))
                                     (libc/printf "Env<>"))))
       ((= type <context>)	(let ()
                                   (libc/printf "Context<>")))
-      (else                     (libc/printf "<type:%d>" type)))))
+      (else                     (libc/printf "<type:%ld>" type)))))
 
 (define-function k/print	(obj) (do_print obj false))
 (define-function k/println	(obj) (do_print obj false) (libc/printf "\n"))

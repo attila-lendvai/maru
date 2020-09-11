@@ -292,10 +292,10 @@
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
-        ((= type <long>)   (libc/fprintf libc/stderr "%d" (get/long   arg)))
+        ((= type <long>)   (libc/fprintf libc/stderr "%ld" (get/long   arg)))
         (else
          ;; TODO
-         (libc/fprintf libc/stderr "<unable to print {%p} of type %d>" arg type))))
+         (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type))))
     (set -args- (get/tail -args-)))
   (libc/flush-streams))
 

@@ -317,7 +317,7 @@
 (define-function %type-check (obj exp-type)
   (let ((act-type (get/type obj)))
     (or (= exp-type act-type)
-        (fatal2 "kernel get/put type error: expected type id %d, got %d" exp-type act-type))))
+        (fatal2 "kernel get/put type error: expected type id %ld, got %ld" exp-type act-type))))
 
 ;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
 (define-form get (designator object)
@@ -703,7 +703,7 @@
               (libc/printf "\targs: ")
 	      (k/dumpln it))
             (libc/flush-streams))))
-    (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %d\n" *call-stack-index*)))
+    (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %ld\n" *call-stack-index*)))
 
 ;;;
 ;;; eval
@@ -1201,13 +1201,17 @@
                  (k/repl-stream stream)
                  (libc/fclose stream)))))))))
 
+  (debug (libc/printf "main is on the way out\n"))
+
   (libc/flush-streams)
   (when (< 0 *arg/verbose*)
     (gc/collect)
-    (libc/printf "; GC: %d objects in %d bytes, %d free\n" gc/objects-live gc/bytes-used gc/bytes-free))
+    (libc/printf "; GC: %ld objects in %ld bytes, %ld free\n" gc/objects-live gc/bytes-used gc/bytes-free))
 
-  (libc/fprintf libc/stderr "%d objects in %d bytes, %d free\n" gc/objects-live gc/bytes-used gc/bytes-free)
+  (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld free\n" gc/objects-live gc/bytes-used gc/bytes-free)
   (libc/flush-streams)
+
+  (debug (libc/printf "main is returning normally\n"))
   (return 0))
 
 (compile-end)
