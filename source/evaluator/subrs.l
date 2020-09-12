@@ -188,6 +188,11 @@
 (define-binary-operator bitwise-asl)
 (define-binary-operator bitwise-asr)
 
+(define-subr (bitwise-not 1)
+  (let ((value (get/head -args-)))
+    (safety 1 (or (is/long value) (k/error "non-numeric argument for bitwise-not: "value)))
+    (new-<long> (bitwise-not (get/long value)))))
+
 ;; (define-subr (bitwise-shift 2)
 ;;   (let ((value	(get/long (get/head -args-)))
 ;;         (shift	(get/long (get/head (get/tail -args-)))))

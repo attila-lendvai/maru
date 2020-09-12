@@ -12,3 +12,8 @@
 (define bitwise-xor	^)
 (define bitwise-asl	<<)
 (define bitwise-asr	>>)
+
+;; this one is new in this stage, so let's give it a simple implementation that can be executed in the meta-level code.
+;; when used in compiled code, it will be recognized by the compiler.
+(define-function bitwise-not (value)
+  (^ value -1))

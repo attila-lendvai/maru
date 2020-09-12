@@ -170,12 +170,11 @@
 						(println "	divl	"$1))
 
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
-
-(define-emit    (OR TI32)			(println "	orl	"$1", %eax"))
-
+(define-emit    (OR  TI32)			(println "	orl	"$1", %eax"))
 (define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
+(define-emit    (BITWISE-NOT)			(println "	notl	%eax"))
 
-(define-emit    (NOT)				(println "	cmpl	$0, %eax")
+(define-emit    (LOGIC-NOT)			(println "	cmpl	$0, %eax")
 						(println "	sete	%al")
 						(println "	movzbl	%al, %eax"))
 
@@ -387,7 +386,7 @@
            `(;; nullary
              ()
              ;; unary
-             ((slave:-  ,NEG) (slave:not ,NOT))
+             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT) (slave:bitwise-not ,BITWISE-NOT))
              ;; binary
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
@@ -408,7 +407,7 @@
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
                        ;; see here at runtime).
-                       (assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
                        (cons op (cdr entry))))
                    arity-line))
             table))))

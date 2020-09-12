@@ -27,6 +27,14 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
+(switch-to-slave-module)
+
+;; we can't say anything smarter than this, because the LLVM IR doesn't have a not primitive.
+;; so, let's just define a macro instead of a full compiler primitive.
+(define-form bitwise-not (value) `(bitwise-xor ,value -1))
+
+(switch-to-host-module)
+
 (define *ffi-type->llvm-type*
     (cond
       ((= 32 target/word-size-in-bits)
@@ -381,7 +389,7 @@
 				(println "	"$reg2" = sub nsw %word 0, "$reg1)
 				(println "	"$reg3" = inttoptr %word "$reg2" to %ptr")))
 
-(define-instruction NOT		(t 4 t)
+(define-instruction LOGIC-NOT	(t 4 t)
   ((LOCAL)			(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
 				(println "	"$reg2" = icmp eq %word "$reg1", 0")
 				(println "	"$reg3" = zext i1 "$reg2" to %word")
@@ -717,7 +725,7 @@
            `(;; nullary
              ()
              ;; unary
-             ((slave:-  ,NEG) (slave:not ,NOT))
+             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT))
              ;; binary
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:bitwise-and  ,AND) (slave:bitwise-or   ,OR ) (slave:bitwise-xor ,XOR)
