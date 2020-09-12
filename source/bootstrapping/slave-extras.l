@@ -6,3 +6,9 @@
 ;;;
 
 (warn "--- boostrapping: slave extras\n")
+
+(define bitwise-and	&)
+(define bitwise-or	|)
+(define bitwise-xor	^)
+(define bitwise-asl	<<)
+(define bitwise-asr	>>)

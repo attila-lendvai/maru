@@ -92,21 +92,23 @@
                                                   res))
 
 (when (< target/word-size-in-bytes
-         (<< 1 immediate-type/max-tag-width))
+         (bitwise-asl 1 immediate-type/max-tag-width))
   (warn "immediate-type/max-tag-width ("immediate-type/max-tag-width") will force a stronger alignment for OOP's than what the target word size demands\n"))
 
-(define-constant oop/alignment-in-bytes		(max target/word-size-in-bytes (<< 1 immediate-type/max-tag-width)))
+(define-constant oop/alignment-in-bytes		(max target/word-size-in-bytes (bitwise-asl 1 immediate-type/max-tag-width)))
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
-(define-constant oop/tag-mask			(^ oop/payload-mask -1))
+(define-constant oop/tag-mask			(bitwise-xor oop/payload-mask -1))
 
 ;;(warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n")
 
 (define-form oop/align (value)
-  `(& (+ ,value ,oop/align-padding) ,oop/payload-mask))
+  `(bitwise-and (+ ,value ,oop/align-padding)
+                ,oop/payload-mask))
 
 (define-form aligned-to-oop? (ptr)
-  `(= 0 (& ,ptr ,oop/tag-mask)))
+  `(= 0 (bitwise-and ,ptr
+                     ,oop/tag-mask)))
 
 (define-form oop? (word)
   `(aligned-to-oop? ,word))
@@ -297,7 +299,7 @@
       ((not ptr)	<undefined>)
       ((oop? ptr)	(let ((header (header-of ptr)))
                           (safety 3 (or (valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
-                          (safety 1 (or (& <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
+                          (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
       ((immediate? ptr) (cond
                           ,@(let ((conds ()))
@@ -305,8 +307,8 @@
                                 (when (immediate-type? type)
                                   (let* ((tag-value	(<immediate-type>-tag-value type))
                                          (tag-width	(<immediate-type>-tag-width type))
-                                         (tag-mask	(^ (- (<< 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
-                                    (push conds `((= ,tag-value (& ptr ,tag-mask)) ,(<type>-name type))))))
+                                         (tag-mask	(bitwise-xor (- (bitwise-asl 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
+                                    (push conds `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))))
                               conds)
                           (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
       (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
@@ -350,10 +352,10 @@
 (define-form is/pair		(obj)		`(is <pair> ,obj))
 (if (immediate-type? <long>)
     (define-form get/long	(obj)		(if (< safety-level 2)
-                                                    `(>> ,obj ,(<immediate-type>-tag-width <long>))
+                                                    `(bitwise-asr ,obj ,(<immediate-type>-tag-width <long>))
                                                   `(let ((__obj__ ,obj))
                                                      (k/assert (is/long __obj__))
-                                                     (>> __obj__ ,(<immediate-type>-tag-width <long>)))))
+                                                     (bitwise-asr __obj__ ,(<immediate-type>-tag-width <long>)))))
     (define-form get/long	(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
 (define-form get/head		(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
 (define-form put/head		(obj val)	(if (< safety-level 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
@@ -411,7 +413,7 @@
 
 (define-form new-<long> (bits)
   (if (immediate-type? <long>)
-      `(+ (<< ,bits ,(<immediate-type>-tag-width <long>))
+      `(+ (bitwise-asl ,bits ,(<immediate-type>-tag-width <long>))
           ,(<immediate-type>-tag-value <long>))
     `(let ((obj (new-record-instance/opaque <long>)))
        (set (<long>-_bits obj) ,bits)

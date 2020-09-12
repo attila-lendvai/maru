@@ -23,3 +23,10 @@
 
 (define-function <expr>-body (obj)
   (cddr (<expr>-defn obj)))
+
+;; only some of these are used in the compiler, or the meta-level code (that runs in the host)
+(define bitwise-and	&)
+;;(define bitwise-or	|)
+;;(define bitwise-xor	^)
+(define bitwise-asl	<<)
+(define bitwise-asr	>>)

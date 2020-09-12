@@ -179,14 +179,23 @@
        (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
-(define-binary-operator &)
-(define-binary-operator |)
-(define-binary-operator ^)
 (define-binary-operator +)
 (define-binary-operator *)
 (define-binary-operator /)
-(define-binary-operator <<)
-(define-binary-operator >>)
+(define-binary-operator bitwise-and)
+(define-binary-operator bitwise-or)
+(define-binary-operator bitwise-xor)
+(define-binary-operator bitwise-asl)
+(define-binary-operator bitwise-asr)
+
+;; (define-subr (bitwise-shift 2)
+;;   (let ((value	(get/long (get/head -args-)))
+;;         (shift	(get/long (get/head (get/tail -args-)))))
+;;     (new-<long>
+;;      (cond
+;;        ((> shift 0)	(bitwise-asl value shift))
+;;        ((< shift 0)	(bitwise-asr value shift))
+;;        (else		value)))))
 
 (define-form define-relation (op)
   `(define-subr (,op 2)

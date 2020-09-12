@@ -79,8 +79,8 @@
         (if (legal-char? c)
             (putnext c)
           (putnext ?\\)
-          (putnext (digit-for (>> c  4)))
-          (putnext (digit-for (&  c 15)))))
+          (putnext (digit-for (bitwise-asr c 4)))
+          (putnext (digit-for (bitwise-and c 0xf)))))
       (incr index))
     (when with-zero
       (putnext ?\\)
@@ -720,9 +720,9 @@
              ((slave:-  ,NEG) (slave:not ,NOT))
              ;; binary
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
-              (slave:&  ,AND) (slave:|   ,OR ) (slave:^ ,XOR)
+              (slave:bitwise-and  ,AND) (slave:bitwise-or   ,OR ) (slave:bitwise-xor ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              (slave:<< ,SLA) (slave:>>  ,SRA)
+              (slave:bitwise-asl ,SLA) (slave:bitwise-asr  ,SRA)
               (slave:string-at		,LOAD-I8)
               (slave:oop-at		,LOAD-OOP))
              ;; ternary
