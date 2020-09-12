@@ -494,8 +494,6 @@
 (define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
 
-(define-function align (value alignment)	(& (+ value (- alignment 1)) (- alignment)))
-
 ;;;
 ;;; types
 ;;;

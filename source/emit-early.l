@@ -97,6 +97,10 @@
   (define-function unique-name (prefix)
     (concat-string prefix (long->string (incr counter)))))
 
+(define-function align (alignment value)
+  (bitwise-and (+ value (- alignment 1))
+               (- alignment)))
+
 ;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
 (define-function <expr>-n-required-parameters (op)
   (let ((params		(<expr>-parameters op))

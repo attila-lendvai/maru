@@ -39,8 +39,6 @@
   (unless (= 32 word-size)
     (error "The x86 compiler backend doesn't support target word size " word-size)))
 
-(define-function align (alignment value)        (& (- alignment) (+ (- alignment 1) value)))
-
 ;;; DEFINE-OPERAND
 
 (define-function define-operand/make-setters (type-name fields)
