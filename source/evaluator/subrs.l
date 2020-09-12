@@ -172,6 +172,39 @@
       (set result (- result)))
     (new-<long> result)))
 
+(define-subr +
+  (let ((result	0)
+        (rest	()))
+    (when (is/pair -args-)
+      (set result (get/long (get/head -args-)))
+      (set rest   (get/tail -args-)))
+    (while (is/pair rest)
+      (set result (+ result (get/long (get/head rest))))
+      (set rest (get/tail rest)))
+    (new-<long> result)))
+
+(define-subr /
+  (or (is/pair -args-) (k/error "operator '/' called with zero arguments"))
+  (let ((result	(get/long (get/head -args-)))
+        (rest	(get/tail -args-)))
+    (if (is/pair rest)
+        (while (let ()
+                 (set result (/ result (get/long (get/head rest))))
+                 (is/pair (set rest (get/tail rest)))))
+      (set result (/ 1 result)))
+    (new-<long> result)))
+
+(define-subr *
+  (let ((result	1)
+        (rest	()))
+    (when (is/pair -args-)
+      (set result (get/long (get/head -args-)))
+      (set rest   (get/tail -args-)))
+    (while (is/pair rest)
+      (set result (* result (get/long (get/head rest))))
+      (set rest (get/tail rest)))
+    (new-<long> result)))
+
 (define-form define-binary-operator (op)
   `(define-subr (,op 2)
      (let ((lhs (get/head -args-))
@@ -179,9 +212,6 @@
        (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
-(define-binary-operator +)
-(define-binary-operator *)
-(define-binary-operator /)
 (define-binary-operator bitwise-and)
 (define-binary-operator bitwise-or)
 (define-binary-operator bitwise-xor)
