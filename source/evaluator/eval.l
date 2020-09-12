@@ -29,7 +29,7 @@
   (when (<= level safety-level)
     `(let () ,@prog)))
 
-(define-constant track-backtrace? (or true (< 0 safety-level)))
+(define-constant feature/backtrace		(or true (< 0 safety-level)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -212,7 +212,7 @@
 (define k/+end+) ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
 
 (define *call-stack-index*	0)
-(when-at-expand track-backtrace?
+(when-at-expand feature/backtrace
   (define *call-stack*		0))
 
 (define *arg/verbose*		0)
@@ -651,7 +651,7 @@
 (define-form with-new-call-frame (args . body)
   (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
                              (fatal1 "infinite recursion guard triggered at call depth %ld" *call-stack-index*))))
-    `(let ((__result__ ,(if track-backtrace?
+    `(let ((__result__ ,(if feature/backtrace
                             `(let ((-call-frame- (%new-call-frame ,@args)))
                                ,call-depth-check
                                ,@body)
@@ -659,7 +659,7 @@
                              ,call-depth-check
                              ,@body))))
        (decr *call-stack-index*)
-       ,(when track-backtrace?
+       ,(when feature/backtrace
           '(when (<= 0 *call-stack-index*)
             ;; gc optimization: clear the now unused call-frame
             ;; TODO clean up the situation with with-instance-accessors
@@ -671,7 +671,7 @@
        (debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
        __result__)))
 
-(when-at-expand track-backtrace?
+(when-at-expand feature/backtrace
   (define-function %new-call-frame (callee-designator callee args)
     (safety 3 (unless (or (not callee-designator)	(valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
     (safety 3 (unless (or (not callee)			(valid-maru-value? callee))		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
@@ -690,7 +690,7 @@
       frame)))
 
 (define-function print-backtrace ()
-  (if-at-expand track-backtrace?
+  (if-at-expand feature/backtrace
       (let ((i *call-stack-index*))
         (while (<= 0 (decr i))
           (let ((call-frame (k/array-at *call-stack* i)))
@@ -762,7 +762,7 @@
       (cond
         ((is/pair exp)
          (gc/let* ((head (k/expand (get/head exp) env)))
-           (when-at-expand track-backtrace?
+           (when-at-expand feature/backtrace
              (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
              (set (<call-frame>-callee			-call-frame-) head)
              (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
@@ -906,26 +906,26 @@
   (with-new-call-frame (() () ())
     (cond
       ((= type <pair>)
-       (when-at-expand track-backtrace?
+       (when-at-expand feature/backtrace
          (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
          (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
        (gc/let* ((evaled-head (k/eval (get/head exp) ctx)))
          (debug (libc/printf "k/eval of pair, head eval'ed to ") (k/dumpln evaled-head))
-         (when-at-expand track-backtrace?
+         (when-at-expand feature/backtrace
            (set (<call-frame>-callee -call-frame-) evaled-head))
 	 (if (is <fixed> evaled-head)
 	     (k/apply (get (<fixed> function) evaled-head) (get/tail exp) ctx)
 	   (gc/let* ((args (k/eval/list (get/tail exp) ctx)))
-             (when-at-expand track-backtrace?
+             (when-at-expand feature/backtrace
                (set (<call-frame>-arguments -call-frame-) args))
              (k/apply evaled-head args ctx)))))
       (else
-       (when-at-expand track-backtrace?
+       (when-at-expand feature/backtrace
          (set (<call-frame>-callee-designator -call-frame-) exp))
        (let ((evaluator (k/array-at (get/variable-value var/*evaluators*) type)))
 	 (if evaluator
 	     (gc/let* ((args (new-<pair> exp ())))
-	       (when-at-expand track-backtrace?
+	       (when-at-expand feature/backtrace
                  (set (<call-frame>-callee -call-frame-) evaluator))
 	       (k/apply evaluator args ctx))
            exp))))))
@@ -1107,7 +1107,7 @@
 
   (debug (libc/printf "initializing *call-stack*\n"))
 
-  (when-at-expand track-backtrace?
+  (when-at-expand feature/backtrace
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (new-<array> 32)))
 

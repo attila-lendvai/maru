@@ -31,7 +31,16 @@
       (k/dumpln var)
       (fatal "aborting"))
     (let ((val (k/eval (k/cadr -args-) -ctx-)))
-      (put (<variable> value) var val))))
+      (put (<variable> value) var val)
+      ;; optionally set the <expr>'s name slot
+      (when-at-expand feature/track-expr-names
+        (let ((tmp val))
+          (when (is <form> tmp)
+            (set tmp (get (<form> function) tmp)))
+          (when (and (is <expr> tmp)
+                     (not (get (<expr> name) tmp)))
+            (put (<expr> name) tmp (get (<variable> name) var)))))
+      val)))
 
 (define-subr (defined? 1)
   (let ((name (get/head -args-))

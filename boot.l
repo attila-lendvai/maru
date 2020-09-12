@@ -206,6 +206,11 @@
           (if a (cdr a) exp))
       exp)))
 
+;;; configuration
+
+;; TODO rework config so that the name slot only gets added when true
+(define-constant feature/track-expr-names	true)
+
 ;;; let*
 
 (define-function %let*getters (vars getter rest)
@@ -968,7 +973,8 @@
     self))
 
 (define-function <selector>-add-method (self type method)
-  (when-at-expand (not bootstrapping?)
+  (when-at-expand (and feature/track-expr-names
+                       (not bootstrapping?))
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
     (when (and (expr? method)
                (not (<expr>-name method)))
@@ -1129,7 +1135,8 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
-  (when-at-expand (not bootstrapping?)
+  (when-at-expand (and feature/track-expr-names
+                       (not bootstrapping?))
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
     (or (<expr>-name method) (set (<expr>-name method) (<generic>-name mm))))
   (if types
