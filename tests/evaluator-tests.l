@@ -25,6 +25,27 @@
 ;;;
 ;;; Tests
 ;;;
+(define-test maru/arithmetic/- ()
+  (test-assert (= -42 (- 42)))
+  (test-assert (= 0   (- 2 2)))
+  (test-assert (= -3  (- 2 2 3))))
+
+(define-test maru/arithmetic/+ ()
+  (test-assert (= 0 (+)))
+  (test-assert (= 42 (+ 42)))
+  (test-assert (= 42 (+ 40 2)))
+  (test-assert (= 42 (+ 20 21 1))))
+
+(define-test maru/arithmetic// ()
+  (test-assert (= 1   (/ 1)))
+  (test-assert (= 100 (/ 1000 10)))
+  (test-assert (= 5   (/ 1000 20 10))))
+
+(define-test maru/arithmetic/* ()
+  (test-assert (= 1   (*)))
+  (test-assert (= 42  (* 42)))
+  (test-assert (= 24  (* 1 2 3 4))))
+
 (define-test maru/string/insert ()
   (let ((x "alma"))
     (string-insert x 2 ?z)

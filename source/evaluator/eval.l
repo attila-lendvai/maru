@@ -98,7 +98,7 @@
 (define-constant oop/alignment-in-bytes		(max target/word-size-in-bytes (bitwise-asl 1 immediate-type/max-tag-width)))
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
-(define-constant oop/tag-mask			(bitwise-xor oop/payload-mask -1))
+(define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
 
 ;;(warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n")
 
@@ -307,7 +307,7 @@
                                 (when (immediate-type? type)
                                   (let* ((tag-value	(<immediate-type>-tag-value type))
                                          (tag-width	(<immediate-type>-tag-width type))
-                                         (tag-mask	(bitwise-xor (- (bitwise-asl 1 tag-width)) -1))) ; TODO this should use bitwise not instead of xor
+                                         (tag-mask	(bitwise-not (- (bitwise-asl 1 tag-width)))))
                                     (push conds `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))))
                               conds)
                           (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
