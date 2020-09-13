@@ -537,7 +537,7 @@
   (let ((def (defined? name)))
     (if def
 	(if (selector? (<variable>-value def))
-	    (list 'quote <variable>-value def)
+	    (list 'quote (<variable>-value def))
 	  (error name" already defined as non-selector: " (<variable>-value def)))
       (let ()
 	(or default (set default `(args (error "selector "',name
