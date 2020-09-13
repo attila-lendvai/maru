@@ -963,7 +963,8 @@
     (cond
       ((= kind <ir-extern>)	(emitln self name":	.long	"__USER_LABEL_PREFIX__(car (<ir-extern>-parameters init))))
       ((= kind <ir-function>)	(emitln self name":	.long	"(ir-gen-x86-function-name init)))
-      (else			(error "cannot initialise: "name" with: "value)))))
+      ((= kind <ir-lit>)	(emitln self name":	.long	"(car (<ir-lit>-parameters init))))
+      (else			(error "cannot initialise: "name" with: "init)))))
 
 (define-method ir-gen-header <ir-gen-x86> ()	(info self 0 "# HEADER"))
 (define-method ir-gen-preamble <ir-gen-x86> ()	(info self 0 "# PRE-INITIALISATION"))

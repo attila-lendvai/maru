@@ -43,9 +43,10 @@
       ))
   (printf "\n")
 
-  (let (((foo foo_t)))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
-    (set (member foo x 42))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
-    (set (member foo y 666))	(printf "%d\n" (member foo x))    (printf "%d\n" (member foo y))
+  (let (((foo foo_t)))
+				(printf "%d (uninitialized)\n" (member foo x))    (printf "%d (uninitialized)\n\n" (member foo y))
+    (set (member foo x 42))	(printf "%d\n" (member foo x))    (printf "%d (uninitialized)\n\n" (member foo y))
+    (set (member foo y 666))	(printf "%d\n" (member foo x))    (printf "%d\n\n" (member foo y))
     (printf "sum is %d\n" (print-foo foo))
     (set foo (double-foo foo))
     (print-foo foo)
@@ -54,3 +55,5 @@
   ;;(my-printf "%s world %i %f\n" "goodbye" 42 6.66)
 
   (return 0))
+
+(export main)

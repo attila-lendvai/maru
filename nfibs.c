@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int fibs(long n)
+int fibs(int n)
 {
   return (n < 2) ? 1 : (fibs(n - 1) + fibs(n - 2) + 1);
 }

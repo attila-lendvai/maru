@@ -244,3 +244,5 @@
   (info)
   (return (cast 0 int))
   )
+
+(export main)

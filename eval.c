@@ -1,7 +1,7 @@
 // last edited: 2012-10-05 09:11:14 by piumarta on emilia.local
 
 #define _ISOC99_SOURCE 1
-#define _BSD_SOURCE 1
+#define _DEFAULT_SOURCE 1
 
 #include <stddef.h>
 #include <stdio.h>

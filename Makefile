@@ -4,7 +4,7 @@ NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -Wno-comment -g $(OFLAGS)
+CFLAGS = -Wall -Wno-comment -g -Wl,-z,execstack $(OFLAGS)
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
@@ -35,13 +35,17 @@ run : all
 status : .force
 	@echo "SYS is $(SYS)"
 
-eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval1 eval.c $(LIBS)
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
+
+eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
+
+eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
 
 check-maru : eval2
 	./eval2 ir-gen-c.k maru.k maru-nfibs.k
@@ -54,19 +58,18 @@ check-marux : eval2
 	./eval2 ir-gen-x86.k maru.k maru-test.k
 
 test-maru : eval2
-	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
-	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && cc -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k	> test.c && $(CC32) -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-test.k	> test.c && $(CC32) -fno-builtin -g -o test test.c -ldl && ./test 32
+	./eval2 ir-gen-c.k maru.k maru-gc.k	> test.c && $(CC32) -fno-builtin -g -o test test.c -ldl && ./test 32
 
-test2-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test2.k > test.s && cc -fno-builtin -g -o test2 test2.c test.s && ./test2 15
-
-test3-maru : eval2
-	./eval2 ir-gen-x86.k maru.k maru-test3.k > test.s && cc -m32 -fno-builtin -g -o test3 test.s && ./test3
+test-marux : eval2
+	./eval2 ir-gen-x86.k maru.k maru-nfibs.k	> test.s && $(CC32) -fno-builtin -g -o test test.s && ./test 32
+	./eval2 ir-gen-x86.k maru.k maru-test.k		> test.s && $(CC32) -fno-builtin -g -o test test.s && ./test 32
+	./eval2 ir-gen-x86.k maru.k maru-gc.k		> test.s && $(CC32) -fno-builtin -g -o test test.s && ./test 32
 
 maru-check : eval2 .force
 	./eval2 -g ir-gen-x86.k maru.k maru-check.k > maru-check.s
-	cc -m32 -o maru-check maru-check.s
+	$(CC32) -o maru-check maru-check.s
 	./maru-check
 
 maru-check-c : eval2 .force
@@ -87,27 +90,20 @@ maru-label-c : eval2 .force
 NFIBS=40
 
 maru-bench : eval2 .force
-##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
-	cc -O2 -fomit-frame-pointer -o nfibs nfibs.c
+##	$(CC32) -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
+	$(CC32) -O2 -fomit-frame-pointer -o nfibs nfibs.c
 	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
-##	cc -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
-	cc -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
+##	$(CC32) -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
+	$(CC32) -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
+#	./eval2 ir-gen-c.k maru.k maru-nfibs.k > maru-nfibs.c
+#	$(CC32) -O2 -fomit-frame-pointer -ldl -o maru-nfibs maru-nfibs.c
 	time ./nfibs $(NFIBS)
 	time ./nfibs $(NFIBS)
 	time ./maru-nfibs $(NFIBS)
 	time ./maru-nfibs $(NFIBS)
-
-eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
-	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
-
-eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
-	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c $(LIBS) -lgc
-	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
 debug : .force
 	$(MAKE) OFLAGS="-O0"
