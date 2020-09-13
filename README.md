@@ -138,6 +138,7 @@ force a normal bootstrap process building the previous stage(s).
 
 ### Build instructions
 
+#### Linux
 From the default branch invoke `make test-bootstrap[-llvm,-x86]`.
 
 You will of course need:
@@ -151,6 +152,22 @@ running 32 bit C code. On Debian based x86_64 systems:
 ```
 sudo apt-get install gcc-multilib
 ```
+
+#### MacOS
+
+1. Make sure XCode is installed. In a Terminal:
+
+```
+xcode-select --install
+```
+
+2. [Install Homebrew](https://brew.sh/)
+
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+```
+
+3. `brew install llvm`
 
 Patches are welcome for dealing with other platforms, including the extension of this readme.
 The LLVM backend should work even on untested targets, but I only test it on Linux for now.
@@ -223,7 +240,7 @@ Assorted TODO:
 - compile to, and bootstrap on the bare metal of some interesting target (C64? an ARM board?)
 - rewrite the build process in Maru; eliminate dependency on GNU Make
 
-### History
+### History and perspective
 
 #### Around 2010-2013
 Maru was developed as part of Alan Kay's *Fundamentals of New Computing* project,
@@ -258,9 +275,17 @@ the minimal/historical version of Maru that can already self-host. I started out
 my work from this minimal repo (hence the divergence between the `piumarta` and
 the `maru.x` branches in this repo).
 
-#### Other repos
+#### Other instances
 
 There are a few different copies/versions of Maru online. Here are the ones
 that I know about and contain non-trivial work:
 
 - [github.com/melvinzhang/maru](https://github.com/melvinzhang/maru)
+
+#### Related projects
+
+A list of projects that I think is worth mentioning in this context:
+
+- [Project Oberon](http://www.projectoberon.com/): a project which encompasses CPU,
+language, operating system and user interface, and which can be run on a relatively
+inexpensive FPGA board, and simple enough for one person to understand it all.

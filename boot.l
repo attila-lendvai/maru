@@ -1378,6 +1378,7 @@
 
 (define-function load (name)
   (let ((exps (find-and-read name)))
+    ;; TODO FIXME this has a different expand/eval order than the rest of the codebase
     (or exps (error "file not found or empty: "name))
     (list-do expr exps (eval expr))))
 

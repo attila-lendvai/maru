@@ -161,6 +161,7 @@
         (k/array-append bindings var)
         var))))
 
+;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-subr -
   (or (is/pair -args-) (k/error "operator '-' called with zero arguments"))
   (let ((result	(get/long (get/head -args-)))
