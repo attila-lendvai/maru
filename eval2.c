@@ -1,9 +1,25 @@
 // last edited: 2013-03-08 23:27:55 by piumarta on emilia.local
 
+/*
+ peculiarities of this version of eval.c compared to the others:
+   - Maru long is the C long
+   - long is boxed
+   - env is an alist
+   - no profiling and sigvtalrm
+   - commented out:
+       symbol-compare
+       insert-array-at
+       data
+       data-length
+       subr
+       subr-name
+       eallocate-atomic
+ */
+
 #define DEMO_BITS	1
 
 #define _ISOC99_SOURCE	1
-#define _BSD_SOURCE	1
+#define _DEFAULT_SOURCE	1
 
 #include <stdio.h>
 #include <locale.h>
@@ -2325,7 +2341,7 @@ static subr(format)
     oop     oarg= cadr(args);
     wchar_t *fmt= get(ofmt, String,bits);
     int     farg= 0;
-    union { long l;  void *p;	double d; } arg;
+    union { long l;  void *p;	double d; } arg = {0};
     switch (getType(oarg)) {
 	case Undefined:					  break;
 	case Long:	arg.l= getLong(oarg);		  break;

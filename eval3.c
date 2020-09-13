@@ -1,9 +1,25 @@
 // last edited: 2013-08-20 03:13:50 by piumarta on emilia
 
+/*
+ peculiarities of this version of eval.c compared to the others:
+   - Maru long is: typedef int64_t long_t;
+   - long is boxed
+   - env is an alist
+   - no profiling and sigvtalrm
+   - has ffcall
+       symbol-compare
+       insert-array-at
+       data
+       data-length
+       subr
+       subr-name
+       allocate-atomic
+ */
+
 #define DEMO_BITS	1
 
 #define _ISOC99_SOURCE	1
-#define _BSD_SOURCE	1
+#define _DEFAULT_SOURCE	1
 
 #include <stdio.h>
 #include <locale.h>
@@ -12,6 +28,7 @@
 #include <math.h>
 #include <signal.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 // #include <stddef.h>
 // #include <string.h>
@@ -89,7 +106,7 @@ enum {
 
 typedef int64_t long_t;
 
-#define LD	"lld"
+#define LD	PRId64
 
 struct Data	{ };
 struct Long	{ long_t    bits; };
@@ -2326,7 +2343,7 @@ static subr(format)
     oop     oarg= cadr(args);
     wchar_t *fmt= get(ofmt, String,bits);
     int     farg= 0;
-    union { long_t l;  void *p;	double d; } arg;
+    union { long_t l;  void *p;	double d; } arg = {0};
     switch (getType(oarg)) {
 	case Undefined:					  break;
 	case Long:	arg.l= getLong(oarg);		  break;

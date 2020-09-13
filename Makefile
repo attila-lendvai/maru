@@ -1,4 +1,4 @@
-EVAL = eval3
+EVAL = eval
 
 NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
@@ -35,8 +35,8 @@ run : all
 status : .force
 	@echo "SYS is $(SYS)"
 
-eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
-	$(CC) -g $(CFLAGS) -o eval1 eval.c $(LIBS)
+eval : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+	$(CC) -g $(CFLAGS) -o eval eval.c $(LIBS)
 
 eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval2 eval2.c $(LIBS)
@@ -44,7 +44,7 @@ eval2 : eval2.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 eval3 : eval3.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC) -g $(CFLAGS) -o eval3 eval3.c $(LIBS)
 
-eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+eval32 : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
 	$(CC32) -g $(CFLAGS) -o eval32 eval.c $(LIBS)
 
 check-maru : eval2
@@ -128,11 +128,16 @@ cg : eval .force
 	ld  --build-id --eh-frame-hdr -m elf_i386 --hash-style=both -dynamic-linker /lib/ld-linux.so.2 -o test /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crt1.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crti.o /usr/lib/gcc/i486-linux-gnu/4.4.5/crtbegin.o -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5 -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib -L/lib/../lib -L/usr/lib/../lib -L/usr/lib/gcc/i486-linux-gnu/4.4.5/../../.. a.out -lgcc --as-needed -lgcc_s --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed /usr/lib/gcc/i486-linux-gnu/4.4.5/crtend.o /usr/lib/gcc/i486-linux-gnu/4.4.5/../../../../lib/crtn.o
 	./test
 
-test : emit.l eval.l eval1
-	$(TIME) ./eval1 -O emit.l eval.l > test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o
+test-bootstrap : test test2
+
+test : emit.l eval.l eval
+	$(TIME) ./eval -O emit.l eval.l > test.s
+	$(CC32) -c -o test.o test.s
+	size test.o
+	$(CC32) -o test test.o
 
 time : .force
-	$(TIME) ./eval1 -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
+	$(TIME) ./eval -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
 test2 : test .force
 	$(TIME) ./test -O boot.l emit.l eval.l > test2.s
@@ -141,14 +146,12 @@ test2 : test .force
 time2 : .force
 	$(TIME) ./test boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
 
-test-eval : test .force
-	$(TIME) ./test test-eval.l
-
-test-boot : test .force
-	$(TIME) ./test boot-emit.l
-
 test-emit : eval .force
-	./emit.l test-emit.l | tee test.s && $(CC32) -c -o test.o test.s && size test.o && $(CC32) -o test test.o && ./test
+	./eval emit.l test-emit.l >test.s
+	$(CC32) -c -o test.o test.s
+	size test.o
+	$(CC32) -o test test.o
+	./test
 
 peg.l : eval parser.l peg-compile.l peg-boot.l peg.g
 	-rm peg.l.new
@@ -286,7 +289,7 @@ stats : .force
 
 clean : .force
 	rm -f irl.g.l irgol.g.l osdefs.k test.c tpeg.l a.out
-	rm -f *~ *.o main eval eval32 eval2 gceval test *.s mkosdefs *.exe *.$(SO)
+	rm -f *~ *.o main eval eval32 eval2 eval3 gceval test *.s mkosdefs *.exe *.$(SO)
 	rm -f test-main test-pegen
 	rm -rf *.dSYM *.mshark
 	rm -rf osdefs.g.l *.osdefs.k
