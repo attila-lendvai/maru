@@ -89,18 +89,19 @@ maru-label-c : eval2 .force
 
 NFIBS=40
 
+# TODO FIXME ir-gen-x86.k miscompiles maru-nfibx.k.
+# it runs, but it returns the wrong answer. maybe due to overwriting a temp on the stack?
 maru-bench : eval2 .force
 ##	$(CC32) -O2 -fomit-frame-pointer -mdynamic-no-pic -o nfibs nfibs.c
 	$(CC32) -O2 -fomit-frame-pointer -o nfibs nfibs.c
 	./eval2 ir-gen-x86.k maru.k maru-nfibs.k > maru-nfibs.s
 ##	$(CC32) -O2 -fomit-frame-pointer -mdynamic-no-pic -o maru-nfibs maru-nfibs.s
-	$(CC32) -O2 -fomit-frame-pointer -o maru-nfibs maru-nfibs.s
-#	./eval2 ir-gen-c.k maru.k maru-nfibs.k > maru-nfibs.c
-#	$(CC32) -O2 -fomit-frame-pointer -ldl -o maru-nfibs maru-nfibs.c
+	$(CC32) -O2 -fomit-frame-pointer -o maru-nfibs-x86 maru-nfibs.s
+	./eval2 ir-gen-c.k maru.k maru-nfibs.k > maru-nfibs.c
+	$(CC32) -O2 -fomit-frame-pointer -ldl -o maru-nfibs-c maru-nfibs.c
 	time ./nfibs $(NFIBS)
-	time ./nfibs $(NFIBS)
-	time ./maru-nfibs $(NFIBS)
-	time ./maru-nfibs $(NFIBS)
+	time ./maru-nfibs-c $(NFIBS)
+	time ./maru-nfibs-x86 $(NFIBS)
 
 gceval : eval.c libgc.c buffer.c chartab.h wcs.c
 	$(CC) -g $(CFLAGS) -DLIB_GC=1 -o gceval eval.c $(LIBS) -lgc

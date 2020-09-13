@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 {
     while (--argc) {
 	int arg= atoi(*++argv);
-	printf("nfibs(%d) = %d\n", arg, fibs(arg));
+	printf("C: nfibs(%d) = %d\n", arg, fibs(arg));
     }
     return 0;
 }

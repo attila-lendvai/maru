@@ -7,7 +7,7 @@
 (define-function main int ((argc int) (argv char * *))
   (for (i 1 argc)
     (let ((count (atoi (indir argv i))))
-      (printf "nfibs(%d) = %d\n" count (fibs count))))
+      (printf "Maru: nfibs(%d) = %d\n" count (fibs count))))
   (return 0))
 
 (export main)
