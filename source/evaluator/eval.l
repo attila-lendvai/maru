@@ -17,19 +17,7 @@
 ;(define-form debug/identities	prog		`(let () ,@prog))
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
-;; This variable controls the amount of safety features compiled
-;; into the runtime, at the cost of execution speed.
-;; 1: checks that are cheap
-;; 2: consider their costs...
-;; 3: catch my bug!
-;; 4: run a gc before every allocation
-(define-constant safety-level 1)
-
-(define-form safety (level . prog)
-  (when (<= level safety-level)
-    `(let () ,@prog)))
-
-(define-constant feature/backtrace		(or true (< 0 safety-level)))
+(define-constant feature/backtrace		(or true (< 0 *safety*)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -129,7 +117,7 @@
   `(libc/memmove ,to ,from ,count))
 
 ;; the header of heap objects
-(eval `(define-record <header> () (,@(when (<= 3 safety-level) '(canary)) size flags next type)))
+(eval `(define-record <header> () (,@(when (<= 3 *safety*) '(canary)) size flags next type)))
 
 (define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
 
@@ -351,16 +339,16 @@
 (define-form is/long		(obj)		`(is <long> ,obj))
 (define-form is/pair		(obj)		`(is <pair> ,obj))
 (if (immediate-type? <long>)
-    (define-form get/long	(obj)		(if (< safety-level 2)
+    (define-form get/long	(obj)		(if (< *safety* 2)
                                                     `(bitwise-asr ,obj ,(<immediate-type>-tag-width <long>))
                                                   `(let ((__obj__ ,obj))
                                                      (k/assert (is/long __obj__))
                                                      (bitwise-asr __obj__ ,(<immediate-type>-tag-width <long>)))))
-    (define-form get/long	(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
-(define-form get/head		(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
-(define-form put/head		(obj val)	(if (< safety-level 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
-(define-form get/tail		(obj)		(if (< safety-level 2)		`(oop-at ,obj ,(record-slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
-(define-form put/tail		(obj val)	(if (< safety-level 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
+    (define-form get/long	(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
+(define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
+(define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
+(define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
+(define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
 
 ;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
 (define-form get/tvmptr		(obj)		`(get (<target-vm-pointer> _bits) ,obj))

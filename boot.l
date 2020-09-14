@@ -18,6 +18,15 @@
           (warn "; we're evolving"))
       (warn "\n")))
 
+;; This variable is controls the amount of safety features. It's mostly queried at expand time,
+;; and its value at bootstrapping also controls the amount of checks compiled into the eval executable.
+;; See also the (define-form safety ...).
+;; 1: add some checks that are cheap
+;; 2: non-trivial runtime costs
+;; 3: catch my bug no matter what!
+;; 4: run a gc before every allocation
+(define *safety* 1)
+
 (define unit-testing? '(t))
 
 (define list (lambda args args))
@@ -208,6 +217,10 @@
 
 (define-form verbosity (level . body)
   `(and (>= *verbosity* ,level) (let () ,@body)))
+
+(define-form safety (level . prog)
+  (when (<= level *safety*)
+    `(let () ,@prog)))
 
 ;;; configuration
 
