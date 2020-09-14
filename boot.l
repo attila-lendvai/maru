@@ -549,20 +549,16 @@
   (define-function allocate-type-id ()
     (incr %last-type-id)))
 
-(define *force-trivial-accessors* '()) ; expand to only a single oop-at, which is understood by the compiler
-
-(define-function %make-accessor (type-id type-name slot-names offset typecheck?)
-  (let ((slot-name (car slot-names)))
-    `(define-form ,(concat-symbol type-name (concat-symbol '- slot-name)) (obj)
-       (if (and ',typecheck?
-                (not *force-trivial-accessors*))
-           (list 'slot-value ',type-id '',slot-name obj ,offset)
-         (list 'oop-at obj ,offset)))))
-
-(define-function %make-accessors (type-id type-name slot-names offset typecheck?)
+(define-function %make-accessor-forms (type-id type-name slot-names slot-index disable-typecheck)
   (when slot-names
-    (cons (%make-accessor  type-id type-name slot-names offset typecheck?)
-          (%make-accessors type-id type-name (cdr slot-names) (+ 1 offset) typecheck?))))
+    (cons (let ((slot-name (car slot-names))
+                (accessor-name (concat-symbol type-name (concat-symbol '- slot-name))))
+            (if disable-typecheck
+                `(define-form ,accessor-name (obj)
+                   (list 'oop-at obj ,slot-index))
+              `(define-form ,accessor-name (obj)
+                 (list '%slot-value-form ',type-id ',slot-name obj ,slot-index))))
+          (%make-accessor-forms type-id type-name (cdr slot-names) (+ 1 slot-index) disable-typecheck))))
 
 (define <type>)
 (define <record>)
@@ -581,8 +577,8 @@
 
 ;; define temporary, non-typechecking accessors for <type> and <record>
 (eval `(let ()
-         ,@(%make-accessors type-id-of-<type>	'<type>		slots-of-<type>		0				())
-         ,@(%make-accessors type-id-of-<record>	'<record>	slots-of-<record>	(list-length slots-of-<type>)	())))
+         ,@(%make-accessor-forms type-id-of-<type>	'<type>		slots-of-<type>		0				true)
+         ,@(%make-accessor-forms type-id-of-<record>	'<record>	slots-of-<record>	(list-length slots-of-<type>)	true)))
 
 (assert <type>-name)
 
@@ -699,11 +695,19 @@
         ;; (warn "about to process an %accessor-typecheck failure, which may fail to properly print the error output\nslot name is "slot-name", expected-type-id is "expected-type-id", object's actual type id is "(type-id-of object)"\n")
         (error "type check failed for record slot accessor: expected type "expected-type", slot name "slot-name", got " actual-type)))))
 
-(define-function slot-value (expected-type-id slot-name object slot-index)
+;; this is a "choke-point" that we can override while loading and expanding
+;; the level-shifted code. see compile-begin for more details.
+(define-form %slot-value-form (expected-type-id slot-name object slot-index)
+  (if (and (< *optimised* 1)
+           (< 0 *safety*))
+      `(%slot-value-fn ,expected-type-id ',slot-name ,object ,slot-index)
+    `(oop-at ,object ,slot-index)))
+
+(define-function %slot-value-fn (expected-type-id slot-name object slot-index)
   (%accessor-typecheck expected-type-id slot-name object)
   (oop-at object slot-index))
 
-(define-function set-slot-value (expected-type-id slot-name object slot-index value)
+(define-function set-%slot-value-fn (expected-type-id slot-name object slot-index value)
   (%accessor-typecheck expected-type-id slot-name object)
   (set-oop-at object slot-index value))
 
@@ -744,13 +748,13 @@
 
 (define-function %make-record-accessors (type)
   (assert (subtype? (type-of type) <record>) "%make-record-accessors called with a non-record type " type)
-  (%make-accessors (<type>-id type)
-                   (<type>-name type)
-                   (<record>-direct-slots type)
-                   (or (and (<record>-super type)
-                            (record/effective-slot-count (<record>-super type)))
-                       0)
-                   (= 0 *optimised*)))
+  (%make-accessor-forms (<type>-id type)
+                        (<type>-name type)
+                        (<record>-direct-slots type)
+                        (or (and (<record>-super type)
+                                 (record/effective-slot-count (<record>-super type)))
+                            0)
+                        ()))
 
 ;; redefine the preliminary bootstrap accessors with full featured ones
 (eval `(let ()
@@ -916,15 +920,13 @@
 
 ;;; field accesors
 
-(define-function make-instance-accessors (var-name type-id slots i)
+(define-function make-instance-accessors (var-name type-id slots slot-index)
   (when (pair? slots)
     (cons `(,(concat-symbols var-name '. (car slots))
              ()
-             ((slot-name)
-              (if *force-trivial-accessors*
-                  (list 'oop-at ',var-name ,i)
-                (list 'slot-value ',type-id (list 'quote slot-name) ',var-name ,i))))
-          (make-instance-accessors var-name type-id (cdr slots) (+ i 1)))))
+             ((_)
+              `(%slot-value-form ,type-id ,(car slots) ,var-name ,slot-index)))
+          (make-instance-accessors var-name type-id (cdr slots) (+ slot-index 1)))))
 
 (define-form with-instance-accessors (var-name type . body)
   (let ((type-object (eval type)))

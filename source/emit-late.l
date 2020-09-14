@@ -6,11 +6,13 @@
 (switch-to-slave-module)
 
 (define-form compile-begin ()
-  (set *force-trivial-accessors* true)
-  `(set *globals* (eval-in-module host `(host:environment ,*globals*))))
+  (set *globals* (eval-in-module host `(host:environment ,*globals*)))
+  ;; override the slot-accessor choke-point with a form that expands to a simple oop-at that the compiler can deal with
+  (define-form %slot-value-form (expected-type-id slot-name object slot-index)
+    (list 'oop-at object slot-index))
+  ())
 
 (define-form compile-end ()
-  (set *force-trivial-accessors* ())
   '(let ((env *globals*))
      (set *globals* (eval-in-module host `(host:<env>-parent ,env)))
      (eval-in-module host `(host:compile-env (host:quote ,env)))))
