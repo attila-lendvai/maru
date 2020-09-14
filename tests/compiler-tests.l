@@ -218,27 +218,31 @@
   42)
 
 (define-test compile/bitwise-and/1
-    (& 0xef 0xf0)
+    (bitwise-and 0xef 0xf0)
   0xe0)
 
 (define-test compile/bitwise-or/1
-    (| 0xe0 0x0f)
+    (bitwise-or 0xe0 0x0f)
   0xef)
 
 (define-test compile/bitwise-xor/1
-    (^ 0xff 0xf0)
+    (bitwise-xor 0xff 0xf0)
   0x0f)
 
+(define-test compile/bitwise-not/1
+    (bitwise-not -1)
+  0)
+
 (define-test compile/bitwise-shift-left/1
-    (<< 0x0f 4)
+    (bitwise-asl 0x0f 4)
   0xf0)
 
 (define-test compile/bitwise-shift-right/1
-    (>> 0x0f 2)
+    (bitwise-asr 0x0f 2)
   0x3)
 
 (define-test compile/bitwise-shift-right/2
-    (>> -8 1)
+    (bitwise-asr -8 1)
   -4)
 
 (define-test compile/string-at/1
@@ -257,8 +261,8 @@
 ;; NOTE a 32 bit eval cannot read 64 bit numbers, so we need to >> everything by 32 bits there
 ;; NOTE shifting right is signed
 (define-test compile/oop-at/1
-    (>> (oop-at "0123456789abcdefghijklmnopqrst" 0)
-        (- target/word-size-in-bits 32))
+    (bitwise-asr (oop-at "0123456789abcdefghijklmnopqrst" 0)
+                 (- target/word-size-in-bits 32))
   (cond
     ((= 32 target/word-size-in-bits)
      (if target/little-endian? 0x33323130 0x30313233))
@@ -269,8 +273,8 @@
      (if target/little-endian? 0x37363534 0x3031323))))
 
 (define-test compile/oop-at/2
-    (>> (oop-at "0z0000x01z1111x12z2222x23z3333x3" 1)
-        (- target/word-size-in-bits 32))
+    (bitwise-asr (oop-at "0z0000x01z1111x12z2222x23z3333x3" 1)
+                 (- target/word-size-in-bits 32))
   (cond
     ((= 32 target/word-size-in-bits)
      (if target/little-endian? 0x30783030 0x30307830))
