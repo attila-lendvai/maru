@@ -206,6 +206,9 @@
           (if a (cdr a) exp))
       exp)))
 
+(define-form verbosity (level . body)
+  `(and (>= *verbosity* ,level) (let () ,@body)))
+
 ;;; configuration
 
 ;; TODO rework config so that the name slot only gets added when true
@@ -643,7 +646,7 @@
 (assert (= (type-object-for-id (<type>-id <type>)) <type>))
 (assert (= (type-object-for-id (<type>-id <record>)) <record>))
 
-(when (< 0 *verbosity*)
+(verbosity 1
   (warn "<type> is bootstrapped: "	<type>		", id: "	(<type>-id <type>)"\n")
   (warn "<record> is bootstrapped: "	<record>	", id: "	(<type>-id <record>)"\n"))
 
@@ -741,7 +744,7 @@
          ,@(%make-record-accessors <type>)
          ,@(%make-record-accessors <record>)))
 
-(when (< 0 *verbosity*) (warn "type bootstrap finished\n"))
+(verbosity 1 (warn "type bootstrap finished\n"))
 
 ;;; at this point the type registry is bootstrapped, containing two types: <type> and <record>
 
