@@ -381,6 +381,11 @@
     (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
     (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
+(define-subr (allocate-data 1)
+  (let ((size (get/head -args-)))
+    (safety 1 (k/assert (is/long size) "allocate-data: invalid size "size))
+    (gc/allocate-opaque <data> (get/long size))))
+
 (define-subr (type-of 1) (new-<long> (get/type (get/head -args-))))
 (define-subr (string? 1) (and (is <string> (get/head -args-)) symbol/true))
 (define-subr (symbol? 1) (and (is <symbol> (get/head -args-)) symbol/true))
