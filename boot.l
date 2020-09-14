@@ -226,6 +226,7 @@
 
 ;; TODO rework config so that the name slot only gets added when true
 (define-constant feature/track-expr-names	true)
+(define-constant feature/typecheck-slot-access	(if (and (< *optimised* 1) (< 0 *safety*)) true)) ; bootstrap? artifact, drop in the next stage
 
 ;;; let*
 
@@ -557,7 +558,7 @@
                 `(define-form ,accessor-name (obj)
                    (list 'oop-at obj ,slot-index))
               `(define-form ,accessor-name (obj)
-                 (list '%slot-value-form ',type-id ',slot-name obj ,slot-index))))
+                 (list '%slot-value ',type-id ',slot-name obj ,slot-index))))
           (%make-accessor-forms type-id type-name (cdr slot-names) (+ 1 slot-index) disable-typecheck))))
 
 (define <type>)
@@ -693,23 +694,17 @@
           (actual-type (type-of object)))
       (unless (subtype? actual-type expected-type)
         ;; (warn "about to process an %accessor-typecheck failure, which may fail to properly print the error output\nslot name is "slot-name", expected-type-id is "expected-type-id", object's actual type id is "(type-id-of object)"\n")
-        (error "type check failed for record slot accessor: expected type "expected-type", slot name "slot-name", got " actual-type)))))
+        (error "type check failed for record slot accessor: expected type "expected-type", slot name "slot-name", got " actual-type))))
+  object)
 
 ;; this is a "choke-point" that we can override while loading and expanding
 ;; the level-shifted code. see compile-begin for more details.
-(define-form %slot-value-form (expected-type-id slot-name object slot-index)
-  (if (and (< *optimised* 1)
-           (< 0 *safety*))
-      `(%slot-value-fn ,expected-type-id ',slot-name ,object ,slot-index)
-    `(oop-at ,object ,slot-index)))
-
-(define-function %slot-value-fn (expected-type-id slot-name object slot-index)
-  (%accessor-typecheck expected-type-id slot-name object)
-  (oop-at object slot-index))
-
-(define-function set-%slot-value-fn (expected-type-id slot-name object slot-index value)
-  (%accessor-typecheck expected-type-id slot-name object)
-  (set-oop-at object slot-index value))
+(define-form %slot-value (expected-type-id slot-name object slot-index)
+  `(oop-at
+    ,(if feature/typecheck-slot-access
+         `(%accessor-typecheck ,expected-type-id ',slot-name ,object)
+       object)
+    ,slot-index))
 
 (define-function sanity-check-record-slots (record slots)
   (let ((f slots))
@@ -925,7 +920,7 @@
     (cons `(,(concat-symbols var-name '. (car slots))
              ()
              ((_)
-              `(%slot-value-form ,type-id ,(car slots) ,var-name ,slot-index)))
+              `(%slot-value ,type-id ,(car slots) ,var-name ,slot-index)))
           (make-instance-accessors var-name type-id (cdr slots) (+ slot-index 1)))))
 
 (define-form with-instance-accessors (var-name type . body)

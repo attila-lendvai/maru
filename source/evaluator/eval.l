@@ -161,6 +161,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (compile-begin)
 
+;; override the slot-accessor choke-point. any accessor expanded after this point
+;; will expand to a simple oop-at form that the compiler can directly deal with.
+(define-form %slot-value (expected-type-id slot-name object slot-index)
+  (list 'oop-at
+        ;; TODO to enable some type-checking, we need to somehow differentiate here between
+        ;; the object level (simple define-function's that are meant to be level-shifted),
+        ;; and the meta level (e.g. define-forms and other meta-level code that runs
+        ;; while expanding the object-level stuff), because they need different typecheck forms.
+        ;; this publication may be relevant for the solution:
+        ;; Submodules in Racket https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf
+        (if (and false feature/typecheck-slot-access)
+            `(k/%accessor-typecheck ,expected-type-id ,object)
+          object)
+        slot-index))
+
 ;;;
 ;;; some forward definitions to relax the error handler
 ;;; ----------------------------------------------------------------
@@ -304,10 +319,11 @@
 (define-form is (type ptr)
   `(= ,type (get/type ,ptr)))
 
-(define-function %type-check (obj exp-type)
-  (let ((act-type (get/type obj)))
-    (or (= exp-type act-type)
-        (fatal2 "kernel get/put type error: expected type id %ld, got %ld" exp-type act-type))))
+(define-function k/%accessor-typecheck (expected-type-id object)
+  (let ((type (get/type object)))
+    (or (= type expected-type-id)
+        (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
+  (return object))
 
 ;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
 (define-form get (designator object)
@@ -315,22 +331,25 @@
         (slot		(second designator))
         (type		(eval type-name)))
     (assert (not (cddr designator)) "malformed get designator: "designator)
-    `(let ((__obj__ ,object))
-       (safety 2 (%type-check __obj__ ,type-name))
-       ;; we could use the accessors, too:
-       ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
-       (oop-at __obj__ ,(record-slot-index type slot)))))
+    ;; we could use the accessors, too:
+    ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
+    `(oop-at ,(if feature/typecheck-slot-access
+                  `(k/%accessor-typecheck ,type-name ,object)
+                object)
+             ,(record-slot-index type slot))))
 
 (define-form put (designator object value)
   (let* ((type-name	(first designator))
          (slot		(second designator))
          (type		(eval type-name)))
     (assert (not (cddr designator)) "malformed put designator: "designator)
-    `(let ((__obj__ ,object))
-       (safety 2 (%type-check __obj__ ,type-name))
-       ;; we could use the accessors, too:
-       ;; (set (,(concat-symbol (concat-symbol type-name '-) slot) __obj__) ,value)
-       (set (oop-at __obj__ ,(record-slot-index type slot)) ,value))))
+    ;; we could use the accessors, too:
+    ;; (set (,(concat-symbol (concat-symbol type-name '-) slot) __obj__) ,value)
+    `(set (oop-at ,(if feature/typecheck-slot-access
+                       `(k/%accessor-typecheck ,type-name ,object)
+                     object)
+                  ,(record-slot-index type slot))
+          ,value)))
 
 ;; shorthands (and optimizations)
 (define-form get/globals	()		`(get (<variable> value) (get (<module> globals) *module*)))

@@ -7,9 +7,6 @@
 
 (define-form compile-begin ()
   (set *globals* (eval-in-module host `(host:environment ,*globals*)))
-  ;; override the slot-accessor choke-point with a form that expands to a simple oop-at that the compiler can deal with
-  (define-form %slot-value-form (expected-type-id slot-name object slot-index)
-    (list 'oop-at object slot-index))
   ())
 
 (define-form compile-end ()
