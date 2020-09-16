@@ -120,8 +120,11 @@
 
 (define-function peg-make-definition (type rule)
   `(define-method ,(concat-symbol '$ (car rule)) ,type ()
-     (let ,(peg-find-variables (cadr rule) ())
-       ,(expand (cadr rule)))))
+     (let ,(peg-find-variables (second rule) ())
+       ,(let ((env (environment *globals*)))
+          ;; override slot-value so that its expansion is delayed until the compiled parser is loaded
+          (environment-define env 'slot-value (fixed (form (lambda (env . expr) `(slot-value ,@expr)))))
+          (expand (second rule) env)))))
 
 (define-function peg-compile-grammar (grammar)
   (let ((class (list 'define-class (<grammar>-name grammar) (<grammar>-base grammar) (<grammar>-fields grammar)))
