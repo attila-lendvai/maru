@@ -132,18 +132,6 @@
 
 (define *subr-registry* ()) ; define-subr collects them here at compile time
 
-;; TODO get rid of this by representing the metadata of strucure fields as full objects that hold the offset
-(define-function record-slot-index (type slot-name)
-  (let ((i 0)
-        (list (<record>-effective-slots type)))
-    (while (and (pair? list)
-                (not (= slot-name (car list))))
-      (set list (cdr list))
-      (set i (+ i 1)))
-    (or (and (pair? list)
-             i)
-        (error "record-slot-index has failed for type "type", slot-name "slot-name))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Actual artifacts that are meant to be level-shifted into the target
@@ -153,18 +141,20 @@
 
 ;; override the slot-accessor choke-point. any accessor expanded after this point
 ;; will expand to a simple oop-at form that the compiler can directly deal with.
-(define-form %slot-value (expected-type-id slot-name object slot-index)
-  (list 'oop-at
-        ;; TODO to enable some type-checking, we need to somehow differentiate here between
-        ;; the object level (simple define-function's that are meant to be level-shifted),
-        ;; and the meta level (e.g. define-forms and other meta-level code that runs
-        ;; while expanding the object-level stuff), because they need different typecheck forms.
-        ;; this publication may be relevant for the solution:
-        ;; Submodules in Racket https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf
-        (if (and false feature/typecheck-slot-access)
-            `(k/%accessor-typecheck ,expected-type-id ,object)
-          object)
-        slot-index))
+(define-form slot-value (type-name slot-name object)
+  (let* ((type (eval type-name))
+         (slot-index (record/slot-index type slot-name)))
+    (list 'oop-at
+          ;; TODO to enable some type-checking, we need to somehow differentiate here between
+          ;; the object level (simple define-function's that are meant to be level-shifted),
+          ;; and the meta level (e.g. define-forms and other meta-level code that runs
+          ;; while expanding the object-level stuff), because they need different typecheck forms.
+          ;; this publication may be relevant for the solution:
+          ;; Submodules in Racket https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf
+          (if (and false feature/typecheck-slot-access)
+              `(k/%accessor-typecheck ,(<type>-id type) ,object)
+            object)
+          slot-index)))
 
 ;;;
 ;;; some forward definitions to relax the error handler
@@ -327,7 +317,7 @@
     `(oop-at ,(if feature/typecheck-slot-access
                   `(k/%accessor-typecheck ,type-name ,object)
                 object)
-             ,(record-slot-index type slot))))
+             ,(record/slot-index type slot))))
 
 (define-form put (designator object value)
   (let* ((type-name	(first designator))
@@ -339,7 +329,7 @@
     `(set (oop-at ,(if feature/typecheck-slot-access
                        `(k/%accessor-typecheck ,type-name ,object)
                      object)
-                  ,(record-slot-index type slot))
+                  ,(record/slot-index type slot))
           ,value)))
 
 ;; shorthands (and optimizations)
@@ -354,11 +344,11 @@
                                                   `(let ((__obj__ ,obj))
                                                      (k/assert (is/long __obj__))
                                                      (bitwise-asr __obj__ ,(<immediate-type>-tag-width <long>)))))
-    (define-form get/long	(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
-(define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
-(define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
-(define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record-slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
-(define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record-slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
+    (define-form get/long	(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
+(define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
+(define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
+(define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
+(define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
 
 ;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
 (define-form get/tvmptr		(obj)		`(get (<target-vm-pointer> _bits) ,obj))
