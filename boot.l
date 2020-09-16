@@ -40,7 +40,7 @@
   (lambda args
     (set error abort) ; let's give up in case of more recursive errors
     (primitive/print "\nNESTED ERROR LEVEL 2: ")
-    (apply primitive/print args)
+    (apply primitive/dump args)
     (primitive/print "\n")
     (abort)))
 
