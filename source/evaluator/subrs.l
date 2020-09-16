@@ -425,6 +425,12 @@
     (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (set-oop-at obj (get/long idx) val)))
 
+(define-subr (address-of 1)
+  ;; TODO what about when <long> is a tagged immediate and the address is truncated?
+  ;; or return a target-vm-pointer here and define pointer arithmetics?
+  ;; or implement various boxed data types and return a word-sized integer here?
+  (new-<long> (get/head -args-)))
+
 (define-subr (copy-bytes 3)
   (let ((from	(get/head -args-))
         (to	(get/head (get/tail -args-)))
