@@ -47,11 +47,16 @@ TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
-# use this eval to execute any tests or code generation from the makefile.
+# use this eval to execute any tests from the makefile.
 # in order of speed, as of this writing.
 #TEST_EVAL	= build/llvm/i686-pc-linux-gnu/eval2
 TEST_EVAL	= $(BUILD_llvm)/eval2
 #TEST_EVAL	= $(BUILD_x86)/eval2
+
+GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval2
+define maybe-build-gen-eval
+  test -e $(GEN_EVAL) || $(MAKE) TARGET_CPU=i686 $(GEN_EVAL)
+endef
 
 ##
 ## internal variables
@@ -250,8 +255,8 @@ endef
 ### PEG parser
 ###
 $(BUILD)/peg.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compile.l
-	$(call ensure-built,$(TEST_EVAL))
-	$(TIME) $(TEST_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
+	$(call maybe-build-gen-eval)
+	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
@@ -263,8 +268,8 @@ source/parsing/peg.l: $(BUILD)/peg.l
 ###
 # the output of gen-asm-x86.l is broken currently. probably its newest version was not checked into the repo.
 # $(BUILD)/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile.l source/parsing/peg.l
-# 	$(call ensure-built,$(TEST_EVAL))
-# 	$(TIME) $(TEST_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
+# 	$(call maybe-build-gen-eval)
+# 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 # 		|| { $(BACKDATE_FILE) $@; exit 42; }
 # 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
