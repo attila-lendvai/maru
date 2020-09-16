@@ -366,12 +366,15 @@
                                                 (<foreign-function>-vararg? $1))))
 
 (define-instruction CALLPTR	(t 2 t)
-  ;;((LOCAL  undefined)		(println "	"$reg1" = call %ptr "$1"()"))
   ((LOCAL pair)			(let ((param-types (map (lambda _ '%ptr) $2)))
                                   (print "	"$reg1" = bitcast %ptr "$1" to ")
                                   (emit-llvm-fn-type '%ptr param-types ())
                                   (println "*")
-                                  (emit-llvm-call $reg2 $reg1 $2 '%ptr param-types ()))))
+                                  (emit-llvm-call $reg2 $reg1 $2 '%ptr param-types ())))
+  ((LOCAL undefined)		(print "	"$reg1" = bitcast %ptr "$1" to ")
+				(emit-llvm-fn-type '%ptr () ())
+				(println "*")
+				(emit-llvm-call $reg2 $reg1 () '%ptr () ())))
 
 (define-instruction DEFLABEL	()
   ((LABEL)			(println $1":")))
