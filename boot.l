@@ -1409,7 +1409,7 @@
 (define-function open (path)
   (assert (= <string> (type-of path)) "open: non-string path argument: " path)
   ;; TODO error handling
-  (libc/fopen path))
+  (libc/fopen path "r"))
 
 (define-function close (stream)
   (assert (= <target-vm-pointer> (type-of stream)) "close: inappropriate argument: " stream)
@@ -1425,7 +1425,7 @@
   (assert (= <target-vm-pointer> (type-of stream)) "putc: inappropriate stream argument: " stream)
   (assert (= <long> (type-of char))   "putc: non-integer char argument: " char)
   ;; TODO error handling
-  (libc/fputc stream char))
+  (libc/fputc char stream))
 
 (define-function format (fmt arg)
   (assert (= <string> (type-of fmt)) "format: non-string fmt argument: " fmt)

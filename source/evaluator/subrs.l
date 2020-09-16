@@ -277,9 +277,10 @@
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 
-(define-subr (libc/fopen 1)
-  (let ((path (get/head -args-)))
-    (let ((stream (libc/fopen (get/string path) "rb")))
+(define-subr (libc/fopen 2)
+  (let ((path (get/head -args-))
+        (mode (get/head (get/tail -args-))))
+    (let ((stream (libc/fopen (get/string path) (get/string mode))))
       (and stream (new-<target-vm-pointer> stream)))))
 
 (define-subr (libc/fclose 1)
@@ -294,9 +295,9 @@
          (new-<long> c))))
 
 (define-subr (libc/fputc 2)
-  (let ((stream (get/head -args-))
-        (obj	(get/head (get/tail -args-))))
-    (new-<long> (libc/fputc (get/tvmptr stream) (get/long obj)))))
+  (let ((char	(get/head -args-))
+        (stream	(get/head (get/tail -args-))))
+    (new-<long> (libc/fputc (get/long char) (get/tvmptr stream)))))
 
 (define-subr (libc/format 2)
   (let ((ofmt (get/head -args-))
