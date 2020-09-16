@@ -101,20 +101,22 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l subrs.l arrays.l)
 
+GENERATED_FILES = $(addprefix source/,parsing/peg.l assembler/asm-x86.l)
+
 .SUFFIXES:					# disable all built-in rules
 
 all: eval
 
 clean:
-	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend)) eval $(foreach backend,${BACKENDS},eval-$(backend))
-	git checkout $(BUILD) || true
+	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend),eval-$(backend)) eval
+	git checkout $(BUILD) $(GENERATED_FILES) || true
 
 distclean: clean
 	rm -rf $(BUILD)
-	git checkout $(BUILD) || true
+	git checkout $(BUILD) $(GENERATED_FILES) || true
 
 veryclean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) $(GENERATED_FILES)
 
 stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
