@@ -1,9 +1,9 @@
 (define-function array-append-all (arr . vals)
   (list-do val vals (array-append arr val)))
 
-(load "parser.l")
-(load "peg-compile.l")
-(load "peg.l")
+(require "source/parsing/parser.l")
+(require "source/parsing/peg-compile.l")
+(require "source/parsing/peg.l")
 
 (define *parser-stream*)
 
@@ -18,8 +18,8 @@
 
 (define-class <temp-grammar> <parser> ())
 
-;;(load "port.l")
-(load "pretty-print.l")
+;;(require "port.l")
+;;(require "source/pretty-print.l")
 
 (define-form grammar-eval (rules expr)
   ;;(println "GRAMMAR EVAL ")  (pretty-print (expand rules))
@@ -65,6 +65,7 @@
 
 (define-function load (name)	(repl-path name ()))
 
-(while *arguments* (repl-path (next-argument) ()))
+(while *command-line-arguments*
+  (repl-path (pop *command-line-arguments*) ()))
 
 (exit 0)

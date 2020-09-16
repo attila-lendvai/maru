@@ -247,14 +247,27 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/peg.l: source/parsing/peg.g source/parsing/peg-bootstrap.l source/parsing/parser.l source/parsing/peg-compile.l
+$(BUILD)/peg.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compile.l
 	$(call ensure-built,$(TEST_EVAL))
-	$(TIME) $(TEST_EVAL) boot.l source/parsing/peg-bootstrap.l >$(BUILD)/peg.l \
-		|| { $(BACKDATE_FILE) $(BUILD)/peg.l; exit 42; }
-#	mv peg.l peg.l.$(shell date '+%Y%m%d.%H%M%S')
+	$(TIME) $(TEST_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
+		|| { $(BACKDATE_FILE) $@; exit 42; }
+	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
 source/parsing/peg.l: $(BUILD)/peg.l
-	cp $(BUILD)/peg.l source/parsing/peg.l
+	cp $< $@
+
+###
+### x86 assembler
+###
+# the output of gen-asm-x86.l is broken currently. probably its newest version was not checked into the repo.
+# $(BUILD)/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile.l source/parsing/peg.l
+# 	$(call ensure-built,$(TEST_EVAL))
+# 	$(TIME) $(TEST_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
+# 		|| { $(BACKDATE_FILE) $@; exit 42; }
+# 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
+
+# source/assembler/asm-x86.l: $(BUILD)/asm-x86.l
+# 	cp $< $@
 
 ###
 ### Pattern rules
