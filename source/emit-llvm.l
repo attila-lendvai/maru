@@ -731,10 +731,12 @@
               (slave:bitwise-and  ,AND) (slave:bitwise-or   ,OR ) (slave:bitwise-xor ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
               (slave:bitwise-asl ,SLA) (slave:bitwise-asr  ,SRA)
+              (slave:byte-at		,LOAD-I8)
               (slave:string-at		,LOAD-I8)
               (slave:oop-at		,LOAD-OOP))
              ;; ternary
-             ((slave:set-string-at	,STORE-I8)
+             ((slave:set-byte-at	,STORE-I8)
+              (slave:set-string-at	,STORE-I8)
               (slave:set-oop-at		,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)

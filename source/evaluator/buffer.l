@@ -4,7 +4,7 @@
 
 (define-record <buffer> () (size elements))
 
-(define-vector-accessors <buffer>	buffer	t	string-at	copy-bytes	1)
+(define-vector-accessors <buffer>	buffer	t	byte-at		copy-bytes	1)
 
 (define-function new-<buffer> ()
   (let ((initial-capacity 32))
