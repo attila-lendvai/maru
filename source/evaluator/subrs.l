@@ -405,6 +405,13 @@
     (and (is/pair obj)
          (put (<pair> tail) obj (get/head (get/tail -args-))))))
 
+(define-subr (copy-oops 3)
+  (let ((from	(get/head -args-))
+        (to	(get/head (get/tail -args-)))
+        (count	(get/long (get/head (get/tail (get/tail -args-))))))
+    (copy-oops from to count)
+    ()))
+
 (define-subr (oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
@@ -417,6 +424,13 @@
         (val (get/head (get/tail -args-))))
     (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (set-oop-at obj (get/long idx) val)))
+
+(define-subr (copy-bytes 3)
+  (let ((from	(get/head -args-))
+        (to	(get/head (get/tail -args-)))
+        (count	(get/long (get/head (get/tail (get/tail -args-))))))
+    (copy-bytes from to count)
+    ()))
 
 (define-subr (byte-at 2)
   (let ((obj (get/head -args-))
