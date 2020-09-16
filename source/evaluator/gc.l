@@ -1,4 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
+;;;
+;;; A naive precise mark-and-sweep GC.
+;;;
 
 (define gc/minimum-growth-unit	(* 50 1024))
 (define gc/frequency            32768)

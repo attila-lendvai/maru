@@ -167,7 +167,12 @@ xcode-select --install
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
-3. `brew install llvm`
+3. [Install LLVM using Homebrew](https://embeddedartistry.com/blog/2017/02/24/installing-llvm-clang-on-osx/)
+```
+brew install llvm
+echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
+source ~/.bash_profile
+```
 
 Patches are welcome for dealing with other platforms, including the extension of this readme.
 The LLVM backend should work even on untested targets, but I only test it on Linux for now.

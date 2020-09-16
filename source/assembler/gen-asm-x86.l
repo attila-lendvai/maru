@@ -1,3 +1,32 @@
+;;; -*- mode: fundamental; coding: us-ascii; tab-width: 8 -*-
+
+;;; Based on the Previous NEXT emulator:
+;;;   https://unix.superglobalmegacorp.com/
+;;;   https://unix.superglobalmegacorp.com/previous/newsrc/src/cpu/jit/codegen_x86.h.html
+;;;   http://previous.unixdude.net/
+;;;   https://github.com/probonopd/previous/blob/master/src/cpu/jit/codegen_x86.h
+;;;
+;;; Run-time assembler for IA-32 and AMD64
+;;;
+;;; This file is derived from CCG.
+;;;
+;;; Copyright 1999, 2000, 2001, 2002, 2003 Ian Piumarta
+;;;
+;;; Adaptations and enhancements for AMD64 support, Copyright 2003-2008
+;;;   Gwenole Beauchesne
+;;;
+;;; Basilisk II (C) 1997-2008 Christian Bauer
+;;;
+;;; This program is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; This program is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
 ;;; ./eval repl.l gen-asm-86.k
 
 (println "(load \"asm-common.k\")")
@@ -142,10 +171,10 @@
 #define _r_1BIS(X,R, D,B,I,S)           (_Mrm(X,_b01,_rN(R),_b100 ),_SIB(X,_SCL(S),_r4(I),_r4(B)),_B(X,D))
 #define _r_4B(  X,R, D,B    )           (_Mrm(X,_b10,_rN(R),_r4(B))                              ,_L(X,D))
 #define _r_4BIS(X,R, D,B,I,S)           (_Mrm(X,_b10,_rN(R),_b100 ),_SIB(X,_SCL(S),_r4(I),_r4(B)),_L(X,D))
- 
+
 #define _r_DB(  X,R, D,B    )           ((_s0P(D) ? _r_0B  (X,R,  B    ) : (_s1P(D) ? _r_1B(  X,R,D,B    ) : _r_4B(  X,R,D,B    ))))
 #define _r_DBIS(X,R, D,B,I,S)           ((_s0P(D) ? _r_0BIS(X,R,  B,I,S) : (_s1P(D) ? _r_1BIS(X,R,D,B,I,S) : _r_4BIS(X,R,D,B,I,S))))
- 
+
 #define _r_X( X,R, D,B,I,S)             (_r0P(I)  ? (_r0P(B)   ? _r_D   (X,R,D            )   : \
                                                     (_ESP==(B) ? _r_DBIS(X,R,D,_ESP,_ESP,1)   : \
                                                                  _r_DB  (X,R,D,   B       ))) : \
@@ -156,7 +185,7 @@
 /* instruction formats */
 
 /*       _format                                                     Opcd         ModR/M dN(rB,rI,Sc)     imm... */
-        
+
 #define  _d16(       X                            )  (                _B(X,0x66      )                               )
 #define   _O(        X,OP                         )  (                _B(X,(OP)      )                               )
 #define   _Or(       X,OP,R                       )  (                _B(X,(OP)|_r(R))                               )
@@ -215,57 +244,56 @@
 /* +++ fully-qualified intrinsic instructions */
 
 /*                                      _format          Opcd           ,Mod ,r     ,m          ,mem=dsp+sib    ,imm... */
-        
+
 #define ADCBrr(RS, RD,X)                  _O_Mrm          (X,0x10           ,_b11,_r1(RS),_r1(RD)                           )
 #define ADCBmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x12                ,_r1(RD)           ,MD,MB,MI,MS            )
 #define ADCBrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x10                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define ADCBir(IM, RD,X)                  _O_Mrm_B        (X,0x80           ,_b11,_b010  ,_r1(RD)                   ,_s1(IM))
 #define ADCBim(IM, MD, MB, MI, MS,X)      _O_r_X_B        (X,0x80                ,_b010             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define ADCWrr(RS, RD,X)                  _wO_Mrm         (X,0x11           ,_b11,_r2(RS),_r2(RD)                           )
 #define ADCWmr(MD, MB, MI, MS, RD,X)      _wO_r_X         (X,0x13                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define ADCWrm(RS, MD, MB, MI, MS,X)      _wO_r_X         (X,0x11                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define ADCWir(IM, RD,X)                  _wOs_Mrm_sW     (X,0x81           ,_b11,_b010  ,_r2(RD)                   ,_s2(IM))
 #define ADCWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW     (X,0x81                ,_b010             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define ADCLrr(RS, RD,X)                  _O_Mrm          (X,0x11           ,_b11,_r4(RS),_r4(RD)                           )
 #define ADCLmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x13                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define ADCLrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x11                ,_r4(RS)           ,MD,MB,MI,MS            )
 #define ADCLir(IM, RD,X)                  _Os_Mrm_sL      (X,0x81           ,_b11,_b010  ,_r4(RD)                   ,IM     )
 #define ADCLim(IM, MD, MB, MI, MS,X)      _Os_r_X_sL      (X,0x81                ,_b010             ,MD,MB,MI,MS    ,IM     )
-        
-        
+
 #define ADDBrr(RS, RD,X)                  _O_Mrm          (X,0x00           ,_b11,_r1(RS),_r1(RD)                           )
 #define ADDBmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x02                ,_r1(RD)           ,MD,MB,MI,MS            )
 #define ADDBrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x00                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define ADDBir(IM, RD,X)                  _O_Mrm_B        (X,0x80           ,_b11,_b000  ,_r1(RD)                   ,_s1(IM))
 #define ADDBim(IM, MD, MB, MI, MS,X)      _O_r_X_B        (X,0x80                ,_b000             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define ADDWrr(RS, RD,X)                  _wO_Mrm         (X,0x01           ,_b11,_r2(RS),_r2(RD)                           )
 #define ADDWmr(MD, MB, MI, MS, RD,X)      _wO_r_X         (X,0x03                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define ADDWrm(RS, MD, MB, MI, MS,X)      _wO_r_X         (X,0x01                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define ADDWir(IM, RD,X)                  _wOs_Mrm_sW     (X,0x81           ,_b11,_b000  ,_r2(RD)                   ,_s2(IM))
 #define ADDWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW     (X,0x81                ,_b000             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define ADDLrr(RS, RD,X)                  _O_Mrm          (X,0x01           ,_b11,_r4(RS),_r4(RD)                           )
 #define ADDLmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x03                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define ADDLrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x01                ,_r4(RS)           ,MD,MB,MI,MS            )
 #define ADDLir(IM, RD,X)                  _Os_Mrm_sL      (X,0x81           ,_b11,_b000  ,_r4(RD)                   ,IM     )
 #define ADDLim(IM, MD, MB, MI, MS,X)      _Os_r_X_sL      (X,0x81                ,_b000             ,MD,MB,MI,MS    ,IM     )
-        
-        
+
+
 #define ANDBrr(RS, RD,X)                  _O_Mrm          (X,0x20           ,_b11,_r1(RS),_r1(RD)                           )
 #define ANDBmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x22                ,_r1(RD)           ,MD,MB,MI,MS            )
 #define ANDBrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x20                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define ANDBir(IM, RD,X)                  _O_Mrm_B        (X,0x80           ,_b11,_b100  ,_r1(RD)                   ,_s1(IM))
 #define ANDBim(IM, MD, MB, MI, MS,X)      _O_r_X_B        (X,0x80                ,_b100             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define ANDWrr(RS, RD,X)                  _wO_Mrm         (X,0x21           ,_b11,_r2(RS),_r2(RD)                           )
 #define ANDWmr(MD, MB, MI, MS, RD,X)      _wO_r_X         (X,0x23                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define ANDWrm(RS, MD, MB, MI, MS,X)      _wO_r_X         (X,0x21                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define ANDWir(IM, RD,X)                  _wOs_Mrm_sW     (X,0x81           ,_b11,_b100  ,_r2(RD)                   ,_s2(IM))
 #define ANDWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW     (X,0x81                ,_b100             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define ANDLrr(RS, RD,X)                  _O_Mrm          (X,0x21           ,_b11,_r4(RS),_r4(RD)                           )
 #define ANDLmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x23                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define ANDLrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x21                ,_r4(RS)           ,MD,MB,MI,MS            )
@@ -335,19 +363,19 @@
 #define CMPBrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x38                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define CMPBir(IM, RD,X)                  _O_Mrm_B        (X,0x80           ,_b11,_b111  ,_r1(RD)                   ,_s1(IM))
 #define CMPBim(IM, MD, MB, MI, MS,X)      _O_r_X_B        (X,0x80                ,_b111             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define CMPWrr(RS, RD,X)                  _wO_Mrm         (X,0x39           ,_b11,_r2(RS),_r2(RD)                           )
 #define CMPWmr(MD, MB, MI, MS, RD,X)      _wO_r_X         (X,0x3b                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define CMPWrm(RS, MD, MB, MI, MS,X)      _wO_r_X         (X,0x39                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define CMPWir(IM, RD,X)                  _wOs_Mrm_sW     (X,0x81           ,_b11,_b111  ,_r2(RD)                   ,_s2(IM))
 #define CMPWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW     (X,0x81                ,_b111             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define CMPLrr(RS, RD,X)                  _O_Mrm          (X,0x39           ,_b11,_r4(RS),_r4(RD)                           )
 #define CMPLmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x3b                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define CMPLrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x39                ,_r4(RS)           ,MD,MB,MI,MS            )
 #define CMPLir(IM, RD,X)                  _O_Mrm_L        (X,0x81           ,_b11,_b111  ,_r4(RD)                   ,IM     )
 #define CMPLim(IM, MD, MB, MI, MS,X)      _O_r_X_L        (X,0x81                ,_b111             ,MD,MB,MI,MS    ,IM     )
-        
+
 
 #define CWD(X)                            _O              (X,0x99                                                           )
 
@@ -498,7 +526,7 @@
 #define LEALmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x8d                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define LEAVE(X)                          _O              (X,0xc9                                                           )
 
-        
+
 #define LMSWr(RS,X)                       _OO_Mrm         (X,0x0f01         ,_b11,_b110,_r4(RS)                             )
 #define LMSWm(MD,MB,MI,MS,X)              _OO_r_X         (X,0x0f01              ,_b110             ,MD,MB,MI,MS            )
 
@@ -577,13 +605,13 @@
 #define ORBrm(RS, MD, MB, MI, MS,X)       _O_r_X          (X,0x08                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define ORBir(IM, RD,X)                   _O_Mrm_B        (X,0x80           ,_b11,_b001  ,_r1(RD)                   ,_s1(IM))
 #define ORBim(IM, MD, MB, MI, MS,X)       _O_r_X_B        (X,0x80                ,_b001             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define ORWrr(RS, RD,X)                   _wO_Mrm         (X,0x09           ,_b11,_r2(RS),_r2(RD)                           )
 #define ORWmr(MD, MB, MI, MS, RD,X)       _wO_r_X         (X,0x0b                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define ORWrm(RS, MD, MB, MI, MS,X)       _wO_r_X         (X,0x09                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define ORWir(IM, RD,X)                   _wOs_Mrm_sW     (X,0x81           ,_b11,_b001  ,_r2(RD)                   ,_s2(IM))
 #define ORWim(IM, MD, MB, MI, MS,X)       _wOs_r_X_sW     (X,0x81                ,_b001             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define ORLrr(RS, RD,X)                   _O_Mrm          (X,0x09           ,_b11,_r4(RS),_r4(RD)                           )
 #define ORLmr(MD, MB, MI, MS, RD,X)       _O_r_X          (X,0x0b                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define ORLrm(RS, MD, MB, MI, MS,X)       _O_r_X          (X,0x09                ,_r4(RS)           ,MD,MB,MI,MS            )
@@ -716,13 +744,13 @@
 #define SBBBrm(RS, MD, MB, MI, MS,X)      _O_r_X                  (X,0x18                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define SBBBir(IM, RD,X)                  _O_Mrm_B                (X,0x80           ,_b11,_b011  ,_r1(RD)                   ,_s1(IM))
 #define SBBBim(IM, MD, MB, MI, MS,X)      _O_r_X_B                (X,0x80                ,_b011             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define SBBWrr(RS, RD,X)                  _wO_Mrm                 (X,0x19           ,_b11,_r2(RS),_r2(RD)                           )
 #define SBBWmr(MD, MB, MI, MS, RD,X)      _wO_r_X                 (X,0x1b                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define SBBWrm(RS, MD, MB, MI, MS,X)      _wO_r_X                 (X,0x19                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define SBBWir(IM, RD,X)                  _wOs_Mrm_sW             (X,0x81           ,_b11,_b011  ,_r2(RD)                   ,_s2(IM))
 #define SBBWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW             (X,0x81                ,_b011             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define SBBLrr(RS, RD,X)                  _O_Mrm                  (X,0x19           ,_b11,_r4(RS),_r4(RD)                           )
 #define SBBLmr(MD, MB, MI, MS, RD,X)      _O_r_X                  (X,0x1b                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define SBBLrm(RS, MD, MB, MI, MS,X)      _O_r_X                  (X,0x19                ,_r4(RS)           ,MD,MB,MI,MS            )
@@ -857,13 +885,13 @@
 #define SUBBrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x28                ,_r1(RS)           ,MD,MB,MI,MS            )
 #define SUBBir(IM, RD,X)                  _O_Mrm_B        (X,0x80           ,_b11,_b101  ,_r1(RD)                   ,_s1(IM))
 #define SUBBim(IM, MD, MB, MI, MS,X)      _O_r_X_B        (X,0x80                ,_b101             ,MD,MB,MI,MS    ,_s1(IM))
-        
+
 #define SUBWrr(RS, RD,X)                  _wO_Mrm         (X,0x29           ,_b11,_r2(RS),_r2(RD)                           )
 #define SUBWmr(MD, MB, MI, MS, RD,X)      _wO_r_X         (X,0x2b                ,_r2(RD)           ,MD,MB,MI,MS            )
 #define SUBWrm(RS, MD, MB, MI, MS,X)      _wO_r_X         (X,0x29                ,_r2(RS)           ,MD,MB,MI,MS            )
 #define SUBWir(IM, RD,X)                  _wOs_Mrm_sW     (X,0x81           ,_b11,_b101  ,_r2(RD)                   ,_s2(IM))
 #define SUBWim(IM, MD, MB, MI, MS,X)      _wOs_r_X_sW     (X,0x81                ,_b101             ,MD,MB,MI,MS    ,_s2(IM))
-        
+
 #define SUBLrr(RS, RD,X)                  _O_Mrm          (X,0x29           ,_b11,_r4(RS),_r4(RD)                           )
 #define SUBLmr(MD, MB, MI, MS, RD,X)      _O_r_X          (X,0x2b                ,_r4(RD)           ,MD,MB,MI,MS            )
 #define SUBLrm(RS, MD, MB, MI, MS,X)      _O_r_X          (X,0x29                ,_r4(RS)           ,MD,MB,MI,MS            )
@@ -925,15 +953,15 @@
 #define XORLir(IM, RD,X)                  _Os_Mrm_sL      (X,0x81           ,_b11,_b110  ,_r4(RD)                   ,IM     )
 #define XORLim(IM, MD, MB, MI, MS,X)      _Os_r_X_sL      (X,0x81                ,_b110             ,MD,MB,MI,MS    ,IM     )
 
-#define SALBir  SHLBir  
-#define SALBim  SHLBim  
-#define SALBrr  SHLBrr  
-#define SALBrm  SHLBrm  
-#define SALWir  SHLWir  
-#define SALWim  SHLWim  
-#define SALWrr  SHLWrr  
-#define SALWrm  SHLWrm  
-#define SALLir  SHLLir  
-#define SALLim  SHLLim  
-#define SALLrr  SHLLrr  
-#define SALLrm  SHLLrm  
+#define SALBir  SHLBir
+#define SALBim  SHLBim
+#define SALBrr  SHLBrr
+#define SALBrm  SHLBrm
+#define SALWir  SHLWir
+#define SALWim  SHLWim
+#define SALWrr  SHLWrr
+#define SALWrm  SHLWrm
+#define SALLir  SHLLir
+#define SALLim  SHLLim
+#define SALLrr  SHLLrr
+#define SALLrm  SHLLrm

@@ -17,7 +17,7 @@
 ;(define-form debug/identities	prog		`(let () ,@prog))
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
-(define-constant feature/backtrace		(or true (< 0 *safety*)))
+(define-constant feature/backtrace		(or true  (< 0 *safety*)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -764,11 +764,11 @@
                  (gc/let* ((args (new-<pair> env (get/tail exp))))
                    (set result (k/apply fn args ()))
                    (set result (k/expand result env)))
-               ;; head is nothing special
+               ;; head is not a <form>
                (gc/let* ((tail (get/tail exp)))
                  (unless (= head symbol/quote)
                    (set tail (k/expand/list tail env)))
-                 ;; possibly convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
+                 ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
                  (when (and (= symbol/set head)
                             (is/pair (k/car tail))
                             (is <symbol> (k/caar tail)))
@@ -843,7 +843,7 @@
 
 (define-function k/encode/symbol (exp env)
   (let ((var (k/env/lookup-variable env exp)))
-    (or var (fatal1 "undefined variable in encode: %s" (get/symbol exp)))
+    (or var (fatal1 "undefined variable in encode: '%s'" (get/symbol exp)))
     (set exp var)
     (if (global-variable? exp)
         (let ((val (get (<variable> value) exp)))

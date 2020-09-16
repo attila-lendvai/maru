@@ -4,7 +4,7 @@
 ;;;
 
 ;; NOTE define is implemented so that it unconditionally defines the variable
-;; at expand time, therefore we need to "hide" it inside a quote.
+;; at expand time, therefore we need to "hide" it inside a quote+eval.
 (if (not (defined? 'bootstrapping?))
     (eval '(define bootstrapping? ())))
 
@@ -257,6 +257,12 @@
 
 (define-form let* bindings-body
   (%let* (%let*bindings (car bindings-body)) (cdr bindings-body)))
+
+;; this simple let* is also enough for bootstrapping
+;; (define-form let* (bindings . body)
+;;   (if bindings
+;;       `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
+;;     `(let () ,@body)))
 
 ;;; list
 
@@ -824,6 +830,9 @@
     type))
 
 (define-form define-record (name super slots)
+  ;; TODO what if? it would make when-at-expand usable in slot definitons...
+  ;; (set slots (map-with expand slots *env*))
+  ;; (set slots (remove () slots))
   (let ((record-type (new-<record> name (eval super) slots)))
     (eval `(define ,name ,record-type))
     `(let ((type-obj ,record-type))
@@ -867,23 +876,25 @@
 ;; reflect the fact that editing these and bringing it out of sync with the
 ;; level-shifted binary is not an option without grave consequences.
 ;; such a setup would hopefully simplify the bootstrapping dance above
-(define-type		<data>)					; some internal blob; used for stuff like the elements of <string> and <array>
-(define-immediate-type	<undefined> 0 ())			; undefined tag-width means a full-word immediate 0 value
-(define-immediate-type	<long> 1 1)
-;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
-(define-record <array>			() (size elements))
-(define-record <string>			() (size elements))
-(define-record <expr>			() (parameters body env ctx name))	; name is informal, only for debugging purposes.
-(define-record <form>			() (function symbol))      ; these are expander lambda's
-(define-record <fixed>			() (function))
-(define-record <subr>			() (_name _imp _sig _profile))
-(define-record <variable>		() (name value env index))
-(define-record <env>			() (parent level offset bindings stable))
-(define-record <context>		() (home env bindings callee pc))
-(define-record <module>			() (symbols globals)) ; globals is the <variable> that holds '*globals*
-(define-record <target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
-(define-record <symbol>			() (_bits))
-(define-record <pair>			() (head tail))
+(define-type		<data>)					; some opaque blob; used for stuff like the elements of <string> and <array>
+
+(define-immediate-type	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
+(define-immediate-type	<long>			1 1)
+;(define-record		<long>			() (_bits))	; bootstrap is about 25% slower
+
+(define-record		<array>			() (size elements))
+(define-record		<string>		() (size elements))
+(define-record		<expr>			() (parameters body env ctx name))	; name is informal, only for debugging purposes.
+(define-record		<form>			() (function symbol))	; these are expander lambda's
+(define-record		<fixed>			() (function))
+(define-record		<subr>			() (_name _imp _sig _profile))
+(define-record		<variable>		() (name value env index))
+(define-record		<env>			() (parent level offset bindings stable))
+(define-record		<context>		() (home env bindings callee pc))
+(define-record		<module>		() (symbols globals)) ; globals is the <variable> that holds '*globals*
+(define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
+(define-record		<symbol>		() (_bits))
+(define-record		<pair>			() (head tail))
 
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
@@ -1425,6 +1436,7 @@
       (read name)))
 
 (define-function load (name)
+  (when (or bootstrapping? (> *verbosity* 1)) (warn "loading file "name"\n"))
   (let ((exps (find-and-read name)))
     ;; TODO FIXME this has a different expand/eval order than the rest of the codebase
     (or exps (error "file not found or empty: "name))
