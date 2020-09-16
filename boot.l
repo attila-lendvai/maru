@@ -197,8 +197,8 @@
     (set args (list "assertion failed: " `(quote ,test))))
   `(or ,test (error ,@args)))
 
-(define-form define-constant (name value)
-  `(define ,name (form () (lambda _ ,value))))
+(define-form define-constant (name value-form)
+  `(define ,name (form () (lambda _ ',(eval value-form)))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
