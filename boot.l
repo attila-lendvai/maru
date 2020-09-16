@@ -805,14 +805,13 @@
 (define-record <immediate-type> <type> (tag-value tag-width))
 
 (define-function new-<immediate-type> (name tag-value tag-width)
-  (assert (and (< 0 tag-width) (< 0 tag-value)) "new-<immediate-type>: illegal tag-width or tag-value for type " name)
   (let ((type (new-type-instance name <immediate-type>)))
     (set (<immediate-type>-tag-value	type) tag-value)
     (set (<immediate-type>-tag-width	type) tag-width)
     type))
 
-(define-form define-immediate-type (name tag-width tag-value)
-  `(define ,name ,(new-<immediate-type> name (eval tag-width) (eval tag-value))))
+(define-form define-immediate-type (name tag-value tag-width)
+  `(define ,name ,(new-<immediate-type> name (eval tag-value) (eval tag-width))))
 
 (define-function immediate-type? (type)
   (subtype? (type-of type) <immediate-type>))
@@ -837,8 +836,8 @@
 ;; reflect the fact that editing these and bringing it out of sync with the
 ;; level-shifted binary is not an option without grave consequences.
 ;; such a setup would hopefully simplify the bootstrapping dance above
-(define-type		<undefined>)				; NOTE: it doesn't need to be the first one (i.e. to be denoted by 0 in the target at runtime)
 (define-type		<data>)					; some internal blob; used for stuff like the elements of <string> and <array>
+(define-immediate-type	<undefined> 0 ())			; undefined tag-width means a full-word immediate 0 value
 (define-immediate-type	<long> 1 1)
 ;(define-record <long>			() (_bits))		; bootstrap is about 25% slower
 (define-record <array>			() (size elements))

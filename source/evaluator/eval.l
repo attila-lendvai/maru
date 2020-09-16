@@ -73,22 +73,12 @@
 ;;;    which is denoted in the target by some integer assigned as per the type definition order.
 ;;;
 
-(define-constant immediate-type/max-tag-width	(let ((res 0))
-                                                  (types-do type
-                                                    (when (immediate-type? type)
-                                                      (set res (max res (<immediate-type>-tag-width type)))))
-                                                  res))
-
-(when (< target/word-size-in-bytes
-         (bitwise-asl 1 immediate-type/max-tag-width))
-  (warn "immediate-type/max-tag-width ("immediate-type/max-tag-width") will force a stronger alignment for OOP's than what the target word size demands\n"))
-
-(define-constant oop/alignment-in-bytes		(max target/word-size-in-bytes (bitwise-asl 1 immediate-type/max-tag-width)))
+(define-constant oop/alignment-in-bytes		target/word-size-in-bytes)
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
 (define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
 
-;;(warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n")
+(verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n"))
 
 (define-form oop/align (value)
   `(bitwise-and (+ ,value ,oop/align-padding)
@@ -297,24 +287,25 @@
 ;;; ----------------------------------------------------------------
 
 (eval-at-expand
- `(define-function get/type (ptr)
-    (cond
-      ((not ptr)	<undefined>)
-      ((oop? ptr)	(let ((header (header-of ptr)))
+ (let ((conds-early	())
+       (conds-late	()))
+   (types-do type
+     (when (immediate-type? type)
+       (let* ((tag-value	(<immediate-type>-tag-value type))
+              (tag-width	(<immediate-type>-tag-width type)))
+         (if tag-width
+             (let ((tag-mask (bitwise-not (- (bitwise-asl 1 tag-width)))))
+               (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
+           (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
+   `(define-function get/type (ptr)
+      (cond
+        ,@conds-early
+        ((oop? ptr)	(let ((header (header-of ptr)))
                           (safety 3 (or (valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
-      ((immediate? ptr) (cond
-                          ,@(let ((conds ()))
-                              (types-do type
-                                (when (immediate-type? type)
-                                  (let* ((tag-value	(<immediate-type>-tag-value type))
-                                         (tag-width	(<immediate-type>-tag-width type))
-                                         (tag-mask	(bitwise-not (- (bitwise-asl 1 tag-width)))))
-                                    (push conds `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))))
-                              conds)
-                          (else (fatal1 "get/type: encountered an unidentifiable immediate: {%p}" ptr))))
-      (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr)))))
+        ,@conds-late
+        (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr))))))
 
 (define-form is (type ptr)
   `(= ,type (get/type ,ptr)))
