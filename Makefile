@@ -10,7 +10,7 @@
 #  make test-bootstrap-llvm || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
-#  make TARGET_MACHINE=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
+#  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
 #
 # the makefile parallelism is mostly only between the backends.
 
@@ -24,7 +24,7 @@ BACKENDS		= x86 llvm
 PREVIOUS_STAGE_BACKEND	= llvm
 
 HOST_OS		= $(shell uname -s)
-TARGET_MACHINE	?= $(shell uname -m)
+TARGET_CPU	?= $(shell uname -m)
 
 # tested to work with LLVM version 8-11
 ifeq ($(HOST_OS),Linux)
@@ -44,7 +44,7 @@ LLVM_ARGS	= -O3
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
-TARGET_llvm	?= $(TARGET_MACHINE)-$(TARGET_VENDOR)-$(TARGET_OS)
+TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
 # use this eval to execute any tests or code generation from the makefile.
@@ -62,15 +62,15 @@ PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
 
-TARGET_MACHINE_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
-TARGET_MACHINE_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
+TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
+TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
-ifeq ($(TARGET_MACHINE_llvm),x86_64)
+ifeq ($(TARGET_CPU_llvm),x86_64)
   BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
-else ifeq ($(TARGET_MACHINE_llvm),i686)
+else ifeq ($(TARGET_CPU_llvm),i686)
   BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
 else
-  $(error "Couldn't extract the target's word size from TARGET_MACHINE_llvm '$(TARGET_MACHINE_llvm)'.")
+  $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
 
 # see https://stackoverflow.com/a/20983251/14464
@@ -152,7 +152,7 @@ $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
-		--define target/machine			$(TARGET_MACHINE_x86)	\
+		--define target/cpu			$(TARGET_CPU_x86)	\
 		--define target/vendor			$(TARGET_VENDOR)	\
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_x86)					\
@@ -169,7 +169,7 @@ $(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_F
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
-		--define target/machine			$(TARGET_MACHINE_llvm)		\
+		--define target/cpu			$(TARGET_CPU_llvm)		\
 		--define target/vendor			$(TARGET_VENDOR)		\
 		--define target/os			$(TARGET_OS)			\
 		$(EMIT_FILES_llvm)					\
@@ -215,7 +215,7 @@ define compile-x86
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/machine			$(TARGET_MACHINE_x86)		\
+	--define target/cpu			$(TARGET_CPU_x86)		\
 	--define target/vendor			$(TARGET_VENDOR)		\
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
@@ -230,7 +230,7 @@ define compile-llvm
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/machine			$(TARGET_MACHINE_llvm)		\
+	--define target/cpu			$(TARGET_CPU_llvm)		\
 	--define target/vendor			$(TARGET_VENDOR)		\
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
