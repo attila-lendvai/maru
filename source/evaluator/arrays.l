@@ -2,7 +2,7 @@
 
 ;; TODO this is only slightly different from what is in source/arrays.l.
 ;; maybe try to merge them by eliminating the differences between the level-shifted code and normal maru code.
-(define-form define-vector-accessors (type-name basename elements-are-opaque? accessor copier element-size-in-bytes)
+(define-form define-vector-accessors (type-name basename elements-are-opaque? accessor copier mover element-size-in-bytes)
   (let ((setter-name (concat-symbols 'set- basename '-at))
         (getter-name (concat-symbol basename '-at))
         (length-name (concat-symbol basename '-length))
@@ -51,9 +51,9 @@
            (when (< idx size)
              (let* ((elements	(get (,type-name elements) obj))
                     (src	(+ elements (* idx ,element-size-in-bytes))))
-               (move-oops src
-                          (+ src ,element-size-in-bytes)
-                          (- size idx)))))
+               (,mover src
+                       (+ src ,element-size-in-bytes)
+                       (- size idx)))))
          (,setter-name obj idx value))
 
        (define-function ,zeroed-name (obj)
@@ -62,5 +62,5 @@
            (put (,type-name size) obj (new-<long> size)))
          obj))))
 
-(define-vector-accessors <array>	k/array		()	oop-at		copy-oops	target/word-size-in-bytes)
-(define-vector-accessors <string>	k/string	t	string-at	copy-bytes	1)
+(define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	target/word-size-in-bytes)
+(define-vector-accessors <string>	k/string	t	string-at	copy-bytes	move-bytes	1)
