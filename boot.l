@@ -168,18 +168,24 @@
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
-(define-form eval-at-expand body
-  (eval `(let () ,@body)))
+(define-form eval-at-expand (form)
+  (eval form))
 
 (define-form if-at-expand (cond true-form . false-forms)
   (if (eval cond)
       true-form
-    `(let () ,@false-forms)))
+    (if (and false-forms
+             (cdr false-forms))
+        `(let () ,@false-forms)
+      (car false-forms))))
 
 (define-form when-at-expand (cond . true-forms)
   (if (eval cond)
-      `(let ()
-         ,@true-forms)))
+      (if (and true-forms
+               (cdr true-forms))
+          `(let ()
+             ,@true-forms)
+        (car true-forms))))
 
 (define-form when (test . body)
   `(if ,test (let () ,@body)))
