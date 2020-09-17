@@ -301,6 +301,19 @@
     (set list (cdr list)))
   (car list))
 
+(define-function list-remove (key list)
+  (let ((result ())
+        (last ()))
+    (while list
+      (unless (= key (car list))
+        (let ((new (cons (car list))))
+          (if last
+              (set (cdr last) new)
+            (set result new))
+          (set last new)))
+      (set list (cdr list)))
+    result))
+
 (define-function list-reverse (lst)
   (let ((result ()))
     (while (pair? lst)
