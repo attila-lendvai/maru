@@ -18,6 +18,7 @@
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
 (define-constant feature/backtrace		(or true  (< 0 *safety*)))
+(define-constant feature/object-canary		(or false (<= 3 *safety*)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -107,7 +108,7 @@
   `(libc/memmove ,to ,from ,count))
 
 ;; the header of heap objects
-(eval `(define-record <header> () (,@(when (<= 3 *safety*) '(canary)) size flags next type)))
+(define-record <header> () (size flags next type (when-at-expand feature/object-canary canary)))
 
 (define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
 
@@ -116,15 +117,20 @@
 
 (let ((marker 233495534)) ; 0xDEADBEE, it's just an easy to recognize token without any meaning
   (define-form valid-header-canary? (header)
-    `(= (<header>-canary ,header) ,marker))
+    (if feature/object-canary
+        `(= (<header>-canary ,header) ,marker)
+      true))
 
   (define-form initialize-header-canary (header)
-    `(set (<header>-canary ,header) ,marker)))
+    (when feature/object-canary
+      `(set (<header>-canary ,header) ,marker))))
 
 (define-form valid-maru-value? (obj)
-  `(let ((__obj__ ,obj))
-     (or (immediate? __obj__)
-         (valid-header-canary? (header-of __obj__)))))
+  (if feature/object-canary
+      `(let ((__obj__ ,obj))
+         (or (immediate? __obj__)
+             (valid-header-canary? (header-of __obj__))))
+    true))
 
 (define-constant <header>-flags/used	1)
 (define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects

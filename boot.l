@@ -849,9 +849,8 @@
     type))
 
 (define-form define-record (name super slots)
-  ;; TODO what if? it would make when-at-expand usable in slot definitons...
-  ;; (set slots (map-with expand slots *env*))
-  ;; (set slots (remove () slots))
+  (set slots (map-with expand slots *env*))
+  (set slots (list-remove () slots))
   (let ((record-type (new-<record> name (eval super) slots)))
     (eval `(define ,name ,record-type))
     `(let ((type-obj ,record-type))
@@ -903,7 +902,7 @@
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
-(define-record		<expr>			() (parameters body env ctx name))	; name is informal, only for debugging purposes.
+(define-record		<expr>			() (parameters body env ctx (when-at-expand feature/track-expr-names name)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<fixed>			() (function))
 (define-record		<subr>			() (_name _imp _sig _profile))
