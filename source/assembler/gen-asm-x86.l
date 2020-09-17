@@ -1,6 +1,7 @@
 ;;; -*- mode: fundamental; coding: us-ascii; tab-width: 8 -*-
 
 ;;; Based on the Previous NEXT emulator:
+;;;   https://github.com/cebix/macemu/blob/master/BasiliskII/src/uae_cpu/compiler/codegen_x86.h
 ;;;   https://unix.superglobalmegacorp.com/
 ;;;   https://unix.superglobalmegacorp.com/previous/newsrc/src/cpu/jit/codegen_x86.h.html
 ;;;   http://previous.unixdude.net/

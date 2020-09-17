@@ -48,7 +48,8 @@
          (slave:int		i32)
          (slave:long		i64)
          (slave:unsigned-long	i64)
-         (slave:size_t		i32)))))
+         (slave:size_t		i32)))
+      (else (error "unexpected word size in target/word-size-in-bits: "target/word-size-in-bits))))
 
 (define-function ffi-type->llvm-type (type)
   (let ((entry (assq type *ffi-type->llvm-type*)))

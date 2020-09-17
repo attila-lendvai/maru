@@ -3,6 +3,7 @@
 ;; NOTE for debugging only, because this breaks the output due to e.g. multiline string literals escaping from the line comment prefix char
 (define *compiler-verbose* '())
 
+;; NOTE using symbols here is not a good idea because of the host/slave isolation
 (define-constant target/machine (cond
                                   ((or (= target/cpu "x86_64"))		"x86-64")
                                   ((or (= target/cpu "i686")

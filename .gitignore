@@ -3,3 +3,6 @@ notes.txt
 eval
 eval-llvm
 eval-x86
+etc
+source/parsing/peg.l
+source/assembler/asm-x86.l
