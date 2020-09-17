@@ -297,7 +297,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 ### Tests
 ###
 run: $(TEST_EVAL)
-	rlwrap $(TEST_EVAL) boot.l -
+	rlwrap --no-warning $(TEST_EVAL) boot.l -
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 

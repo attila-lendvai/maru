@@ -1197,12 +1197,8 @@
 
   (debug (libc/printf "main is on the way out\n"))
 
-  (libc/flush-streams)
-  (when (< 0 *arg/verbose*)
-    (gc/collect)
-    (libc/printf "; GC: %ld objects in %ld bytes, %ld free\n" gc/objects-live gc/bytes-used gc/bytes-free))
-
-  (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld free\n" gc/objects-live gc/bytes-used gc/bytes-free)
+  (gc/collect)
+  (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free)
   (libc/flush-streams)
 
   (debug (libc/printf "main is returning normally\n"))

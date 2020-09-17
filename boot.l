@@ -718,6 +718,8 @@
 (define-function sanity-check-record-slots (record slots)
   (let ((f slots))
     (while (pair? f)
+      (unless (symbol? (car f))
+        (error "slot is not symbol?: "(car f)))
       (and (memq (car f) (cdr f))
            (error "slot '"(car f)"' multiply-defined in record: "record" "slots))
       (set f (cdr f)))))
