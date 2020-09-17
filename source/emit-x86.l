@@ -569,26 +569,26 @@
 
 (define-selector compile-definition)
 
-(define-method compile-definition <form>		(name -c-)	(gen COMMENT (list "form "name)))
-(define-method compile-definition <type>		(name -c-)	(gen COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
+(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
-(define-method compile-definition <foreign-function>	(name -c-)	(gen COMMENT (list "foreign function "name))) ; it will be handled at the call site
+(define-method compile-definition <foreign-function>	(name -c-)	(emit COMMENT (list "foreign function "name))) ; it will be handled at the call site
 
 (define-method compile-definition <long> (name -c-)
-  (gen DATA)
-  (gen DEFLABEL (LABEL name))
-  (gen LONG self)
-  (gen TEXT))
+  (emit DATA)
+  (emit DEFLABEL (LABEL name))
+  (emit LONG self)
+  (emit TEXT))
 
 ;; (define-method compile-definition <string> (name -c-)
 ;;   (let ((temp (UNIQUE-LABEL)))
-;;     (gen DATA)
-;;     (gen DEFLABEL temp)
-;;     (gen ASCIZ self)
-;;     (gen ALIGN 4)
-;;     (gen DEFLABEL (LABEL name))
-;;     (gen LONG temp)
-;;     (gen TEXT)))
+;;     (emit DATA)
+;;     (emit DEFLABEL temp)
+;;     (emit ASCIZ self)
+;;     (emit ALIGN 4)
+;;     (emit DEFLABEL (LABEL name))
+;;     (emit LONG temp)
+;;     (emit TEXT)))
 
 (define-method compile-definition <expr> (name parent-comp)
   (let* ((main? (= 'slave:main name))

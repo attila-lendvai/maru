@@ -836,8 +836,8 @@
 
 (define-selector compile-definition)
 
-(define-method compile-definition <form>		(name -c-)	(gen COMMENT (list "form "name)))
-(define-method compile-definition <type>		(name -c-)	(gen COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
+(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
