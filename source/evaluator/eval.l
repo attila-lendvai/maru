@@ -960,6 +960,7 @@
         (set res (k/expand-encode-eval res env))
         (when (= libc/stdin stream)
           (gc/let* ((printer (new-<pair> res 0)))
+            (set printer (new-<pair> (new-<pair> symbol/quote printer) 0))
             (set printer (new-<pair> (k/intern "print") printer))
             (k/expand-encode-eval printer env))
           (libc/flush-streams))))
