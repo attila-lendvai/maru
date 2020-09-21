@@ -3,7 +3,7 @@
 
 (require "source/parsing/parser.l")
 (require "source/parsing/peg-compiler.l")
-(require "source/parsing/peg.l")
+(require "source/parsing/peg.g.l")
 
 (define *parser-stream*)
 

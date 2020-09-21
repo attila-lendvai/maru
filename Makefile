@@ -106,7 +106,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l subrs.l arrays.l)
 
-GENERATED_FILES = $(addprefix source/,parsing/peg.l assembler/asm-x86.l)
+GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
 .SUFFIXES:					# disable all built-in rules
 
@@ -114,11 +114,11 @@ all: eval
 
 clean:
 	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend),eval-$(backend)) eval
-	git checkout $(BUILD) $(GENERATED_FILES) || true
+	-git checkout --quiet $(BUILD)
 
 distclean: clean
 	rm -rf $(BUILD)
-	git checkout $(BUILD) $(GENERATED_FILES) || true
+	-git checkout --quiet $(BUILD)
 
 veryclean:
 	rm -rf $(BUILD) $(GENERATED_FILES)
@@ -254,26 +254,28 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/peg.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
+$(BUILD)/generated/peg.g.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
+	@mkdir -p $(BUILD)/generated
 	$(call maybe-build-gen-eval)
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
-source/parsing/peg.l: $(BUILD)/peg.l
+source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	cp $< $@
 
 ###
 ### x86 assembler
 ###
 # the output of gen-asm-x86.l is broken currently. probably its newest version was not checked into the repo.
-# $(BUILD)/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.l
+# $(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.l
+#	@mkdir -p $(BUILD)/generated
 # 	$(call maybe-build-gen-eval)
 # 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 # 		|| { $(BACKDATE_FILE) $@; exit 42; }
 # 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
-# source/assembler/asm-x86.l: $(BUILD)/asm-x86.l
+# source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
 # 	cp $< $@
 
 ###
