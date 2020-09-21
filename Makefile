@@ -128,7 +128,7 @@ endif
 all: eval
 
 clean:
-	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend),eval-$(backend)) eval
+	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend) eval-$(backend)) eval
 	-git checkout --quiet $(BUILD)
 
 distclean: clean

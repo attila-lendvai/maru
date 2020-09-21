@@ -25,7 +25,7 @@
 ;; 2: non-trivial runtime costs
 ;; 3: catch my bug no matter what!
 ;; 4: run a gc before every allocation
-(define *safety* 1)
+(define *safety* 0)
 
 (define unit-testing? '(t))
 

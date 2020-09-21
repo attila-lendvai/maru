@@ -119,6 +119,7 @@
 ;; override the slot-accessor choke-point. any accessor expanded after this point
 ;; will expand to a simple oop-at form that the compiler can directly deal with.
 (define-form slot-value (type-name slot-name object)
+  ;; TODO either get rid of the get/put accessors, or expand this to them, but see note below
   (let* ((type (eval type-name))
          (slot-index (record/slot-index type slot-name)))
     (list 'oop-at

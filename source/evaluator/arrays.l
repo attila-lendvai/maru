@@ -30,7 +30,7 @@
                                   0)))
            (unless (< idx capacity)
              (when (= 0 capacity)
-               (set capacity 1))
+               (set capacity 4)) ; start from a reasonably not-small number
              (while (not (< idx capacity))
                (set capacity (* capacity 2)))
              (gc/let* ((new-elements (,(if elements-are-opaque? 'gc/allocate-opaque 'gc/allocate)
@@ -63,4 +63,4 @@
          obj))))
 
 (define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	target/word-size-in-bytes)
-(define-vector-accessors <string>	k/string	t	string-at	copy-bytes	move-bytes	1)
+(define-vector-accessors <string>	k/string	t	byte-at		copy-bytes	move-bytes	1)

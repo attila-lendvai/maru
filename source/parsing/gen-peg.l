@@ -1,7 +1,13 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 ;;;
-;;; The bootstrapping of source/parsing/peg.l
+;;; The bootstrapping of source/parsing/peg.g.l.
+;;;
+;;; Its steps are:
+;;;   1) use Maru expressions to instantiate the rules describing the PEG grammar
+;;;   2) compile this into the first iteration of the PEG parser implementation (stored in BEG)
+;;;   3) use this parser to parse the PEG grammar found in peg.g, and to generate a parser (stored in PEG)
+;;;   4) assert that BEG and PEG are identical
 ;;;
 
 (define-function progress args
