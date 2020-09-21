@@ -230,8 +230,13 @@
 
 ;;; configuration
 
-;; TODO rework config so that the name slot only gets added when true
-(define-constant feature/track-expr-names	true)
+;; this may or may not be defined by the makefile
+(if (defined? 'feature/profiler)
+    (eval '(when (= feature/profiler 0)
+             (set feature/profiler ())))
+  (eval '(define feature/profiler ())))
+
+(define-constant feature/track-expr-names	(or true feature/profiler))
 (define-constant feature/typecheck-slot-access	(if (and (< *optimised* 1) (< 0 *safety*)) true)) ; bootstrap? artifact, drop in the next stage
 
 ;;; let*
@@ -904,10 +909,12 @@
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
-(define-record		<expr>			() (parameters body env ctx (when-at-expand feature/track-expr-names name)))
+(define-record		<expr>			() (parameters body env ctx
+                                                     (when-at-expand feature/track-expr-names	name)
+                                                     (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<fixed>			() (function))
-(define-record		<subr>			() (_name _imp _sig _profile))
+(define-record		<subr>			() (_imp _name (when-at-expand feature/profiler profiler-counter)))
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))

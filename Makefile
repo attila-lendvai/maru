@@ -11,6 +11,7 @@
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
+#  make PROFILER=1 test-bootstrap-x86 || beep
 #
 # the makefile parallelism is mostly only between the backends.
 
@@ -104,9 +105,23 @@ HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
+GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
+
 EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l subrs.l arrays.l)
 
-GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
+# for some optional C files, e.g. profiler.c
+EVAL_OBJ_x86	=
+EVAL_OBJ_llvm	=
+
+ifdef PROFILER
+  PROFILER	= 1
+  EVAL_OBJ_x86	+= $(BUILD_x86)/profiler.o
+  EVAL_OBJ_llvm	+= $(BUILD_llvm)/profiler.o
+  PROFILER_ARG	= -p
+else
+  PROFILER	= 0
+  PROFILER_ARG	=
+endif
 
 .SUFFIXES:					# disable all built-in rules
 
@@ -149,13 +164,14 @@ eval-llvm: $(BUILD_llvm)/eval2
 # some functionality may be broken in this one. this is when we are 'evolving'.
 # stage 6 note: in this stage we skip the eval1 step and compile eval2 straight away
 # by using the eval.exe of the previous stage to execute our version of the compiler.
-$(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
+$(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\
 		source/bootstrapping/early.l				\
+		--define feature/profiler		$(PROFILER)		\
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
@@ -166,19 +182,20 @@ $(BUILD_x86)/eval2.s: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILE
 		source/evaluator/eval.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval2.ll: $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\
 		source/bootstrapping/early.l				\
+		--define feature/profiler		$(PROFILER)		\
 		boot.l							\
 		source/bootstrapping/slave-extras.l			\
 		source/bootstrapping/late.l				\
-		--define target/cpu			$(TARGET_CPU_llvm)		\
-		--define target/vendor			$(TARGET_VENDOR)		\
-		--define target/os			$(TARGET_OS)			\
+		--define target/cpu			$(TARGET_CPU_llvm)	\
+		--define target/vendor			$(TARGET_VENDOR)	\
+		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_llvm)					\
 		source/evaluator/eval.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
@@ -216,10 +233,11 @@ $(HOST_DIR)/eval:
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(1)									\
+  $(TIME) $(1) $(PROFILER_ARG)							\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\
+	--define feature/profiler		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
 	--define target/cpu			$(TARGET_CPU_x86)		\
@@ -231,10 +249,11 @@ define compile-x86
 endef
 
 define compile-llvm
-  $(TIME) $(1)									\
+  $(TIME) $(1) $(PROFILER_ARG)							\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\
+	--define feature/profiler		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
 	--define target/cpu			$(TARGET_CPU_llvm)		\
@@ -280,19 +299,27 @@ source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
 ###
 ### Pattern rules
 ###
-$(BUILD)/%: $(BUILD)/%.s
+$(BUILD_x86)/%: $(BUILD_x86)/%.s
 	@mkdir -p $(@D)
-	$(CC) -m32 -o $@ $<
+	$(CC) -m32 -o $@ $(EVAL_OBJ_x86) $<
 	@-$(STRIP) $@ -o $@.stripped
+
+$(BUILD_x86)/%.o: source/evaluator/%.c
+	@mkdir -p $(@D)
+	$(CC) -m32 -c -o $@ $<
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
 	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
-	$(CLANG) --target=$(TARGET_llvm) -o $@ $@.o
+	$(CLANG) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
 	@-$(STRIP) $@ -o $@.stripped
 	@-$(LLC) -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
 #	$(CLANG) --target=$(TARGET_llvm) -S -o $@.clang.s $<
+
+$(BUILD_llvm)/%.o: source/evaluator/%.c
+	@mkdir -p $(@D)
+	$(CLANG) --target=$(TARGET_llvm) -c -o $@ $<
 
 ###
 ### Tests

@@ -274,6 +274,8 @@
   (let ((arg (get/head -args-)))
     (or (is/long arg)
         (k/error "argument to subr_exit is not a <long>: " arg))
+    (when-at-expand feature/profiler
+      (profiler/disable))
     (libc/flush-streams)
     (libc/exit (get/long arg))))
 

@@ -17,7 +17,7 @@
 ;(define-form debug/identities	prog		`(let () ,@prog))
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
-(define-constant feature/backtrace		(or true  (< 0 *safety*)))
+(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
 (define-constant feature/object-canary		(or false (<= 3 *safety*)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
@@ -458,6 +458,8 @@
     (put (<expr> body)		obj body)
     (put (<expr> env)		obj env)
     (put (<expr> ctx)		obj ctx)
+    (when-at-expand feature/profiler
+      (put (<expr> profiler-counter) obj (new-<long> 0)))
     obj))
 
 (define-function new-<form> (fn sym)
@@ -473,8 +475,10 @@
 
 (define-function new-<subr> (_imp _name)
   (let ((obj (new-record-instance/opaque <subr>)))
-    (put (<subr> _imp)		obj _imp )
+    (put (<subr> _imp)		obj _imp)
     (put (<subr> _name)		obj _name)
+    (when-at-expand feature/profiler
+      (put (<subr> profiler-counter) obj 0))
     obj))
 
 (define-function new-<variable> (name value env index)
@@ -680,7 +684,11 @@
         (set frame.callee-designator	callee-designator)
         (set frame.callee		callee)
         (set frame.arguments		args))
-      frame)))
+      frame))
+
+  (define-function current-call-frame ()
+    (when (< 0 *call-stack-index*)
+      (k/array-at *call-stack* (- *call-stack-index* 1)))))
 
 (define-function print-backtrace ()
   (if-at-expand feature/backtrace
@@ -991,6 +999,46 @@
   (set *module* module)
   (capture-well-known-vm-values))
 
+(when-at-expand feature/profiler
+  ;; these are coming from profiler.c
+  (define-foreign-function install_profiler_handler void install_profiler_handler (*))
+  (define-foreign-function set_profiler_interval void set_profiler_interval (int))
+
+  (define profiler/sample-counter 0)
+
+  (define-function profiler/take-sample (_)
+    (incr profiler/sample-counter)
+    (let ((frame (current-call-frame)))
+      (when frame
+        (let* ((callee		(<call-frame>-callee frame))
+               (callee-type	(get/type callee)))
+          (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
+            (cond
+              ((= callee-type <expr>)		(incr-boxed	(<expr>-profiler-counter callee)))
+              ((= callee-type <subr>)		(incr		(<subr>-profiler-counter callee)))))))))
+
+  (define-function profiler/disable ()
+    (set_profiler_interval 0)
+    (when (< 0 profiler/sample-counter)
+      (libc/fprintf libc/stderr "Profiler took %ld samples:\n" profiler/sample-counter)
+      (let ((obj (gc/first-object)))
+        (while obj
+          (let ((type (get/type obj))
+                (name ())
+                (counter ()))
+            (cond
+              ((and (= type <expr>)
+                    (< 0 (set counter (get/long (<expr>-profiler-counter obj)))))
+               (set name (<expr>-name obj))
+               (when name
+                 (set name (get/symbol name))))
+              ((and (= type <subr>)
+                    (< 0 (set counter (<subr>-profiler-counter obj))))
+               (set name (<subr>-_name obj))))
+            (when name
+              (libc/fprintf libc/stderr "%ld\t%s\n" counter name)))
+          (set obj (gc/next-object obj)))))))
+
 ;;;
 ;;; the subr's
 ;;;
@@ -1146,6 +1194,15 @@
                (set tmp (new-<long> *arg/optimised*))
                (put/variable-value "*optimised*" tmp))
 
+              ;; -p
+              ((not (libc/strcmp arg "-p"))
+               (if-at-expand feature/profiler
+                   (let ((usecs 1000))
+                     (install_profiler_handler profiler/take-sample)
+                     (set_profiler_interval usecs)
+                     (libc/fprintf libc/stderr "profiling at every %ld uSec(s)\n" usecs))
+                 (libc/fprintf libc/stderr "WARNING: this build has no profiler, ignoring -p\n")))
+
               ;; -
               ((not (libc/strcmp arg "-"))
                (k/repl-stream libc/stdin))
@@ -1199,6 +1256,8 @@
 
   (gc/collect)
   (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free)
+  (when-at-expand feature/profiler
+    (profiler/disable))
   (libc/flush-streams)
 
   (debug (libc/printf "main is returning normally\n"))
