@@ -70,6 +70,20 @@
 (define-function gc/object-size (obj)
   (<header>-size (header-of obj)))
 
+(define-function %next-object-from-header (header)
+  (while (not (bitwise-and <header>-flags/used (<header>-flags header)))
+    (set header (<header>-next header))
+    (when (= header gc/memory-base)
+      (return 0)))
+  (return (+ header size-of-<header>)))
+
+(define-function gc/first-object ()
+  (return (%next-object-from-header (<header>-next gc/memory-base))))
+
+(define-function gc/next-object (obj)
+  (or obj (return ()))
+  (return (%next-object-from-header (<header>-next (header-of obj)))))
+
 (define-function gc/sweep ()
   (gc/debug (libc/printf "sweep\n"))
   (let ((ptr gc/memory-base)
