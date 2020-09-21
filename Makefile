@@ -344,3 +344,11 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
 	./eval-x86 boot.l tests/test-elf.l
 	@-chmod +x build/a.out
+
+tests/parsing/%.g.l: tests/parsing/%.g source/parsing/parser.l source/parsing/peg.g.l
+	$(call maybe-build-gen-eval)
+	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+		|| { $(BACKDATE_FILE) $@; exit 42; }
+
+test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
+	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l

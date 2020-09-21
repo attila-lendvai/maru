@@ -858,3 +858,6 @@
 	 (result  (parse-stream grammar rule stream)))
     (close handle)
     result))
+
+(define-function parse-string (grammar rule str)
+  (parse-stream grammar rule (string-stream str)))
