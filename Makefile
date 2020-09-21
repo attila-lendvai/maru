@@ -254,7 +254,7 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/peg.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compile.l
+$(BUILD)/peg.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
 	$(call maybe-build-gen-eval)
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
@@ -267,7 +267,7 @@ source/parsing/peg.l: $(BUILD)/peg.l
 ### x86 assembler
 ###
 # the output of gen-asm-x86.l is broken currently. probably its newest version was not checked into the repo.
-# $(BUILD)/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile.l source/parsing/peg.l
+# $(BUILD)/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.l
 # 	$(call maybe-build-gen-eval)
 # 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 # 		|| { $(BACKDATE_FILE) $@; exit 42; }

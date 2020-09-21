@@ -2,7 +2,7 @@
   (list-do val vals (array-append arr val)))
 
 (require "source/parsing/parser.l")
-(require "source/parsing/peg-compile.l")
+(require "source/parsing/peg-compiler.l")
 (require "source/parsing/peg.l")
 
 (define *parser-stream*)

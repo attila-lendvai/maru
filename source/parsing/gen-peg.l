@@ -11,7 +11,7 @@
 (progress "loading dependencies")
 
 (require "source/parsing/parser.l")
-(require "source/parsing/peg-compile.l")
+(require "source/parsing/peg-compiler.l")
 
 (progress "defining bootstrap parser")
 
