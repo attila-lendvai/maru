@@ -221,7 +221,7 @@ value =
  | 'match-string .:str			-> `(set self.result (parser-stream-match-string self.source ,str))
  | 'match-object .:obj			-> `(and (= ',obj (parser-stream-peek self.source))
  					         (set self.result (parser-stream-next self.source)))
- | 'match-any				-> '(and (!= *end* (parser-stream-peek self.source))
+ | 'match-any				-> '(and (!= +end+ (parser-stream-peek self.source))
 					      (let () (set self.result (parser-stream-next self.source)) 1))
  | 'make-span effect:exp		-> `(let ((pos (<parser-stream>-position self.source)))
  					      (and ,exp
