@@ -27,12 +27,12 @@
 (define-function .long longs		(list-do long longs (_L () (eval long))))
 (define-function .ascii strings		(list-do string strings (string-do char string (_B () char))))
 
-(define-function movlIR (src dst)	(MOVLir () src dst))
-(define-function movlRM (src dst)	(MOVLrm () src dst 0 0 0))
-(define-function inclR (dst)		(INCLr () dst))
-(define-function pushlI (src)		(PUSHLi () src))
-(define-function addlIR (src dst)	(ADDLir () src dst))
-(define-function sublIR (src dst)	(SUBLir () src dst))
+(define-function movlIR (src dst)	(MOVLir src dst ()))
+(define-function movlRM (src dst)	(MOVLrm src dst 0 0 0 ()))
+(define-function inclR (dst)		(INCLr dst ()))
+(define-function pushlI (src)		(PUSHLi src ()))
+(define-function addlIR (src dst)	(ADDLir src dst ()))
+(define-function sublIR (src dst)	(SUBLir src dst ()))
 (define-function intI (src)		(_B () 0xCD) (_B () src))
 
 (define-function assemble (program)

@@ -267,16 +267,15 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-# the output of gen-asm-x86.l is broken currently. probably its newest version was not checked into the repo.
-# $(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.l
-#	@mkdir -p $(BUILD)/generated
-# 	$(call maybe-build-gen-eval)
-# 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
-# 		|| { $(BACKDATE_FILE) $@; exit 42; }
-# 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
+$(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
+	@mkdir -p $(BUILD)/generated
+	$(call maybe-build-gen-eval)
+	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
+		|| { $(BACKDATE_FILE) $@; exit 42; }
+	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
-# source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
-# 	cp $< $@
+source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
+	cp $< $@
 
 ###
 ### Pattern rules
