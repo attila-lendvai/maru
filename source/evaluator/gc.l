@@ -3,6 +3,41 @@
 ;;; A naive precise mark-and-sweep GC.
 ;;;
 
+;; the header of heap objects
+(define-record <header> () (size flags next type (when-at-expand feature/object-canary canary)))
+
+(define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
+
+(define-constant <header>-flags/used	1)
+(define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects
+(define-constant <header>-flags/mark	4)
+
+(define-form gc/header-of (arg)
+  `(- ,arg ,size-of-<header>))
+
+(define-form gc/payload-of (arg)
+  `(+ ,arg ,size-of-<header>))
+
+(let ((marker 0xDEADBEE)) ; an easy to notice token without any meaning
+  (define-form gc/valid-header-canary? (header)
+    (if feature/object-canary
+        `(= (<header>-canary ,header) ,marker)
+      true))
+
+  (define-form gc/initialize-header-canary (header)
+    (when feature/object-canary
+      `(set (<header>-canary ,header) ,marker))))
+
+(define-form gc/valid-maru-value? (obj)
+  (if feature/object-canary
+      `(let ((__obj__ ,obj))
+         (or (immediate? __obj__)
+             (gc/valid-header-canary? (gc/header-of __obj__))))
+    true))
+
+;;;
+;;; The GC's state
+;;;
 (define gc/minimum-growth-unit	(* 50 1024))
 (define gc/frequency            32768)
 
@@ -68,21 +103,21 @@
     new-block))
 
 (define-function gc/object-size (obj)
-  (<header>-size (header-of obj)))
+  (<header>-size (gc/header-of obj)))
 
 (define-function %next-object-from-header (header)
   (while (not (bitwise-and <header>-flags/used (<header>-flags header)))
     (set header (<header>-next header))
     (when (= header gc/memory-base)
       (return 0)))
-  (return (+ header size-of-<header>)))
+  (return (gc/payload-of header)))
 
 (define-function gc/first-object ()
   (return (%next-object-from-header (<header>-next gc/memory-base))))
 
 (define-function gc/next-object (obj)
   (or obj (return ()))
-  (return (%next-object-from-header (<header>-next (header-of obj)))))
+  (return (%next-object-from-header (<header>-next (gc/header-of obj)))))
 
 (define-function gc/sweep ()
   (gc/debug (libc/printf "sweep\n"))
@@ -113,10 +148,10 @@
 (define-function gc/mark-and-trace (obj)
   (and obj
        (not (immediate? obj))
-       (let* ((header (header-of obj))
+       (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p (%p) flags %ld size %ld type %ld\n" obj header flags (<header>-size header) (<header>-type header)))
-         (safety 3 (or (valid-header-canary? header)		(fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
+         (safety 3 (or (gc/valid-header-canary? header)		(fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
          (safety 1 (or (bitwise-and <header>-flags/used flags)	(fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
          (or (bitwise-and flags <header>-flags/mark)
              (let ()
@@ -139,7 +174,7 @@
   (for (i 0 gc/root-count)
     (let* ((root-ptr	(oop-at gc/roots i))
            (root	(oop-at root-ptr 0)))
-      (gc/debug (libc/printf "mark gc root %ld : %p -> %p (%p)\n" i root-ptr root (header-of root)))
+      (gc/debug (libc/printf "mark gc root %ld : %p -> %p (%p)\n" i root-ptr root (gc/header-of root)))
       (gc/mark-and-trace root)))
   (gc/debug (libc/printf "finished marking gc roots\n"))
   (gc/sweep)
@@ -185,13 +220,13 @@
                 (set gc/alloc-count (+ gc/alloc-count 1))
                 ;; initialize the freshly reserved chunk
                 (let* ((header chunk)
-                       (obj (+ header size-of-<header>)))
+                       (obj (gc/payload-of header)))
                   (set (<header>-flags header) <header>-flags/used)
                   (set (<header>-type header) type)
                   (libc/memset obj 0 chunk-size)
                   (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (k/assert (bitwise-and <header>-flags/used (<header>-flags header)) "gc/allocate: was about to return with an object whose USED flag is unset"))
-                  (safety 3 (initialize-header-canary header))
+                  (safety 3 (gc/initialize-header-canary header))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (header: %p), type %ld, size %ld\n" obj header (<header>-type header) (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
@@ -200,7 +235,7 @@
 
 (define-function gc/allocate-opaque (type requested-size)
   (let* ((obj (gc/allocate type requested-size))
-         (header (header-of obj)))
+         (header (gc/header-of obj)))
     (set (<header>-flags header) (bitwise-or (<header>-flags header) <header>-flags/opaque))
     obj))
 

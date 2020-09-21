@@ -107,35 +107,6 @@
 (define-form move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-;; the header of heap objects
-(define-record <header> () (size flags next type (when-at-expand feature/object-canary canary)))
-
-(define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
-
-(define-form header-of (arg)
-  `(- ,arg ,size-of-<header>))
-
-(let ((marker 233495534)) ; 0xDEADBEE, it's just an easy to recognize token without any meaning
-  (define-form valid-header-canary? (header)
-    (if feature/object-canary
-        `(= (<header>-canary ,header) ,marker)
-      true))
-
-  (define-form initialize-header-canary (header)
-    (when feature/object-canary
-      `(set (<header>-canary ,header) ,marker))))
-
-(define-form valid-maru-value? (obj)
-  (if feature/object-canary
-      `(let ((__obj__ ,obj))
-         (or (immediate? __obj__)
-             (valid-header-canary? (header-of __obj__))))
-    true))
-
-(define-constant <header>-flags/used	1)
-(define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects
-(define-constant <header>-flags/mark	4)
-
 (define *subr-registry* ()) ; define-subr collects them here at compile time
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,6 +246,12 @@
      (die)))
 
 ;;;
+;;; garbage collector
+;;; ----------------------------------------------------------------
+
+(require "source/evaluator/gc.l")
+
+;;;
 ;;; types and their kernel accessors (get, put, is)
 ;;;
 ;;; unsurprisingly, types are represented in the target as integers.
@@ -296,8 +273,8 @@
    `(define-function get/type (ptr)
       (cond
         ,@conds-early
-        ((oop? ptr)	(let ((header (header-of ptr)))
-                          (safety 3 (or (valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
+        ((oop? ptr)	(let ((header (gc/header-of ptr)))
+                          (safety 3 (or (gc/valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
         ,@conds-late
@@ -390,10 +367,8 @@
 (define-function k/cadddr	(list)		(k/car (k/cdr (k/cdr (k/cdr list)))))
 
 ;;;
-;;; GC and instantiation
+;;; object instantiation
 ;;; ----------------------------------------------------------------
-
-(require "source/evaluator/gc.l")
 
 (define-form new-record-instance (type)
   (set type (eval type))
@@ -672,8 +647,8 @@
 
 (when-at-expand feature/backtrace
   (define-function %new-call-frame (callee-designator callee args)
-    (safety 3 (unless (or (not callee-designator)	(valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
-    (safety 3 (unless (or (not callee)			(valid-maru-value? callee))		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
+    (safety 3 (unless (or (not callee-designator)	(gc/valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
+    (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
     (let ((frame (k/array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 1 (k/assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type frame)))
