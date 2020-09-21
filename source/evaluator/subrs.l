@@ -528,6 +528,16 @@
       (libc/sprintf buf "%ld" (get/long arg))
       (new-<string>-from-cstring buf))))
 
+(define-subr (string->long 1)
+  (let ((arg (get/head -args-)))
+    (k/assert (is <string> arg))
+    (let* ((str		(get/string arg))
+           (endptr	str)
+           (result	(libc/strtol str (address-of endptr) 10)))
+      (if (= (string-at endptr 0) ?\x00)
+          (new-<long> result)
+        (fatal1 "invalid number in string->long, libc/strtol failed for '%s'" str)))))
+
 ;; TODO is this the actual primitive that we want to publish? maybe a just read-form?
 (define-subr read
   (if (= () -args-)
