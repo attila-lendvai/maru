@@ -2,30 +2,34 @@
 
 (define code (buffer 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
-(define $% 0)			;; file offset
-(define $$ 0)			;; last .org address
+;;(define $% 0)			;; file offset
+(define $$ 0)			;; last .base address
 (define $ 0)			;; current address
 
-(define-selector _B  (gen value)	(buffer-append code value) (incr $))
-(define-selector _W  (gen value)	(_B gen (bitwise-and 0xff value))   (_B gen (bitwise-and 0xff   (bitwise-asr value 8))))
-(define-selector _L  (gen value)	(_W gen (bitwise-and 0xffff value)) (_W gen (bitwise-and 0xffff (bitwise-asr value 16))))
-(define-selector _D1 (gen value)	(_B gen value))
-(define-selector _D4 (gen value)	(_L gen value))
+(define-function _B  (out value)	(buffer-append code value) (incr $))
+(define-function _W  (out value)	(_B out (bitwise-and 0xff value))   (_B out (bitwise-and 0xff   (bitwise-asr value 8))))
+(define-function _L  (out value)	(_W out (bitwise-and 0xffff value)) (_W out (bitwise-and 0xffff (bitwise-asr value 16))))
+(define-function _D1 (out value)	(_B out value))
+(define-function _D4 (out value)	(_L out value))
 
 (require "source/assembler/asm-x86.l")
 
 (define-function define-label (name value)
-  (or (= (eval name) value)
-      (let ()
-	(eval (list 'set name value))
-	(set phased 1))))
+  (unless (= (eval name) value)
+    (eval (list 'set name value))
+    (set phased 1)))
 
-(define-function .org (addr)		(set $$ (set $ (eval addr))))
-(define-form	 .equ (name expr)	(define-label name (eval expr)) ())
-(define-function .byte bytes		(list-do byte bytes (_B () (eval byte))))
-(define-function .half halfs		(list-do half halfs (_W () (eval half))))
-(define-function .long longs		(list-do long longs (_L () (eval long))))
+(define-function .base (addr)		(set $$ (set $ (eval addr))))
+(define-form	 .def (name expr)	(define-label name (eval expr)) ())
+(define-function .i8 bytes		(list-do byte bytes (_B () (eval byte))))
+(define-function .i16 halfs		(list-do half halfs (_W () (eval half))))
+(define-function .i32 longs		(list-do long longs (_L () (eval long))))
 (define-function .ascii strings		(list-do string strings (string-do char string (_B () char))))
+(define-function .asciiz strings	(apply .ascii strings) (_B () 0))
+(define-function .align (bytes)		(let ((remainder (bitwise-and $ (- bytes 1))))
+                                          (when (< 0 remainder)
+                                            (times-do (- bytes remainder)
+                                              (_B () 0)))))
 
 (define-function movlIR (src dst)	(MOVLir src dst ()))
 (define-function movlRM (src dst)	(MOVLrm src dst 0 0 0 ()))
@@ -39,7 +43,7 @@
   (list-do insn program
     (cond
       ((symbol? insn)		(eval (list 'define insn 0)))
-      ((= '.equ (car insn))	(eval (list 'define (cadr insn) 0)))))
+      ((= '.def (car insn))	(eval (list 'define (cadr insn) 0)))))
   (set phased 1)
   (while phased
     (set phased ())
@@ -53,36 +57,45 @@
   (println "assembled "(buffer-length code)" bytes")
   )
 
+;; man elf
+;; /usr/include/linux/elf.h
+;; https://cirosantilli.com/elf-hello-world
+;; man 8 ld-linux.so
+
 (assemble '(
-	(.org	0x08048000)
-ehdr	(.byte	0x7f)				;   ident
+	(.base	0x08048000)			; with ASLR disabled, programs for x86 architecture are based at 0x8048000 by the linker: https://stackoverflow.com/questions/18296276/base-address-of-elf
+file-start
+	(.i8	0x7f)				; ident
 	(.ascii	"ELF")
-	(.byte	1 1 1 0)
-	(.byte	0 0 0 0 0 0 0 0)
-	(.half	2)				;   type
-	(.half	3)				;   machine
-	(.long	1)				;   version
-	(.long	start)				;   entry
-	(.long	(- phdr $$))			;   phoff
-	(.long	0)				;   shoff
-	(.long	0)				;   flags
-	(.half	ehdrsize)			;   ehsize
-	(.half	phdrsize)			;   phentsize
-	(.half	1)				;   phnum
-	(.half	0)				;   shentsize
-	(.half	0)				;   shnum
-	(.half	0)				;   shstrndx
-	(.equ	ehdrsize (- $ ehdr))
-phdr	(.long	1)				;   type
-	(.long	0)				;   offset
-	(.long	$$)				;   vaddr
-	(.long	$$)				;   paddr
-	(.long	filesize)			;   filesz
-	(.long	filesize)			;   memsz
-	(.long	5)				;   flags
-	(.long	0x1000)				;   align
-	(.equ	phdrsize (- $ phdr))
-start	(movlIR	4 _EAX)
+	(.i8	1 1 1 0)			; ELFCLASS32, ELFDATA2LSB, version, ELFOSABI_NONE
+	(.i8	0 0 0 0 0 0 0 0)		; EI_ABIVERSION and padding
+	(.i16	2)				; type (ET_EXEC = 2)
+	(.i16	3)				; machine (EM_386 = 3)
+	(.i32	1)				; version
+	(.i32	entry-point)			; entry point
+	(.i32	(- section-headers file-start))	; phoff
+	(.i32	0)				; shoff
+	(.i32	0)				; flags
+	(.i16	elf-header-size)		; ehsize
+	(.i16	section-header-size)		; phentsize, of *one* section header, the rest are the same.
+	(.i16	1)				; phnum
+	(.i16	0)				; shentsize
+	(.i16	0)				; shnum
+	(.i16	0)				; shstrndx
+	(.def	elf-header-size (- $ file-start))
+section-headers
+	(.i32	1)				; type (1 = PT_LOAD)
+	(.i32	0)				; offset
+	(.i32	0x08048000)			; vaddr
+	(.i32	0)				; paddr
+	(.i32	file-size)			; filesz
+	(.i32	file-size)			; memsz
+	(.i32	5)				; flags (PF_R + PF_X = 5)
+	(.i32	0x1000)				; alignment
+	(.def	section-header-size (- $ section-headers)) ; of *one* section header
+	;; (.align	0x1000)
+entry-point
+	(movlIR	4 _EAX)
 	(movlIR	1 _EBX)
 	(movlIR	msg _ECX)
 	(movlIR	msglen _EDX)
@@ -91,15 +104,13 @@ start	(movlIR	4 _EAX)
 	(movlIR	0 _EBX)
 	(intI	0x80)
 msg	(.ascii	"Hello, world! From an elf binary!\n")
-	(.equ	msglen (- $ msg))
-	(.equ	filesize (- $ $$))
-end	))
+	(.def	msglen (- $ msg))
+	;;(.def	code-size (- $ entry-point))
+	(.def	file-size (- $ file-start))))
 
-(println "writing buffer")
+(print "writing buffer to ")
 
-(buffer-save code "./build/a.out")
-
-(println "buffer written to ./build/a.out")
+(buffer-save code (println "./build/test-elf"))
 
 ;; for details on int 0x80 see:
 ;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
@@ -117,7 +128,7 @@ end	))
 	;;(movlRM	_EAX 0)				; crash! for testing...
 	(RET	0)
 msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
-	(.equ	msglen (- $ msg))))
+	(.def	msglen (- $ msg))))
 
 (println "calling it, printed output should follow")
 
@@ -133,7 +144,7 @@ msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
 	(movlIR	0 _EBX)				; status
 	(intI	0x80)
 msg	(.ascii	"Now run ./a.out for a friendly greeting\n")
-	(.equ	msglen (- $ msg))))
+	(.def	msglen (- $ msg))))
 
 (println "calling it, printed output should follow")
 

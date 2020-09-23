@@ -368,7 +368,9 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 
 test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
 	./eval-x86 boot.l tests/test-elf.l
-	@-chmod +x build/a.out
+	@chmod +x build/test-elf
+	-readelf -el build/test-elf
+	./build/test-elf
 
 tests/parsing/%.g.l: tests/parsing/%.g source/parsing/parser.l source/parsing/peg.g.l
 	$(call maybe-build-gen-eval)
