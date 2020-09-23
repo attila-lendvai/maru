@@ -1128,12 +1128,13 @@
 
 (define-method do-dump  <undefined>	()	(primitive/dump self))
 (define-method do-dump  <string>	()	(primitive/dump self))
-(define-method do-print <symbol>	()	(primitive/dump self))
-(define-method do-print <long>		()	(primitive/dump self))
+(define-method do-dump	<symbol>	()	(primitive/dump self))
+(define-method do-dump	<long>		()	(primitive/dump self))
 (define-method do-dump  <array>		()	(primitive/dump self))
 
-(define-method do-print <selector> ()   (print "<selector "(<selector>-name self)">"))
-(define-method do-print <type> ()	(print "<"(<type>-name self)" "(<type>-id self)">"))
+(define-method do-print <fixed>		()	(print "<fixed "(<fixed>-function self)">"))
+(define-method do-print <selector>	()	(print "<selector "(<selector>-name self)">"))
+(define-method do-print <type>		()	(print "<"(<type>-name self)" "(<type>-id self)">"))
 
 (define-method do-print <pair> ()
   (print "(")
