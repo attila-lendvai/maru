@@ -193,8 +193,8 @@
                   sum)
         (set sum (+ sum x))
         (set x (- x 1)))
-      (return sum))
-  15)
+      sum)
+  16)
 
 (define-test compile/not/1
     (not ())
@@ -350,8 +350,6 @@
   99)
 
 (define-function main (argc argv)
-  (libc/printf "strcmp return value: %d\n" (libc/strcmp "bar" "foo"))
-
   (libc/printf "Printing command line args:\n")
   (for (i 0 argc)
     (libc/printf "  %.2d %s\n" i (oop-at argv i)))
@@ -364,9 +362,9 @@
     (libc/printf "++%.2d %s\n" argc (oop-at argv argc)))
 
   (when uninitialized-global
-    (failure "uninitialized-global is %d" uninitialized-global))
+    (failure "uninitialized-global is %ld" uninitialized-global))
   (unless (= global42 42)
-    (failure "global42 is %d" global42))
+    (failure "global42 is %ld" global42))
 
   (libc/printf "About to start running the compiled tests\n")
   (run-tests)

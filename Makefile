@@ -27,9 +27,8 @@ PREVIOUS_STAGE_BACKEND	= llvm
 HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
 
-# tested to work with LLVM version 8-11
 ifeq ($(HOST_OS),Linux)
-  LLVM_VERSION	= -8
+  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
   TARGET_VENDOR	?= linux
   TARGET_OS	?= gnu
   TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'

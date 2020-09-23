@@ -34,8 +34,8 @@
 ;;(define-eval <temp-grammar> (self) ($start self *parser-stream*))
 
 (define-function repl-parser-stream (stream prompt)
-  (let ((p (parser <peg> stream))
-	(s *parser-stream*)
+  (let ((p		(parser <peg> stream))
+	(prev-stream	*parser-stream*)
 	(v))
     (set *parser-stream* stream)
     (while (let ()
@@ -54,7 +54,7 @@
 	    (print (format "%c" (parser-stream-next *parser-stream*))))
 	  (println "<EOF>")
 	  (error "abort")))
-    (set *parser-stream* s)
+    (set *parser-stream* prev-stream)
     v))
 
 (define-function repl-stream (stream prompt)	(repl-parser-stream (parser-stream stream) prompt))

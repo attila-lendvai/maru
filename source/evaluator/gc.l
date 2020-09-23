@@ -110,14 +110,14 @@
     (set header (<header>-next header))
     (when (= header gc/memory-base)
       (return 0)))
-  (return (gc/payload-of header)))
+  (gc/payload-of header))
 
 (define-function gc/first-object ()
-  (return (%next-object-from-header (<header>-next gc/memory-base))))
+  (%next-object-from-header (<header>-next gc/memory-base)))
 
 (define-function gc/next-object (obj)
-  (or obj (return ()))
-  (return (%next-object-from-header (<header>-next (gc/header-of obj)))))
+  (when obj
+    (%next-object-from-header (<header>-next (gc/header-of obj)))))
 
 (define-function gc/sweep ()
   (gc/debug (libc/printf "sweep\n"))
