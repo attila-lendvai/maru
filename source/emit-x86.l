@@ -69,8 +69,7 @@
 (define-form emit args
   `(emit-instruction ,@args))
 
-(define-generic emit-instruction op-args
-  (error "no emit-instruction defined for: " op-args ", of types: " (map type-of op-args)))
+(define-generic emit-instruction)
 
 (define-function %define-emit-param-name (index)
   (string->symbol (concat-string "$" (long->string index))))
@@ -114,7 +113,7 @@
            (putnext ?_))
           (else
            (putnext ?_)
-           (putnext (digit-for (bitwise-asr c 4)))
+           (putnext (digit-for (bitwise-shift c -4)))
            (putnext (digit-for (bitwise-and c 0xf))))))
       (incr index))
     (array->string mangled)))
@@ -216,6 +215,7 @@
 (define-emit/comparator GE "setge")
 (define-emit/comparator GT "setg")
 
+;; TODO deal with shifts that are out of range
 ;; (define-emit    (ASH TI32)			(let ((exit-label (UNIQUE-LABEL))
 ;;                                                       (lt-label (UNIQUE-LABEL)))
 ;; 						  (println "	movl	"$1", %ecx")
@@ -231,9 +231,19 @@
 
 ;; (define-emit    (ASH LI32)			(let ((shift (<LI32>-value $1)))
 ;;                                                   (cond
+;;                                                     ((< 31 shift)	(println "	xor	%eax, %eax"))
 ;;                                                     ((< 0 shift)	(println "	shll	$"shift", %eax"))
+;;                                                     ((< shift -31)	(let ((negative (UNIQUE-LABEL))
+;;                                                                               (end (UNIQUE-LABEL)))
+;;                                                                           (println "	cmpl	$0, %eax")
+;;                                                                           (println "	jl	"negative)
+;; 									  (println "	xor	%eax, %eax")
+;;                                                                           (println "	jmp	"end)
+;;                                                                           (emit DEFLABEL negative)
+;;                                                                           (println "	movl	$-1, %eax")
+;;                                                                           (emit DEFLABEL end)))
 ;;                                                     ((< shift 0)	(println "	sarl	$"(- shift)", %eax"))
-;;                                                     ((= 0 shift)	(emit COMMENT (list "shifting with literal zero"))))))
+;;                                                     ((= 0 shift)	(emit COMMENT (list "shifting with literal zero: NOP"))))))
 
 (define-emit    (ASL TI32)			(println "	movl	"$1", %ecx")
 						(println "	shll	%cl, %eax"))
@@ -463,7 +473,8 @@
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              (slave:bitwise-asl ,ASL) (slave:bitwise-asr  ,ASR)
+              ;;(slave:bitwise-shift ,ASH)
+              (slave:<< ,ASL) (slave:>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
               (slave:string-at		,LOAD-I8)
@@ -484,6 +495,7 @@
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
                        ;; see here at runtime).
                        ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       (assert op "operator not found while building +special-operators+: "op)
                        (cons op (cdr entry))))
                    arity-line))
             table))))
@@ -588,12 +600,13 @@
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
          (op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var? (<variable>-value op) op))
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
+    (emit COMMENT (list "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
     (cond
-      ((set handler (and op-is-a-var?
-                         (cadr (assq (<variable>-value op) (array-at +special-operators+ arity)))))
+      ((set handler (second (assq op-value (array-at +special-operators+ arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))

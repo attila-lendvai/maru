@@ -28,5 +28,8 @@
 (define bitwise-and	&)
 ;;(define bitwise-or	|)
 ;;(define bitwise-xor	^)
-(define bitwise-asl	<<)
-(define bitwise-asr	>>)
+(define-function bitwise-shift (value shift)
+  (cond
+    ((< 0 shift)	(<< value shift))
+    ((< shift 0)	(>> value (- shift)))
+    (else		value)))

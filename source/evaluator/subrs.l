@@ -216,22 +216,24 @@
 (define-binary-operator bitwise-and)
 (define-binary-operator bitwise-or)
 (define-binary-operator bitwise-xor)
-(define-binary-operator bitwise-asl)
-(define-binary-operator bitwise-asr)
 
 (define-subr (bitwise-not 1)
   (let ((value (get/head -args-)))
     (safety 1 (or (is/long value) (k/error "non-numeric argument for bitwise-not: "value)))
     (new-<long> (bitwise-not (get/long value)))))
 
-;; (define-subr (bitwise-shift 2)
-;;   (let ((value	(get/long (get/head -args-)))
-;;         (shift	(get/long (get/head (get/tail -args-)))))
-;;     (new-<long>
-;;      (cond
-;;        ((> shift 0)	(bitwise-asl value shift))
-;;        ((< shift 0)	(bitwise-asr value shift))
-;;        (else		value)))))
+(define-subr (bitwise-shift 2)
+  (let* ((value (get/long (get/head -args-)))
+         (shift (get/long (get/head (get/tail -args-))))
+         (bit-length-of-<long> 31) ; TODO FIXME arrange for using the actual value here
+         (max-shift (- bit-length-of-<long> 1)))
+    (new-<long>
+     (cond
+       ((< max-shift shift)	0)
+       ((< 0 shift)		(<< value shift))
+       ((< shift (- max-shift))	(if (< value 0) -1 0))
+       ((< shift 0)		(>> value (- shift)))
+       ((= 0 shift)		value)))))
 
 (define-form define-relation (op)
   `(define-subr (,op 2)

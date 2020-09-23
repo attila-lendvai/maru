@@ -54,9 +54,14 @@
       (* value   target/word-size-in-bytes)
      `(* ,value ,target/word-size-in-bytes)))
 
-;; stubs for the special operators
-(define return		(fixed (lambda args (error "return encountered in interpreted code"))))
-(define address-of	(fixed (lambda args (error "address-of encountered in interpreted code"))))
+;; some stubs for the +special-forms+
+(list-do name '(return address-of << >>)
+  (eval `(define ,name (fixed (lambda args (error ,(symbol->string name) " encountered in interpreted code"))))))
+
+;; some stubs for the +special-operators+
+;; (list-do name '()
+;;   ;; they need to be subr's, so that encode doesn't insert them
+;;   (eval `(define ,name error)))
 
 ;;;
 ;;; host code follows from here

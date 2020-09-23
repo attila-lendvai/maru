@@ -58,8 +58,8 @@
   prefix        = suffix ;
   mulop         = prefix:a      ( ("*"|"/"|"%")@$$:o            _ mulop:b                       -> (list o		a b):a    )*      -> a ;
   addop         = mulop:a       ( ("+"|"-")@$$:o                _ addop:b                       -> (list o		a b):a    )*      -> a ;
-  shiftl        = addop:a       ( "<<"@$$:o                     _ shiftl:b                      -> (list 'bitwise-asl	a b):a    )*      -> a ;
-  shiftr        = shiftl:a      ( ">>"@$$:o                     _ shiftr:b                      -> (list 'bitwise-asr	a b):a    )*      -> a ;
+  shiftl        = addop:a       ( "<<"@$$:o                     _ shiftl:b                      -> (list 'bitwise-shift	a b):a    )*      -> a ;
+  shiftr        = shiftl:a      ( ">>"@$$:o                     _ shiftr:b                      -> (list 'bitwise-shift	a (- b)):a    )*      -> a ;
   inequality    = shiftr:a      ( ("<="|"<"|">="|">")@$$:o      _ inequality:b                  -> (list o		a b):a    )*      -> a ;
   equality      = inequality:a  ( "=="@$$:o                     _ equality:b                    -> (list '=		a b):a    )*      -> a ;
   notequality   = equality:a    ( "!="@$$:o                     _ notequality:b                 -> (list o		a b):a    )*      -> a ;

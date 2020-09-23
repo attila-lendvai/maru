@@ -7,8 +7,8 @@
 (define $ 0)			;; current address
 
 (define-function _B  (out value)	(buffer-append code value) (incr $))
-(define-function _W  (out value)	(_B out (bitwise-and 0xff value))   (_B out (bitwise-and 0xff   (bitwise-asr value 8))))
-(define-function _L  (out value)	(_W out (bitwise-and 0xffff value)) (_W out (bitwise-and 0xffff (bitwise-asr value 16))))
+(define-function _W  (out value)	(_B out (bitwise-and 0xff value))   (_B out (bitwise-and 0xff   (bitwise-shift value -8))))
+(define-function _L  (out value)	(_W out (bitwise-and 0xffff value)) (_W out (bitwise-and 0xffff (bitwise-shift value -16))))
 (define-function _D1 (out value)	(_B out value))
 (define-function _D4 (out value)	(_L out value))
 

@@ -88,7 +88,7 @@
         (if (legal-char? c)
             (putnext c)
           (putnext ?\\)
-          (putnext (digit-for (bitwise-asr c 4)))
+          (putnext (digit-for (bitwise-shift c -4)))
           (putnext (digit-for (bitwise-and c 0xf)))))
       (incr index))
     (when with-zero
@@ -429,8 +429,8 @@
 (define-arithmetic-instruction OR  "or")
 (define-arithmetic-instruction XOR "xor")
 
-(define-arithmetic-instruction SLA "shl")
-(define-arithmetic-instruction SRA "ashr")
+(define-arithmetic-instruction ASL "shl")
+(define-arithmetic-instruction ASR "ashr")
 
 ;; args: baseptr, index
 (define-instruction LOAD-I8	(t 5 t)
@@ -731,7 +731,7 @@
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:bitwise-and  ,AND) (slave:bitwise-or   ,OR ) (slave:bitwise-xor ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              (slave:bitwise-asl ,SLA) (slave:bitwise-asr  ,SRA)
+              (slave:<< ,ASL) (slave:>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
               (slave:string-at		,LOAD-I8)
@@ -751,7 +751,8 @@
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
                        ;; see here at runtime).
-                       (assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       (assert op "operator not found while building +special-operators+: "op)
                        (cons op (cdr entry))))
                    arity-line))
             table))))
@@ -760,13 +761,13 @@
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
-         (op-is-a-var	(variable? op))
+         (op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var? (<variable>-value op) op))
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
     (cond
-      ((set handler (and op-is-a-var
-                         (second (assq (<variable>-value op) (array-at +special-operators+ arity)))))
+      ((set handler (second (assq op-value (array-at +special-operators+ arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))
@@ -777,16 +778,15 @@
                               (<compiler>-current-value -c-))
                             args)))
          (cond
-           ((and op-is-a-var
+           ((and op-is-a-var?
                  (global-variable? op))
-            (let ((value (<variable>-value op))
-                  (n-params ()))
+            (let ((n-params ()))
               (cond
-                ((expr? value)
+                ((expr? op-value)
                  (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
-                 (set n-params (<expr>-n-required-parameters value)))
-                ((= (type-of value) <foreign-function>)
-                 (let ((param-types	(<foreign-function>-parameter-types value)))
+                 (set n-params (<expr>-n-required-parameters op-value)))
+                ((= (type-of op-value) <foreign-function>)
+                 (let ((param-types (<foreign-function>-parameter-types op-value)))
                    (gen COMMENT (list "	casting FFI args"))
                    ;; for FFI calls we need to cast the non-pointer llvm args
                    ;; using ptrtoint to the specific llvm type.
@@ -805,9 +805,9 @@
                            (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
                            (push new-arg-regs cast-reg))))
                      ;; gen the call itself
-                     (gen CALL value (list-reverse! new-arg-regs)))
+                     (gen CALL op-value (list-reverse! new-arg-regs)))
                    ;; convert return value
-                   (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type value))))
+                   (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
                      (cond
                        ((= '%ptr return-type)) ; all good
                        ((= 'slave:void return-type)
@@ -819,13 +819,13 @@
                             ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
                             ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
                         (gen INTTOPTR '%word))))
-                   (unless (<foreign-function>-vararg? value)
+                   (unless (<foreign-function>-vararg? op-value)
                      (set n-params (list-length param-types)))))
                 (else
-                 (error "Don't know how to emit call to global value "value", in variable "op)))
+                 (error "Don't know how to emit call to global value "op-value", in variable "op)))
               (when (and n-params
                          (not (= n-params arity)))
-                (error "compile: calling " value
+                (error "compile: calling " op-value
                        " with the wrong number of arguments: " args
                        ", while expecting " n-params))))
            (else

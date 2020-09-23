@@ -46,6 +46,13 @@
   (test-assert (= 42  (* 42)))
   (test-assert (= 24  (* 1 2 3 4))))
 
+(define-test maru/arithmetic/shift ()
+  (test-assert (= 0xffffff	(bitwise-shift 0xffffff0 -4)))
+  (test-assert (= 0xffffff0	(bitwise-shift 0xffffff 4)))
+  (test-assert (= 0		(bitwise-shift 0xffffff0 10000)))
+  (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
+  (test-assert (= -1		(bitwise-shift -1 -100))))
+
 (define-test maru/string/insert ()
   (let ((x "alma"))
     (string-insert x 2 ?z)
