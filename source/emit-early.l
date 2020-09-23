@@ -17,6 +17,9 @@
 
 (switch-to-slave-module)
 
+(define-form host-value (form)
+  `(eval-in-module host ',form))
+
 (define-constant target-boolean/true  1)
 (define-constant target-boolean/false 0)
 
@@ -28,11 +31,11 @@
 ;;;
 ;;; the target's configuration
 ;;;
-(define-constant target/cpu			(eval-in-module host 'host:target/cpu))
-(define-constant target/machine			(eval-in-module host 'host:target/machine))
-(define-constant target/vendor			(eval-in-module host 'host:target/vendor))
-(define-constant target/os			(eval-in-module host 'host:target/os))
-(define-constant target/word-size-in-bits	(eval-in-module host 'host:target/word-size-in-bits))
+(define-constant target/cpu			(host-value host:target/cpu))
+(define-constant target/machine			(host-value host:target/machine))
+(define-constant target/vendor			(host-value host:target/vendor))
+(define-constant target/os			(host-value host:target/os))
+(define-constant target/word-size-in-bits	(host-value host:target/word-size-in-bits))
 (define-constant target/little-endian?		true)
 ;;(define-constant target-triplet			(concat-strings target/cpu "-" target/vendor "-" target/os))
 
