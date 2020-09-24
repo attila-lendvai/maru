@@ -511,8 +511,10 @@
   (or (pop (<compiler>-temps comp))
       (new-temp comp)))
 
-(define-function free-temp (comp temp)          (push (<compiler>-temps comp) temp))
-(define-function free-temps (comp temps)        (list-do temp temps (free-temp comp temp)))
+(define-function %free-temp (comp temp)		(when (= <TEMP> (type-of temp)) (push (<compiler>-temps comp) temp)))
+(define-function %free-temps (comp temps)	(list-do temp temps (%free-temp comp temp)))
+(define-form free-temp (temp)			`(%free-temp -c- ,temp))
+(define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
 ;;; COMPILE
 
@@ -571,12 +573,6 @@
     (gen STORE temp)
     temp))
 
-(define-function compile/expr-into-temp (expr -c-)
-  (comp expr)
-  (let ((temp (alloc-temp -c-)))
-    (gen STORE temp)
-    temp))
-
 (define-function compile/unary-operator (op args -c-)
   (comp (car args))
   (gen op))
@@ -614,7 +610,7 @@
     (list-do form (cdddr expr)
       (comp form))
     (list-do temp temps
-      (free-temp -c- temp))))
+      (free-temp temp))))
 
 (define-function %compile/and-or (op expr -c-)
   (let ((lend	(UNIQUE-LABEL))
@@ -637,7 +633,7 @@
     (gen BR lend)
     (gen DEFLABEL lend)
     (gen LOAD retval ())
-    (free-temp -c- retval)))
+    (free-temp retval)))
 
 (define-function compile/and (expr -c-)
   (%compile/and-or 'and expr -c-))
@@ -672,7 +668,7 @@
     ;; end
     (gen DEFLABEL lend)
     (gen LOAD retval ())
-    (free-temp -c- retval)))
+    (free-temp retval)))
 
 (define-function compile/while (expr -c-)
   ;; TODO double-check the return value semantics
@@ -884,7 +880,7 @@
     (emit/function-prologue (GLOBAL name) param-decls)
 
     (unless +function-parameters-are-read-only+
-      (free-temps -c- params))
+      (free-temps params))
 
     ;; all temps must be free-temp'ed properly at this point.
     (map (lambda (tmp)

@@ -70,7 +70,7 @@
   `(emit-instruction ,@args))
 
 (define-generic emit-instruction op-args
-  (error "no emit-instruction defined for: " op-args))
+  (error "no emit-instruction defined for: " op-args ", of types: " (map type-of op-args)))
 
 (define-function %define-emit-param-name (index)
   (string->symbol (concat-string "$" (long->string index))))
@@ -134,6 +134,8 @@
 
 ;;; IA32 -- INSTRUCTIONS
 
+(define-emit    (COMMENT pair)			(when *compiler-verbose* (print "## ") (apply println $1)))
+
 (define-emit    (TEXT)				(println "	.text"))
 (define-emit    (DATA)				(println "	.data"))
 (define-emit    (SECTION string)		(println "	.section "$1))
@@ -162,51 +164,85 @@
 
 (define-emit    (ADD TI32)			(println "	addl	"$1", %eax"))
 
+(define-emit    (ADD LI32)			(println "	addl	$"$1", %eax"))
+
 (define-emit    (SUB TI32)			(println "	subl	"$1", %eax"))
 
+(define-emit    (SUB LI32)			(println "	subl	$"$1", %eax"))
+
 (define-emit    (MUL TI32)			(println "	mull	"$1))
+
+(define-emit    (MUL LI32)			(println "	movl	$"$1", %ecx")
+						(println "	mull	%ecx"))
 
 (define-emit    (DIV TI32)			(println "	movl	$0, %edx")
 						(println "	divl	"$1))
 
+(define-emit    (DIV LI32)			(println "	movl	$0, %edx")
+						(println "	movl	$"$1", %ecx")
+						(println "	divl	%ecx"))
+
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
+(define-emit    (AND LI32)			(println "	andl	$"$1", %eax"))
 (define-emit    (OR  TI32)			(println "	orl	"$1", %eax"))
+(define-emit    (OR  LI32)			(println "	orl	$"$1", %eax"))
 (define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
+(define-emit    (XOR LI32)			(println "	xorl	$"$1", %eax"))
 (define-emit    (BITWISE-NOT)			(println "	notl	%eax"))
 
 (define-emit    (LOGIC-NOT)			(println "	cmpl	$0, %eax")
 						(println "	sete	%al")
 						(println "	movzbl	%al, %eax"))
 
-(define-emit    (LT TI32)			(println "	cmpl	"$1", %eax")
-						(println "	setl	%al")
-						(println "	movzbl	%al, %eax"))
+(define-form define-emit/comparator (maru-name x86-name)
+  (unless (defined? maru-name)
+    ;; TODO KLUDGE we need to do this early, otherwise the expanded define-emit's would define it twice in their own expand-time
+    (eval `(define-instruction ,maru-name)))
+  `(let ()
+     (define-emit (,maru-name TI32)
+       (println "	cmpl	"$1", %eax")
+       (println "	" ,x86-name "	%al")
+       (println "	movzbl	%al, %eax"))
+     (define-emit (,maru-name LI32)
+       (println "	cmpl	$"$1", %eax")
+       (println "	" ,x86-name "	%al")
+       (println "	movzbl	%al, %eax"))))
 
-(define-emit    (LE TI32)			(println "	cmpl	"$1", %eax")
-						(println "	setle	%al")
-						(println "	movzbl	%al, %eax"))
+(define-emit/comparator LT "setl")
+(define-emit/comparator LE "setle")
+(define-emit/comparator EQ "sete")
+(define-emit/comparator NE "setne")
+(define-emit/comparator GE "setge")
+(define-emit/comparator GT "setg")
 
-(define-emit    (EQ TI32)			(println "	cmpl	"$1", %eax")
-						(println "	sete	%al")
-						(println "	movzbl	%al, %eax"))
+;; (define-emit    (ASH TI32)			(let ((exit-label (UNIQUE-LABEL))
+;;                                                       (lt-label (UNIQUE-LABEL)))
+;; 						  (println "	movl	"$1", %ecx")
+;; 						  (println "	cmpl	$0, %ecx")
+;;                                                   (println "	je	"exit-label)
+;;                                                   (println "	jl	"lt-label)
+;;                                                   (println "	shll	%cl, %eax")
+;;                                                   (println "	jmp	"exit-label)
+;;                                                   (emit DEFLABEL lt-label)
+;;                                                   (println "	negl	%ecx")
+;;                                                   (println "	sarl	%cl, %eax")
+;;                                                   (emit DEFLABEL exit-label)))
 
-(define-emit    (NE TI32)			(println "	cmpl	"$1", %eax")
-						(println "	setne	%al")
-						(println "	movzbl	%al, %eax"))
+;; (define-emit    (ASH LI32)			(let ((shift (<LI32>-value $1)))
+;;                                                   (cond
+;;                                                     ((< 0 shift)	(println "	shll	$"shift", %eax"))
+;;                                                     ((< shift 0)	(println "	sarl	$"(- shift)", %eax"))
+;;                                                     ((= 0 shift)	(emit COMMENT (list "shifting with literal zero"))))))
 
-(define-emit	(GE TI32)			(println "	cmpl	"$1", %eax")
-						(println "	setge	%al")
-						(println "	movzbl	%al, %eax"))
-
-(define-emit    (GT TI32)			(println "	cmpl	"$1", %eax")
-						(println "	setg	%al")
-						(println "	movzbl	%al, %eax"))
-
-(define-emit    (SLA TI32)			(println "	movl	"$1", %ecx")
+(define-emit    (ASL TI32)			(println "	movl	"$1", %ecx")
 						(println "	shll	%cl, %eax"))
 
-(define-emit    (SRA TI32)			(println "	movl	"$1", %ecx")
+(define-emit    (ASL LI32)			(println "	shll	$"$1", %eax"))
+
+(define-emit    (ASR TI32)			(println "	movl	"$1", %ecx")
 						(println "	sarl	%cl, %eax"))
+
+(define-emit    (ASR LI32)			(println "	sarl	$"$1", %eax"))
 
 (define-emit    (BR LABEL)			(println "	jmp	"$1))
 
@@ -221,8 +257,8 @@
 
 (define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
-(define-emit    (LOAD GI32)			(println "	movl	" $1", %eax"))
-(define-emit    (LOAD TI32)			(println "	movl	" $1", %eax"))
+(define-emit    (LOAD GI32)			(println "	movl	"$1", %eax"))
+(define-emit    (LOAD TI32)			(println "	movl	"$1", %eax"))
 
 (define-emit    (STORE TI32)			(println "	movl	%eax, "$1))
 (define-emit    (STORE GI32)			(println "	movl	%eax, "$1))
@@ -233,10 +269,14 @@
 (define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	movl	%ecx, "$2))
 
-(define-emit    (COMMENT pair)			(when *compiler-verbose* (print "## ") (apply println $1)))
+(define-emit    (MOVE LI32 TI32)		(println "	movl	$"$1", "$2))
 
 (define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
+						(println "	xorl	%eax, %eax")
+						(println "	movb	(%ecx), %al"))
+
+(define-emit    (LOAD-I8 LI32)			(println "	leal	"$1"(%eax), %ecx")
 						(println "	xorl	%eax, %eax")
 						(println "	movb	(%ecx), %al"))
 
@@ -245,14 +285,32 @@
 						(println "	movl	"$2", %eax")
 						(println "	movb	%al, (%ecx)"))
 
+(define-emit    (STORE-I8 TI32 LI32)		(println "	movl	"$1", %ecx")
+						(println "	leal	(%eax, %ecx), %ecx")
+						(println "	movb	$"$2", (%ecx)"))
+
+(define-emit    (STORE-I8 LI32 TI32)		(println "	leal	"$1"(%eax), %ecx")
+						(println "	movl	"$2", %eax")
+						(println "	movb	%al, (%ecx)"))
+
 (define-emit    (LOAD-OOP TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx, 4), %ecx")
+						(println "	movl	(%ecx), %eax"))
+
+(define-emit    (LOAD-OOP LI32)			(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
 						(println "	movl	(%ecx), %eax"))
 
 (define-emit    (STORE-OOP TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx, 4), %ecx")
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
+
+(define-emit    (STORE-OOP LI32 TI32)		(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
+						(println "	movl	"$2", %eax")
+						(println "	movl	%eax, (%ecx)"))
+
+(define-emit    (STORE-OOP LI32 LI32)		(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
+						(println "	movl	$"$2", (%ecx)"))
 
 ;;;
 
@@ -310,8 +368,10 @@
   (or (pop (<compiler>-temps comp))
       (new-temp comp)))
 
-(define-function free-temp (comp temp)          (push (<compiler>-temps comp) temp))
-(define-function free-temps (comp temps)        (list-do temp temps (free-temp comp temp)))
+(define-function %free-temp (comp temp)		(when (temp? temp) (push (<compiler>-temps comp) temp)))
+(define-function %free-temps (comp temps)	(list-do temp temps (%free-temp comp temp)))
+(define-form free-temp (temp)			`(%free-temp -c- ,temp))
+(define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
 ;;; COMPILE
 
@@ -346,7 +406,9 @@
     (gen LOAD label)))
 
 (define-function compile/prog-into-temp (prog -c-)
-  (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
+  (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
+  ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp
+  ;; but our single caller, namely compile/let, requires a temp location, even when initialized to literal values.
   (while (pair? prog)
     (comp (car prog))
     (set prog (cdr prog)))
@@ -355,10 +417,14 @@
     temp))
 
 (define-function compile/expr-into-temp (expr -c-)
-  (comp expr)
-  (let ((temp (alloc-temp -c-)))
-    (gen STORE temp)
-    temp))
+  (cond
+    ((long? expr)
+     (LI32 expr))
+    (else
+      (comp expr)
+      (let ((temp (alloc-temp -c-)))
+        (gen STORE temp)
+        temp))))
 
 (define-function compile/unary-operator (op args -c-)
   (comp (car args))
@@ -367,15 +433,15 @@
 (define-function compile/binary-operator (op args -c-)
   (let ((tmp (compile/expr-into-temp (cadr args) -c-)))
     (comp (car args))
-    (free-temp -c- tmp)
+    (free-temp tmp)
     (gen op tmp)))
 
 (define-function compile/ternary-operator (op args -c-)
   (let ((tmp2 (compile/expr-into-temp (caddr args) -c-))
         (tmp1 (compile/expr-into-temp (cadr  args) -c-)))
     (comp (car args))
-    (free-temp -c- tmp1)
-    (free-temp -c- tmp2)
+    (free-temp tmp1)
+    (free-temp tmp2)
     (gen op tmp1 tmp2)))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
@@ -391,7 +457,7 @@
              ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
               (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
               (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              (slave:bitwise-asl ,SLA) (slave:bitwise-asr  ,SRA)
+              (slave:bitwise-asl ,ASL) (slave:bitwise-asr  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
               (slave:string-at		,LOAD-I8)
@@ -432,7 +498,7 @@
   (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
     (list-do stmt (cdddr expr)
       (comp stmt))
-    (free-temps -c- temps)))
+    (free-temps temps)))
 
 (define-function compile/and (expr -c-)
   (let ((done (UNIQUE-LABEL)))
@@ -551,7 +617,7 @@
                (arg-locs (map (lambda (_) (new-arg -c-)) args)))
            ;; set up the stack for the call
            (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
-           (free-temps -c- arg-tmps)
+           (free-temps arg-tmps)
 
            (cond
              (ff-name
@@ -565,7 +631,7 @@
 
            (free-args  -c- arg-locs)
            (when op-tmp
-             (free-temp -c- op-tmp))))))))
+             (free-temp op-tmp))))))))
 
 ;;; COMPILE-DEFINITION
 
