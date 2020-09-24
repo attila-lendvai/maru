@@ -186,6 +186,13 @@
       y)
   3)
 
+(define-test compile/let/constant-prop
+    (let ((y (+ 2 3)
+             40))
+      ;; the compiler must not turn 40 into a literal, because let needs temp locations
+      (+ y 2))
+  42)
+
 (define-test compile/while/1
     (let ((x 5)
           (sum 1))

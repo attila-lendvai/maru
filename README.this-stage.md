@@ -6,7 +6,8 @@
 ## Assorted smaller changes
  - more detailed backtraces
  - the symbol true now evaluates to itself. it was just too much hassle not to have a self-evaluating true value.
- - first successful LLVM (cross)compile to Darwin
+ - first successful LLVM (cross)compile to Darwin.
+ - added very basic constant propagation for the x86 backend, yet it nicely yielded around 10% speedup with the bootstrap.
 
 ## Stats
 
