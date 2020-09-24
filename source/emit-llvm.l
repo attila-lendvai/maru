@@ -547,7 +547,8 @@
                                    (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
                                   (else
                                    (gen LOAD (GLOBAL self.name) value))))
-      (else			(error "compile of <variable> failed for " self.name ", holding value " value)))))
+      (else
+       (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))

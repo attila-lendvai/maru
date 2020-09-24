@@ -130,7 +130,8 @@
 (define-function UNIQUE-LABEL ()
   (LABEL (unique-name "L_")))
 
-(define-function temp? (obj)    (= <TI32> (type-of obj)))
+(define-function temp?		(obj)	(= <TI32> (type-of obj)))
+(define-function literal?	(obj)	(= <LI32> (type-of obj)))
 
 ;;; IA32 -- INSTRUCTIONS
 
@@ -376,7 +377,9 @@
 ;;; COMPILE
 
 (define-form comp (obj)
-  `(compile ,obj -c-))
+  `(let ((__obj__ ,obj))
+     (emit COMMENT (list "COMPILE of "__obj__))
+     (compile __obj__ -c-)))
 
 (define-selector compile)
 
@@ -386,16 +389,19 @@
 (define-method compile <variable> (-c-)
   (let ((value self.value))
     (cond
-      ((temp? value)
+      ((or (temp? value)
+           (literal? value))
        (gen LOAD value))
-      ((and (global-variable? self)
-            (= 'slave:true self.name))
-       (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
-      ((and (global-variable? self)
-            (subtype? (type-of value) <type>))
-       (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+      ((global-variable? self)
+       (cond
+         ((= 'slave:true self.name)
+          (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
+         ((subtype? (type-of value) <type>)
+          (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+         (else
+          (gen LOAD (GI32 (LABEL self.name))))))
       (else
-       (gen LOAD (GI32 (LABEL self.name)))))))
+       (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
   (let ((label (UNIQUE-LABEL)))
@@ -407,7 +413,7 @@
 
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
-  ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp
+  ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp-or-literal
   ;; but our single caller, namely compile/let, requires a temp location, even when initialized to literal values.
   (while (pair? prog)
     (comp (car prog))
@@ -416,7 +422,7 @@
     (gen STORE temp)
     temp))
 
-(define-function compile/expr-into-temp (expr -c-)
+(define-function compile/expr-into-temp-or-literal (expr -c-)
   (cond
     ((long? expr)
      (LI32 expr))
@@ -431,14 +437,14 @@
   (gen op))
 
 (define-function compile/binary-operator (op args -c-)
-  (let ((tmp (compile/expr-into-temp (cadr args) -c-)))
+  (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
     (comp (car args))
     (free-temp tmp)
     (gen op tmp)))
 
 (define-function compile/ternary-operator (op args -c-)
-  (let ((tmp2 (compile/expr-into-temp (caddr args) -c-))
-        (tmp1 (compile/expr-into-temp (cadr  args) -c-)))
+  (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
+        (tmp1 (compile/expr-into-temp-or-literal (cadr  args) -c-)))
     (comp (car args))
     (free-temp tmp1)
     (free-temp tmp2)
@@ -560,9 +566,13 @@
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
     (let ((val (<variable>-value var)))
-      (if (temp? val)
-          (gen ADDR val)
-        (gen ADDR (GI32 (LABEL (<variable>-name var))))))))
+      (cond
+        ((global-variable? var)
+         (gen ADDR (GI32 (LABEL (<variable>-name var)))))
+        ((temp? val)
+         (gen ADDR val))
+        (else
+         (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
 (define +special-forms+ (list
   (cons (slave-value slave:let)            compile/let)
@@ -590,7 +600,7 @@
       (else
        (let ((ff-name ())
              (op-is-simple? ())
-             (arg-tmps (map-with compile/expr-into-temp args -c-)))
+             (arg-tmps (map-with compile/expr-into-temp-or-literal args -c-)))
          (when (and op-is-a-var?
                     (global-variable? op))
            (let ((value		(<variable>-value op))
@@ -613,7 +623,7 @@
 
          (let ((op-tmp (unless (or op-is-simple?
                                    ff-name)
-                         (compile/expr-into-temp op -c-)))
+                         (compile/expr-into-temp-or-literal op -c-)))
                (arg-locs (map (lambda (_) (new-arg -c-)) args)))
            ;; set up the stack for the call
            (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
@@ -666,6 +676,7 @@
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
          (params (map init-param (<expr>-parameters self))))
+    (emit COMMENT (list "compiling fn "name", body: " body))
     (list-do e body
       (and e (comp e)))
     ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
