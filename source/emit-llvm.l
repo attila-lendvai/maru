@@ -759,6 +759,71 @@
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
+(define-function compile-call (op args -c-)
+  (let* ((op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var? (<variable>-value op) op))
+         (arity		(list-length args))
+         (handler	()))
+    (let ((arg-regs (map (lambda (arg)
+                           (gen COMMENT (list "arg " arg))
+                           (comp arg)
+                           (<compiler>-current-value -c-))
+                         args)))
+      (cond
+        ((and op-is-a-var?
+              (global-variable? op))
+         (let ((n-params ()))
+           (cond
+             ((expr? op-value)
+              (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
+              (set n-params (<expr>-n-required-parameters op-value)))
+             ((= (type-of op-value) <foreign-function>)
+              (let ((param-types (<foreign-function>-parameter-types op-value)))
+                (gen COMMENT (list "	casting FFI args"))
+                ;; for FFI calls we need to cast the non-pointer llvm args
+                ;; using ptrtoint to the specific llvm type.
+                (let ((param-type	())
+                      (new-arg-regs	())
+                      (arg		())
+                      (arg-lst	arg-regs)
+                      (param-lst	param-types))
+                  (while (set arg (pop arg-lst))
+                    (set param-type (ffi-type->llvm-type (pop param-lst)))
+                    (if (or (= ()    param-type) ; vararg calls have more args than params
+                            (= '%ptr param-type))
+                        (push new-arg-regs arg)
+                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
+                        ;; TODO check for value range issues?
+                        (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
+                        (push new-arg-regs cast-reg))))
+                  ;; gen the call itself
+                  (gen CALL op-value (list-reverse! new-arg-regs)))
+                ;; convert return value
+                (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
+                  (cond
+                    ((= '%ptr return-type)) ; all good
+                    ((= 'slave:void return-type)
+                     (gen COMMENT (list "	void FFI call return value"))
+                     (gen LOAD (LITERAL 0) 0))
+                    (else
+                     (let ((bitsize (llvm-type-bitsize return-type)))
+                       (cond
+                         ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
+                         ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
+                     (gen INTTOPTR '%word))))
+                (unless (<foreign-function>-vararg? op-value)
+                  (set n-params (list-length param-types)))))
+             (else
+              (error "Don't know how to emit call to global value "op-value", in variable "op)))
+           (when (and n-params
+                      (not (= n-params arity)))
+             (error "compile: calling " op-value
+                    " with the wrong number of arguments: " args
+                    ", while expecting " n-params))))
+        (else
+         (comp op)
+         (gen CALLPTR arg-regs))))))
+
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
          (op-is-a-var?	(variable? op))
@@ -772,65 +837,7 @@
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))
       (else
-       (let ((arg-regs (map (lambda (arg)
-                              (gen COMMENT (list "arg " arg))
-                              (comp arg)
-                              (<compiler>-current-value -c-))
-                            args)))
-         (cond
-           ((and op-is-a-var?
-                 (global-variable? op))
-            (let ((n-params ()))
-              (cond
-                ((expr? op-value)
-                 (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
-                 (set n-params (<expr>-n-required-parameters op-value)))
-                ((= (type-of op-value) <foreign-function>)
-                 (let ((param-types (<foreign-function>-parameter-types op-value)))
-                   (gen COMMENT (list "	casting FFI args"))
-                   ;; for FFI calls we need to cast the non-pointer llvm args
-                   ;; using ptrtoint to the specific llvm type.
-                   (let ((param-type	())
-                         (new-arg-regs	())
-                         (arg		())
-                         (arg-lst	arg-regs)
-                         (param-lst	param-types))
-                     (while (set arg (pop arg-lst))
-                       (set param-type (ffi-type->llvm-type (pop param-lst)))
-                       (if (or (= ()    param-type) ; vararg calls have more args than params
-                               (= '%ptr param-type))
-                           (push new-arg-regs arg)
-                         (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
-                           ;; TODO check for value range issues?
-                           (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
-                           (push new-arg-regs cast-reg))))
-                     ;; gen the call itself
-                     (gen CALL op-value (list-reverse! new-arg-regs)))
-                   ;; convert return value
-                   (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
-                     (cond
-                       ((= '%ptr return-type)) ; all good
-                       ((= 'slave:void return-type)
-                        (gen COMMENT (list "	void FFI call return value"))
-                        (gen LOAD (LITERAL 0) 0))
-                       (else
-                        (let ((bitsize (llvm-type-bitsize return-type)))
-                          (cond
-                            ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
-                            ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
-                        (gen INTTOPTR '%word))))
-                   (unless (<foreign-function>-vararg? op-value)
-                     (set n-params (list-length param-types)))))
-                (else
-                 (error "Don't know how to emit call to global value "op-value", in variable "op)))
-              (when (and n-params
-                         (not (= n-params arity)))
-                (error "compile: calling " op-value
-                       " with the wrong number of arguments: " args
-                       ", while expecting " n-params))))
-           (else
-            (comp op)
-            (gen CALLPTR arg-regs))))))))
+       (compile-call op args -c-)))))
 
 ;;; COMPILE-DEFINITION
 
