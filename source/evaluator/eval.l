@@ -18,7 +18,7 @@
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
 (define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
-(define-constant feature/object-canary		(or false (<= 3 *safety*)))
+(define-constant feature/object-canary		(or false (and (<= 3 *safety*) true))) ; TODO evolving? artifact
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)

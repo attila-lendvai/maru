@@ -247,7 +247,6 @@
 
 (define-function gc/push-root (ptr)
   (gc/debug (libc/printf "gc/push-root %ld at %p\n" gc/root-count ptr))
-  (safety 3 (valid-maru-value? ptr))
   (set (oop-at gc/roots gc/root-count) ptr)
   (incr gc/root-count)
   ;; make sure that there's always space for the next root because otherwise our call to gc/allocate
