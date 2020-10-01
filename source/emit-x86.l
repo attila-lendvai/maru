@@ -27,6 +27,9 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
+;; TODO decide: left in for now, but maybe this should be the only option? a little extra complexity, but nice speed gain, and simpler compiler output
+(define-constant +direct-calls+	true)
+
 (define-constant +label-prefix+ (cond
                                   ((= target/os "darwin") "_")
                                   (else "")))
@@ -422,7 +425,8 @@
   (let* ((main? (= 'slave:main name))
          (body (<expr>-body self))
          (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
-         (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
+         (entry-label (LABEL (concat-string (symbol->string name)
+                                            (if (or main? +direct-calls+) "" "_body"))))
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
          (params (map init-param (<expr>-parameters self))))
@@ -445,43 +449,45 @@
       (and (<compiler>-epilogue -c-)
            (emit DEFLABEL (<compiler>-epilogue -c-)))
       (emit LEAVE (- frm-size 8)))
-    (unless main?
+    (unless (or main?
+                +direct-calls+)
       (let ((-c- parent-comp))
-        (gen DATA)
-        (gen GLOBAL (LABEL name))
-        (gen DEFLABEL (LABEL name))
-        (gen LONG entry-label)
-        (gen TEXT)))))
+        (emit DATA)
+        (emit GLOBAL (LABEL name))
+        (emit DEFLABEL (LABEL name))
+        (emit LONG entry-label)))))
 
 (define-function compile-call (op args -c-)
   (let* ((op-is-a-var?	(variable? op))
+         (op-is-global?	(and op-is-a-var?
+                             (global-variable? op)))
          (op-value	(if op-is-a-var? (<variable>-value op) op))
          (arity		(list-length args))
-         (ff-name	())
-         (op-is-simple?	())
+         (target-name	())
          (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-)))
-    (when (and op-is-a-var?
-               (global-variable? op))
-      (let ((value	(<variable>-value op))
-            (n-params	()))
+    (when op-is-global?
+      (let ((n-params	()))
         (cond
-          ((expr? value)
-           (set op-is-simple? true)
-           (set n-params (<expr>-n-required-parameters value)))
-          ((= (type-of value) <foreign-function>)
-           (set ff-name (<foreign-function>-name value))
-           (unless (<foreign-function>-vararg? value)
-             (set n-params (list-length (<foreign-function>-parameter-types value)))))
+          ((expr? op-value)
+           (when +direct-calls+
+             (set target-name (symbol->string (<variable>-name op))))
+           (set n-params (<expr>-n-required-parameters op-value)))
+          ((= (type-of op-value) <foreign-function>)
+           (set target-name (<foreign-function>-name op-value))
+           (unless (<foreign-function>-vararg? op-value)
+             (set n-params (list-length (<foreign-function>-parameter-types op-value)))))
           (else
-           (error "Don't know how to emit call to global value "value", in variable "op)))
+           (error "Don't know how to emit call to global value "op-value", in variable "op)))
         (when (and n-params
                    (not (= n-params arity)))
-          (error "compile: calling " value
+          (error "compile: calling " op-value
                  " with the wrong number of arguments: " args
                  ", while expecting " n-params))))
-
-    (let ((op-tmp (unless (or op-is-simple?
-                              ff-name)
+    ;; NOTE we compile the operator expression early to implement the evaluation order.
+    ;; also note that moving it into the relevant cond branch below causes silent miscompilation
+    ;; of the accessor typechecks on safety 3, probably this form: ((get (<subr> _imp) fun) arguments ctx)
+    (let ((op-tmp (unless (or op-is-global?
+                              target-name)
                     (compile/expr-into-temp-or-literal op -c-)))
           (arg-locs (map (lambda (_) (new-arg -c-)) args)))
       ;; set up the stack for the call
@@ -489,18 +495,17 @@
       (free-temps arg-tmps)
 
       (cond
-        (ff-name
-         (gen CALL (LABEL ff-name)))
-        (op-is-simple?
+        (target-name
+         (gen CALL (LABEL target-name)))
+        (op-is-global?
          (comp op)
          (gen CALL arity))
         (else
          (gen LOAD op-tmp)
          (gen CALL arity)))
 
-      (free-args  -c- arg-locs)
-      (when op-tmp
-        (free-temp op-tmp)))))
+      (free-args -c- arg-locs)
+      (free-temp op-tmp))))
 
 ;;;
 ;;; Special Forms
@@ -570,8 +575,14 @@
       ((temp? val)   (gen STORE val))
       (else          (gen STORE (GI32 (LABEL (<variable>-name var))))))))
 
-(define-function compile/lambda (expr comp)
-  (error "gen: lambda forms are not supported"))
+(define-function compile/lambda (form -c-)
+  (let ((name (unique-name "closure-"))
+        (expr (eval form)))
+    ;; TODO this silently miscompiles closures that capture some variables
+    (compile-expr expr name -c-)
+    (gen LOAD (if +direct-calls+
+                  (LI32 (LABEL name))
+                (GI32 (LABEL name))))))
 
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
@@ -678,6 +689,11 @@
           (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
          ((subtype? (type-of value) <type>)
           (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+         ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
+          (gen LOAD (LI32 (LABEL (<foreign-function>-name value)))))
+         ((and +direct-calls+
+               (subtype? (type-of value) <expr>))
+          (gen LOAD (LI32 (LABEL self.name))))
          (else
           (gen LOAD (GI32 (LABEL self.name))))))
       (else
@@ -720,8 +736,7 @@
 (define-method compile-definition <long> (name -c-)
   (emit DATA)
   (emit DEFLABEL (LABEL name))
-  (emit LONG self)
-  (emit TEXT))
+  (emit LONG self))
 
 ;; (define-method compile-definition <string> (name -c-)
 ;;   (let ((temp (UNIQUE-LABEL)))
@@ -731,7 +746,7 @@
 ;;     (emit ALIGN 4)
 ;;     (emit DEFLABEL (LABEL name))
 ;;     (emit LONG temp)
-;;     (emit TEXT)))
+;;     ))
 
 (define-method compile-definition <expr> (name parent-comp)
   (compile-expr self name parent-comp))
