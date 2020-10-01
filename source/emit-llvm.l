@@ -27,6 +27,10 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
+;; Shall we map function params directly to LLVM IR function params?
+;; NOTE: They are read-only in LLVM IR, and as of now eval.l violates this assumption.
+(define-constant +function-parameters-are-read-only+ ())
+
 (switch-to-slave-module)
 
 ;; we can't say anything smarter than this, because the LLVM IR doesn't have a not primitive.
@@ -127,8 +131,9 @@
                        (not (= ?\\ c))))))
 
 ;;;
-;;; OPERANDS
+;;; Operands
 ;;;
+
 (define-function define-operand/make-setters (type-name fields)
   (if (pair? fields)
       (cons `(set (,(concat-symbol (concat-symbol type-name '-) (car fields)) self) ,(car fields))
@@ -158,29 +163,8 @@
   (= <TEMP> (type-of obj)))
 
 ;;;
-;;; COMPILER
+;;; Instructions
 ;;;
-(define-record <compiler> ()
-  (level
-   temp-counter
-   reg-counter
-   temps
-   gen-buffer
-   gen-buffer-index
-   current-value ; the output of the previous-instruction
-   ))
-
-(define-function compiler (level)
-  (make <compiler>
-        (level			level)
-        (temp-counter		0)
-        (reg-counter		0)
-        (gen-buffer		(array))
-        (gen-buffer-index	-1)
-        (current-value		())
-        ))
-
-;;; INSTRUCTIONS
 
 (define-record <instruction> ()
   ;; TODO some of these slots are the same for all instances; they should reside on the type
@@ -244,7 +228,30 @@
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
 ;;;
+;;; Compiler early
 ;;;
+(define-record <compiler> ()
+  (level
+   temp-counter
+   reg-counter
+   temps
+   gen-buffer
+   gen-buffer-index
+   current-value ; the output of the previous-instruction
+   ))
+
+(define-function compiler (level)
+  (make <compiler>
+        (level			level)
+        (temp-counter		0)
+        (reg-counter		0)
+        (gen-buffer		(array))
+        (gen-buffer-index	-1)
+        (current-value		())
+        ))
+
+;;;
+;;; LLVM IR Instructions
 ;;;
 (define-function emit-llvm-fn-type (return-type param-types vararg?)
   (let ((first? true))
@@ -463,7 +470,9 @@
 				(println "	store %ptr "$3", %ptr* "$reg3)
 				(println "	"$reg4" = bitcast %ptr "$3" to %ptr")))
 
-;;; COMPILER
+;;;
+;;; Compiler
+;;;
 
 (define-form gen (instr-name . args)
   `(%gen -c- ,instr-name (list ,@args)))
@@ -516,8 +525,6 @@
 (define-form free-temp (temp)			`(%free-temp -c- ,temp))
 (define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
-;;; COMPILE
-
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
      (emit COMMENT (list "COMPILE of "__obj__))
@@ -526,44 +533,9 @@
 
 (define-selector compile)
 
-(define-method compile <undefined> (-c-)
-  (let ((false-value (slave-value slave:target-boolean/false)))
-    (gen LOAD (LITERAL false-value) false-value)))
-
-(define-method compile <long> (-c-)
-  (gen LOAD (LITERAL self) self))
-
-(define-method compile <variable> (-c-)
-  (let ((value self.value))
-    (cond
-      ((local? value)		(set (<compiler>-current-value -c-) value))
-      ((temp? value)		(gen LOAD value ()))
-      ((global-variable? self)	(cond
-                                  ((= 'slave:true self.name)
-                                   (let ((true-value (slave-value slave:target-boolean/true)))
-                                     (gen LOAD (LITERAL true-value) true-value)))
-                                  ((subtype? (type-of value) <type>)
-                                   ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                   (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
-                                  (else
-                                   (gen LOAD (GLOBAL self.name) value))))
-      (else
-       (error "compile of <variable> failed for " self ", holding the value " value)))))
-
-(define-function compile/set (expr -c-)
-  (let* ((var	(second expr))
-         (value	(<variable>-value var)))
-    (comp (third expr))
-    (cond
-      ;; NOTE the LLVM IR is SSA, locals cannot be written
-      ((temp? value)		(gen STORE value))
-      ((global-variable? var)	(gen STORE (GLOBAL (<variable>-name var))))
-      (else			(error "compile/set failed for variable " (<variable>-name var) ", holding value " value)))))
-
-(define-method compile <string> (-c-)
-  (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
-    (emit DEFINE const self)
-    (gen ADDR const)))
+;;;
+;;; Compiling
+;;;
 
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
@@ -574,25 +546,131 @@
     (gen STORE temp)
     temp))
 
-(define-function compile/unary-operator (op args -c-)
-  (comp (car args))
-  (gen op))
+(define-function emit/function-prologue (name params)
+  (print "define %ptr "name"(")
+  (let ((first? true))
+    (list-do param params
+      (if first?
+          (set first? ())
+        (print ", "))
+      (print "%ptr ")
+      (print param)))
+  (println ") {"))
 
-(define-function compile/binary-operator (op args -c-)
-  (comp (second args))
-  (let ((arg2 (<compiler>-current-value -c-)))
-    (comp (first args))
-    (gen op arg2)))
+(define-function emit/function-epilogue ()
+  (println "}"))
 
-(define-function compile/ternary-operator (op args -c-)
-  (let ((tmp2 (let ()
-                (comp (third  args))
-                (<compiler>-current-value -c-)))
-        (tmp1 (let ()
-                (comp (second args))
-                (<compiler>-current-value -c-))))
-    (comp (first args))
-    (gen op tmp1 tmp2)))
+(define-function compile-expr (self name parent-comp)
+  (let* ((-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
+         (parameters	(<expr>-parameters self))
+         (body		(<expr>-body self))
+         (init-param	(lambda (var)
+                          (set (<variable>-value var)
+                               (if +function-parameters-are-read-only+
+                                   (LOCAL (<variable>-name var))
+                                 (alloc-temp -c-)))))
+         (params	(map init-param parameters))
+         (param-decls	(map (lambda (var)
+                               (LOCAL (<variable>-name var)))
+                             parameters)))
+    (emit COMMENT (list "compiling fn "name", body: " body))
+
+    (list-do e body
+      (comp e))
+
+    (emit/function-prologue (GLOBAL name) param-decls)
+
+    (unless +function-parameters-are-read-only+
+      (free-temps params))
+
+    ;; all temps must be free-temp'ed properly at this point.
+    (map (lambda (tmp)
+           (emit ALLOCA tmp))
+         (<compiler>-temps -c-))
+
+    ;; store the parameters in the temps
+    (unless +function-parameters-are-read-only+
+      (map (lambda (local temp)
+             (emit STORE local temp))
+           param-decls params))
+
+    ;; emit the body from the gen buffer
+    (emit-gen-buffer -c-)
+
+    ;; make sure we finish off with a ret
+    (unless (= <RET> (type-of (previous-instruction -c-)))
+      (emit RET (or (<compiler>-current-value -c-)
+                    (LITERAL "null"))))
+    (emit/function-epilogue)))
+
+(define-function compile-call (op args -c-)
+  (let* ((op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var? (<variable>-value op) op))
+         (arity		(list-length args))
+         (handler	()))
+    (let ((arg-regs (map (lambda (arg)
+                           (gen COMMENT (list "arg " arg))
+                           (comp arg)
+                           (<compiler>-current-value -c-))
+                         args)))
+      (cond
+        ((and op-is-a-var?
+              (global-variable? op))
+         (let ((n-params ()))
+           (cond
+             ((expr? op-value)
+              (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
+              (set n-params (<expr>-n-required-parameters op-value)))
+             ((= (type-of op-value) <foreign-function>)
+              (let ((param-types (<foreign-function>-parameter-types op-value)))
+                (gen COMMENT (list "	casting FFI args"))
+                ;; for FFI calls we need to cast the non-pointer llvm args
+                ;; using ptrtoint to the specific llvm type.
+                (let ((param-type	())
+                      (new-arg-regs	())
+                      (arg		())
+                      (arg-lst	arg-regs)
+                      (param-lst	param-types))
+                  (while (set arg (pop arg-lst))
+                    (set param-type (ffi-type->llvm-type (pop param-lst)))
+                    (if (or (= ()    param-type) ; vararg calls have more args than params
+                            (= '%ptr param-type))
+                        (push new-arg-regs arg)
+                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
+                        ;; TODO check for value range issues?
+                        (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
+                        (push new-arg-regs cast-reg))))
+                  ;; gen the call itself
+                  (gen CALL op-value (list-reverse! new-arg-regs)))
+                ;; convert return value
+                (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
+                  (cond
+                    ((= '%ptr return-type)) ; all good
+                    ((= 'slave:void return-type)
+                     (gen COMMENT (list "	void FFI call return value"))
+                     (gen LOAD (LITERAL 0) 0))
+                    (else
+                     (let ((bitsize (llvm-type-bitsize return-type)))
+                       (cond
+                         ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
+                         ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
+                     (gen INTTOPTR '%word))))
+                (unless (<foreign-function>-vararg? op-value)
+                  (set n-params (list-length param-types)))))
+             (else
+              (error "Don't know how to emit call to global value "op-value", in variable "op)))
+           (when (and n-params
+                      (not (= n-params arity)))
+             (error "compile: calling " op-value
+                    " with the wrong number of arguments: " args
+                    ", while expecting " n-params))))
+        (else
+         (comp op)
+         (gen CALLPTR arg-regs))))))
+
+;;;
+;;; Special Forms
+;;;
 
 (define-function compile/let-binding (binding -c-)
   ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
@@ -690,6 +768,16 @@
 
     (gen DEFLABEL lend)))
 
+(define-function compile/set (expr -c-)
+  (let* ((var	(second expr))
+         (value	(<variable>-value var)))
+    (comp (third expr))
+    (cond
+      ;; NOTE the LLVM IR is SSA, locals cannot be written
+      ((temp? value)		(gen STORE value))
+      ((global-variable? var)	(gen STORE (GLOBAL (<variable>-name var))))
+      (else			(error "compile/set failed for variable " (<variable>-name var) ", holding value " value)))))
+
 (define-function compile/lambda (expr comp)
   (error "gen: lambda forms are not supported"))
 
@@ -719,6 +807,32 @@
   (cons (slave-value slave:lambda)	compile/lambda)
   (cons (slave-value slave:return)	compile/return)
   (cons (slave-value slave:address-of)	compile/address-of)))
+
+;;;
+;;; Special Operators
+;;;
+
+(define-function compile/unary-operator (op args -c-)
+  (comp (car args))
+  (gen op))
+
+(define-function compile/binary-operator (op args -c-)
+  (comp (second args))
+  (let ((arg2 (<compiler>-current-value -c-)))
+    (comp (first args))
+    (gen op arg2)))
+
+(define-function compile/ternary-operator (op args -c-)
+  (let ((tmp2 (let ()
+                (comp (third  args))
+                (<compiler>-current-value -c-)))
+        (tmp1 (let ()
+                (comp (second args))
+                (<compiler>-current-value -c-))))
+    (comp (first args))
+    (gen op tmp1 tmp2)))
+
+(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
 ;; a vector of assoc lists indexed by operator arity
 (define +special-operators+
@@ -757,72 +871,34 @@
                    arity-line))
             table))))
 
-(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
+(define-method compile <undefined> (-c-)
+  (let ((false-value (slave-value slave:target-boolean/false)))
+    (gen LOAD (LITERAL false-value) false-value)))
 
-(define-function compile-call (op args -c-)
-  (let* ((op-is-a-var?	(variable? op))
-         (op-value	(if op-is-a-var? (<variable>-value op) op))
-         (arity		(list-length args))
-         (handler	()))
-    (let ((arg-regs (map (lambda (arg)
-                           (gen COMMENT (list "arg " arg))
-                           (comp arg)
-                           (<compiler>-current-value -c-))
-                         args)))
-      (cond
-        ((and op-is-a-var?
-              (global-variable? op))
-         (let ((n-params ()))
-           (cond
-             ((expr? op-value)
-              (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
-              (set n-params (<expr>-n-required-parameters op-value)))
-             ((= (type-of op-value) <foreign-function>)
-              (let ((param-types (<foreign-function>-parameter-types op-value)))
-                (gen COMMENT (list "	casting FFI args"))
-                ;; for FFI calls we need to cast the non-pointer llvm args
-                ;; using ptrtoint to the specific llvm type.
-                (let ((param-type	())
-                      (new-arg-regs	())
-                      (arg		())
-                      (arg-lst	arg-regs)
-                      (param-lst	param-types))
-                  (while (set arg (pop arg-lst))
-                    (set param-type (ffi-type->llvm-type (pop param-lst)))
-                    (if (or (= ()    param-type) ; vararg calls have more args than params
-                            (= '%ptr param-type))
-                        (push new-arg-regs arg)
-                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
-                        ;; TODO check for value range issues?
-                        (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
-                        (push new-arg-regs cast-reg))))
-                  ;; gen the call itself
-                  (gen CALL op-value (list-reverse! new-arg-regs)))
-                ;; convert return value
-                (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
-                  (cond
-                    ((= '%ptr return-type)) ; all good
-                    ((= 'slave:void return-type)
-                     (gen COMMENT (list "	void FFI call return value"))
-                     (gen LOAD (LITERAL 0) 0))
-                    (else
-                     (let ((bitsize (llvm-type-bitsize return-type)))
-                       (cond
-                         ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
-                         ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
-                     (gen INTTOPTR '%word))))
-                (unless (<foreign-function>-vararg? op-value)
-                  (set n-params (list-length param-types)))))
-             (else
-              (error "Don't know how to emit call to global value "op-value", in variable "op)))
-           (when (and n-params
-                      (not (= n-params arity)))
-             (error "compile: calling " op-value
-                    " with the wrong number of arguments: " args
-                    ", while expecting " n-params))))
-        (else
-         (comp op)
-         (gen CALLPTR arg-regs))))))
+(define-method compile <long> (-c-)
+  (gen LOAD (LITERAL self) self))
+
+(define-method compile <variable> (-c-)
+  (let ((value self.value))
+    (cond
+      ((local? value)		(set (<compiler>-current-value -c-) value))
+      ((temp? value)		(gen LOAD value ()))
+      ((global-variable? self)	(cond
+                                  ((= 'slave:true self.name)
+                                   (let ((true-value (slave-value slave:target-boolean/true)))
+                                     (gen LOAD (LITERAL true-value) true-value)))
+                                  ((subtype? (type-of value) <type>)
+                                   ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
+                                   (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
+                                  (else
+                                   (gen LOAD (GLOBAL self.name) value))))
+      (else
+       (error "compile of <variable> failed for " self ", holding the value " value)))))
+
+(define-method compile <string> (-c-)
+  (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
+    (emit DEFINE const self)
+    (gen ADDR const)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -849,90 +925,18 @@
 (define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 
-(define-function emit/function-prologue (name params)
-  (print "define %ptr "name"(")
-  (let ((first? true))
-    (list-do param params
-      (if first?
-          (set first? ())
-        (print ", "))
-      (print "%ptr ")
-      (print param)))
-  (println ") {"))
-
-(define-function emit/function-epilogue ()
-  (println "}"))
-
-;; Shall we map function directly to LLVM IR function params?
-;; NOTE: They are read-only, and as of now eval.l violates this assumption.
-(define-constant +function-parameters-are-read-only+ ())
-
 (define-method compile-definition <expr> (name parent-comp)
-  (let* ((-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
-         (parameters	(<expr>-parameters self))
-         (body		(<expr>-body self))
-         (init-param	(lambda (var)
-                          (set (<variable>-value var)
-                               (if +function-parameters-are-read-only+
-                                   (LOCAL (<variable>-name var))
-                                 (alloc-temp -c-)))))
-         (params	(map init-param parameters))
-         (param-decls	(map (lambda (var)
-                               (LOCAL (<variable>-name var)))
-                             parameters)))
-    (emit COMMENT (list "compiling fn "name", body: " body))
+  (compile-expr self name parent-comp))
 
-    (list-do e body
-      (comp e))
-
-    (emit/function-prologue (GLOBAL name) param-decls)
-
-    (unless +function-parameters-are-read-only+
-      (free-temps params))
-
-    ;; all temps must be free-temp'ed properly at this point.
-    (map (lambda (tmp)
-           (emit ALLOCA tmp))
-         (<compiler>-temps -c-))
-
-    ;; store the parameters in the temps
-    (unless +function-parameters-are-read-only+
-      (map (lambda (local temp)
-             (emit STORE local temp))
-           param-decls params))
-
-    ;; emit the body from the gen buffer
-    (emit-gen-buffer -c-)
-
-    ;; make sure we finish off with a ret
-    (unless (= <RET> (type-of (previous-instruction -c-)))
-      (emit RET (or (<compiler>-current-value -c-)
-                    (LITERAL "null"))))
-    (emit/function-epilogue)))
-
-;;;
-;;; compilation unit
-;;;
-(define-function compile-env (env)
-  (warn "begin compiling\n")
-  (let* ((vars  (<env>-bindings env))
-         (-c-  (compiler 0)))
-    (let (;(target-triplet	(slave-value slave:target-triplet))
-          (word-size		target/word-size-in-bits))
-      (warn "\nCompiling for word size: " word-size " bits\n\n")
-      ;;(assert (string?	target-triplet))
-      (assert (long?	word-size))
-      ;; our output is less specific, so allow the makefile, or whoever builds the
-      ;; bitcode output to chose the proper target triplet.
-      ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
-      (emit INLINE (concat-strings "%word = type i" (long->string word-size) "\n")))
-    (emit INLINE "%ptr = type i8*\n")
-    (for (i 0 (array-length vars))
-      (let* ((var   (array-at vars i))
-             (name  (<variable>-name  var))
-             (value (<variable>-value var)))
-        (emit COMMENT (list "defn " name))
-        (warn name ", ")
-        (compile-definition value name -c-)))
-    (warn "\n")
-    (emit-gen-buffer -c-)))
+(define-method emit-prelude <compiler> ()
+  (let (;;(target-triplet	(slave-value slave:target-triplet))
+        (word-size		target/word-size-in-bits)
+        (-c- self))
+    (warn "\nCompiling for word size: " word-size " bits\n\n")
+    ;;(assert (string?	target-triplet))
+    (assert (long?	word-size))
+    ;; our output is less specific, so allow the makefile, or whoever builds the
+    ;; bitcode output to chose the proper target triplet.
+    ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
+    (emit INLINE (concat-strings "%word = type i" (long->string word-size) "\n"))
+    (emit INLINE "%ptr = type i8*\n")))

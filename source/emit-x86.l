@@ -118,8 +118,9 @@
       (incr index))
     (array->string mangled)))
 
+;;;
 ;;; IA32 -- OPERANDS
-
+;;;
 (define-operand LABEL (name)    +label-prefix+ (mangle-label (<LABEL>-name self)))
 ;; global, literal, and temp pointers
 (define-operand GI32 (name)     (<GI32>-name self))
@@ -132,8 +133,9 @@
 (define-function temp?		(obj)	(= <TI32> (type-of obj)))
 (define-function literal?	(obj)	(= <LI32> (type-of obj)))
 
+;;;
 ;;; IA32 -- INSTRUCTIONS
-
+;;;
 (define-emit    (COMMENT pair)			(when *compiler-verbose* (print "## ") (apply println $1)))
 
 (define-emit    (TEXT)				(println "	.text"))
@@ -324,7 +326,8 @@
 						(println "	movl	$"$2", (%ecx)"))
 
 ;;;
-
+;;; Compiler Infrastructure
+;;;
 (define-record <compiler> () (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue gen-buffer gen-buffer-index))
 
 (define-function compiler (level)
@@ -384,8 +387,6 @@
 (define-form free-temp (temp)			`(%free-temp -c- ,temp))
 (define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
-;;; COMPILE
-
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
      (emit COMMENT (list "COMPILE of "__obj__))
@@ -393,34 +394,9 @@
 
 (define-selector compile)
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (slave-value slave:target-boolean/false))))
-(define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
-
-(define-method compile <variable> (-c-)
-  (let ((value self.value))
-    (cond
-      ((or (temp? value)
-           (literal? value))
-       (gen LOAD value))
-      ((global-variable? self)
-       (cond
-         ((= 'slave:true self.name)
-          (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
-         ((subtype? (type-of value) <type>)
-          (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
-         (else
-          (gen LOAD (GI32 (LABEL self.name))))))
-      (else
-       (error "compile of <variable> failed for " self ", holding the value " value)))))
-
-(define-method compile <string> (-c-)
-  (let ((label (UNIQUE-LABEL)))
-    (gen DATA)
-    (gen DEFLABEL label)
-    (gen ASCIZ self)
-    (gen TEXT)
-    (gen LOAD label)))
-
+;;;
+;;; Compiling
+;;;
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp-or-literal
@@ -442,64 +418,93 @@
         (gen STORE temp)
         temp))))
 
-(define-function compile/unary-operator (op args -c-)
-  (comp (car args))
-  (gen op))
+(define-function compile-expr (self name parent-comp)
+  (let* ((main? (= 'slave:main name))
+         (body (<expr>-body self))
+         (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
+         (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
+         (init-param (lambda (var)
+                       (set (<variable>-value var) (new-param -c-))))
+         (params (map init-param (<expr>-parameters self))))
+    (emit COMMENT (list "compiling fn "name", body: " body))
+    (list-do e body
+      (and e (comp e)))
+    ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
+    (let* ((arg-size (align +call-frame-alignmet+             (<compiler>-arg-limit -c-) ))
+           (tmp-size (align +call-frame-alignmet+ (+ arg-size (<compiler>-tmp-limit -c-))))
+           (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
+      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
+      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
+      (emit TEXT)
+      (when main?
+        (emit GLOBAL entry-label))
+      (emit DEFLABEL entry-label)
+      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit -c-)" "tmp-size" "frm-size))
+      (emit ENTER (- frm-size 8))
+      (emit-gen-buffer -c-)
+      (and (<compiler>-epilogue -c-)
+           (emit DEFLABEL (<compiler>-epilogue -c-)))
+      (emit LEAVE (- frm-size 8)))
+    (unless main?
+      (let ((-c- parent-comp))
+        (gen DATA)
+        (gen GLOBAL (LABEL name))
+        (gen DEFLABEL (LABEL name))
+        (gen LONG entry-label)
+        (gen TEXT)))))
 
-(define-function compile/binary-operator (op args -c-)
-  (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
-    (comp (car args))
-    (free-temp tmp)
-    (gen op tmp)))
+(define-function compile-call (op args -c-)
+  (let* ((op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var? (<variable>-value op) op))
+         (arity		(list-length args))
+         (ff-name	())
+         (op-is-simple?	())
+         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-)))
+    (when (and op-is-a-var?
+               (global-variable? op))
+      (let ((value	(<variable>-value op))
+            (n-params	()))
+        (cond
+          ((expr? value)
+           (set op-is-simple? true)
+           (set n-params (<expr>-n-required-parameters value)))
+          ((= (type-of value) <foreign-function>)
+           (set ff-name (<foreign-function>-name value))
+           (unless (<foreign-function>-vararg? value)
+             (set n-params (list-length (<foreign-function>-parameter-types value)))))
+          (else
+           (error "Don't know how to emit call to global value "value", in variable "op)))
+        (when (and n-params
+                   (not (= n-params arity)))
+          (error "compile: calling " value
+                 " with the wrong number of arguments: " args
+                 ", while expecting " n-params))))
 
-(define-function compile/ternary-operator (op args -c-)
-  (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
-        (tmp1 (compile/expr-into-temp-or-literal (cadr  args) -c-)))
-    (comp (car args))
-    (free-temp tmp1)
-    (free-temp tmp2)
-    (gen op tmp1 tmp2)))
+    (let ((op-tmp (unless (or op-is-simple?
+                              ff-name)
+                    (compile/expr-into-temp-or-literal op -c-)))
+          (arg-locs (map (lambda (_) (new-arg -c-)) args)))
+      ;; set up the stack for the call
+      (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
+      (free-temps arg-tmps)
 
-(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
+      (cond
+        (ff-name
+         (gen CALL (LABEL ff-name)))
+        (op-is-simple?
+         (comp op)
+         (gen CALL arity))
+        (else
+         (gen LOAD op-tmp)
+         (gen CALL arity)))
 
-;; a vector of assoc lists indexed by operator arity
-(define +special-operators+
-    (let ((table
-           `(;; nullary
-             ()
-             ;; unary
-             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT) (slave:bitwise-not ,BITWISE-NOT))
-             ;; binary
-             ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
-              (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
-              (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              ;;(slave:bitwise-shift ,ASH)
-              (slave:<< ,ASL) (slave:>>  ,ASR)
-              ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
-              ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (slave:string-at		,LOAD-I8)
-              (slave:byte-at		,LOAD-I8)
-              (slave:oop-at		,LOAD-OOP))
-             ;; ternary
-             ((slave:set-string-at	,STORE-I8)
-              (slave:set-byte-at	,STORE-I8)
-              (slave:set-oop-at		,STORE-OOP)))))
-      (list->array
-       (map (lambda (arity-line)
-              (map (lambda (entry)
-                     (let* ((op-name (car entry))
-                            (op (eval-in-module slave op-name)))
-                       ;; NOTE this is not (slave-value slave:<subr>), because it's the eval.exe of the
-                       ;; previous stage that instantiates these subr's, and it instantiates them
-                       ;; with the type that is encoded into the executable (which should be in sync
-                       ;; with the definitions in the boot.l of that stage, which in turn is what we
-                       ;; see here at runtime).
-                       ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
-                       (assert op "operator not found while building +special-operators+: "op)
-                       (cons op (cdr entry))))
-                   arity-line))
-            table))))
+      (free-args  -c- arg-locs)
+      (when op-tmp
+        (free-temp op-tmp)))))
 
+;;;
+;;; Special Forms
+;;;
 (define-function compile/let-binding (binding comp)
   ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
   ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
@@ -597,54 +602,94 @@
   (cons (slave-value slave:return)         compile/return)
   (cons (slave-value slave:address-of)     compile/address-of)))
 
-(define-function compile-call (op args -c-)
-  (let* ((op-is-a-var?	(variable? op))
-         (op-value	(if op-is-a-var? (<variable>-value op) op))
-         (arity		(list-length args))
-         (ff-name	())
-         (op-is-simple?	())
-         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-)))
-    (when (and op-is-a-var?
-               (global-variable? op))
-      (let ((value	(<variable>-value op))
-            (n-params	()))
-        (cond
-          ((expr? value)
-           (set op-is-simple? true)
-           (set n-params (<expr>-n-required-parameters value)))
-          ((= (type-of value) <foreign-function>)
-           (set ff-name (<foreign-function>-name value))
-           (unless (<foreign-function>-vararg? value)
-             (set n-params (list-length (<foreign-function>-parameter-types value)))))
-          (else
-           (error "Don't know how to emit call to global value "value", in variable "op)))
-        (when (and n-params
-                   (not (= n-params arity)))
-          (error "compile: calling " value
-                 " with the wrong number of arguments: " args
-                 ", while expecting " n-params))))
+;;;
+;;; Special Operators
+;;;
+(define-function compile/unary-operator (op args -c-)
+  (comp (car args))
+  (gen op))
 
-    (let ((op-tmp (unless (or op-is-simple?
-                              ff-name)
-                    (compile/expr-into-temp-or-literal op -c-)))
-          (arg-locs (map (lambda (_) (new-arg -c-)) args)))
-      ;; set up the stack for the call
-      (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
-      (free-temps arg-tmps)
+(define-function compile/binary-operator (op args -c-)
+  (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
+    (comp (car args))
+    (free-temp tmp)
+    (gen op tmp)))
 
-      (cond
-        (ff-name
-         (gen CALL (LABEL ff-name)))
-        (op-is-simple?
-         (comp op)
-         (gen CALL arity))
-        (else
-         (gen LOAD op-tmp)
-         (gen CALL arity)))
+(define-function compile/ternary-operator (op args -c-)
+  (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
+        (tmp1 (compile/expr-into-temp-or-literal (cadr  args) -c-)))
+    (comp (car args))
+    (free-temp tmp1)
+    (free-temp tmp2)
+    (gen op tmp1 tmp2)))
 
-      (free-args  -c- arg-locs)
-      (when op-tmp
-        (free-temp op-tmp)))))
+(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
+
+;; a vector of assoc lists indexed by operator arity
+(define +special-operators+
+    (let ((table
+           `(;; nullary
+             ()
+             ;; unary
+             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT) (slave:bitwise-not ,BITWISE-NOT))
+             ;; binary
+             ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
+              (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
+              (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
+              ;;(slave:bitwise-shift ,ASH)
+              (slave:<< ,ASL) (slave:>>  ,ASR)
+              ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
+              ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
+              (slave:string-at		,LOAD-I8)
+              (slave:byte-at		,LOAD-I8)
+              (slave:oop-at		,LOAD-OOP))
+             ;; ternary
+             ((slave:set-string-at	,STORE-I8)
+              (slave:set-byte-at	,STORE-I8)
+              (slave:set-oop-at		,STORE-OOP)))))
+      (list->array
+       (map (lambda (arity-line)
+              (map (lambda (entry)
+                     (let* ((op-name (car entry))
+                            (op (eval-in-module slave op-name)))
+                       ;; NOTE this is not (slave-value slave:<subr>), because it's the eval.exe of the
+                       ;; previous stage that instantiates these subr's, and it instantiates them
+                       ;; with the type that is encoded into the executable (which should be in sync
+                       ;; with the definitions in the boot.l of that stage, which in turn is what we
+                       ;; see here at runtime).
+                       ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
+                       (assert op "operator not found while building +special-operators+: "op)
+                       (cons op (cdr entry))))
+                   arity-line))
+            table))))
+
+(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (slave-value slave:target-boolean/false))))
+(define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
+
+(define-method compile <variable> (-c-)
+  (let ((value self.value))
+    (cond
+      ((or (temp? value)
+           (literal? value))
+       (gen LOAD value))
+      ((global-variable? self)
+       (cond
+         ((= 'slave:true self.name)
+          (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
+         ((subtype? (type-of value) <type>)
+          (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+         (else
+          (gen LOAD (GI32 (LABEL self.name))))))
+      (else
+       (error "compile of <variable> failed for " self ", holding the value " value)))))
+
+(define-method compile <string> (-c-)
+  (let ((label (UNIQUE-LABEL)))
+    (gen DATA)
+    (gen DEFLABEL label)
+    (gen ASCIZ self)
+    (gen TEXT)
+    (gen LOAD label)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -662,8 +707,9 @@
       (else
        (compile-call op args -c-)))))
 
+;;;
 ;;; COMPILE-DEFINITION
-
+;;;
 (define-selector compile-definition)
 
 (define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
@@ -688,52 +734,6 @@
 ;;     (emit TEXT)))
 
 (define-method compile-definition <expr> (name parent-comp)
-  (let* ((main? (= 'slave:main name))
-         (body (<expr>-body self))
-         (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
-         (entry-label (LABEL (concat-string (symbol->string name) (if main? "" "_body"))))
-         (init-param (lambda (var)
-                       (set (<variable>-value var) (new-param -c-))))
-         (params (map init-param (<expr>-parameters self))))
-    (emit COMMENT (list "compiling fn "name", body: " body))
-    (list-do e body
-      (and e (comp e)))
-    ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
-    (let* ((arg-size (align +call-frame-alignmet+             (<compiler>-arg-limit -c-) ))
-           (tmp-size (align +call-frame-alignmet+ (+ arg-size (<compiler>-tmp-limit -c-))))
-           (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
-      (emit TEXT)
-      (when main?
-        (emit GLOBAL entry-label))
-      (emit DEFLABEL entry-label)
-      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit -c-)" "tmp-size" "frm-size))
-      (emit ENTER (- frm-size 8))
-      (emit-gen-buffer -c-)
-      (and (<compiler>-epilogue -c-)
-           (emit DEFLABEL (<compiler>-epilogue -c-)))
-      (emit LEAVE (- frm-size 8)))
-    (unless main?
-      (let ((-c- parent-comp))
-        (gen DATA)
-        (gen GLOBAL (LABEL name))
-        (gen DEFLABEL (LABEL name))
-        (gen LONG entry-label)
-        (gen TEXT)))))
+  (compile-expr self name parent-comp))
 
-;;;
-
-(define-function compile-env (env)
-  (warn "begin compiling\n")
-  (let* ((vars  (<env>-bindings env))
-         (-c-  (compiler 0)))
-    (for (i 0 (array-length vars))
-      (let* ((var   (array-at vars i))
-             (name  (<variable>-name  var))
-             (value (<variable>-value var)))
-        (emit COMMENT (list "defn " name))
-        (warn name ", ")
-        (compile-definition value name -c-)))
-    (warn "\n")
-    (emit-gen-buffer -c-)))
+(define-method emit-prelude <compiler> ())
