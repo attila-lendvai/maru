@@ -236,7 +236,6 @@
    reg-counter
    temps
    gen-buffer
-   gen-buffer-index
    current-value ; the output of the previous-instruction
    ))
 
@@ -246,7 +245,6 @@
         (temp-counter		0)
         (reg-counter		0)
         (gen-buffer		(array))
-        (gen-buffer-index	-1)
         (current-value		())
         ))
 
@@ -503,20 +501,18 @@
            (array-at (<instruction>-regs instr)
                      (- (<instruction>-n-regs instr) 1))))
     ;; save into the gen buffer
-    (set (array-at (<compiler>-gen-buffer -c-)
-                   (incr (<compiler>-gen-buffer-index -c-)))
-         (cons instr args))
-    instr))
+    (array-append (<compiler>-gen-buffer -c-) (cons instr args))
+    ()))
 
 (define-function previous-instruction (-c-)
-  (let ((idx (<compiler>-gen-buffer-index -c-)))
-    (when (< 0 idx)
-      (first (array-at (<compiler>-gen-buffer -c-) idx)))))
+  (let* ((buffer (<compiler>-gen-buffer -c-))
+         (idx (- (array-length buffer) 1)))
+    (when (<= 0 idx)
+      (first (array-at buffer idx)))))
 
 (define-function emit-gen-buffer (-c-)
-  (for (i 0 (+ 1 (<compiler>-gen-buffer-index -c-)))
-    (let* ((entry (array-at (<compiler>-gen-buffer -c-) i))
-           (instr (first entry))
+  (array-do entry (<compiler>-gen-buffer -c-)
+    (let* ((instr (first entry))
            (args (rest entry)))
       (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args))
       (apply emit-instruction (cons -c- (cons instr args))))))

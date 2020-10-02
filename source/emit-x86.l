@@ -331,7 +331,7 @@
 ;;;
 ;;; Compiler Infrastructure
 ;;;
-(define-record <compiler> () (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue gen-buffer gen-buffer-index))
+(define-record <compiler> () (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue gen-buffer))
 
 (define-function compiler (level)
   (let ((self (new <compiler>)))
@@ -342,19 +342,14 @@
     (set (<compiler>-tmp-counter	self) 0)
     (set (<compiler>-tmp-limit		self) 0)
     (set (<compiler>-gen-buffer		self) (array))
-    (set (<compiler>-gen-buffer-index	self) 0)
     self))
 
-(define-function %save-into-gen-buffer (-c- . args)
-  (set-array-at (<compiler>-gen-buffer -c-) (<compiler>-gen-buffer-index -c-) args)
-  (incr (<compiler>-gen-buffer-index -c-)))
-
 (define-form gen args
-  `(%save-into-gen-buffer -c- ,@args))
+  `(array-append (<compiler>-gen-buffer -c-) (list ,@args)))
 
 (define-function emit-gen-buffer (-c-)
-  (for (i 0 (<compiler>-gen-buffer-index -c-))
-    (apply emit-instruction (array-at (<compiler>-gen-buffer -c-) i))))
+  (array-do entry (<compiler>-gen-buffer -c-)
+    (apply emit-instruction entry)))
 
 (define-function new-param (comp)
   (let* ((i (<compiler>-param-counter comp))
