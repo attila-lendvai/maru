@@ -64,3 +64,18 @@
 
 (define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	target/word-size-in-bytes)
 (define-vector-accessors <string>	k/string	t	byte-at		copy-bytes	move-bytes	1)
+
+(define-function array-binary-search (array item comparator inserter)
+  (let ((lo 0)
+        (hi (- (k/array-length array) 1)))
+    (while (<= lo hi)
+      (let* ((mid	(/ (+ lo hi) 2))
+             (candidate	(k/array-at array mid))
+             (res	(comparator item candidate)))
+        (cond
+          ((< res 0)	(set hi (- mid 1)))
+          ((> res 0)	(set lo (+ mid 1)))
+          (else		(return candidate)))))
+    (if inserter
+        (inserter array lo item)
+      ())))
