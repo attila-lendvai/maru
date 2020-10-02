@@ -54,10 +54,8 @@ TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 TEST_EVAL	= $(BUILD_llvm)/eval2
 #TEST_EVAL	= $(BUILD_x86)/eval2
 
-GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval2
-define maybe-build-gen-eval
-  test -e $(GEN_EVAL) || $(MAKE) TARGET_CPU=i686 $(GEN_EVAL)
-endef
+#GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval2
+GEN_EVAL	= $(BUILD_llvm)/eval2
 
 ##
 ## internal variables
@@ -182,8 +180,9 @@ $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/evaluator/eval.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
+	$(call ensure-built,$(HOST_DIR)/eval) # we need to move the dependency here, mimicing the currently commented out version of eval2.ll rule below
 	$(TIME) $(HOST_DIR)/eval -v					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
@@ -275,7 +274,7 @@ endef
 ###
 $(BUILD)/generated/peg.g.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
 	@mkdir -p $(BUILD)/generated
-	$(call maybe-build-gen-eval)
+	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
@@ -288,7 +287,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 $(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
-	$(call maybe-build-gen-eval)
+	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
