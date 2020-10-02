@@ -936,9 +936,7 @@
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
-
-(define-method compile-definition <expr> (name parent-comp)
-  (compile-expr self name parent-comp))
+(define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
 
 (define-method emit-prelude <compiler> ()
   (let (;;(target-triplet	(slave-value slave:target-triplet))

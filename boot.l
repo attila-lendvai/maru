@@ -29,8 +29,6 @@
 
 (define unit-testing? '(t))
 
-(define list (lambda args args))
-
 (define primitive/print print)
 (define primitive/dump  dump)
 
@@ -59,6 +57,8 @@
     (apply print args)
     (primitive/print "\n")
     (abort)))
+
+(define list (lambda args args))
 
 (define caar (lambda (x) (car (car x))))
 (define cadr (lambda (x) (car (cdr x))))
@@ -1216,7 +1216,7 @@
 (define-method do-print <generic> () (print "<multimethod:" (<generic>-name self) ">"))
 
 (define-form define-generic (name . default)
-  (or default (set default `(args (error "no method in  "',name" corresponding to: "args))))
+  (or default (set default `(args (error "no method in generic "',name" corresponding to: "args", of types: " (map type-of args)))))
   `(define ,name (generic ',name (lambda ,@default))))
 
 (define-function %add-multimethod (mm types method)
