@@ -417,7 +417,7 @@
         temp))))
 
 (define-function compile-expr (self name parent-comp)
-  (let* ((main? (= 'slave:main name))
+  (let* ((main? (= 'main name))
          (body (<expr>-body self))
          (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (LABEL (concat-string (symbol->string name)
@@ -598,15 +598,15 @@
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
 (define +special-forms+ (list
-  (cons (slave-value slave:let)            compile/let)
-  (cons (slave-value slave:and)            compile/and)
-  (cons (slave-value slave:or)             compile/or)
-  (cons (slave-value slave:if)             compile/if)
-  (cons (slave-value slave:while)          compile/while)
-  (cons (slave-value slave:set)            compile/set)
-  (cons (slave-value slave:lambda)         compile/lambda)
-  (cons (slave-value slave:return)         compile/return)
-  (cons (slave-value slave:address-of)     compile/address-of)))
+  (cons (slave-value let)		compile/let)
+  (cons (slave-value and)		compile/and)
+  (cons (slave-value or)		compile/or)
+  (cons (slave-value if)		compile/if)
+  (cons (slave-value while)		compile/while)
+  (cons (slave-value set)		compile/set)
+  (cons (slave-value lambda)			compile/lambda)
+  (cons (slave-value return)		compile/return)
+  (cons (slave-value address-of)	compile/address-of)))
 
 ;;;
 ;;; Special Operators
@@ -637,28 +637,28 @@
            `(;; nullary
              ()
              ;; unary
-             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT) (slave:bitwise-not ,BITWISE-NOT))
+             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
              ;; binary
-             ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
-              (slave:bitwise-and ,AND) (slave:bitwise-or ,OR) (slave:bitwise-xor ,XOR)
-              (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              ;;(slave:bitwise-shift ,ASH)
-              (slave:<< ,ASL) (slave:>>  ,ASR)
+             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
+              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (!= ,NE) (>= ,GE) (> ,GT)
+              ;;(bitwise-shift ,ASH)
+              (<< ,ASL) (>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (slave:string-at		,LOAD-I8)
-              (slave:byte-at		,LOAD-I8)
-              (slave:oop-at		,LOAD-OOP))
+              (string-at		,LOAD-I8)
+              (byte-at		,LOAD-I8)
+              (oop-at		,LOAD-OOP))
              ;; ternary
-             ((slave:set-string-at	,STORE-I8)
-              (slave:set-byte-at	,STORE-I8)
-              (slave:set-oop-at		,STORE-OOP)))))
+             ((set-string-at	,STORE-I8)
+              (set-byte-at	,STORE-I8)
+              (set-oop-at		,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-module slave op-name)))
-                       ;; NOTE this is not (slave-value slave:<subr>), because it's the eval.exe of the
+                       ;; NOTE this is not (slave-value <subr>), because it's the eval.exe of the
                        ;; previous stage that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
@@ -669,7 +669,7 @@
                    arity-line))
             table))))
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (slave-value slave:target-boolean/false))))
+(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (slave-value target-boolean/false))))
 (define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
 (define-method compile <variable> (-c-)
@@ -680,10 +680,10 @@
        (gen LOAD value))
       ((global-variable? self)
        (cond
-         ((= 'slave:true self.name)
-          (gen LOAD (LI32 (slave-value slave:target-boolean/true))))
+         ((= 'true self.name)
+          (gen LOAD (LI32 (slave-value target-boolean/true))))
          ((subtype? (type-of value) <type>)
-          (gen LOAD (LI32 (eval-in-module slave `(slave:<type>-slave-id ,value)))))
+          (gen LOAD (LI32 (eval-in-module slave `(<type>-slave-id ,value)))))
          ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
           (gen LOAD (LI32 (LABEL (<foreign-function>-name value)))))
          ((and +direct-calls+
@@ -724,7 +724,7 @@
 (define-selector compile-definition)
 
 (define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
-(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <foreign-function>	(name -c-)	(emit COMMENT (list "foreign function "name))) ; it will be handled at the call site
 

@@ -18,7 +18,7 @@
 ;(define-form gc/debug		prog		`(let () ,@prog))
 
 (define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
-(define-constant feature/object-canary		(or false (and (<= 3 *safety*) true))) ; TODO evolving? artifact
+(define-constant feature/object-canary		(or false (<= 3 *safety*)))
 
 ;; to detect infinite recursion before a sigsegv tells us so.
 (define-constant +maximum-call-stack-depth+ 10000)
@@ -572,14 +572,6 @@
     var))
 
 (define-function k/intern (cstr)
-  ;; deal with ?: syntax for denoting modules
-  ;; evolving?
-  (let ((len (libc/strlen cstr))
-        (submod ()))
-    (for (i 0 len)
-      (when (= ?: (string-at cstr i))
-        (return (k/intern (+ 1 (+ cstr i)))))))
-  ;; no module is denoted in cstr (anymore); it's just a symbol to be interned at this point
   (array-binary-search *symbols*
                        cstr
                        (lambda (item candidate)

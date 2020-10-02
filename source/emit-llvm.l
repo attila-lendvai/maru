@@ -42,17 +42,17 @@
 (define *ffi-type->llvm-type*
     (cond
       ((= 32 target/word-size-in-bits)
-       '((slave:*		%ptr)
-         (slave:int		i32)
-         (slave:long		i32)
-         (slave:unsigned-long	i32)
-         (slave:size_t		i32)))
+       '((*		%ptr)
+         (int		i32)
+         (long		i32)
+         (unsigned-long	i32)
+         (size_t	i32)))
       ((= 64 target/word-size-in-bits)
-       '((slave:*		%ptr)
-         (slave:int		i32)
-         (slave:long		i64)
-         (slave:unsigned-long	i64)
-         (slave:size_t		i32)))
+       '((*		%ptr)
+         (int		i32)
+         (long		i64)
+         (unsigned-long	i64)
+         (size_t	i32)))
       (else (error "unexpected word size in target/word-size-in-bits: "target/word-size-in-bits))))
 
 (define-function ffi-type->llvm-type (type)
@@ -281,7 +281,7 @@
 (define-function emit-llvm-call (result-reg name args return-type param-types vararg?)
   (set return-type (ffi-type->llvm-type return-type))
   (set param-types (map ffi-type->llvm-type param-types))
-  (let ((void? (= return-type 'slave:void)))
+  (let ((void? (= return-type 'void)))
     (print "	")
     (unless void?
       (print result-reg" = " ))
@@ -294,7 +294,7 @@
            (lambda (arg)
              (let ((param-type (or (pop param-types) '%ptr)))
                ;; TODO FIXME this ... situation is messy
-               (when (= param-type 'slave:...)
+               (when (= param-type '...)
                  (set param-type '%ptr))
                (if first?
                    (set first? ())
@@ -650,7 +650,7 @@
                 (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
                   (cond
                     ((= '%ptr return-type)) ; all good
-                    ((= 'slave:void return-type)
+                    ((= 'void return-type)
                      (gen COMMENT (list "	void FFI call return value"))
                      (gen LOAD (LITERAL 0) 0))
                     (else
@@ -699,8 +699,8 @@
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
     (gen LOAD (LITERAL (cond
-                         ((= op 'and) (slave-value slave:target-boolean/true))
-                         ((= op 'or)  (slave-value slave:target-boolean/false))))
+                         ((= op 'and) (slave-value target-boolean/true))
+                         ((= op 'or)  (slave-value target-boolean/false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
@@ -806,15 +806,15 @@
          (gen ADDR val))))))
 
 (define +special-forms+ (list
-  (cons (slave-value slave:let)		compile/let)
-  (cons (slave-value slave:and)		compile/and)
-  (cons (slave-value slave:or)		compile/or)
-  (cons (slave-value slave:if)		compile/if)
-  (cons (slave-value slave:while)	compile/while)
-  (cons (slave-value slave:set)		compile/set)
-  (cons (slave-value slave:lambda)	compile/lambda)
-  (cons (slave-value slave:return)	compile/return)
-  (cons (slave-value slave:address-of)	compile/address-of)))
+  (cons (slave-value let)		compile/let)
+  (cons (slave-value and)		compile/and)
+  (cons (slave-value or)		compile/or)
+  (cons (slave-value if)		compile/if)
+  (cons (slave-value while)		compile/while)
+  (cons (slave-value set)		compile/set)
+  (cons (slave-value lambda)			compile/lambda)
+  (cons (slave-value return)		compile/return)
+  (cons (slave-value address-of)	compile/address-of)))
 
 ;;;
 ;;; Special Operators
@@ -848,27 +848,27 @@
            `(;; nullary
              ()
              ;; unary
-             ((slave:-  ,NEG) (slave:not ,LOGIC-NOT))
+             ((-  ,NEG) (not ,LOGIC-NOT))
              ;; binary
-             ((slave:+  ,ADD) (slave:-   ,SUB) (slave:* ,MUL) (slave:/ ,DIV)
-              (slave:bitwise-and  ,AND) (slave:bitwise-or   ,OR ) (slave:bitwise-xor ,XOR)
-              (slave:<  ,LT ) (slave:<=  ,LE ) (slave:= ,EQ ) (slave:!= ,NE) (slave:>= ,GE) (slave:> ,GT)
-              (slave:<< ,ASL) (slave:>>  ,ASR)
+             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
+              (bitwise-and  ,AND) (bitwise-or   ,OR ) (bitwise-xor ,XOR)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (!= ,NE) (>= ,GE) (> ,GT)
+              (<< ,ASL) (>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (slave:string-at		,LOAD-I8)
-              (slave:byte-at		,LOAD-I8)
-              (slave:oop-at		,LOAD-OOP))
+              (string-at		,LOAD-I8)
+              (byte-at		,LOAD-I8)
+              (oop-at		,LOAD-OOP))
              ;; ternary
-             ((slave:set-string-at	,STORE-I8)
-              (slave:set-byte-at	,STORE-I8)
-              (slave:set-oop-at		,STORE-OOP)))))
+             ((set-string-at	,STORE-I8)
+              (set-byte-at	,STORE-I8)
+              (set-oop-at		,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-module slave op-name)))
-                       ;; NOTE this is not (slave-value slave:<subr>), because it's the host eval.exe
+                       ;; NOTE this is not (slave-value <subr>), because it's the host eval.exe
                        ;; that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
@@ -880,7 +880,7 @@
             table))))
 
 (define-method compile <undefined> (-c-)
-  (let ((false-value (slave-value slave:target-boolean/false)))
+  (let ((false-value (slave-value target-boolean/false)))
     (gen LOAD (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
@@ -892,12 +892,12 @@
       ((local? value)		(set (<compiler>-current-value -c-) value))
       ((temp? value)		(gen LOAD value ()))
       ((global-variable? self)	(cond
-                                  ((= 'slave:true self.name)
-                                   (let ((true-value (slave-value slave:target-boolean/true)))
+                                  ((= 'true self.name)
+                                   (let ((true-value (slave-value target-boolean/true)))
                                      (gen LOAD (LITERAL true-value) true-value)))
                                   ((subtype? (type-of value) <type>)
                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                   (gen LOAD (LITERAL (eval-in-module slave `(slave:<type>-slave-id ,value))) 0))
+                                   (gen LOAD (LITERAL (eval-in-module slave `(<type>-slave-id ,value))) 0))
                                   (else
                                    (gen LOAD (GLOBAL self.name) value))))
       (else
@@ -928,14 +928,14 @@
 (define-selector compile-definition)
 
 (define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
-(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value slave:<type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 (define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
 
 (define-method emit-prelude <compiler> ()
-  (let (;;(target-triplet	(slave-value slave:target-triplet))
+  (let (;;(target-triplet	(slave-value target-triplet))
         (word-size		target/word-size-in-bits)
         (-c- self))
     (verbosity 1 (warn "\nCompiling for word size: " word-size " bits\n\n"))

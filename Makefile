@@ -11,6 +11,7 @@
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
+#  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
 #
 # the makefile parallelism is mostly only between the backends.
@@ -61,7 +62,7 @@ endef
 ##
 ## internal variables
 ##
-PREVIOUS_STAGE	= maru.5
+PREVIOUS_STAGE	= maru.6
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
@@ -183,7 +184,7 @@ $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 
 $(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(TIME) $(HOST_DIR)/eval					\
+	$(TIME) $(HOST_DIR)/eval -v					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\

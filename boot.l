@@ -238,7 +238,7 @@
   (eval '(define feature/profiler ())))
 
 (define-constant feature/track-expr-names	(or true feature/profiler))
-(define-constant feature/typecheck-slot-access	(if (and (< *optimised* 1) (< 0 *safety*)) true)) ; bootstrap? artifact, drop in the next stage
+(define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))
 
 ;;; let*
 
@@ -571,7 +571,7 @@
       ;; integrate with the host vm's type machinery to instantiate slave objects
       ;; in the framework of the host while we are being bootstrapped.
       (define-function allocate-type-id ()
-        (eval-in-module host '(host:allocate-type-id)))
+        (eval-in-module host '(allocate-type-id)))
 
       (define-function allocate-type-id/slave ()
         (incr %last-type-id))
@@ -597,10 +597,10 @@
 
 (if-at-expand bootstrapping?
     (let ()
-      (define type-id-of-<type>		(eval-in-module host '(host:<type>-id host:<type>)))
-      (define type-id-of-<record>	(eval-in-module host '(host:<type>-id host:<record>)))
-      (define slots-of-<type>		(eval-in-module host '(host:<record>-direct-slots host:<type>)))
-      (define slots-of-<record>		(eval-in-module host '(host:<record>-direct-slots host:<record>))))
+      (define type-id-of-<type>		(eval-in-module host '(<type>-id <type>)))
+      (define type-id-of-<record>	(eval-in-module host '(<type>-id <record>)))
+      (define slots-of-<type>		(eval-in-module host '(<record>-direct-slots <type>)))
+      (define slots-of-<record>		(eval-in-module host '(<record>-direct-slots <record>))))
 
   (define type-id-of-<type>		(allocate-type-id))
   (define type-id-of-<record>		(allocate-type-id))
@@ -619,12 +619,8 @@
 ;;; bootstrap is happening, i.e. <type> and <record> is mapped into the slave from the host in early.l
 ;;;
     (let ()
-      (set <type>		(eval-in-module host 'host:<type>))
-      (set <record>		(eval-in-module host 'host:<record>))
-      ;; the next two are needed because if anything (e.g. the accessor machinery) decides to look up types
-      ;; by their name, then their name will be host:<type> and host:<record> while bootstrapping.
-      (define host:<type>	<type>)
-      (define host:<record>	<record>)
+      (set <type>		(eval-in-module host '<type>))
+      (set <record>		(eval-in-module host '<record>))
 
       (let ((slave-id (allocate-type-id/slave)))
         (set (array-at %type-id-map/host->slave (<type>-id <type>)) slave-id)
@@ -647,7 +643,7 @@
               (host-id	(<type>-id type)))
           (set (array-at %type-id-map/host->slave host-id) slave-id)
           (set (array-at %types slave-id) type)
-          (eval-in-module host `(host:register-type (host:quote ,type)))))
+          (eval-in-module host `(register-type ',type))))
 
       (define-function type-object-for-id (type-id)
         (or (array-at %types (let ((slave-id (array-at %type-id-map/host->slave type-id)))

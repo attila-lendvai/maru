@@ -31,11 +31,11 @@
 ;;;
 ;;; the target's configuration
 ;;;
-(define-constant target/cpu			(host-value host:target/cpu))
-(define-constant target/machine			(host-value host:target/machine))
-(define-constant target/vendor			(host-value host:target/vendor))
-(define-constant target/os			(host-value host:target/os))
-(define-constant target/word-size-in-bits	(host-value host:target/word-size-in-bits))
+(define-constant target/cpu			(host-value target/cpu))
+(define-constant target/machine			(host-value target/machine))
+(define-constant target/vendor			(host-value target/vendor))
+(define-constant target/os			(host-value target/os))
+(define-constant target/word-size-in-bits	(host-value target/word-size-in-bits))
 (define-constant target/little-endian?		true)
 ;;(define-constant target-triplet			(concat-strings target/cpu "-" target/vendor "-" target/os))
 
@@ -94,7 +94,7 @@
 
 (define-function foreign-function (return-type foreign-name parameter-types)
   (let* ((rev-types (list-reverse parameter-types))
-         (vararg? (= 'slave:... (first rev-types))))
+         (vararg? (= '... (first rev-types))))
     (when vararg?
       (pop rev-types))
     (set parameter-types (list-reverse! rev-types))

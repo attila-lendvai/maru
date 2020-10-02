@@ -4,10 +4,7 @@
 > The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
 
 ## Assorted smaller changes
- - more detailed backtraces
- - the symbol true now evaluates to itself. it was just too much hassle not to have a self-evaluating true value.
- - first successful LLVM (cross)compile to Darwin.
- - added very basic constant propagation for the x86 backend, yet it nicely yielded around 10% speedup with the bootstrap.
+ - TODO
 
 ## Stats
 
@@ -15,19 +12,19 @@ This stage started out with:
 ```
 Backend x86:
 
-cat boot.l emit-early.l emit-x86.l emit-late.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-1445
-cat eval.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-1571
-cat boot.l emit-early.l emit-x86.l emit-late.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-2988
+cat boot.l source/emit-early.l source/emit-x86.l source/emit-late.l			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1629
+cat source/evaluator/buffer.l source/evaluator/eval.l source/evaluator/gc.l source/evaluator/printer.l source/evaluator/reader.l source/evaluator/subrs.l source/evaluator/arrays.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1744
+cat boot.l source/emit-early.l source/emit-x86.l source/emit-late.l source/evaluator/buffer.l source/evaluator/eval.l source/evaluator/gc.l source/evaluator/printer.l source/evaluator/reader.l source/evaluator/subrs.l source/evaluator/arrays.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+3342
 
 Backend llvm:
 
-cat boot.l emit-early.l emit-llvm.l emit-late.l		| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-1695
-cat eval.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-1571
-cat boot.l emit-early.l emit-llvm.l emit-late.l eval.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-3235
+cat boot.l source/emit-early.l source/emit-llvm.l source/emit-late.l			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1820
+cat source/evaluator/buffer.l source/evaluator/eval.l source/evaluator/gc.l source/evaluator/printer.l source/evaluator/reader.l source/evaluator/subrs.l source/evaluator/arrays.l				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+1744
+cat boot.l source/emit-early.l source/emit-llvm.l source/emit-late.l source/evaluator/buffer.l source/evaluator/eval.l source/evaluator/gc.l source/evaluator/printer.l source/evaluator/reader.l source/evaluator/subrs.l source/evaluator/arrays.l	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+3530
 ```
