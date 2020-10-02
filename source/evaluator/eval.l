@@ -501,17 +501,18 @@
     obj))
 
 ;;;
-;;; arrays, strings, and more utils
+;;;
 ;;; ----------------------------------------------------------------
-
-(require "source/evaluator/arrays.l")
-(require "source/evaluator/buffer.l")
 
 (define-function k/concat-list (head tail)
   (if (is/pair head)
       (gc/let* ((new-tail (k/concat-list (get/tail head) tail)))
         (new-<pair> (get/head head) new-tail))
     tail))
+
+(require "source/evaluator/arrays.l")
+(require "source/evaluator/buffer.l")
+(require "source/evaluator/printer.l")
 
 ;;;
 ;;; env
@@ -611,12 +612,6 @@
   (k/intern* cstr *module*))
 
 (require "source/evaluator/reader.l")
-
-;;;
-;;; printer
-;;; ----------------------------------------------------------------
-
-(require "source/evaluator/printer.l")
 
 ;;;
 ;;; backtrace
