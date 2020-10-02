@@ -186,6 +186,7 @@
 ;; Only the first one of these is essential: *module*, the rest could
 ;; be looked up each time; i.e. they're just optimization or debug helpers.
 (define *module*)
+(define *symbols*)
 
 ;; optimization: we cache these definitions from the env of the Maru VM
 ;; to avoid looking them up a gazillion times.
@@ -421,11 +422,11 @@
       (put (<symbol> _bits) obj bits)
       obj)))
 
-(define-function new-<array> (size)
+(define-function new-<array> (capacity)
   (gc/let* ((arr (new-record-instance <array>)))
-    (put (<array> size) arr (new-<long> size))
-    (when (> size 0)
-      (put (<array> elements) arr (gc/allocate <data> (words-to-bytes size))))
+    (put (<array> size) arr (new-<long> 0))
+    (when (> capacity 0)
+      (put (<array> elements) arr (gc/allocate <data> (words-to-bytes capacity))))
     arr))
 
 (define-function new-<expr> (parameters body env ctx)
@@ -569,8 +570,16 @@
     (put (<variable> value) var value)
     var))
 
-(define-function %intern (cstr module)
-  (array-binary-search (get (<module> symbols) module)
+(define-function k/intern (cstr)
+  ;; deal with ?: syntax for denoting modules
+  ;; evolving?
+  (let ((len (libc/strlen cstr))
+        (submod ()))
+    (for (i 0 len)
+      (when (= ?: (string-at cstr i))
+        (return (k/intern (+ 1 (+ cstr i)))))))
+  ;; no module is denoted in cstr (anymore); it's just a symbol to be interned at this point
+  (array-binary-search *symbols*
                        cstr
                        (lambda (item candidate)
                          (libc/strcmp item (get/symbol candidate)))
@@ -579,31 +588,6 @@
                          (gc/let* ((sym (new-<symbol> item)))
                            (k/array-insert array index sym)
                            sym))))
-
-(define-function k/intern* (cstr module)
-  (safety 1 (k/assert (is <module> module) "k/intern called with not a module " module))
-  ;; deal with ?: syntax for denoting modules
-  (let ((len (libc/strlen cstr))
-        (idx 0)
-        (submod ()))
-    (while (< idx len)
-      (when (= ?: (string-at cstr idx))
-        (gc/let* ((submod-name (gc/allocate-opaque <data> (+ idx 1))))
-          (libc/memcpy submod-name cstr idx)
-          (set (string-at submod-name idx) ?\x00)
-          (awhen (k/env/lookup-variable (get/globals* module) (k/intern* submod-name module))
-            (set submod (get (<variable> value) it))
-            (unless (is <module> submod)
-              (fatal2 "k/intern: while interning '%s', '%s' was found, but it's not a <module>" cstr submod-name))))
-        (return (if submod
-                    (k/intern* (+ 1 (+ cstr idx)) submod)
-                  (%intern cstr module))))
-      (set idx (+ 1 idx))))
-  ;; no module is denoted in cstr (anymore); it's just a symbol to be interned at this point
-  (%intern cstr module))
-
-(define-function k/intern (cstr)
-  (k/intern* cstr *module*))
 
 (require "source/evaluator/reader.l")
 
@@ -952,7 +936,7 @@
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0)))
     (set (<module>-symbols module)	(new-<array> 0))
-    (set (<module>-globals module)	(k/env/define env (k/intern* "*globals*" module) env))
+    (set (<module>-globals module)	(k/env/define env (k/intern "*globals*") env))
 
     (populate-module-with-primitives module)
 
@@ -1015,7 +999,7 @@
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
-    (k/env/define (get/globals* module) (k/intern* name module) tmp)))
+    (k/env/define (get/globals* module) (k/intern name) tmp)))
 
 (define-form instantiate-subrs ()
   (let ((result ()))
@@ -1032,20 +1016,20 @@
   ;; the predefined primitives of the language
   (let ((env (get/globals* module)))
     (gc/let* ((tmp))
-				(k/env/define env (k/intern* "*input*"			module) ())
-				(k/env/define env (k/intern* "*command-line-arguments*"	module) ())
-      (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*verbosity*"		module) tmp)
-      (set tmp (new-<long> 0))	(k/env/define env (k/intern* "*optimised*"		module) tmp)
+				(k/env/define env (k/intern "*input*")			())
+				(k/env/define env (k/intern "*command-line-arguments*")	())
+      (set tmp (new-<long> 0))	(k/env/define env (k/intern "*verbosity*")		tmp)
+      (set tmp (new-<long> 0))	(k/env/define env (k/intern "*optimised*")		tmp)
 
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*expanders*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*encoders*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*evaluators*"		module) tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern* "*applicators*"		module) tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*expanders*")		tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*encoders*")		tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*evaluators*")		tmp)
+      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*applicators*")		tmp)
 
       ;; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
-      (set tmp (new-<symbol> "+end+")) (k/env/define env (k/intern* "+end+" module) tmp))
+      (set tmp (new-<symbol> "+end+")) (k/env/define env (k/intern "+end+") tmp))
 
-    (let ((symbol/true (k/intern* "true" module)))
+    (let ((symbol/true (k/intern "true")))
       ;; make sure the symbol true evaluates to itself
       (k/env/define env symbol/true symbol/true))
 
@@ -1107,6 +1091,7 @@
   (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
 
   (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
+  (gc/push-root (address-of *symbols*))
   (gc/push-root (address-of fixed-subr/quote))		; precautionary, in case someone redefines them and they get removed from the env.
   (gc/push-root (address-of fixed-subr/lambda))
   (gc/push-root (address-of fixed-subr/let))
@@ -1118,9 +1103,8 @@
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (new-<array> 32)))
 
-  (debug (libc/printf "initializing *module*\n"))
-
-  (set *module* (new-<module>))
+  (set *symbols* (new-<array> 32))			(debug (libc/printf "initialized *symbols*\n"))
+  (set *module*  (new-<module>))			(debug (libc/printf "initialized *module*\n"))
 
   (capture-well-known-vm-values)
 
