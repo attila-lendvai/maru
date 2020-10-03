@@ -13,7 +13,7 @@
 
 (if bootstrapping?
     (let ()
-      (warn "boot.l speaking; we're bootstrapping")
+      (warn "boot.l speaking with *verbosity* " *verbosity* "; we're bootstrapping")
       (if evolving?
           (warn "; we're evolving"))
       (warn "\n")))
@@ -222,7 +222,8 @@
       exp)))
 
 (define-form verbosity (level . body)
-  `(and (>= *verbosity* ,level) (let () ,@body)))
+  `(when (<= ,level *verbosity*)
+     ,@body))
 
 (define-form safety (level . prog)
   (when (<= level *safety*)
@@ -690,7 +691,7 @@
 (assert (= (type-object-for-id (<type>-id <type>)) <type>))
 (assert (= (type-object-for-id (<type>-id <record>)) <record>))
 
-(verbosity 1
+(verbosity 2
   (warn "<type> is bootstrapped: "	<type>		", id: "	(<type>-id <type>)"\n")
   (warn "<record> is bootstrapped: "	<record>	", id: "	(<type>-id <record>)"\n"))
 
@@ -819,7 +820,7 @@
          ,@(%make-record-accessors <type>)
          ,@(%make-record-accessors <record>)))
 
-(verbosity 1 (warn "type bootstrap finished\n"))
+(verbosity 2 (warn "type bootstrap finished\n"))
 
 ;;; at this point the type registry is bootstrapped, containing two types: <type> and <record>
 
@@ -1464,7 +1465,8 @@
       (read name)))
 
 (define-function load (name)
-  (when (or bootstrapping? (> *verbosity* 1)) (warn "loading file: "name"\n"))
+  ;;(primitive/print "load, verbosity is " *verbosity* "\n")
+  (verbosity 1 (warn "loading file: "name"\n"))
   (let ((exps (find-and-read name)))
     ;; TODO FIXME this has a different expand/eval order than the rest of the codebase
     (or exps (error "file not found or empty: "name))

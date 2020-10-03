@@ -1,7 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (define-function compile-env (env -c-)
-  (warn "begin compiling\n")
+  (verbosity 1 (warn "begin compiling\n"))
   (emit-prelude -c-)
   (let ((vars (<env>-bindings env)))
     (for (i 0 (array-length vars))
@@ -9,9 +9,9 @@
              (name  (<variable>-name  var))
              (value (<variable>-value var)))
         (emit COMMENT (list "defn " name))
-        (warn name ", ")
+        (verbosity 1 (warn name ", "))
         (compile-definition value name -c-)))
-    (warn "\n")
+    (verbosity 1 (warn "\n"))
     (emit-gen-buffer -c-)))
 
 ;;;

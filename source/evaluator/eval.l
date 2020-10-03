@@ -178,8 +178,9 @@
 (when-at-expand feature/backtrace
   (define *call-stack*		0))
 
-(define *arg/verbose*		(or (debug 1) 0))
-(define *arg/optimised*		0)
+;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
+(define *verbosity*		(or (debug 1) 0))
+(define *optimised*		0)
 
 ;; Some of the state of the Maru VM being implemented needs to be
 ;; captured/known by the code implementing it in the target VM.
@@ -660,7 +661,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function k/apply-expr (fun arguments parent-ctx)
-  (when (< 2 *arg/verbose*) (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
+  (verbosity 2 (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
@@ -881,7 +882,7 @@
            exp))))))
 
 (define-function k/eval (exp ctx)
-  (when (< 2 *arg/verbose*) (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
+  (verbosity 2 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
   (let ((type (get/type exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -902,11 +903,11 @@
 (define-function k/expand-encode-eval (form env)
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-								(when (< 1 *arg/verbose*) (libc/printf ";;; ")		(k/dumpln x))
-    (set x (k/expand x env))					(when (< 2 *arg/verbose*) (libc/printf "expd--> ")	(k/dumpln x))
-    (set x (k/encode x env))					(when (< 2 *arg/verbose*) (libc/printf "encd--> ")	(k/dumpln x))
+								(verbosity 2 (libc/printf ";;; ")	(k/dumpln x))
+    (set x (k/expand x env))					(verbosity 3 (libc/printf "expd--> ")	(k/dumpln x))
+    (set x (k/encode x env))					(verbosity 3 (libc/printf "encd--> ")	(k/dumpln x))
     (set x (k/eval   x ctx))
-								(when (< 1 *arg/verbose*) (libc/printf ";;; => ")	(k/dumpln x))
+								(verbosity 2 (libc/printf ";;; => ")	(k/dumpln x))
     x))
 
 (define-function k/repl-stream (stream)
@@ -1018,7 +1019,7 @@
     (gc/let* ((tmp))
 				(k/env/define env (k/intern "*input*")			())
 				(k/env/define env (k/intern "*command-line-arguments*")	())
-      (set tmp (new-<long> 0))	(k/env/define env (k/intern "*verbosity*")		tmp)
+      (set tmp (new-<long> *verbosity*))	(k/env/define env (k/intern "*verbosity*")		tmp)
       (set tmp (new-<long> 0))	(k/env/define env (k/intern "*optimised*")		tmp)
 
       (set tmp (new-<array> 0))	(k/env/define env (k/intern "*expanders*")		tmp)
@@ -1133,14 +1134,14 @@
             (cond
               ;; -v
               ((not (libc/strcmp arg "-v"))
-               (set *arg/verbose* (+ 1 *arg/verbose*))
-               (set tmp (new-<long> *arg/verbose*))
+               (incr *verbosity*)
+               (set tmp (new-<long> *verbosity*))
                (put/variable-value "*verbosity*" tmp))
 
               ;; -O
               ((not (libc/strcmp arg "-O"))
-               (set *arg/optimised* (+ 1 *arg/optimised*))
-               (set tmp (new-<long> *arg/optimised*))
+               (incr *optimised*)
+               (set tmp (new-<long> *optimised*))
                (put/variable-value "*optimised*" tmp))
 
               ;; -p
@@ -1195,7 +1196,7 @@
 
               ;; read file as a program
               (else
-               (when (< 0 *arg/verbose*) (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
+               (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
                  (k/repl-stream stream)

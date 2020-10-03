@@ -165,7 +165,7 @@ eval-llvm: $(BUILD_llvm)/eval2
 # by using the eval.exe of the previous stage to execute our version of the compiler.
 $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval					\
+	$(TIME) $(HOST_DIR)/eval -v					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\

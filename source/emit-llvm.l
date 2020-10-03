@@ -938,7 +938,7 @@
   (let (;;(target-triplet	(slave-value slave:target-triplet))
         (word-size		target/word-size-in-bits)
         (-c- self))
-    (warn "\nCompiling for word size: " word-size " bits\n\n")
+    (verbosity 1 (warn "\nCompiling for word size: " word-size " bits\n\n"))
     ;;(assert (string?	target-triplet))
     (assert (long?	word-size))
     ;; our output is less specific, so allow the makefile, or whoever builds the
