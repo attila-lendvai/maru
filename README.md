@@ -36,19 +36,22 @@ s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
 
 * `eval.l` (in branch `maru.1` and up) contains the same evaluator, written in
 (a subset of) this s-expression language.
-In other words, `eval.l` is a
+In other words, `eval.l` implementats a
 [metacircular evaluator](https://en.wikipedia.org/wiki/Meta-circular_evaluator)
 for the language it is written in.
 
-* `emit.l` contains a compiler from s-expressions to [IA-32](https://en.wikipedia.org/wiki/IA-32) (x86)
-machine code and [LLVM](https://llvm.org/) IR, written in the s-expression language. This compiler can be thought of as a
-semantics-preserving "level shift" from s-expressions to IA-32 machine code, letting the metacircular
-evaluator in `eval.l` escape from "infinite metacircular regression" to a language grounded in hardware.
-A possible metaphor of this is a "target universe" that, when compiling the abstract to the concrete,
-provides you with a set of axiomatic foundations to build upon.
+* `emit.l` contains a compiler from s-expressions to
+[IA-32](https://en.wikipedia.org/wiki/IA-32) (x86) assembly (and [LLVM](https://llvm.org/) IR
+in the later stages), written in the s-expression language. This compiler can be thought of
+as a semantics-preserving "level shift" from s-expressions to machine code, letting
+the metacircular evaluator in `eval.l` escape from the "infinite metacircular regression"
+to a language grounded in hardware. A possible metaphor of this is a "target universe"
+implemented by some electric circuits (i.e. transistors wired to each other in a CPU)
+that provide you a set of axiomatic foundations to build upon while compiling the
+abstract to the concrete; while implementing your new universe (the Maru language in this case).
 
-* `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by `emit.l`,
-written in the s-expression language.
+* `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by
+`emit.l`; it's written in the s-expression language.
 
 ### Build architecture
 
@@ -64,15 +67,16 @@ then you need to *bootstrap* it:
    implementation of this very feature, and use/assume this feature in its own
    implementation.
 
-It's a confusing enough process, so it makes sense to fork the codebase at the point between 1) and 2).
+It's a confusing enough process, therefore it makes sense to fork the codebase at the point between 1) and 2).
 Strictly speaking, checking out and building a specific prior commit would be enough to provide an
 executable to execute the bootstrap process,
 but you may want to harmonize the build system, or you need to `git cherry-pick` some fixes into 1),
 and sometimes the implementation of the new feature simply requires two parallel, wildly diverged
 instances of the codebase, until the feature is fully implemented/debugged/bootstrapped.
+
 But once it's working fine, the old branch becomes irrelevant/stale, except for:
 
-- didactic purposes (to make it easier to follow how a language grows)
+- didactic purposes (to make it easier to follow how a self-hosted language grows)
 - aesthetics (cherry-picking or backporting changes wouldn't be possible without having separate branches)
 - "Oh God, we have lost all the executables!" -- bootstrap again all the way up from the C implementation
 
@@ -101,9 +105,10 @@ The bootstrap process in general is the following:
    `(n-1)` of the same language) to acquire an `eval` executable.
 
  - using that executable it compiles a version of itself that can already
-   load and run the codebase in stage `n`, but the resulting executable may not be
+   load and compile the codebase in stage `n`, but the resulting executable may not be
    fully functional (in this phase the `evolving?` variable is true). It's called
-   `eval1` in the build process.
+   `eval1` in the build process. Note that this phase is not always necessary,
+   depending on the nature of the new features being bootstrapped.
 
  - then it uses the resulting, potentially only semi-functional `eval1` executable to
    once again compile itself, which will yield the final, fully functional `eval2` executable.
@@ -113,8 +118,8 @@ The bootstrap process in general is the following:
 
 The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`
 whose semantics they are assuming, i.e. the `eval1` executable of the `maru.2`
-stage is built using the `eval` executable, `boot.l`, and `emit.l` of the previous,
-`maru.1` stage.
+stage is built by the `eval` executable, the `boot.l`, and the `emit.l` files
+of the previous, `maru.1` stage.
 
 During the build the previous stage is `git checkout`'ed locally under `./build/`,
 and its own build process is invoked in that directory. Note that short of caching
@@ -130,18 +135,18 @@ Daniel A. Nagy's [seedling](https://github.com/nagydani/seedling/) project.
 
 Starting with `maru.5`, the LLVM IR output (`eval2.ll`) is pushed to the repo under
 `build/`. This effectively short-circuits the recursive bootstrap process by
-straight away producing an executable by compiling the checked-in `eval2.ll` using `llc`
+straight away producing an executable from the checked-in `eval2.ll` using `llc`
 (see `make eval-llvm`).
 
-Deleting these files (note that `make clean` retains them), or touching the sources will
-force a normal bootstrap process building the previous stage(s).
+Deleting these files (note that `make clean` retains them!), or touching the sources will
+force a normal bootstrap process building/using the previous stage(s).
 
 ### Build instructions
 
 #### Linux
 From the default branch invoke `make test-bootstrap[-llvm,-x86]`.
 
-You will of course need:
+You may need:
 ```
 sudo apt-get install llvm-8 clang-8
 ```
@@ -193,7 +198,7 @@ Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru
 
 You are very welcome to contribute, but beware that until further notice
 **this repo will receive forced pushes** (i.e.
-**`git push -f`** to rewrite git history (except the `piumarta` branch)). This will stop
+**`git push -f`** rewriting git history (except the `piumarta` branch)). This will stop
 eventually when I settle with
 a build setup that nicely facilitates bootstrapping multiple, parallel paths of
 language development. Please make sure that you open a branch for your work,
@@ -201,7 +206,7 @@ and/or that you are ready for some `git fetch` and `git rebase`.
 
 ## Why
 
-* Programming badly [needs better foundations](https://github.com/nagydani/seedling/blob/master/RATIONALE.md),
+* Programming badly needs [better foundations](https://github.com/nagydani/seedling/blob/master/RATIONALE.md),
 and Maru is part of this exploration.
 The foundations should get smaller, simpler, more self-contained, and more approachable
 by people who set out to learn programming.
@@ -224,16 +229,18 @@ a repo and a maintainer.
 
 ### Maru's status
 
-Backporting of the latest from the `piumarta` branch is done: the latest branch should be
+Backporting the latest language semantics from the `piumarta` branch is done: the `eval.l`
+in the latest branch should be
 semantically equivalent with the `eval.l` that resides in the Piumarta branch, although
-we have arrived to this state on a different path: Ian has kept `eval.c` and `eval.l`
+we have arrived to this state on a different path: Ian has kept his `eval.c` and `eval.l`
 semantically in sync, while I have bootstrapped the needed changes from an earlier
-version of `eval.l`, starting out from, and abandoning a simpler `eval.c` at my first step.
+version of `eval.l`, starting out from, and then abandoning a simpler `eval.c` that I've
+used as the first stepping stone.
 
-There are several Maru stages/branches now, introducing non-trivial features.
+There are several Maru stages/branches now, introducing non-trivial new features.
 
 The compiler backends currently emit text files. Therefore, for now, a
-C toolchain is required for a full circle of bootstrap even on x86. With the addition of an IA-32
+C toolchain is required for a full cycle of bootstrap even on x86. With the addition of an IA-32
 assembler this requirement can be eliminated; i.e. there's no inherent external
 dependency in the codebase (the basic IO and memory management services
 of `libc` will also be made pluggable).
@@ -241,9 +248,18 @@ of `libc` will also be made pluggable).
 Assorted TODO:
 - revive all the goodies in the `piumarta` branch, but in a structured way
 - replace the hand-written parser in `eval.l` with something generated by the
-  [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) generator
+  [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) compiler
 - compile to, and bootstrap on the bare metal of some interesting target (C64? an ARM board?)
 - rewrite the build process in Maru; eliminate dependency on GNU Make
+- implement modules and phase separation along what is outlined in
+  [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf)
+- bring closer the language that the compiler and the evaluator understands;
+  i.e. make the level-shifted code (`eval.l` & co.) less different than code meant for the evaluator.
+  This would mean that we can e.g. load/compile `source/buffer.l` both into the level-shifted code and into
+  the evaluator. Once we have proper phase isolation between compile time and run time, then we could simply
+  define a different version of `car` in the level-shifted code (as opposed to the current
+  `k/car` isolation done by hand).
+- directly generate IA-32 machine code and thus eliminate the dependency on an external assembler
 
 ### History and perspective
 
@@ -265,7 +281,9 @@ Their annual reports:
 #### This git repo
 
 The `piumarta` branch of this git repo is a conversion of Ian Piumarta's Mercurial
-repo that was once available at http://piumarta.com/hg/maru/. To the best of my knowledge
+repo that was once available at
+[http://piumarta.com/hg/maru/](http://piumarta.com/hg/maru/).
+To the best of my knowledge
 this is the latest publically available state of Ian's work. This repo was full of
 assorted code, probably driving the VPRI demos.
 
@@ -294,3 +312,5 @@ A list of projects that I think is worth mentioning in this context:
 - [Project Oberon](http://www.projectoberon.com/): a project which encompasses CPU,
 language, operating system and user interface, and which can be run on a relatively
 inexpensive FPGA board, and simple enough for one person to understand it all.
+
+- [Seedling](https://github.com/nagydani/seedling/)
