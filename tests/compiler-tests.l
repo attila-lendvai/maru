@@ -391,6 +391,12 @@
     (set-second-to-first 33 99)
   99)
 
+(define-test compile/set/bug/4
+    (let ((x 40))
+      ;; TODO instead of silent miscompilation, this should error explicitly noting that the lambda is capturing x, which is currently not supported
+      ((lambda (y) (+ x y)) 2))
+  42)
+
 (define-function main (argc argv)
   (libc/printf "Printing command line args:\n")
   (for (i 0 argc)
