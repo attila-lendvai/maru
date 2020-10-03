@@ -232,7 +232,7 @@ $(HOST_DIR)/eval:
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(1) $(PROFILER_ARG)							\
+  $(TIME) $(1) $(PROFILER_ARG) -v						\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\
@@ -248,7 +248,7 @@ define compile-x86
 endef
 
 define compile-llvm
-  $(TIME) $(1) $(PROFILER_ARG)							\
+  $(TIME) $(1) $(PROFILER_ARG) -v						\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\

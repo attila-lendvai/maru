@@ -1,7 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(warn "--- boostrapping: prepare\n")
-
 (let ((host-module (current-module))
       (slave-module (create-module)))
   (define slave slave-module)

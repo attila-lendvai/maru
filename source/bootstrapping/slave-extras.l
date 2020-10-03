@@ -5,8 +5,6 @@
 ;;; building using the executable of the previous stage.
 ;;;
 
-(warn "--- boostrapping: slave extras\n")
-
 (define bitwise-and	&)
 (define bitwise-or	|)
 (define bitwise-xor	^)

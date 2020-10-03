@@ -178,7 +178,7 @@
 (when-at-expand feature/backtrace
   (define *call-stack*		0))
 
-(define *arg/verbose*		0)
+(define *arg/verbose*		(or (debug 1) 0))
 (define *arg/optimised*		0)
 
 ;; Some of the state of the Maru VM being implemented needs to be
@@ -660,7 +660,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function k/apply-expr (fun arguments parent-ctx)
-  (and (< 2 *arg/verbose*) (let () (libc/printf "  A  ")  (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ")  (k/dumpln parent-ctx) (libc/flush-streams)))
+  (when (< 2 *arg/verbose*) (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
@@ -881,7 +881,7 @@
            exp))))))
 
 (define-function k/eval (exp ctx)
-  (and (< 2 *arg/verbose*) (let () (libc/printf "  E  ")  (k/dump exp)  (libc/printf " ") (k/dumpln ctx)  (libc/flush-streams)))
+  (when (< 2 *arg/verbose*) (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
   (let ((type (get/type exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -902,11 +902,11 @@
 (define-function k/expand-encode-eval (form env)
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-								(when (< 0 *arg/verbose*) (libc/printf ";;; ")		(k/dumpln x))
+								(when (< 1 *arg/verbose*) (libc/printf ";;; ")		(k/dumpln x))
     (set x (k/expand x env))					(when (< 2 *arg/verbose*) (libc/printf "expd--> ")	(k/dumpln x))
     (set x (k/encode x env))					(when (< 2 *arg/verbose*) (libc/printf "encd--> ")	(k/dumpln x))
     (set x (k/eval   x ctx))
-								(when (< 0 *arg/verbose*) (libc/printf ";;; => ")	(k/dumpln x))
+								(when (< 1 *arg/verbose*) (libc/printf ";;; => ")	(k/dumpln x))
     x))
 
 (define-function k/repl-stream (stream)
@@ -1195,7 +1195,7 @@
 
               ;; read file as a program
               (else
-               (debug (libc/printf "reading file %s\n" arg))
+               (when (< 0 *arg/verbose*) (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
                  (k/repl-stream stream)

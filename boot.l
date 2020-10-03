@@ -1464,7 +1464,7 @@
       (read name)))
 
 (define-function load (name)
-  (when (or bootstrapping? (> *verbosity* 1)) (warn "loading file "name"\n"))
+  (when (or bootstrapping? (> *verbosity* 1)) (warn "loading file: "name"\n"))
   (let ((exps (find-and-read name)))
     ;; TODO FIXME this has a different expand/eval order than the rest of the codebase
     (or exps (error "file not found or empty: "name))
