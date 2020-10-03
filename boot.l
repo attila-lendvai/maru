@@ -140,15 +140,18 @@
 
 (define quasiquote
   (form
-    (let ((qq-list) (qq-element) (qq-object))
+    (let (qq-list qq-element qq-object)
       (set qq-list (lambda (l)
                      (if (pair? l)
                          (let ((obj (car l)))
-                           (if (and (pair? obj) (= (car obj) 'unquote-splicing))
+                           (if (and (pair? obj)
+                                    (= (car obj) 'unquote-splicing))
                                (if (cdr l)
                                    (list 'concat-list (cadr obj) (qq-list (cdr l)))
                                  (cadr obj))
-                             (if (and (= 'unquote obj) (pair? (cdr l)) (not (cddr l)))
+                             (if (and (= 'unquote obj)
+                                      (pair? (cdr l))
+                                      (not (cddr l)))
                                  (cadr l)
                                (list 'cons (qq-object obj) (qq-list (cdr l))))))
                        (list 'quote l))))
@@ -229,16 +232,27 @@
   (when (<= level *safety*)
     `(let () ,@prog)))
 
-;;; configuration
+;;; list basics
 
-;; this may or may not be defined by the makefile
-(if (defined? 'feature/profiler)
-    (eval '(when (= feature/profiler 0)
-             (set feature/profiler ())))
-  (eval '(define feature/profiler ())))
+(define-function first	(list)	(car list))
+(define-function second	(list)	(cadr list))
+(define-function third	(list)	(caddr list))
 
-(define-constant feature/track-expr-names	(or true feature/profiler))
-(define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))
+(define-function rest	(list)	(cdr list))
+
+(define-function member? (key list)
+  (while (and (pair? list) (!= key (car list)))
+    (set list (cdr list)))
+  (car list))
+
+(define-form push (list element)
+  `(set ,list (cons ,element ,list)))
+
+(define-form pop (list)
+  `(let* ((_list_ ,list)
+          (_head_ (car _list_)))
+     (set ,list (cdr _list_))
+     _head_))
 
 ;;; let*
 
@@ -276,13 +290,63 @@
 ;;       `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
 ;;     `(let () ,@body)))
 
+;;; basic iteration
+
+(define-form for (var-init-limit-step . body)
+  (let ((var       (car    var-init-limit-step)    )
+        (init      (cadr   var-init-limit-step)    )
+        (limit     (caddr  var-init-limit-step)    )
+        (step  (or (cadddr var-init-limit-step) 1)))
+    `(let ((,var ,init)
+           (_limit_ ,limit))
+       (while (< ,var _limit_)
+         ,@body
+         (set ,var (+ ,var ,step))))))
+
+(define-form list-do (var list . body)
+  `(let ((_list_ ,list))
+     (while _list_
+       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
+       (set _list_ (cdr _list_)))))
+
+(define-form until (condition . body)
+  `(while (not ,condition) ,@body))
+
+(define-form times-do (count . body)
+  `(for (__i__ 0 ,count)
+     ,@body))
+
+;;;
+;;; require
+;;;
+
+(define-function load (path)
+  ;;(primitive/print "load, verbosity is " *verbosity* "\n")
+  (verbosity 1 (warn "loading file: "path"\n"))
+  (let ((exps (or (read path)
+                  (error "file not found or empty: "path))))
+    (list-do expr exps
+      (eval expr))))
+
+(define *loaded*)
+
+(define-function require (path)
+  (unless (member? path *loaded*)
+    (push *loaded* path)
+    (load path)))
+
+;;; configuration
+
+;; this may or may not be defined by the makefile
+(if (defined? 'feature/profiler)
+    (eval '(when (= feature/profiler 0)
+            (set feature/profiler ())))
+  (eval '(define feature/profiler ())))
+
+(define-constant feature/track-expr-names	(or true feature/profiler))
+(define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))
+
 ;;; list
-
-(define-function first	(list)	(car list))
-(define-function second	(list)	(cadr list))
-(define-function third	(list)	(caddr list))
-
-(define-function rest	(list)	(cdr list))
 
 (define-function list-length (list)
   (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)
@@ -292,20 +356,6 @@
           (set len (+ len 1)))
         len)
     0))
-
-(define-form push (list element)
-  `(set ,list (cons ,element ,list)))
-
-(define-form pop (list)
-  `(let* ((_list_ ,list)
-          (_head_ (car _list_)))
-     (set ,list (cdr _list_))
-     _head_))
-
-(define-function member? (key list)
-  (while (and (pair? list) (!= key (car list)))
-    (set list (cdr list)))
-  (car list))
 
 (define-function list-remove (key list)
   (let ((result ())
@@ -348,6 +398,7 @@
 (define-function list->array (list)
   (%list->array list 0))
 
+;; TODO move this to be a primitive once subr creation/mapping is more automated
 (define-function array-append (arr val)
   (set-array-at arr (array-length arr) val))
 
@@ -457,48 +508,24 @@
 
 (define-form cond clauses (%cond clauses))
 
-;;; basic iteration
-
-(define-form for (var-init-limit-step . body)
-  (let ((var       (car    var-init-limit-step)    )
-        (init      (cadr   var-init-limit-step)    )
-        (limit     (caddr  var-init-limit-step)    )
-        (step  (or (cadddr var-init-limit-step) 1)))
-    `(let ((,var ,init)
-           (_limit_ ,limit))
-       (while (< ,var _limit_)
-         ,@body
-         (set ,var (+ ,var ,step))))))
-
-(define-form list-do (var list . body)
-  `(let ((_list_ ,list))
-     (while _list_
-       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
-       (set _list_ (cdr _list_)))))
-
-(define-form times-do (count . body)
-  `(for (__i__ 0 ,count)
-     ,@body))
+;;; iteration
 
 (define-function %generic-do (get len var col body)
   `(let* ((_col_ ,col)
           (_idx_ 0)
           (_end_ (,len _col_)))
      (while (< _idx_ _end_)
-       (let* ((,var (,get _col_ _idx_))) ,@body)
+       (let ((,var (,get _col_ _idx_))) ,@body)
        (set _idx_ (+ _idx_ 1)))))
 
 (define-form array-do	(var arr . body)	(%generic-do array-at  array-length  var arr body))
 (define-form string-do	(var str . body)	(%generic-do string-at string-length var str body))
 
-(define-form until (condition . body)
-  `(while (not ,condition) ,@body))
-
 (define-form list-detect (name list expr)
   `(let ((_ ())
          (__ ,list))
      (while (and __ (not _))
-       (let* ((,name (car __)))
+       (let ((,name (car __)))
          (and ,expr (set _ (car __)))
          (set __ (cdr __))))
      _))
@@ -1419,76 +1446,52 @@
 
 (define-form namespace (name)			`(set *globals* ,name))
 
-;;; command line
-
-(define *load-path*)
-
-(and (= "-L" (car *command-line-arguments*))
-     (let ()
-       (pop *command-line-arguments*)
-       (set *load-path* (pop *command-line-arguments*))))
-
 ;;; load/save
 
+;; (define *load-path* ())
+
+;; (when (= "-L" (car *command-line-arguments*))
+;;   (pop *command-line-arguments*)
+;;   (set *load-path* (pop *command-line-arguments*)))
+
 ;; KLUDGE the following is not well designed, they are here just to remain compatible with the original eval.l for the time being
-(define-function open (path)
-  (assert (= <string> (type-of path)) "open: non-string path argument: " path)
-  ;; TODO error handling
+(define-function file-open (path)
+  ;;(assert (= <string> (type-of path)) "file-open: non-string path argument: " path)
   (libc/fopen path "r"))
 
-(define-function close (stream)
-  (assert (= <target-vm-pointer> (type-of stream)) "close: inappropriate argument: " stream)
-  ;; TODO error handling
-  (libc/fclose stream))
+(define-function file-close (handle)
+  ;;(assert (= <target-vm-pointer> (type-of stream)) "close: inappropriate handle: " handle)
+  (libc/fclose handle))
 
-(define-function getc (stream)
-  (assert (= <target-vm-pointer> (type-of stream)) "getc: inappropriate argument: " stream)
-  ;; TODO error handling
-  (libc/fgetc stream))
+;; (define-function read-file-at-path (path)
+;;   (read (concat-string (or *load-path* "") path)))
 
-(define-function putc (stream char)
-  (assert (= <target-vm-pointer> (type-of stream)) "putc: inappropriate stream argument: " stream)
-  (assert (= <long> (type-of char))   "putc: non-integer char argument: " char)
-  ;; TODO error handling
-  (libc/fputc char stream))
+(define-function file-read-character (handle)
+  ;;(assert (= <target-vm-pointer> (type-of handle)) "file-read-character: inappropriate handle: " handle)
+  (libc/fgetc handle))
 
-(define-function format (fmt arg)
-  (assert (= <string> (type-of fmt)) "format: non-string fmt argument: " fmt)
-  (libc/format fmt arg))
+;; (define-function file-write-character (stream char)
+;;   ;;(assert (= <target-vm-pointer> (type-of stream)) "file-write-character: inappropriate stream argument: " stream)
+;;   (libc/fputc char stream))
 
-(define-function find-and-read (name)
-  (or (and *load-path* (read (concat-string *load-path* name)))
-      (read name)))
-
-(define-function load (name)
-  ;;(primitive/print "load, verbosity is " *verbosity* "\n")
-  (verbosity 1 (warn "loading file: "name"\n"))
-  (let ((exps (find-and-read name)))
-    ;; TODO FIXME this has a different expand/eval order than the rest of the codebase
-    (or exps (error "file not found or empty: "name))
-    (list-do expr exps (eval expr))))
-
-(define *loaded*)
-
-(define-function require (name)
-  (or (member? name *loaded*)
-      (let ()
-        (push *loaded* name)
-        (load name))))
-
-(define-function contents-to-file-named (string path . options)
-  (let ((f (or (open path "w")
-               (error "cannot open for writing: "path)))
-        (p (or (car options) putc)))
-    (for (i 0 (length string)) (p (at string i) f))
-    (close f)))
+;; (define-function contents-to-file-named (string path . options)
+;;   (let ((f (or (file-open path "w")
+;;                (error "cannot open for writing: "path)))
+;;         (p (or (car options) file-write-character)))
+;;     (for (i 0 (length string))
+;;       (p (at string i) f))
+;;     (close f)))
 
 (define-function contents-of-file-named (path)
-  (let ((f (or (open path)
+  (let ((f (or (file-open path)
                (error "cannot open for reading: "path)))
         (s (array))
         (c))
-    (while (set c (getc f))
+    (while (set c (file-read-character f))
       (array-append s c))
-    (close f)
+    (file-close f)
     (array->string s)))
+
+(define-function format (fmt arg)
+  ;;(assert (= <string> (type-of fmt)) "format: non-string fmt argument: " fmt)
+  (libc/format fmt arg))

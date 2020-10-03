@@ -75,6 +75,34 @@
 (define-test maru/let/1 ()
   (test-assert (= 9979 (maru/let/1/helper 9979))))
 
+(define-form maru/expand/bug/1/helper-form (val)
+  `(zork ,val))
+
+(define-test maru/expand/bug/1 ()
+  ;; the bug is that expand mindlessly expands the bindings of a let form as if they were call forms
+  ;; is this a bug to be fixed? or a semantics to live with?
+  ;; maybe the fix is that expand and encode should be merged and descend recursively in one pass?
+  (let ((zork 42)
+        (maru/expand/bug/1/helper-form -1))
+    (test-assert (= <long> (type-of maru/expand/bug/1/helper-form)))
+    (test-assert (= 42 zork))
+    (test-assert (= -1 maru/expand/bug/1/helper-form))))
+
+(define-test maru/expand/bug/2 ()
+  (test-assert (= 42 ((lambda (maru/expand/bug/1/helper-form y)
+                        (+ maru/expand/bug/1/helper-form
+                           y))
+                      40 2))))
+
+(define *a-global-holding-42* 42)
+
+(define-test maru/let/hiding-a-global ()
+  (let ((*a-global-holding-42* 999))
+    (test-assert (= 999 *a-global-holding-42*))
+    (incr *a-global-holding-42*)
+    (test-assert (= 1000 *a-global-holding-42*)))
+  (test-assert (= 42 *a-global-holding-42*)))
+
 (define-form %_eval-at-expand-time body
   (eval `(let ()
            ,@body)))

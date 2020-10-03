@@ -124,12 +124,12 @@
 (define-method $peek <input-stream> ()
   (or self.pending
       (if self.source
-	  (let ((c (getc self.source)))
+	  (let ((c (file-read-character self.source)))
 	    (if c
 		(let ()
 		  (and (= ?\n c) (set self.srcpos (cons (car self.srcpos) (+ 1 (cdr self.srcpos)))))
 		  (set self.pending c))
-	      ;;(or (= self.source *input*) (close self.source)) ;; the caller should close the stream
+	      ;;(or (= self.source *input*) (file-close self.source)) ;; the caller should close the stream
 	      (set self.source ())
 	      (set self.pending +end+)))
 	(set self.pending +end+))))
@@ -150,7 +150,7 @@
 
 ;; *** moved to boot.l ***
 ;; (define-function contents-of-file-named (name)
-;;   (input-stream-up-to (input-stream (or (open name)
+;;   (input-stream-up-to (input-stream (or (file-open name)
 ;; 					(error "no such file: "name))
 ;; 				    name) +end+))
 
@@ -853,10 +853,10 @@
     (<parser>-result p)))
 
 (define-function parse-file (grammar rule path)
-  (let* ((handle  (or (open path) (error "cannot open: "path)))
+  (let* ((handle  (or (file-open path) (error "cannot open: "path)))
 	 (stream  (input-stream handle path))
 	 (result  (parse-stream grammar rule stream)))
-    (close handle)
+    (file-close handle)
     result))
 
 (define-function parse-string (grammar rule str)

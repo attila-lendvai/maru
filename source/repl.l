@@ -59,7 +59,7 @@
 
 (define-function repl-stream (stream prompt)	(repl-parser-stream (parser-stream stream) prompt))
 (define-function repl-file   (file prompt path)	(repl-stream (parser-input-stream (input-stream file path)) prompt))
-(define-function repl-path   (path prompt)	(repl-file (or (open path) (error "cannot open: "path)) prompt path))
+(define-function repl-path   (path prompt)	(repl-file (or (file-open path) (error "cannot open: "path)) prompt path))
 
 ;; recursive require/load comes back to here...
 

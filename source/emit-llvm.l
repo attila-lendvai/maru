@@ -755,22 +755,22 @@
 
 (define-function compile/while (expr -c-)
   ;; TODO double-check the return value semantics
-  (let ((lbody	(UNIQUE-LABEL))
-        (ltest	(UNIQUE-LABEL))
-        (lend	(UNIQUE-LABEL)))
-    (gen BR ltest)
+  (let ((l/body	(UNIQUE-LABEL))
+        (l/cond	(UNIQUE-LABEL))
+        (l/done	(UNIQUE-LABEL)))
+    (gen BR l/cond)
 
-    (gen DEFLABEL lbody)
+    (gen DEFLABEL l/body)
     (list-do stmt (cddr expr)
       (and stmt (comp stmt)))
-    (gen BR ltest)
+    (gen BR l/cond)
 
-    (gen DEFLABEL ltest)
+    (gen DEFLABEL l/cond)
     (comp (second expr))
 
-    (gen BRIF lbody lend)
+    (gen BRIF l/body l/done)
 
-    (gen DEFLABEL lend)))
+    (gen DEFLABEL l/done)))
 
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))
