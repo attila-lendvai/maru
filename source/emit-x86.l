@@ -657,7 +657,7 @@
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
-                            (op (eval-in-module slave op-name)))
+                            (op (eval-in-slave op-name)))
                        ;; NOTE this is not (slave-value <subr>), because it's the eval.exe of the
                        ;; previous stage that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
@@ -683,7 +683,7 @@
          ((= 'true self.name)
           (gen LOAD (LI32 (slave-value target-boolean/true))))
          ((subtype? (type-of value) <type>)
-          (gen LOAD (LI32 (eval-in-module slave `(<type>-slave-id ,value)))))
+          (gen LOAD (LI32 (eval-in-slave `(<type>-slave-id ,value)))))
          ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
           (gen LOAD (LI32 (LABEL (<foreign-function>-name value)))))
          ((and +direct-calls+

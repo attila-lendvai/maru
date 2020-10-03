@@ -867,7 +867,7 @@
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
-                            (op (eval-in-module slave op-name)))
+                            (op (eval-in-slave op-name)))
                        ;; NOTE this is not (slave-value <subr>), because it's the host eval.exe
                        ;; that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
@@ -897,7 +897,7 @@
                                      (gen LOAD (LITERAL true-value) true-value)))
                                   ((subtype? (type-of value) <type>)
                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                   (gen LOAD (LITERAL (eval-in-module slave `(<type>-slave-id ,value))) 0))
+                                   (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
                                   (else
                                    (gen LOAD (GLOBAL self.name) value))))
       (else

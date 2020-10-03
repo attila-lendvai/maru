@@ -28,3 +28,9 @@
       (set (current-module) host)))
 
 (switch-to-host-module)
+
+(define-function eval-in-slave (form)
+  (eval-in-module slave form))
+
+(define-form slave-value (form)
+  `(eval-in-slave ',form))

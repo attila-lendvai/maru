@@ -17,9 +17,6 @@
 
 (switch-to-slave-module)
 
-(define-form host-value (form)
-  `(eval-in-module host ',form))
-
 (define-constant target-boolean/true  1)
 (define-constant target-boolean/false 0)
 
@@ -72,7 +69,7 @@
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
 (define-form slave-value (form)
-  `(eval-in-module slave ',form))
+  `(eval-in-slave ',form))
 
 ;;;
 ;;; FFI

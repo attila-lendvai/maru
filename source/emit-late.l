@@ -20,16 +20,16 @@
 (switch-to-slave-module)
 
 (define-form compile-begin ()
-  (set *globals* (eval-in-module host `(environment ,*globals*)))
+  (set *globals* (eval-in-host `(environment ,*globals*)))
   ())
 
 (define-form compile-end ()
   '(let ((env *globals*))
-     (set *globals* (eval-in-module host `(<env>-parent ,env)))
-     (eval-in-module host `(compile-env ',env (compiler 0)))))
+     (set *globals* (eval-in-host `(<env>-parent ,env)))
+     (eval-in-host `(compile-env ',env (compiler 0)))))
 
 (define-form define-foreign-function (maru-name return-type foreign-name parameter-types)
-  `(define ,maru-name (eval-in-module host '(foreign-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
+  `(define ,maru-name (eval-in-host '(foreign-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
 
 (define-form define-foreign-functions (maru-prefix . entries)
   `(let ()
