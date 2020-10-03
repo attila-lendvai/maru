@@ -31,3 +31,7 @@
     ((< 0 shift)	(<< value shift))
     ((< shift 0)	(>> value (- shift)))
     (else		value)))
+
+(define-form verbosity (level . body)
+  `(when (<= ,level *verbosity*)
+     ,@body))
