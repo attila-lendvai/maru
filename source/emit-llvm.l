@@ -784,7 +784,7 @@
 
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
-        (expr (eval form)))
+        (expr (eval-encoded form)))
     ;; TODO this silently miscompiles closures that capture some variables
     (compile-expr expr name -c-)
     (gen LOAD (GLOBAL name) expr)))

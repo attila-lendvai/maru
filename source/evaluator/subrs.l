@@ -590,16 +590,12 @@
   (new-<module>))
 
 (define-subr (eval-in-module 2)
-  (let ((new-module (get/head -args-))
-        (form (get/head (get/tail -args-)))
-        (previous-module *module*))
+  (let ((new-module	(get/head -args-))
+        (form		(get/head (get/tail -args-))))
     (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
-    (k/set-current-module new-module)
-    (gc/let* ((result (k/expand-encode-eval form (module-env new-module))))
-      (k/set-current-module previous-module)
-      (debug (libc/printf "eval-in-module is done\n"))
-      result)))
+    (with-current-module new-module
+      (k/expand-encode-eval form (module-env new-module)))))
 
 (when-at-expand (= target/machine "IA-32")
   (define-subr (call-IA-32-machine-code 1)

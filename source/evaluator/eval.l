@@ -141,8 +141,8 @@
  `(let ()
     ,@(map (lambda (name)
              (list 'define name))
-           '(print-backtrace populate-module-with-primitives capture-well-known-vm-values k/print
-             k/read k/encode/list k/encode k/expand/list k/expand k/eval k/intern))))
+           '(print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
+             k/print k/read k/encode/list k/encode k/expand/list k/expand k/eval k/intern))))
 
 ;;;
 ;;; libc
@@ -184,6 +184,7 @@
 ;; Only the first one of these is essential: *module*, the rest could
 ;; be looked up each time; i.e. they're just optimization or debug helpers.
 (define *module*)
+(define *maru-module*)
 (define *symbols*)
 
 ;; optimization: we cache these definitions from the env of the Maru VM
@@ -192,16 +193,16 @@
 (define var/*encoders*)
 (define var/*evaluators*)
 (define var/*applicators*)
-(define var/*input*)
 
 ;; cache some symbols into the symbol/foo global variables
 (eval-at-expand
- (let ((symbols `(true define set quote quasiquote unquote unquote-splicing expand encode apply ,(string->symbol "."))))
+ (let ((symbols `(true define set quote quasiquote unquote unquote-splicing expand encode apply
+                  ,(string->symbol ".") lambda let *globals* *syntax-module*)))
    `(let ()
       ,@(map (lambda (name)
                `(define ,(concat-symbol 'symbol/ name)))
              symbols)
-      (define-function capture-well-known-vm-values/symbols ()
+      (define-function initialize-symbol-cache ()
         ,@(map (lambda (name)
                  `(set ,(concat-symbol 'symbol/ name)
                        (k/intern ,(symbol->string name))))
@@ -515,6 +516,19 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
+(define-function k/set-current-module (module)
+  (debug (libc/printf "k/set-current-module {%p}\n" module))
+  (set *module* module)
+  (capture-well-known-module-values))
+
+(define-form with-current-module (module . body)
+  `(gc/let* ((__previous-module__ *module*)
+             __result__)
+     (k/set-current-module ,module)
+     (set __result__ (let () ,@body))
+     (k/set-current-module __previous-module__)
+     __result__))
+
 (define-function module-env	(module)
   (get (<variable> value) (get (<module> globals) module)))
 
@@ -580,6 +594,22 @@
                          (gc/let* ((sym (new-<symbol> item)))
                            (k/array-insert array index sym)
                            sym))))
+
+(define-function copy-module-bindings (from to)
+  (debug (libc/printf "copy-module-bindings from %p to %p\n" from to))
+  (let* ((from-env	(module-env from))
+         (to-env	(module-env to))
+         (from-bindings	(get (<env> bindings) from-env))
+         (count		(k/array-length from-bindings)))
+    (for (i 0 count)
+      (let* ((var	(k/array-at from-bindings i))
+             (name	(get (<variable> name) var))
+             (value	(get (<variable> value) var)))
+        ;; *globals* is special in that it should point to the module's env, therefore we skip that
+        (unless (= name symbol/*globals*)
+          (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (get/type value)))
+          (k/env/define to-env name value))))
+    (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
 (require "source/evaluator/reader.l")
 
@@ -914,7 +944,7 @@
     x))
 
 (define-function k/repl-stream (stream)
-  (put/variable-value var/*input* (new-<long> stream))
+  ;;(put/variable-value var/*input* (new-<long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\012\015]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -938,18 +968,23 @@
 (define-function new-<module> ()
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
-            (env    (new-<env> () 0 0)))
-    (set (<module>-globals module)	(k/env/define env (k/intern "*globals*") env))
+            (env    (new-<env> () 0 0))
+            tmp)
+    (set (<module>-globals module)	(k/env/define env symbol/*globals* env))
 
-    (populate-module-with-primitives module)
+    (when *maru-module*
+      (copy-module-bindings *maru-module* module))
+
+    (k/env/define env symbol/*syntax-module* module)
+
+    ;; we always overwrite these with empty arrays in the new module
+    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*expanders*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*encoders*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*evaluators*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*applicators*")		tmp)
 
     (debug (libc/printf "new-<module> returning with %p\n" module))
     module))
-
-(define-function k/set-current-module (module)
-  (debug (libc/printf "k/set-current-module {%p}\n" module))
-  (set *module* module)
-  (capture-well-known-vm-values))
 
 (when-at-expand feature/profiler
   ;; these are coming from profiler.c
@@ -998,69 +1033,58 @@
 
 (require "source/evaluator/subrs.l")
 
-(define-function %instantiate-subr (name imp fixed? module)
+(define-function %instantiate-subr (module name imp fixed?)
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
     (k/env/define (module-env module) (k/intern name) tmp)))
 
-(define-form instantiate-subrs ()
-  (let ((result ()))
-    (list-do entry *subr-registry*
-      (let* ((name (car entry))
-             (impl-name (concat-symbol 'subr/ name))
-             (fixed? (caddr entry)))
-        (push result `(%instantiate-subr ,(symbol->string name) ,impl-name ,(target-boolean fixed?) module))))
-    `(let () ,@result)))
-
-(define-function populate-module-with-primitives (module)
-  (debug (libc/printf "populate-module-with-primitives on %p\n" module))
-  (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
-  ;; the predefined primitives of the language
+(define-function populate-module-with-maru-primitives (module)
+  (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-				(k/env/define env (k/intern "*input*")			())
-				(k/env/define env (k/intern "*command-line-arguments*")	())
-      (set tmp (new-<long> *verbosity*))	(k/env/define env (k/intern "*verbosity*")		tmp)
-      (set tmp (new-<long> 0))	(k/env/define env (k/intern "*optimised*")		tmp)
+					(k/env/define env (k/intern "*command-line-arguments*")	())
+      (set tmp (new-<long> *verbosity*))(k/env/define env (k/intern "*verbosity*")		tmp)
+      (set tmp (new-<long> *optimised*))(k/env/define env (k/intern "*optimised*")		tmp)
 
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*expanders*")		tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*encoders*")		tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*evaluators*")		tmp)
-      (set tmp (new-<array> 0))	(k/env/define env (k/intern "*applicators*")		tmp)
+      ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
+      (set k/+end+ (or k/+end+ (set tmp (new-<symbol> "+end+"))))
+      (k/env/define env (k/intern "+end+") k/+end+))
 
-      ;; an uninterned symbol, i.e. a unique identity that cannot be recreated any other way
-      (set tmp (new-<symbol> "+end+")) (k/env/define env (k/intern "+end+") tmp))
+    ;; make sure the symbol true evaluates to itself
+    (k/env/define env symbol/true symbol/true)
 
-    (let ((symbol/true (k/intern "true")))
-      ;; make sure the symbol true evaluates to itself
-      (k/env/define env symbol/true symbol/true))
+    (k/env/define env (k/intern "*maru-module*") *maru-module*)
 
-    (instantiate-subrs)))
+    (eval-at-expand
+     `(let ()
+        ,@(map (lambda (entry)
+                 (let* ((name (car entry))
+                        (impl-name (concat-symbol 'subr/ name))
+                        (fixed? (caddr entry)))
+                   `(%instantiate-subr module ,(symbol->string name) ,impl-name ,(target-boolean fixed?))))
+               *subr-registry*)))
 
-(define-function capture-well-known-vm-values ()
-  (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
+    (set fixed-subr/quote	(k/env/variable-value env symbol/quote))
+    (set fixed-subr/lambda	(k/env/variable-value env symbol/lambda))
+    (set fixed-subr/let		(k/env/variable-value env symbol/let))
+    (set fixed-subr/define	(k/env/variable-value env symbol/define))
+    (set fixed-subr/set		(k/env/variable-value env symbol/set))
+
+    (k/env/define env symbol/*syntax-module* *maru-module*) ; the syntax module of the *maru-module* is itself
+
+    (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
+
+(define-function capture-well-known-module-values ()
+  (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
-  (capture-well-known-vm-values/symbols)
+  (let ((env (module-env *module*)))
+    (set var/*expanders*	(k/env/lookup-variable-or-die env (k/intern "*expanders*")))
+    (set var/*encoders*		(k/env/lookup-variable-or-die env (k/intern "*encoders*")))
+    (set var/*evaluators*	(k/env/lookup-variable-or-die env (k/intern "*evaluators*")))
+    (set var/*applicators*	(k/env/lookup-variable-or-die env (k/intern "*applicators*"))))
 
-  (let ((global-env (module-env *module*)))
-    (set k/+end+ (k/env/lookup-variable-or-die global-env (k/intern "+end+")))
-
-    (set var/*expanders*	(k/env/lookup-variable-or-die global-env (k/intern "*expanders*")))
-    (set var/*encoders*		(k/env/lookup-variable-or-die global-env (k/intern "*encoders*")))
-    (set var/*evaluators*	(k/env/lookup-variable-or-die global-env (k/intern "*evaluators*")))
-    (set var/*applicators*	(k/env/lookup-variable-or-die global-env (k/intern "*applicators*")))
-    (set var/*input*		(k/env/lookup-variable-or-die global-env (k/intern "*input*")))
-
-    (set fixed-subr/quote  (k/env/variable-value global-env (k/intern "quote")))
-    (set fixed-subr/lambda (k/env/variable-value global-env (k/intern "lambda")))
-    (set fixed-subr/let    (k/env/variable-value global-env (k/intern "let")))
-    (set fixed-subr/define (k/env/variable-value global-env (k/intern "define")))
-    (set fixed-subr/set    (k/env/variable-value global-env (k/intern "set")))
-
-    (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "capture-well-known-vm-values: assert 2"))
-
-  (debug (libc/printf "capture-well-known-vm-values is done\n")))
+  (debug (libc/printf "capture-well-known-module-values is done\n")))
 
 (define-function main (argc argv)
   (debug (libc/printf "alive\n"))
@@ -1083,12 +1107,9 @@
   (k/assert (= <long>	(get/type (new-<long> 42))) "get/type for <long> is broken")
   (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
 
-  (gc/push-root (address-of *module*))			; the gc root for all (module-)global definitions
+  (gc/push-root (address-of *module*))
+  (gc/push-root (address-of *maru-module*))
   (gc/push-root (address-of *symbols*))
-  (gc/push-root (address-of fixed-subr/quote))		; precautionary, in case someone redefines them and they get removed from the env.
-  (gc/push-root (address-of fixed-subr/lambda))
-  (gc/push-root (address-of fixed-subr/let))
-  (gc/push-root (address-of fixed-subr/define))
 
   (debug (libc/printf "initializing *call-stack*\n"))
 
@@ -1096,10 +1117,13 @@
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (new-<array> 32)))
 
-  (set *symbols* (new-<array> 32))			(debug (libc/printf "initialized *symbols*\n"))
-  (set *module*  (new-<module>))			(debug (libc/printf "initialized *module*\n"))
+  (set *symbols* (new-<array> 32))
+  (initialize-symbol-cache)				(debug (libc/printf "initialized *symbols*\n"))
 
-  (capture-well-known-vm-values)
+  (set *maru-module* (new-<module>))
+  (populate-module-with-maru-primitives *maru-module*)
+  (set *module* (new-<module>))
+  (capture-well-known-module-values)			(debug (libc/printf "finished module initialization\n"))
 
   (debug (libc/printf "start processing argv\n"))
 
