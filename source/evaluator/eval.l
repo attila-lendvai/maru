@@ -137,16 +137,12 @@
 ;;;
 ;;; some forward definitions to relax the error handler
 ;;; ----------------------------------------------------------------
-(define print-backtrace)
-(define populate-module-with-primitives)
-(define capture-well-known-vm-values)
-(define k/print)
-(define k/read)
-(define k/encode/list)
-(define k/encode)
-(define k/expand/list)
-(define k/expand)
-(define k/eval)
+(eval-at-expand
+ `(let ()
+    ,@(map (lambda (name)
+             (list 'define name))
+           '(print-backtrace populate-module-with-primitives capture-well-known-vm-values k/print
+             k/read k/encode/list k/encode k/expand/list k/expand k/eval k/intern))))
 
 ;;;
 ;;; libc
@@ -198,17 +194,18 @@
 (define var/*applicators*)
 (define var/*input*)
 
-(define symbol/true)
-(define symbol/dot)
-(define symbol/define)
-(define symbol/set)
-(define symbol/quote)
-(define symbol/quasiquote)
-(define symbol/unquote)
-(define symbol/unquote_splicing)
-(define symbol/expand)
-(define symbol/encode)
-(define symbol/apply)
+;; cache some symbols into the symbol/foo global variables
+(eval-at-expand
+ (let ((symbols `(true define set quote quasiquote unquote unquote-splicing expand encode apply ,(string->symbol "."))))
+   `(let ()
+      ,@(map (lambda (name)
+               `(define ,(concat-symbol 'symbol/ name)))
+             symbols)
+      (define-function capture-well-known-vm-values/symbols ()
+        ,@(map (lambda (name)
+                 `(set ,(concat-symbol 'symbol/ name)
+                       (k/intern ,(symbol->string name))))
+               symbols)))))
 
 (define fixed-subr/quote)
 (define fixed-subr/lambda)
@@ -1043,17 +1040,7 @@
 (define-function capture-well-known-vm-values ()
   (debug (libc/printf "capture-well-known-vm-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
-  (set symbol/true                   (k/intern "true"))
-  (set symbol/dot                    (k/intern "."))
-  (set symbol/define                 (k/intern "define"))
-  (set symbol/set                    (k/intern "set"))
-  (set symbol/quote                  (k/intern "quote"))
-  (set symbol/quasiquote             (k/intern "quasiquote"))
-  (set symbol/unquote                (k/intern "unquote"))
-  (set symbol/unquote_splicing       (k/intern "unquote-splicing"))
-  (set symbol/expand                 (k/intern "expand"))
-  (set symbol/encode                 (k/intern "encode"))
-  (set symbol/apply                  (k/intern "apply"))
+  (capture-well-known-vm-values/symbols)
 
   (let ((global-env (get/globals)))
     (set k/+end+ (k/env/lookup-variable-or-die global-env (k/intern "+end+")))
