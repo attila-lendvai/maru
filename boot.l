@@ -201,6 +201,12 @@
 (define-form unless (test . body)
   `(if ,test () ,@body))
 
+(define-form aif (test true-form . false-forms)
+  `(let ((it ,test))
+     (if it
+         ,true-form
+       ,@false-forms)))
+
 (define-form assert (test . args)
   (unless args
     (set args (list "assertion failed: " `(quote ,test))))
