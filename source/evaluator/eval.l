@@ -686,7 +686,7 @@
     (let ((type (get/type fun)))
       (cond
         ((= type <expr>)	(k/apply-expr fun arguments ctx))
-        ((= type <fixed>)	(k/apply (get (<fixed> function) fun) arguments ctx))
+        ;;((= type <fixed>)	(k/apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
         ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
         (else
          (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
