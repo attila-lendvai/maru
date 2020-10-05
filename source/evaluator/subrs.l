@@ -151,15 +151,7 @@
   (let ((env   (get/head -args-))
         (name  (get/head (set -args- (get/tail -args-))))
         (value (get/head (get/tail -args-))))
-    (k/assert (is <env> env))
-    (k/assert (is <symbol> name))
-    (let* ((bindings (get (<env> bindings) env))
-           (offset (get/long (get (<env> offset) env)))
-           (var (new-<variable> name value env offset)))
-      (gc/protect (var)
-        (put (<env> offset) env (new-<long> (+ offset 1)))
-        (k/array-append bindings var)
-        var))))
+    (k/env/define env name value)))
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-subr -
