@@ -145,6 +145,7 @@
 (define k/encode/list)
 (define k/encode)
 (define k/expand/list)
+(define k/expand)
 (define k/eval)
 
 ;;;
@@ -697,63 +698,69 @@
                    (k/apply ap args ctx)))
              (k/error "cannot apply: " fun))))))))
 
+;;;
+;;; expand
 ;;; ----------------------------------------------------------------
+
+(define-function k/expand/pair (exp env -call-frame-)
+  (gc/let* ((head (k/expand (get/head exp) env)))
+    (when-at-expand feature/backtrace
+      (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
+      (set (<call-frame>-callee			-call-frame-) head)
+      (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
+    (let (tmp)
+      (cond
+        ((and (is <symbol> head)
+              (set tmp (k/env/lookup-variable env head))
+              (is <variable> tmp)
+              (set tmp (get (<variable> value) tmp))
+              (is <form> tmp)
+              (set tmp (get (<form> function) tmp)))
+         ;; head is a <form>
+         (gc/let* ((args (new-<pair> env (get/tail exp))))
+           (k/expand (k/apply tmp args ()) env)))
+        (else
+         ;; head is not a <form>
+         (gc/let* ((tail (get/tail exp)))
+           (unless (= head symbol/quote)
+             (set tail (k/expand/list tail env)))
+           ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
+           (when (and (= symbol/set head)
+                      (is/pair (k/car tail))
+                      (is <symbol> (k/caar tail)))
+             (gc/let* ((buf (new-<buffer>)))
+               (buffer-append-string buf "set-")
+               (buffer-append-string buf (get/symbol (get/head (get/head tail))))
+               (set head (k/intern (buffer-contents buf)))
+               (set tail (k/concat-list (get/tail (get/head tail)) (get/tail tail)))))
+           (new-<pair> head tail)))))))
+
+(define-function k/expand/symbol (exp env)
+  (let (tmp)
+    (if (and (set tmp (k/env/lookup-variable env exp))
+             (is <variable> tmp)
+             (set tmp (get (<variable> value) tmp))
+             (is <form> tmp)
+             (set tmp (get (<form> symbol) tmp)))
+        ;; head is a <form>
+        (gc/let* ((args (new-<pair> exp ())))
+          (set args (new-<pair> env args))
+          (set args (k/apply tmp args ()))
+          (k/expand args env))
+      exp)))
 
 (define-function k/expand (exp env)
   (debug (libc/printf "k/expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
-  (let ((result exp))
-    (with-new-call-frame (symbol/expand () exp)
-      (cond
-        ((is/pair exp)
-         (gc/let* ((head (k/expand (get/head exp) env)))
-           (when-at-expand feature/backtrace
-             (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
-             (set (<call-frame>-callee			-call-frame-) head)
-             (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
-           (let (val fn)
-             (if (and (is <symbol> head)
-                      (set val (k/env/lookup-variable env head))
-                      (is <variable> val)
-                      (set val (get (<variable> value) val))
-                      (is <form> val)
-                      (set fn (get (<form> function) val)))
-                 ;; head is a <form>
-                 (gc/let* ((args (new-<pair> env (get/tail exp))))
-                   (set result (k/apply fn args ()))
-                   (set result (k/expand result env)))
-               ;; head is not a <form>
-               (gc/let* ((tail (get/tail exp)))
-                 (unless (= head symbol/quote)
-                   (set tail (k/expand/list tail env)))
-                 ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
-                 (when (and (= symbol/set head)
-                            (is/pair (k/car tail))
-                            (is <symbol> (k/caar tail)))
-                   (gc/let* ((buf (new-<buffer>)))
-                     (buffer-append-string buf "set-")
-                     (buffer-append-string buf (get/symbol (get/head (get/head tail))))
-                     (set head (k/intern (buffer-contents buf)))
-                     (set tail (k/concat-list (get/tail (get/head tail)) (get/tail tail)))))
-                 (set result (new-<pair> head tail)))))))
-        ((is <symbol> exp)
-         (let (val fn)
-           (when (and (set val (k/env/lookup-variable env exp))
-                      (is <variable> val)
-                      (set val (get (<variable> value) val))
-                      (is <form> val)
-                      (set fn (get (<form> symbol) val)))
-             ;; head is a <form>
-             (gc/let* ((args (new-<pair> exp ())))
-               (set args (new-<pair> env args))
-               (set args (k/apply fn args ()))
-               (set result (k/expand args env))))))
-        (else
-         ;; consult the *expanders* array to see if there's any custom expander for this type
-         (let ((fn (k/array-at (get/variable-value var/*expanders*) (get/type exp))))
-           (when fn
-             (gc/let* ((args (new-<pair> exp ())))
-               (set result (k/apply fn args ()))))))))
-    result))
+  (with-new-call-frame (symbol/expand () exp)
+    (cond
+      ((is/pair exp)		(k/expand/pair		exp env -call-frame-))
+      ((is <symbol> exp)	(k/expand/symbol	exp env))
+      (else
+       ;; consult the *expanders* array to see if there's any custom expander for this type
+       (aif (k/array-at (get/variable-value var/*expanders*) (get/type exp))
+           (gc/let* ((args (new-<pair> exp ())))
+             (k/apply it args ()))
+         exp)))))
 
 (define-function k/expand/list (list env)
   (if (is/pair list)
@@ -761,6 +768,10 @@
                 (tail (k/expand/list	(get/tail list) env)))
         (new-<pair> head tail))
     (k/expand list env)))
+
+;;;
+;;; encode
+;;; ----------------------------------------------------------------
 
 (define-function k/encode/pair (exp env)
   (gc/let* ((head (k/encode (get/head exp) env))
@@ -813,16 +824,6 @@
           (put (<env> stable) venv symbol/true)))))
   exp)
 
-(define-function k/encode/other (exp env)
-  (let ((fn (k/array-at (get/variable-value var/*encoders*) (get/type exp))))
-    (debug (libc/printf "k/encode/other looked up fn: ") (k/println fn))
-    (when fn
-      (gc/let* ((args (new-<pair> env ())))
-        (set args (new-<pair> exp args))
-        (debug (libc/printf "APPLY ENCODER\n... ") (k/print fn) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
-        (set exp (k/apply fn args ())))))
-  exp)
-
 (define-function k/encode (exp env)
   (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
   (with-new-call-frame (symbol/encode () exp)
@@ -830,7 +831,13 @@
     (cond
       ((is/pair exp)		(k/encode/pair		exp env))
       ((is <symbol> exp)	(k/encode/symbol	exp env))
-      (else			(k/encode/other		exp env)))))
+      (else
+       (aif (k/array-at (get/variable-value var/*encoders*) (get/type exp))
+           (gc/let* ((args (new-<pair> env ())))
+             (set args (new-<pair> exp args))
+             (debug (libc/printf "k/encode/other: applying fn: ") (k/println it) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
+             (k/apply it args ()))
+         exp)))))
 
 (define-function k/encode/list (list env)
   (if (is/pair list)
@@ -838,6 +845,10 @@
                 (tail (k/encode/list	(get/tail list) env)))
         (new-<pair> head tail))
     (k/encode list env)))
+
+;;;
+;;; eval
+;;; ----------------------------------------------------------------
 
 (define-function k/eval/list (obj ctx)
   (if (is/pair obj)
