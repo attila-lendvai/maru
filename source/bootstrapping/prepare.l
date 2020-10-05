@@ -15,7 +15,7 @@
 
 ;; The variable bootstrapping? denotes that the process is underway in which a host loads a slave into an isolated module,
 ;; and then compiles the definitions to the target (does the level-shift).
-(define bootstrapping? 't)
+(define bootstrapping? true)
 
 ;; The variable evolving? denotes that the host running the bootstrapping process is
 ;; the previous stage, i.e. an earlier version of us. It will be set in host-extras.l

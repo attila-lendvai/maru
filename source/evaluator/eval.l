@@ -317,9 +317,6 @@
           ,value)))
 
 ;; shorthands (and optimizations)
-(define-form get/globals	()		`(get (<variable> value) (get (<module> globals) *module*)))
-(define-form get/globals*	(obj)		`(get (<variable> value) (get (<module> globals) ,obj)))
-
 (define-form is/long		(obj)		`(is <long> ,obj))
 (define-form is/pair		(obj)		`(is <pair> ,obj))
 (if (immediate-type? <long>)
@@ -342,12 +339,12 @@
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (k/intern ,var))
+                                                           `(k/env/lookup-variable (module-env *module*) (k/intern ,var))
                                                          var)))
 
 (define-form put/variable-value	(var val)	`(put (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (get/globals) (k/intern ,var))
+                                                           `(k/env/lookup-variable (module-env *module*) (k/intern ,var))
                                                          var)
                                                       ,val))
 
@@ -518,6 +515,9 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
+(define-function module-env	(module)
+  (get (<variable> value) (get (<module> globals) module)))
+
 (define-function global-variable? (var)
   (let ((env (get (<variable> env) var)))
     (and env (= 0 (get/long (get (<env> level) env))))))
@@ -550,7 +550,7 @@
 (define-function k/env/variable-value (env name)
   (aif (k/env/lookup-variable env name)
       (get (<variable> value) it)
-    (fatal1 "undefined variable in env/variable-value: %s" (get/symbol name))))
+    (fatal1 "undefined variable in k/env/variable-value: %s" (get/symbol name))))
 
 (define-function k/env/ensure-variable (env name)
   (safety 1 (k/assert (is <env> env)		"k/env/ensure-variable: env arg is not of type <env>: "env))
@@ -563,8 +563,8 @@
       (k/array-append (get (<env> bindings) env) var))))
 
 (define-function k/env/define (env name value)
-  (safety 1 (k/assert (is <env> env) "k/env/define: env arg is not of type <env>: "env))
-  (safety 1 (k/assert (is <symbol> name) "k/env/define: name arg is not of type <symbol>: "name))
+  (safety 1 (k/assert (is <env> env) "k/env/define: env is not of type <env>: "env))
+  (safety 1 (k/assert (is <symbol> name) "k/env/define: name is not of type <symbol>: "name))
   (debug (libc/printf "k/env/define called, name is %s\n" (get/symbol name)))
   (let ((var (k/env/ensure-variable env name)))
     (put (<variable> value) var value)
@@ -576,7 +576,7 @@
                        (lambda (item candidate)
                          (libc/strcmp item (get/symbol candidate)))
                        (lambda (array index item)
-                         (debug (libc/printf "interning %s into module {%p}\n" cstr module))
+                         (debug (libc/printf "interning %s\n" item))
                          (gc/let* ((sym (new-<symbol> item)))
                            (k/array-insert array index sym)
                            sym))))
@@ -689,10 +689,9 @@
         (else
          (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
            (if ap
-               (let ((args arguments))
-                 (gc/protect (args)
-                   (set args (new-<pair> fun args))
-                   (k/apply ap args ctx)))
+               (gc/let* ((args arguments))
+                 (set args (new-<pair> fun args))
+                 (k/apply ap args ctx))
              (k/error "cannot apply: " fun))))))))
 
 ;;;
@@ -773,6 +772,8 @@
 (define-function k/encode/pair (exp env)
   (gc/let* ((head (k/encode (get/head exp) env))
             (tail (get/tail exp)))
+    ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
+    ;; because of that emit requires the introduction of the eval-encoded subr
     (cond
       ((= head fixed-subr/let)		(let ((bindings (k/cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 0 (get/long (get (<env> offset) env)))))
@@ -793,7 +794,7 @@
 					    (set tail (new-<pair> new-env tail)))))
       ;; TODO this defines the variable in the encode phase, even if the code doesn't get executed in the end.
       ;; i doubt it's the intended behavior... investigate!
-      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (get/globals) (k/car tail))))
+      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (module-env *module*) (k/car tail))))
 					  (set tail (k/encode/list (k/cdr tail) env))
 					  (set tail (new-<pair> var tail))))
       ;; TODO and then this errors while expand'ing an if branch that is _not_ taken at the end at runtime
@@ -902,13 +903,14 @@
 
 
 (define-function k/expand-encode-eval (form env)
+  (debug (libc/printf "k/expand-encode-eval for form ") (k/println form))
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-								(verbosity 2 (libc/printf ";;; ")	(k/dumpln x))
-    (set x (k/expand x env))					(verbosity 3 (libc/printf "expd--> ")	(k/dumpln x))
-    (set x (k/encode x env))					(verbosity 3 (libc/printf "encd--> ")	(k/dumpln x))
+					(verbosity 2 (libc/printf ";;; ")	(k/dumpln x))
+    (set x (k/expand x env))		(verbosity 3 (libc/printf "expd--> ")	(k/dumpln x))
+    (set x (k/encode x env))		(verbosity 3 (libc/printf "encd--> ")	(k/dumpln x))
     (set x (k/eval   x ctx))
-								(verbosity 2 (libc/printf ";;; => ")	(k/dumpln x))
+					(verbosity 2 (libc/printf ";;; => ")	(k/dumpln x))
     x))
 
 (define-function k/repl-stream (stream)
@@ -921,7 +923,7 @@
                (libc/printf ".")
                (libc/flush-streams))
              (!= k/+end+ (set res (k/read stream))))
-      (gc/let* ((env (new-<env> (get/globals) 1 0)))
+      (gc/let* ((env (new-<env> (module-env *module*) 1 0)))
         (set res (k/expand-encode-eval res env))
         (when (= libc/stdin stream)
           (gc/let* ((printer (new-<pair> res 0)))
@@ -937,7 +939,6 @@
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0)))
-    (set (<module>-symbols module)	(new-<array> 0))
     (set (<module>-globals module)	(k/env/define env (k/intern "*globals*") env))
 
     (populate-module-with-primitives module)
@@ -1001,7 +1002,7 @@
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
-    (k/env/define (get/globals* module) (k/intern name) tmp)))
+    (k/env/define (module-env module) (k/intern name) tmp)))
 
 (define-form instantiate-subrs ()
   (let ((result ()))
@@ -1016,7 +1017,7 @@
   (debug (libc/printf "populate-module-with-primitives on %p\n" module))
   (safety 1 (k/assert (is <module> module) "populate-module-with-primitives: called with not a <module>: "module))
   ;; the predefined primitives of the language
-  (let ((env (get/globals* module)))
+  (let ((env (module-env module)))
     (gc/let* ((tmp))
 				(k/env/define env (k/intern "*input*")			())
 				(k/env/define env (k/intern "*command-line-arguments*")	())
@@ -1042,7 +1043,7 @@
   ;; let's cache some values from *module* to speed up their access in tight loops
   (capture-well-known-vm-values/symbols)
 
-  (let ((global-env (get/globals)))
+  (let ((global-env (module-env *module*)))
     (set k/+end+ (k/env/lookup-variable-or-die global-env (k/intern "+end+")))
 
     (set var/*expanders*	(k/env/lookup-variable-or-die global-env (k/intern "*expanders*")))
@@ -1103,7 +1104,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/lookup-variable (get/globals) (k/intern "*command-line-arguments*"))))
+  (let ((cla-var (k/env/lookup-variable (module-env *module*) (k/intern "*command-line-arguments*"))))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
@@ -1156,10 +1157,9 @@
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
                (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
-               (let* ((sym (k/intern arg))
-                      (form (new-<pair> sym ())))
-                 (gc/protect (form)
-                   (k/expand-encode-eval form (get/globals)))))
+               (let ((sym (k/intern arg)))
+                 (gc/let* ((form (new-<pair> sym ())))
+                   (k/expand-encode-eval form (module-env *module*)))))
 
               ;; --define to define a variable
               ((not (libc/strcmp arg "--define"))
@@ -1183,7 +1183,7 @@
                  (gc/let* ((form (new-<pair> val ())))
                    (set form (new-<pair> (k/intern (get/string var)) form))
                    (set form (new-<pair> symbol/define form))
-                   (k/expand-encode-eval form (get/globals)))))
+                   (k/expand-encode-eval form (module-env *module*)))))
 
               ;; read file as a program
               (else

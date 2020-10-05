@@ -123,6 +123,8 @@ endif
 
 .SUFFIXES:					# disable all built-in rules
 
+#.PRECIOUS: $(BUILD_x86)/eval3.s
+
 all: eval
 
 clean:

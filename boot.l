@@ -948,7 +948,7 @@
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))
-(define-record		<module>		() (symbols globals)) ; globals is the <variable> that holds '*globals*
+(define-record		<module>		() (globals))		; globals is the <variable> that holds '*globals*
 (define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
 (define-record		<symbol>		() (_bits))
 (define-record		<pair>			() (head tail))
@@ -1162,8 +1162,10 @@
 (define-method do-dump	<long>		()	(primitive/dump self))
 (define-method do-dump  <array>		()	(primitive/dump self))
 
-(define-method do-print <fixed>		()	(print "<fixed "(<fixed>-function self)">"))
-(define-method do-print <selector>	()	(print "<selector "(<selector>-name self)">"))
+(define-method do-print <fixed>		()	(print "<fixed "self.function">"))
+(define-method do-print <selector>	()	(print "<selector "self.name">"))
+(define-method do-print <expr>		()	(print "<expr "self.parameters" "(or (when-at-expand feature/track-expr-names self.name) "?")">"))
+(define-method do-print <env>		()	(print "<env "self.level","(array-length self.bindings)">"))
 (define-method do-print <type>		()	(print "<"(<type>-name self)" "(<type>-id self)">"))
 
 (define-method do-print <pair> ()

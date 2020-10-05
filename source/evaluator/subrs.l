@@ -44,7 +44,7 @@
 
 (define-subr (defined? 1)
   (let ((name (get/head -args-))
-        (env (or (k/cadr -args-) (get/globals))))
+        (env (or (k/cadr -args-) (module-env *module*))))
     (k/env/lookup-variable env name)))
 
 (define-subr (lambda () fixed)
@@ -353,7 +353,7 @@
   (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
 (define-subr eval
-  (gc/let* ((e (or (k/cadr -args-) (new-<env> (get/globals) 1 0))))
+  (gc/let* ((e (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
     (k/expand-encode-eval (k/car -args-) e)))
 
 (define-subr encode
@@ -575,7 +575,7 @@
     (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
     (k/set-current-module new-module)
-    (gc/let* ((result (k/expand-encode-eval form (get/globals* new-module))))
+    (gc/let* ((result (k/expand-encode-eval form (module-env new-module))))
       (k/set-current-module previous-module)
       (debug (libc/printf "eval-in-module is done\n"))
       result)))
