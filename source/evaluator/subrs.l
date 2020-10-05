@@ -353,8 +353,13 @@
   (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
 (define-subr eval
-  (gc/let* ((e (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
-    (k/expand-encode-eval (k/car -args-) e)))
+  (gc/let* ((env (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
+    (k/expand-encode-eval (k/car -args-) env)))
+
+(define-subr eval-encoded
+  ;; TODO investivate: why is this needed? try to eliminate it
+  (gc/let* ((env (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
+    (k/eval (k/car -args-) env)))
 
 (define-subr encode
   (k/encode (k/car -args-)
