@@ -320,6 +320,22 @@
                 (set size (* size 2))))))
         result))))
 
+(define-subr (load 1)
+  (let* ((path		(get/head -args-))
+         (stream	(or (cond
+                              ((is <string> path)
+                               (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\n" (get/string path)))
+                               (libc/fopen (get/string path) "r"))
+                              ((not path)
+                               (verbosity 1 (libc/fprintf libc/stderr "loading from stdin\n"))
+                               (libc/fdopen libc/stdin "r"))
+                              (else
+                               (k/error "load: don't know how to open "path)))
+                            (k/error "load: fopen failed on "path)))
+         (result	(k/repl-stream stream)))
+    (libc/fclose stream)
+    result))
+
 (define-subr (repl-stream 1)
   (let ((stream (get/head -args-)))
     ;;(or stream (set stream (get/variable-value var/*input*)))
