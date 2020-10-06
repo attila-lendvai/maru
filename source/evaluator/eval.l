@@ -502,6 +502,10 @@
 ;;;
 ;;; ----------------------------------------------------------------
 
+(define-function k/list2 (a b)
+  (gc/let* ((tmp (new-<pair> b ())))
+    (new-<pair> a tmp)))
+
 (define-function k/concat-list (head tail)
   (if (is/pair head)
       (gc/let* ((new-tail (k/concat-list (get/tail head) tail)))
@@ -594,6 +598,15 @@
                          (gc/let* ((sym (new-<symbol> item)))
                            (k/array-insert array index sym)
                            sym))))
+
+(define-function maybe-object-in-variable (env name type)
+  (let ((tmp (when (is <symbol> name)
+               (k/env/lookup-variable env name))))
+    (and tmp
+         (is <variable> tmp)
+         (set tmp (get (<variable> value) tmp))
+         (= type (get/type tmp))
+         tmp)))
 
 (define-function copy-module-bindings (from to)
   (debug (libc/printf "copy-module-bindings from %p to %p\n" from to))
@@ -728,23 +741,35 @@
 ;;; expand
 ;;; ----------------------------------------------------------------
 
-(define-function k/expand/pair (exp env -call-frame-)
+(define-function maybe-form-in-variable/function (env name)
+  (awhen (maybe-object-in-variable env name <form>)
+    (get (<form> function) it)))
+
+(define-function maybe-form-in-variable/symbol (env name)
+  (awhen (maybe-object-in-variable env name <form>)
+    (get (<form> symbol) it)))
+
+(define-function k/expand/pair (exp env syntax-module -call-frame-)
   (gc/let* ((head (k/expand (get/head exp) env)))
     (when-at-expand feature/backtrace
       (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
       (set (<call-frame>-callee			-call-frame-) head)
       (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
-    (let (tmp)
+    (let (expander)
       (cond
-        ((and (is <symbol> head)
-              (set tmp (k/env/lookup-variable env head))
-              (is <variable> tmp)
-              (set tmp (get (<variable> value) tmp))
-              (is <form> tmp)
-              (set tmp (get (<form> function) tmp)))
-         ;; head is a <form>
-         (gc/let* ((args (new-<pair> env (get/tail exp))))
-           (k/expand (k/apply tmp args ()) env)))
+        ((set expander (maybe-form-in-variable/function env head))
+         ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
+         (gc/let* ((args (new-<pair> env (get/tail exp)))
+                   (expansion (k/apply expander args ())))
+           (debug (libc/printf "k/expand/pair, found in local env, expanded to ") (k/dump expansion) (libc/printf "\n"))
+           (k/expand expansion env)))
+        ((set expander (maybe-form-in-variable/function (module-env syntax-module) head))
+         ;; head is a <form> found in the *syntax-module*'s env
+         (gc/let* ((args (new-<pair> env (get/tail exp)))
+                   (expansion (with-current-module syntax-module
+                                (k/apply expander args ()))))
+           (debug (libc/printf "k/expand/pair, found in the *syntax-module*'s env, expanded to ") (k/dump expansion) (libc/printf "\n"))
+           (k/expand expansion env)))
         (else
          ;; head is not a <form>
          (gc/let* ((tail (get/tail exp)))
@@ -761,26 +786,32 @@
                (set tail (k/concat-list (get/tail (get/head tail)) (get/tail tail)))))
            (new-<pair> head tail)))))))
 
-(define-function k/expand/symbol (exp env)
-  (let (tmp)
-    (if (and (set tmp (k/env/lookup-variable env exp))
-             (is <variable> tmp)
-             (set tmp (get (<variable> value) tmp))
-             (is <form> tmp)
-             (set tmp (get (<form> symbol) tmp)))
-        ;; head is a <form>
-        (gc/let* ((args (new-<pair> exp ())))
-          (set args (new-<pair> env args))
-          (set args (k/apply tmp args ()))
-          (k/expand args env))
-      exp)))
+(define-function k/expand/symbol (exp env syntax-module)
+  (debug (libc/printf "k/expand/symbol, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
+  (let (expander)
+    (cond
+      ((set expander (maybe-form-in-variable/symbol env exp))
+       ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
+       (gc/let* ((args (k/list2 env exp))
+                 (expansion (k/apply expander args ())))
+         (debug (libc/printf "k/expand/symbol, found in local env, expanded to ") (k/dump expansion) (libc/printf "\n"))
+         (k/expand expansion env)))
+      ((set expander (maybe-form-in-variable/symbol (module-env syntax-module) exp))
+       ;; head is a <form> found in the *syntax-module*'s env
+       (gc/let* ((args (k/list2 env exp))
+                 (expansion (with-current-module syntax-module
+                              (k/apply expander args ()))))
+         (debug (libc/printf "k/expand/symbol, found in the *syntax-module*'s env, expanded to ") (k/dump expansion) (libc/printf "\n"))
+         (k/expand expansion env)))
+      (else
+       exp))))
 
 (define-function k/expand (exp env)
   (debug (libc/printf "k/expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
   (with-new-call-frame (symbol/expand () exp)
     (cond
-      ((is/pair exp)		(k/expand/pair		exp env -call-frame-))
-      ((is <symbol> exp)	(k/expand/symbol	exp env))
+      ((is/pair exp)		(k/expand/pair		exp env (k/env/variable-value env symbol/*syntax-module*) -call-frame-))
+      ((is <symbol> exp)	(k/expand/symbol	exp env (k/env/variable-value env symbol/*syntax-module*)))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
        (aif (k/array-at (get/variable-value var/*expanders*) (get/type exp))
