@@ -123,7 +123,7 @@ endif
 
 .SUFFIXES:					# disable all built-in rules
 
-#.PRECIOUS: $(BUILD_x86)/eval3.s $(BITCODE_DIR)/eval3.ll
+#.PRECIOUS: $(BUILD_x86)/eval*.s $(BITCODE_DIR)/eval*.ll
 
 all: eval
 

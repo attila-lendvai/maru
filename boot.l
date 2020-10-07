@@ -1133,8 +1133,8 @@
 
 ;;; print
 
-(define-selector do-print (arg) (primitive/print "<"(type-name-of arg)" "(type-id-of arg)">"))
-(define-selector do-dump  (arg) (do-print arg)) ; TODO why not primitive/dump?
+(define-selector do-print (self) (primitive/print "["(type-name-of self)" "(type-id-of self)"]"))
+(define-selector do-dump  (self) (primitive/dump self))
 
 (define print
   (lambda args
@@ -1168,6 +1168,7 @@
 (define-method do-print <long>		()	(primitive/print self))
 (define-method do-print <array>		()	(primitive/print self))
 (define-method do-print <variable>	()	(primitive/print self))
+(define-method do-print <subr>		()	(primitive/print self))
 
 (define-method do-dump  <undefined>	()	(primitive/dump self))
 (define-method do-dump  <string>	()	(primitive/dump self))

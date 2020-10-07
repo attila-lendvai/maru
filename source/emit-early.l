@@ -21,6 +21,8 @@
   `(let ()
      (define *host-module*	,(current-module))
      (define *slave-module*	,*slave-module*)
+     ;;(define slave-value	,slave-value)
+     ;;(define eval-in-slave	,eval-in-slave)
      (set *syntax-module*	,*slave-module*)))
 
 ;; stubs for the +special-forms+

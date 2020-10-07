@@ -397,13 +397,16 @@
 (define-subr (apply 2)
   (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
+;; TODO rename to eval-sexp to differentiate from eval-encoded? find some better names...
 (define-subr eval
-  (gc/let* ((env (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
+  (gc/let* ((env (or (k/cadr -args-)
+                     (new-<env> (module-env *module*) 1 0))))
     (k/expand-encode-eval (k/car -args-) env)))
 
 (define-subr eval-encoded
-  ;; TODO investivate: why is this needed? try to eliminate it
-  (gc/let* ((env (or (k/cadr -args-) (new-<env> (module-env *module*) 1 0))))
+  ;; TODO investigate: why is this needed? try to eliminate it
+  (gc/let* ((env (or (k/cadr -args-)
+                     (new-<env> (module-env *module*) 1 0))))
     (k/eval (k/car -args-) env)))
 
 (define-subr encode
