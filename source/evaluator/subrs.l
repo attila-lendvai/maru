@@ -249,7 +249,7 @@
 (define-subr (= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
-         (type (get/type lhs)))
+         (type (type-of lhs)))
     (cond
       ((= type <long>)		(and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
@@ -258,7 +258,7 @@
 (define-subr (!= 2)
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
-         (type (get/type lhs)))
+         (type (type-of lhs)))
     (cond
       ((= type <long>)		(and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
@@ -307,7 +307,7 @@
         (oarg (get/head (get/tail -args-))))
     (or (is <string> ofmt) (fatal "subr/libc/format: non-string format"))
     (let ((fmt (get/string ofmt))
-          (typ (get/type oarg))
+          (typ (type-of oarg))
           (arg ()))
       (cond
         ((= typ <undefined>))
@@ -383,7 +383,7 @@
 (define-subr warn
   (while (is/pair -args-)
     (let* ((arg  (get/head -args-))
-           (type (get/type arg)))
+           (type (type-of arg)))
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
@@ -436,7 +436,7 @@
     (safety 1 (k/assert (is/long size) "allocate-data: invalid size "size))
     (gc/allocate-opaque <data> (get/long size))))
 
-(define-subr (type-of 1) (new-<long> (get/type (get/head -args-))))
+(define-subr (type-of 1) (new-<long> (type-of (get/head -args-))))
 (define-subr (string? 1) (and (is <string> (get/head -args-)) symbol/true))
 (define-subr (symbol? 1) (and (is <symbol> (get/head -args-)) symbol/true))
 (define-subr (pair? 1)   (and (is <pair>   (get/head -args-)) symbol/true))
@@ -613,7 +613,7 @@
   (define-subr (call-IA-32-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-IA-32-machine-code will call %p\n" data))
-      (k/assert (is <data> data) "call-IA-32-machine-code: cannot call object of type "(get/type data)", printing as "data)
+      (k/assert (is <data> data) "call-IA-32-machine-code: cannot call object of type "(type-of data)", printing as "data)
       (data)
       (debug (libc/printf "call-IA-32-machine-code got back the control from %p\n" data))
       ())))
@@ -622,7 +622,7 @@
   (define-subr (call-x86-64-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-x86-64-machine-code will call %p\n" data))
-      (k/assert (is <data> data) "call-x86-64-machine-code: cannot call object of type "(get/type data)", printing as "data)
+      (k/assert (is <data> data) "call-x86-64-machine-code: cannot call object of type "(type-of data)", printing as "data)
       (data)
       (debug (libc/printf "call-x86-64-machine-code got back the control from %p\n" data))
       ())))

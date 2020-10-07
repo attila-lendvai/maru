@@ -3,7 +3,7 @@
 (define-function do_print (obj storing)
   ;; NOTE: be prepared to handle uninitialized objects!
   (debug/identities (libc/printf "{%p}" obj))
-  (let ((type (get/type obj)))
+  (let ((type (type-of obj)))
     (cond
       ((= type <undefined>)	(libc/printf "()"))
       ((= type <long>)		(libc/printf "%ld" (get/long obj)))

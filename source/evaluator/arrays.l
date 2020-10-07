@@ -14,14 +14,14 @@
          (get/long (get (,type-name size) obj)))
 
        (define-function ,getter-name (obj idx)
-         (safety 1 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (get/type obj) idx)))
+         (safety 1 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
          (let ((elements (get (,type-name elements) obj))
                (size     (,length-name obj)))
            (and (< idx size)
                 (,accessor elements idx))))
 
        (define-function ,setter-name (obj idx val)
-         (safety 1 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string setter-name) ": called with object of type %ld, and index %ld") (get/type obj) idx)))
+         (safety 1 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string setter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
          (let* ((elements	(get (,type-name elements) obj))
                 (size		(get/long (get (,type-name size) obj)))
                 (capacity	(if elements

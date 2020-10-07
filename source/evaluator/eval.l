@@ -265,21 +265,21 @@
              (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
                (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
            (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
-   `(define-function get/type (ptr)
+   `(define-function type-of (ptr)
       (cond
         ,@conds-early
         ((oop? ptr)	(let ((header (gc/header-of ptr)))
-                          (safety 3 (or (gc/valid-header-canary? header) (fatal1 "get/type: encountered an untagged pointer: %p" ptr)))
-                          (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "get/type: attempt to access dead object: %p" ptr)))
+                          (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
+                          (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
         ,@conds-late
-        (else (fatal1 "get/type: encountered something unidentifiable: {%p}" ptr))))))
+        (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
 
 (define-form is (type ptr)
-  `(= ,type (get/type ,ptr)))
+  `(= ,type (type-of ,ptr)))
 
 (define-function k/%accessor-typecheck (expected-type-id object)
-  (let ((type (get/type object)))
+  (let ((type (type-of object)))
     (or (= type expected-type-id)
         (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
   (return object))
@@ -597,7 +597,7 @@
     (and tmp
          (is <variable> tmp)
          (set tmp (get (<variable> value) tmp))
-         (= type (get/type tmp))
+         (= type (type-of tmp))
          tmp)))
 
 (define-function copy-module-bindings (from to)
@@ -612,7 +612,7 @@
              (value	(get (<variable> value) var)))
         ;; *globals* is special in that it should point to the module's env, therefore we skip that
         (unless (= name symbol/*globals*)
-          (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (get/type value)))
+          (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (type-of value)))
           (k/env/define to-env name value))))
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
@@ -653,7 +653,7 @@
     (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
     (let ((frame (k/array-at *call-stack* *call-stack-index*)))
       (if frame
-          (safety 1 (k/assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (get/type frame)))
+          (safety 1 (k/assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
         (gc/let* ((new-frame (new-record-instance <call-frame>)))
           (set (k/array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
@@ -717,13 +717,13 @@
   (debug (libc/printf "k/apply, function ") (k/dump fun) (libc/printf ", arguments: ") (k/dump arguments) (libc/printf "\n"))
   (safety 1 (k/assert fun "k/apply: fun is nil"))
   (with-new-call-frame (symbol/apply fun arguments)
-    (let ((type (get/type fun)))
+    (let ((type (type-of fun)))
       (cond
         ((= type <expr>)	(k/apply-expr fun arguments ctx))
         ;;((= type <fixed>)	(k/apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
         ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
         (else
-         (aif (k/array-at (get/variable-value var/*applicators*) (get/type fun))
+         (aif (k/array-at (get/variable-value var/*applicators*) (type-of fun))
              (gc/let* ((args arguments))
                (set args (new-<pair> fun args))
                (k/apply it args ctx))
@@ -806,7 +806,7 @@
       ((is <symbol> exp)	(k/expand/symbol	exp env (k/env/variable-value env symbol/*syntax-module*)))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
-       (aif (k/array-at (get/variable-value var/*expanders*) (get/type exp))
+       (aif (k/array-at (get/variable-value var/*expanders*) (type-of exp))
            (gc/let* ((args (new-<pair> exp ())))
              (k/apply it args ()))
          exp)))))
@@ -876,12 +876,12 @@
 (define-function k/encode (exp env)
   (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
   (with-new-call-frame (symbol/encode () exp)
-    (debug (libc/printf "k/encode is dispatching on type %ld\n" (get/type exp)))
+    (debug (libc/printf "k/encode is dispatching on type %ld\n" (type-of exp)))
     (cond
       ((is/pair exp)		(k/encode/pair		exp env))
       ((is <symbol> exp)	(k/encode/symbol	exp env))
       (else
-       (aif (k/array-at (get/variable-value var/*encoders*) (get/type exp))
+       (aif (k/array-at (get/variable-value var/*encoders*) (type-of exp))
            (gc/let* ((args (new-<pair> env ())))
              (set args (new-<pair> exp args))
              (debug (libc/printf "k/encode/other: applying fn: ") (k/println it) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
@@ -936,7 +936,7 @@
 
 (define-function k/eval (exp ctx)
   (verbosity 3 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
-  (let ((type (get/type exp)))
+  (let ((type (type-of exp)))
     (cond
       ((= type <undefined>)	exp)
       ((= type <long>)		exp)
@@ -1028,7 +1028,7 @@
     (let ((frame (current-call-frame)))
       (when frame
         (let* ((callee		(<call-frame>-callee frame))
-               (callee-type	(get/type callee)))
+               (callee-type	(type-of callee)))
           (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
             (cond
               ((= callee-type <expr>)		(incr-boxed	(<expr>-profiler-counter callee)))
@@ -1040,7 +1040,7 @@
       (libc/fprintf libc/stderr "Profiler took %ld samples:\n" profiler/sample-counter)
       (let ((obj (gc/first-object)))
         (while obj
-          (let ((type (get/type obj))
+          (let ((type (type-of obj))
                 (name ())
                 (counter ()))
             (cond
@@ -1132,7 +1132,7 @@
 
   (debug (libc/printf "gc initialized\n"))
 
-  (k/assert (= <long>	(get/type (new-<long> 42))) "get/type for <long> is broken")
+  (k/assert (= <long>	(type-of (new-<long> 42))) "type-of for <long> is broken")
   (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
 
   (gc/push-root (address-of *module*))
