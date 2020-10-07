@@ -11,7 +11,7 @@
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
-#  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm || beep
+#  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
 #
 # the makefile parallelism is mostly only between the backends.
@@ -123,7 +123,7 @@ endif
 
 .SUFFIXES:					# disable all built-in rules
 
-#.PRECIOUS: $(BUILD_x86)/eval3.s
+#.PRECIOUS: $(BUILD_x86)/eval3.s $(BITCODE_DIR)/eval3.ll
 
 all: eval
 

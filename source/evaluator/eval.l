@@ -695,7 +695,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function k/apply-expr (fun arguments parent-ctx)
-  (verbosity 2 (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
@@ -945,7 +945,7 @@
            exp))))))
 
 (define-function k/eval (exp ctx)
-  (verbosity 2 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
   (let ((type (get/type exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -967,11 +967,11 @@
   (debug (libc/printf "k/expand-encode-eval for form ") (k/println form))
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-					(verbosity 2 (libc/printf ";;; ")	(k/dumpln x))
-    (set x (k/expand x env))		(verbosity 3 (libc/printf "expd--> ")	(k/dumpln x))
-    (set x (k/encode x env))		(verbosity 3 (libc/printf "encd--> ")	(k/dumpln x))
+					(verbosity 2 (libc/printf ";;; ? ")		(k/dumpln x))
+    (set x (k/expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(k/dumpln x))
+    (set x (k/encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(k/dumpln x))
     (set x (k/eval   x ctx))
-					(verbosity 2 (libc/printf ";;; => ")	(k/dumpln x))
+					(verbosity 2 (libc/printf ";;; => ")		(k/dumpln x))
     x))
 
 (define-function k/repl-stream (stream)

@@ -320,6 +320,27 @@
                 (set size (* size 2))))))
         result))))
 
+;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
+(define-subr read
+  (if (= () -args-)
+      (let ((obj (k/read libc/stdin)))
+        (and (= k/+end+ obj) (set obj ()))
+        obj)
+    (let ((arg (k/car -args-)))
+      (or (is <string> arg) (fatal1 "read: argument is not a <string> "arg))
+      (let ((stream (libc/fopen (get/string arg) "r")))
+        ;; TODO error handling
+        (if stream
+            (let* ((head (new-<pair> () ()))
+                   (tail head)
+                   (obj  ()))
+              (gc/protect (head obj)
+                (while (!= k/+end+ (set obj (k/read stream)))
+                  (set tail (put/tail tail (new-<pair> obj ())))))
+              (libc/fclose stream)
+              (get/tail head))
+          ())))))
+
 (define-subr (load 1)
   (let* ((path		(get/head -args-))
          (stream	(or (cond
@@ -336,6 +357,7 @@
     (libc/fclose stream)
     result))
 
+;; TODO delme?
 (define-subr (repl-stream 1)
   (let ((stream (get/head -args-)))
     ;;(or stream (set stream (get/variable-value var/*input*)))
@@ -554,28 +576,6 @@
       (if (= (string-at endptr 0) ?\x00)
           (new-<long> result)
         (fatal1 "invalid number in string->long, libc/strtol failed for '%s'" str)))))
-
-;; TODO is this the actual primitive that we want to publish? maybe a just read-form?
-(define-subr read
-  (if (= () -args-)
-      (let ((obj (k/read libc/stdin)))
-        (and (= k/+end+ obj) (set obj ()))
-        obj)
-    (let ((arg (k/car -args-)))
-      (or (is <string> arg) (fatal1 "read: non-String argument: " arg))
-      (let* ((path   (get/string arg))
-             (stream (libc/fopen path "r")))
-        ;; TODO error handling
-        (if stream
-            (let* ((head (new-<pair> () ()))
-                   (tail head)
-                   (obj  ()))
-              (gc/protect (head obj)
-                (while (!= k/+end+ (set obj (k/read stream)))
-                  (set tail (put/tail tail (new-<pair> obj ())))))
-              (libc/fclose stream)
-              (get/tail head))
-          ())))))
 
 (define-subr (current-module 0)
   *module*)
