@@ -243,6 +243,8 @@
   (when (<= level *safety*)
     `(let () ,@prog)))
 
+(define-constant false ()) ; just a convenience to facilitate code readability
+
 ;;; list basics
 
 (define-function first	(list)	(car list))

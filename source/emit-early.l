@@ -42,8 +42,6 @@
 (define-function target-boolean (value)
   (if value target-boolean/true target-boolean/false))
 
-(define-constant false ()) ; just a convenience to facilitate code readability
-
 ;;;
 ;;; the target's configuration
 ;;;
