@@ -342,21 +342,21 @@
                                                          var)
                                                       ,val))
 
-(define-function k/car (list)
+(define-function car (list)
   (when list
-    (k/assert (is/pair list) "k/car called on non-list: " list)
+    (k/assert (is/pair list) "car called on non-list: " list)
     (get/head list)))
 
-(define-function k/cdr (list)
+(define-function cdr (list)
   (when list
-    (k/assert (is/pair list) "k/cdr called on non-list: " list)
+    (k/assert (is/pair list) "cdr called on non-list: " list)
     (get/tail list)))
 
-(define-function k/caar		(list)		(k/car (k/car list)))
-(define-function k/cadr		(list)		(k/car (k/cdr list)))
-(define-function k/cddr		(list)		(k/cdr (k/cdr list)))
-(define-function k/caddr	(list)		(k/car (k/cdr (k/cdr list))))
-(define-function k/cadddr	(list)		(k/car (k/cdr (k/cdr (k/cdr list)))))
+(define-function caar		(list)		(car (car list)))
+(define-function cadr		(list)		(car (cdr list)))
+(define-function cddr		(list)		(cdr (cdr list)))
+;;(define-function caddr		(list)		(car (cdr (cdr list))))
+;;(define-function cadddr	(list)		(car (cdr (cdr (cdr list)))))
 
 ;;;
 ;;; object instantiation
@@ -769,8 +769,8 @@
              (set tail (k/expand/list tail env)))
            ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
            (when (and (= symbol/set head)
-                      (is/pair (k/car tail))
-                      (is <symbol> (k/caar tail)))
+                      (is/pair (car tail))
+                      (is <symbol> (caar tail)))
              (gc/let* ((buf (new-<buffer>)))
                (buffer-append-string buf "set-")
                (buffer-append-string buf (get/symbol (get/head (get/head tail))))
@@ -828,7 +828,7 @@
     ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
     ;; because of that emit requires the introduction of the eval-encoded subr
     (cond
-      ((= head fixed-subr/let)		(let ((bindings (k/cadr exp)))
+      ((= head fixed-subr/let)		(let ((bindings (cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 0 (get/long (get (<env> offset) env)))))
 					    (while (is/pair bindings)
 					      (let ((var-name (get/head bindings)))
@@ -837,7 +837,7 @@
 					        (set bindings (get/tail bindings))))
 					    (set tail (k/encode/list tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
-      ((= head fixed-subr/lambda)	(let ((args (k/cadr exp)))
+      ((= head fixed-subr/lambda)	(let ((args (cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 1 0)))
 					    (while (is/pair args)
 					      (k/env/define new-env (get/head args) ())
@@ -847,14 +847,14 @@
 					    (set tail (new-<pair> new-env tail)))))
       ;; TODO this defines the variable in the encode phase, even if the code doesn't get executed in the end.
       ;; i doubt it's the intended behavior... investigate!
-      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (module-env *module*) (k/car tail))))
-					  (set tail (k/encode/list (k/cdr tail) env))
+      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (module-env *module*) (car tail))))
+					  (set tail (k/encode/list (cdr tail) env))
 					  (set tail (new-<pair> var tail))))
       ;; TODO and then this errors while expand'ing an if branch that is _not_ taken at the end at runtime
-      ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (k/car tail))))
-					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (k/car tail))))
-					  (and (or (not (k/car tail)) (k/cddr tail)) (k/error "encode: malformed SET expression " exp))
-					  (set tail (k/encode/list (k/cdr tail) env))
+      ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (car tail))))
+					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
+					  (and (or (not (car tail)) (cddr tail)) (k/error "encode: malformed SET expression " exp))
+					  (set tail (k/encode/list (cdr tail) env))
 					  (set tail (new-<pair> var tail))))
       ((!= head fixed-subr/quote)	(set tail (k/encode/list tail env))))
     ;; return value
@@ -1219,8 +1219,8 @@
                (unless (and (is/pair cla)
                             (is/pair (get/tail cla)))
                  (fatal "--define requires two arguments"))
-               (let ((var (k/car  cla))
-                     (val (k/cadr cla)))
+               (let ((var (car  cla))
+                     (val (cadr cla)))
                  (put (<variable> value) cla-var (set cla (get/tail (get/tail cla)))) ; (pop *command-line-arguments*) x 2
                  ;; convert to long when possible
                  (let* ((cstr	(get/string val))

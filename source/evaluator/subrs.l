@@ -27,13 +27,13 @@
         (k/error "Operator '" op "' called with the wrong number of arguments: " args))))
 
 (define-subr (define () fixed)
-  (let ((var (k/car -args-)))
+  (let ((var (car -args-)))
     (unless (is <variable> var)
       ;; FIXME? use k/error? why the dumpln? test it...
       (libc/printf "\nerror: non-variable in define: ")
       (k/dumpln var)
       (fatal "aborting"))
-    (let ((val (k/eval (k/cadr -args-) -ctx-)))
+    (let ((val (k/eval (cadr -args-) -ctx-)))
       (put (<variable> value) var val)
       ;; optionally set the <expr>'s name slot
       (when-at-expand feature/track-expr-names
@@ -47,21 +47,21 @@
 
 (define-subr (defined? 1)
   (let ((name (get/head -args-))
-        (env (or (k/cadr -args-) (module-env *module*))))
+        (env (or (cadr -args-) (module-env *module*))))
     (k/env/lookup-variable env name)))
 
 (define-subr (lambda () fixed)
-  (let ((env		(k/car  -args-)) ; see k/encode/pair; it puts the env as the first arg
-        (parameters	(k/cadr -args-))
-        (body		(k/cddr -args-)))
+  (let ((env		(car  -args-)) ; see k/encode/pair; it puts the env as the first arg
+        (parameters	(cadr -args-))
+        (body		(cddr -args-)))
     (k/assert (is <env> env) "lambda subr: env is "env)
     (k/assert (or (not parameters) (is <variable> parameters) (is <pair> parameters)) "lambda subr: parameters is of wrong type: " parameters)
     (new-<expr> parameters body env -ctx-)))
 
 (define-subr (let () fixed)
-  (let* ((bindings (k/cadr -args-))
+  (let* ((bindings (cadr -args-))
          (locals   (get (<context> bindings) -ctx-))
-         (body     (k/cddr -args-)))
+         (body     (cddr -args-)))
     (gc/let* (tmp)
       (while (is/pair bindings)
         (let ((binding (get/head bindings)))
@@ -101,19 +101,19 @@
           (set (k/array-at (get (<context> bindings) -ctx-) (get/long (get (<variable> index) var))) val))))))
 
 (define-subr (while () fixed)
-  (let ((tst  (k/car -args-))
+  (let ((tst  (car -args-))
         (prog -args-))
     (while (k/eval tst -ctx-)
       (let ((body prog))
-        (while (is/pair (set body (k/cdr body)))
+        (while (is/pair (set body (cdr body)))
           (k/eval (get/head body) -ctx-))))))
 
 (define-subr (if () fixed)
-  (if (k/eval (k/car  -args-) -ctx-)
-      (k/eval (k/cadr -args-) -ctx-)
+  (if (k/eval (car  -args-) -ctx-)
+      (k/eval (cadr -args-) -ctx-)
     (let ((ans ()))
-      (set -args- (k/cdr -args-))
-      (while (is/pair (set -args- (k/cdr -args-)))
+      (set -args- (cdr -args-))
+      (while (is/pair (set -args- (cdr -args-)))
         (set ans (k/eval (get/head -args-) -ctx-)))
       ans)))
 
@@ -333,7 +333,7 @@
       (let ((obj (k/read libc/stdin)))
         (and (= k/+end+ obj) (set obj ()))
         obj)
-    (let ((arg (k/car -args-)))
+    (let ((arg (car -args-)))
       (or (is <string> arg) (fatal1 "read: argument is not a <string> "arg))
       (let ((stream (libc/fopen (get/string arg) "r")))
         ;; TODO error handling
@@ -399,30 +399,30 @@
 
 ;; TODO rename to eval-sexp to differentiate from eval-encoded? find some better names...
 (define-subr eval
-  (gc/let* ((env (or (k/cadr -args-)
+  (gc/let* ((env (or (cadr -args-)
                      (new-<env> (module-env *module*) 1 0))))
-    (k/expand-encode-eval (k/car -args-) env)))
+    (k/expand-encode-eval (car -args-) env)))
 
 (define-subr eval-encoded
   ;; TODO investigate: why is this needed? try to eliminate it
-  (gc/let* ((env (or (k/cadr -args-)
+  (gc/let* ((env (or (cadr -args-)
                      (new-<env> (module-env *module*) 1 0))))
-    (k/eval (k/car -args-) env)))
+    (k/eval (car -args-) env)))
 
 (define-subr encode
-  (k/encode (k/car -args-)
-            (or (k/cadr -args-)
+  (k/encode (car -args-)
+            (or (cadr -args-)
                 (get (<context> env) -ctx-))))
 
 (define-subr expand
-  (k/expand (k/car -args-)
-            (or (k/cadr -args-)
+  (k/expand (car -args-)
+            (or (cadr -args-)
                 (get (<context> env) -ctx-))))
 
-(define-subr cons       (new-<pair> (k/car -args-) (k/cadr -args-)))
+(define-subr cons       (new-<pair> (car -args-) (cadr -args-)))
 (define-subr (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
-(define-subr array      (new-<array> (and (is/long (k/car -args-)) (get/long (get/head -args-)))))
-(define-subr form       (new-<form> (k/car -args-) (k/cadr -args-)))
+(define-subr array      (new-<array> (and (is/long (car -args-)) (get/long (get/head -args-)))))
+(define-subr form       (new-<form> (car -args-) (cadr -args-)))
 
 (define-subr (allocate 2)
   (let ((type (get/head -args-))
@@ -441,8 +441,8 @@
 (define-subr (symbol? 1) (and (is <symbol> (get/head -args-)) symbol/true))
 (define-subr (pair? 1)   (and (is <pair>   (get/head -args-)) symbol/true))
 (define-subr (array? 1)  (and (is <array>  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
-(define-subr (car 1)     (k/car (get/head -args-)))
-(define-subr (cdr 1)     (k/cdr (get/head -args-)))
+(define-subr (car 1)     (car (get/head -args-)))
+(define-subr (cdr 1)     (cdr (get/head -args-)))
 
 (define-subr (set-car 2)
   (let ((obj (get/head -args-)))
@@ -597,7 +597,7 @@
   ())
 
 (define-subr create-module
-  (new-<module> (awhen (k/car -args-)
+  (new-<module> (awhen (car -args-)
                   (get/string it))))
 
 (define-subr (eval-in-module 2)
