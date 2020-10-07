@@ -967,7 +967,7 @@
   ;; so that type-of on one of their instances will return the slave type object.
   ;; this is mainly needed to interact with the data that the host's reader returns
   ;; e.g. to be able to specialize methods on them while in the bootstrap process.
-  (list-do entry `(("" ,<string>) (42 ,<long>) (t ,<symbol>) ((1) ,<pair>))
+  (list-do entry `(("" ,<string>) (42 ,<long>) (t ,<symbol>) ((1) ,<pair>) (() ,<undefined>))
     (apply (lambda (instance type)
              (set (array-at %type-id-map/host->slave (type-id-of instance))
                   (<type>-slave-id type))
@@ -1077,9 +1077,12 @@
   ;; the fast version is: (type-id-of (car arguments))
   ;; same applies to generics.
   (apply (or (array-at (<selector>-methods self)
-                       (type-id-of (car arguments)) ; faster version
-                       ;;(<type>-id (type-of (car arguments))) ; more correct version that considers the type mappings while bootstrapping (i.e. pretty printing works properly while bootstrapping)
-                       )
+                       (if-at-expand (and bootstrapping?
+                                          (= 0 *optimised*))
+                           ;; more correct version that considers the type mappings while bootstrapping (i.e. pretty printing works properly while bootstrapping).
+                           ;; this slows down the bootstrap by about 10% though.
+                           (<type>-id (type-of (car arguments)))
+                         (type-id-of (car arguments))))
              (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
          arguments))
