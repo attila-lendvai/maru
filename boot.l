@@ -605,7 +605,7 @@
       ;; integrate with the host vm's type machinery to instantiate slave objects
       ;; in the framework of the host while we are being bootstrapped.
       (define-function allocate-type-id ()
-        (eval-in-module host '(allocate-type-id)))
+        (eval-in-host '(allocate-type-id)))
 
       (define-function allocate-type-id/slave ()
         (incr %last-type-id))
@@ -631,10 +631,10 @@
 
 (if-at-expand bootstrapping?
     (let ()
-      (define type-id-of-<type>		(eval-in-module host '(<type>-id <type>)))
-      (define type-id-of-<record>	(eval-in-module host '(<type>-id <record>)))
-      (define slots-of-<type>		(eval-in-module host '(<record>-direct-slots <type>)))
-      (define slots-of-<record>		(eval-in-module host '(<record>-direct-slots <record>))))
+      (define type-id-of-<type>		(eval-in-host '(<type>-id <type>)))
+      (define type-id-of-<record>	(eval-in-host '(<type>-id <record>)))
+      (define slots-of-<type>		(eval-in-host '(<record>-direct-slots <type>)))
+      (define slots-of-<record>		(eval-in-host '(<record>-direct-slots <record>))))
 
   (define type-id-of-<type>		(allocate-type-id))
   (define type-id-of-<record>		(allocate-type-id))
@@ -653,8 +653,8 @@
 ;;; bootstrap is happening, i.e. <type> and <record> is mapped into the slave from the host in early.l
 ;;;
     (let ()
-      (set <type>		(eval-in-module host '<type>))
-      (set <record>		(eval-in-module host '<record>))
+      (set <type>		(eval-in-host '<type>))
+      (set <record>		(eval-in-host '<record>))
 
       (let ((slave-id (allocate-type-id/slave)))
         (set (array-at %type-id-map/host->slave (<type>-id <type>)) slave-id)
@@ -677,7 +677,7 @@
               (host-id	(<type>-id type)))
           (set (array-at %type-id-map/host->slave host-id) slave-id)
           (set (array-at %types slave-id) type)
-          (eval-in-module host `(register-type ',type))))
+          (eval-in-host `(register-type ',type))))
 
       (define-function type-object-for-id (type-id)
         (or (array-at %types (let ((slave-id (array-at %type-id-map/host->slave type-id)))

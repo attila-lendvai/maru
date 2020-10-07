@@ -2,13 +2,13 @@
 
 (let ((host-module (current-module))
       (slave-module (create-module "slave")))
-  (define slave slave-module)
+  (define *slave-module* slave-module)
   (define-function switch-to-slave-module ()
     ;;(warn "--- switching to the slave module\n")
-    (set (current-module) slave))
+    (set (current-module) *slave-module*))
   (switch-to-slave-module)
   ;; in the slave, set the global variable called 'host' to hold the host-module
-  (eval-in-module slave `(define host ,host-module)))
+  (eval-in-module *slave-module* `(define *host-module* ,host-module)))
 
 ;; NOTE: we are in the slave module now, and the following forms will be read/interned into the slave.
 ;; NOTE: the slave module doesn't have boot.l loaded at this point, we only have the primitives.
@@ -25,12 +25,15 @@
 (define switch-to-host-module
     (lambda ()
       ;;(warn "--- switching to the host  module\n")
-      (set (current-module) host)))
+      (set (current-module) *host-module*)))
+
+(define eval-in-host (lambda (form)
+                       (eval-in-module *host-module* form)))
 
 (switch-to-host-module)
 
 (define-function eval-in-slave (form)
-  (eval-in-module slave form))
+  (eval-in-module *slave-module* form))
 
 (define-form slave-value (form)
   `(eval-in-slave ',form))
