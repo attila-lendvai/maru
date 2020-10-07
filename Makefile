@@ -60,7 +60,7 @@ GEN_EVAL	= $(BUILD_llvm)/eval2
 ##
 ## internal variables
 ##
-PREVIOUS_STAGE	= maru.6
+PREVIOUS_STAGE	= maru.7
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
