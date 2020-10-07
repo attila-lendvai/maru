@@ -537,7 +537,7 @@
 
 (define-function global-variable? (var)
   (let ((env (get (<variable> env) var)))
-    (and env (= 0 (get/long (get (<env> level) env))))))
+    (= 0 (get/long (get (<env> level) env)))))
 
 (define-function k/env/find-variable (env name)
   (safety 2 (k/assert (is <env> env)     "k/env/find-variable: env is not an <env>: "env))
@@ -730,12 +730,11 @@
         ;;((= type <fixed>)	(k/apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
         ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
         (else
-         (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
-           (if ap
-               (gc/let* ((args arguments))
-                 (set args (new-<pair> fun args))
-                 (k/apply ap args ctx))
-             (k/error "cannot apply: " fun))))))))
+         (aif (k/array-at (get/variable-value var/*applicators*) (get/type fun))
+             (gc/let* ((args arguments))
+               (set args (new-<pair> fun args))
+               (k/apply it args ctx))
+           (k/error "cannot apply: " fun)))))))
 
 ;;;
 ;;; expand
@@ -950,13 +949,19 @@
       ((= type <long>)		exp)
       ((= type <string>)	exp)
       ((= type <variable>)	(if (global-variable? exp)
-				    (get (<variable> value) exp)
+				    (let ()
+                                      (debug (libc/printf "k/eval is reading global var ") (k/dumpln exp))
+                                      (get (<variable> value) exp))
 				  (let ((delta (- (get/long (get (<env> level) (get (<context>  env) ctx)))
 					      (get/long (get (<env> level) (get (<variable> env) exp))))))
+				    (debug (libc/printf "k/eval is reading local var ") (k/dump exp) (libc/printf " with delta %ld\n" delta))
 				    (while (< 0 delta)
 				      (set ctx (get (<context> home) ctx))
-				      (set delta (- delta 1)))
-				    (k/array-at (get (<context> bindings) ctx) (get/long (get (<variable> index) exp))))))
+				      (decr delta))
+                                    (let* ((index (get/long (get (<variable> index) exp)))
+                                           (value (k/array-at (get (<context> bindings) ctx) index)))
+                                      (debug (libc/printf "k/eval is reading local var from context ") (k/dump ctx) (libc/printf " at index %ld, holding value " index) (k/dumpln value))
+				      value))))
       ((= type <symbol>)	(k/error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(k/eval/with-backtrace type exp ctx)))))
 
@@ -970,6 +975,7 @@
     (set x (k/encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(k/dumpln x))
     (set x (k/eval   x ctx))
 					(verbosity 2 (libc/printf ";;; => ")		(k/dumpln x))
+    (debug (libc/printf "k/expand-encode-eval for form ") (k/dump form) (libc/printf " is returning with ") (k/dumpln x))
     x))
 
 (define-function k/repl-stream (stream)

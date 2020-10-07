@@ -1078,7 +1078,7 @@
   ;; same applies to generics.
   (apply (or (array-at (<selector>-methods self)
                        (type-id-of (car arguments)) ; faster version
-                       ;;(<type>-id (type-of (car arguments))) ; more correct version that considers the type mappings while bootstrapping
+                       ;;(<type>-id (type-of (car arguments))) ; more correct version that considers the type mappings while bootstrapping (i.e. pretty printing works properly while bootstrapping)
                        )
              (<selector>-inherit (<selector>-methods self) (type-of (car arguments)))
              (<selector>-default self))
