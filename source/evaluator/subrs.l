@@ -595,8 +595,9 @@
         (form		(get/head (get/tail -args-))))
     (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
-    (with-current-module new-module
-      (k/expand-encode-eval form (module-env new-module)))))
+    (gc/let* ((env (new-<env> (module-env new-module) 1 0)))
+      (with-current-module new-module
+        (k/expand-encode-eval form env)))))
 
 (when-at-expand (= target/machine "IA-32")
   (define-subr (call-IA-32-machine-code 1)
