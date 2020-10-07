@@ -349,7 +349,8 @@
             (set feature/profiler ())))
   (eval '(define feature/profiler ())))
 
-(define-constant feature/track-expr-names	(or true feature/profiler))
+(define-constant feature/debug-info		true)
+(define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))
 (define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))
 
 ;;; list
@@ -948,7 +949,7 @@
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))
-(define-record		<module>		() (globals))		; globals is the <variable> that holds '*globals*
+(define-record		<module>		() (globals (when-at-expand feature/debug-info name)))		; globals is the <variable> that holds '*globals*
 (define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
 (define-record		<symbol>		() (_bits))
 (define-record		<pair>			() (head tail))

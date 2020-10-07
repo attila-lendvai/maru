@@ -1,7 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (let ((host-module (current-module))
-      (slave-module (create-module)))
+      (slave-module (create-module "slave")))
   (define slave slave-module)
   (define-function switch-to-slave-module ()
     ;;(warn "--- switching to the slave module\n")

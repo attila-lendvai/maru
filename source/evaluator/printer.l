@@ -70,6 +70,12 @@
                                     (libc/printf "Env<>"))))
       ((= type <context>)	(let ()
                                   (libc/printf "Context<>")))
+      ((= type <module>)	(let ()
+                                  (if-at-expand feature/debug-info
+                                      (libc/printf "Module<%s," (get/string (<module>-name obj)))
+                                    (libc/printf "Module<"))
+                                  (do_print (module-env obj) storing)
+                                  (libc/printf ">")))
       (else                     (libc/printf "<type:%ld>" type)))))
 
 (define-function k/print	(obj) (do_print obj false))

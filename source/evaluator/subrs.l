@@ -586,8 +586,9 @@
     (k/set-current-module module))
   ())
 
-(define-subr (create-module 0)
-  (new-<module>))
+(define-subr create-module
+  (new-<module> (awhen (k/car -args-)
+                  (get/string it))))
 
 (define-subr (eval-in-module 2)
   (let ((new-module	(get/head -args-))

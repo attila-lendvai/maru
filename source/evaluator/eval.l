@@ -514,7 +514,6 @@
 
 (require "source/evaluator/arrays.l")
 (require "source/evaluator/buffer.l")
-(require "source/evaluator/printer.l")
 
 ;;;
 ;;; env
@@ -562,7 +561,7 @@
 (define-function k/env/lookup-variable-or-die (env name)
   (let ((var (k/env/lookup-variable env name)))
     (unless (is <variable> var)
-      (fatal1 "k/env/lookup-variable-or-die failed for %s" (get/symbol name)))
+      (k/error "k/env/lookup-variable-or-die failed for "name", current module: "*module*))
     var))
 
 (define-function k/env/variable-value (env name)
@@ -625,6 +624,7 @@
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
 (require "source/evaluator/reader.l")
+(require "source/evaluator/printer.l")
 
 ;;;
 ;;; backtrace
@@ -869,19 +869,17 @@
     (new-<pair> head tail)))
 
 (define-function k/encode/symbol (exp env)
-  (let ((var (k/env/lookup-variable env exp)))
-    (or var (fatal1 "undefined variable in encode: '%s'" (get/symbol exp)))
-    (set exp var)
-    (if (global-variable? exp)
-        (let ((val (get (<variable> value) exp)))
+  (let ((var (k/env/lookup-variable-or-die env exp)))
+    (if (global-variable? var)
+        (let ((val (get (<variable> value) var)))
           (when (or (is <form> val)
                     (is <fixed> val))
-            (set exp val)))
-      (let ((venv (get (<variable> env) exp)))
+            (return val)))
+      (let ((venv (get (<variable> env) var)))
         (unless (= (get/long (get (<env> level) venv))
                    (get/long (get (<env> level) env)))
-          (put (<env> stable) venv symbol/true)))))
-  exp)
+          (put (<env> stable) venv symbol/true))))
+    var))
 
 (define-function k/encode (exp env)
   (debug (libc/printf "k/encode, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
@@ -996,12 +994,14 @@
          (libc/printf "\nmorituri te salutant\n"))
     res))
 
-(define-function new-<module> ()
+(define-function new-<module> (name)
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0))
             tmp)
     (set (<module>-globals module)	(k/env/define env symbol/*globals* env))
+    (when-at-expand feature/debug-info
+      (set (<module>-name module)	(new-<string>-from-cstring (or name ""))))
 
     (when *maru-module*
       (copy-module-bindings *maru-module* module))
@@ -1014,7 +1014,7 @@
     (set tmp (new-<array> 0))		(k/env/define env (k/intern "*evaluators*")		tmp)
     (set tmp (new-<array> 0))		(k/env/define env (k/intern "*applicators*")		tmp)
 
-    (debug (libc/printf "new-<module> returning with %p\n" module))
+    (debug (libc/printf "new-<module> returning with ") (k/println module))
     module))
 
 (when-at-expand feature/profiler
@@ -1151,9 +1151,9 @@
   (set *symbols* (new-<array> 32))
   (initialize-symbol-cache)				(debug (libc/printf "initialized *symbols*\n"))
 
-  (set *maru-module* (new-<module>))
+  (set *maru-module* (new-<module> "maru"))
   (populate-module-with-maru-primitives *maru-module*)
-  (set *module* (new-<module>))
+  (set *module* (new-<module> "maru-user"))
   (capture-well-known-module-values)			(debug (libc/printf "finished module initialization\n"))
 
   (debug (libc/printf "start processing argv\n"))
