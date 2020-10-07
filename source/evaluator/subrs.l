@@ -51,7 +51,8 @@
   (let ((env		(k/car  -args-)) ; see k/encode/pair; it puts the env as the first arg
         (parameters	(k/cadr -args-))
         (body		(k/cddr -args-)))
-    (k/assert (is <env> env))
+    (k/assert (is <env> env) "lambda subr: env is "env)
+    (k/assert (or (not parameters) (is <variable> parameters) (is <pair> parameters)) "lambda subr: parameters is of wrong type: " parameters)
     (new-<expr> parameters body env -ctx-)))
 
 (define-subr (let () fixed)
