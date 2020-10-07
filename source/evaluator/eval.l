@@ -107,42 +107,24 @@
 (define-form move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-(define *subr-registry* ()) ; define-subr collects them here at compile time
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Actual artifacts that are meant to be level-shifted into the target
-;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(compile-begin)
-
-;; override the slot-accessor choke-point. any accessor expanded after this point
-;; will expand to a simple oop-at form that the compiler can directly deal with.
-(define-form slot-value (type-name slot-name object)
-  ;; TODO either get rid of the get/put accessors, or expand this to them, but see note below
-  (let* ((type (eval type-name))
-         (slot-index (record/slot-index type slot-name)))
-    (list 'oop-at
-          ;; TODO to enable some type-checking, we need to somehow differentiate here between
-          ;; the object level (simple define-function's that are meant to be level-shifted),
-          ;; and the meta level (e.g. define-forms and other meta-level code that runs
-          ;; while expanding the object-level stuff), because they need different typecheck forms.
-          ;; this publication may be relevant for the solution:
-          ;; Submodules in Racket https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf
-          (if (and false feature/typecheck-slot-access)
-              `(k/%accessor-typecheck ,(<type>-id type) ,object)
-            object)
-          slot-index)))
+;; redefine %accessor-typecheck with a macro that redirects to a kernel version that drops the slot-name,
+;; because the compiler cannot emit symbols yet
+;; TODO this is ugly for now
+(define %accessor-typecheck
+    (form (lambda (*env* expected-type-id slot-name object)
+            ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
+            object)))
 
 ;;;
-;;; some forward definitions to relax the error handler
+;;; some forward definitions, so that the variables get created in time
 ;;; ----------------------------------------------------------------
 (eval-at-expand
  `(let ()
     ,@(map (lambda (name)
              (list 'define name))
            '(print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-             k/print k/read k/encode/list k/encode k/expand/list k/expand k/eval k/intern))))
+             k/print k/read k/encode/list k/encode k/expand/list k/expand k/eval k/intern
+             k/%accessor-typecheck))))
 
 ;;;
 ;;; libc
@@ -248,10 +230,21 @@
      (die)))
 
 ;;;
+;;; copy the types here that should be visible to the target code
+;;; ----------------------------------------------------------------
+
+(eval-at-expand
+ `(let ()
+    ,@(map (lambda (name)
+             `(define ,name (eval-in-module *slave-module* ',name)))
+           '(<data> <undefined> <long> <array> <string> <expr> <form> <fixed> <subr>
+             <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>))))
+
+;;;
 ;;; garbage collector
 ;;; ----------------------------------------------------------------
 
-(require "source/evaluator/gc.l")
+(load "source/evaluator/gc.l")
 
 ;;;
 ;;; types and their kernel accessors (get, put, is)
@@ -320,13 +313,13 @@
 ;; shorthands (and optimizations)
 (define-form is/long		(obj)		`(is <long> ,obj))
 (define-form is/pair		(obj)		`(is <pair> ,obj))
-(if (immediate-type? <long>)
+(if-at-expand (immediate-type? <long>)
     (define-form get/long	(obj)		(if (< *safety* 2)
                                                     `(>> ,obj ,(<immediate-type>-tag-width <long>))
                                                   `(let ((__obj__ ,obj))
                                                      (k/assert (is/long __obj__))
                                                      (>> __obj__ ,(<immediate-type>-tag-width <long>)))))
-    (define-form get/long	(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
+  (define-form get/long	(obj)			(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
@@ -512,8 +505,8 @@
         (new-<pair> (get/head head) new-tail))
     tail))
 
-(require "source/evaluator/arrays.l")
-(require "source/evaluator/buffer.l")
+(load "source/evaluator/arrays.l")
+(load "source/evaluator/buffer.l")
 
 ;;;
 ;;; env
@@ -623,8 +616,8 @@
           (k/env/define to-env name value))))
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
-(require "source/evaluator/reader.l")
-(require "source/evaluator/printer.l")
+(load "source/evaluator/reader.l")
+(load "source/evaluator/printer.l")
 
 ;;;
 ;;; backtrace
@@ -1068,7 +1061,7 @@
 ;;;
 ;;; ----------------------------------------------------------------
 
-(require "source/evaluator/subrs.l")
+(load "source/evaluator/subrs.l")
 
 (define-function %instantiate-subr (module name imp fixed?)
   (gc/let* ((tmp (new-<subr> imp name)))
@@ -1262,5 +1255,3 @@
 
   (debug (libc/printf "main is returning normally\n"))
   (return 0))
-
-(compile-end)

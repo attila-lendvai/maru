@@ -1,5 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(for-syntax
+ (define *subr-registry* ()))
+
 (define-form define-subr (name-and-props . body)
   (unless (pair? name-and-props)
     (set name-and-props (list name-and-props)))

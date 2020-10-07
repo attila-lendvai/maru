@@ -18,15 +18,16 @@
 (define-form gc/payload-of (arg)
   `(+ ,arg ,size-of-<header>))
 
-(let ((marker 0xDEADBEE)) ; an easy to notice token without any meaning
-  (define-form gc/valid-header-canary? (header)
-    (if feature/object-canary
-        `(= (<header>-canary ,header) ,marker)
-      true))
+(define-constant +canary-value+ 0xDEADBEE) ; an easy to notice token without any meaning
 
-  (define-form gc/initialize-header-canary (header)
-    (when feature/object-canary
-      `(set (<header>-canary ,header) ,marker))))
+(define-form gc/valid-header-canary? (header)
+  (if feature/object-canary
+      `(= (<header>-canary ,header) ,+canary-value+)
+    true))
+
+(define-form gc/initialize-header-canary (header)
+  (when feature/object-canary
+    `(set (<header>-canary ,header) ,+canary-value+)))
 
 (define-form gc/valid-maru-value? (obj)
   (if feature/object-canary

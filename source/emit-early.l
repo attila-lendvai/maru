@@ -15,6 +15,23 @@
                                             ((= target/machine "IA-32")		32)
                                             (else (error "Couldn't identify word size from target/machine: "target/machine))))
 
+(define *target-module* (create-module "target"))
+
+(eval-in-module *target-module*
+  `(let ()
+     (define *host-module*	,(current-module))
+     (define *slave-module*	,*slave-module*)
+     (set *syntax-module*	,*slave-module*)))
+
+;; stubs for the +special-forms+
+(list-do name '(return address-of << >>)
+  (eval-in-module *target-module* `(define ,name (fixed (lambda _ (print ,(symbol->string name) " encountered in interpreted code") (abort))))))
+
+;; stubs for the +special-operators+
+;; (list-do name '()
+;;   ;; they need to be subr's, so that encode doesn't insert them
+;;   (eval-in-module *target-module* `(define ,name error)))
+
 (switch-to-slave-module)
 
 (define-constant target-boolean/true  1)
@@ -51,15 +68,6 @@
       (* value   target/word-size-in-bytes)
      `(* ,value ,target/word-size-in-bytes)))
 
-;; some stubs for the +special-forms+
-(list-do name '(return address-of << >>)
-  (eval `(define ,name (fixed (lambda args (error ,(symbol->string name) " encountered in interpreted code"))))))
-
-;; some stubs for the +special-operators+
-;; (list-do name '()
-;;   ;; they need to be subr's, so that encode doesn't insert them
-;;   (eval `(define ,name error)))
-
 ;;;
 ;;; host code follows from here
 ;;;
@@ -68,8 +76,11 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
-(define-form slave-value (form)
-  `(eval-in-slave ',form))
+(define-function eval-in-target (form)
+  (eval-in-module *target-module* form))
+
+(define-form target-value (form)
+  `(eval-in-target ',form))
 
 ;;;
 ;;; FFI

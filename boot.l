@@ -167,15 +167,20 @@
       (lambda (env expr)
         (qq-object expr)))))
 
+(define for-syntax
+    (form (lambda (env . prog)
+            `(eval-in-module *syntax-module* '(let () ,@prog)))))
+
+
 (define define-form (form (lambda (env name args . body)
-                            `(define ,name (form (lambda (*env* ,@args) ,@body))))))
+                            `(for-syntax (define ,name (form (lambda (*env* ,@args) ,@body)))))))
 
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
 (define-form eval-at-expand (form)
-  (eval form))
+  (eval-in-module *syntax-module* form))
 
 (define-form if-at-expand (cond true-form . false-forms)
-  (if (eval cond)
+  (if (eval-in-module *syntax-module* cond)
       true-form
     (if (and false-forms
              (cdr false-forms))
@@ -183,7 +188,7 @@
       (car false-forms))))
 
 (define-form when-at-expand (cond . true-forms)
-  (if (eval cond)
+  (if (eval-in-module *syntax-module* cond)
       (if (and true-forms
                (cdr true-forms))
           `(let ()
@@ -213,7 +218,7 @@
   `(or ,test (error ,@args)))
 
 (define-form define-constant (name value-form)
-  `(define ,name (form () (lambda _ ',(eval value-form)))))
+  `(for-syntax (define ,name (form () (lambda _ ',(eval value-form))))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))

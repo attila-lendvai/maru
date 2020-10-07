@@ -3,33 +3,27 @@
 (define-function compile-env (env -c-)
   (verbosity 1 (warn "begin compiling\n"))
   (emit-prelude -c-)
-  (let ((vars (<env>-bindings env)))
-    (for (i 0 (array-length vars))
-      (let* ((var   (array-at vars i))
-             (name  (<variable>-name  var))
-             (value (<variable>-value var)))
+  (array-do var (<env>-bindings env)
+    (let* ((name		(<variable>-name  var))
+           (value		(<variable>-value var))
+           (type-blacklist	(list <subr> <fixed> <form> <array> <env> <module>))
+           (name-blacklist	'(+end+ true)))
+      (unless (or (member? (type-of value) type-blacklist)
+                  (member? name name-blacklist))
         (emit COMMENT (list "defn " name))
         (verbosity 1 (warn name ", "))
-        (compile-definition value name -c-)))
-    (verbosity 1 (warn "\n"))
-    (emit-gen-buffer -c-)))
+        (compile-definition value name -c-))))
+  (verbosity 1 (warn "\n"))
+  (emit-gen-buffer -c-))
 
 ;;;
 ;;; API visible in the slave
 ;;;
 (switch-to-slave-module)
 
-(define-form compile-begin ()
-  (set *globals* (eval-in-host `(environment ,*globals*)))
-  ())
-
-(define-form compile-end ()
-  '(let ((env *globals*))
-     (set *globals* (eval-in-host `(<env>-parent ,env)))
-     (eval-in-host `(compile-env ',env (compiler 0)))))
-
 (define-form define-foreign-function (maru-name return-type foreign-name parameter-types)
-  `(define ,maru-name (eval-in-host '(foreign-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
+  (let ((ff (eval-in-host `(foreign-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
+    `(define ,maru-name ,ff)))
 
 (define-form define-foreign-functions (maru-prefix . entries)
   `(let ()
@@ -50,3 +44,5 @@
      (size_t strlen (*)) (* strcpy (* *)) (* strncpy (* * size_t)) (int strcmp (* *)) (int strncmp (* * size_t)) (* strdup (*)) (unsigned-long strtoul (* * int)) (long strtol (* * int))
      )
     (define-constant libc/EOF -1)))
+
+(set (current-module) (host-value *target-module*))

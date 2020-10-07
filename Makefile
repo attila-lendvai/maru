@@ -177,6 +177,7 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_x86)					\
 		source/evaluator/eval.l					\
+		source/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
@@ -196,6 +197,7 @@ $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_llvm)					\
 		source/evaluator/eval.l					\
+		source/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval2 is the second iteration of us that gets built by our compiler animated by our eval executable.
@@ -233,6 +235,7 @@ define compile-x86
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
 	$(2)									\
+	source/emit-finish.l							\
 		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
 endef
 
@@ -249,6 +252,7 @@ define compile-llvm
 	--define target/os			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
 	$(2)									\
+	source/emit-finish.l							\
 		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
 endef
 

@@ -696,8 +696,8 @@
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
     (gen LOAD (LITERAL (cond
-                         ((= op 'and) (slave-value target-boolean/true))
-                         ((= op 'or)  (slave-value target-boolean/false))))
+                         ((= op 'and) (target-value target-boolean/true))
+                         ((= op 'or)  (target-value target-boolean/false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
@@ -803,15 +803,15 @@
          (gen ADDR val))))))
 
 (define +special-forms+ (list
-  (cons (slave-value let)		compile/let)
-  (cons (slave-value and)		compile/and)
-  (cons (slave-value or)		compile/or)
-  (cons (slave-value if)		compile/if)
-  (cons (slave-value while)		compile/while)
-  (cons (slave-value set)		compile/set)
-  (cons (slave-value lambda)			compile/lambda)
-  (cons (slave-value return)		compile/return)
-  (cons (slave-value address-of)	compile/address-of)))
+  (cons (target-value let)		compile/let)
+  (cons (target-value and)		compile/and)
+  (cons (target-value or)		compile/or)
+  (cons (target-value if)		compile/if)
+  (cons (target-value while)		compile/while)
+  (cons (target-value set)		compile/set)
+  (cons (target-value lambda)			compile/lambda)
+  (cons (target-value return)		compile/return)
+  (cons (target-value address-of)	compile/address-of)))
 
 ;;;
 ;;; Special Operators
@@ -864,8 +864,8 @@
        (map (lambda (arity-line)
               (map (lambda (entry)
                      (let* ((op-name (car entry))
-                            (op (eval-in-slave op-name)))
-                       ;; NOTE this is not (slave-value <subr>), because it's the host eval.exe
+                            (op (eval-in-target op-name)))
+                       ;; NOTE this is not (target-value <subr>), because it's the host eval.exe
                        ;; that instantiates these subr's, and it instantiates them
                        ;; with the type that is encoded into the executable (which should be in sync
                        ;; with the definitions in the boot.l of that stage, which in turn is what we
@@ -877,7 +877,7 @@
             table))))
 
 (define-method compile <undefined> (-c-)
-  (let ((false-value (slave-value target-boolean/false)))
+  (let ((false-value (target-value target-boolean/false)))
     (gen LOAD (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
@@ -890,7 +890,7 @@
       ((temp? value)		(gen LOAD value ()))
       ((global-variable? self)	(cond
                                   ((= 'true self.name)
-                                   (let ((true-value (slave-value target-boolean/true)))
+                                   (let ((true-value (target-value target-boolean/true)))
                                      (gen LOAD (LITERAL true-value) true-value)))
                                   ((subtype? (type-of value) <type>)
                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
@@ -924,8 +924,7 @@
 
 (define-selector compile-definition)
 
-(define-method compile-definition <form>		(name -c-)	(emit COMMENT (list "form "name)))
-(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (slave-value <type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
