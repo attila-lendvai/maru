@@ -33,7 +33,7 @@
       (libc/printf "\nerror: non-variable in define: ")
       (k/dumpln var)
       (fatal "aborting"))
-    (let ((val (k/eval (cadr -args-) -ctx-)))
+    (let ((val (eval (cadr -args-) -ctx-)))
       (put (<variable> value) var val)
       ;; optionally set the <expr>'s name slot
       (when-at-expand feature/track-expr-names
@@ -51,7 +51,7 @@
     (k/env/lookup-variable env name)))
 
 (define-subr (lambda () fixed)
-  (let ((env		(car  -args-)) ; see k/encode/pair; it puts the env as the first arg
+  (let ((env		(car  -args-)) ; see encode/pair; it puts the env as the first arg
         (parameters	(cadr -args-))
         (body		(cddr -args-)))
     (k/assert (is <env> env) "lambda subr: env is "env)
@@ -71,14 +71,14 @@
               (debug (libc/printf "let subr is initializing var ") (k/dumpln var))
               (set tmp ())
               (while (is/pair prog)
-                (set tmp (k/eval (get/head prog) -ctx-))
+                (set tmp (eval (get/head prog) -ctx-))
                 (set prog (get/tail prog)))
               (debug (libc/printf "let subr is setting var ") (k/dump var) (libc/printf " to value ") (k/dumpln tmp))
               (set (k/array-at locals (get/long (get (<variable> index) var))) tmp))))
         (set bindings (get/tail bindings)))
       (set tmp ())
       (while (is/pair body)
-        (set tmp (k/eval (get/head body) -ctx-))
+        (set tmp (eval (get/head body) -ctx-))
         (set body (get/tail body)))
       tmp)))
 
@@ -90,7 +90,7 @@
       (libc/printf "\ncannot set undefined variable: ")
       (k/dumpln var)
       (fatal "aborting"))
-    (let ((val (k/eval (get/head (get/tail -args-)) -ctx-)))
+    (let ((val (eval (get/head (get/tail -args-)) -ctx-)))
       (if (global-variable? var)
           (put (<variable> value) var val)
         (let ((delta (- (get/long (get (<env> level) (get (<context>  env) -ctx-)))
@@ -103,31 +103,31 @@
 (define-subr (while () fixed)
   (let ((tst  (car -args-))
         (prog -args-))
-    (while (k/eval tst -ctx-)
+    (while (eval tst -ctx-)
       (let ((body prog))
         (while (is/pair (set body (cdr body)))
-          (k/eval (get/head body) -ctx-))))))
+          (eval (get/head body) -ctx-))))))
 
 (define-subr (if () fixed)
-  (if (k/eval (car  -args-) -ctx-)
-      (k/eval (cadr -args-) -ctx-)
+  (if (eval (car  -args-) -ctx-)
+      (eval (cadr -args-) -ctx-)
     (let ((ans ()))
       (set -args- (cdr -args-))
       (while (is/pair (set -args- (cdr -args-)))
-        (set ans (k/eval (get/head -args-) -ctx-)))
+        (set ans (eval (get/head -args-) -ctx-)))
       ans)))
 
 (define-subr (or () fixed)
   (let ((ans ()))
     (while (is/pair -args-)
-      (and (set ans (k/eval (get/head -args-) -ctx-))
+      (and (set ans (eval (get/head -args-) -ctx-))
            (return ans))
       (set -args- (get/tail -args-)))))
 
 (define-subr (and () fixed)
   (let ((ans symbol/true))
     (while (is/pair -args-)
-      (or (set ans (k/eval (get/head -args-) -ctx-))
+      (or (set ans (eval (get/head -args-) -ctx-))
           (return ()))
       (set -args- (get/tail -args-)))
     ans))
@@ -395,29 +395,29 @@
   (libc/flush-streams))
 
 (define-subr (apply 2)
-  (k/apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
+  (apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
 ;; TODO rename to eval-sexp to differentiate from eval-encoded? find some better names...
 (define-subr eval
   (gc/let* ((env (or (cadr -args-)
                      (new-<env> (module-env *module*) 1 0))))
-    (k/expand-encode-eval (car -args-) env)))
+    (expand-encode-eval (car -args-) env)))
 
 (define-subr eval-encoded
   ;; TODO investigate: why is this needed? try to eliminate it
   (gc/let* ((env (or (cadr -args-)
                      (new-<env> (module-env *module*) 1 0))))
-    (k/eval (car -args-) env)))
+    (eval (car -args-) env)))
 
 (define-subr encode
-  (k/encode (car -args-)
-            (or (cadr -args-)
-                (get (<context> env) -ctx-))))
+  (encode (car -args-)
+          (or (cadr -args-)
+              (get (<context> env) -ctx-))))
 
 (define-subr expand
-  (k/expand (car -args-)
-            (or (cadr -args-)
-                (get (<context> env) -ctx-))))
+  (expand (car -args-)
+          (or (cadr -args-)
+              (get (<context> env) -ctx-))))
 
 (define-subr cons       (new-<pair> (car -args-) (cadr -args-)))
 (define-subr (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
@@ -607,7 +607,7 @@
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
     (gc/let* ((env (new-<env> (module-env new-module) 1 0)))
       (with-current-module new-module
-        (k/expand-encode-eval form env)))))
+        (expand-encode-eval form env)))))
 
 (when-at-expand (= target/machine "IA-32")
   (define-subr (call-IA-32-machine-code 1)
