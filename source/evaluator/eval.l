@@ -1074,10 +1074,8 @@
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-					(k/env/define env (k/intern "*command-line-arguments*")	())
-      (set tmp (new-<long> *verbosity*))(k/env/define env (k/intern "*verbosity*")		tmp)
-      (set tmp (new-<long> *optimised*))(k/env/define env (k/intern "*optimised*")		tmp)
-
+      (set tmp (new-<long> *verbosity*))	(k/env/define env (k/intern "*verbosity*")		tmp)
+      (set tmp (new-<long> *optimised*))	(k/env/define env (k/intern "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
       (set k/+end+ (or k/+end+ (set tmp (new-<symbol> "+end+"))))
       (k/env/define env (k/intern "+end+") k/+end+))
@@ -1159,7 +1157,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/lookup-variable (module-env *module*) (k/intern "*command-line-arguments*"))))
+  (let ((cla-var (k/env/define (module-env *module*) (k/intern "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
