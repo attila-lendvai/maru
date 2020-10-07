@@ -152,19 +152,16 @@ $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 eval: $(foreach backend,${BACKENDS},eval-$(backend))
 # NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
 
-eval-x86: $(BUILD_x86)/eval2
+eval-x86: $(BUILD_x86)/eval1
 	cp $< $@
 	cp $< eval
 
-eval-llvm: $(BUILD_llvm)/eval2
+eval-llvm: $(BUILD_llvm)/eval1
 	cp $< $@
 	cp $< eval
 
-# eval1 is the first version of us that gets built by the previous stage.
-# some functionality may be broken in this one. this is when we are 'evolving'.
-# stage 6 note: in this stage we skip the eval1 step and compile eval2 straight away
-# by using the eval.exe of the previous stage to execute our version of the compiler.
-$(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
+# eval1 is the first version of us that gets built by our compiler animated by the previous stage.
+$(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval -v					\
 		$(HOST_DIR)/boot.l					\
@@ -182,7 +179,7 @@ $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/evaluator/eval.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(HOST_DIR)/eval) # we need to move the dependency here, mimicing the currently commented out version of eval2.ll rule below
 	$(TIME) $(HOST_DIR)/eval -v					\
@@ -201,25 +198,15 @@ $(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 		source/evaluator/eval.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-# eval2 is the bootstrapped version of this stage, self-built by this stage (i.e. by eval1).
-# eval2 should implement the semantics encoded by the sources of this stage.
-# $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-# 	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$(BUILD_x86)/eval2.s)
-# 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
+# eval2 is the second iteration of us that gets built by our compiler animated by our eval executable.
+# eval2 is just a test: eval2.s should be the exact same file as eval1.s
+$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$@)
+	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-# $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-# 	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$(BITCODE_DIR)/eval2.ll)
-# 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
-
-# eval3 is just a test, it's the result of yet another bootstrap iteration, based off of eval2 this time.
-# eval3.s should be the exact same file as the output of the previous iteration, namely eval2.s.
-$(BUILD_x86)/eval3.s: $(BUILD_x86)/eval2 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(BUILD_x86)/eval2,source/evaluator/eval.l,$(BUILD_x86)/eval3.s)
-	@-$(DIFF) $(BUILD_x86)/eval2.s $(BUILD_x86)/eval3.s >$(BUILD_x86)/eval3.s.diff
-
-$(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval2,source/evaluator/eval.l,$(BITCODE_DIR)/eval3.ll)
-	@-$(DIFF) $(BITCODE_DIR)/eval2.ll $(BITCODE_DIR)/eval3.ll >$(BITCODE_DIR)/eval3.ll.diff
+$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$@)
+	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 $(HOST_DIR)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
@@ -336,15 +323,15 @@ test-bootstrap-recursively:
 	$(MAKE) PREVIOUS_STAGE_EXTRA_TARGETS=veryclean veryclean test-bootstrap
 
 # TODO backend duplication
-test-bootstrap-x86: $(BUILD_x86)/eval3
-	$(DIFF) $(BUILD_x86)/eval2.$(ASM_FILE_EXT_x86) $(BUILD_x86)/eval3.$(ASM_FILE_EXT_x86)
-	$(DIFF) $(BUILD_x86)/eval2.stripped $(BUILD_x86)/eval3.stripped
-	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_x86)/eval2 boot.l -
+test-bootstrap-x86: $(BUILD_x86)/eval2
+	$(DIFF) $(BUILD_x86)/eval1.$(ASM_FILE_EXT_x86) $(BUILD_x86)/eval2.$(ASM_FILE_EXT_x86)
+	$(DIFF) $(BUILD_x86)/eval1.stripped $(BUILD_x86)/eval2.stripped
+	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_x86)/eval1 boot.l -
 
-test-bootstrap-llvm: $(BUILD_llvm)/eval3
-	$(DIFF) $(BITCODE_DIR)/eval2.$(ASM_FILE_EXT_llvm) $(BITCODE_DIR)/eval3.$(ASM_FILE_EXT_llvm)
-	$(DIFF) $(BUILD_llvm)/eval2.stripped $(BUILD_llvm)/eval3.stripped
-	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_llvm)/eval2 boot.l -
+test-bootstrap-llvm: $(BUILD_llvm)/eval2
+	$(DIFF) $(BITCODE_DIR)/eval1.$(ASM_FILE_EXT_llvm) $(BITCODE_DIR)/eval2.$(ASM_FILE_EXT_llvm)
+	$(DIFF) $(BUILD_llvm)/eval1.stripped $(BUILD_llvm)/eval2.stripped
+	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_llvm)/eval1 boot.l -
 
 test-compiler: $(foreach backend,${BACKENDS},test-compiler-$(backend))
 
