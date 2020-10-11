@@ -3,25 +3,26 @@
 ;;; The Maru VM, written in a dialect of Maru.
 ;;;
 
-(define-form k/assert		prog ())
+(define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
+(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
+(define-constant feature/object-canary		(or false (<= 3 *safety*)))
+(define-constant feature/debug-output		(or false (<= 3 *safety*)))
+
 (define-form debug		prog ())
 (define-form debug/identities	prog ())
 (define-form gc/debug		prog ())
 
-;;
-;; you can enable safety and debugging features here
-;;
+(when-at-expand feature/debug-output
+  (define *debug-output-enabled?* false)
+
+  (define-form debug		prog	`(when *debug-output-enabled?* ,@prog))
+  ;;(define-form debug/identities	prog	`(when *debug-output-enabled?* ,@prog))
+  ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
+  )
+
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
+;;(define-form k/assert		prog ())
 (define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
-;(define-form debug		prog		`(let () ,@prog))
-;(define-form debug/identities	prog		`(let () ,@prog))
-;(define-form gc/debug		prog		`(let () ,@prog))
-
-(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
-(define-constant feature/object-canary		(or false (<= 3 *safety*)))
-
-;; to detect infinite recursion before a sigsegv tells us so.
-(define-constant +maximum-call-stack-depth+ 10000)
 
 ;;;
 ;;; Naming convention in this file:

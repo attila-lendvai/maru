@@ -626,3 +626,7 @@
       (data)
       (debug (libc/printf "call-x86-64-machine-code got back the control from %p\n" data))
       ())))
+
+(when-at-expand feature/debug-output
+  (define-subr (enable-debug-output 0)	(set *debug-output-enabled?* true))
+  (define-subr (disable-debug-output 0)	(set *debug-output-enabled?* false)))
