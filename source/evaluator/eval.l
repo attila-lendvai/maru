@@ -781,6 +781,13 @@
              (set tmp (new-<pair> new-bindings tmp))
              (set tmp (new-<pair> symbol/let tmp))
              tmp)))
+        ((= head symbol/lambda)
+         (let ((params	(cadr exp))
+               (body	(cddr exp)))
+           (gc/let* ((tmp (expand-all body env)))
+             (set tmp (new-<pair> params tmp))
+             (new-<pair> symbol/lambda tmp))))
+
         ((set expander (maybe-form-in-variable/function env head))
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
          (gc/let* ((args (new-<pair> env (get/tail exp)))
