@@ -5,7 +5,7 @@
 #  make -j eval
 #  make eval-llvm
 #
-#  alias beep='paplay some-file.ogg'
+#  alias beep='(paplay some-file.ogg &)'
 #  make -j test-bootstrap || beep
 #  make test-bootstrap-llvm || beep
 #  make -j test-compiler || beep
@@ -50,12 +50,12 @@ TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 
 # use this eval to execute any tests from the makefile.
 # in order of speed, as of this writing.
-#TEST_EVAL	= build/llvm/i686-pc-linux-gnu/eval2
-TEST_EVAL	= $(BUILD_llvm)/eval2
-#TEST_EVAL	= $(BUILD_x86)/eval2
+#TEST_EVAL	= build/llvm/i686-pc-linux-gnu/eval1
+#TEST_EVAL	= $(BUILD_llvm)/eval1
+TEST_EVAL	= $(BUILD_x86)/eval1
 
-#GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval2
-GEN_EVAL	= $(BUILD_llvm)/eval2
+#GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval1
+GEN_EVAL	= $(BUILD_llvm)/eval1
 
 ##
 ## internal variables
@@ -318,6 +318,9 @@ $(BUILD_llvm)/%.o: source/evaluator/%.c
 ###
 run: $(TEST_EVAL)
 	rlwrap --no-warning $(TEST_EVAL) boot.l -
+
+run-bare: $(TEST_EVAL)
+	rlwrap --no-warning $(TEST_EVAL) -
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 

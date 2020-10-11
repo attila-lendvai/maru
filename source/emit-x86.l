@@ -646,13 +646,13 @@
               (<< ,ASL) (>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (string-at		,LOAD-I8)
+              (string-at	,LOAD-I8)
               (byte-at		,LOAD-I8)
               (oop-at		,LOAD-OOP))
              ;; ternary
              ((set-string-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              (set-oop-at		,STORE-OOP)))))
+              (set-oop-at	,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)

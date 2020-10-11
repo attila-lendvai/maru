@@ -199,8 +199,9 @@
   `(if ,test (let () ,@body)))
 
 (define-form awhen (test . body)
-  `(let ((it ,test))
-     (when it
+  `(let (it)
+     ;; this allows SETting IT from inside TEST
+     (when (set it ,test)
        ,@body)))
 
 (define-form unless (test . body)
@@ -400,7 +401,7 @@
         (next ()))
     (while curr
       (set next (cdr curr))
-      (set-cdr curr prev)
+      (set (cdr curr) prev)
       (set prev curr)
       (set curr next))
     prev))

@@ -124,7 +124,7 @@
     ,@(map (lambda (name)
              (list 'define name))
            '(print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-             k/print k/read encode expand eval k/intern
+             k/print k/println k/read encode expand eval k/intern
              k/%accessor-typecheck))))
 
 ;;;
@@ -493,7 +493,7 @@
     obj))
 
 ;;;
-;;;
+;;; more utils
 ;;; ----------------------------------------------------------------
 
 (define-function k/list2 (a b)
@@ -645,7 +645,7 @@
                 (set frame.callee-designator	())
                 (set frame.callee		())
                 (set frame.arguments		())))))
-       (debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
+       ;;(debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
        __result__)))
 
 (when-at-expand feature/backtrace
@@ -850,15 +850,13 @@
 					    (while (is/pair args)
 					      (k/env/define new-env (get/head args) ())
 					      (set args (get/tail args)))
-					    (and args (k/env/define new-env args ()))
+					    (when args
+                                              (k/env/define new-env args ()))
 					    (set tail (encode-all tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
-      ;; TODO this defines the variable in the encode phase, even if the code doesn't get executed in the end.
-      ;; i doubt it's the intended behavior... investigate!
       ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (module-env *module*) (car tail))))
 					  (set tail (encode-all (cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-      ;; TODO and then this errors while expand'ing an if branch that is _not_ taken at the end at runtime
       ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
 					  (and (or (not (car tail)) (cddr tail)) (k/error "encode: malformed SET expression " exp))

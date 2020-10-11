@@ -67,7 +67,7 @@
     ((= type '%ptr)	target/word-size-in-bits)
     ((= type 'void)	())
     (else
-     (let ((entry	(assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
+     (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
        (unless entry
          (error "llvm-type-bitsize: unexpected type "type))
        (cdr entry)))))
@@ -482,9 +482,9 @@
 
 (define-function %gen (-c- factory args)
   (let ((instr (factory)))
-    (emit COMMENT (list "GEN of "instr", args: " args))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
+    (emit COMMENT (list "GEN of "instr", args: " args))
     ;; instantiate the regs
     (set (<instruction>-regs instr)
          (let ((temps ()))
@@ -630,7 +630,7 @@
                 (let ((param-type	())
                       (new-arg-regs	())
                       (arg		())
-                      (arg-lst	arg-regs)
+                      (arg-lst		arg-regs)
                       (param-lst	param-types))
                   (while (set arg (pop arg-lst))
                     (set param-type (ffi-type->llvm-type (pop param-lst)))
@@ -853,13 +853,13 @@
               (<< ,ASL) (>>  ,ASR)
               ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
               ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (string-at		,LOAD-I8)
+              (string-at	,LOAD-I8)
               (byte-at		,LOAD-I8)
               (oop-at		,LOAD-OOP))
              ;; ternary
              ((set-string-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              (set-oop-at		,STORE-OOP)))))
+              (set-oop-at	,STORE-OOP)))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)
