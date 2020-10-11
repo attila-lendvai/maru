@@ -356,7 +356,8 @@
 (define-function caar		(list)		(car (car list)))
 (define-function cadr		(list)		(car (cdr list)))
 (define-function cddr		(list)		(cdr (cdr list)))
-;;(define-function caddr		(list)		(car (cdr (cdr list))))
+(define-function caddr		(list)		(car (cdr (cdr list))))
+(define-function cdddr		(list)		(cdr (cdr (cdr list))))
 ;;(define-function cadddr	(list)		(car (cdr (cdr (cdr list)))))
 
 ;;;
@@ -782,6 +783,37 @@
              (set tmp (new-<pair> new-bindings tmp))
              (set tmp (new-<pair> symbol/let tmp))
              tmp)))
+
+        ((= head symbol/quote)
+         (new-<pair> symbol/quote (get/tail exp)))
+
+        ((= head symbol/set)
+         (k/assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
+         (debug (libc/printf "expand/set on form ") (k/dumpln exp))
+         (gc/let* ((body (expand-all (get/tail exp) env)))
+           (let (fn-name)
+             (if (and (is/pair body)
+                      (is/pair (get/head body))
+                      (set fn-name (get/head (get/head body)))
+                      (is <symbol> fn-name))
+                 ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
+                 (gc/let* ((buf (new-<buffer>)))
+                   (buffer-append-string buf "set-")
+                   (buffer-append-string buf (get/symbol fn-name))
+                   (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
+                     (new-<pair> (k/intern (buffer-contents buf))
+                                 args)))
+               (new-<pair> symbol/set body)))))
+
+        ((= head symbol/define)
+         (k/assert (not (cdddr exp)) "illegal define form: " exp)
+         (let ((name	(cadr exp))
+               (value	(caddr exp)))
+           (gc/let* ((tmp (expand value env)))
+             (set tmp (new-<pair> tmp ()))
+             (set tmp (new-<pair> name tmp))
+             (new-<pair> symbol/define tmp))))
+
         ((= head symbol/lambda)
          (let ((params	(cadr exp))
                (body	(cddr exp)))
@@ -805,19 +837,8 @@
            (expand expansion env)))
 
         (else
-         ;; head is not a <form>
-         (gc/let* ((tail (get/tail exp)))
-           (unless (= head symbol/quote)
-             (set tail (expand-all tail env)))
-           ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
-           (when (and (= symbol/set head)
-                      (is/pair (car tail))
-                      (is <symbol> (caar tail)))
-             (gc/let* ((buf (new-<buffer>)))
-               (buffer-append-string buf "set-")
-               (buffer-append-string buf (get/symbol (get/head (get/head tail))))
-               (set head (k/intern (buffer-contents buf)))
-               (set tail (concat-list (get/tail (get/head tail)) (get/tail tail)))))
+         ;; head is not a <form> nor a fixed special form
+         (gc/let* ((tail (expand-all (get/tail exp) env)))
            (new-<pair> head tail)))))))
 
 (define-function expand/symbol (exp env syntax-module)
