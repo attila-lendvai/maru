@@ -629,8 +629,8 @@
 
 (define-function %make-accessor-forms (type-name slot-names slot-index disable-typecheck)
   (when slot-names
-    (cons (let ((slot-name (car slot-names))
-                (accessor-name (concat-symbol type-name (concat-symbol '- slot-name))))
+    (cons (let* ((slot-name (car slot-names))
+                 (accessor-name (concat-symbol type-name (concat-symbol '- slot-name))))
             (if disable-typecheck
                 `(define-form ,accessor-name (obj)
                    (list 'oop-at obj ,slot-index))

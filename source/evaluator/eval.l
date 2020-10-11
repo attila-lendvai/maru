@@ -287,9 +287,9 @@
 
 ;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
 (define-form get (designator object)
-  (let ((type-name	(first designator))
-        (slot		(second designator))
-        (type		(eval type-name)))
+  (let* ((type-name	(first designator))
+         (slot		(second designator))
+         (type		(eval type-name)))
     (assert (not (cddr designator)) "malformed get designator: "designator)
     ;; we could use the accessors, too:
     ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
@@ -757,6 +757,30 @@
       (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
     (let (expander)
       (cond
+        ((= head symbol/let)
+         ;; TODO use a collecting macro to simplify this
+         (gc/let* ((new-bindings ()))
+           (let ((bindings (cadr exp))
+                 new-bindings-last)
+             (while (is/pair bindings)
+               (let* ((entry (get/head bindings))
+                      var-name)
+                 (gc/let* (var-init-prog)
+                   (if (is/pair entry)
+                       (let ()
+                         (set var-name		(get/head entry))
+                         (set var-init-prog	(expand-all (get/tail entry) env)))
+                     (set var-name	entry)
+                     (set var-init-prog	(new-<pair> () ())))
+                   (gc/let* ((new-entry (new-<pair> var-name var-init-prog)))
+                     (set new-bindings-last (if new-bindings
+                                                (put/tail new-bindings-last (new-<pair> new-entry ()))
+                                              (set new-bindings (new-<pair> new-entry ())))))))
+               (set bindings (get/tail bindings))))
+           (gc/let* ((tmp (expand-all (cddr exp) env))) ; the body
+             (set tmp (new-<pair> new-bindings tmp))
+             (set tmp (new-<pair> symbol/let tmp))
+             tmp)))
         ((set expander (maybe-form-in-variable/function env head))
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
          (gc/let* ((args (new-<pair> env (get/tail exp)))
@@ -836,15 +860,38 @@
     ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
     ;; because of that emit requires the introduction of the eval-encoded subr
     (cond
-      ((= head fixed-subr/let)		(let ((bindings (cadr exp)))
-					  (gc/let* ((new-env (new-<env> env 0 (get/long (get (<env> offset) env)))))
-					    (while (is/pair bindings)
-					      (let ((var-name (get/head bindings)))
-					        (and (is/pair var-name) (set var-name (get/head var-name)))
-					        (k/env/define new-env var-name ())
-					        (set bindings (get/tail bindings))))
-					    (set tail (encode-all tail new-env))
-					    (set tail (new-<pair> new-env tail)))))
+      ((= head fixed-subr/let)
+       (gc/let* ((vars		())
+                 (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
+         ;; phase 1: first define the let variables into new-env
+         (let ((bindings (cadr exp))
+               vars/last)
+           (while (is/pair bindings)
+             (let* ((var-name	(get/head (get/head bindings)))
+                    (var-obj	(k/env/define new-env var-name ())))
+               (set vars/last (if vars
+                                  (put/tail vars/last (new-<pair> var-obj ()))
+                                (set vars (new-<pair> var-obj ())))))
+             (set bindings (get/tail bindings))))
+         ;; update the offset of the parent env to "skip" the indices of our let variables
+         (put (<env> offset) env
+              (get (<env> offset) new-env))
+         ;; phase 2: encode-all the init-progs and build the new bindings list
+         (gc/let* (var
+                   new-bindings)
+           (let ((bindings (cadr exp))
+                 new-bindings/last)
+             (while (is/pair bindings)
+               (gc/let* ((init-prog	(encode-all (get/tail (get/head bindings)) env))
+                         (new-entry	(new-<pair> (pop vars) init-prog)))
+                 (set new-bindings/last (if new-bindings
+                                            (put/tail new-bindings/last (new-<pair> new-entry ()))
+                                          (set new-bindings (new-<pair> new-entry ())))))
+               (set bindings (get/tail bindings))))
+           (set tail (encode-all (cddr exp) new-env)) ; encode the body
+           (set tail (new-<pair> new-bindings tail))
+           (set tail (new-<pair> new-env tail)))))
+
       ((= head fixed-subr/lambda)	(let ((args (cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 1 0)))
 					    (while (is/pair args)
@@ -1170,8 +1217,8 @@
     ;; process *cla*
     (let (cla tmp)
       (while (is/pair (set cla (get (<variable> value) cla-var)))
-        (let ((arg-string	(get/head cla))
-              (arg		(get/string arg-string)))
+        (let* ((arg-string	(get/head cla))
+               (arg		(get/string arg-string)))
           (gc/protect (arg-string tmp)
             (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
             (cond

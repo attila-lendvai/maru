@@ -287,8 +287,8 @@
     ()))
 
 (define-subr (libc/fgetc 1)
-  (let ((stream	(get/head -args-))
-        (c	(libc/fgetc (get/tvmptr stream))))
+  (let* ((stream	(get/head -args-))
+         (c		(libc/fgetc (get/tvmptr stream))))
     (and (>= c 0)
          (new-<long> c))))
 
@@ -490,10 +490,10 @@
     (new-<long> (byte-at obj (get/long idx)))))
 
 (define-subr (set-byte-at 3)
-  (let ((obj		(get/head -args-))
-        (idx		(get/head (set -args- (get/tail -args-))))
-        (val		(get/head (get/tail -args-)))
-        (unboxed-val	(get/long val)))
+  (let* ((obj		(get/head -args-))
+         (idx		(get/head (set -args- (get/tail -args-))))
+         (val		(get/head (get/tail -args-)))
+         (unboxed-val	(get/long val)))
     (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (safety 1 (k/assert (and (<= unboxed-val 256) (<= 0 unboxed-val)) "set-byte-at: value is out of range: "unboxed-val))
     (set-byte-at obj (get/long idx) unboxed-val)))
