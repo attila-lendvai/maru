@@ -25,78 +25,112 @@
 ;;;
 ;;; Tests
 ;;;
-(define-test maru/arithmetic/- ()
+(define-test eval/arithmetic/- ()
   (test-assert (= -42 (- 42)))
   (test-assert (= 0   (- 2 2)))
   (test-assert (= -3  (- 2 2 3))))
 
-(define-test maru/arithmetic/+ ()
+(define-test eval/arithmetic/+ ()
   (test-assert (= 0 (+)))
   (test-assert (= 42 (+ 42)))
   (test-assert (= 42 (+ 40 2)))
   (test-assert (= 42 (+ 20 21 1))))
 
-(define-test maru/arithmetic// ()
+(define-test eval/arithmetic// ()
   (test-assert (= 1   (/ 1)))
   (test-assert (= 100 (/ 1000 10)))
   (test-assert (= 5   (/ 1000 20 10))))
 
-(define-test maru/arithmetic/* ()
+(define-test eval/arithmetic/* ()
   (test-assert (= 1   (*)))
   (test-assert (= 42  (* 42)))
   (test-assert (= 24  (* 1 2 3 4))))
 
-(define-test maru/arithmetic/shift ()
+(define-test eval/arithmetic/shift ()
   (test-assert (= 0xffffff	(bitwise-shift 0xffffff0 -4)))
   (test-assert (= 0xffffff0	(bitwise-shift 0xffffff 4)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 10000)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
   (test-assert (= -1		(bitwise-shift -1 -100))))
 
-(define-test maru/string/insert ()
+(define-test eval/string/insert ()
   (let ((x "alma"))
     (string-insert x 2 ?z)
     (test-assert (= x "alzma"))
     (string-insert x 5 ?x)
     (test-assert (= x "alzmax"))))
 
-(define-test maru/array/insert ()
+(define-test eval/array/insert ()
   (let ((x (list->array '(1 2 3 4))))
     (array-insert x 2 42)
     (test-assert (equal (array->list x) '(1 2 42 3 4)))
     (array-insert x 5 43)
     (test-assert (equal (array->list x) '(1 2 42 3 4 43)))))
 
-(define-function maru/let/1/helper (env)
+(define-function eval/let/1/helper (env)
   (let ((env env))
     (set env 42))
   env)
 
-(define-test maru/let/1 ()
-  (test-assert (= 9979 (maru/let/1/helper 9979))))
+(define-test eval/let/1 ()
+  (test-assert (= 9979 (eval/let/1/helper 9979))))
 
-(define-form maru/expand/bug/1/helper-form (val)
+(define-test eval/let/2 ()
+  ;; this is present in Piumarta's eval.l (but not in eval.c)
+  (let ((x 42))
+    (let ((x (+ x 1)))
+      (test-assert (= x 43))
+      (set x -1)
+      (test-assert (= x -1)))
+    (test-assert (= x 42))))
+
+(define-test eval/let/3 ()
+  (let ((x 42)
+        (y (let ((foo 'bar))
+             (set foo 99)
+             foo)))
+    (test-assert (= x 42))
+    (test-assert (= y 99))))
+
+;; (define-test eval/let/bug/2 ()
+;;   ;; this is a bug also present in the piumarta branch
+;;   ;; this should error...
+;;   (encode '(let ((x 42)
+;;                  (y (+ x 1))))))
+
+;; this should probably throw an error like in CL
+;; (define-test eval/let/3 ()
+;;   (let ((x 42))
+;;     (let ((x -1000)
+;;           (x (+ x 1)))
+;;       (test-assert (= x 43))
+;;       (set x -1)
+;;       (test-assert (= x -1)))
+;;     (test-assert (= x 42))))
+
+(define-form eval/expand/bug/1/helper-form (val)
   `(zork ,val))
 
-(define-test maru/expand/bug/1 ()
+(define-test eval/expand/bug/1 ()
+  ;; this bug is inherited from Piumarta's work, both eval.c and eval.l has them.
   ;; the bug is that expand mindlessly expands the bindings of a let form as if they were call forms
   ;; is this a bug to be fixed? or a semantics to live with?
   ;; maybe the fix is that expand and encode should be merged and descend recursively in one pass?
   (let ((zork 42)
-        (maru/expand/bug/1/helper-form -1))
-    (test-assert (= <long> (type-of maru/expand/bug/1/helper-form)))
+        (eval/expand/bug/1/helper-form -1))
+    (test-assert (= <long> (type-of eval/expand/bug/1/helper-form)))
     (test-assert (= 42 zork))
-    (test-assert (= -1 maru/expand/bug/1/helper-form))))
+    (test-assert (= -1 eval/expand/bug/1/helper-form))))
 
-(define-test maru/expand/bug/2 ()
-  (test-assert (= 42 ((lambda (maru/expand/bug/1/helper-form y)
-                        (+ maru/expand/bug/1/helper-form
+(define-test eval/expand/bug/2 ()
+  (test-assert (= 42 ((lambda (eval/expand/bug/1/helper-form y)
+                        (+ eval/expand/bug/1/helper-form
                            y))
                       40 2))))
 
 (define *a-global-holding-42* 42)
 
-(define-test maru/let/hiding-a-global ()
+(define-test eval/let/hiding-a-global ()
   (let ((*a-global-holding-42* 999))
     (test-assert (= 999 *a-global-holding-42*))
     (incr *a-global-holding-42*)
@@ -109,17 +143,17 @@
 
 (define *a-global-visible-at-expand-time* 1)
 
-(define-test maru/bug/eval-at-expand-time ()
+(define-test eval/bug/eval-at-expand-time ()
   (%_eval-at-expand-time
    (if *a-global-visible-at-expand-time*
-       (define-form maru/bug/at-expand-time/true ()
+       (define-form eval/bug/at-expand-time/true ()
          43)
-     (define-function maru/bug/at-expand-time/false ()
+     (define-function eval/bug/at-expand-time/false ()
        42)))
-  (test-assert (= 43 (maru/bug/at-expand-time/true)))
-  (test-assert (= () maru/bug/at-expand-time/false)))
+  (test-assert (= 43 (eval/bug/at-expand-time/true)))
+  (test-assert (= () eval/bug/at-expand-time/false)))
 
-(define-test maru/if-at-expand/1 ()
+(define-test eval/if-at-expand/1 ()
   (let ((x 999)
         (< (lambda args (error "this should not be visible inside if-at-expand at expand time"))))
     (if-at-expand (< 5 4)
@@ -127,7 +161,7 @@
       (incr x))
     (test-assert (= x 1000))))
 
-(define-test maru/modules/bug/1 ()
+(define-test eval/modules/bug/1 ()
   (let ((x 43)) (test-assert (= x 43)))
   (test-assert (= 44 (eval '(let ((x 44)) x))))
   (test-assert (= 45 (eval-in-module (current-module) 45)))
