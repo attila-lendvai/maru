@@ -1181,7 +1181,7 @@
 
 (define-method do-print <fixed>		()	(print "<fixed "self.function">"))
 (define-method do-print <selector>	()	(print "<selector "self.name">"))
-(define-method do-print <expr>		()	(print "<expr "self.parameters" "(or (when-at-expand feature/track-expr-names self.name) "?")">"))
+(define-method do-print <expr>		()	(print "<expr "(or (when-at-expand feature/track-expr-names self.name) "?")" "self.parameters">"))
 (define-method do-print <env>		()	(print "<env "self.level","(array-length self.bindings)">"))
 (define-method do-print <module>	()	(print "<module "(or (when-at-expand feature/debug-info self.name) "?") ">"))
 (define-method do-print <type>		()	(print "<"(<type>-name self)" "(<type>-id self)">"))

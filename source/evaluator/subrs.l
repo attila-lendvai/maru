@@ -33,10 +33,10 @@
       (put (<variable> value) var val)
       ;; maybe set the <expr>'s name slot
       (when-at-expand feature/track-expr-names
-        (let (tmp)
-          (when (and (is <form> val)
-                     (set tmp (get (<form> function) val))
-                     (is <expr> tmp)
+        (let ((tmp val))
+          (when (is <form> tmp)
+            (set tmp (get (<form> function) tmp)))
+          (when (and (is <expr> tmp)
                      (not (get (<expr> name) tmp)))
             (put (<expr> name) tmp (get (<variable> name) var)))))
       val)))
