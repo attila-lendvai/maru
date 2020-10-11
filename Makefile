@@ -359,6 +359,9 @@ $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
+test-modules: $(TEST_EVAL) boot.l tests/module-tests.l
+	$(TEST_EVAL) boot.l tests/module-tests.l
+
 test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
 	./eval-x86 boot.l tests/test-elf.l
 	@chmod +x build/test-elf
