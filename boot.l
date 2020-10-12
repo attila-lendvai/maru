@@ -168,20 +168,15 @@
       (lambda (env expr)
         (qq-object expr)))))
 
-(define for-syntax
-    (form (lambda (env . prog)
-            `(eval-in-module *syntax-module* '(let () ,@prog)))))
-
-
 (define define-form (form (lambda (env name args . body)
-                            `(for-syntax (define ,name (form (lambda (*env* ,@args) ,@body)))))))
+                            `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
 (define-form eval-at-expand (form)
-  (eval-in-module *syntax-module* form))
+  (eval form))
 
 (define-form if-at-expand (cond true-form . false-forms)
-  (if (eval-in-module *syntax-module* cond)
+  (if (eval cond)
       true-form
     (if (and false-forms
              (cdr false-forms))
@@ -189,7 +184,7 @@
       (car false-forms))))
 
 (define-form when-at-expand (cond . true-forms)
-  (if (eval-in-module *syntax-module* cond)
+  (if (eval cond)
       (if (and true-forms
                (cdr true-forms))
           `(let ()
@@ -220,7 +215,7 @@
   `(or ,test (error ,@args)))
 
 (define-form define-constant (name value-form)
-  `(for-syntax (define ,name (form () (lambda _ ',(eval value-form))))))
+  `(define ,name (form () (lambda _ ',(eval value-form)))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -987,6 +982,25 @@
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
+
+;; TODO these are duplicates from eval.l
+(define-function module-env (module)
+  (<variable>-value (<module>-globals module)))
+
+(define-function copy-module-bindings (from to filter)
+  (let* ((from-env	(module-env from))
+         (to-env	(module-env to))
+         (from-bindings	(<env>-bindings from-env))
+         (count		(array-length from-bindings)))
+    (for (i 0 count)
+      (let* ((var	(array-at from-bindings i))
+             (name	(<variable>-name var))
+             (value	(<variable>-value var)))
+        ;; *globals* is special in that it should point to the module's env, therefore we skip that
+        (when (or (not filter)
+                  (filter name value))
+          (environment-define to-env name value))))
+    ()))
 
 ;; (define-function environment-find (env name)
 ;;   (let* ((bindings (<env>-bindings env))

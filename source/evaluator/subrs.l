@@ -1,7 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(for-syntax
- (define *subr-registry* ()))
+(eval-in-module *slave-module*
+  '(define *subr-registry* ()))
 
 (define-form define-subr (name-and-props . body)
   (unless (pair? name-and-props)
@@ -619,7 +619,7 @@
       (with-current-module new-module
         (expand-encode-eval form env)))))
 
-(when-at-expand (= target/machine "IA-32")
+(when-at-expand (= +architecture+ 'IA-32)
   (define-subr (call-IA-32-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-IA-32-machine-code will call %p\n" data))
@@ -628,7 +628,7 @@
       (debug (libc/printf "call-IA-32-machine-code got back the control from %p\n" data))
       ())))
 
-(when-at-expand (= target/machine "x86-64")
+(when-at-expand (= +architecture+ 'x86-64)
   (define-subr (call-x86-64-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-x86-64-machine-code will call %p\n" data))

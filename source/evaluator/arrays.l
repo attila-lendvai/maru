@@ -62,7 +62,7 @@
            (put (,type-name size) obj (new-<long> size)))
          obj))))
 
-(define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	target/word-size-in-bytes)
+(define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	k/string	t	byte-at		copy-bytes	move-bytes	1)
 
 (define-function array-binary-search (array item comparator inserter)

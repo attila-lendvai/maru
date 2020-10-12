@@ -3,84 +3,8 @@
 ;; NOTE for debugging only, because this breaks the output due to multiline string literals escaping the line-comment syntax
 (define *compiler-verbose* '())
 
-;; NOTE using symbols here is not a good idea because of the host/slave isolation
-(define-constant target/machine (cond
-                                  ((or (= target/cpu "x86_64"))		"x86-64")
-                                  ((or (= target/cpu "i686")
-                                       (= target/cpu "i386"))		"IA-32")
-                                  (else (error "Couldn't identify target/machine from target/cpu: "target/cpu))))
-
-(define-constant target/word-size-in-bits (cond
-                                            ((= target/machine "x86-64")	64)
-                                            ((= target/machine "IA-32")		32)
-                                            (else (error "Couldn't identify word size from target/machine: "target/machine))))
-
-(define *target-module* (create-module "target"))
-
-(eval-in-module *target-module*
-  `(let ()
-     (define *host-module*	,(current-module))
-     (define *slave-module*	,*slave-module*)
-     ;;(define slave-value	,slave-value)
-     ;;(define eval-in-slave	,eval-in-slave)
-     (set *syntax-module*	,*slave-module*)))
-
-;; stubs for the +special-forms+
-(list-do name '(return address-of << >>)
-  (eval-in-module *target-module* `(define ,name (fixed (lambda _ (print ,(symbol->string name) " encountered in interpreted code") (abort))))))
-
-;; stubs for the +special-operators+
-;; (list-do name '()
-;;   ;; they need to be subr's, so that encode doesn't insert them
-;;   (eval-in-module *target-module* `(define ,name error)))
-
-(switch-to-slave-module)
-
-(define-constant target-boolean/true  1)
-(define-constant target-boolean/false 0)
-
-(define-function target-boolean (value)
-  (if value target-boolean/true target-boolean/false))
-
-;;;
-;;; the target's configuration
-;;;
-(define-constant target/cpu			(host-value target/cpu))
-(define-constant target/machine			(host-value target/machine))
-(define-constant target/vendor			(host-value target/vendor))
-(define-constant target/os			(host-value target/os))
-(define-constant target/word-size-in-bits	(host-value target/word-size-in-bits))
-(define-constant target/little-endian?		true)
-;;(define-constant target-triplet			(concat-strings target/cpu "-" target/vendor "-" target/os))
-
-;;;
-;;; useful utils and constants
-;;;
-(define-constant target/word-size-in-bytes	(/ target/word-size-in-bits 8))
-
-(define-form bytes-to-words (value)
-  (if (long? value)
-      (/  value  target/word-size-in-bytes)
-     `(/ ,value ,target/word-size-in-bytes)))
-
-(define-form words-to-bytes (value)
-  (if (long? value)
-      (* value   target/word-size-in-bytes)
-     `(* ,value ,target/word-size-in-bytes)))
-
-;;;
-;;; host code follows from here
-;;;
-(switch-to-host-module)
-
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
-
-(define-function eval-in-target (form)
-  (eval-in-module *target-module* form))
-
-(define-form target-value (form)
-  `(eval-in-target ',form))
 
 ;;;
 ;;; FFI
@@ -135,3 +59,114 @@
       (else
        (error "<expr>-n-required-parameters: error parsing <expr> " op ", parameters " params)))
     n-params))
+
+;;;
+;;; target module setup
+;;;
+
+;; TODO isn't this kinda messy? all these switch-to-foo-module &co...
+
+(eval-in-slave
+ (let (arch word-size)
+   (cond
+     ((or (= target/cpu "x86_64"))
+
+      (set arch		'x86-64)
+      (set word-size	64))
+
+     ((or (= target/cpu "i686")
+          (= target/cpu "i386"))
+
+      (set arch		'IA-32)
+      (set word-size	32))
+
+     (else
+      (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
+
+   ;; we want these constants (i.e. <form>s) to be present both in the slave and in the target module,
+   ;; so that later forms can access them in both modules (forms will be run in the slave module
+   ;; while constants will be referenced both directly from the target and in the form bodies).
+   `(let ()
+      (define-constant +architecture+		'',arch)
+      (define-constant +operating-system+	'',(string->symbol target/os))
+      ;;(define-constant +cpu+			,target/cpu)
+      ;;(define-constant +vendor+		,target/vendor)
+      ;;(define-constant +little-endian?+	true)
+      ;;(define-constant +target-triplet+	,(concat-strings target/cpu "-" target/vendor "-" target/os))
+      (define-constant +word-size-in-bits+	,word-size)
+      (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
+
+(switch-to-slave-module)
+
+;; FIXME these would be too much trouble to define above because nested quasiquote doesn't work
+(define-form bytes-to-words (value)
+  (if (long? value)
+      (/  value +word-size-in-bytes+)
+    `(/ ,value ,+word-size-in-bytes+)))
+
+(define-form words-to-bytes (value)
+  (if (long? value)
+      (* value  +word-size-in-bytes+)
+    `(* ,value ,+word-size-in-bytes+)))
+
+(switch-to-host-module)
+
+(define *target-module* (create-module "target"))
+
+;; let's make all the slave's <form>s available in the *target-module*
+(copy-module-bindings *slave-module* *target-module*
+                      (lambda (name value)
+                        (= (type-of value) <form>)))
+
+(define-function eval-in-target (form)
+  (eval-in-module *target-module* form))
+
+(define-form target-value (form)
+  `(eval-in-module *target-module* ',form))
+
+(define-function switch-to-target-module ()
+  (set (current-module) *target-module*))
+
+(when evolving?
+  ;; there's a nasty bug in the host with expand that prevents us from redefining false using define-constant...
+  (eval-in-target '(eval-encoded (encode '(set false -42)))))
+
+(eval-in-target
+ `(let ()
+    (define *host-module*	,(current-module))
+    (define *slave-module*	,*slave-module*)
+    (define slave-value		,slave-value)
+    ;;(define eval-in-slave	,eval-in-slave)
+    ;;(define eval-in-host	,(slave-value eval-in-host))
+    ;; this cannot be a function because functions are supposed to be lowered to the target VM
+    ;; (define-form switch-to-host-module ()
+    ;;   `(set (current-module) *host-module*))
+
+    (define-constant false 0)
+    (define-constant true  1)))
+
+(assert (= 1 (target-value true)))
+(assert (= 0 (target-value false)))
+
+(define-function target-boolean (value)
+  (eval-in-target (if value 'true 'false)))
+
+(assert (= 1 (target-boolean "foo")))
+(assert (= 0 (target-boolean ())))
+
+(eval-in-slave
+ `(let ()
+    (define *target-module*	,*target-module*)
+    ;;(define eval-in-target	,(host-value eval-in-target))
+    ;;(define target-value	,target-value)
+    (define target-boolean	,target-boolean)))
+
+;;;
+;;; install stubs for the +special-forms+ and +special-operators+
+;;;
+(list-do name '(return address-of << >>)
+  (eval-in-target `(define ,name (fixed (lambda _ (print ,(symbol->string name) " encountered in interpreted code") (abort))))))
+
+;; (list-do name '()
+;;   ;; they need to be subr's, so that encode doesn't insert them
+;;   (eval-in-module *target-module* `(define ,name error)))

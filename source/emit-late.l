@@ -17,9 +17,45 @@
   (emit-gen-buffer -c-))
 
 ;;;
-;;; API visible in the slave
+;;; API visible in the target
 ;;;
-(switch-to-slave-module)
+(set (current-module) *target-module*)
+
+;; redefine DEFINE-FORM with one that evaluates the body in *slave-module*.
+;; this way the body code can use everything that's available in the slave module
+;; even when used in the target, i.e. in eval.l.
+(define-form define-form (name args . body)
+  `(define ,name ,(eval-in-module *slave-module*
+                    (cons 'form (cons (cons 'lambda (cons (cons '*env* args) body)) ())))))
+
+;; redefine DEFINE-CONSTANT so that it defines it both into the slave and into the target.
+(define-form define-constant (name value-form)
+  ;; NOTE as per the custom DEFINE-FORM above, we are expanded/encoded in the slave module,
+  ;; but at apply time the (current-module) will be the target module.
+  ;; TODO the wizardry here smells like accidental complexity, or at least it's semantics with a high congnitive load.
+  (let* ((value		(eval `(eval-in-module *slave-module* ',value-form)))
+         (form-obj	(eval `(form () (lambda _ ',value))))
+         (definer-form	`(define ,name ',form-obj)))
+    (eval `(eval-in-module *slave-module* ',definer-form))
+    definer-form))
+
+;; (define-constant +test+ 42)
+;; (eval-in-module *slave-module* `(assert (= +test+ 42)))
+;; (eval-in-module *slave-module* `(println "+test+ in target is " ,+test+))
+
+;; redefine DEFINE-RECORD so that it defines both into the slave and the target.
+(define-form define-record (name super slots)
+  (let* ((definer-form	`(define-record ,name ,super ,slots))
+         (type		(eval `(eval-in-module *slave-module* ',definer-form)))
+         (accessors	(eval `(eval-in-module *slave-module* '(%make-record-accessors ,type)))))
+    `(let ()
+       (define ,name ,type)
+       ,@accessors
+       ())))
+
+;; an alternative that almost works
+;; (define-form define-record (name super slots)
+;;   (eval `(eval-in-module *slave-module* '(encode (expand '(define-record ,name ,super ,slots))))))
 
 (define-form define-foreign-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(foreign-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
@@ -44,5 +80,3 @@
      (size_t strlen (*)) (* strcpy (* *)) (* strncpy (* * size_t)) (int strcmp (* *)) (int strncmp (* * size_t)) (* strdup (*)) (unsigned-long strtoul (* * int)) (long strtol (* * int))
      )
     (define-constant libc/EOF -1)))
-
-(set (current-module) (host-value *target-module*))

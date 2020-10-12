@@ -36,4 +36,5 @@
   (eval-in-module *slave-module* form))
 
 (define-form slave-value (form)
-  `(eval-in-slave ',form))
+  ;; we don't use eval-in-slave in our expansion so that the expansion only uses primitives and *slave-module*. this way it can be used in the target module as is.
+  `(eval-in-module *slave-module* ',form))

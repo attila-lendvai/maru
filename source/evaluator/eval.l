@@ -3,27 +3,6 @@
 ;;; The Maru VM, written in a dialect of Maru.
 ;;;
 
-(define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
-(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
-(define-constant feature/object-canary		(or false (<= 3 *safety*)))
-(define-constant feature/debug-output		(or false (<= 3 *safety*)))
-
-(define-form debug		prog ())
-(define-form debug/identities	prog ())
-(define-form gc/debug		prog ())
-
-(when-at-expand feature/debug-output
-  (define *debug-output-enabled?* false)
-
-  (define-form debug		prog	`(when *debug-output-enabled?* ,@prog))
-  ;;(define-form debug/identities	prog	`(when *debug-output-enabled?* ,@prog))
-  ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
-  )
-
-;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
-;;(define-form k/assert		prog ())
-(define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
-
 ;;;
 ;;; Naming convention in this file:
 ;;;
@@ -75,7 +54,32 @@
 ;;;    which is denoted in the target by some integer assigned as per the type definition order.
 ;;;
 
-(define-constant oop/alignment-in-bytes		target/word-size-in-bytes)
+(define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
+(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
+(define-constant feature/object-canary		(or () (<= 3 *safety*)))
+(define-constant feature/debug-output		(or () (<= 3 *safety*)))
+
+(define-form debug		prog ())
+(define-form debug/identities	prog ())
+(define-form gc/debug		prog ())
+
+(when-at-expand feature/debug-output
+  (define *debug-output-enabled?* false)
+
+  (define-form debug		prog	`(when *debug-output-enabled?* ,@prog))
+  ;;(define-form debug/identities	prog	`(when *debug-output-enabled?* ,@prog))
+  ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
+  )
+
+;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
+;;(define-form k/assert		prog ())
+(define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
+
+;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
+(define *verbosity*		0)
+(define *optimised*		0)
+
+(define-constant oop/alignment-in-bytes		+word-size-in-bytes+)
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
 (define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
@@ -117,15 +121,16 @@
             object)))
 
 ;;;
-;;; some forward definitions, so that the variables get created in time
+;;; forward definitions, so that the variables get created early enough for building the graph
 ;;; ----------------------------------------------------------------
-(eval-at-expand
- `(let ()
-    ,@(map (lambda (name)
-             (list 'define name))
-           '(print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-             k/print k/println k/read encode expand eval k/intern
-             k/%accessor-typecheck))))
+(define-form define-forwards names
+  `(let ()
+     ,@(map (lambda (name) (list 'define name))
+            names)))
+
+(define-forwards
+    print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
+    k/print k/println k/read encode expand eval k/intern k/%accessor-typecheck)
 
 ;;;
 ;;; libc
@@ -158,10 +163,6 @@
 (when-at-expand feature/backtrace
   (define *call-stack*		0))
 
-;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
-(define *verbosity*		(or (debug 1) 0))
-(define *optimised*		0)
-
 ;; Some of the state of the Maru VM being implemented needs to be
 ;; captured/known by the code implementing it in the target VM.
 ;; Only the first one of these is essential: *module*, the rest could
@@ -178,18 +179,20 @@
 (define var/*applicators*)
 
 ;; cache some symbols into the symbol/foo global variables
-(eval-at-expand
- (let ((symbols `(true define set quote quasiquote unquote unquote-splicing expand encode apply
-                  ,(string->symbol ".") lambda let *globals* *syntax-module*)))
-   `(let ()
-      ,@(map (lambda (name)
-               `(define ,(concat-symbol 'symbol/ name)))
-             symbols)
-      (define-function initialize-symbol-cache ()
-        ,@(map (lambda (name)
-                 `(set ,(concat-symbol 'symbol/ name)
-                       (k/intern ,(symbol->string name))))
-               symbols)))))
+(define-form define-symbol-cache symbols
+  `(let ()
+     ,@(map (lambda (name)
+              `(define ,(concat-symbol 'symbol/ name)))
+            symbols)
+     (define-function initialize-symbol-cache ()
+       ,@(map (lambda (name)
+                `(set ,(concat-symbol 'symbol/ name)
+                      (k/intern ,(symbol->string name))))
+              symbols))))
+
+(define-symbol-cache
+    true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
+    lambda let *globals*)
 
 (define fixed-subr/quote)
 (define fixed-subr/lambda)
@@ -234,12 +237,15 @@
 ;;; copy the types here that should be visible to the target code
 ;;; ----------------------------------------------------------------
 
-(eval-at-expand
- `(let ()
-    ,@(map (lambda (name)
-             `(define ,name (eval-in-module *slave-module* ',name)))
-           '(<data> <undefined> <long> <array> <string> <expr> <form> <fixed> <subr>
-             <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>))))
+(define-form define-target-types names
+  `(let ()
+     ,@(map (lambda (name)
+              `(define ,name (eval-in-module *slave-module* ',name)))
+            names)))
+
+(define-target-types
+    <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <subr>
+    <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>)
 
 ;;;
 ;;; garbage collector
@@ -255,26 +261,28 @@
 ;;; the subr's encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
 
-(eval-at-expand
- (let ((conds-early	())
-       (conds-late	()))
-   (types-do type
-     (when (immediate-type? type)
-       (let* ((tag-value	(<immediate-type>-tag-value type))
-              (tag-width	(<immediate-type>-tag-width type)))
-         (if tag-width
-             (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
-               (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
-           (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
-   `(define-function type-of (ptr)
-      (cond
-        ,@conds-early
-        ((oop? ptr)	(let ((header (gc/header-of ptr)))
+(define-form define-type-of ()
+  (let ((conds-early	())
+        (conds-late	()))
+    (types-do type
+      (when (immediate-type? type)
+        (let* ((tag-value	(<immediate-type>-tag-value type))
+               (tag-width	(<immediate-type>-tag-width type)))
+          (if tag-width
+              (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
+            (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
+    `(define-function type-of (ptr)
+       (cond
+         ,@conds-early
+         ((oop? ptr)	(let ((header (gc/header-of ptr)))
                           (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
                           (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
-        ,@conds-late
-        (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
+         ,@conds-late
+         (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
+
+(define-type-of)
 
 (define-form is (type ptr)
   `(= ,type (type-of ,ptr)))
@@ -314,13 +322,13 @@
 ;; shorthands (and optimizations)
 (define-form is/long		(obj)		`(is <long> ,obj))
 (define-form is/pair		(obj)		`(is <pair> ,obj))
-(if-at-expand (immediate-type? <long>)
-    (define-form get/long	(obj)		(if (< *safety* 2)
-                                                    `(>> ,obj ,(<immediate-type>-tag-width <long>))
-                                                  `(let ((__obj__ ,obj))
-                                                     (k/assert (is/long __obj__))
-                                                     (>> __obj__ ,(<immediate-type>-tag-width <long>)))))
-  (define-form get/long	(obj)			(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
+(define-form get/long		(obj)		(if (immediate-type? <long>)
+                                                    (if (< *safety* 2)
+                                                        `(>> ,obj ,(<immediate-type>-tag-width <long>))
+                                                      `(let ((__obj__ ,obj))
+                                                         (k/assert (is/long __obj__))
+                                                         (>> __obj__ ,(<immediate-type>-tag-width <long>))))
+                                                  (if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
@@ -602,7 +610,7 @@
          (= type (type-of tmp))
          tmp)))
 
-(define-function copy-module-bindings (from to)
+(define-function copy-module-bindings (from to filter)
   (debug (libc/printf "copy-module-bindings from %p to %p\n" from to))
   (let* ((from-env	(module-env from))
          (to-env	(module-env to))
@@ -613,7 +621,8 @@
              (name	(get (<variable> name) var))
              (value	(get (<variable> value) var)))
         ;; *globals* is special in that it should point to the module's env, therefore we skip that
-        (unless (= name symbol/*globals*)
+        (when (or (not filter)
+                  (filter name value))
           (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (type-of value)))
           (k/env/define to-env name value))))
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
@@ -751,7 +760,7 @@
         (new-<pair> head tail))
     (expand list env)))
 
-(define-function expand/pair (exp env syntax-module -call-frame-)
+(define-function expand/pair (exp env -call-frame-)
   (gc/let* ((head (expand (get/head exp) env)))
     (debug (libc/printf "expand/pair on head ") (k/dumpln head))
     (when-at-expand feature/backtrace
@@ -829,20 +838,12 @@
            (debug (libc/printf "expand/pair, found in local env, expanded to ") (k/dumpln expansion))
            (expand expansion env)))
 
-        ((set expander (maybe-form-in-variable/function (module-env syntax-module) head))
-         ;; head is a <form> found in the *syntax-module*'s env
-         (gc/let* ((args (new-<pair> env (get/tail exp)))
-                   (expansion (with-current-module syntax-module
-                                (apply expander args ()))))
-           (debug (libc/printf "expand/pair, found in the *syntax-module*'s env, expanded to ") (k/dumpln expansion))
-           (expand expansion env)))
-
         (else
          ;; head is not a <form> nor a fixed special form
          (gc/let* ((tail (expand-all (get/tail exp) env)))
            (new-<pair> head tail)))))))
 
-(define-function expand/symbol (exp env syntax-module)
+(define-function expand/symbol (exp env)
   (debug (libc/printf "expand/symbol, exp ") (k/dump exp) (libc/printf ", env ") (k/dumpln env))
   (let (expander)
     (cond
@@ -852,13 +853,7 @@
                  (expansion (apply expander args ())))
          (debug (libc/printf "expand/symbol, found in local env, expanded to ") (k/dumpln expansion))
          (expand expansion env)))
-      ((set expander (maybe-form-in-variable/symbol (module-env syntax-module) exp))
-       ;; head is a <form> found in the *syntax-module*'s env
-       (gc/let* ((args (k/list2 env exp))
-                 (expansion (with-current-module syntax-module
-                              (apply expander args ()))))
-         (debug (libc/printf "expand/symbol, found in the *syntax-module*'s env, expanded to ") (k/dumpln expansion))
-         (expand expansion env)))
+
       (else
        exp))))
 
@@ -866,8 +861,8 @@
   (debug (libc/printf "expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dumpln env))
   (with-new-call-frame (symbol/expand () exp)
     (cond
-      ((is/pair exp)		(expand/pair	exp env (k/env/variable-value env symbol/*syntax-module*) -call-frame-))
-      ((is <symbol> exp)	(expand/symbol	exp env (k/env/variable-value env symbol/*syntax-module*)))
+      ((is/pair exp)		(expand/pair	exp env -call-frame-))
+      ((is <symbol> exp)	(expand/symbol	exp env))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
        (aif (k/array-at (get/variable-value var/*expanders*) (type-of exp))
@@ -1084,9 +1079,7 @@
       (set (<module>-name module)	(new-<string>-from-cstring (or name ""))))
 
     (when *maru-module*
-      (copy-module-bindings *maru-module* module))
-
-    (k/env/define env symbol/*syntax-module* module)
+      (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
 
     ;; we always overwrite these with empty arrays in the new module
     (set tmp (new-<array> 0))		(k/env/define env (k/intern "*expanders*")		tmp)
@@ -1166,8 +1159,6 @@
     (set fixed-subr/let		(k/env/variable-value env symbol/let))
     (set fixed-subr/define	(k/env/variable-value env symbol/define))
     (set fixed-subr/set		(k/env/variable-value env symbol/set))
-
-    (k/env/define env symbol/*syntax-module* *maru-module*) ; the syntax module of the *maru-module* is itself
 
     (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
 

@@ -31,29 +31,28 @@
 ;; NOTE: They are read-only in LLVM IR, and as of now eval.l violates this assumption.
 (define-constant +function-parameters-are-read-only+ ())
 
-(switch-to-slave-module)
-
 ;; we can't say anything smarter than this, because the LLVM IR doesn't have a NOT primitive.
 ;; so, let's just define a macro instead of a full compiler primitive.
-(define-form bitwise-not (value) `(bitwise-xor ,value -1))
-
-(switch-to-host-module)
+(eval-in-target
+ '(define-form bitwise-not (value)
+   `(bitwise-xor ,value -1)))
 
 (define *ffi-type->llvm-type*
+    ;; TODO use case
     (cond
-      ((= 32 target/word-size-in-bits)
+      ((= 32 (target-value +word-size-in-bits+))
        '((*		%ptr)
          (int		i32)
          (long		i32)
          (unsigned-long	i32)
          (size_t	i32)))
-      ((= 64 target/word-size-in-bits)
+      ((= 64 (target-value +word-size-in-bits+))
        '((*		%ptr)
          (int		i32)
          (long		i64)
          (unsigned-long	i64)
          (size_t	i32)))
-      (else (error "unexpected word size in target/word-size-in-bits: "target/word-size-in-bits))))
+      (else (error "unexpected word size in +word-size-in-bits+: "(target-value +word-size-in-bits+)))))
 
 (define-function ffi-type->llvm-type (type)
   (let ((entry (assq type *ffi-type->llvm-type*)))
@@ -64,7 +63,7 @@
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
   (cond
-    ((= type '%ptr)	target/word-size-in-bits)
+    ((= type '%ptr)	(target-value +word-size-in-bits+))
     ((= type 'void)	())
     (else
      (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
@@ -651,10 +650,14 @@
                      (gen COMMENT (list "	void FFI call return value"))
                      (gen LOAD (LITERAL 0) 0))
                     (else
-                     (let ((bitsize (llvm-type-bitsize return-type)))
+                     (let ((bitsize	(llvm-type-bitsize return-type))
+                           (word-size	(target-value +word-size-in-bits+)))
                        (cond
-                         ((< bitsize target/word-size-in-bits)	(gen SEXT return-type '%word))
-                         ((> bitsize target/word-size-in-bits)	(error "This shouldn't happen: (> bitsize target/word-size-in-bits) for FFI type " return-type))))
+                         ((< bitsize word-size)
+	                  (gen SEXT return-type '%word))
+
+                         ((> bitsize word-size)
+	                  (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " return-type))))
                      (gen INTTOPTR '%word))))
                 (unless (<foreign-function>-vararg? op-value)
                   (set n-params (list-length param-types)))))
@@ -696,8 +699,8 @@
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
     (gen LOAD (LITERAL (cond
-                         ((= op 'and) (target-value target-boolean/true))
-                         ((= op 'or)  (target-value target-boolean/false))))
+                         ((= op 'and) (target-value true))
+                         ((= op 'or)  (target-value false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
@@ -877,7 +880,7 @@
             table))))
 
 (define-method compile <undefined> (-c-)
-  (let ((false-value (target-value target-boolean/false)))
+  (let ((false-value (target-value false)))
     (gen LOAD (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
@@ -890,7 +893,7 @@
       ((temp? value)		(gen LOAD value ()))
       ((global-variable? self)	(cond
                                   ((= 'true self.name)
-                                   (let ((true-value (target-value target-boolean/true)))
+                                   (let ((true-value (target-value true)))
                                      (gen LOAD (LITERAL true-value) true-value)))
                                   ((subtype? (type-of value) <type>)
                                    ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
@@ -932,7 +935,7 @@
 
 (define-method emit-prelude <compiler> ()
   (let (;;(target-triplet	(slave-value target-triplet))
-        (word-size		target/word-size-in-bits)
+        (word-size		(target-value +word-size-in-bits+))
         (-c- self))
     (verbosity 1 (warn "\nCompiling for word size: " word-size " bits\n\n"))
     ;;(assert (string?	target-triplet))

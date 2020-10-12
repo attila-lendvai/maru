@@ -30,23 +30,26 @@
 ;; TODO decide: left in for now, but maybe this should be the only option? a little extra complexity, but nice speed gain, and simpler compiler output
 (define-constant +direct-calls+	true)
 
-(define-constant +label-prefix+ (cond
-                                  ((= target/os "darwin") "_")
-                                  (else "")))
+(define-constant +label-prefix+
+    ;; TODO use case
+    (cond
+      ((= (target-value +operating-system+) 'darwin)	"_")
+      (else						"")))
 
-(define-constant +call-frame-alignmet+ (cond
-                                         ((= target/os "darwin") 16)
-                                         (else (/ target/word-size-in-bits 8))))
+(define-constant +call-frame-alignmet+
+    (cond
+      ((= (target-value +operating-system+) 'darwin)	16)
+      (else						(/ (target-value +word-size-in-bits+)
+                                                           8))))
 
-(let ((word-size target/word-size-in-bits))
-  (unless (= 32 word-size)
-    (error "The x86 compiler backend doesn't support target word size " word-size)))
+(unless (= 32 (target-value +word-size-in-bits+))
+  (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))
 
 ;;; DEFINE-OPERAND
 
 (define-function define-operand/make-setters (type-name fields)
   (if (pair? fields)
-      (cons `(set (,(concat-symbol (concat-symbol type-name '-) (car fields)) self) ,(car fields))
+      (cons `(set (,(concat-symbols type-name '- (car fields)) self) ,(car fields))
             (define-operand/make-setters type-name (cdr fields)))))
 
 (define-form define-operand (name fields . printing)
@@ -669,7 +672,7 @@
                    arity-line))
             table))))
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (target-value target-boolean/false))))
+(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (target-value false))))
 (define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
 (define-method compile <variable> (-c-)
@@ -681,7 +684,7 @@
       ((global-variable? self)
        (cond
          ((= 'true self.name)
-          (gen LOAD (LI32 (target-value target-boolean/true))))
+          (gen LOAD (LI32 (target-value true))))
          ((subtype? (type-of value) <type>)
           (gen LOAD (LI32 (eval-in-slave `(<type>-slave-id ,value)))))
          ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
