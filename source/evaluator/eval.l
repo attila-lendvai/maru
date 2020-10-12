@@ -73,7 +73,7 @@
 
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
 ;;(define-form assert		prog ())
-(define-form assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
+(define-form assert		(test . args)	`(or ,test (error ,@(or args (list "kernel assertion failed")))))
 
 ;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
 (define *verbosity*		0)
@@ -203,14 +203,14 @@
   (libc/abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
-;; K/ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
+;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
 (define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (die))
 (define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (die))
 (define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (die))
 
-;; FIXME it would be nice for K/ERROR to be a function (or at least expand to a breakpoint'able function call),
+;; FIXME it would be nice for ERROR to be a function (or at least expand to a breakpoint'able function call),
 ;; but that would need the compiler to support variable nr of args, or literal lists
-(define-form k/error args
+(define-form error args
   `(let ()
      (libc/printf "\nerror: ")
      ,@(map (lambda (arg)
@@ -555,7 +555,7 @@
 (define-function lookup-variable-or-die (env name)
   (let ((var (lookup-variable env name)))
     (unless (is <variable> var)
-      (k/error "lookup-variable-or-die failed for "name", current module: "*module*))
+      (error "lookup-variable-or-die failed for "name", current module: "*module*))
     var))
 
 (define-function variable-value (env name)
@@ -698,7 +698,7 @@
       (let ((locals (get (<context> bindings) new-ctx))
             (args   arguments))
         (while (is/pair params)
-          (or (is/pair args) (k/error "too few arguments for "fun": "arguments))
+          (or (is/pair args) (error "too few arguments for "fun": "arguments))
           (set (k/array-at locals (get/long (get (<variable> index) (get/head params)))) (get/head args))
           (set params (get/tail params))
           (set args    (get/tail args)))
@@ -706,7 +706,7 @@
           (set (k/array-at locals (get/long (get (<variable> index) params))) args)
           (set args ()))
         (when args
-          (k/error "too many arguments for "fun": "arguments)))
+          (error "too many arguments for "fun": "arguments)))
       (let ((prg (get (<expr> body) fun))
             (result ()))
         (while (is/pair prg)
@@ -730,7 +730,7 @@
              (gc/let* ((args arguments))
                (set args (new-<pair> fun args))
                (apply it args ctx))
-           (k/error "cannot apply: " fun)))))))
+           (error "cannot apply: " fun)))))))
 
 ;;;
 ;;; expand
@@ -926,7 +926,7 @@
 					  (set tail (new-<pair> var tail))))
       ((= head fixed-subr/set)		(let ((var (lookup-variable env (car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
-					  (and (or (not (car tail)) (cddr tail)) (k/error "encode: malformed SET expression " exp))
+					  (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
 					  (set tail (encode-all (cdr tail) env))
 					  (set tail (new-<pair> var tail))))
       ((!= head fixed-subr/quote)	(set tail (encode-all tail env))))
@@ -1022,7 +1022,7 @@
                                            (value (k/array-at (get (<context> bindings) ctx) index)))
                                       (debug (libc/printf "eval is reading local var from context ") (k/dump ctx) (libc/printf " at index %ld, holding value " index) (k/dumpln value))
 				      value))))
-      ((= type <symbol>)	(k/error "encountered a <symbol> in eval. this shouldn't happen!"))
+      ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(eval/with-backtrace type exp ctx)))))
 
 

@@ -24,7 +24,7 @@
       (set lst (get/tail lst))
       (set count (- count 1)))
     (or (and (= 0 count) (not lst))
-        (k/error "Operator '" op "' called with the wrong number of arguments: " args))))
+        (error "Operator '" op "' called with the wrong number of arguments: " args))))
 
 (define-function instantiate-primitive-function (module name imp fixed?)
   (gc/let* ((tmp (new-<subr> imp name)))
@@ -170,7 +170,7 @@
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-subr -
-  (or (is/pair -args-) (k/error "operator '-' called with zero arguments"))
+  (or (is/pair -args-) (error "operator '-' called with zero arguments"))
   (let ((result	(get/long (get/head -args-)))
         (rest	(get/tail -args-)))
     (if (is/pair rest)
@@ -192,7 +192,7 @@
     (new-<long> result)))
 
 (define-subr /
-  (or (is/pair -args-) (k/error "operator '/' called with zero arguments"))
+  (or (is/pair -args-) (error "operator '/' called with zero arguments"))
   (let ((result	(get/long (get/head -args-)))
         (rest	(get/tail -args-)))
     (if (is/pair rest)
@@ -217,7 +217,7 @@
   `(define-subr (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
 (define-binary-operator bitwise-and)
@@ -226,7 +226,7 @@
 
 (define-subr (bitwise-not 1)
   (let ((value (get/head -args-)))
-    (safety 1 (or (is/long value) (k/error "non-numeric argument for bitwise-not: "value)))
+    (safety 1 (or (is/long value) (error "non-numeric argument for bitwise-not: "value)))
     (new-<long> (bitwise-not (get/long value)))))
 
 (define-subr (bitwise-shift 2)
@@ -246,7 +246,7 @@
   `(define-subr (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (k/error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
+       (safety 1 (or (and (is/long lhs) (is/long rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (and (,op (get/long lhs) (get/long rhs))
             symbol/true))))
 
@@ -284,7 +284,7 @@
 (define-subr (exit 1)
   (let ((arg (get/head -args-)))
     (or (is/long arg)
-        (k/error "argument to subr_exit is not a <long>: " arg))
+        (error "argument to subr_exit is not a <long>: " arg))
     (when-at-expand feature/profiler
       (profiler/disable))
     (libc/flush-streams)
@@ -368,8 +368,8 @@
                                (verbosity 1 (libc/fprintf libc/stderr "loading from stdin\n"))
                                (libc/fdopen libc/stdin "r"))
                               (else
-                               (k/error "load: don't know how to open "path)))
-                            (k/error "load: fopen failed on "path)))
+                               (error "load: don't know how to open "path)))
+                            (error "load: fopen failed on "path)))
          (result	(repl-stream stream)))
     (libc/fclose stream)
     result))
