@@ -141,7 +141,7 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    k/print k/println read encode expand eval string->symbol k/%accessor-typecheck)
+    print println read encode expand eval string->symbol k/%accessor-typecheck)
 
 ;;;
 ;;; libc
@@ -219,7 +219,7 @@
               ;; them into Maru objects using new-<string>-from-cstring).
               (if (string? arg)
                   `(libc/printf ,arg)
-                  `(k/print ,arg)))
+                  `(print ,arg)))
             args)
      (libc/printf "\n")
      (die)))
@@ -614,7 +614,7 @@
         ;; *globals* is special in that it should point to the module's env, therefore we skip that
         (when (or (not filter)
                   (filter name value))
-          (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (type-of value)))
+          (debug (libc/printf "\t") (print name) (libc/printf " = ") (print value) (libc/printf "\tof type %ld\n" (type-of value)))
           (environment-define to-env name value))))
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
@@ -646,7 +646,7 @@
                 (set frame.callee-designator	())
                 (set frame.callee		())
                 (set frame.arguments		())))))
-       ;;(debug (libc/printf "with-new-call-frame returning with result: ") (k/dumpln __result__))
+       ;;(debug (libc/printf "with-new-call-frame returning with result: ") (dumpln __result__))
        __result__)))
 
 (when-at-expand feature/backtrace
@@ -675,13 +675,13 @@
         (while (<= 0 (decr i))
           (let ((call-frame (k/array-at *call-stack* i)))
             (libc/printf "%3ld: " i)
-	    (k/dumpln (<call-frame>-callee-designator call-frame))
+	    (dumpln (<call-frame>-callee-designator call-frame))
             (awhen (<call-frame>-callee call-frame)
               (libc/printf "\tcallee: ")
-	      (k/dumpln it))
+	      (dumpln it))
             (awhen (<call-frame>-arguments call-frame)
               (libc/printf "\targs: ")
-	      (k/dumpln it))
+	      (dumpln it))
             (libc/flush-streams))))
     (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %ld\n" *call-stack-index*)))
 
@@ -691,7 +691,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function apply/expr (fun arguments parent-ctx)
-  (verbosity 3 (libc/printf "  A  ") (k/dump fun)  (libc/printf " ")  (k/dump arguments) (libc/printf " ") (k/dumpln parent-ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  A  ") (dump fun)  (libc/printf " ")  (dump arguments) (libc/printf " ") (dumpln parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
@@ -717,7 +717,7 @@
         result))))
 
 (define-function apply (fun arguments ctx)
-  (debug (libc/printf "apply, function ") (k/dump fun) (libc/printf ", arguments: ") (k/dump arguments) (libc/printf "\n"))
+  (debug (libc/printf "apply, function ") (dump fun) (libc/printf ", arguments: ") (dump arguments) (libc/printf "\n"))
   (safety 1 (assert fun "apply: fun is null"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
@@ -753,7 +753,7 @@
 
 (define-function expand/pair (exp env -call-frame-)
   (gc/let* ((head (expand (get/head exp) env)))
-    (debug (libc/printf "expand/pair on head ") (k/dumpln head))
+    (debug (libc/printf "expand/pair on head ") (dumpln head))
     (when-at-expand feature/backtrace
       (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
       (set (<call-frame>-callee			-call-frame-) head)
@@ -790,7 +790,7 @@
 
         ((= head symbol/set)
          (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
-         (debug (libc/printf "expand/set on form ") (k/dumpln exp))
+         (debug (libc/printf "expand/set on form ") (dumpln exp))
          (gc/let* ((body (expand-all (get/tail exp) env)))
            (let (fn-name)
              (if (and (is/pair body)
@@ -826,7 +826,7 @@
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
          (gc/let* ((args (new-<pair> env (get/tail exp)))
                    (expansion (apply expander args ())))
-           (debug (libc/printf "expand/pair, found in local env, expanded to ") (k/dumpln expansion))
+           (debug (libc/printf "expand/pair, found in local env, expanded to ") (dumpln expansion))
            (expand expansion env)))
 
         (else
@@ -835,21 +835,21 @@
            (new-<pair> head tail)))))))
 
 (define-function expand/symbol (exp env)
-  (debug (libc/printf "expand/symbol, exp ") (k/dump exp) (libc/printf ", env ") (k/dumpln env))
+  (debug (libc/printf "expand/symbol, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (let (expander)
     (cond
       ((set expander (maybe-form-in-variable/symbol env exp))
        ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
        (gc/let* ((args (k/list2 env exp))
                  (expansion (apply expander args ())))
-         (debug (libc/printf "expand/symbol, found in local env, expanded to ") (k/dumpln expansion))
+         (debug (libc/printf "expand/symbol, found in local env, expanded to ") (dumpln expansion))
          (expand expansion env)))
 
       (else
        exp))))
 
 (define-function expand (exp env)
-  (debug (libc/printf "expand, exp ") (k/dump exp) (libc/printf ", env ") (k/dumpln env))
+  (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (with-new-call-frame (symbol/expand () exp)
     (cond
       ((is/pair exp)		(expand/pair	exp env -call-frame-))
@@ -875,7 +875,7 @@
 (define-function encode/pair (exp env)
   (gc/let* ((head (encode (get/head exp) env))
             (tail (get/tail exp)))
-    (debug (libc/printf "encode/pair of head ") (k/dump head) (libc/printf ", in env ") (k/dumpln env))
+    (debug (libc/printf "encode/pair of head ") (dump head) (libc/printf ", in env ") (dumpln env))
     ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
     ;; because of that emit requires the introduction of the eval-encoded subr
     (cond
@@ -886,7 +886,7 @@
          (let ((bindings (cadr exp))
                vars/last)
            (while (is/pair bindings)
-             (debug (libc/printf "encode/let visiting entry ") (k/dumpln (get/head bindings)))
+             (debug (libc/printf "encode/let visiting entry ") (dumpln (get/head bindings)))
              (let* ((var-name	(get/head (get/head bindings)))
                     (var-obj	(environment-define new-env var-name ())))
                (set vars/last (if vars
@@ -934,7 +934,7 @@
     (new-<pair> head tail)))
 
 (define-function encode/symbol (exp env)
-  (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (k/dumpln env))
+  (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (dumpln env))
   (let ((var (lookup-variable-or-die env exp)))
     (if (global-variable? var)
         (let ((val (get (<variable> value) var)))
@@ -948,7 +948,7 @@
     var))
 
 (define-function encode (exp env)
-  (debug (libc/printf "encode of exp ") (k/dump exp) (libc/printf ", in env ") (k/dumpln env))
+  (debug (libc/printf "encode of exp ") (dump exp) (libc/printf ", in env ") (dumpln env))
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
     (cond
@@ -958,7 +958,7 @@
        (aif (k/array-at (get/variable-value var/*encoders*) (type-of exp))
            (gc/let* ((args (new-<pair> env ())))
              (set args (new-<pair> exp args))
-             (debug (libc/printf "encode/other: applying fn: ") (k/println it) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
+             (debug (libc/printf "encode/other: applying fn: ") (println it) (libc/printf " ") (print args) (libc/printf " ") (println env))
              (apply it args ()))
          exp)))))
 
@@ -981,7 +981,7 @@
          (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
          (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
        (gc/let* ((evaled-head (eval (get/head exp) ctx)))
-         (debug (libc/printf "eval of pair, head eval'ed to ") (k/dumpln evaled-head))
+         (debug (libc/printf "eval of pair, head eval'ed to ") (dumpln evaled-head))
          (when-at-expand feature/backtrace
            (set (<call-frame>-callee -call-frame-) evaled-head))
 	 (if (is <fixed> evaled-head)
@@ -1002,7 +1002,7 @@
            exp))))))
 
 (define-function eval (exp ctx)
-  (verbosity 3 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  E  ") (dump exp) (libc/printf " ") (dumpln ctx) (libc/flush-streams))
   (let ((type (type-of exp)))
     (cond
       ((= type <undefined>)	exp)
@@ -1010,32 +1010,32 @@
       ((= type <string>)	exp)
       ((= type <variable>)	(if (global-variable? exp)
 				    (let ()
-                                      (debug (libc/printf "eval is reading global var ") (k/dumpln exp))
+                                      (debug (libc/printf "eval is reading global var ") (dumpln exp))
                                       (get (<variable> value) exp))
 				  (let ((delta (- (get/long (get (<env> level) (get (<context>  env) ctx)))
 					      (get/long (get (<env> level) (get (<variable> env) exp))))))
-				    (debug (libc/printf "eval is reading local var ") (k/dump exp) (libc/printf " with delta %ld\n" delta))
+				    (debug (libc/printf "eval is reading local var ") (dump exp) (libc/printf " with delta %ld\n" delta))
 				    (while (< 0 delta)
 				      (set ctx (get (<context> home) ctx))
 				      (decr delta))
                                     (let* ((index (get/long (get (<variable> index) exp)))
                                            (value (k/array-at (get (<context> bindings) ctx) index)))
-                                      (debug (libc/printf "eval is reading local var from context ") (k/dump ctx) (libc/printf " at index %ld, holding value " index) (k/dumpln value))
+                                      (debug (libc/printf "eval is reading local var from context ") (dump ctx) (libc/printf " at index %ld, holding value " index) (dumpln value))
 				      value))))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(eval/with-backtrace type exp ctx)))))
 
 
 (define-function expand-encode-eval (form env)
-  (debug (libc/printf "expand-encode-eval for form ") (k/println form))
+  (debug (libc/printf "expand-encode-eval for form ") (println form))
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-					(verbosity 2 (libc/printf ";;; ? ")		(k/dumpln x))
-    (set x (expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(k/dumpln x))
-    (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(k/dumpln x))
+					(verbosity 2 (libc/printf ";;; ? ")		(dumpln x))
+    (set x (expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(dumpln x))
+    (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(dumpln x))
     (set x (eval   x ctx))
-					(verbosity 2 (libc/printf ";;; => ")		(k/dumpln x))
-    (debug (libc/printf "expand-encode-eval for form ") (k/dump form) (libc/printf " is returning with ") (k/dumpln x))
+					(verbosity 2 (libc/printf ";;; => ")		(dumpln x))
+    (debug (libc/printf "expand-encode-eval for form ") (dump form) (libc/printf " is returning with ") (dumpln x))
     x))
 
 (define-function repl-stream (stream)
@@ -1078,7 +1078,7 @@
     (set tmp (new-<array> 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
     (set tmp (new-<array> 0))		(environment-define env (string->symbol "*applicators*")		tmp)
 
-    (debug (libc/printf "new-<module> returning with ") (k/println module))
+    (debug (libc/printf "new-<module> returning with ") (println module))
     module))
 
 (when-at-expand feature/profiler

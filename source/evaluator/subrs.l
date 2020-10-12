@@ -79,12 +79,12 @@
           (when (is/pair binding)
             (let ((var  (get/head binding))
                   (prog (get/tail binding)))
-              (debug (libc/printf "let subr is initializing var ") (k/dump var) (libc/printf " in context ") (k/dumpln -ctx-))
+              (debug (libc/printf "let subr is initializing var ") (dump var) (libc/printf " in context ") (dumpln -ctx-))
               (set tmp ())
               (while (is/pair prog)
                 (set tmp (eval (get/head prog) -ctx-))
                 (set prog (get/tail prog)))
-              (debug (libc/printf "let subr is setting var ") (k/dump var) (libc/printf " to value ") (k/print tmp) (libc/printf " in context ") (k/dumpln -ctx-))
+              (debug (libc/printf "let subr is setting var ") (dump var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (dumpln -ctx-))
               (set (k/array-at locals (get/long (get (<variable> index) var))) tmp))))
         (set bindings (get/tail bindings)))
       (set tmp ())
@@ -94,7 +94,7 @@
       tmp)))
 
 (define-subr (set 2 fixed)
-  ;;(printf "SET ") (k/print args) (libc/printf " IN ") (k/println -ctx-)
+  (debug (libc/printf "SET ") (print -args-) (libc/printf " IN ") (println -ctx-))
   (let ((var (get/head -args-))
         (value (eval (get/head (get/tail -args-)) -ctx-)))
     (assert (is <variable> var) "non-variable in set: "var)
@@ -102,12 +102,12 @@
         (put (<variable> value) var value)
       (let ((delta (- (get/long (get (<env> level) (get (<context>  env) -ctx-)))
                   (get/long (get (<env> level) (get (<variable> env) var))))))
-        (debug (libc/printf "set subr is writing local var ") (k/dump var) (libc/printf " with delta %ld\n" delta))
+        (debug (libc/printf "set subr is writing local var ") (dump var) (libc/printf " with delta %ld\n" delta))
         (while (< 0 delta)
           (set -ctx- (get (<context> home) -ctx-))
           (set delta (- delta 1)))
         (let ((index (get/long (get (<variable> index) var))))
-          (debug (libc/printf "set subr is setting local var in context ") (k/dump -ctx-) (libc/printf " at index %ld, to value " index) (k/dumpln value))
+          (debug (libc/printf "set subr is setting local var in context ") (dump -ctx-) (libc/printf " at index %ld, to value " index) (dumpln value))
           (set (k/array-at (get (<context> bindings) -ctx-) index) value))))))
 
 (define-subr (while () fixed)
@@ -276,7 +276,7 @@
 
 (define-subr abort
   (libc/printf "ABORTED: ")
-  (k/dumpln -args-)
+  (dumpln -args-)
   (print-backtrace)
   (libc/flush-streams)
   (libc/abort))
@@ -382,12 +382,12 @@
 
 (define-subr dump
   (while (is/pair -args-)
-    (k/dump (get/head -args-))
+    (dump (get/head -args-))
     (set -args- (get/tail -args-))))
 
 (define-subr print
   (while (is/pair -args-)
-    (k/print (get/head -args-))
+    (print (get/head -args-))
     (set -args- (get/tail -args-))))
 
 (define-subr warn
@@ -614,7 +614,7 @@
   (let ((new-module	(get/head -args-))
         (form		(get/head (get/tail -args-))))
     (safety 1 (assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
-    (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
+    (debug (libc/printf "eval-in-module: form ") (dumpln form))
     (gc/let* ((env (new-<env> (module-env new-module) 1 0)))
       (with-current-module new-module
         (expand-encode-eval form env)))))
