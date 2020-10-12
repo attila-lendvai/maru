@@ -5,6 +5,7 @@
 ;;;
 
 ;; Mark the fact that we are evolving from the previous stage.
+(set evolving? true)
 (eval-in-slave '(set evolving? true))
 
 ;;;

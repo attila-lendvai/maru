@@ -119,6 +119,8 @@ msg	(.ascii	"Hello, world! From an elf binary!\n")
 ;; TODO the next two doesn't print anything for me, even though the asm looks good in gdb
 ;; when i uncomment the crashing line to enter gdb.
 
+;; TODO this started to sigsegv for me. due to stricter ASLR on a new kernel?
+
 (assemble '(
 	(movlIR	4 _EAX)				; write
 	(movlIR	2 _EBX)				; stderr

@@ -33,7 +33,7 @@
 
 (switch-to-slave-module)
 
-;; we can't say anything smarter than this, because the LLVM IR doesn't have a not primitive.
+;; we can't say anything smarter than this, because the LLVM IR doesn't have a NOT primitive.
 ;; so, let's just define a macro instead of a full compiler primitive.
 (define-form bitwise-not (value) `(bitwise-xor ,value -1))
 
@@ -809,7 +809,7 @@
   (cons (target-value if)		compile/if)
   (cons (target-value while)		compile/while)
   (cons (target-value set)		compile/set)
-  (cons (target-value lambda)			compile/lambda)
+  (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)))
 

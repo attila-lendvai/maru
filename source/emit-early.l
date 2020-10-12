@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; NOTE for debugging only, because this breaks the output due to e.g. multiline string literals escaping from the line comment prefix char
+;; NOTE for debugging only, because this breaks the output due to multiline string literals escaping the line-comment syntax
 (define *compiler-verbose* '())
 
 ;; NOTE using symbols here is not a good idea because of the host/slave isolation
@@ -93,12 +93,7 @@
    vararg?))
 
 (define-method do-print <foreign-function> ()
-  (print "<<foreign-function> "
-         (<foreign-function>-return-type self)", "
-         (<foreign-function>-name self)", "
-         (<foreign-function>-parameter-types self)", "
-         (<foreign-function>-vararg? self)
-         ">"))
+  (print "<<foreign-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
 
 (define-function foreign-function (return-type foreign-name parameter-types)
   (let* ((rev-types (list-reverse parameter-types))

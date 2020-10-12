@@ -163,7 +163,7 @@ eval-llvm: $(BUILD_llvm)/eval1
 # eval1 is the first version of us that gets built by our compiler animated by the previous stage.
 $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval -v					\
+	$(TIME) $(HOST_DIR)/eval -O -v					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\
@@ -183,7 +183,7 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(HOST_DIR)/eval) # we need to move the dependency here, mimicing the currently commented out version of eval2.ll rule below
-	$(TIME) $(HOST_DIR)/eval -v					\
+	$(TIME) $(HOST_DIR)/eval -O -v					\
 		$(HOST_DIR)/boot.l					\
 		source/bootstrapping/prepare.l				\
 		source/bootstrapping/host-extras.l			\
@@ -223,7 +223,7 @@ $(HOST_DIR)/eval:
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(1) $(PROFILER_ARG) -v						\
+  $(TIME) $(1) $(PROFILER_ARG) -O -v						\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\
@@ -240,7 +240,7 @@ define compile-x86
 endef
 
 define compile-llvm
-  $(TIME) $(1) $(PROFILER_ARG) -v						\
+  $(TIME) $(1) $(PROFILER_ARG) -O -v						\
 	boot.l									\
 	source/bootstrapping/prepare.l						\
 	source/bootstrapping/early.l						\

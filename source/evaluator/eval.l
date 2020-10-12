@@ -527,7 +527,7 @@
      (k/set-current-module __previous-module__)
      __result__))
 
-(define-function module-env	(module)
+(define-function module-env (module)
   (get (<variable> value) (get (<module> globals) module)))
 
 (define-function global-variable? (var)
@@ -686,7 +686,8 @@
     (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %ld\n" *call-stack-index*)))
 
 ;;;
-;;; eval
+;;; apply
+;;; TODO move this into the expand-encode-eval-apply order
 ;;; ----------------------------------------------------------------
 
 (define-function apply/expr (fun arguments parent-ctx)

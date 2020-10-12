@@ -138,6 +138,7 @@
         (set result (concat-symbol result (car args))))
       result)))
 
+;; NOTE this is broken with multi-level quasiquotes. see https://github.com/fare/fare-quasiquote
 (define quasiquote
   (form
     (let (qq-list qq-element qq-object)
@@ -355,11 +356,10 @@
 
 ;;; configuration
 
-;; this may or may not be defined by the makefile
-(if (defined? 'feature/profiler)
-    (eval '(when (= feature/profiler 0)
-            (set feature/profiler ())))
-  (eval '(define feature/profiler ())))
+;; this may or may not be defined by the makefile, so let's hide the reading of the var feature/profiler behind an eval
+(eval `(define-constant feature/profiler
+           ,(when (defined? 'feature/profiler)
+              (eval '(not (= feature/profiler 0))))))
 
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))

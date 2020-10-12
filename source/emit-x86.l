@@ -604,7 +604,7 @@
   (cons (target-value if)		compile/if)
   (cons (target-value while)		compile/while)
   (cons (target-value set)		compile/set)
-  (cons (target-value lambda)			compile/lambda)
+  (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)))
 
