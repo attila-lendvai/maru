@@ -1171,34 +1171,28 @@
 (define-method do-print <selector>	()	(print "<selector "self.name">"))
 (define-method do-print <expr>		()	(print "<expr "self.parameters" "(or (when-at-expand feature/track-expr-names self.name) "?")">"))
 (define-method do-print <env>		()	(print "<env "self.level","(array-length self.bindings)">"))
+(define-method do-print <module>	()	(print "<module "(or (when-at-expand feature/debug-info self.name) "?") ">"))
 (define-method do-print <type>		()	(print "<"(<type>-name self)" "(<type>-id self)">"))
 
-(define-method do-print <pair> ()
+(define-function %print-list (lst fn)
   (print "(")
-  (while self
-    (if (pair? self)
-        (print (car self))
-        (let ()
-          (print ". ")
-          (print self)))
-    (if (set self (cdr self))
-        (print " ")))
-  (print ")"))
+  (let ((first-time?	true)
+        (cell		lst))
+    (while (pair? cell)
+      (if first-time?
+          (set first-time? ())
+        (print " "))
+      (fn (car cell))
+      (set cell (cdr cell)))
+    (when cell
+      (print " . " cell))
+    (print ")")))
+
+(define-method do-print <pair> ()
+  (%print-list self print))
 
 (define-method do-dump <pair> ()
-  (if (= *globals* (cdr self)) ;; TODO is this still needed?
-      (print "*globals*")
-    (let ()
-      (print "(")
-      (while self
-        (if (pair? self)
-            (dump (car self))
-          (let ()
-            (print ". ")
-            (print self)))
-        (if (set self (cdr self))
-            (print " ")))
-      (print ")"))))
+  (%print-list self dump))
 
 (define-method do-print <array> ()
   (print "Array(")
