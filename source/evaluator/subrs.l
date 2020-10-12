@@ -340,7 +340,7 @@
 ;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
 (define-subr read
   (if (= () -args-)
-      (let ((obj (k/read libc/stdin)))
+      (let ((obj (read libc/stdin)))
         (and (= k/+end+ obj) (set obj ()))
         obj)
     (let ((arg (car -args-)))
@@ -352,7 +352,7 @@
                    (tail head)
                    (obj  ()))
               (gc/protect (head obj)
-                (while (!= k/+end+ (set obj (k/read stream)))
+                (while (!= k/+end+ (set obj (read stream)))
                   (set tail (put/tail tail (new-<pair> obj ())))))
               (libc/fclose stream)
               (get/tail head))

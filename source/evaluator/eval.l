@@ -141,7 +141,7 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    k/print k/println k/read encode expand eval string->symbol k/%accessor-typecheck)
+    k/print k/println read encode expand eval string->symbol k/%accessor-typecheck)
 
 ;;;
 ;;; libc
@@ -1047,7 +1047,7 @@
              (when (= libc/stdin stream)
                (libc/printf ".")
                (libc/flush-streams))
-             (!= k/+end+ (set res (k/read stream))))
+             (!= k/+end+ (set res (read stream))))
       (gc/let* ((env (new-<env> (module-env *module*) 1 0)))
         (set res (expand-encode-eval res env))
         (when (= libc/stdin stream)
