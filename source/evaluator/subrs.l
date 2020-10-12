@@ -370,7 +370,7 @@
                               (else
                                (k/error "load: don't know how to open "path)))
                             (k/error "load: fopen failed on "path)))
-         (result	(k/repl-stream stream)))
+         (result	(repl-stream stream)))
     (libc/fclose stream)
     result))
 
@@ -378,7 +378,7 @@
 (define-subr (repl-stream 1)
   (let ((stream (get/head -args-)))
     ;;(or stream (set stream (get/variable-value var/*input*)))
-    (k/repl-stream (get/tvmptr stream))))
+    (repl-stream (get/tvmptr stream))))
 
 (define-subr dump
   (while (is/pair -args-)

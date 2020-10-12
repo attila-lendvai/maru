@@ -1038,7 +1038,7 @@
     (debug (libc/printf "expand-encode-eval for form ") (k/dump form) (libc/printf " is returning with ") (k/dumpln x))
     x))
 
-(define-function k/repl-stream (stream)
+(define-function repl-stream (stream)
   ;;(put/variable-value var/*input* (new-<long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\012\015]")) ; drop the possible #!./eval first line of the file
@@ -1249,7 +1249,7 @@
 
               ;; -
               ((not (libc/strcmp arg "-"))
-               (k/repl-stream libc/stdin))
+               (repl-stream libc/stdin))
 
               ;; --call to call a function
               ((not (libc/strcmp arg "--call"))
@@ -1292,7 +1292,7 @@
                (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
                (let ((stream (libc/fopen arg "r")))
                  (or stream (fatal1 "no such file: %s" arg))
-                 (k/repl-stream stream)
+                 (repl-stream stream)
                  (libc/fclose stream)))))))))
 
   (debug (libc/printf "main is on the way out\n"))
