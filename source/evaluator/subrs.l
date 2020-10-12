@@ -30,7 +30,7 @@
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
-    (k/env/define (module-env module) (string->symbol name) tmp)))
+    (environment-define (module-env module) (string->symbol name) tmp)))
 
 (define-form instantiate-primitive-functions (module)
   `(let ((__module__ ,module))
@@ -59,7 +59,7 @@
 (define-subr (defined? 1)
   (let ((name (get/head -args-))
         (env (or (cadr -args-) (module-env *module*))))
-    (k/env/lookup-variable env name)))
+    (lookup-variable env name)))
 
 (define-subr (lambda () fixed)
   (let ((env		(car  -args-)) ; see encode/pair; it puts the env as the first arg
@@ -166,7 +166,7 @@
   (let ((env   (get/head -args-))
         (name  (get/head (set -args- (get/tail -args-))))
         (value (get/head (get/tail -args-))))
-    (k/env/define env name value)))
+    (environment-define env name value)))
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-subr -

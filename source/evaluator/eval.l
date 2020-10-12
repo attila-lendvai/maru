@@ -333,12 +333,12 @@
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (module-env *module*) (string->symbol ,var))
+                                                           `(lookup-variable (module-env *module*) (string->symbol ,var))
                                                          var)))
 
 (define-form put/variable-value	(var val)	`(put (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (module-env *module*) (string->symbol ,var))
+                                                           `(lookup-variable (module-env *module*) (string->symbol ,var))
                                                          var)
                                                       ,val))
 
@@ -533,9 +533,9 @@
   (let ((env (get (<variable> env) var)))
     (= 0 (get/long (get (<env> level) env)))))
 
-(define-function k/env/find-variable (env name)
-  (safety 2 (assert (is <env> env)     "k/env/find-variable: env is not an <env>: "env))
-  (safety 2 (assert (is <symbol> name) "k/env/find-variable: name is not a <symbol>: "name))
+(define-function find-variable (env name)
+  (safety 2 (assert (is <env> env)     "find-variable: env is not an <env>: "env))
+  (safety 2 (assert (is <symbol> name) "find-variable: name is not a <symbol>: "name))
   (let* ((bindings (get (<env> bindings) env))
          (index    (k/array-length bindings))
          (vars     (get (<array> elements) bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
@@ -544,40 +544,40 @@
         (when (= name (get (<variable> name) var))
           (return var))))))
 
-(define-function k/env/lookup-variable (env name)
-  (safety 1 (assert (is <env> env)     "k/env/lookup-variable: env is not an <env>: "env))
-  (safety 1 (assert (is <symbol> name) "k/env/lookup-variable: name is not a <symbol>: "name))
+(define-function lookup-variable (env name)
+  (safety 1 (assert (is <env> env)     "lookup-variable: env is not an <env>: "env))
+  (safety 1 (assert (is <symbol> name) "lookup-variable: name is not a <symbol>: "name))
   (while env
-    (awhen (k/env/find-variable env name)
+    (awhen (find-variable env name)
       (return it))
     (set env (get (<env> parent) env))))
 
-(define-function k/env/lookup-variable-or-die (env name)
-  (let ((var (k/env/lookup-variable env name)))
+(define-function lookup-variable-or-die (env name)
+  (let ((var (lookup-variable env name)))
     (unless (is <variable> var)
-      (k/error "k/env/lookup-variable-or-die failed for "name", current module: "*module*))
+      (k/error "lookup-variable-or-die failed for "name", current module: "*module*))
     var))
 
-(define-function k/env/variable-value (env name)
-  (aif (k/env/lookup-variable env name)
+(define-function variable-value (env name)
+  (aif (lookup-variable env name)
       (get (<variable> value) it)
-    (fatal1 "undefined variable in k/env/variable-value: %s" (get/symbol name))))
+    (fatal1 "undefined variable in variable-value: %s" (get/symbol name))))
 
-(define-function k/env/ensure-variable (env name)
-  (safety 1 (assert (is <env> env)		"k/env/ensure-variable: env arg is not of type <env>: "env))
-  (safety 1 (assert (is <symbol> name)	"k/env/ensure-variable: name arg is not of type <symbol>: "name))
-  (awhen (k/env/find-variable env name)
+(define-function ensure-variable (env name)
+  (safety 1 (assert (is <env> env)		"ensure-variable: env arg is not of type <env>: "env))
+  (safety 1 (assert (is <symbol> name)	"ensure-variable: name arg is not of type <symbol>: "name))
+  (awhen (find-variable env name)
     (return it))
   (let ((offset (get/long (get (<env> offset) env))))
     (gc/let* ((var (new-<variable> name () env offset)))
       (put (<env> offset) env (new-<long> (+ offset 1)))
       (k/array-append (get (<env> bindings) env) var))))
 
-(define-function k/env/define (env name value)
-  (safety 1 (assert (is <env> env) "k/env/define: env is not of type <env>: "env))
-  (safety 1 (assert (is <symbol> name) "k/env/define: name is not of type <symbol>: "name))
-  (debug (libc/printf "k/env/define called, name is %s\n" (get/symbol name)))
-  (let ((var (k/env/ensure-variable env name)))
+(define-function environment-define (env name value)
+  (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
+  (safety 1 (assert (is <symbol> name) "environment-define: name is not of type <symbol>: "name))
+  (debug (libc/printf "environment-define called, name is %s\n" (get/symbol name)))
+  (let ((var (ensure-variable env name)))
     (put (<variable> value) var value)
     var))
 
@@ -594,7 +594,7 @@
 
 (define-function maybe-object-in-variable (env name type)
   (let ((tmp (when (is <symbol> name)
-               (k/env/lookup-variable env name))))
+               (lookup-variable env name))))
     (and tmp
          (is <variable> tmp)
          (set tmp (get (<variable> value) tmp))
@@ -615,7 +615,7 @@
         (when (or (not filter)
                   (filter name value))
           (debug (libc/printf "\t") (k/print name) (libc/printf " = ") (k/print value) (libc/printf "\tof type %ld\n" (type-of value)))
-          (k/env/define to-env name value))))
+          (environment-define to-env name value))))
     (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
 
 (load "source/evaluator/reader.l")
@@ -888,7 +888,7 @@
            (while (is/pair bindings)
              (debug (libc/printf "encode/let visiting entry ") (k/dumpln (get/head bindings)))
              (let* ((var-name	(get/head (get/head bindings)))
-                    (var-obj	(k/env/define new-env var-name ())))
+                    (var-obj	(environment-define new-env var-name ())))
                (set vars/last (if vars
                                   (put/tail vars/last (new-<pair> var-obj ()))
                                 (set vars (new-<pair> var-obj ())))))
@@ -915,16 +915,16 @@
       ((= head fixed-subr/lambda)	(let ((args (cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 1 0)))
 					    (while (is/pair args)
-					      (k/env/define new-env (get/head args) ())
+					      (environment-define new-env (get/head args) ())
 					      (set args (get/tail args)))
 					    (when args
-                                              (k/env/define new-env args ()))
+                                              (environment-define new-env args ()))
 					    (set tail (encode-all tail new-env))
 					    (set tail (new-<pair> new-env tail)))))
-      ((= head fixed-subr/define)	(let ((var (k/env/ensure-variable (module-env *module*) (car tail))))
+      ((= head fixed-subr/define)	(let ((var (ensure-variable (module-env *module*) (car tail))))
 					  (set tail (encode-all (cdr tail) env))
 					  (set tail (new-<pair> var tail))))
-      ((= head fixed-subr/set)		(let ((var (k/env/lookup-variable env (car tail))))
+      ((= head fixed-subr/set)		(let ((var (lookup-variable env (car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
 					  (and (or (not (car tail)) (cddr tail)) (k/error "encode: malformed SET expression " exp))
 					  (set tail (encode-all (cdr tail) env))
@@ -935,7 +935,7 @@
 
 (define-function encode/symbol (exp env)
   (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (k/dumpln env))
-  (let ((var (k/env/lookup-variable-or-die env exp)))
+  (let ((var (lookup-variable-or-die env exp)))
     (if (global-variable? var)
         (let ((val (get (<variable> value) var)))
           (when (or (is <form> val)
@@ -1065,7 +1065,7 @@
   (gc/let* ((module (new-record-instance <module>))
             (env    (new-<env> () 0 0))
             tmp)
-    (set (<module>-globals module)	(k/env/define env symbol/*globals* env))
+    (set (<module>-globals module)	(environment-define env symbol/*globals* env))
     (when-at-expand feature/debug-info
       (set (<module>-name module)	(new-<string>-from-cstring (or name ""))))
 
@@ -1073,10 +1073,10 @@
       (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
 
     ;; we always overwrite these with empty arrays in the new module
-    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*expanders*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*encoders*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*evaluators*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*applicators*")		tmp)
+    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*expanders*")		tmp)
+    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*encoders*")		tmp)
+    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
+    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*applicators*")		tmp)
 
     (debug (libc/printf "new-<module> returning with ") (k/println module))
     module))
@@ -1132,24 +1132,24 @@
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-      (set tmp (new-<long> *verbosity*))	(k/env/define env (string->symbol "*verbosity*")		tmp)
-      (set tmp (new-<long> *optimised*))	(k/env/define env (string->symbol "*optimised*")		tmp)
+      (set tmp (new-<long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
+      (set tmp (new-<long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
       (set k/+end+ (or k/+end+ (set tmp (new-<symbol> "+end+"))))
-      (k/env/define env (string->symbol "+end+") k/+end+))
+      (environment-define env (string->symbol "+end+") k/+end+))
 
     ;; make sure the symbol true evaluates to itself
-    (k/env/define env symbol/true symbol/true)
+    (environment-define env symbol/true symbol/true)
 
-    (k/env/define env (string->symbol "*maru-module*") *maru-module*)
+    (environment-define env (string->symbol "*maru-module*") *maru-module*)
 
     (instantiate-primitive-functions module)
 
-    (set fixed-subr/quote	(k/env/variable-value env symbol/quote))
-    (set fixed-subr/lambda	(k/env/variable-value env symbol/lambda))
-    (set fixed-subr/let		(k/env/variable-value env symbol/let))
-    (set fixed-subr/define	(k/env/variable-value env symbol/define))
-    (set fixed-subr/set		(k/env/variable-value env symbol/set))
+    (set fixed-subr/quote	(variable-value env symbol/quote))
+    (set fixed-subr/lambda	(variable-value env symbol/lambda))
+    (set fixed-subr/let		(variable-value env symbol/let))
+    (set fixed-subr/define	(variable-value env symbol/define))
+    (set fixed-subr/set		(variable-value env symbol/set))
 
     (assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
 
@@ -1157,10 +1157,10 @@
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set var/*expanders*	(k/env/lookup-variable-or-die env (string->symbol "*expanders*")))
-    (set var/*encoders*		(k/env/lookup-variable-or-die env (string->symbol "*encoders*")))
-    (set var/*evaluators*	(k/env/lookup-variable-or-die env (string->symbol "*evaluators*")))
-    (set var/*applicators*	(k/env/lookup-variable-or-die env (string->symbol "*applicators*"))))
+    (set var/*expanders*	(lookup-variable-or-die env (string->symbol "*expanders*")))
+    (set var/*encoders*		(lookup-variable-or-die env (string->symbol "*encoders*")))
+    (set var/*evaluators*	(lookup-variable-or-die env (string->symbol "*evaluators*")))
+    (set var/*applicators*	(lookup-variable-or-die env (string->symbol "*applicators*"))))
 
   (debug (libc/printf "capture-well-known-module-values is done\n")))
 
@@ -1206,7 +1206,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
+  (let ((cla-var (environment-define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
