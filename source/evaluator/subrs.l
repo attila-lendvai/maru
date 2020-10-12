@@ -43,7 +43,7 @@
 
 (define-subr (define () fixed)
   (let ((var (car -args-)))
-    (k/assert (is <variable> var) "non-variable in define: "var)
+    (assert (is <variable> var) "non-variable in define: "var)
     (let ((val (eval (cadr -args-) -ctx-)))
       (put (<variable> value) var val)
       ;; maybe set the <expr>'s name slot
@@ -65,8 +65,8 @@
   (let ((env		(car  -args-)) ; see encode/pair; it puts the env as the first arg
         (parameters	(cadr -args-))
         (body		(cddr -args-)))
-    (k/assert (is <env> env) "lambda subr: env is "env)
-    (k/assert (or (not parameters) (is <variable> parameters) (is <pair> parameters)) "lambda subr: parameters is of wrong type: " parameters)
+    (assert (is <env> env) "lambda subr: env is "env)
+    (assert (or (not parameters) (is <variable> parameters) (is <pair> parameters)) "lambda subr: parameters is of wrong type: " parameters)
     (new-<expr> parameters body env -ctx-)))
 
 (define-subr (let () fixed)
@@ -97,7 +97,7 @@
   ;;(printf "SET ") (k/print args) (libc/printf " IN ") (k/println -ctx-)
   (let ((var (get/head -args-))
         (value (eval (get/head (get/tail -args-)) -ctx-)))
-    (k/assert (is <variable> var) "non-variable in set: "var)
+    (assert (is <variable> var) "non-variable in set: "var)
     (if (global-variable? var)
         (put (<variable> value) var value)
       (let ((delta (- (get/long (get (<env> level) (get (<context>  env) -ctx-)))
@@ -159,7 +159,7 @@
 
 (define-subr (environment 1)
   (let ((parent (get/head -args-)))
-    (k/assert (is <env> parent))
+    (assert (is <env> parent))
     (new-<env> parent 0 (get/long (get (<env> offset) parent)))))
 
 (define-subr (environment-define 3)
@@ -437,13 +437,13 @@
 (define-subr (allocate 2)
   (let ((type (get/head -args-))
         (size (get/head (get/tail -args-))))
-    (safety 1 (k/assert (is/long type) "allocate: invalid type "type))
-    (safety 1 (k/assert (is/long size) "allocate: invalid size "size))
+    (safety 1 (assert (is/long type) "allocate: invalid type "type))
+    (safety 1 (assert (is/long size) "allocate: invalid size "size))
     (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
 (define-subr (allocate-data 1)
   (let ((size (get/head -args-)))
-    (safety 1 (k/assert (is/long size) "allocate-data: invalid size "size))
+    (safety 1 (assert (is/long size) "allocate-data: invalid size "size))
     (gc/allocate-opaque <data> (get/long size))))
 
 (define-subr (type-of 1) (new-<long> (type-of (get/head -args-))))
@@ -475,14 +475,14 @@
 (define-subr (oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
     (oop-at obj (get/long idx))))
 
 (define-subr (set-oop-at 3)
   (let ((obj (get/head -args-))
         (idx (get/head (set -args- (get/tail -args-))))
         (val (get/head (get/tail -args-))))
-    (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
     (set-oop-at obj (get/long idx) val)))
 
 (define-subr (address-of 1)
@@ -501,7 +501,7 @@
 (define-subr (byte-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
     (new-<long> (byte-at obj (get/long idx)))))
 
 (define-subr (set-byte-at 3)
@@ -509,18 +509,18 @@
          (idx		(get/head (set -args- (get/tail -args-))))
          (val		(get/head (get/tail -args-)))
          (unboxed-val	(get/long val)))
-    (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
-    (safety 1 (k/assert (and (<= unboxed-val 256) (<= 0 unboxed-val)) "set-byte-at: value is out of range: "unboxed-val))
+    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 1 (assert (and (<= unboxed-val 256) (<= 0 unboxed-val)) "set-byte-at: value is out of range: "unboxed-val))
     (set (byte-at obj (get/long idx)) unboxed-val)))
 
 (define-subr (array-length 1)
   (let ((arg (get/head -args-)))
-    (safety 1 (k/assert (is <array> arg)))
+    (safety 1 (assert (is <array> arg)))
     (get (<array> size) arg)))
 
 (define-subr (string-length 1)
   (let ((arg (get/head -args-)))
-    (safety 1 (k/assert (is <string> arg)))
+    (safety 1 (assert (is <string> arg)))
     (get (<string> size) arg)))
 
 (define-subr (array-at 2)
@@ -546,7 +546,7 @@
          (val (get/head (get/tail -args-))))
     ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
-    (safety 1 (k/assert (<= idx (k/string-length arr))))
+    (safety 1 (assert (<= idx (k/string-length arr))))
     (set (k/string-at arr idx) (get/long val))
     val))
 
@@ -582,14 +582,14 @@
 
 (define-subr (long->string 1)
   (let ((arg (get/head -args-)))
-    (k/assert (is/long arg))
+    (assert (is/long arg))
     (let ((buf (gc/allocate-opaque <data> 32))) ; safe up until 64 bits
       (libc/sprintf buf "%ld" (get/long arg))
       (new-<string>-from-cstring buf))))
 
 (define-subr (string->long 1)
   (let ((arg (get/head -args-)))
-    (k/assert (is <string> arg))
+    (assert (is <string> arg))
     (let* ((str		(get/string arg))
            (endptr	str)
            (result	(libc/strtol str (address-of endptr) 10)))
@@ -602,7 +602,7 @@
 
 (define-subr (set-current-module 1)
   (let ((module (get/head -args-)))
-    (safety 1 (k/assert (is <module> module) "set-current-module: called with not a <module>: "module))
+    (safety 1 (assert (is <module> module) "set-current-module: called with not a <module>: "module))
     (k/set-current-module module))
   ())
 
@@ -613,7 +613,7 @@
 (define-subr (eval-in-module 2)
   (let ((new-module	(get/head -args-))
         (form		(get/head (get/tail -args-))))
-    (safety 1 (k/assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
+    (safety 1 (assert (is <module> new-module) "eval-in-module: called with not a <module>: "new-module))
     (debug (libc/printf "eval-in-module: form ") (k/dumpln form))
     (gc/let* ((env (new-<env> (module-env new-module) 1 0)))
       (with-current-module new-module
@@ -623,7 +623,7 @@
   (define-subr (call-IA-32-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-IA-32-machine-code will call %p\n" data))
-      (k/assert (is <data> data) "call-IA-32-machine-code: cannot call object of type "(type-of data)", printing as "data)
+      (assert (is <data> data) "call-IA-32-machine-code: cannot call object of type "(type-of data)", printing as "data)
       (data)
       (debug (libc/printf "call-IA-32-machine-code got back the control from %p\n" data))
       ())))
@@ -632,7 +632,7 @@
   (define-subr (call-x86-64-machine-code 1)
     (let ((data (get/head -args-)))
       (debug (libc/printf "call-x86-64-machine-code will call %p\n" data))
-      (k/assert (is <data> data) "call-x86-64-machine-code: cannot call object of type "(type-of data)", printing as "data)
+      (assert (is <data> data) "call-x86-64-machine-code: cannot call object of type "(type-of data)", printing as "data)
       (data)
       (debug (libc/printf "call-x86-64-machine-code got back the control from %p\n" data))
       ())))

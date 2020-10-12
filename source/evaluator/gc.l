@@ -94,7 +94,7 @@
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
     (gc/debug (libc/printf "heap growth %p size %ld %ld/%ld\n" ptr size gc/alloc-count gc/frequency))
-    (k/assert (aligned-to-oop? ptr) "gc/acquire-new-heap-space: aligned-to-oop? has failed for ptr "ptr)
+    (assert (aligned-to-oop? ptr) "gc/acquire-new-heap-space: aligned-to-oop? has failed for ptr "ptr)
     ptr))
 
 (define-function gc/grow-heap (size)
@@ -183,7 +183,7 @@
 
 (define-function gc/allocate (type requested-size)
   (gc/debug (libc/printf "gc/allocate type %ld %ld\n" type requested-size))
-  (safety 1 (k/assert (not (= 0 type)) "gc/allocate: type is 0"))
+  (safety 1 (assert (not (= 0 type)) "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
   (and (= gc/alloc-count gc/frequency)
        (gc/collect))
@@ -225,8 +225,8 @@
                   (set (<header>-flags header) <header>-flags/used)
                   (set (<header>-type header) type)
                   (libc/memset obj 0 chunk-size)
-                  (safety 4 (k/assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
-                  (safety 4 (k/assert (bitwise-and <header>-flags/used (<header>-flags header)) "gc/allocate: was about to return with an object whose USED flag is unset"))
+                  (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
+                  (safety 4 (assert (bitwise-and <header>-flags/used (<header>-flags header)) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (header: %p), type %ld, size %ld\n" obj header (<header>-type header) (gc/object-size obj)))
                   (return obj)))))
@@ -257,9 +257,9 @@
 
 (define-function gc/pop-root (ptr)
   (gc/debug (libc/printf "gc/pop-root %ld at %p\n" gc/root-count ptr))
-  (safety 1 (k/assert (< 0 gc/root-count) "root table underflow"))
+  (safety 1 (assert (< 0 gc/root-count) "root table underflow"))
   (decr gc/root-count)
-  (safety 1 (k/assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
+  (safety 1 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
   (set (oop-at gc/roots gc/root-count) ()))
 
 (define-function gc/initialise ()

@@ -72,8 +72,8 @@
   )
 
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
-;;(define-form k/assert		prog ())
-(define-form k/assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
+;;(define-form assert		prog ())
+(define-form assert		(test . args)	`(or ,test (k/error ,@(or args (list "kernel assertion failed")))))
 
 ;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
 (define *verbosity*		0)
@@ -317,7 +317,7 @@
                                                     (if (< *safety* 2)
                                                         `(>> ,obj ,(<immediate-type>-tag-width <long>))
                                                       `(let ((__obj__ ,obj))
-                                                         (k/assert (is/long __obj__))
+                                                         (assert (is/long __obj__))
                                                          (>> __obj__ ,(<immediate-type>-tag-width <long>))))
                                                   (if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
@@ -344,12 +344,12 @@
 
 (define-function car (list)
   (when list
-    (k/assert (is/pair list) "car called on non-list: " list)
+    (assert (is/pair list) "car called on non-list: " list)
     (get/head list)))
 
 (define-function cdr (list)
   (when list
-    (k/assert (is/pair list) "cdr called on non-list: " list)
+    (assert (is/pair list) "cdr called on non-list: " list)
     (get/tail list)))
 
 (define-function caar		(list)		(car (car list)))
@@ -534,8 +534,8 @@
     (= 0 (get/long (get (<env> level) env)))))
 
 (define-function k/env/find-variable (env name)
-  (safety 2 (k/assert (is <env> env)     "k/env/find-variable: env is not an <env>: "env))
-  (safety 2 (k/assert (is <symbol> name) "k/env/find-variable: name is not a <symbol>: "name))
+  (safety 2 (assert (is <env> env)     "k/env/find-variable: env is not an <env>: "env))
+  (safety 2 (assert (is <symbol> name) "k/env/find-variable: name is not a <symbol>: "name))
   (let* ((bindings (get (<env> bindings) env))
          (index    (k/array-length bindings))
          (vars     (get (<array> elements) bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
@@ -545,8 +545,8 @@
           (return var))))))
 
 (define-function k/env/lookup-variable (env name)
-  (safety 1 (k/assert (is <env> env)     "k/env/lookup-variable: env is not an <env>: "env))
-  (safety 1 (k/assert (is <symbol> name) "k/env/lookup-variable: name is not a <symbol>: "name))
+  (safety 1 (assert (is <env> env)     "k/env/lookup-variable: env is not an <env>: "env))
+  (safety 1 (assert (is <symbol> name) "k/env/lookup-variable: name is not a <symbol>: "name))
   (while env
     (awhen (k/env/find-variable env name)
       (return it))
@@ -564,8 +564,8 @@
     (fatal1 "undefined variable in k/env/variable-value: %s" (get/symbol name))))
 
 (define-function k/env/ensure-variable (env name)
-  (safety 1 (k/assert (is <env> env)		"k/env/ensure-variable: env arg is not of type <env>: "env))
-  (safety 1 (k/assert (is <symbol> name)	"k/env/ensure-variable: name arg is not of type <symbol>: "name))
+  (safety 1 (assert (is <env> env)		"k/env/ensure-variable: env arg is not of type <env>: "env))
+  (safety 1 (assert (is <symbol> name)	"k/env/ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (k/env/find-variable env name)
     (return it))
   (let ((offset (get/long (get (<env> offset) env))))
@@ -574,8 +574,8 @@
       (k/array-append (get (<env> bindings) env) var))))
 
 (define-function k/env/define (env name value)
-  (safety 1 (k/assert (is <env> env) "k/env/define: env is not of type <env>: "env))
-  (safety 1 (k/assert (is <symbol> name) "k/env/define: name is not of type <symbol>: "name))
+  (safety 1 (assert (is <env> env) "k/env/define: env is not of type <env>: "env))
+  (safety 1 (assert (is <symbol> name) "k/env/define: name is not of type <symbol>: "name))
   (debug (libc/printf "k/env/define called, name is %s\n" (get/symbol name)))
   (let ((var (k/env/ensure-variable env name)))
     (put (<variable> value) var value)
@@ -655,7 +655,7 @@
     (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
     (let ((frame (k/array-at *call-stack* *call-stack-index*)))
       (if frame
-          (safety 1 (k/assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
+          (safety 1 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
         (gc/let* ((new-frame (new-record-instance <call-frame>)))
           (set (k/array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
@@ -718,7 +718,7 @@
 
 (define-function apply (fun arguments ctx)
   (debug (libc/printf "apply, function ") (k/dump fun) (libc/printf ", arguments: ") (k/dump arguments) (libc/printf "\n"))
-  (safety 1 (k/assert fun "apply: fun is null"))
+  (safety 1 (assert fun "apply: fun is null"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
       (cond
@@ -789,7 +789,7 @@
          (new-<pair> symbol/quote (get/tail exp)))
 
         ((= head symbol/set)
-         (k/assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
+         (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
          (debug (libc/printf "expand/set on form ") (k/dumpln exp))
          (gc/let* ((body (expand-all (get/tail exp) env)))
            (let (fn-name)
@@ -807,7 +807,7 @@
                (new-<pair> symbol/set body)))))
 
         ((= head symbol/define)
-         (k/assert (not (cdddr exp)) "illegal define form: " exp)
+         (assert (not (cdddr exp)) "illegal define form: " exp)
          (let ((name	(cadr exp))
                (value	(caddr exp)))
            (gc/let* ((tmp (expand value env)))
@@ -1151,7 +1151,7 @@
     (set fixed-subr/define	(k/env/variable-value env symbol/define))
     (set fixed-subr/set		(k/env/variable-value env symbol/set))
 
-    (k/assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
+    (assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
 
 (define-function capture-well-known-module-values ()
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
@@ -1182,8 +1182,8 @@
 
   (debug (libc/printf "gc initialized\n"))
 
-  (k/assert (= <long>	(type-of (new-<long> 42))) "type-of for <long> is broken")
-  (k/assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
+  (assert (= <long>	(type-of (new-<long> 42))) "type-of for <long> is broken")
+  (assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
 
   (gc/push-root (address-of *module*))
   (gc/push-root (address-of *maru-module*))
