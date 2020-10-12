@@ -123,7 +123,7 @@
       (buffer-append buf c)
       (set c (libc/fgetc stream)))
     (libc/ungetc c stream)
-    (k/intern (buffer-contents buf))))
+    (string->symbol (buffer-contents buf))))
 
 (define-function read_string (c stream)
   (gc/let* ((buf (new-<buffer>)))

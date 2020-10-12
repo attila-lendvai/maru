@@ -141,7 +141,7 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    k/print k/println k/read encode expand eval k/intern k/%accessor-typecheck)
+    k/print k/println k/read encode expand eval string->symbol k/%accessor-typecheck)
 
 ;;;
 ;;; libc
@@ -184,7 +184,7 @@
      (define-function initialize-symbol-cache ()
        ,@(map (lambda (name)
                 `(set ,(concat-symbol 'symbol/ name)
-                      (k/intern ,(symbol->string name))))
+                      (string->symbol ,(symbol->string name))))
               symbols))))
 
 (define-symbol-cache
@@ -333,12 +333,12 @@
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (module-env *module*) (k/intern ,var))
+                                                           `(k/env/lookup-variable (module-env *module*) (string->symbol ,var))
                                                          var)))
 
 (define-form put/variable-value	(var val)	`(put (<variable> value)
                                                       ,(if (string? var)
-                                                           `(k/env/lookup-variable (module-env *module*) (k/intern ,var))
+                                                           `(k/env/lookup-variable (module-env *module*) (string->symbol ,var))
                                                          var)
                                                       ,val))
 
@@ -581,7 +581,7 @@
     (put (<variable> value) var value)
     var))
 
-(define-function k/intern (cstr)
+(define-function string->symbol (cstr)
   (array-binary-search *symbols*
                        cstr
                        (lambda (item candidate)
@@ -802,7 +802,7 @@
                    (buffer-append-string buf "set-")
                    (buffer-append-string buf (get/symbol fn-name))
                    (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
-                     (new-<pair> (k/intern (buffer-contents buf))
+                     (new-<pair> (string->symbol (buffer-contents buf))
                                  args)))
                (new-<pair> symbol/set body)))))
 
@@ -1053,7 +1053,7 @@
         (when (= libc/stdin stream)
           (gc/let* ((printer (new-<pair> res 0)))
             (set printer (new-<pair> (new-<pair> symbol/quote printer) 0))
-            (set printer (new-<pair> (k/intern "print") printer))
+            (set printer (new-<pair> (string->symbol "print") printer))
             (expand-encode-eval printer env))
           (libc/flush-streams))))
     (and (= libc/stdin stream)
@@ -1073,10 +1073,10 @@
       (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
 
     ;; we always overwrite these with empty arrays in the new module
-    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*expanders*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*encoders*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*evaluators*")		tmp)
-    (set tmp (new-<array> 0))		(k/env/define env (k/intern "*applicators*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*expanders*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*encoders*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*evaluators*")		tmp)
+    (set tmp (new-<array> 0))		(k/env/define env (string->symbol "*applicators*")		tmp)
 
     (debug (libc/printf "new-<module> returning with ") (k/println module))
     module))
@@ -1132,16 +1132,16 @@
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-      (set tmp (new-<long> *verbosity*))	(k/env/define env (k/intern "*verbosity*")		tmp)
-      (set tmp (new-<long> *optimised*))	(k/env/define env (k/intern "*optimised*")		tmp)
+      (set tmp (new-<long> *verbosity*))	(k/env/define env (string->symbol "*verbosity*")		tmp)
+      (set tmp (new-<long> *optimised*))	(k/env/define env (string->symbol "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
       (set k/+end+ (or k/+end+ (set tmp (new-<symbol> "+end+"))))
-      (k/env/define env (k/intern "+end+") k/+end+))
+      (k/env/define env (string->symbol "+end+") k/+end+))
 
     ;; make sure the symbol true evaluates to itself
     (k/env/define env symbol/true symbol/true)
 
-    (k/env/define env (k/intern "*maru-module*") *maru-module*)
+    (k/env/define env (string->symbol "*maru-module*") *maru-module*)
 
     (instantiate-primitive-functions module)
 
@@ -1157,10 +1157,10 @@
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set var/*expanders*	(k/env/lookup-variable-or-die env (k/intern "*expanders*")))
-    (set var/*encoders*		(k/env/lookup-variable-or-die env (k/intern "*encoders*")))
-    (set var/*evaluators*	(k/env/lookup-variable-or-die env (k/intern "*evaluators*")))
-    (set var/*applicators*	(k/env/lookup-variable-or-die env (k/intern "*applicators*"))))
+    (set var/*expanders*	(k/env/lookup-variable-or-die env (string->symbol "*expanders*")))
+    (set var/*encoders*		(k/env/lookup-variable-or-die env (string->symbol "*encoders*")))
+    (set var/*evaluators*	(k/env/lookup-variable-or-die env (string->symbol "*evaluators*")))
+    (set var/*applicators*	(k/env/lookup-variable-or-die env (string->symbol "*applicators*"))))
 
   (debug (libc/printf "capture-well-known-module-values is done\n")))
 
@@ -1206,7 +1206,7 @@
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
-  (let ((cla-var (k/env/define (module-env *module*) (k/intern "*command-line-arguments*") ())))
+  (let ((cla-var (k/env/define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
@@ -1259,7 +1259,7 @@
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
                (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
-               (let ((sym (k/intern arg)))
+               (let ((sym (string->symbol arg)))
                  (gc/let* ((form (new-<pair> sym ())))
                    (expand-encode-eval form (module-env *module*)))))
 
@@ -1283,7 +1283,7 @@
                    (when (= 0 (string-at endptr 0))
                      (set val (new-<long> i))))
                  (gc/let* ((form (new-<pair> val ())))
-                   (set form (new-<pair> (k/intern (get/string var)) form))
+                   (set form (new-<pair> (string->symbol (get/string var)) form))
                    (set form (new-<pair> symbol/define form))
                    (expand-encode-eval form (module-env *module*)))))
 

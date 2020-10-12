@@ -30,7 +30,7 @@
   (gc/let* ((tmp (new-<subr> imp name)))
     (when fixed?
       (set tmp (new-<fixed> tmp)))
-    (k/env/define (module-env module) (k/intern name) tmp)))
+    (k/env/define (module-env module) (string->symbol name) tmp)))
 
 (define-form instantiate-primitive-functions (module)
   `(let ((__module__ ,module))
@@ -570,7 +570,7 @@
     (if (is <symbol> arg)
         arg
       (and (is <string> arg)
-           (k/intern (get/string arg))))))
+           (string->symbol (get/string arg))))))
 
 (define-subr (symbol->string 1)
   (let ((arg (get/head -args-)))
