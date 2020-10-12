@@ -129,16 +129,23 @@
             names)))
 
 (define-forwards
+    fixed-subr/quote fixed-subr/lambda fixed-subr/let fixed-subr/define fixed-subr/set
+
+    ;; optimization: we cache these definitions from the env of the Maru VM
+    ;; to avoid looking them up a gazillion times.
+    var/*expanders* var/*encoders* var/*evaluators* var/*applicators*
+
+    k/+end+ ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
+
+    libc/stdin libc/stdout libc/stderr
+
+    ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
     k/print k/println k/read encode expand eval k/intern k/%accessor-typecheck)
 
 ;;;
 ;;; libc
 ;;; ----------------------------------------------------------------
-
-(define libc/stdin)
-(define libc/stdout)
-(define libc/stderr)
 
 (define-foreign-functions/libc)
 
@@ -155,28 +162,18 @@
 
 ;;;
 ;;; global state
+;;;
+;;; Some of the state of the Maru VM being implemented needs to be
+;;; captured/known by the code implementing it in the target VM.
 ;;; ----------------------------------------------------------------
 
-(define k/+end+) ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
-
-(define *call-stack-index*	0)
-(when-at-expand feature/backtrace
-  (define *call-stack*		0))
-
-;; Some of the state of the Maru VM being implemented needs to be
-;; captured/known by the code implementing it in the target VM.
-;; Only the first one of these is essential: *module*, the rest could
-;; be looked up each time; i.e. they're just optimization or debug helpers.
 (define *module*)
 (define *maru-module*)
 (define *symbols*)
 
-;; optimization: we cache these definitions from the env of the Maru VM
-;; to avoid looking them up a gazillion times.
-(define var/*expanders*)
-(define var/*encoders*)
-(define var/*evaluators*)
-(define var/*applicators*)
+(define *call-stack-index*	0)
+(when-at-expand feature/backtrace
+  (define *call-stack*		0))
 
 ;; cache some symbols into the symbol/foo global variables
 (define-form define-symbol-cache symbols
@@ -193,12 +190,6 @@
 (define-symbol-cache
     true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
     lambda let *globals*)
-
-(define fixed-subr/quote)
-(define fixed-subr/lambda)
-(define fixed-subr/let)
-(define fixed-subr/define)
-(define fixed-subr/set)
 
 ;;;
 ;;; error handling
@@ -1126,8 +1117,8 @@
               ((and (= type <subr>)
                     (< 0 (set counter (<subr>-profiler-counter obj))))
                (set name (<subr>-_name obj))))
-            (when name
-              (libc/fprintf libc/stderr "%ld\t%s\n" counter name)))
+            (when counter
+              (libc/fprintf libc/stderr "%ld\t%s\n" counter (or name "n/a"))))
           (set obj (gc/next-object obj)))))))
 
 ;;;
@@ -1285,7 +1276,7 @@
                  (let* ((cstr	(get/string val))
                         (endptr	cstr)
                         (i	(libc/strtoul cstr (address-of endptr) 0)))
-                   ;; TODO investigate: why the hell does this behave differently than the at the other call site of strtoul?
+                   ;; TODO investigate: why the hell does this behave differently than the one at the other call site of strtoul?
                    ;; (when (or (not (= -1 i))
                    ;;           (= 0 (libc/strcmp cstr "-1")))
                    ;;   (set val (new-<long> i)))

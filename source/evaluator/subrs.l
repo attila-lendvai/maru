@@ -511,7 +511,7 @@
          (unboxed-val	(get/long val)))
     (safety 3 (k/assert (and obj (is/long idx) (not (is/long obj)))))
     (safety 1 (k/assert (and (<= unboxed-val 256) (<= 0 unboxed-val)) "set-byte-at: value is out of range: "unboxed-val))
-    (set-byte-at obj (get/long idx) unboxed-val)))
+    (set (byte-at obj (get/long idx)) unboxed-val)))
 
 (define-subr (array-length 1)
   (let ((arg (get/head -args-)))

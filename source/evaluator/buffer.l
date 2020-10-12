@@ -9,9 +9,9 @@
 (define-function new-<buffer> ()
   (let ((initial-capacity 32))
     (with-instance-accessors self <buffer>
-      (gc/let* ((self (new-record-instance <buffer>)))
-        (set self.elements (gc/allocate-opaque <data> initial-capacity))
-        (set self.size (new-<long> 0))
+      (gc/let* ((self		(new-record-instance <buffer>)))
+        (set self.size		(new-<long> 0))
+        (set self.elements	(gc/allocate-opaque <data> initial-capacity))
         self))))
 
 (define-function buffer-contents (self)
