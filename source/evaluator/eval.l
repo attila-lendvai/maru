@@ -1144,12 +1144,6 @@
 
 (load "source/evaluator/subrs.l")
 
-(define-function %instantiate-subr (module name imp fixed?)
-  (gc/let* ((tmp (new-<subr> imp name)))
-    (when fixed?
-      (set tmp (new-<fixed> tmp)))
-    (k/env/define (module-env module) (k/intern name) tmp)))
-
 (define-function populate-module-with-maru-primitives (module)
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
@@ -1165,14 +1159,7 @@
 
     (k/env/define env (k/intern "*maru-module*") *maru-module*)
 
-    (eval-at-expand
-     `(let ()
-        ,@(map (lambda (entry)
-                 (let* ((name (car entry))
-                        (impl-name (concat-symbol 'subr/ name))
-                        (fixed? (caddr entry)))
-                   `(%instantiate-subr module ,(symbol->string name) ,impl-name ,(target-boolean fixed?))))
-               *subr-registry*)))
+    (instantiate-primitive-functions module)
 
     (set fixed-subr/quote	(k/env/variable-value env symbol/quote))
     (set fixed-subr/lambda	(k/env/variable-value env symbol/lambda))

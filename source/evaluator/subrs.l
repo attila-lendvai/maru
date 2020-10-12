@@ -26,6 +26,21 @@
     (or (and (= 0 count) (not lst))
         (k/error "Operator '" op "' called with the wrong number of arguments: " args))))
 
+(define-function instantiate-primitive-function (module name imp fixed?)
+  (gc/let* ((tmp (new-<subr> imp name)))
+    (when fixed?
+      (set tmp (new-<fixed> tmp)))
+    (k/env/define (module-env module) (k/intern name) tmp)))
+
+(define-form instantiate-primitive-functions (module)
+  `(let ((__module__ ,module))
+     ,@(map (lambda (entry)
+              (let* ((name	(first entry))
+                     (impl-name	(concat-symbol 'subr/ name))
+                     (fixed?	(third entry)))
+                `(instantiate-primitive-function __module__ ,(symbol->string name) ,impl-name ,(target-boolean fixed?))))
+            *subr-registry*)))
+
 (define-subr (define () fixed)
   (let ((var (car -args-)))
     (k/assert (is <variable> var) "non-variable in define: "var)
