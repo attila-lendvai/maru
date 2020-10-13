@@ -315,6 +315,7 @@
 (define-form pair?		(obj)		`(is <pair> ,obj))
 (define-form string?		(obj)		`(is <string> ,obj))
 (define-form symbol?		(obj)		`(is <symbol> ,obj))
+(define-form array?		(obj)		`(is <array> ,obj))
 (define-form get/long		(obj)		(if (immediate-type? <long>)
                                                     (if (< *safety* 2)
                                                         `(>> ,obj ,(<immediate-type>-tag-width <long>))

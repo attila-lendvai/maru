@@ -438,7 +438,7 @@
 (define-primitive-function (string? 1)	(and (string? (get/head -args-)) symbol/true))
 (define-primitive-function (symbol? 1)	(and (symbol? (get/head -args-)) symbol/true))
 (define-primitive-function (pair? 1)	(and (pair?   (get/head -args-)) symbol/true))
-(define-primitive-function (array? 1)	(and (is <array>  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
+(define-primitive-function (array? 1)	(and (array?  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
 
 (define-primitive-function (allocate 2)
   (let ((type (get/head -args-))
@@ -513,7 +513,7 @@
 
 (define-primitive-function (array-length 1)
   (let ((arg (get/head -args-)))
-    (safety 1 (assert (is <array> arg)))
+    (safety 1 (assert (array? arg)))
     (get (<array> size) arg)))
 
 (define-primitive-function (string-length 1)
