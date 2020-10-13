@@ -6,7 +6,7 @@
   (array-do var (<env>-bindings env)
     (let* ((name		(<variable>-name  var))
            (value		(<variable>-value var))
-           (type-blacklist	(list <subr> <fixed> <form> <array> <env> <module>))
+           (type-blacklist	(list <primitive-function> <fixed> <form> <array> <env> <module>))
            (name-blacklist	'(+end+ true)))
       (unless (or (member? (type-of value) type-blacklist)
                   (member? name name-blacklist))

@@ -932,17 +932,17 @@
 
 ;;; built-in types
 
-;; NOTE: the subr's in eval.l assume a certain layout for the built-in types.
-;; what actually happens is encoded in eval.l, and the define-record forms
-;; for the built-in types in boot.l merely fill in some missing parts. types
-;; are represented internally as successive integers.
-;; corollary: the two files must agree, both in the order and in the field layout.
+;; NOTE: the primitive-functions provided by the eval executable assume
+;; a certain memory layout for the built-in types.
+;; what actually happens is encoded in the executable, and if you change any of these
+;; then you need to bootstrap to reflect the changes in the next executable.
+;; types are represented in the target as successive integers.
 
 ;; TODO maybe: type objects should be serialized into the compiled binary and this
 ;; should be wrapped in a big (eval-at-expand (if bootstrapping? ...)). this would also
 ;; reflect the fact that editing these and bringing it out of sync with the
 ;; level-shifted binary is not an option without grave consequences.
-;; such a setup would hopefully simplify the bootstrapping dance above
+;; such a setup would hopefully also simplify the bootstrapping dance above.
 (define-type		<data>)					; some opaque blob; used for stuff like the elements of <string> and <array>
 
 (define-immediate-type	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
@@ -956,12 +956,12 @@
                                                      (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<fixed>			() (function))
-(define-record		<subr>			() (_imp _name (when-at-expand feature/profiler profiler-counter)))
+(define-record		<primitive-function>	() (_imp _name (when-at-expand feature/profiler profiler-counter)))	; a "subr" in old lisp parlance
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))
 (define-record		<module>		() (globals (when-at-expand feature/debug-info name)))		; globals is the <variable> that holds '*globals*
-(define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, wrapped up, so that it can be stored in the maru heap
+(define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
 (define-record		<symbol>		() (_bits))
 (define-record		<pair>			() (head tail))
 
@@ -1183,19 +1183,19 @@
     (primitive/print "\n")
     (car args)))
 
-(define-method do-print <undefined>	()	(primitive/print self))
-(define-method do-print <string>	()	(primitive/print self))
-(define-method do-print <symbol>	()	(primitive/print self))
-(define-method do-print <long>		()	(primitive/print self))
-(define-method do-print <array>		()	(primitive/print self))
-(define-method do-print <variable>	()	(primitive/print self))
-(define-method do-print <subr>		()	(primitive/print self))
+(define-method do-print <undefined>		()	(primitive/print self))
+(define-method do-print <string>		()	(primitive/print self))
+(define-method do-print <symbol>		()	(primitive/print self))
+(define-method do-print <long>			()	(primitive/print self))
+(define-method do-print <array>			()	(primitive/print self))
+(define-method do-print <variable>		()	(primitive/print self))
+(define-method do-print <primitive-function>	()	(primitive/print self))
 
-(define-method do-dump  <undefined>	()	(primitive/dump self))
-(define-method do-dump  <string>	()	(primitive/dump self))
-(define-method do-dump	<symbol>	()	(primitive/dump self))
-(define-method do-dump	<long>		()	(primitive/dump self))
-(define-method do-dump  <array>		()	(primitive/dump self))
+(define-method do-dump  <undefined>		()	(primitive/dump self))
+(define-method do-dump  <string>		()	(primitive/dump self))
+(define-method do-dump  <symbol>		()	(primitive/dump self))
+(define-method do-dump  <long>			()	(primitive/dump self))
+(define-method do-dump  <array>			()	(primitive/dump self))
 
 (define-method do-print <fixed>		()	(print "<fixed "self.function">"))
 (define-method do-print <selector>	()	(print "<selector "self.name">"))

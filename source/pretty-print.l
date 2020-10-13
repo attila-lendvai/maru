@@ -39,7 +39,7 @@
 (define-method do-pretty <expr>		(port col)	(port-write port "<expr>"))
 (define-method do-pretty <form>		(port col)	(port-write port "<form>"))
 (define-method do-pretty <fixed>	(port col)	(port-write port "<fixed>"))
-(define-method do-pretty <subr>		(port col)	(port-write port "<subr>"))
+(define-method do-pretty <primitive-function>	(port col)	(port-write port "<primitive-function>"))
 ;;(define-method do-pretty <variable>	(port col)	(port-write port "<variable>"))
 ;;(define-method do-pretty <env>		(port col)	(port-write port "<env>"))
 ;;(define-method do-pretty <context>	(port col)	(port-write port "<context>"))

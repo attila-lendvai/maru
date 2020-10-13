@@ -179,7 +179,7 @@
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()
-;;   ;; they need to be subr's, so that encode doesn't insert them
+;;   ;; they need to be <primitive-function>'s, so that encode doesn't insert them
 ;;   (eval-in-module *target-module* `(define ,name error)))
 
 (when evolving?

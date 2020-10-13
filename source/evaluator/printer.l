@@ -60,7 +60,7 @@
                                   (libc/printf "Fixed<")
                                   (do-print (get (<fixed> function) obj) storing)
                                   (libc/printf ">")))
-      ((= type <subr>)		(libc/printf "Subr<%s>" (get (<subr> _name) obj)))
+      ((= type <primitive-function>)	(libc/printf "Primitive-Function<%s>" (get (<primitive-function> _name) obj)))
       ((= type <variable>)	(let ((env (get (<variable> env) obj)))
                                   (do-print (get (<variable> name) obj) storing)
                                   (when env

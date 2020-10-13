@@ -129,7 +129,11 @@
             names)))
 
 (define-forwards
-    fixed-subr/quote fixed-subr/lambda fixed-subr/let fixed-subr/define fixed-subr/set
+    fixed-primitive-function/quote
+    fixed-primitive-function/lambda
+    fixed-primitive-function/let
+    fixed-primitive-function/define
+    fixed-primitive-function/set
 
     k/+end+ ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
 
@@ -231,7 +235,7 @@
             names)))
 
 (define-target-types
-    <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <subr>
+    <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <primitive-function>
     <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>)
 
 ;;;
@@ -245,7 +249,7 @@
 ;;;
 ;;; unsurprisingly, types are represented in the target as integers.
 ;;; <undefined> doesn't necessarily need to be denoted by zero.
-;;; the subr's encode/implement the behavior of the primitive types.
+;;; the primitive-functions encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
 
 (define-form define-type-of ()
@@ -437,12 +441,12 @@
     (put (<fixed> function)	obj fn)
     obj))
 
-(define-function new-<subr> (_imp _name)
-  (let ((obj (new-record-instance/opaque <subr>)))
-    (put (<subr> _imp)		obj _imp)
-    (put (<subr> _name)		obj _name)
+(define-function new-<primitive-function> (_imp _name)
+  (let ((obj (new-record-instance/opaque <primitive-function>)))
+    (put (<primitive-function> _imp)		obj _imp)
+    (put (<primitive-function> _name)		obj _name)
     (when-at-expand feature/profiler
-      (put (<subr> profiler-counter) obj 0))
+      (put (<primitive-function> profiler-counter) obj 0))
     obj))
 
 (define-function new-<variable> (name value env index)
@@ -722,9 +726,12 @@
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
       (cond
-        ((= type <expr>)	(apply/expr fun arguments ctx))
-        ;;((= type <fixed>)	(apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
-        ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
+        ((= type <expr>)
+         (apply/expr fun arguments ctx))
+
+        ((= type <primitive-function>)
+         ((get (<primitive-function> _imp) fun) arguments ctx))
+
         (else
          (aif (and *applicators*
                    (set it (maybe-object-in-variable *applicators* <array>))
@@ -881,9 +888,9 @@
             (tail (get/tail exp)))
     (debug (libc/printf "encode/pair of head ") (dump head) (libc/printf ", in env ") (dumpln env))
     ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
-    ;; because of that emit requires the introduction of the eval-encoded subr
+    ;; because of that emit requires the introduction of the eval-encoded primitive-function
     (cond
-      ((= head fixed-subr/let)
+      ((= head fixed-primitive-function/let)
        (gc/let* ((vars		())
                  (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
          ;; phase 1: first define the let variables into new-env
@@ -916,24 +923,31 @@
            (set tail (cons new-bindings tail))
            (set tail (cons new-env tail)))))
 
-      ((= head fixed-subr/lambda)	(let ((args (cadr exp)))
-					  (gc/let* ((new-env (new-<env> env 1 0)))
-					    (while (is/pair args)
-					      (environment-define new-env (get/head args) ())
-					      (set args (get/tail args)))
-					    (when args
-                                              (environment-define new-env args ()))
-					    (set tail (encode-all tail new-env))
-					    (set tail (cons new-env tail)))))
-      ((= head fixed-subr/define)	(let ((var (ensure-variable (module-env *module*) (car tail))))
-					  (set tail (encode-all (cdr tail) env))
-					  (set tail (cons var tail))))
-      ((= head fixed-subr/set)		(let ((var (lookup-variable env (car tail))))
-					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
-					  (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
-					  (set tail (encode-all (cdr tail) env))
-					  (set tail (cons var tail))))
-      ((!= head fixed-subr/quote)	(set tail (encode-all tail env))))
+      ((= head fixed-primitive-function/lambda)
+       (let ((args (cadr exp)))
+         (gc/let* ((new-env (new-<env> env 1 0)))
+           (while (is/pair args)
+             (environment-define new-env (get/head args) ())
+             (set args (get/tail args)))
+           (when args
+             (environment-define new-env args ()))
+           (set tail (encode-all tail new-env))
+           (set tail (cons new-env tail)))))
+
+      ((= head fixed-primitive-function/define)
+       (let ((var (ensure-variable (module-env *module*) (car tail))))
+         (set tail (encode-all (cdr tail) env))
+         (set tail (cons var tail))))
+
+      ((= head fixed-primitive-function/set)
+       (let ((var (lookup-variable env (car tail))))
+         (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
+         (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
+         (set tail (encode-all (cdr tail) env))
+         (set tail (cons var tail))))
+
+      ((!= head fixed-primitive-function/quote)
+       (set tail (encode-all tail env))))
     ;; return value
     (cons head tail)))
 
@@ -1103,8 +1117,11 @@
                (callee-type	(type-of callee)))
           (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
             (cond
-              ((= callee-type <expr>)		(incr-boxed	(<expr>-profiler-counter callee)))
-              ((= callee-type <subr>)		(incr		(<subr>-profiler-counter callee)))))))))
+              ((= callee-type <expr>)
+               (incr-boxed (<expr>-profiler-counter callee)))
+
+              ((= callee-type <primitive-function>)
+               (incr (<primitive-function>-profiler-counter callee)))))))))
 
   (define-function profiler/disable ()
     (set_profiler_interval 0)
@@ -1121,19 +1138,20 @@
                (set name (<expr>-name obj))
                (when name
                  (set name (get/symbol name))))
-              ((and (= type <subr>)
-                    (< 0 (set counter (<subr>-profiler-counter obj))))
-               (set name (<subr>-_name obj))))
+
+              ((and (= type <primitive-function>)
+                    (< 0 (set counter (<primitive-function>-profiler-counter obj))))
+               (set name (<primitive-function>-_name obj))))
             (when counter
               (libc/fprintf libc/stderr "%ld\t%s\n" counter (or name "n/a"))))
           (set obj (gc/next-object obj)))))))
 
 ;;;
-;;; the subr's
+;;; the primitive-functions
 ;;;
 ;;; ----------------------------------------------------------------
 
-(load "source/evaluator/subrs.l")
+(load "source/evaluator/primitive-functions.l")
 
 (define-function populate-module-with-maru-primitives (module)
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
@@ -1152,13 +1170,13 @@
 
     (instantiate-primitive-functions module)
 
-    (set fixed-subr/quote	(variable-value env symbol/quote))
-    (set fixed-subr/lambda	(variable-value env symbol/lambda))
-    (set fixed-subr/let		(variable-value env symbol/let))
-    (set fixed-subr/define	(variable-value env symbol/define))
-    (set fixed-subr/set		(variable-value env symbol/set))
+    (set fixed-primitive-function/quote		(variable-value env symbol/quote))
+    (set fixed-primitive-function/lambda	(variable-value env symbol/lambda))
+    (set fixed-primitive-function/let		(variable-value env symbol/let))
+    (set fixed-primitive-function/define	(variable-value env symbol/define))
+    (set fixed-primitive-function/set		(variable-value env symbol/set))
 
-    (assert (and (is <fixed> fixed-subr/quote) (is <fixed> fixed-subr/lambda) (is <fixed> fixed-subr/let) (is <fixed> fixed-subr/define) (is <fixed> fixed-subr/set)) "populate-module-with-maru-primitives: final assert")))
+    (assert (and (is <fixed> fixed-primitive-function/quote) (is <fixed> fixed-primitive-function/lambda) (is <fixed> fixed-primitive-function/let) (is <fixed> fixed-primitive-function/define) (is <fixed> fixed-primitive-function/set)) "populate-module-with-maru-primitives: final assert")))
 
 (define-function capture-well-known-module-values ()
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))

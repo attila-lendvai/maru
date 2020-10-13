@@ -34,3 +34,6 @@
                   (filter name value))
           (environment-define to-env name value))))
     ()))
+
+;; this got renamed
+(define <primitive-function> <subr>)
