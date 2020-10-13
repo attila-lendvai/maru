@@ -5,7 +5,8 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
-(define *tests* ())
+(eval-in-module *slave-module*
+  '(define *tests* ()))
 
 (define-form failure (format . args)
   `(let ()
@@ -33,13 +34,6 @@
       (set tests (rest tests)))
     `(let ()
        ,@forms)))
-
-;;;
-;;;
-;;; Actual artifacts that are meant to be level-shifted into the target
-;;;
-;;;
-(compile-begin)
 
 (define-foreign-functions/libc)
 
@@ -70,12 +64,12 @@
 ;;   42)
 
 (define-test compile/if/1
-    (if target-boolean/false 342 343)
+    (if false 342 343)
   343)
 
 (define-test compile/if/2
-    (if target-boolean/true
-        (if target-boolean/false
+    (if true
+        (if false
             242
           244)
       243)
@@ -102,11 +96,11 @@
 
 (define-test compile/foreign-function/2
     (< 0 (libc/strcmp "foo" "bar"))
-  target-boolean/true)
+  true)
 
 (define-test compile/foreign-function/3
     (> 0 (libc/strcmp "bar" "foo"))
-  target-boolean/true)
+  true)
 
 (define-test compile/load-store/1
     (let ((x 42))
@@ -138,7 +132,7 @@
 
 (define-test compile/and/1
     (and)
-  target-boolean/true)
+  true)
 
 (define-test compile/and/2
     (and 42 43)
@@ -160,7 +154,7 @@
 
 (define-test compile/or/1
     (or)
-  target-boolean/false)
+  false)
 
 (define-test compile/or/2
     (or () 42 43)
@@ -205,11 +199,11 @@
 
 (define-test compile/not/1
     (not ())
-  target-boolean/true)
+  true)
 
 (define-test compile/not/2
     (not 42)
-  target-boolean/false)
+  false)
 
 (define-test compile/neg/1
     (- 42)
@@ -287,15 +281,15 @@
 ;;       (bitwise-shift 0x42 shift))
 ;;   0x42)
 
-(define-test compile/string-at/1
-    (string-at "alma" 2)
+(define-test compile/char-at/1
+    (char-at "alma" 2)
   ?m)
 
-(define-test compile/set-string-at/1
-    ;; NOTE if we just set-string-at on the constant, then LLVM optimizes it into oblivion without any notice
+(define-test compile/set-char-at/1
+    ;; NOTE if we just set-char-at on the constant, then LLVM optimizes it into oblivion without any notice
     (let* ((buf (libc/strdup "bogyo"))
            (value ?i))
-      (set (string-at buf 1) value)
+      (set (char-at buf 1) value)
       (libc/strcmp buf "bigyo"))
   0)
 
@@ -304,24 +298,24 @@
 ;; NOTE shifting right is signed
 (define-test compile/oop-at/1
     (>> (oop-at "0123456789abcdefghijklmnopqrst" 0)
-        (- target/word-size-in-bits 32))
+        (- +word-size-in-bits+ 32))
   (cond
-    ((= 32 target/word-size-in-bits)
-     (if target/little-endian? 0x33323130 0x30313233))
+    ((= 32 +word-size-in-bits+)
+     (if +little-endian?+ 0x33323130 0x30313233))
     ;; TODO add read-time eval for this?
-    ;; ((= 64 target/word-size-in-bits)
-    ;;  (if target/little-endian? 0x3736353433323130 0x303132334353637))
-    ((= 64 target/word-size-in-bits)
-     (if target/little-endian? 0x37363534 0x3031323))))
+    ;; ((= 64 +word-size-in-bits+)
+    ;;  (if +little-endian?+ 0x3736353433323130 0x303132334353637))
+    ((= 64 +word-size-in-bits+)
+     (if +little-endian?+ 0x37363534 0x3031323))))
 
 (define-test compile/oop-at/2
     (>> (oop-at "0z0000x01z1111x12z2222x23z3333x3" 1)
-        (- target/word-size-in-bits 32))
+        (- +word-size-in-bits+ 32))
   (cond
-    ((= 32 target/word-size-in-bits)
-     (if target/little-endian? 0x30783030 0x30307830))
-    ((= 64 target/word-size-in-bits)
-     (if target/little-endian? 0x31783131 0x317a3131))))
+    ((= 32 +word-size-in-bits+)
+     (if +little-endian?+ 0x30783030 0x30307830))
+    ((= 64 +word-size-in-bits+)
+     (if +little-endian?+ 0x31783131 0x317a3131))))
 
 (define-test compile/set-oop-at/1
     (let* ((buf (libc/strdup "0123456789abcdefghijklmnopqrst"))
@@ -329,13 +323,13 @@
       (set (oop-at buf 1) value)
       (libc/strcmp buf
                    (cond
-                     ((= 32 target/word-size-in-bits)
-                      (if target/little-endian?
+                     ((= 32 +word-size-in-bits+)
+                      (if +little-endian?+
                           "0123kuk189abcdefghijklmnopqrst"
                         "01231kuk89abcdefghijklmnopqrst"))
-                     ((= 64 target/word-size-in-bits)
+                     ((= 64 +word-size-in-bits+)
                       ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if target/little-endian?
+                      (if +little-endian?+
                           "01234567kuk1"
                         "TODO fill me in")))))
   0)
@@ -348,13 +342,13 @@
       (libc/puts buf)
       (libc/strcmp buf
                    (cond
-                     ((= 32 target/word-size-in-bits)
-                      (if target/little-endian?
+                     ((= 32 +word-size-in-bits+)
+                      (if +little-endian?+
                           "01234567kuk1cdefghijklmnopqrst"
                         "012345671kukcdefghijklmnopqrst"))
-                     ((= 64 target/word-size-in-bits)
+                     ((= 64 +word-size-in-bits+)
                       ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if target/little-endian?
+                      (if +little-endian?+
                           "0123456789abcdefkuk1"
                         "TODO fill me in")))))
   0)
@@ -376,12 +370,12 @@
 (define-test compile/set/bug/1
     (let ((argc 2))
       (< 0 (set argc (- argc 1))))
-  target-boolean/true)
+  true)
 
 (define-test compile/set/bug/2
     (let ((argc 1))
       (< 0 (set argc (- argc 1))))
-  target-boolean/false)
+  false)
 
 (define-function set-second-to-first (x y)
   (set x y)
@@ -419,5 +413,3 @@
   (libc/printf "\nFinished running the compiled tests\n")
 
   (return *exit-code*))
-
-(compile-end)
