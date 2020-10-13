@@ -598,14 +598,18 @@
                            (k/array-insert array index sym)
                            sym))))
 
-(define-function maybe-object-in-variable (env name type)
-  (let ((tmp (when (is <symbol> name)
-               (k/env/lookup-variable env name))))
+(define-function maybe-object-in-variable (var type)
+  (let ((tmp var))
     (and tmp
          (is <variable> tmp)
          (set tmp (get (<variable> value) tmp))
-         (= type (get/type tmp))
+         (or (not type)
+             (= type (get/type tmp)))
          tmp)))
+
+(define-function maybe-object-in-env (env name type)
+  (when (is <symbol> name)
+    (maybe-object-in-variable (k/env/lookup-variable env name) type)))
 
 (define-function copy-module-bindings (from to)
   (debug (libc/printf "copy-module-bindings from %p to %p\n" from to))
@@ -730,23 +734,24 @@
         ;;((= type <fixed>)	(k/apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
         ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
         (else
-         (let ((ap (k/array-at (get/variable-value var/*applicators*) (get/type fun))))
-           (if ap
-               (gc/let* ((args arguments))
-                 (set args (new-<pair> fun args))
-                 (k/apply ap args ctx))
-             (k/error "cannot apply: " fun))))))))
+         (aif (and var/*applicators*
+                   (set it (maybe-object-in-variable var/*applicators* <array>))
+                   (k/array-at it (get/type fun)))
+             (gc/let* ((args arguments))
+               (set args (new-<pair> fun args))
+               (k/apply it args ctx))
+           (k/error "cannot apply: " fun)))))))
 
 ;;;
 ;;; expand
 ;;; ----------------------------------------------------------------
 
-(define-function maybe-form-in-variable/function (env name)
-  (awhen (maybe-object-in-variable env name <form>)
+(define-function maybe-form-in-env/function (env name)
+  (awhen (maybe-object-in-env env name <form>)
     (get (<form> function) it)))
 
-(define-function maybe-form-in-variable/symbol (env name)
-  (awhen (maybe-object-in-variable env name <form>)
+(define-function maybe-form-in-env/symbol (env name)
+  (awhen (maybe-object-in-env env name <form>)
     (get (<form> symbol) it)))
 
 (define-function k/expand/pair (exp env syntax-module -call-frame-)
@@ -757,13 +762,13 @@
       (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
     (let (expander)
       (cond
-        ((set expander (maybe-form-in-variable/function env head))
+        ((set expander (maybe-form-in-env/function env head))
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
          (gc/let* ((args (new-<pair> env (get/tail exp)))
                    (expansion (k/apply expander args ())))
            (debug (libc/printf "k/expand/pair, found in local env, expanded to ") (k/dump expansion) (libc/printf "\n"))
            (k/expand expansion env)))
-        ((set expander (maybe-form-in-variable/function (module-env syntax-module) head))
+        ((set expander (maybe-form-in-env/function (module-env syntax-module) head))
          ;; head is a <form> found in the *syntax-module*'s env
          (gc/let* ((args (new-<pair> env (get/tail exp)))
                    (expansion (with-current-module syntax-module
@@ -790,13 +795,13 @@
   (debug (libc/printf "k/expand/symbol, exp ") (k/dump exp) (libc/printf ", env ") (k/dump env) (libc/printf "\n"))
   (let (expander)
     (cond
-      ((set expander (maybe-form-in-variable/symbol env exp))
+      ((set expander (maybe-form-in-env/symbol env exp))
        ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
        (gc/let* ((args (k/list2 env exp))
                  (expansion (k/apply expander args ())))
          (debug (libc/printf "k/expand/symbol, found in local env, expanded to ") (k/dump expansion) (libc/printf "\n"))
          (k/expand expansion env)))
-      ((set expander (maybe-form-in-variable/symbol (module-env syntax-module) exp))
+      ((set expander (maybe-form-in-env/symbol (module-env syntax-module) exp))
        ;; head is a <form> found in the *syntax-module*'s env
        (gc/let* ((args (k/list2 env exp))
                  (expansion (with-current-module syntax-module
@@ -814,7 +819,9 @@
       ((is <symbol> exp)	(k/expand/symbol	exp env (k/env/variable-value env symbol/*syntax-module*)))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
-       (aif (k/array-at (get/variable-value var/*expanders*) (get/type exp))
+       (aif (and var/*expanders*
+                 (set it (maybe-object-in-variable var/*expanders* <array>))
+                 (k/array-at it (get/type exp)))
            (gc/let* ((args (new-<pair> exp ())))
              (k/apply it args ()))
          exp)))))
@@ -889,7 +896,9 @@
       ((is/pair exp)		(k/encode/pair		exp env))
       ((is <symbol> exp)	(k/encode/symbol	exp env))
       (else
-       (aif (k/array-at (get/variable-value var/*encoders*) (get/type exp))
+       (aif (and var/*encoders*
+                 (set it (maybe-object-in-variable var/*encoders* <array>))
+                 (k/array-at it (get/type exp)))
            (gc/let* ((args (new-<pair> env ())))
              (set args (new-<pair> exp args))
              (debug (libc/printf "k/encode/other: applying fn: ") (k/println it) (libc/printf " ") (k/print args) (libc/printf " ") (k/println env))
@@ -934,13 +943,14 @@
       (else
        (when-at-expand feature/backtrace
          (set (<call-frame>-callee-designator -call-frame-) exp))
-       (let ((evaluator (k/array-at (get/variable-value var/*evaluators*) type)))
-	 (if evaluator
-	     (gc/let* ((args (new-<pair> exp ())))
-	       (when-at-expand feature/backtrace
-                 (set (<call-frame>-callee -call-frame-) evaluator))
-	       (k/apply evaluator args ctx))
-           exp))))))
+       (aif (and var/*evaluators*
+                 (set it (maybe-object-in-variable var/*evaluators* <array>))
+                 (k/array-at it type))
+	   (gc/let* ((args (new-<pair> exp ())))
+	     (when-at-expand feature/backtrace
+               (set (<call-frame>-callee -call-frame-) it))
+	     (k/apply it args ctx))
+         exp)))))
 
 (define-function k/eval (exp ctx)
   (verbosity 3 (libc/printf "  E  ") (k/dump exp) (libc/printf " ") (k/dumpln ctx) (libc/flush-streams))
@@ -1108,10 +1118,10 @@
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set var/*expanders*	(k/env/lookup-variable-or-die env (k/intern "*expanders*")))
-    (set var/*encoders*		(k/env/lookup-variable-or-die env (k/intern "*encoders*")))
-    (set var/*evaluators*	(k/env/lookup-variable-or-die env (k/intern "*evaluators*")))
-    (set var/*applicators*	(k/env/lookup-variable-or-die env (k/intern "*applicators*"))))
+    (set var/*expanders*	(k/env/lookup-variable env (k/intern "*expanders*")))
+    (set var/*encoders*		(k/env/lookup-variable env (k/intern "*encoders*")))
+    (set var/*evaluators*	(k/env/lookup-variable env (k/intern "*evaluators*")))
+    (set var/*applicators*	(k/env/lookup-variable env (k/intern "*applicators*"))))
 
   (debug (libc/printf "capture-well-known-module-values is done\n")))
 
