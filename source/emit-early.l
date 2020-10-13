@@ -170,3 +170,8 @@
 ;; (list-do name '()
 ;;   ;; they need to be subr's, so that encode doesn't insert them
 ;;   (eval-in-module *target-module* `(define ,name error)))
+
+(when evolving?
+  (eval-in-target `(let ()
+                     (define char-at		string-at)
+                     (define set-char-at	set-string-at))))

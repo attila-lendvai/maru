@@ -533,6 +533,12 @@
         (idx (get/long (get/head (get/tail -args-)))))
     (new-<long> (k/string-at arr idx))))
 
+;; adding [set-]char-at to the evaluator makes it source-level compatible with the level-shifted code, and with that enables us to load files like buffer.l into both worlds
+(define-subr (char-at 2)
+  (let ((arr (get/head -args-))
+        (idx (get/long (get/head (get/tail -args-)))))
+    (new-<long> (k/string-at arr idx))))
+
 (define-subr (set-array-at 3)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (set -args- (get/tail -args-)))))
@@ -541,6 +547,16 @@
     val))
 
 (define-subr (set-string-at 3)
+  (let* ((arr (get/head -args-))
+         (idx (get/long (get/head (set -args- (get/tail -args-)))))
+         (val (get/head (get/tail -args-))))
+    ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
+    ;; we also assert here that idx is out of bounds at most by +1.
+    (safety 1 (assert (<= idx (k/string-length arr))))
+    (set (k/string-at arr idx) (get/long val))
+    val))
+
+(define-subr (set-char-at 3)
   (let* ((arr (get/head -args-))
          (idx (get/long (get/head (set -args- (get/tail -args-)))))
          (val (get/head (get/tail -args-))))
@@ -593,7 +609,7 @@
     (let* ((str		(get/string arg))
            (endptr	str)
            (result	(libc/strtol str (address-of endptr) 10)))
-      (if (= (string-at endptr 0) ?\x00)
+      (if (= (char-at endptr 0) ?\x00)
           (new-<long> result)
         (fatal1 "invalid number in string->long, libc/strtol failed for '%s'" str)))))
 

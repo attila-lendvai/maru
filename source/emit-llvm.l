@@ -854,13 +854,11 @@
               (bitwise-and  ,AND) (bitwise-or   ,OR ) (bitwise-xor ,XOR)
               (<  ,LT ) (<=  ,LE ) (= ,EQ ) (!= ,NE) (>= ,GE) (> ,GT)
               (<< ,ASL) (>>  ,ASR)
-              ;; the reason we define a [set-]string-at primitive here is to enable writing files like source/buffer.l
-              ;; that can be both part of the level-shifted code, and loaded into the interpreter, verbatim.
-              (string-at	,LOAD-I8)
+              (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
               (oop-at		,LOAD-OOP))
              ;; ternary
-             ((set-string-at	,STORE-I8)
+             ((set-char-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
               (set-oop-at	,STORE-OOP)))))
       (list->array

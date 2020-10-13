@@ -21,6 +21,6 @@
 (define-function buffer-append-string (buf str)
   (let ((i 0)
         (c 0))
-    (while (set c (string-at str i))
+    (while (set c (char-at str i))
       (buffer-append buf c)
       (incr i))))

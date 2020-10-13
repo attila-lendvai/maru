@@ -14,7 +14,7 @@
                                     (let ((i 0)
                                           (c 0))
                                       (libc/printf "\"")
-                                      (while (set c (string-at bits i))
+                                      (while (set c (char-at bits i))
                                         (if (and (<= 32 c) (<= c 126))
                                             (cond
                                               ((= c ?\")        (libc/printf "\\\"")) ; \"

@@ -1280,7 +1280,7 @@
                    ;; (when (or (not (= -1 i))
                    ;;           (= 0 (libc/strcmp cstr "-1")))
                    ;;   (set val (new-<long> i)))
-                   (when (= 0 (string-at endptr 0))
+                   (when (= 0 (char-at endptr 0))
                      (set val (new-<long> i))))
                  (gc/let* ((form (new-<pair> val ())))
                    (set form (new-<pair> (string->symbol (get/string var)) form))
