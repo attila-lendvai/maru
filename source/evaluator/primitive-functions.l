@@ -262,7 +262,7 @@
          (type (type-of lhs)))
     (cond
       ((= type <long>)		(and (long? rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
-      ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
+      ((= type <string>)	(and (string? rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
 (define-primitive-function (!= 2)
@@ -271,7 +271,7 @@
          (type (type-of lhs)))
     (cond
       ((= type <long>)		(and (long? rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
-      ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
+      ((= type <string>)	(and (string? rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
       (else                     (and (!= lhs rhs) symbol/true)))))
 
 (define-primitive-function abort
@@ -314,7 +314,7 @@
 (define-primitive-function (libc/format 2)
   (let ((ofmt (get/head -args-))
         (oarg (get/head (get/tail -args-))))
-    (assert (is <string> ofmt) "libc/format primitive-function: non-string format")
+    (assert (string? ofmt) "libc/format primitive-function: non-string format")
     (let ((fmt (get/string ofmt))
           (typ (type-of oarg))
           (arg ()))
@@ -343,7 +343,7 @@
         (and (= k/+end+ obj) (set obj ()))
         obj)
     (let ((arg (car -args-)))
-      (or (is <string> arg) (fatal1 "read: argument is not a <string> "arg))
+      (or (string? arg) (fatal1 "read: argument is not a <string> "arg))
       (let ((stream (libc/fopen (get/string arg) "r")))
         ;; TODO error handling
         (if stream
@@ -360,7 +360,7 @@
 (define-primitive-function (load 1)
   (let* ((path		(get/head -args-))
          (stream	(or (cond
-                              ((is <string> path)
+                              ((string? path)
                                (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\n" (get/string path)))
                                (libc/fopen (get/string path) "r"))
                               ((not path)
@@ -435,7 +435,7 @@
 (define-primitive-function (type-of 1)	(new-<long> (type-of (get/head -args-))))
 (define-primitive-function (car 1)	(car (get/head -args-)))
 (define-primitive-function (cdr 1)	(cdr (get/head -args-)))
-(define-primitive-function (string? 1)	(and (is <string> (get/head -args-)) symbol/true))
+(define-primitive-function (string? 1)	(and (string? (get/head -args-)) symbol/true))
 (define-primitive-function (symbol? 1)	(and (is <symbol> (get/head -args-)) symbol/true))
 (define-primitive-function (pair? 1)	(and (is <pair>   (get/head -args-)) symbol/true))
 (define-primitive-function (array? 1)	(and (is <array>  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
@@ -518,7 +518,7 @@
 
 (define-primitive-function (string-length 1)
   (let ((arg (get/head -args-)))
-    (safety 1 (assert (is <string> arg)))
+    (safety 1 (assert (string? arg)))
     (get (<string> size) arg)))
 
 (define-primitive-function (array-at 2)
@@ -583,13 +583,13 @@
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (is <symbol> arg)
         arg
-      (and (is <string> arg)
+      (and (string? arg)
            (string->symbol (get/string arg))))))
 
 (define-primitive-function (symbol->string 1)
   (let ((arg (get/head -args-)))
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
-    (if (is <string> arg)
+    (if (string? arg)
         arg
       (and (is <symbol> arg)
            (new-<string>-from-cstring (get/symbol arg))))))
@@ -603,7 +603,7 @@
 
 (define-primitive-function (string->long 1)
   (let ((arg (get/head -args-)))
-    (assert (is <string> arg))
+    (assert (string? arg))
     (let* ((str		(get/string arg))
            (endptr	str)
            (result	(libc/strtol str (address-of endptr) 10)))
