@@ -418,9 +418,9 @@
               (get (<context> env) -ctx-))))
 
 (define-primitive-function cons		(cons (car -args-) (cadr -args-)))
-(define-primitive-function (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
-(define-primitive-function array	(new-<array> (and (long? (car -args-)) (get/long (get/head -args-)))))
 (define-primitive-function form		(new-<form> (car -args-) (cadr -args-)))
+(define-primitive-function (string 1)	(string (get/long (get/head -args-))))
+(define-primitive-function array	(array (and (long? (car -args-)) (get/long (get/head -args-)))))
 (define-primitive-function (type-of 1)	(new-<long> (type-of (get/head -args-))))
 (define-primitive-function (car 1)	(car (get/head -args-)))
 (define-primitive-function (cdr 1)	(cdr (get/head -args-)))

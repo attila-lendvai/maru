@@ -390,7 +390,7 @@
     (set (<pair>-tail obj) tail)
     obj))
 
-(define-function new-<string>-of-length (len)
+(define-function string (len)
   (gc/let* ((str (new-record-instance <string>)))
     (put (<string> size) str (new-<long> len))
     (when (> len 0)
@@ -399,7 +399,7 @@
 
 (define-function new-<string>-from-cstring (cstr)
   (let* ((len (libc/strlen cstr))
-         (obj (new-<string>-of-length len)))
+         (obj (string len)))
     (libc/memcpy (get (<string> elements) obj) cstr len)
     obj))
 
@@ -411,7 +411,7 @@
       (put (<symbol> _bits) obj bits)
       obj)))
 
-(define-function new-<array> (capacity)
+(define-function array (capacity)
   (gc/let* ((arr (new-record-instance <array>)))
     (put (<array> size) arr (new-<long> 0))
     (when (> capacity 0)
@@ -460,14 +460,14 @@
     (put (<env> parent)		obj parent)
     (put (<env> level)		obj (new-<long> (if parent (+ (get/long (get (<env> level) parent)) level) 0)))
     (put (<env> offset)		obj (new-<long> offset))
-    (put (<env> bindings)	obj (new-<array> 0))
+    (put (<env> bindings)	obj (array 0))
     obj))
 
 (define-function new-base-<context> (home caller env)
   (gc/let* ((obj (new-record-instance <context>)))
     (put (<context> home)	obj home)
     (put (<context> env)	obj env)
-    (put (<context> bindings)	obj (new-<array> 0))
+    (put (<context> bindings)	obj (array 0))
     obj))
 
 ;; (define-function new-<context> (home caller env)
@@ -475,7 +475,7 @@
 ;;     (gc/protect (obj)
 ;;       (set (<context>-home     obj) home)
 ;;       (set (<context>-env      obj) env)
-;;       (set (<context>-bindings obj) (new-<array> 0))
+;;       (set (<context>-bindings obj) (array 0))
 ;;       obj)))
 
 (define-function new-<context> (home caller env)
@@ -1065,10 +1065,10 @@
       (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
 
     ;; we always overwrite these with empty arrays in the new module
-    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*expanders*")		tmp)
-    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*encoders*")		tmp)
-    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
-    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*applicators*")	tmp)
+    (set tmp (array 0))		(environment-define env (string->symbol "*expanders*")		tmp)
+    (set tmp (array 0))		(environment-define env (string->symbol "*encoders*")		tmp)
+    (set tmp (array 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
+    (set tmp (array 0))		(environment-define env (string->symbol "*applicators*")	tmp)
 
     (debug (libc/printf "new-<module> returning with ") (println module))
     module))
@@ -1189,9 +1189,9 @@
 
   (when-at-expand feature/backtrace
     (gc/push-root (address-of *call-stack*))
-    (set *call-stack* (new-<array> 32)))
+    (set *call-stack* (array 32)))
 
-  (set *symbols* (new-<array> 32))
+  (set *symbols* (array 32))
   (initialize-symbol-cache)				(debug (libc/printf "initialized *symbols*\n"))
 
   (set *maru-module* (new-<module> "maru"))
