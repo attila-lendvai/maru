@@ -193,16 +193,18 @@
 (define-form when (test . body)
   `(if ,test (let () ,@body)))
 
-(define-form awhen (test . body)
-  `(let ((it ,test))
-     (when it
-       ,@body)))
-
 (define-form unless (test . body)
   `(if ,test () ,@body))
 
+(define-form awhen (test . body)
+  `(let (it)
+     ;; this allows SETting IT from inside TEST
+     (when (set it ,test)
+       ,@body)))
+
 (define-form aif (test true-form . false-forms)
-  `(let ((it ,test))
+  `(let (it)
+     (set it ,test)
      (if it
          ,true-form
        ,@false-forms)))
