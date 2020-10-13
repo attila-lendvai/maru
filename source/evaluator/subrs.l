@@ -260,7 +260,9 @@
       ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
       (else                     (and (!= lhs rhs) symbol/true)))))
 
-(define-subr (abort 0)
+(define-subr abort
+  (libc/printf "ABORTED: ")
+  (k/dumpln -args-)
   (print-backtrace)
   (libc/flush-streams)
   (libc/abort))
