@@ -57,7 +57,7 @@
 (define-primitive-function (defined? 1)
   (let ((name (get/head -args-))
         (env (or (cadr -args-) (module-env *module*))))
-    (lookup-variable env name)))
+    (defined? name env)))
 
 (define-primitive-function (lambda () fixed)
   (let* (((env parameters . body) -args-)) ; see encode/pair, it puts the env as the first arg

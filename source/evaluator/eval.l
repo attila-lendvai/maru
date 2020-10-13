@@ -336,12 +336,12 @@
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
-                                                           `(lookup-variable (module-env *module*) (string->symbol ,var))
+                                                           `(defined? (string->symbol ,var) (module-env *module*))
                                                          var)))
 
 (define-form put/variable-value	(var val)	`(put (<variable> value)
                                                       ,(if (string? var)
-                                                           `(lookup-variable (module-env *module*) (string->symbol ,var))
+                                                           `(defined? (string->symbol ,var) (module-env *module*))
                                                          var)
                                                       ,val))
 
@@ -535,22 +535,16 @@
         (when (= name (get (<variable> name) var))
           (return var))))))
 
-(define-function lookup-variable (env name)
-  (safety 1 (assert (is <env> env)     "lookup-variable: env is not an <env>: "env))
-  (safety 1 (assert (symbol? name) "lookup-variable: name is not a <symbol>: "name))
+(define-function defined? (name env)
+  (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
+  (safety 1 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
   (while env
     (awhen (find-variable env name)
       (return it))
     (set env (get (<env> parent) env))))
 
-(define-function lookup-variable-or-die (env name)
-  (let ((var (lookup-variable env name)))
-    (unless (is <variable> var)
-      (error "lookup-variable-or-die failed for "name", current module: "*module*))
-    var))
-
 (define-function variable-value (env name)
-  (aif (lookup-variable env name)
+  (aif (defined? name env)
       (get (<variable> value) it)
     (fatal1 "undefined variable in variable-value: %s" (get/symbol name))))
 
@@ -594,7 +588,7 @@
 
 (define-function maybe-object-in-env (env name type)
   (when (symbol? name)
-    (maybe-object-in-variable (lookup-variable env name) type)))
+    (maybe-object-in-variable (defined? name env) type)))
 
 (load "source/env-min.l")
 
@@ -914,7 +908,7 @@
          (set tail (cons var tail))))
 
       ((= head fixed-primitive-function/set)
-       (let ((var (lookup-variable env (car tail))))
+       (let ((var (defined? (car tail) env)))
          (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
          (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
          (set tail (encode-all (cdr tail) env))
@@ -927,7 +921,8 @@
 
 (define-function encode/symbol (exp env)
   (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (dumpln env))
-  (let ((var (lookup-variable-or-die env exp)))
+  (let ((var (or (defined? exp env)
+                 (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
         (let ((val (get (<variable> value) var)))
           (when (or (is <form> val)
@@ -1156,10 +1151,10 @@
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set *expanders*	(lookup-variable env (string->symbol "*expanders*")))
-    (set *encoders*	(lookup-variable env (string->symbol "*encoders*")))
-    (set *evaluators*	(lookup-variable env (string->symbol "*evaluators*")))
-    (set *applicators*	(lookup-variable env (string->symbol "*applicators*"))))
+    (set *expanders*	(defined? (string->symbol "*expanders*") env))
+    (set *encoders*	(defined? (string->symbol "*encoders*") env))
+    (set *evaluators*	(defined? (string->symbol "*evaluators*") env))
+    (set *applicators*	(defined? (string->symbol "*applicators*") env)))
 
   (debug (libc/printf "capture-well-known-module-values is done\n")))
 
