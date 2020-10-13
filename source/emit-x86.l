@@ -461,8 +461,7 @@
                              (global-variable? op)))
          (op-value	(if op-is-a-var? (<variable>-value op) op))
          (arity		(list-length args))
-         (target-name	())
-         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-)))
+         (target-name	()))
     (when op-is-global?
       (let ((n-params	()))
         (cond
@@ -481,13 +480,12 @@
           (error "compile: calling " op-value
                  " with the wrong number of arguments: " args
                  ", while expecting " n-params))))
-    ;; NOTE we compile the operator expression early to implement the evaluation order.
-    ;; also note that moving it into the relevant cond branch below causes silent miscompilation
-    ;; of the accessor typechecks on safety 3, probably this form: ((get (<subr> _imp) fun) arguments ctx)
-    (let ((op-tmp (unless (or op-is-global?
-                              target-name)
-                    (compile/expr-into-temp-or-literal op -c-)))
-          (arg-locs (map (lambda (_) (new-arg -c-)) args)))
+    ;; NOTE this implements a left-to-right evaluation order, including the operator
+    (let ((op-tmp	(unless (or target-name
+                                    op-is-global?)
+                          (compile/expr-into-temp-or-literal op -c-)))
+          (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
+          (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
       ;; set up the stack for the call
       (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
       (free-temps arg-tmps)
