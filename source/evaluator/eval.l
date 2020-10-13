@@ -328,7 +328,7 @@
 ;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
 (define-form get/tvmptr		(obj)		`(get (<target-vm-pointer> _bits) ,obj))
 
-(define-form get/string		(obj)		`(get (<string> elements) (k/string-ensure-zero-terminated ,obj)))
+(define-form get/string		(obj)		`(get (<string> elements) (string-ensure-zero-terminated ,obj)))
 (define-form get/symbol		(obj)		`(get (<symbol> _bits) ,obj))
 
 (define-form get/variable-value	(var)		`(get (<variable> value)

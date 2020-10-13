@@ -63,7 +63,7 @@
          obj))))
 
 (define-vector-accessors <array>	array-		()	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
-(define-vector-accessors <string>	k/string-	t	byte-at		copy-bytes	move-bytes	1)
+(define-vector-accessors <string>	string-		true	byte-at		copy-bytes	move-bytes	1)
 
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)

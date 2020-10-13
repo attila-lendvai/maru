@@ -531,13 +531,13 @@
 (define-subr (string-at 2)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-)))))
-    (new-<long> (k/string-at arr idx))))
+    (new-<long> (string-at arr idx))))
 
 ;; adding [set-]char-at to the evaluator makes it source-level compatible with the level-shifted code, and with that enables us to load files like buffer.l into both worlds
 (define-subr (char-at 2)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-)))))
-    (new-<long> (k/string-at arr idx))))
+    (new-<long> (string-at arr idx))))
 
 (define-subr (set-array-at 3)
   (let ((arr (get/head -args-))
@@ -550,20 +550,20 @@
   (let* ((arr (get/head -args-))
          (idx (get/long (get/head (set -args- (get/tail -args-)))))
          (val (get/head (get/tail -args-))))
-    ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
+    ;; NOTE set-string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
-    (safety 1 (assert (<= idx (k/string-length arr))))
-    (set (k/string-at arr idx) (get/long val))
+    (safety 1 (assert (<= idx (string-length arr))))
+    (set (string-at arr idx) (get/long val))
     val))
 
 (define-subr (set-char-at 3)
   (let* ((arr (get/head -args-))
          (idx (get/long (get/head (set -args- (get/tail -args-)))))
          (val (get/head (get/tail -args-))))
-    ;; NOTE set-k/string-at happily extends the string with a gap of zeores, so
+    ;; NOTE set-string-at happily extends the string with a gap of zeores, so
     ;; we also assert here that idx is out of bounds at most by +1.
-    (safety 1 (assert (<= idx (k/string-length arr))))
-    (set (k/string-at arr idx) (get/long val))
+    (safety 1 (assert (<= idx (string-length arr))))
+    (set (string-at arr idx) (get/long val))
     val))
 
 (define-subr (array-insert 3)
@@ -577,7 +577,7 @@
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (set -args- (get/tail -args-)))))
         (val (get/head (get/tail -args-))))
-    (k/string-insert arr idx (get/long val))
+    (string-insert arr idx (get/long val))
     val))
 
 (define-subr (string->symbol 1)

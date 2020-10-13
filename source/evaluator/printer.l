@@ -7,7 +7,7 @@
     (cond
       ((= type <undefined>)	(libc/printf "()"))
       ((= type <long>)		(libc/printf "%ld" (get/long obj)))
-      ((= type <string>)	(k/string-ensure-zero-terminated obj)
+      ((= type <string>)	(string-ensure-zero-terminated obj)
 				(let ((bits (get/string obj)))
                                   (if (not storing)
                                       (libc/printf "%s" bits) ; this way we don't need to worry about possible %'s in the string
