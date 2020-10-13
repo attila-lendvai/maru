@@ -142,6 +142,11 @@
     ;; (define-form switch-to-host-module ()
     ;;   `(set (current-module) *host-module*))
 
+    (define qq/cons		,(slave-value qq/cons))
+    ;; this will also be needed once a ,@ is at the "wrong" place, but then this is a closure,
+    ;; and as such the compiler tires to lower it and fails.
+    ;;(define qq/concat-list	,(slave-value qq/concat-list))
+
     (define-constant false 0)
     (define-constant true  1)))
 
@@ -161,12 +166,12 @@
     ;;(define target-value	,target-value)
     (define target-boolean	,target-boolean)))
 
-;;;
-;;; install stubs for the +special-forms+ and +special-operators+
-;;;
-(list-do name '(return address-of << >>)
-  (eval-in-target `(define ,name (fixed (lambda _ (print ,(symbol->string name) " encountered in interpreted code") (abort))))))
+;; install stubs for the +special-forms+, and also for some primitive functions,
+;; so that any accidental use of them will result in an early and useful error message.
+(list-do name '(return address-of << >> eval cons list car cdr)
+  (eval-in-target `(define ,name (fixed (lambda args (abort ',name " encountered in interpreted code with args " args))))))
 
+;; install stubs for the +special-operators+
 ;; (list-do name '()
 ;;   ;; they need to be subr's, so that encode doesn't insert them
 ;;   (eval-in-module *target-module* `(define ,name error)))

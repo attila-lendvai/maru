@@ -348,12 +348,12 @@
       (let ((stream (libc/fopen (get/string arg) "r")))
         ;; TODO error handling
         (if stream
-            (let* ((head (new-<pair> () ()))
+            (let* ((head (cons () ()))
                    (tail head)
                    (obj  ()))
               (gc/protect (head obj)
                 (while (!= k/+end+ (set obj (read stream)))
-                  (set tail (put/tail tail (new-<pair> obj ())))))
+                  (set tail (put/tail tail (cons obj ())))))
               (libc/fclose stream)
               (get/tail head))
           ())))))
@@ -429,7 +429,7 @@
           (or (cadr -args-)
               (get (<context> env) -ctx-))))
 
-(define-subr cons       (new-<pair> (car -args-) (cadr -args-)))
+(define-subr cons       (cons (car -args-) (cadr -args-)))
 (define-subr (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
 (define-subr array      (new-<array> (and (is/long (car -args-)) (get/long (get/head -args-)))))
 (define-subr form       (new-<form> (car -args-) (cadr -args-)))

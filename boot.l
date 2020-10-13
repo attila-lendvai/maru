@@ -138,7 +138,10 @@
         (set result (concat-symbol result (car args))))
       result)))
 
-;; NOTE this is broken with multi-level quasiquotes. see https://github.com/fare/fare-quasiquote
+(define qq/cons cons)
+(define qq/concat-list concat-list)
+
+;; NOTE quasituote is broken with multi-level quasiquotes. see https://github.com/fare/fare-quasiquote
 (define quasiquote
   (form
     (let (qq-list qq-element qq-object)
@@ -148,13 +151,13 @@
                            (if (and (pair? obj)
                                     (= (car obj) 'unquote-splicing))
                                (if (cdr l)
-                                   (list 'concat-list (cadr obj) (qq-list (cdr l)))
+                                   (list 'qq/concat-list (cadr obj) (qq-list (cdr l)))
                                  (cadr obj))
                              (if (and (= 'unquote obj)
                                       (pair? (cdr l))
                                       (not (cddr l)))
                                  (cadr l)
-                               (list 'cons (qq-object obj) (qq-list (cdr l))))))
+                               (list 'qq/cons (qq-object obj) (qq-list (cdr l))))))
                        (list 'quote l))))
       (set qq-element (lambda (l)
                         (let ((head (car l)))

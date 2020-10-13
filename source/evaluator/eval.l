@@ -386,7 +386,7 @@
     (set (<target-vm-pointer>-_bits obj) bits)
     obj))
 
-(define-function new-<pair> (head tail)
+(define-function cons (head tail)
   (let ((obj (new-record-instance <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
@@ -497,13 +497,13 @@
 ;;; ----------------------------------------------------------------
 
 (define-function k/list2 (a b)
-  (gc/let* ((tmp (new-<pair> b ())))
-    (new-<pair> a tmp)))
+  (gc/let* ((tmp (cons b ())))
+    (cons a tmp)))
 
 (define-function concat-list (head tail)
   (if (is/pair head)
       (gc/let* ((new-tail (concat-list (get/tail head) tail)))
-        (new-<pair> (get/head head) new-tail))
+        (cons (get/head head) new-tail))
     tail))
 
 (load "source/evaluator/arrays.l")
@@ -728,7 +728,7 @@
         (else
          (aif (array-at (get/variable-value var/*applicators*) (type-of fun))
              (gc/let* ((args arguments))
-               (set args (new-<pair> fun args))
+               (set args (cons fun args))
                (apply it args ctx))
            (error "cannot apply: " fun)))))))
 
@@ -748,7 +748,7 @@
   (if (is/pair list)
       (gc/let* ((head (expand		(get/head list) env))
                 (tail (expand-all	(get/tail list) env)))
-        (new-<pair> head tail))
+        (cons head tail))
     (expand list env)))
 
 (define-function expand/pair (exp env -call-frame-)
@@ -774,19 +774,19 @@
                          (set var-name		(get/head entry))
                          (set var-init-prog	(expand-all (get/tail entry) env)))
                      (set var-name	entry)
-                     (set var-init-prog	(new-<pair> () ())))
-                   (gc/let* ((new-entry (new-<pair> var-name var-init-prog)))
+                     (set var-init-prog	(cons () ())))
+                   (gc/let* ((new-entry (cons var-name var-init-prog)))
                      (set new-bindings-last (if new-bindings
-                                                (put/tail new-bindings-last (new-<pair> new-entry ()))
-                                              (set new-bindings (new-<pair> new-entry ())))))))
+                                                (put/tail new-bindings-last (cons new-entry ()))
+                                              (set new-bindings (cons new-entry ())))))))
                (set bindings (get/tail bindings))))
            (gc/let* ((tmp (expand-all (cddr exp) env))) ; the body
-             (set tmp (new-<pair> new-bindings tmp))
-             (set tmp (new-<pair> symbol/let tmp))
+             (set tmp (cons new-bindings tmp))
+             (set tmp (cons symbol/let tmp))
              tmp)))
 
         ((= head symbol/quote)
-         (new-<pair> symbol/quote (get/tail exp)))
+         (cons symbol/quote (get/tail exp)))
 
         ((= head symbol/set)
          (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
@@ -802,29 +802,29 @@
                    (buffer-append-string buf "set-")
                    (buffer-append-string buf (get/symbol fn-name))
                    (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
-                     (new-<pair> (string->symbol (buffer-contents buf))
+                     (cons (string->symbol (buffer-contents buf))
                                  args)))
-               (new-<pair> symbol/set body)))))
+               (cons symbol/set body)))))
 
         ((= head symbol/define)
          (assert (not (cdddr exp)) "illegal define form: " exp)
          (let ((name	(cadr exp))
                (value	(caddr exp)))
            (gc/let* ((tmp (expand value env)))
-             (set tmp (new-<pair> tmp ()))
-             (set tmp (new-<pair> name tmp))
-             (new-<pair> symbol/define tmp))))
+             (set tmp (cons tmp ()))
+             (set tmp (cons name tmp))
+             (cons symbol/define tmp))))
 
         ((= head symbol/lambda)
          (let ((params	(cadr exp))
                (body	(cddr exp)))
            (gc/let* ((tmp (expand-all body env)))
-             (set tmp (new-<pair> params tmp))
-             (new-<pair> symbol/lambda tmp))))
+             (set tmp (cons params tmp))
+             (cons symbol/lambda tmp))))
 
         ((set expander (maybe-form-in-variable/function env head))
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
-         (gc/let* ((args (new-<pair> env (get/tail exp)))
+         (gc/let* ((args (cons env (get/tail exp)))
                    (expansion (apply expander args ())))
            (debug (libc/printf "expand/pair, found in local env, expanded to ") (dumpln expansion))
            (expand expansion env)))
@@ -832,7 +832,7 @@
         (else
          ;; head is not a <form> nor a fixed special form
          (gc/let* ((tail (expand-all (get/tail exp) env)))
-           (new-<pair> head tail)))))))
+           (cons head tail)))))))
 
 (define-function expand/symbol (exp env)
   (debug (libc/printf "expand/symbol, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
@@ -857,7 +857,7 @@
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
        (aif (array-at (get/variable-value var/*expanders*) (type-of exp))
-           (gc/let* ((args (new-<pair> exp ())))
+           (gc/let* ((args (cons exp ())))
              (apply it args ()))
          exp)))))
 
@@ -869,7 +869,7 @@
   (if (is/pair list)
       (gc/let* ((head (encode		(get/head list) env))
                 (tail (encode-all	(get/tail list) env)))
-        (new-<pair> head tail))
+        (cons head tail))
     (encode list env)))
 
 (define-function encode/pair (exp env)
@@ -890,8 +890,8 @@
              (let* ((var-name	(get/head (get/head bindings)))
                     (var-obj	(environment-define new-env var-name ())))
                (set vars/last (if vars
-                                  (put/tail vars/last (new-<pair> var-obj ()))
-                                (set vars (new-<pair> var-obj ())))))
+                                  (put/tail vars/last (cons var-obj ()))
+                                (set vars (cons var-obj ())))))
              (set bindings (get/tail bindings))))
          ;; update the offset of the parent env to "skip" the indices of our let variables
          (put (<env> offset) env
@@ -903,14 +903,14 @@
                  new-bindings/last)
              (while (is/pair bindings)
                (gc/let* ((init-prog	(encode-all (get/tail (get/head bindings)) env))
-                         (new-entry	(new-<pair> (pop vars) init-prog)))
+                         (new-entry	(cons (pop vars) init-prog)))
                  (set new-bindings/last (if new-bindings
-                                            (put/tail new-bindings/last (new-<pair> new-entry ()))
-                                          (set new-bindings (new-<pair> new-entry ())))))
+                                            (put/tail new-bindings/last (cons new-entry ()))
+                                          (set new-bindings (cons new-entry ())))))
                (set bindings (get/tail bindings))))
            (set tail (encode-all (cddr exp) new-env)) ; encode the body
-           (set tail (new-<pair> new-bindings tail))
-           (set tail (new-<pair> new-env tail)))))
+           (set tail (cons new-bindings tail))
+           (set tail (cons new-env tail)))))
 
       ((= head fixed-subr/lambda)	(let ((args (cadr exp)))
 					  (gc/let* ((new-env (new-<env> env 1 0)))
@@ -920,18 +920,18 @@
 					    (when args
                                               (environment-define new-env args ()))
 					    (set tail (encode-all tail new-env))
-					    (set tail (new-<pair> new-env tail)))))
+					    (set tail (cons new-env tail)))))
       ((= head fixed-subr/define)	(let ((var (ensure-variable (module-env *module*) (car tail))))
 					  (set tail (encode-all (cdr tail) env))
-					  (set tail (new-<pair> var tail))))
+					  (set tail (cons var tail))))
       ((= head fixed-subr/set)		(let ((var (lookup-variable env (car tail))))
 					  (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
 					  (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
 					  (set tail (encode-all (cdr tail) env))
-					  (set tail (new-<pair> var tail))))
+					  (set tail (cons var tail))))
       ((!= head fixed-subr/quote)	(set tail (encode-all tail env))))
     ;; return value
-    (new-<pair> head tail)))
+    (cons head tail)))
 
 (define-function encode/symbol (exp env)
   (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (dumpln env))
@@ -956,8 +956,8 @@
       ((is <symbol> exp)	(encode/symbol	exp env))
       (else
        (aif (array-at (get/variable-value var/*encoders*) (type-of exp))
-           (gc/let* ((args (new-<pair> env ())))
-             (set args (new-<pair> exp args))
+           (gc/let* ((args (cons env ())))
+             (set args (cons exp args))
              (debug (libc/printf "encode/other: applying fn: ") (println it) (libc/printf " ") (print args) (libc/printf " ") (println env))
              (apply it args ()))
          exp)))))
@@ -970,7 +970,7 @@
   (if (is/pair obj)
       (gc/let* ((head (eval	(get/head obj) ctx))
                 (tail (eval-all	(get/tail obj) ctx)))
-        (new-<pair> head tail))
+        (cons head tail))
     obj))
 
 (define-function eval/with-backtrace (type exp ctx)
@@ -995,7 +995,7 @@
          (set (<call-frame>-callee-designator -call-frame-) exp))
        (let ((evaluator (array-at (get/variable-value var/*evaluators*) type)))
 	 (if evaluator
-	     (gc/let* ((args (new-<pair> exp ())))
+	     (gc/let* ((args (cons exp ())))
 	       (when-at-expand feature/backtrace
                  (set (<call-frame>-callee -call-frame-) evaluator))
 	       (apply evaluator args ctx))
@@ -1051,9 +1051,9 @@
       (gc/let* ((env (new-<env> (module-env *module*) 1 0)))
         (set res (expand-encode-eval res env))
         (when (= libc/stdin stream)
-          (gc/let* ((printer (new-<pair> res 0)))
-            (set printer (new-<pair> (new-<pair> symbol/quote printer) 0))
-            (set printer (new-<pair> (string->symbol "print") printer))
+          (gc/let* ((printer (cons res 0)))
+            (set printer (cons (cons symbol/quote printer) 0))
+            (set printer (cons (string->symbol "print") printer))
             (expand-encode-eval printer env))
           (libc/flush-streams))))
     (and (= libc/stdin stream)
@@ -1212,7 +1212,7 @@
       (let ((idx argc))
         (while (< 0 (decr idx))
           (debug (libc/printf "processing argv %ld = %s\n" idx (oop-at argv idx)))
-          (set tmp (new-<pair> () tmp))
+          (set tmp (cons () tmp))
           (put/head tmp (new-<string>-from-cstring (oop-at argv idx)))))
       (put (<variable> value) cla-var tmp))
 
@@ -1260,7 +1260,7 @@
                (set arg (get/string arg-string))
                (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
                (let ((sym (string->symbol arg)))
-                 (gc/let* ((form (new-<pair> sym ())))
+                 (gc/let* ((form (cons sym ())))
                    (expand-encode-eval form (module-env *module*)))))
 
               ;; --define to define a variable
@@ -1282,9 +1282,9 @@
                    ;;   (set val (new-<long> i)))
                    (when (= 0 (char-at endptr 0))
                      (set val (new-<long> i))))
-                 (gc/let* ((form (new-<pair> val ())))
-                   (set form (new-<pair> (string->symbol (get/string var)) form))
-                   (set form (new-<pair> symbol/define form))
+                 (gc/let* ((form (cons val ())))
+                   (set form (cons (string->symbol (get/string var)) form))
+                   (set form (cons symbol/define form))
                    (expand-encode-eval form (module-env *module*)))))
 
               ;; read file as a program

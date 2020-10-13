@@ -26,7 +26,7 @@
 ;; even when used in the target, i.e. in eval.l.
 (define-form define-form (name args . body)
   `(define ,name ,(eval-in-module *slave-module*
-                    (cons 'form (cons (cons 'lambda (cons (cons '*env* args) body)) ())))))
+                    (qq/cons 'form (qq/cons (qq/cons 'lambda (qq/cons (qq/cons '*env* args) body)) ())))))
 
 ;; redefine DEFINE-CONSTANT so that it defines it both into the slave and into the target.
 (define-form define-constant (name value-form)
