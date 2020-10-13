@@ -314,6 +314,7 @@
 (define-form long?		(obj)		`(is <long> ,obj))
 (define-form pair?		(obj)		`(is <pair> ,obj))
 (define-form string?		(obj)		`(is <string> ,obj))
+(define-form symbol?		(obj)		`(is <symbol> ,obj))
 (define-form get/long		(obj)		(if (immediate-type? <long>)
                                                     (if (< *safety* 2)
                                                         `(>> ,obj ,(<immediate-type>-tag-width <long>))
@@ -536,7 +537,7 @@
 
 (define-function find-variable (env name)
   (safety 2 (assert (is <env> env)     "find-variable: env is not an <env>: "env))
-  (safety 2 (assert (is <symbol> name) "find-variable: name is not a <symbol>: "name))
+  (safety 2 (assert (symbol? name) "find-variable: name is not a <symbol>: "name))
   (let* ((bindings (get (<env> bindings) env))
          (index    (array-length bindings))
          (vars     (get (<array> elements) bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
@@ -547,7 +548,7 @@
 
 (define-function lookup-variable (env name)
   (safety 1 (assert (is <env> env)     "lookup-variable: env is not an <env>: "env))
-  (safety 1 (assert (is <symbol> name) "lookup-variable: name is not a <symbol>: "name))
+  (safety 1 (assert (symbol? name) "lookup-variable: name is not a <symbol>: "name))
   (while env
     (awhen (find-variable env name)
       (return it))
@@ -566,7 +567,7 @@
 
 (define-function ensure-variable (env name)
   (safety 1 (assert (is <env> env)		"ensure-variable: env arg is not of type <env>: "env))
-  (safety 1 (assert (is <symbol> name)	"ensure-variable: name arg is not of type <symbol>: "name))
+  (safety 1 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (find-variable env name)
     (return it))
   (let ((offset (get/long (get (<env> offset) env))))
@@ -576,7 +577,7 @@
 
 (define-function environment-define (env name value)
   (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
-  (safety 1 (assert (is <symbol> name) "environment-define: name is not of type <symbol>: "name))
+  (safety 1 (assert (symbol? name) "environment-define: name is not of type <symbol>: "name))
   (debug (libc/printf "environment-define called, name is %s\n" (get/symbol name)))
   (let ((var (ensure-variable env name)))
     (put (<variable> value) var value)
@@ -603,7 +604,7 @@
          tmp)))
 
 (define-function maybe-object-in-env (env name type)
-  (when (is <symbol> name)
+  (when (symbol? name)
     (maybe-object-in-variable (lookup-variable env name) type)))
 
 (define-function copy-module-bindings (from to filter)
@@ -806,7 +807,7 @@
              (if (and (pair? body)
                       (pair? (get/head body))
                       (set fn-name (get/head (get/head body)))
-                      (is <symbol> fn-name))
+                      (symbol? fn-name))
                  ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
                  (gc/let* ((buf (new-<buffer>)))
                    (buffer-append-string buf "set-")
@@ -863,7 +864,7 @@
   (with-new-call-frame (symbol/expand () exp)
     (cond
       ((pair? exp)		(expand/pair	exp env -call-frame-))
-      ((is <symbol> exp)	(expand/symbol	exp env))
+      ((symbol? exp)	(expand/symbol	exp env))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
        (aif (and *expanders*
@@ -972,7 +973,7 @@
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
     (cond
       ((pair? exp)		(encode/pair	exp env))
-      ((is <symbol> exp)	(encode/symbol	exp env))
+      ((symbol? exp)	(encode/symbol	exp env))
       (else
        (aif (and *encoders*
                  (set it (maybe-object-in-variable *encoders* <array>))

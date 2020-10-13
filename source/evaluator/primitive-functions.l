@@ -66,7 +66,7 @@
         (parameters	(cadr -args-))
         (body		(cddr -args-)))
     (assert (is <env> env) "lambda primitive-function: env is "env)
-    (assert (or (not parameters) (is <variable> parameters) (is <pair> parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
+    (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
     (new-<expr> parameters body env -ctx-)))
 
 (define-primitive-function (let () fixed)
@@ -436,8 +436,8 @@
 (define-primitive-function (car 1)	(car (get/head -args-)))
 (define-primitive-function (cdr 1)	(cdr (get/head -args-)))
 (define-primitive-function (string? 1)	(and (string? (get/head -args-)) symbol/true))
-(define-primitive-function (symbol? 1)	(and (is <symbol> (get/head -args-)) symbol/true))
-(define-primitive-function (pair? 1)	(and (is <pair>   (get/head -args-)) symbol/true))
+(define-primitive-function (symbol? 1)	(and (symbol? (get/head -args-)) symbol/true))
+(define-primitive-function (pair? 1)	(and (pair?   (get/head -args-)) symbol/true))
 (define-primitive-function (array? 1)	(and (is <array>  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
 
 (define-primitive-function (allocate 2)
@@ -581,7 +581,7 @@
 (define-primitive-function (string->symbol 1)
   (let ((arg (get/head -args-)))
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
-    (if (is <symbol> arg)
+    (if (symbol? arg)
         arg
       (and (string? arg)
            (string->symbol (get/string arg))))))
@@ -591,7 +591,7 @@
     ;; FIXME this is too permissive, and returns nil when called with an unexpected type
     (if (string? arg)
         arg
-      (and (is <symbol> arg)
+      (and (symbol? arg)
            (new-<string>-from-cstring (get/symbol arg))))))
 
 (define-primitive-function (long->string 1)
