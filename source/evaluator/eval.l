@@ -312,7 +312,7 @@
 
 ;; shorthands (and optimizations)
 (define-form is/long		(obj)		`(is <long> ,obj))
-(define-form is/pair		(obj)		`(is <pair> ,obj))
+(define-form pair?		(obj)		`(is <pair> ,obj))
 (define-form get/long		(obj)		(if (immediate-type? <long>)
                                                     (if (< *safety* 2)
                                                         `(>> ,obj ,(<immediate-type>-tag-width <long>))
@@ -344,12 +344,12 @@
 
 (define-function car (list)
   (when list
-    (assert (is/pair list) "car called on non-list: " list)
+    (assert (pair? list) "car called on non-list: " list)
     (get/head list)))
 
 (define-function cdr (list)
   (when list
-    (assert (is/pair list) "cdr called on non-list: " list)
+    (assert (pair? list) "cdr called on non-list: " list)
     (get/tail list)))
 
 (define-function caar		(list)		(car (car list)))
@@ -501,7 +501,7 @@
     (cons a tmp)))
 
 (define-function concat-list (head tail)
-  (if (is/pair head)
+  (if (pair? head)
       (gc/let* ((new-tail (concat-list (get/tail head) tail)))
         (cons (get/head head) new-tail))
     tail))
@@ -701,8 +701,8 @@
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
       (let ((locals (get (<context> bindings) new-ctx))
             (args   arguments))
-        (while (is/pair params)
-          (or (is/pair args) (error "too few arguments for "fun": "arguments))
+        (while (pair? params)
+          (or (pair? args) (error "too few arguments for "fun": "arguments))
           (set (array-at locals (get/long (get (<variable> index) (get/head params)))) (get/head args))
           (set params (get/tail params))
           (set args    (get/tail args)))
@@ -713,7 +713,7 @@
           (error "too many arguments for "fun": "arguments)))
       (let ((prg (get (<expr> body) fun))
             (result ()))
-        (while (is/pair prg)
+        (while (pair? prg)
           (set result (eval (get/head prg) new-ctx))
           (set prg (get/tail prg)))
         (when (get (<env> stable) env)
@@ -754,7 +754,7 @@
     (get (<form> symbol) it)))
 
 (define-function expand-all (list env)
-  (if (is/pair list)
+  (if (pair? list)
       (gc/let* ((head (expand		(get/head list) env))
                 (tail (expand-all	(get/tail list) env)))
         (cons head tail))
@@ -774,11 +774,11 @@
          (gc/let* ((new-bindings ()))
            (let ((bindings (cadr exp))
                  new-bindings-last)
-             (while (is/pair bindings)
+             (while (pair? bindings)
                (let* ((entry (get/head bindings))
                       var-name)
                  (gc/let* (var-init-prog)
-                   (if (is/pair entry)
+                   (if (pair? entry)
                        (let ()
                          (set var-name		(get/head entry))
                          (set var-init-prog	(expand-all (get/tail entry) env)))
@@ -802,8 +802,8 @@
          (debug (libc/printf "expand/set on form ") (dumpln exp))
          (gc/let* ((body (expand-all (get/tail exp) env)))
            (let (fn-name)
-             (if (and (is/pair body)
-                      (is/pair (get/head body))
+             (if (and (pair? body)
+                      (pair? (get/head body))
                       (set fn-name (get/head (get/head body)))
                       (is <symbol> fn-name))
                  ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
@@ -861,7 +861,7 @@
   (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (with-new-call-frame (symbol/expand () exp)
     (cond
-      ((is/pair exp)		(expand/pair	exp env -call-frame-))
+      ((pair? exp)		(expand/pair	exp env -call-frame-))
       ((is <symbol> exp)	(expand/symbol	exp env))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
@@ -877,7 +877,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function encode-all (list env)
-  (if (is/pair list)
+  (if (pair? list)
       (gc/let* ((head (encode		(get/head list) env))
                 (tail (encode-all	(get/tail list) env)))
         (cons head tail))
@@ -896,7 +896,7 @@
          ;; phase 1: first define the let variables into new-env
          (let ((bindings (cadr exp))
                vars/last)
-           (while (is/pair bindings)
+           (while (pair? bindings)
              (debug (libc/printf "encode/let visiting entry ") (dumpln (get/head bindings)))
              (let* ((var-name	(get/head (get/head bindings)))
                     (var-obj	(environment-define new-env var-name ())))
@@ -912,7 +912,7 @@
                    new-bindings)
            (let ((bindings (cadr exp))
                  new-bindings/last)
-             (while (is/pair bindings)
+             (while (pair? bindings)
                (gc/let* ((init-prog	(encode-all (get/tail (get/head bindings)) env))
                          (new-entry	(cons (pop vars) init-prog)))
                  (set new-bindings/last (if new-bindings
@@ -926,7 +926,7 @@
       ((= head fixed-primitive-function/lambda)
        (let ((args (cadr exp)))
          (gc/let* ((new-env (new-<env> env 1 0)))
-           (while (is/pair args)
+           (while (pair? args)
              (environment-define new-env (get/head args) ())
              (set args (get/tail args)))
            (when args
@@ -970,7 +970,7 @@
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
     (cond
-      ((is/pair exp)		(encode/pair	exp env))
+      ((pair? exp)		(encode/pair	exp env))
       ((is <symbol> exp)	(encode/symbol	exp env))
       (else
        (aif (and *encoders*
@@ -987,7 +987,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function eval-all (obj ctx)
-  (if (is/pair obj)
+  (if (pair? obj)
       (gc/let* ((head (eval	(get/head obj) ctx))
                 (tail (eval-all	(get/tail obj) ctx)))
         (cons head tail))
@@ -1245,7 +1245,7 @@
 
     ;; process *cla*
     (let (cla tmp)
-      (while (is/pair (set cla (get (<variable> value) cla-var)))
+      (while (pair? (set cla (get (<variable> value) cla-var)))
         (let* ((arg-string	(get/head cla))
                (arg		(get/string arg-string)))
           (gc/protect (arg-string tmp)
@@ -1279,7 +1279,7 @@
               ;; --call to call a function
               ((not (libc/strcmp arg "--call"))
                (debug (libc/printf "processing a --call\n"))
-               (unless (is/pair cla)
+               (unless (pair? cla)
                  (fatal "--call requires an argument"))
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
@@ -1291,8 +1291,8 @@
               ;; --define to define a variable
               ((not (libc/strcmp arg "--define"))
                (debug (libc/printf "processing a --define\n"))
-               (unless (and (is/pair cla)
-                            (is/pair (get/tail cla)))
+               (unless (and (pair? cla)
+                            (pair? (get/tail cla)))
                  (fatal "--define requires two arguments"))
                (let ((var (car  cla))
                      (val (cadr cla)))

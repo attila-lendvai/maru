@@ -26,9 +26,9 @@
       ((= type <symbol>)	(libc/printf "%s" (get/symbol obj)))
       ((= type <pair>)		(let ()
                                   (libc/printf "(")
-                                  (while (is/pair obj)
+                                  (while (pair? obj)
                                     (do-print (get/head obj) storing)
-                                    (and (is/pair (set obj (get/tail obj)))
+                                    (and (pair? (set obj (get/tail obj)))
                                          (libc/printf " ")))
                                   (and obj
                                        (let ()
