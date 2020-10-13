@@ -669,6 +669,7 @@
                     " with the wrong number of arguments: " args
                     ", while expecting " n-params))))
         (else
+         ;; NOTE this is not the same left-to-right evaluation order as in the x86 backend: we evaluate the op last.
          (comp op)
          (gen CALLPTR arg-regs))))))
 
@@ -866,12 +867,6 @@
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-target op-name)))
-                       ;; NOTE this is not (target-value <subr>), because it's the host eval.exe
-                       ;; that instantiates these subr's, and it instantiates them
-                       ;; with the type that is encoded into the executable (which should be in sync
-                       ;; with the definitions in the boot.l of that stage, which in turn is what we
-                       ;; see here at runtime).
-                       ;;(assert (= (type-of op) <subr>) "an operator is not (= (type-of op) <subr>)")
                        (assert op "operator not found while building +special-operators+: "op)
                        (cons op (cdr entry))))
                    arity-line))

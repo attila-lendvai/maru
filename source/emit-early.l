@@ -114,6 +114,10 @@
 (define *target-module* (create-module "target"))
 
 ;; let's make all the slave's <form>s available in the *target-module*
+;; TODO FIXME when we are doing this we inherit the definition order of the primitive-functions
+;; from the host, and therefore we cannot reorder our own. this new setup also defines
+;; the order of the definitions in the asm output, as opposed to having it in the same order
+;; as in the source files.
 (copy-module-bindings *slave-module* *target-module*
                       (lambda (name value)
                         (and (= (type-of value) <form>)
@@ -186,6 +190,7 @@
 ;;   (eval-in-module *target-module* `(define ,name error)))
 
 (when evolving?
-  (eval-in-target `(let ()
-                     (define char-at		string-at)
-                     (define set-char-at	set-string-at))))
+  (eval-in-target
+   `(let ()
+      (define char-at		string-at)
+      (define set-char-at	set-string-at))))

@@ -930,6 +930,7 @@
 (define-record		<symbol>		() (_bits))
 (define-record		<pair>			() (head tail))
 
+;; TODO why are some of these here, and some are primitive-functions? unify one way or another!
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
@@ -1190,17 +1191,6 @@
       (dump arg))
     found))
 
-;; (define *backtrace*
-;;   (lambda (stack depth)
-;;     (let ((posn (array)))
-;;       (while (>= (set depth (- depth 1)) 0)
-;;         (let ((here (array-at stack depth)))
-;;           (print "  " depth "\t")
-;;           (dump-until posn here)
-;;           (print "\n")
-;;           (set posn here))))
-;;     (exit 0)))
-
 ;;; generic/multimethod (dispatch on the type of all arguments)
 
 (define-record <generic> () (name methods default))
@@ -1274,22 +1264,6 @@
 
 (define-function for-each-with (collection function value)
   (for-each collection (lambda (x) (function x value))))
-
-(define-function %loop-inits (bindings)
-  (and bindings
-       (cons (list (caar bindings) (cadar bindings))
-             (%loop-inits (cdr bindings)))))
-
-(define-function %loop-steps (bindings)
-  (and bindings
-       (cons (list 'set (caar bindings) (caddar bindings))
-             (%loop-steps (cdr bindings)))))
-
-(define-form loop (bindings test . body)
-  `(let ,(%loop-inits bindings)
-     (while ,test
-       ,@body
-       ,@(%loop-steps bindings))))
 
 ;;; conversion
 

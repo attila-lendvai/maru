@@ -60,6 +60,10 @@
     (string-insert x 5 ?x)
     (test-assert (= x "alzmax"))))
 
+(define-test eval/string/concat ()
+  (test-assert (= "alma.x\x00y.korte"
+                  (concat-strings "alma." "x\x00y" ".korte"))))
+
 (define-test eval/array/insert ()
   (let ((x (list->array '(1 2 3 4))))
     (array-insert x 2 42)

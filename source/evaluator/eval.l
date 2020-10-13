@@ -344,15 +344,15 @@
                                                            `(defined? (string->symbol ,var) (module-env *module*))
                                                          var)
                                                       ,val))
-
+;; TODO should we turn these into macros? or introduce compiler macros?
 (define-function car (list)
   (when list
-    (assert (pair? list) "car called on non-list: " list)
+    (safety 1 (assert (pair? list) "car called on non-list: " list))
     (get/head list)))
 
 (define-function cdr (list)
   (when list
-    (assert (pair? list) "cdr called on non-list: " list)
+    (safety 1 (assert (pair? list) "cdr called on non-list: " list))
     (get/tail list)))
 
 (load "source/list-min.l")
@@ -494,8 +494,12 @@
 ;;; more utils
 ;;; ----------------------------------------------------------------
 
-(define-function k/list2 (a b)
+(define-function list2 (a b)
   (gc/let* ((tmp (cons b ())))
+    (cons a tmp)))
+
+(define-function list3 (a b c)
+  (gc/let* ((tmp (list2 b c)))
     (cons a tmp)))
 
 (define-function concat-list (head tail)
@@ -678,9 +682,10 @@
             (args   arguments))
         (while (pair? params)
           (or (pair? args) (error "too few arguments for "fun": "arguments))
-          (set (array-at locals (get/long (get (<variable> index) (get/head params)))) (get/head args))
-          (set params (get/tail params))
-          (set args    (get/tail args)))
+          (set (array-at locals (get/long (get (<variable> index) (get/head params))))
+               (get/head args))
+          (set params	(get/tail params))
+          (set args	(get/tail args)))
         (when (is <variable> params)
           (set (array-at locals (get/long (get (<variable> index) params))) args)
           (set args ()))
@@ -791,10 +796,7 @@
          (assert (not (cdddr exp)) "illegal define form: " exp)
          (let ((name	(cadr exp))
                (value	(caddr exp)))
-           (gc/let* ((tmp (expand value env)))
-             (set tmp (cons tmp ()))
-             (set tmp (cons name tmp))
-             (cons symbol/define tmp))))
+           (list3 symbol/define name (expand value env))))
 
         ((= head symbol/lambda)
          (let ((params	(cadr exp))
@@ -821,7 +823,7 @@
     (cond
       ((set expander (maybe-form-in-env/symbol env exp))
        ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
-       (gc/let* ((args (k/list2 env exp))
+       (gc/let* ((args (list2 env exp))
                  (expansion (apply expander args ())))
          (debug (libc/printf "expand/symbol, found in local env, expanded to ") (dumpln expansion))
          (expand expansion env)))
@@ -833,7 +835,7 @@
   (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (with-new-call-frame (symbol/expand () exp)
     (cond
-      ((pair? exp)		(expand/pair	exp env -call-frame-))
+      ((pair? exp)	(expand/pair	exp env -call-frame-))
       ((symbol? exp)	(expand/symbol	exp env))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
@@ -962,7 +964,7 @@
         (cons head tail))
     obj))
 
-(define-function eval/with-backtrace (type exp ctx)
+(define-function eval/with-call-frame (type exp ctx)
   (with-new-call-frame (() () ())
     (cond
       ((= type <pair>)
@@ -1013,7 +1015,7 @@
                                       (debug (libc/printf "eval is reading local var from context ") (dump ctx) (libc/printf " at index %ld, holding value " index) (dumpln value))
 				      value))))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
-      (else			(eval/with-backtrace type exp ctx)))))
+      (else			(eval/with-call-frame type exp ctx)))))
 
 
 (define-function expand-encode-eval (form env)
@@ -1029,7 +1031,7 @@
     x))
 
 (define-function repl-stream (stream)
-  ;;(put/variable-value var/*input* (new-<long> stream))
+  ;;(put/variable-value *input* (new-<long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\012\015]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -1066,7 +1068,7 @@
     (set tmp (new-<array> 0))		(environment-define env (string->symbol "*expanders*")		tmp)
     (set tmp (new-<array> 0))		(environment-define env (string->symbol "*encoders*")		tmp)
     (set tmp (new-<array> 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
-    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*applicators*")		tmp)
+    (set tmp (new-<array> 0))		(environment-define env (string->symbol "*applicators*")	tmp)
 
     (debug (libc/printf "new-<module> returning with ") (println module))
     module))

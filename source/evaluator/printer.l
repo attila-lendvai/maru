@@ -82,7 +82,7 @@
                                     (libc/printf "Module<"))
                                   (do-print (module-env obj) storing)
                                   (libc/printf ">")))
-      (else                     (libc/printf "<type:%ld>" type)))))
+      (else                     (libc/printf "<Type:%ld>" type)))))
 
 (define-function print		(obj) (do-print obj false))
 (define-function println	(obj) (do-print obj false) (libc/printf "\n"))
