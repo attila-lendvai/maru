@@ -742,9 +742,8 @@
   (gc/let* ((head (expand (get/head exp) env)))
     (debug (libc/printf "expand/pair on head ") (dumpln head))
     (when-at-expand feature/backtrace
-      (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
       (set (<call-frame>-callee			-call-frame-) head)
-      (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
+      (set (<call-frame>-arguments		-call-frame-) exp))
     (let (expander)
       (cond
         ((= head symbol/let)
