@@ -2,7 +2,9 @@
 
 ;; TODO this is only slightly different from what is in source/arrays.l.
 ;; maybe try to merge them by eliminating the differences between the level-shifted code and normal maru code.
-(define-form define-vector-accessors (type-name basename elements-are-opaque? accessor copier mover element-size-in-bytes)
+(define-form define-vector-accessors (type-name basename elements-are-pointers? accessor copier mover element-size-in-bytes)
+  ;; TODO this assert itself is broken, probably due to some peciuliarity of define-form/target
+  ;;(assert (or (not elements-are-pointers?) (= element-size-in-bytes +word-size-in-bytes+)))
   (let ((setter-name (concat-symbols 'set- basename 'at))
         (getter-name (concat-symbol basename 'at))
         (length-name (concat-symbol basename 'length))
@@ -33,8 +35,8 @@
                (set capacity 4)) ; start from a reasonably not-small number
              (while (not (< idx capacity))
                (set capacity (* capacity 2)))
-             (gc/let* ((new-elements (,(if elements-are-opaque? 'gc/allocate-opaque 'gc/allocate)
-                                       <data> (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
+             (gc/let* ((new-elements (,@(if elements-are-pointers? '(allocate <data>) '(allocate-data))
+                                        (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
                (,copier elements new-elements size)
                (set elements (put (,type-name elements) obj new-elements))))
            (when (<= size idx)
@@ -47,7 +49,7 @@
 
        (define-function ,insert-name (obj idx value)
          (let ((size (,length-name obj)))
-           (,append-name obj 0) ; ensure that we have enough room
+           (,append-name obj 0)      ; ensure that we have enough room
            (when (< idx size)
              (let* ((elements	(get (,type-name elements) obj))
                     (src	(+ elements (* idx ,element-size-in-bytes))))
@@ -62,8 +64,8 @@
            (put (,type-name size) obj (new-<long> size)))
          obj))))
 
-(define-vector-accessors <array>	array-		()	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
-(define-vector-accessors <string>	string-		true	byte-at		copy-bytes	move-bytes	1)
+(define-vector-accessors <array>	array-		true	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
+(define-vector-accessors <string>	string-		()	byte-at		copy-bytes	move-bytes	1)
 
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)

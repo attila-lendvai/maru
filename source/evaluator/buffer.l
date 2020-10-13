@@ -4,14 +4,14 @@
 
 (define-record <buffer> () (size elements))
 
-(define-vector-accessors <buffer> buffer- true byte-at copy-bytes move-bytes 1)
+(define-vector-accessors <buffer> buffer- () byte-at copy-bytes move-bytes 1)
 
 (define-function new-<buffer> ()
   (let ((initial-capacity 32))
     (with-instance-accessors self <buffer>
       (gc/let* ((self		(new-record-instance <buffer>)))
         (set self.size		(new-<long> 0))
-        (set self.elements	(gc/allocate-opaque <data> initial-capacity))
+        (set self.elements	(allocate-data initial-capacity))
         self))))
 
 (define-function buffer-contents (self)

@@ -321,7 +321,7 @@
             (result ()))
         (gc/let* ((buf ()))
           (while (not result)
-            (set buf (gc/allocate-opaque <data> size))
+            (set buf (allocate-data size))
             (let ((n (libc/snprintf buf size fmt arg)))
               (if (and (<= 0 n)
                        (< n size))
@@ -430,16 +430,18 @@
 (define-primitive-function (array? 1)	(and (array?  (get/head -args-)) symbol/true)) ; TODO move to boot.l?
 
 (define-primitive-function (allocate 2)
-  (let ((type (get/head -args-))
-        (size (get/head (get/tail -args-))))
+  ;; allocates a lisp object with the given type. size is a count of the slots (pointers).
+  (let ((type		(get/head -args-))
+        (slot-count	(get/head (get/tail -args-))))
     (safety 1 (assert (long? type) "allocate: invalid type "type))
-    (safety 1 (assert (long? size) "allocate: invalid size "size))
-    (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
+    (safety 1 (assert (long? slot-count) "allocate: invalid size "slot-count))
+    (allocate (get/long type) (get/long slot-count))))
 
 (define-primitive-function (allocate-data 1)
+  ;; allocates a block of memory that will be opaque for the GC. size is in bytes.
   (let ((size (get/head -args-)))
     (safety 1 (assert (long? size) "allocate-data: invalid size "size))
-    (gc/allocate-opaque <data> (get/long size))))
+    (allocate-data (get/long size))))
 
 (define-primitive-function (set-car 2)
   (let ((obj (get/head -args-)))
@@ -586,7 +588,7 @@
 (define-primitive-function (long->string 1)
   (let ((arg (get/head -args-)))
     (assert (long? arg))
-    (let ((buf (gc/allocate-opaque <data> 32))) ; safe up until 64 bits
+    (let ((buf (allocate-data 32))) ; safe up until 64 bits
       (libc/sprintf buf "%ld" (get/long arg))
       (new-<string>-from-cstring buf))))
 

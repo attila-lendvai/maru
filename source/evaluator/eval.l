@@ -360,6 +360,12 @@
 ;;; object instantiation
 ;;; ----------------------------------------------------------------
 
+(define-function allocate (type word-size)
+  (gc/allocate type (words-to-bytes word-size)))
+
+(define-function allocate-data (byte-size)
+  (gc/allocate-opaque <data> byte-size))
+
 (define-form new-record-instance (type)
   (set type (eval type))
   (assert (subtype? (type-of type) <record>))
@@ -393,7 +399,7 @@
   (gc/let* ((str (new-record-instance <string>)))
     (put (<string> size) str (new-<long> len))
     (when (> len 0)
-      (put (<string> elements) str (gc/allocate-opaque <data> len)))
+      (put (<string> elements) str (allocate-data len)))
     str))
 
 (define-function new-<string>-from-cstring (cstr)
@@ -405,7 +411,7 @@
 (define-function new-<symbol> (cstr)
   (let ((len (libc/strlen cstr)))    ; +1 is for the zero termination
     (gc/let* ((obj  (new-record-instance <symbol>))
-              (bits (gc/allocate-opaque <data> (+ len 1))))
+              (bits (allocate-data (+ len 1))))
       (libc/memcpy bits cstr (+ len 1))
       (put (<symbol> _bits) obj bits)
       obj)))
@@ -414,7 +420,7 @@
   (gc/let* ((arr (new-record-instance <array>)))
     (put (<array> size) arr (new-<long> 0))
     (when (> capacity 0)
-      (put (<array> elements) arr (gc/allocate <data> (words-to-bytes capacity))))
+      (put (<array> elements) arr (allocate <data> capacity)))
     arr))
 
 (define-function new-<expr> (parameters body env ctx)
