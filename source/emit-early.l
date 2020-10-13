@@ -109,6 +109,13 @@
       (* value  +word-size-in-bytes+)
     `(* ,value ,+word-size-in-bytes+)))
 
+;; redefine DEFINE-FORM with one that evaluates the body in *slave-module*.
+;; this way the body code can use everything that's available in the slave module
+;; even when used in the target, i.e. in eval.l.
+(define-form define-form/target (name args . body)
+  (let ((form-form	`(form (lambda (*env* ,@args) ,@body))))
+    `(define ,name (eval-in-module *slave-module* ',form-form))))
+
 (switch-to-host-module)
 
 (define *target-module* (create-module "target"))
@@ -155,6 +162,8 @@
     (set *evaluators*	())
     (set *applicators*	())
 
+    (define define-form		,(slave-value define-form/target))
+
     (define qq/cons		,(slave-value qq/cons))
     ;; this will also be needed once a ,@ is at the "wrong" place, but then this is a closure,
     ;; and as such the compiler tires to lower it and fails.
@@ -181,7 +190,11 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of << >> eval cons list car cdr)
+(list-do name '(return address-of << >> eval cons list car cdr
+                ;; TODO with-instance-accessors uses with-forms that needs form to be present in the target.
+                ;; because of that we can't rename new-<form> -> form
+                ;; form
+                )
   (eval-in-target `(define ,name (fixed (lambda args (abort ',name " encountered in interpreted code with args " args))))))
 
 ;; install stubs for the +special-operators+

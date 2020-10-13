@@ -21,20 +21,13 @@
 ;;;
 (set *module* *target-module*)
 
-;; redefine DEFINE-FORM with one that evaluates the body in *slave-module*.
-;; this way the body code can use everything that's available in the slave module
-;; even when used in the target, i.e. in eval.l.
-(define-form define-form (name args . body)
-  `(define ,name ,(eval-in-module *slave-module*
-                    (qq/cons 'form (qq/cons (qq/cons 'lambda (qq/cons (qq/cons '*env* args) body)) ())))))
-
 ;; redefine DEFINE-CONSTANT so that it defines it both into the slave and into the target.
 (define-form define-constant (name value-form)
   ;; NOTE as per the custom DEFINE-FORM above, we are expanded/encoded in the slave module,
   ;; but at apply time *module* will be the target module.
   ;; TODO the wizardry here smells like accidental complexity, or at least it's semantics with a high congnitive load.
   (let* ((value		(eval `(eval-in-module *slave-module* ',value-form)))
-         (form-obj	(eval `(form () (lambda _ ',value))))
+         (form-obj	(eval `(eval-in-module *slave-module* '(form () (lambda _ ',value)))))
          (definer-form	`(define ,name ',form-obj)))
     (eval `(eval-in-module *slave-module* ',definer-form))
     definer-form))

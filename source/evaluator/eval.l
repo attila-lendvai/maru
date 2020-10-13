@@ -115,10 +115,9 @@
 ;; redefine %accessor-typecheck with a macro that redirects to a kernel version that drops the slot-name,
 ;; because the compiler cannot emit symbols yet
 ;; TODO this is ugly for now
-(define %accessor-typecheck
-    (form (lambda (*env* expected-type-id slot-name object)
-            ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
-            object)))
+(define-form %accessor-typecheck (expected-type-id slot-name object)
+  ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
+  object)
 
 ;;;
 ;;; forward definitions, so that the variables get created early enough for building the graph
