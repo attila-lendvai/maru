@@ -162,6 +162,9 @@
 (define define-form (form (lambda (env name args . body)
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
+(define-form define-symbol-form (name replacement)
+  `(define ,name (form () (lambda _ ',replacement))))
+
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
 (define-form eval-at-expand (form)
   (eval form))
