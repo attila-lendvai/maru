@@ -217,7 +217,7 @@
   `(define-primitive-function (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
+       (safety 1 (or (and (long? lhs) (long? rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (new-<long> (,op (get/long lhs) (get/long rhs))))))
 
 (define-binary-operator bitwise-and)
@@ -226,7 +226,7 @@
 
 (define-primitive-function (bitwise-not 1)
   (let ((value (get/head -args-)))
-    (safety 1 (or (is/long value) (error "non-numeric argument for bitwise-not: "value)))
+    (safety 1 (or (long? value) (error "non-numeric argument for bitwise-not: "value)))
     (new-<long> (bitwise-not (get/long value)))))
 
 (define-primitive-function (bitwise-shift 2)
@@ -246,7 +246,7 @@
   `(define-primitive-function (,op 2)
      (let ((lhs (get/head -args-))
            (rhs (get/head (get/tail -args-))))
-       (safety 1 (or (and (is/long lhs) (is/long rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
+       (safety 1 (or (and (long? lhs) (long? rhs)) (error "non-numeric argument: (",(symbol->string op)" "lhs" "rhs")")))
        (and (,op (get/long lhs) (get/long rhs))
             symbol/true))))
 
@@ -261,7 +261,7 @@
          (rhs  (get/head (get/tail -args-)))
          (type (type-of lhs)))
     (cond
-      ((= type <long>)		(and (is/long rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <long>)		(and (long? rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (is <string> rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
@@ -270,7 +270,7 @@
          (rhs  (get/head (get/tail -args-)))
          (type (type-of lhs)))
     (cond
-      ((= type <long>)		(and (is/long rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <long>)		(and (long? rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (is <string> rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
       (else                     (and (!= lhs rhs) symbol/true)))))
 
@@ -283,7 +283,7 @@
 
 (define-primitive-function (exit 1)
   (let ((arg (get/head -args-)))
-    (assert (is/long arg) "exit primitive-function: argument is not an integer: "arg)
+    (assert (long? arg) "exit primitive-function: argument is not an integer: "arg)
     (when-at-expand feature/profiler
       (profiler/disable))
     (libc/flush-streams)
@@ -430,7 +430,7 @@
 
 (define-primitive-function cons		(cons (car -args-) (cadr -args-)))
 (define-primitive-function (string 1)	(new-<string>-of-length (get/long (get/head -args-))))
-(define-primitive-function array	(new-<array> (and (is/long (car -args-)) (get/long (get/head -args-)))))
+(define-primitive-function array	(new-<array> (and (long? (car -args-)) (get/long (get/head -args-)))))
 (define-primitive-function form		(new-<form> (car -args-) (cadr -args-)))
 (define-primitive-function (type-of 1)	(new-<long> (type-of (get/head -args-))))
 (define-primitive-function (car 1)	(car (get/head -args-)))
@@ -443,13 +443,13 @@
 (define-primitive-function (allocate 2)
   (let ((type (get/head -args-))
         (size (get/head (get/tail -args-))))
-    (safety 1 (assert (is/long type) "allocate: invalid type "type))
-    (safety 1 (assert (is/long size) "allocate: invalid size "size))
+    (safety 1 (assert (long? type) "allocate: invalid type "type))
+    (safety 1 (assert (long? size) "allocate: invalid size "size))
     (gc/allocate (get/long type) (words-to-bytes (get/long size)))))
 
 (define-primitive-function (allocate-data 1)
   (let ((size (get/head -args-)))
-    (safety 1 (assert (is/long size) "allocate-data: invalid size "size))
+    (safety 1 (assert (long? size) "allocate-data: invalid size "size))
     (gc/allocate-opaque <data> (get/long size))))
 
 (define-primitive-function (set-car 2)
@@ -473,14 +473,14 @@
 (define-primitive-function (oop-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (long? idx) (not (long? obj)))))
     (oop-at obj (get/long idx))))
 
 (define-primitive-function (set-oop-at 3)
   (let ((obj (get/head -args-))
         (idx (get/head (set -args- (get/tail -args-))))
         (val (get/head (get/tail -args-))))
-    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (long? idx) (not (long? obj)))))
     (set-oop-at obj (get/long idx) val)))
 
 (define-primitive-function (address-of 1)
@@ -499,7 +499,7 @@
 (define-primitive-function (byte-at 2)
   (let ((obj (get/head -args-))
         (idx (get/head (get/tail -args-))))
-    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (long? idx) (not (long? obj)))))
     (new-<long> (byte-at obj (get/long idx)))))
 
 (define-primitive-function (set-byte-at 3)
@@ -507,7 +507,7 @@
          (idx		(get/head (set -args- (get/tail -args-))))
          (val		(get/head (get/tail -args-)))
          (unboxed-val	(get/long val)))
-    (safety 3 (assert (and obj (is/long idx) (not (is/long obj)))))
+    (safety 3 (assert (and obj (long? idx) (not (long? obj)))))
     (safety 1 (assert (and (<= unboxed-val 256) (<= 0 unboxed-val)) "set-byte-at: value is out of range: "unboxed-val))
     (set (byte-at obj (get/long idx)) unboxed-val)))
 
@@ -596,7 +596,7 @@
 
 (define-primitive-function (long->string 1)
   (let ((arg (get/head -args-)))
-    (assert (is/long arg))
+    (assert (long? arg))
     (let ((buf (gc/allocate-opaque <data> 32))) ; safe up until 64 bits
       (libc/sprintf buf "%ld" (get/long arg))
       (new-<string>-from-cstring buf))))
