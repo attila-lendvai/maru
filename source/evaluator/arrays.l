@@ -3,12 +3,12 @@
 ;; TODO this is only slightly different from what is in source/arrays.l.
 ;; maybe try to merge them by eliminating the differences between the level-shifted code and normal maru code.
 (define-form define-vector-accessors (type-name basename elements-are-opaque? accessor copier mover element-size-in-bytes)
-  (let ((setter-name (concat-symbols 'set- basename '-at))
-        (getter-name (concat-symbol basename '-at))
-        (length-name (concat-symbol basename '-length))
-        (append-name (concat-symbol basename '-append))
-        (insert-name (concat-symbol basename '-insert))
-        (zeroed-name (concat-symbol basename '-ensure-zero-terminated)))
+  (let ((setter-name (concat-symbols 'set- basename 'at))
+        (getter-name (concat-symbol basename 'at))
+        (length-name (concat-symbol basename 'length))
+        (append-name (concat-symbol basename 'append))
+        (insert-name (concat-symbol basename 'insert))
+        (zeroed-name (concat-symbol basename 'ensure-zero-terminated)))
     `(let ()
        (define-function ,length-name (obj)
          (get/long (get (,type-name size) obj)))
@@ -62,15 +62,15 @@
            (put (,type-name size) obj (new-<long> size)))
          obj))))
 
-(define-vector-accessors <array>	k/array		()	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
-(define-vector-accessors <string>	k/string	t	byte-at		copy-bytes	move-bytes	1)
+(define-vector-accessors <array>	array-		()	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
+(define-vector-accessors <string>	k/string-	t	byte-at		copy-bytes	move-bytes	1)
 
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)
-        (hi (- (k/array-length array) 1)))
+        (hi (- (array-length array) 1)))
     (while (<= lo hi)
       (let* ((mid	(/ (+ lo hi) 2))
-             (candidate	(k/array-at array mid))
+             (candidate	(array-at array mid))
              (res	(comparator item candidate)))
         (cond
           ((< res 0)	(set hi (- mid 1)))

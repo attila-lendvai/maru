@@ -537,7 +537,7 @@
   (safety 2 (assert (is <env> env)     "find-variable: env is not an <env>: "env))
   (safety 2 (assert (is <symbol> name) "find-variable: name is not a <symbol>: "name))
   (let* ((bindings (get (<env> bindings) env))
-         (index    (k/array-length bindings))
+         (index    (array-length bindings))
          (vars     (get (<array> elements) bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
     (while (<= 0 (decr index))
       (let ((var (oop-at vars index)))
@@ -571,7 +571,7 @@
   (let ((offset (get/long (get (<env> offset) env))))
     (gc/let* ((var (new-<variable> name () env offset)))
       (put (<env> offset) env (new-<long> (+ offset 1)))
-      (k/array-append (get (<env> bindings) env) var))))
+      (array-append (get (<env> bindings) env) var))))
 
 (define-function environment-define (env name value)
   (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
@@ -589,7 +589,7 @@
                        (lambda (array index item)
                          (debug (libc/printf "interning %s\n" item))
                          (gc/let* ((sym (new-<symbol> item)))
-                           (k/array-insert array index sym)
+                           (array-insert array index sym)
                            sym))))
 
 (define-function maybe-object-in-variable (env name type)
@@ -606,9 +606,9 @@
   (let* ((from-env	(module-env from))
          (to-env	(module-env to))
          (from-bindings	(get (<env> bindings) from-env))
-         (count		(k/array-length from-bindings)))
+         (count		(array-length from-bindings)))
     (for (i 0 count)
-      (let* ((var	(k/array-at from-bindings i))
+      (let* ((var	(array-at from-bindings i))
              (name	(get (<variable> name) var))
              (value	(get (<variable> value) var)))
         ;; *globals* is special in that it should point to the module's env, therefore we skip that
@@ -641,7 +641,7 @@
        ,(when feature/backtrace
           '(when (<= 0 *call-stack-index*)
             ;; gc optimization: clear the now unused call-frame
-            (let ((frame (k/array-at *call-stack* *call-stack-index*)))
+            (let ((frame (array-at *call-stack* *call-stack-index*)))
               (with-instance-accessors frame <call-frame>
                 (set frame.callee-designator	())
                 (set frame.callee		())
@@ -653,11 +653,11 @@
   (define-function %new-call-frame (callee-designator callee args)
     (safety 3 (unless (or (not callee-designator)	(gc/valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
     (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
-    (let ((frame (k/array-at *call-stack* *call-stack-index*)))
+    (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 1 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
         (gc/let* ((new-frame (new-record-instance <call-frame>)))
-          (set (k/array-at *call-stack* *call-stack-index*) new-frame)
+          (set (array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
       (with-instance-accessors frame <call-frame>
         (set frame.callee-designator	callee-designator)
@@ -667,13 +667,13 @@
 
   (define-function current-call-frame ()
     (when (< 0 *call-stack-index*)
-      (k/array-at *call-stack* (- *call-stack-index* 1)))))
+      (array-at *call-stack* (- *call-stack-index* 1)))))
 
 (define-function print-backtrace ()
   (if-at-expand feature/backtrace
       (let ((i *call-stack-index*))
         (while (<= 0 (decr i))
-          (let ((call-frame (k/array-at *call-stack* i)))
+          (let ((call-frame (array-at *call-stack* i)))
             (libc/printf "%3ld: " i)
 	    (dumpln (<call-frame>-callee-designator call-frame))
             (awhen (<call-frame>-callee call-frame)
@@ -699,11 +699,11 @@
             (args   arguments))
         (while (is/pair params)
           (or (is/pair args) (error "too few arguments for "fun": "arguments))
-          (set (k/array-at locals (get/long (get (<variable> index) (get/head params)))) (get/head args))
+          (set (array-at locals (get/long (get (<variable> index) (get/head params)))) (get/head args))
           (set params (get/tail params))
           (set args    (get/tail args)))
         (when (is <variable> params)
-          (set (k/array-at locals (get/long (get (<variable> index) params))) args)
+          (set (array-at locals (get/long (get (<variable> index) params))) args)
           (set args ()))
         (when args
           (error "too many arguments for "fun": "arguments)))
@@ -726,7 +726,7 @@
         ;;((= type <fixed>)	(apply (get (<fixed> function) fun) arguments ctx)) TODO delme? isn't it an error when a <fixed> reaches apply?
         ((= type <subr>)	((get (<subr> _imp) fun) arguments ctx))
         (else
-         (aif (k/array-at (get/variable-value var/*applicators*) (type-of fun))
+         (aif (array-at (get/variable-value var/*applicators*) (type-of fun))
              (gc/let* ((args arguments))
                (set args (new-<pair> fun args))
                (apply it args ctx))
@@ -856,7 +856,7 @@
       ((is <symbol> exp)	(expand/symbol	exp env))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
-       (aif (k/array-at (get/variable-value var/*expanders*) (type-of exp))
+       (aif (array-at (get/variable-value var/*expanders*) (type-of exp))
            (gc/let* ((args (new-<pair> exp ())))
              (apply it args ()))
          exp)))))
@@ -955,7 +955,7 @@
       ((is/pair exp)		(encode/pair	exp env))
       ((is <symbol> exp)	(encode/symbol	exp env))
       (else
-       (aif (k/array-at (get/variable-value var/*encoders*) (type-of exp))
+       (aif (array-at (get/variable-value var/*encoders*) (type-of exp))
            (gc/let* ((args (new-<pair> env ())))
              (set args (new-<pair> exp args))
              (debug (libc/printf "encode/other: applying fn: ") (println it) (libc/printf " ") (print args) (libc/printf " ") (println env))
@@ -993,7 +993,7 @@
       (else
        (when-at-expand feature/backtrace
          (set (<call-frame>-callee-designator -call-frame-) exp))
-       (let ((evaluator (k/array-at (get/variable-value var/*evaluators*) type)))
+       (let ((evaluator (array-at (get/variable-value var/*evaluators*) type)))
 	 (if evaluator
 	     (gc/let* ((args (new-<pair> exp ())))
 	       (when-at-expand feature/backtrace
@@ -1019,7 +1019,7 @@
 				      (set ctx (get (<context> home) ctx))
 				      (decr delta))
                                     (let* ((index (get/long (get (<variable> index) exp)))
-                                           (value (k/array-at (get (<context> bindings) ctx) index)))
+                                           (value (array-at (get (<context> bindings) ctx) index)))
                                       (debug (libc/printf "eval is reading local var from context ") (dump ctx) (libc/printf " at index %ld, holding value " index) (dumpln value))
 				      value))))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))

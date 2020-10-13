@@ -85,7 +85,7 @@
                 (set tmp (eval (get/head prog) -ctx-))
                 (set prog (get/tail prog)))
               (debug (libc/printf "let subr is setting var ") (dump var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (dumpln -ctx-))
-              (set (k/array-at locals (get/long (get (<variable> index) var))) tmp))))
+              (set (array-at locals (get/long (get (<variable> index) var))) tmp))))
         (set bindings (get/tail bindings)))
       (set tmp ())
       (while (is/pair body)
@@ -108,7 +108,7 @@
           (set delta (- delta 1)))
         (let ((index (get/long (get (<variable> index) var))))
           (debug (libc/printf "set subr is setting local var in context ") (dump -ctx-) (libc/printf " at index %ld, to value " index) (dumpln value))
-          (set (k/array-at (get (<context> bindings) -ctx-) index) value))))))
+          (set (array-at (get (<context> bindings) -ctx-) index) value))))))
 
 (define-subr (while () fixed)
   (let ((tst  (car -args-))
@@ -526,7 +526,7 @@
 (define-subr (array-at 2)
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (get/tail -args-)))))
-    (k/array-at arr idx)))
+    (array-at arr idx)))
 
 (define-subr (string-at 2)
   (let ((arr (get/head -args-))
@@ -537,7 +537,7 @@
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (set -args- (get/tail -args-)))))
         (val (get/head (get/tail -args-))))
-    (set (k/array-at arr idx) val)
+    (set (array-at arr idx) val)
     val))
 
 (define-subr (set-string-at 3)
@@ -554,7 +554,7 @@
   (let ((arr (get/head -args-))
         (idx (get/long (get/head (set -args- (get/tail -args-)))))
         (val (get/head (get/tail -args-))))
-    (k/array-insert arr idx val)
+    (array-insert arr idx val)
     val))
 
 (define-subr (string-insert 3)
