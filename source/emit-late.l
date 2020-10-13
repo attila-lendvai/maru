@@ -19,7 +19,7 @@
 ;;;
 ;;; API visible in the target
 ;;;
-(set (current-module) *target-module*)
+(set *module* *target-module*)
 
 ;; redefine DEFINE-FORM with one that evaluates the body in *slave-module*.
 ;; this way the body code can use everything that's available in the slave module
@@ -31,7 +31,7 @@
 ;; redefine DEFINE-CONSTANT so that it defines it both into the slave and into the target.
 (define-form define-constant (name value-form)
   ;; NOTE as per the custom DEFINE-FORM above, we are expanded/encoded in the slave module,
-  ;; but at apply time the (current-module) will be the target module.
+  ;; but at apply time *module* will be the target module.
   ;; TODO the wizardry here smells like accidental complexity, or at least it's semantics with a high congnitive load.
   (let* ((value		(eval `(eval-in-module *slave-module* ',value-form)))
          (form-obj	(eval `(form () (lambda _ ',value))))

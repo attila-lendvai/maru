@@ -165,6 +165,8 @@
 (define-form define-symbol-form (name replacement)
   `(define ,name (form () (lambda _ ',replacement))))
 
+(define-symbol-form *module* (current-module))
+
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
 (define-form eval-at-expand (form)
   (eval form))

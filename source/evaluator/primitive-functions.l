@@ -606,7 +606,7 @@
 (define-primitive-function (set-current-module 1)
   (let ((module (get/head -args-)))
     (safety 1 (assert (is <module> module) "set-current-module: called with not a <module>: "module))
-    (k/set-current-module module))
+    (set-current-module module))
   ())
 
 (define-primitive-function create-module

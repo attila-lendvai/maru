@@ -116,7 +116,10 @@
 ;; let's make all the slave's <form>s available in the *target-module*
 (copy-module-bindings *slave-module* *target-module*
                       (lambda (name value)
-                        (= (type-of value) <form>)))
+                        (and (= (type-of value) <form>)
+                             ;; *module* will be a global variable in the target, while in the interpreter
+                             ;; it's a ([set-]current-module), because we need to update some caches when it's set.
+                             (not (member? name '(*module*))))))
 
 (define-function eval-in-target (form)
   (eval-in-module *target-module* form))
@@ -125,7 +128,7 @@
   `(eval-in-module *target-module* ',form))
 
 (define-function switch-to-target-module ()
-  (set (current-module) *target-module*))
+  (set *module* *target-module*))
 
 (when evolving?
   ;; there's a nasty bug in the host with expand that prevents us from redefining false using define-constant...
@@ -133,14 +136,14 @@
 
 (eval-in-target
  `(let ()
-    (define *host-module*	,(current-module))
+    (define *host-module*	,*module*)
     (define *slave-module*	,*slave-module*)
     (define slave-value		,slave-value)
     ;;(define eval-in-slave	,eval-in-slave)
     ;;(define eval-in-host	,(slave-value eval-in-host))
     ;; this cannot be a function because functions are supposed to be lowered to the target VM
     ;; (define-form switch-to-host-module ()
-    ;;   `(set (current-module) *host-module*))
+    ;;   `(set *module* *host-module*))
 
     ;; we want these variables to be lowered into the target, but not the arrays in them
     (set *expanders*	())

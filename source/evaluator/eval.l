@@ -511,17 +511,17 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
-(define-function k/set-current-module (module)
-  (debug (libc/printf "k/set-current-module {%p}\n" module))
+(define-function set-current-module (module)
+  (debug (libc/printf "set-current-module {%p}\n" module))
   (set *module* module)
   (capture-well-known-module-values))
 
 (define-form with-current-module (module . body)
   `(gc/let* ((__previous-module__ *module*)
              __result__)
-     (k/set-current-module ,module)
+     (set-current-module ,module)
      (set __result__ (let () ,@body))
-     (k/set-current-module __previous-module__)
+     (set-current-module __previous-module__)
      __result__))
 
 (define-function find-variable (env name)

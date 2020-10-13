@@ -37,3 +37,9 @@
 
 ;; this got renamed
 (define <primitive-function> <subr>)
+
+;; new stuff
+(define-form define-symbol-form (name replacement)
+  `(define ,name (form () (lambda _ ',replacement))))
+
+(define-symbol-form *module* (current-module))
