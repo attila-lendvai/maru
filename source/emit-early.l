@@ -142,6 +142,12 @@
     ;; (define-form switch-to-host-module ()
     ;;   `(set (current-module) *host-module*))
 
+    ;; we want these variables to be lowered into the target, but not the arrays in them
+    (set *expanders*	())
+    (set *encoders*	())
+    (set *evaluators*	())
+    (set *applicators*	())
+
     (define qq/cons		,(slave-value qq/cons))
     ;; this will also be needed once a ,@ is at the "wrong" place, but then this is a closure,
     ;; and as such the compiler tires to lower it and fails.
