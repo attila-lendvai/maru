@@ -355,12 +355,7 @@
     (assert (pair? list) "cdr called on non-list: " list)
     (get/tail list)))
 
-(define-function caar		(list)		(car (car list)))
-(define-function cadr		(list)		(car (cdr list)))
-(define-function cddr		(list)		(cdr (cdr list)))
-(define-function caddr		(list)		(car (cdr (cdr list))))
-(define-function cdddr		(list)		(cdr (cdr (cdr list))))
-;;(define-function cadddr	(list)		(car (cdr (cdr (cdr list)))))
+(load "source/list-min.l")
 
 ;;;
 ;;; object instantiation
@@ -529,13 +524,6 @@
      (k/set-current-module __previous-module__)
      __result__))
 
-(define-function module-env (module)
-  (get (<variable> value) (get (<module> globals) module)))
-
-(define-function global-variable? (var)
-  (let ((env (get (<variable> env) var)))
-    (= 0 (get/long (get (<env> level) env)))))
-
 (define-function find-variable (env name)
   (safety 2 (assert (is <env> env)     "find-variable: env is not an <env>: "env))
   (safety 2 (assert (symbol? name) "find-variable: name is not a <symbol>: "name))
@@ -608,22 +596,12 @@
   (when (symbol? name)
     (maybe-object-in-variable (lookup-variable env name) type)))
 
-(define-function copy-module-bindings (from to filter)
-  (debug (libc/printf "copy-module-bindings from %p to %p\n" from to))
-  (let* ((from-env	(module-env from))
-         (to-env	(module-env to))
-         (from-bindings	(get (<env> bindings) from-env))
-         (count		(array-length from-bindings)))
-    (for (i 0 count)
-      (let* ((var	(array-at from-bindings i))
-             (name	(get (<variable> name) var))
-             (value	(get (<variable> value) var)))
-        ;; *globals* is special in that it should point to the module's env, therefore we skip that
-        (when (or (not filter)
-                  (filter name value))
-          (debug (libc/printf "\t") (print name) (libc/printf " = ") (print value) (libc/printf "\tof type %ld\n" (type-of value)))
-          (environment-define to-env name value))))
-    (debug (libc/printf "copy-module-bindings from %p to %p is done\n" from to))))
+(load "source/env-min.l")
+
+;; TODO move this is also into env-min.l, but for that we need smart accessors in the level-shifted code that automatically do the unboxing
+(define-function global-variable? (var)
+  (let ((env (get (<variable> env) var)))
+    (= 0 (get/long (get (<env> level) env)))))
 
 (load "source/evaluator/reader.l")
 (load "source/evaluator/printer.l")
@@ -716,9 +694,8 @@
           (error "too many arguments for "fun": "arguments)))
       (let ((prg (get (<expr> body) fun))
             (result ()))
-        (while (pair? prg)
-          (set result (eval (get/head prg) new-ctx))
-          (set prg (get/tail prg)))
+        (list-do exp prg
+          (set result (eval exp new-ctx)))
         (when (get (<env> stable) env)
           (put (<context> callee) new-ctx ()))
         result))))
@@ -777,9 +754,8 @@
          (gc/let* ((new-bindings ()))
            (let ((bindings (cadr exp))
                  new-bindings-last)
-             (while (pair? bindings)
-               (let* ((entry (get/head bindings))
-                      var-name)
+             (list-do entry bindings
+               (let (var-name)
                  (gc/let* (var-init-prog)
                    (if (pair? entry)
                        (let ()
@@ -790,8 +766,7 @@
                    (gc/let* ((new-entry (cons var-name var-init-prog)))
                      (set new-bindings-last (if new-bindings
                                                 (put/tail new-bindings-last (cons new-entry ()))
-                                              (set new-bindings (cons new-entry ())))))))
-               (set bindings (get/tail bindings))))
+                                              (set new-bindings (cons new-entry ())))))))))
            (gc/let* ((tmp (expand-all (cddr exp) env))) ; the body
              (set tmp (cons new-bindings tmp))
              (set tmp (cons symbol/let tmp))
@@ -897,31 +872,27 @@
        (gc/let* ((vars		())
                  (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
          ;; phase 1: first define the let variables into new-env
-         (let ((bindings (cadr exp))
-               vars/last)
-           (while (pair? bindings)
-             (debug (libc/printf "encode/let visiting entry ") (dumpln (get/head bindings)))
-             (let* ((var-name	(get/head (get/head bindings)))
+         (let (vars/last)
+           (list-do entry (second exp)
+             (debug (libc/printf "encode/let visiting entry ") (dumpln entry))
+             (let* ((var-name	(first entry))
                     (var-obj	(environment-define new-env var-name ())))
                (set vars/last (if vars
                                   (put/tail vars/last (cons var-obj ()))
-                                (set vars (cons var-obj ())))))
-             (set bindings (get/tail bindings))))
+                                (set vars (cons var-obj ())))))))
          ;; update the offset of the parent env to "skip" the indices of our let variables
          (put (<env> offset) env
               (get (<env> offset) new-env))
          ;; phase 2: encode-all the init-progs and build the new bindings list
          (gc/let* (var
                    new-bindings)
-           (let ((bindings (cadr exp))
-                 new-bindings/last)
-             (while (pair? bindings)
-               (gc/let* ((init-prog	(encode-all (get/tail (get/head bindings)) env))
+           (let (new-bindings/last)
+             (list-do entry (second exp)
+               (gc/let* ((init-prog	(encode-all (get/tail entry) env))
                          (new-entry	(cons (pop vars) init-prog)))
                  (set new-bindings/last (if new-bindings
                                             (put/tail new-bindings/last (cons new-entry ()))
-                                          (set new-bindings (cons new-entry ())))))
-               (set bindings (get/tail bindings))))
+                                          (set new-bindings (cons new-entry ())))))))
            (set tail (encode-all (cddr exp) new-env)) ; encode the body
            (set tail (cons new-bindings tail))
            (set tail (cons new-env tail)))))

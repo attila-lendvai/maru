@@ -1,0 +1,30 @@
+;;; -*- mode: lisp; coding: us-ascii -*-
+
+(define-function module-env (module)
+  (<variable>-value (<module>-globals module)))
+
+(define-function copy-module-bindings (from to filter)
+  (let* ((from-env	(module-env from))
+         (to-env	(module-env to))
+         (from-bindings	(<env>-bindings from-env))
+         (count		(array-length from-bindings)))
+    (for (i 0 count)
+      (let* ((var	(array-at from-bindings i))
+             (name	(<variable>-name var))
+             (value	(<variable>-value var)))
+        ;; *globals* is special in that it should point to the module's env, therefore we skip that
+        (when (or (not filter)
+                  (filter name value))
+          (environment-define to-env name value))))
+    ()))
+
+;; (define-function environment-find (env name)
+;;   (let* ((bindings (<env>-bindings env))
+;;          (offset   (<env>-offset   env))
+;;          (var      ())
+;;          (idx      0))
+;;     (while (and (not var) (< idx offset))
+;;       (if (= name (<variable>-name (array-at bindings idx)))
+;;           (set var (array-at bindings idx))
+;;         (set idx (+ idx 1))))
+;;     var))

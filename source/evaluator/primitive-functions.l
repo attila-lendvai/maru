@@ -6,9 +6,7 @@
 (define-form define-primitive-function (name-and-props . body)
   (unless (pair? name-and-props)
     (set name-and-props (list name-and-props)))
-  (let ((name (car name-and-props))
-        (arity (cadr name-and-props))
-        (fixed? (caddr name-and-props)))
+  (let* (((name arity fixed?) name-and-props))
     (assert (symbol? name))
     (push *primitive-function-registry* (list name arity fixed?))
     `(define-function ,(concat-symbol 'primitive-function/ name) (-args- -ctx-)
@@ -62,9 +60,7 @@
     (lookup-variable env name)))
 
 (define-primitive-function (lambda () fixed)
-  (let ((env		(car  -args-)) ; see encode/pair; it puts the env as the first arg
-        (parameters	(cadr -args-))
-        (body		(cddr -args-)))
+  (let* (((env parameters . body) -args-)) ; see encode/pair, it puts the env as the first arg
     (assert (is <env> env) "lambda primitive-function: env is "env)
     (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
     (new-<expr> parameters body env -ctx-)))
@@ -74,23 +70,20 @@
          (locals   (get (<context> bindings) -ctx-))
          (body     (cddr -args-)))
     (gc/let* (tmp)
-      (while (pair? bindings)
-        (let ((binding (get/head bindings)))
-          (when (pair? binding)
-            (let ((var  (get/head binding))
-                  (prog (get/tail binding)))
-              (debug (libc/printf "let primitive-function is initializing var ") (dump var) (libc/printf " in context ") (dumpln -ctx-))
-              (set tmp ())
-              (while (pair? prog)
-                (set tmp (eval (get/head prog) -ctx-))
-                (set prog (get/tail prog)))
-              (debug (libc/printf "let primitive-function is setting var ") (dump var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (dumpln -ctx-))
-              (set (array-at locals (get/long (get (<variable> index) var))) tmp))))
-        (set bindings (get/tail bindings)))
+      (list-do binding bindings
+        (when (pair? binding)
+          (let ((var  (get/head binding))
+                (prog (get/tail binding)))
+            (debug (libc/printf "let primitive-function is initializing var ") (dump var) (libc/printf " in context ") (dumpln -ctx-))
+            (set tmp ())
+            (while (pair? prog)
+              (set tmp (eval (get/head prog) -ctx-))
+              (set prog (get/tail prog)))
+            (debug (libc/printf "let primitive-function is setting var ") (dump var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (dumpln -ctx-))
+            (set (array-at locals (get/long (get (<variable> index) var))) tmp))))
       (set tmp ())
-      (while (pair? body)
-        (set tmp (eval (get/head body) -ctx-))
-        (set body (get/tail body)))
+      (list-do exp body
+        (set tmp (eval exp -ctx-)))
       tmp)))
 
 (define-primitive-function (set 2 fixed)
@@ -105,7 +98,7 @@
         (debug (libc/printf "set primitive-function is writing local var ") (dump var) (libc/printf " with delta %ld\n" delta))
         (while (< 0 delta)
           (set -ctx- (get (<context> home) -ctx-))
-          (set delta (- delta 1)))
+          (decr delta))
         (let ((index (get/long (get (<variable> index) var))))
           (debug (libc/printf "set primitive-function is setting local var in context ") (dump -ctx-) (libc/printf " at index %ld, to value " index) (dumpln value))
           (set (array-at (get (<context> bindings) -ctx-) index) value))))))
@@ -346,16 +339,14 @@
       (or (string? arg) (fatal1 "read: argument is not a <string> "arg))
       (let ((stream (libc/fopen (get/string arg) "r")))
         ;; TODO error handling
-        (if stream
-            (let* ((head (cons () ()))
-                   (tail head)
-                   (obj  ()))
-              (gc/protect (head obj)
-                (while (!= k/+end+ (set obj (read stream)))
-                  (set tail (put/tail tail (cons obj ())))))
+        (when stream
+          (gc/let* ((head (cons () ()))
+                    obj)
+            (let ((tail head))      ; TODO use collecting macro
+              (while (!= k/+end+ (set obj (read stream)))
+                (set tail (put/tail tail (cons obj ()))))
               (libc/fclose stream)
-              (get/tail head))
-          ())))))
+              (get/tail head))))))))
 
 (define-primitive-function (load 1)
   (let* ((path		(get/head -args-))
@@ -380,27 +371,25 @@
     (repl-stream (get/tvmptr stream))))
 
 (define-primitive-function dump
-  (while (pair? -args-)
-    (dump (get/head -args-))
-    (set -args- (get/tail -args-))))
+  (list-do arg -args-
+    (dump arg))
+  (first -args-))
 
 (define-primitive-function print
-  (while (pair? -args-)
-    (print (get/head -args-))
-    (set -args- (get/tail -args-))))
+  (list-do arg -args-
+    (print arg))
+  (first -args-))
 
 (define-primitive-function warn
-  (while (pair? -args-)
-    (let* ((arg  (get/head -args-))
-           (type (type-of arg)))
+  (list-do arg -args-
+    (let ((type (type-of arg)))
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
         ((= type <long>)   (libc/fprintf libc/stderr "%ld" (get/long   arg)))
         (else
          ;; TODO
-         (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type))))
-    (set -args- (get/tail -args-)))
+         (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)))))
   (libc/flush-streams))
 
 (define-primitive-function (apply 2)

@@ -60,19 +60,7 @@
 
 (define list (lambda args args))
 
-(define caar (lambda (x) (car (car x))))
-(define cadr (lambda (x) (car (cdr x))))
-(define cdar (lambda (x) (cdr (car x))))
-(define cddr (lambda (x) (cdr (cdr x))))
-(define cadar (lambda (x) (car (cdr (car x)))))
-(define caadr (lambda (x) (car (car (cdr x)))))
-(define cdadr (lambda (x) (cdr (car (cdr x)))))
-(define caddr (lambda (x) (car (cdr (cdr x)))))
-(define cdddr (lambda (x) (cdr (cdr (cdr x)))))
-(define caddar (lambda (x) (car (cdr (cdr (car x))))))
-(define caaddr (lambda (x) (car (car (cdr (cdr x))))))
-(define cadddr (lambda (x) (car (cdr (cdr (cdr x))))))
-(define cddddr (lambda (x) (cdr (cdr (cdr (cdr x))))))
+(load "source/list-min.l")
 
 (define memq
   (lambda (object list)
@@ -248,12 +236,6 @@
 
 ;;; list basics
 
-(define-function first	(list)	(car list))
-(define-function second	(list)	(cadr list))
-(define-function third	(list)	(caddr list))
-
-(define-function rest	(list)	(cdr list))
-
 (define-function member? (key list)
   (while (and (pair? list) (!= key (car list)))
     (set list (cdr list)))
@@ -310,29 +292,7 @@
 
 ;;; basic iteration
 
-(define-form for (var-init-limit-step . body)
-  (let ((var       (car    var-init-limit-step)    )
-        (init      (cadr   var-init-limit-step)    )
-        (limit     (caddr  var-init-limit-step)    )
-        (step  (or (cadddr var-init-limit-step) 1)))
-    `(let ((,var ,init)
-           (_limit_ ,limit))
-       (while (< ,var _limit_)
-         ,@body
-         (set ,var (+ ,var ,step))))))
-
-(define-form list-do (var list . body)
-  `(let ((_list_ ,list))
-     (while _list_
-       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
-       (set _list_ (cdr _list_)))))
-
-(define-form until (condition . body)
-  `(while (not ,condition) ,@body))
-
-(define-form times-do (count . body)
-  `(for (__i__ 0 ,count)
-     ,@body))
+(load "source/iteration-min.l")
 
 ;;;
 ;;; require
@@ -987,37 +947,10 @@
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
 
-;; TODO these are duplicates from eval.l
-(define-function module-env (module)
-  (<variable>-value (<module>-globals module)))
+(load "source/env-min.l")
 
-(define-function copy-module-bindings (from to filter)
-  (let* ((from-env	(module-env from))
-         (to-env	(module-env to))
-         (from-bindings	(<env>-bindings from-env))
-         (count		(array-length from-bindings)))
-    (for (i 0 count)
-      (let* ((var	(array-at from-bindings i))
-             (name	(<variable>-name var))
-             (value	(<variable>-value var)))
-        ;; *globals* is special in that it should point to the module's env, therefore we skip that
-        (when (or (not filter)
-                  (filter name value))
-          (environment-define to-env name value))))
-    ()))
-
-;; (define-function environment-find (env name)
-;;   (let* ((bindings (<env>-bindings env))
-;;          (offset   (<env>-offset   env))
-;;          (var      ())
-;;          (idx      0))
-;;     (while (and (not var) (< idx offset))
-;;       (if (= name (<variable>-name (array-at bindings idx)))
-;;           (set var (array-at bindings idx))
-;;         (set idx (+ idx 1))))
-;;     var))
-
-(define-function global-variable? (var)        (= 0 (<env>-level (<variable>-env var))))
+(define-function global-variable? (var)
+  (= 0 (<env>-level (<variable>-env var))))
 
 (define-form define-expand (type args . body)   `(set-array-at *expanders*   ,(<type>-id (eval type)) (lambda ,args ,@body)))
 (define-form define-encode (type args . body)   `(set-array-at *encoders*    ,(<type>-id (eval type)) (lambda ,args ,@body)))
