@@ -190,7 +190,7 @@
                 ;; because of that we can't rename new-<form> -> form
                 ;; form
                 )
-  (eval-in-target `(define ,name (fixed (lambda args (abort ',name " encountered in interpreted code with args " args))))))
+  (eval-in-target `(define ,name (fixed (lambda args (print ',name " encountered in interpreted code with args " args "\n") (abort))))))
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()

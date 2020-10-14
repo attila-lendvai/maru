@@ -241,6 +241,9 @@
 
 ;;; list basics
 
+(define-function ensure-list (obj)
+  (if (pair? obj) obj (list obj)))
+
 (define-function member? (key list)
   (while (and (pair? list) (!= key (car list)))
     (set list (cdr list)))

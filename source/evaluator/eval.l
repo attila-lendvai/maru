@@ -120,6 +120,108 @@
   object)
 
 ;;;
+;;; primitive-function infrasrtucture
+;;; ----------------------------------------------------------------
+
+(eval-in-module *slave-module*
+  '(let ()
+    (define *primitive-function-registry* ())
+    (define *primitive-function-type-accessors*
+     '((<long>			(long?)				get/long)
+       (<string>		(string?)			get/string)
+       (<target-vm-pointer>	(is <target-vm-pointer>)	get/tvmptr)
+       (<symbol>		(symbol?))
+       (<pair>			(pair?))
+       (<array>			(array?))))))
+
+;; TODO shrink the expansion, and check its speed penalty
+(define-form define-primitive-function (name-and-props args . body)
+  ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
+  ;; ARGS: may be _ to don't do any arg parsing
+  ;;       otherwise a list of entries like:
+  ;;         (arg-name (or arg-type null) (or default-value _) . (properties: nounbox))
+  (set name-and-props (ensure-list name-and-props))
+  (let ((prim-name	(pop name-and-props))
+        impl-name
+        impl-name?
+        fixed?)
+    (when (pair? name-and-props)
+      (set impl-name (pop name-and-props))
+      (set impl-name? true))
+    (list-do prop name-and-props
+      (cond
+        ((= prop 'fixed)	(set fixed? true))
+        (else			(error "define-primitive-function: unexpected property "prop))))
+    (let* ((stub-name		(concat-symbol prim-name '/evaluator-stub))
+           (arg-names		())
+           (binders		()))
+      (push *primitive-function-registry* (list prim-name fixed?))
+      (let ((entries args))
+        (while (pair? entries)
+          (let* ((entry		(ensure-list (first entries)))
+                 (arg-name	(pop entry))
+                 (type		(pop entry))
+                 (unbox?	true)
+                 default-value
+                 default-value?)
+            (when (pair? entry)
+              (set default-value (pop entry))
+              (if (= '_ default-value)
+                  (set default-value ())
+                (set default-value? true)))
+            (list-do prop entry
+              (cond
+                ((= prop 'nounbox)	(set unbox? ()))
+                (else			(error "define-primitive-function: unexpected property "prop))))
+            (assert (or (not type) (symbol? type)))
+            (push arg-names arg-name)
+            (let* ((type-entry		(when type
+                                          (or (assq type *primitive-function-type-accessors*)
+                                              `(,type (is ,type) ()))))
+                   (type-checker	(second type-entry))
+                   (getter		(third type-entry)))
+              (push binders `(if (pair? __args)
+                                 (let ()
+                                   (set ,arg-name (get/head __args))
+                                   ,@(when type-checker
+                                       `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string prim-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
+                                   ,@(when (and unbox?
+                                                getter)
+                                       ;; qq is broken... `((set ,arg-name (,getter arg-name)))
+                                       (list (list 'set arg-name (list getter arg-name))))
+                                   (set __args (get/tail __args)))
+                               ,(if default-value?
+                                    `(set ,arg-name ,default-value)
+                                  `(error ,(symbol->string prim-name)": too few arguments: "-args-))))))
+          (set entries (cdr entries)))
+        (unless (= '_ entries)
+          (push binders (if entries
+                            `(set ,entries __args)
+                          `(assert (not __args) ,(symbol->string prim-name)": too many arguments: "-args-)))
+          (when entries
+            (push arg-names entries))))
+      (set binders	(list-reverse! binders))
+      (set arg-names	(list-reverse! arg-names))
+      (let* ((effective-impl-name (if body
+                                      (if impl-name? impl-name prim-name)
+                                    prim-name))
+             (impl (when (and body
+                              effective-impl-name)
+                     `((define-function ,effective-impl-name ,arg-names
+                         ;; TODO (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
+                         ,@body)))))
+        `(let ()
+           ,@impl
+           (define-function ,stub-name (-args- -ctx-)
+             ;; bind the args
+             (let (,@(when binders `((__args -args-)))
+                   ,@arg-names)
+               ,@binders
+               ,@(if effective-impl-name
+                     `((,effective-impl-name ,@arg-names))
+                   body))))))))
+
+;;;
 ;;; forward definitions, so that the variables get created early enough for building the graph
 ;;; ----------------------------------------------------------------
 (define-form define-forwards names
@@ -187,18 +289,18 @@
 ;;; error handling
 ;;; ----------------------------------------------------------------
 
-(define-function die ()
-  (libc/fprintf libc/stderr "\nDIE called...\n")
-  (libc/flush-streams)
+(define-primitive-function abort _
+  (libc/printf "ABORTED\n")
   (print-backtrace)
   (libc/flush-streams)
+  ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   (libc/exit -1))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
-(define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (die))
-(define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (die))
-(define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (die))
+(define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (abort))
+(define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (abort))
+(define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (abort))
 
 ;; FIXME it would be nice for ERROR to be a function (or at least expand to a breakpoint'able function call),
 ;; but that would need the compiler to support variable nr of args, or literal lists
@@ -214,7 +316,7 @@
                   `(print ,arg)))
             args)
      (libc/printf "\n")
-     (die)))
+     (abort)))
 
 ;;;
 ;;; copy the types here that should be visible to the target code
@@ -334,12 +436,12 @@
                                                          var)
                                                       ,val))
 ;; TODO should we turn these into macros? or introduce compiler macros?
-(define-function car (list)
+(define-primitive-function car (list)
   (when list
     (safety 1 (assert (pair? list) "car called on non-list: " list))
     (get/head list)))
 
-(define-function cdr (list)
+(define-primitive-function cdr (list)
   (when list
     (safety 1 (assert (pair? list) "cdr called on non-list: " list))
     (get/tail list)))
@@ -350,10 +452,11 @@
 ;;; object instantiation
 ;;; ----------------------------------------------------------------
 
-(define-function allocate (type word-size)
-  (gc/allocate type (words-to-bytes word-size)))
+(define-primitive-function allocate ((type <long>) (slot-count <long>))
+  ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
+  (gc/allocate type (words-to-bytes slot-count)))
 
-(define-function allocate-data (byte-size)
+(define-primitive-function allocate-data ((byte-size <long>))
   (gc/allocate-opaque <data> byte-size))
 
 (define-form new-record-instance (type)
@@ -379,17 +482,17 @@
     (set (<target-vm-pointer>-_bits obj) bits)
     obj))
 
-(define-function cons (head tail)
+(define-primitive-function cons ((head () ()) (tail () ()))
   (let ((obj (new-record-instance <pair>)))
     (set (<pair>-head obj) head)
     (set (<pair>-tail obj) tail)
     obj))
 
-(define-function string (len)
+(define-primitive-function string ((length <long> 0))
   (gc/let* ((str (new-record-instance <string>)))
-    (put (<string> size) str (new-<long> len))
-    (when (> len 0)
-      (put (<string> elements) str (allocate-data len)))
+    (put (<string> size) str (new-<long> length))
+    (when (> length 0)
+      (put (<string> elements) str (allocate-data length)))
     str))
 
 (define-function new-<string>-from-cstring (cstr)
@@ -406,7 +509,7 @@
       (put (<symbol> _bits) obj bits)
       obj)))
 
-(define-function array (capacity)
+(define-primitive-function array ((capacity <long> 0))
   (gc/let* ((arr (new-record-instance <array>)))
     (put (<array> size) arr (new-<long> 0))
     (when (> capacity 0)
@@ -429,7 +532,7 @@
     (put (<form> symbol)	obj sym)
     obj))
 
-(define-function new-<fixed> (fn)
+(define-primitive-function fixed (fn)
   (let ((obj (new-record-instance <fixed>)))
     (put (<fixed> function)	obj fn)
     obj))
@@ -442,7 +545,7 @@
       (put (<primitive-function> profiler-counter) obj 0))
     obj))
 
-(define-function new-<variable> (name value env index)
+(define-primitive-function variable ((name <symbol>) value (env <env>) (index <long>))
   (gc/let* ((obj (new-record-instance <variable>)))
     (put (<variable> name)	obj name)
     (put (<variable> value)	obj value)
@@ -450,7 +553,7 @@
     (put (<variable> index)	obj (new-<long> index))
     obj))
 
-(define-function new-<env> (parent level offset)
+(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (get/long (get (<env> offset) parent))))
   (gc/let* ((obj (new-record-instance <env>)))
     (put (<env> parent)		obj parent)
     (put (<env> level)		obj (new-<long> (if parent (+ (get/long (get (<env> level) parent)) level) 0)))
@@ -517,7 +620,10 @@
 
 (load "source/env-min.l")
 
-(define-function set-current-module (module)
+(define-primitive-function (current-module ()) ()
+  *module*)
+
+(define-primitive-function set-current-module ((module <module>))
   (debug (libc/printf "set-current-module {%p}\n" module))
   (set *module* module)
   (capture-well-known-module-values))
@@ -535,9 +641,10 @@
 ;; or as the module's env, and we need to access them, even while we load our own stuff
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
 ;; all the functions that deal with objects that the host gives us.
-(define-function defined? (name env)
-  (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
-  (safety 1 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
+(define-primitive-function defined? ((name <symbol>) (env <env> (module-env *module*)))
+  ;; TODO add these to the macro
+  ;; (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
+  ;; (safety 1 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
   (let ((result ()))
     (while (and env
                 (not (set result (find-variable env name))))
@@ -550,21 +657,19 @@
   (awhen (find-variable env name)
     (return it))
   (let ((offset (get/long (get (<env> offset) env))))
-    (gc/let* ((var (new-<variable> name () env offset)))
+    (gc/let* ((var (variable name () env offset)))
       (put (<env> offset) env (new-<long> (+ offset 1)))
       (array-append (get (<env> bindings) env) var))))
 
-(define-function environment-define (env name value)
-  (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
-  (safety 1 (assert (symbol? name) "environment-define: name is not of type <symbol>: "name))
+(define-primitive-function environment-define ((env <env>) (name <symbol>) value)
   (debug (libc/printf "environment-define called, name is %s\n" (get/symbol name)))
   (let ((var (ensure-variable env name)))
     (put (<variable> value) var value)
     var))
 
-(define-function string->symbol (cstr)
+(define-primitive-function string->symbol ((string <string>))
   (array-binary-search *symbols*
-                       cstr
+                       string
                        (lambda (item candidate)
                          (libc/strcmp item (get/symbol candidate)))
                        (lambda (array index item)
@@ -710,6 +815,9 @@
                (apply it args ctx))
            (error "cannot apply: " fun)))))))
 
+(define-primitive-function (apply ()) (fn args)
+  (apply fn args -ctx-))
+
 ;;;
 ;;; expand
 ;;; ----------------------------------------------------------------
@@ -820,7 +928,7 @@
       (else
        exp))))
 
-(define-function expand (exp env)
+(define-primitive-function expand (exp (env <env> (get (<context> env) -ctx-)))
   (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (with-new-call-frame (symbol/expand () exp)
     (cond
@@ -855,7 +963,7 @@
        ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
        (unless (is <env> (first tail))
          (gc/let* ((vars	())
-                   (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
+                   (new-env	(environment env 0 (get/long (get (<env> offset) env)))))
            ;; phase 1: first define the let variables into new-env
            (let (vars/last)
              (list-do entry (first tail)
@@ -885,7 +993,7 @@
       ((= head fixed-primitive-function/lambda)
        (let ((args (first tail)))
          (unless (is <env> args)
-           (gc/let* ((new-env (new-<env> env 1 0)))
+           (gc/let* ((new-env (environment env 1 0)))
              (while (pair? args)
                (environment-define new-env (get/head args) ())
                (set args (get/tail args)))
@@ -930,7 +1038,7 @@
           (put (<env> stable) venv symbol/true))))
     var))
 
-(define-function encode (exp env)
+(define-primitive-function encode (exp (env <env> (get (<context> env) -ctx-)))
   (debug (libc/printf "encode of exp ") (dump exp) (libc/printf ", in env ") (dumpln env))
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
@@ -1024,7 +1132,8 @@
     (debug (libc/printf "expand-encode-eval for form ") (dump form) (libc/printf " is returning with ") (dumpln x))
     x))
 
-(define-function repl-stream (stream)
+;; TODO unexport?
+(define-primitive-function repl-stream ((stream <target-vm-pointer>))
   ;;(put/variable-value *input* (new-<long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\012\015]")) ; drop the possible #!./eval first line of the file
@@ -1034,7 +1143,7 @@
                (libc/printf ".")
                (libc/flush-streams))
              (!= k/+end+ (set res (read stream))))
-      (gc/let* ((env (new-<env> (module-env *module*) 1 0)))
+      (gc/let* ((env (environment (module-env *module*) 1 0)))
         (set res (expand-encode-eval res env))
         (when (= libc/stdin stream)
           (gc/let* ((printer (cons res 0)))
@@ -1049,7 +1158,7 @@
 (define-function new-<module> (name)
   (debug (libc/printf "new-<module>\n"))
   (gc/let* ((module (new-record-instance <module>))
-            (env    (new-<env> () 0 0))
+            (env    (environment () 0 0))
             tmp)
     (set (<module>-globals module)	(environment-define env symbol/*globals* env))
     (when-at-expand feature/debug-info
@@ -1117,6 +1226,20 @@
 ;;; ----------------------------------------------------------------
 
 (load "source/evaluator/primitive-functions.l")
+
+(define-function instantiate-primitive-function (module name imp fixed?)
+  (gc/let* ((tmp (new-<primitive-function> imp name)))
+    (when fixed?
+      (set tmp (fixed tmp)))
+    (environment-define (module-env module) (string->symbol name) tmp)))
+
+(define-form instantiate-primitive-functions (module)
+  `(let ((__module__ ,module))
+     ,@(map (lambda (entry)
+              (let* (((name fixed?)	entry)
+                     (impl-name		(concat-symbol name '/evaluator-stub)))
+                `(instantiate-primitive-function __module__ ,(symbol->string name) ,impl-name ,(target-boolean fixed?))))
+            *primitive-function-registry*)))
 
 (define-function populate-module-with-maru-primitives (module)
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
