@@ -192,7 +192,7 @@
   (libc/flush-streams)
   (print-backtrace)
   (libc/flush-streams)
-  (libc/abort))
+  (libc/exit -1))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).

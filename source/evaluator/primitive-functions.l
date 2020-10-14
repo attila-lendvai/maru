@@ -272,7 +272,8 @@
   (dumpln -args-)
   (print-backtrace)
   (libc/flush-streams)
-  (libc/abort))
+  ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when redirecting into a file
+  (libc/exit -1))
 
 (define-primitive-function (exit 1)
   (let ((arg (get/head -args-)))
