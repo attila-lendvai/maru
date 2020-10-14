@@ -564,6 +564,9 @@
 ;;;
 ;;; the <foo> global definitions are also holding full maru type objects.
 
+(define-form is (type obj)
+  `(= ,type (type-of ,obj)))
+
 (define type-id-of type-of) ; we will replace type-of later
 (set type-of 'not-yet-bootstrapped)
 
@@ -952,8 +955,6 @@
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible
 (define-function <pair>-source (x) ())
 (define-function set-<pair>-source (x pos) pos)
-
-(load "source/env-min.l")
 
 (define-function global-variable? (var)
   (= 0 (<env>-level (<variable>-env var))))

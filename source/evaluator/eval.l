@@ -274,9 +274,6 @@
 
 (define-type-of)
 
-(define-form is (type ptr)
-  `(= ,type (type-of ,ptr)))
-
 (define-function k/%accessor-typecheck (expected-type-id object)
   (let ((type (type-of object)))
     (or (= type expected-type-id)
@@ -520,6 +517,8 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
+(load "source/env-min.l")
+
 (define-function set-current-module (module)
   (debug (libc/printf "set-current-module {%p}\n" module))
   (set *module* module)
@@ -533,29 +532,19 @@
      (set-current-module __previous-module__)
      __result__))
 
-(define-function find-variable (env name)
-  (safety 2 (assert (is <env> env)     "find-variable: env is not an <env>: "env))
-  (safety 2 (assert (symbol? name) "find-variable: name is not a <symbol>: "name))
-  (let* ((bindings (get (<env> bindings) env))
-         (index    (array-length bindings))
-         (vars     (get (<array> elements) bindings))) ; KLUDGE an early optimization that will bite us somewhere down the road...
-    (while (<= 0 (decr index))
-      (let ((var (oop-at vars index)))
-        (when (= name (get (<variable> name) var))
-          (return var))))))
-
+;; TODO this is ready to be moved into env-min.l, but then it redefines the host's defined?
+;; and breaks something. think this true: the host will provides us the <env>'s in forms
+;; and as the module's env, and we need to access them, even while we load our own stuff
+;; into the slave. we can't just redefine the host's defined? function. this also applies to
+;; all the functions that deal with objects that the host gives us.
 (define-function defined? (name env)
   (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
   (safety 1 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
-  (while env
-    (awhen (find-variable env name)
-      (return it))
-    (set env (get (<env> parent) env))))
-
-(define-function variable-value (env name)
-  (aif (defined? name env)
-      (get (<variable> value) it)
-    (fatal1 "undefined variable in variable-value: %s" (get/symbol name))))
+  (let ((result ()))
+    (while (and env
+                (not (set result (find-variable env name))))
+      (set env (<env>-parent env)))
+    result))
 
 (define-function ensure-variable (env name)
   (safety 1 (assert (is <env> env)		"ensure-variable: env arg is not of type <env>: "env))
@@ -598,8 +587,6 @@
 (define-function maybe-object-in-env (env name type)
   (when (symbol? name)
     (maybe-object-in-variable (defined? name env) type)))
-
-(load "source/env-min.l")
 
 ;; TODO move this is also into env-min.l, but for that we need smart accessors in the level-shifted code that automatically do the unboxing
 (define-function global-variable? (var)

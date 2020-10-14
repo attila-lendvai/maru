@@ -118,6 +118,8 @@
 
 (switch-to-host-module)
 
+(load "source/env-min.l")
+
 (define *target-module* (create-module "target"))
 
 ;; let's make all the slave's <form>s available in the *target-module*
@@ -155,6 +157,9 @@
     ;; this cannot be a function because functions are supposed to be lowered to the target VM
     ;; (define-form switch-to-host-module ()
     ;;   `(set *module* *host-module*))
+
+    (define evolving?		,evolving?)
+    ;;(define bootstrapping?	,bootstrapping?) this is always true here
 
     ;; we want these variables to be lowered into the target, but not the arrays in them
     (set *expanders*	())

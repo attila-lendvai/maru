@@ -105,7 +105,8 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
-EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l)
+EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l) \
+ $(addprefix source/,list-min.l env-min.l)
 
 # for some optional C files, e.g. profiler.c
 EVAL_OBJ_x86	=

@@ -7,7 +7,7 @@
     (let* ((name		(<variable>-name  var))
            (value		(<variable>-value var))
            (type-blacklist	(list <primitive-function> <fixed> <form> <array> <env> <module>))
-           (name-blacklist	'(+end+ true)))
+           (name-blacklist	'(+end+ true evolving?)))
       (unless (or (member? (type-of value) type-blacklist)
                   (member? name name-blacklist))
         (emit COMMENT (list "defn " name))
