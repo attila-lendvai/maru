@@ -395,17 +395,10 @@
 (define-primitive-function (apply 2)
   (apply (get/head -args-) (get/head (get/tail -args-)) -ctx-))
 
-;; TODO rename to eval-sexp to differentiate from eval-encoded? find some better names...
 (define-primitive-function eval
   (gc/let* ((env (or (cadr -args-)
                      (new-<env> (module-env *module*) 1 0))))
     (expand-encode-eval (car -args-) env)))
-
-(define-primitive-function eval-encoded
-  ;; TODO investigate: why is this needed? try to eliminate it
-  (gc/let* ((env (or (cadr -args-)
-                     (new-<env> (module-env *module*) 1 0))))
-    (eval (car -args-) env)))
 
 (define-primitive-function encode
   (encode (car -args-)

@@ -850,62 +850,67 @@
   (gc/let* ((head (encode (get/head exp) env))
             (tail (get/tail exp)))
     (debug (libc/printf "encode/pair of head ") (dump head) (libc/printf ", in env ") (dumpln env))
-    ;; TODO FIXME this injects the env, but also returns a list with the same head => encode is not idempotent
-    ;; because of that emit requires the introduction of the eval-encoded primitive-function
     (cond
       ((= head fixed-primitive-function/let)
-       (gc/let* ((vars		())
-                 (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
-         ;; phase 1: first define the let variables into new-env
-         (let (vars/last)
-           (list-do entry (second exp)
-             (debug (libc/printf "encode/let visiting entry ") (dumpln entry))
-             (let* ((var-name	(first entry))
-                    (var-obj	(environment-define new-env var-name ())))
-               (set vars/last (if vars
-                                  (put/tail vars/last (cons var-obj ()))
-                                (set vars (cons var-obj ())))))))
-         ;; update the offset of the parent env to "skip" the indices of our let variables
-         (put (<env> offset) env
-              (get (<env> offset) new-env))
-         ;; phase 2: encode-all the init-progs and build the new bindings list
-         (gc/let* (var
-                   new-bindings)
-           (let (new-bindings/last)
-             (list-do entry (second exp)
-               (gc/let* ((init-prog	(encode-all (get/tail entry) env))
-                         (new-entry	(cons (pop vars) init-prog)))
-                 (set new-bindings/last (if new-bindings
-                                            (put/tail new-bindings/last (cons new-entry ()))
-                                          (set new-bindings (cons new-entry ())))))))
-           (set tail (encode-all (cddr exp) new-env)) ; encode the body
-           (set tail (cons new-bindings tail))
-           (set tail (cons new-env tail)))))
+       ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
+       (unless (is <env> (first tail))
+         (gc/let* ((vars	())
+                   (new-env	(new-<env> env 0 (get/long (get (<env> offset) env)))))
+           ;; phase 1: first define the let variables into new-env
+           (let (vars/last)
+             (list-do entry (first tail)
+               (debug (libc/printf "encode/let visiting entry ") (dumpln entry))
+               (let* ((var-name	(first entry))
+                      (var-obj	(environment-define new-env var-name ())))
+                 (set vars/last (if vars
+                                    (put/tail vars/last (cons var-obj ()))
+                                  (set vars (cons var-obj ())))))))
+           ;; update the offset of the parent env to "skip" the indices of our let variables
+           (put (<env> offset) env
+                (get (<env> offset) new-env))
+           ;; phase 2: encode-all the init-progs and build the new bindings list
+           (gc/let* (var
+                     new-bindings)
+             (let (new-bindings/last)
+               (list-do entry (first tail)
+                 (gc/let* ((init-prog	(encode-all (get/tail entry) env))
+                           (new-entry	(cons (pop vars) init-prog)))
+                   (set new-bindings/last (if new-bindings
+                                              (put/tail new-bindings/last (cons new-entry ()))
+                                            (set new-bindings (cons new-entry ())))))))
+             (set tail (encode-all (cdr tail) new-env)) ; encode the body
+             (set tail (cons new-bindings tail))
+             (set tail (cons new-env tail))))))
 
       ((= head fixed-primitive-function/lambda)
-       (let ((args (cadr exp)))
-         (gc/let* ((new-env (new-<env> env 1 0)))
-           (while (pair? args)
-             (environment-define new-env (get/head args) ())
-             (set args (get/tail args)))
-           (when args
-             (environment-define new-env args ()))
-           (set tail (encode-all tail new-env))
-           (set tail (cons new-env tail)))))
+       (let ((args (first tail)))
+         (unless (is <env> args)
+           (gc/let* ((new-env (new-<env> env 1 0)))
+             (while (pair? args)
+               (environment-define new-env (get/head args) ())
+               (set args (get/tail args)))
+             (when args
+               (environment-define new-env args ()))
+             (set tail (encode-all tail new-env))
+             (set tail (cons new-env tail))))))
 
       ((= head fixed-primitive-function/define)
-       (let ((var (ensure-variable (module-env *module*) (car tail))))
-         (set tail (encode-all (cdr tail) env))
-         (set tail (cons var tail))))
+       (unless (is <variable> (first tail))
+         (let ((var (ensure-variable (module-env *module*) (first tail))))
+           (set tail (encode-all (cdr tail) env))
+           (set tail (cons var tail)))))
 
       ((= head fixed-primitive-function/set)
-       (let ((var (defined? (car tail) env)))
-         (or var (fatal1 "set: undefined variable: %s" (get/symbol (car tail))))
-         (and (or (not (car tail)) (cddr tail)) (error "encode: malformed SET expression " exp))
-         (set tail (encode-all (cdr tail) env))
-         (set tail (cons var tail))))
+       (unless (is <variable> (first tail))
+         (let ((var (or (defined? (first tail) env)
+                        (error "set: undefined variable: " (first tail)))))
+           (assert (and (car tail) (not (cddr tail))) "encode: malformed SET expression: "exp)
+           (set tail (encode-all (cdr tail) env))
+           (set tail (cons var tail)))))
 
-      ((!= head fixed-primitive-function/quote)
+      ((= head fixed-primitive-function/quote)) ; ignore quotes
+
+      (else
        (set tail (encode-all tail env))))
     ;; return value
     (cons head tail)))
