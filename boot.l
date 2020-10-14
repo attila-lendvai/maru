@@ -768,6 +768,7 @@
   (list-length (<record>-effective-slots type)))
 
 (define-function record/slot-index (type slot-name)
+  (assert (is <record> type))
   (let ((i 0)
         (list (<record>-effective-slots type)))
     (while (and (pair? list)
@@ -983,6 +984,8 @@
       (let* ((name    (first  binding))
              (fun     (second binding))
              (var     (third  binding))
+             ;; if we take the value of form now, then our expansion will not depend on the
+             ;; value of form in the current module. this is useful when bootstrapping.
              (exp     (list form (make-with-form fun) (make-with-form var))))
         (environment-define env name (eval exp *env*))))
     `(let ()
@@ -1198,7 +1201,7 @@
       (dump arg))
     found))
 
-;;; generic/multimethod (dispatch on the type of all arguments)
+;;; generic/multimethod (dispatch on the type of all arguments, but does not support inheritance for now)
 
 (define-record <generic> () (name methods default))
 

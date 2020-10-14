@@ -53,7 +53,7 @@
 	  (while (not (parser-stream-at-end *parser-stream*))
 	    (print (format "%c" (parser-stream-next *parser-stream*))))
 	  (println "<EOF>")
-	  (error "abort")))
+	  (abort)))
     (set *parser-stream* prev-stream)
     v))
 

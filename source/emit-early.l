@@ -191,16 +191,13 @@
 ;; so that any accidental use of them will result in an early and useful error message.
 (list-do name '(return address-of << >>
                 ;; to test if anything calls them before they get redefined:
-                ;; eval cons list car cdr
-                ;; TODO with-instance-accessors uses with-forms that needs form to be present in the target.
-                ;; because of that we can't rename new-<form> -> form
-                ;; form
+                ;; eval cons list car cdr form
                 )
   (eval-in-target `(define ,name (fixed (lambda args (print ',name " encountered in interpreted code with args " args "\n") (abort))))))
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()
-;;   ;; they need to be <primitive-function>'s, so that encode doesn't insert them
+;;   ;; they need to be <primitive-function>'s, so that encode doesn't insert them as it inserts <fixed>'s.
 ;;   (eval-in-module *target-module* `(define ,name error)))
 
 (define-function target-boolean (value)

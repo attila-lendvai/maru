@@ -108,7 +108,7 @@
          (digit-for (lambda (c)
                       (if (< c 10)
                           (+ c ?0)
-                          (+ c (- ?A 10))))))
+                        (+ c (- ?A 10))))))
     (while (< index length)
       (let ((c (string-at plain index)))
         (cond
@@ -465,6 +465,7 @@
         (emit LONG entry-label)))))
 
 (define-function compile-call (op args -c-)
+  (assert op "compile-call: operator is nil")
   (let* ((op-is-a-var?	(variable? op))
          (op-is-global?	(and op-is-a-var?
                              (global-variable? op)))
@@ -518,6 +519,7 @@
 (define-function compile/let-binding (binding comp)
   ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
   ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
+  ;; TODO cleanup! expand now brings let bindings to a normal form (to ease encode's job). think this through...
   (unless (pair? binding)
     (set binding (list binding ())))
   (unless (cdr binding)
@@ -550,16 +552,16 @@
     (gen DEFLABEL done)))
 
 (define-function compile/if (expr -c-)
-  (let ((a (UNIQUE-LABEL))
-        (b (UNIQUE-LABEL)))
-    (comp (cadr expr))
-    (gen BF a)
-    (comp (caddr expr))
-    (gen BR b)
-    (gen DEFLABEL a)
+  (let ((l/false (UNIQUE-LABEL))
+        (l/end (UNIQUE-LABEL)))
+    (comp (second expr))
+    (gen BF l/false)
+    (comp (third expr))
+    (gen BR l/end)
+    (gen DEFLABEL l/false)
     (list-do stmt (cdddr expr)
       (comp stmt))
-    (gen DEFLABEL b)))
+    (gen DEFLABEL l/end)))
 
 (define-function compile/while (expr -c-)
   (let ((l/body	(UNIQUE-LABEL))

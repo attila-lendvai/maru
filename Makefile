@@ -279,9 +279,9 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-$(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
+$(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
-	$(call ensure-built,$(GEN_EVAL))
+#	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
@@ -351,13 +351,14 @@ test-compiler-llvm: $(BUILD_llvm)/compiler-test
 	$(BUILD_llvm)/compiler-test
 
 # TODO backend duplication
-$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): tests/compiler-tests.l $(EMIT_FILES_x86)
-	$(call ensure-built,$(TEST_EVAL))
+$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(TEST_EVAL) tests/compiler-tests.l $(EMIT_FILES_x86)
+	@mkdir -p $(BUILD_x86)
+#	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
-$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
+$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(TEST_EVAL) tests/compiler-tests.l $(EMIT_FILES_llvm)
 	@mkdir -p $(BUILD_llvm)
-	$(call ensure-built,$(TEST_EVAL))
+#	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l

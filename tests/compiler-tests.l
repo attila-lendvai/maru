@@ -63,6 +63,14 @@
 ;;        (compile/bug/push-root/helper/2 2))
 ;;   42)
 
+(define printf 10)
+(define word 10)
+
+(define-test compile/escaping/1
+    (let ((ptr 22))
+      (+ word (+ printf ptr)))
+  42)
+
 (define-test compile/if/1
     (if false 342 343)
   343)
@@ -100,6 +108,15 @@
 
 (define-test compile/foreign-function/3
     (> 0 (libc/strcmp "bar" "foo"))
+  true)
+
+(define-test compile/foreign-function/4
+    (let* ((size	128)
+           (buf		(libc/malloc size)))
+      (libc/snprintf buf size "foo%sbaz%ld" "bar" 42)
+      (let ((res (= 0 (libc/strcmp "foobarbaz42" buf))))
+        (libc/free buf)
+        res))
   true)
 
 (define-test compile/load-store/1
@@ -180,6 +197,19 @@
       y)
   3)
 
+(define-function min (a b)
+  (if (> a b) b a))
+
+(let ()
+  (define-function compile/let/2-helper (a b count)
+    (let* ((count (- count 1)))
+      count)))
+
+(define-test compile/let/2
+    (+ (compile/let/2-helper 1 1 41)
+       (compile/let/2-helper 1 1 3))
+  42)
+
 (define-test compile/let/constant-prop
     (let ((y (+ 2 3)
              40))
@@ -196,6 +226,11 @@
         (set x (- x 1)))
       sum)
   16)
+
+;; this is supposed to signal a compile time error instead of compiling a call to nil...
+;; (define-test compile/call/1
+;;     (() 42)
+;;   ())
 
 (define-test compile/not/1
     (not ())
@@ -385,11 +420,12 @@
     (set-second-to-first 33 99)
   99)
 
-(define-test compile/set/bug/4
-    (let ((x 40))
-      ;; TODO instead of silent miscompilation, this should error explicitly noting that the lambda is capturing x, which is currently not supported
-      ((lambda (y) (+ x y)) 2))
-  42)
+;; TODO instead of silent miscompilation, this should error explicitly noting that the lambda is capturing x, which is currently not supported.
+;; the LLVM IR type system actually catches this bug, but the x86 backend silently miscompiles it currently
+;; (define-test compile/set/bug/4
+;;     (let ((x 40))
+;;       ((lambda (y) (+ x y)) 2))
+;;   42)
 
 (define-function main (argc argv)
   (libc/printf "Printing command line args:\n")

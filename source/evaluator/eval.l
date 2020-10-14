@@ -9,36 +9,24 @@
 ;;; vm     - Virtual Machine, i.e. a universe capable of executing code.
 ;;;          It has its own set of laws that are accepted as axioms.
 ;;;
-;;; host   - The Maru vm running the compiler.
+;;; host   - The Maru vm animating the bootstrap process.
 ;;;
-;;; target - The target vm of the "level-shift" operation (e.g. x86 asm).
+;;; target - The target vm of the "level-shift" operation (e.g. x86 machines).
 ;;;
-;;; kernel - It's the part of the semantic space that runs on the target.
-;;;          e.g. k/apply vs. subr/apply (which uses k/apply in its
-;;;          implementation).
+;;; kernel - It's the part of the code that runs in the target vm.
 ;;;
-;;; k/ prefix means that it's something that is part of the kernel of the
-;;;    codebase, i.e. the stuff that implements the Maru vm. Often it's
-;;;    necessary to distinguish a name that exists both in the Maru vm,
-;;;    and in the kernel (e.g. car and k/car). It's not exhasutive, i.e.
-;;;    not all that is part of the kernel is prefixed with k/.
-;;;
-;;; slave  - The Maru vm that is being bootstrapped and will
+;;; slave  - The Maru vm that is being bootstrapped and that will
 ;;;          spring to life when the result of the level-shift
 ;;;          (the compilation) gets executed on the target.
 ;;;          Its name comes from the idea that, having a dynamic compiler,
 ;;;          the host could start up the slave vm under its full
 ;;;          supervision.
 ;;;
-;;; oop    - Ordinary Object Pointer
+;;; oop    - Ordinary Object Pointer, pointing to a lisp value.
 ;;;
 ;;; get, put, is
 ;;;        - These are the kernel "accessors" for Maru values.
 ;;;          They are also used as a namespace, e.g. get/long.
-;;;
-;;; subr/ prefix denotes the subr's, the primitive functions that will
-;;;       be made visible to user code in the bootstrapped Maru
-;;;       semantic space as part of the laws of the slave vm.
 ;;;
 ;;; *foo* is global
 ;;; +foo+ is a constant
@@ -254,7 +242,11 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    print println read encode expand eval string->symbol k/%accessor-typecheck)
+    print println read encode expand eval string->symbol k/%accessor-typecheck
+    ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
+    ;; bodies of our impl functions below, i.e. primfns end up reaching the compiler.
+    environment-define defined?
+    )
 
 ;;;
 ;;; utils
@@ -371,7 +363,7 @@
   (let ((type (type-of object)))
     (or (= type expected-type-id)
         (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
-  (return object))
+  object)
 
 ;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
 (define-form get (designator object)
@@ -611,11 +603,6 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
-;; we need to hide these primfn's of the host by defining vars in our env,
-;; otherwise the primfn's will be referenced by the function bodies below.
-(define environment-define)
-(define defined?)
-
 (load "source/env-min.l")
 
 (define-primitive-function (current-module ()) ()
@@ -650,7 +637,7 @@
     result))
 
 (define-function ensure-variable (env name)
-  (safety 1 (assert (is <env> env)		"ensure-variable: env arg is not of type <env>: "env))
+  (safety 1 (assert (is <env> env)	"ensure-variable: env arg is not of type <env>: "env))
   (safety 1 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (find-variable env name)
     (return it))
@@ -689,7 +676,8 @@
   (when (symbol? name)
     (maybe-object-in-variable (defined? name env) type)))
 
-;; TODO move this is also into env-min.l, but for that we need smart accessors in the level-shifted code that automatically do the unboxing
+;; TODO move this also into env-min.l, but for that we need smart accessors in the
+;; level-shifted code that automatically do the unboxing of slot values
 (define-function global-variable? (var)
   (let ((env (get (<variable> env) var)))
     (= 0 (get/long (get (<env> level) env)))))
@@ -1042,7 +1030,7 @@
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
     (cond
-      ((pair? exp)		(encode/pair	exp env))
+      ((pair? exp)	(encode/pair	exp env))
       ((symbol? exp)	(encode/symbol	exp env))
       (else
        (aif (and *encoders*
@@ -1135,7 +1123,7 @@
 (define-primitive-function repl-stream ((stream <target-vm-pointer>))
   ;;(put/variable-value *input* (new-<long> stream))
   (unless (= libc/stdin stream)
-    (libc/fscanf stream "#!%*[^\012\015]")) ; drop the possible #!./eval first line of the file
+    (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
     (while (let ()
              (when (= libc/stdin stream)
@@ -1158,14 +1146,17 @@
   (gc/let* ((module (new-record-instance <module>))
             (env    (environment () 0 0))
             tmp)
-    (set (<module>-globals module)	(environment-define env symbol/*globals* env))
     (when-at-expand feature/debug-info
-      (set (<module>-name module)	(new-<string>-from-cstring (or name ""))))
+      (set (<module>-name module)
+	   (new-<string>-from-cstring (or name ""))))
+
+    (set (<module>-globals module)
+	 (environment-define env symbol/*globals* env))
 
     (when *maru-module*
       (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
 
-    ;; we always overwrite these with empty arrays in the new module
+    ;; overwrite these with empty arrays in the new module. TODO why?
     (set tmp (array 0))		(environment-define env (string->symbol "*expanders*")		tmp)
     (set tmp (array 0))		(environment-define env (string->symbol "*encoders*")		tmp)
     (set tmp (array 0))		(environment-define env (string->symbol "*evaluators*")		tmp)

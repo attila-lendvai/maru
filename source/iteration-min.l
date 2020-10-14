@@ -14,7 +14,7 @@
 (define-form list-do (var list . body)
   `(let ((_list_ ,list))
      (while _list_
-       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (vars...) list-of-lists)
+       (let* ((,var (car _list_))) ,@body) ; let* allows (list-do (var1 var2...) list-of-lists)
        (set _list_ (cdr _list_)))))
 
 (define-form until (condition . body)
