@@ -128,6 +128,10 @@
             names)))
 
 (define-forwards
+    *module* *maru-module* *symbols*
+
+    *expanders* *encoders* *evaluators* *applicators*
+
     fixed-primitive-function/quote
     fixed-primitive-function/lambda
     fixed-primitive-function/let
@@ -158,17 +162,6 @@
 
 (define-function max (a b)
   (if (> a b) a b))
-
-;;;
-;;; global state
-;;;
-;;; Some of the state of the Maru VM being implemented needs to be
-;;; captured/known by the code implementing it in the target VM.
-;;; ----------------------------------------------------------------
-
-(define *module*)
-(define *maru-module*)
-(define *symbols*)
 
 (define *call-stack-index*	0)
 (when-at-expand feature/backtrace
@@ -517,6 +510,11 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
+;; we need to hide these primfn's of the host by defining vars in our env,
+;; otherwise the primfn's will be referenced by the function bodies below.
+(define environment-define)
+(define defined?)
+
 (load "source/env-min.l")
 
 (define-function set-current-module (module)
@@ -533,9 +531,9 @@
      __result__))
 
 ;; TODO this is ready to be moved into env-min.l, but then it redefines the host's defined?
-;; and breaks something. think this true: the host will provides us the <env>'s in forms
-;; and as the module's env, and we need to access them, even while we load our own stuff
-;; into the slave. we can't just redefine the host's defined? function. this also applies to
+;; and breaks something. think this true: the host hands over to us <env>'s in e.g. <form>s
+;; or as the module's env, and we need to access them, even while we load our own stuff
+;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
 ;; all the functions that deal with objects that the host gives us.
 (define-function defined? (name env)
   (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))

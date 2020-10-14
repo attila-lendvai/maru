@@ -64,6 +64,8 @@
 ;;; target module setup
 ;;;
 
+(define *target-module* (create-module "target"))
+
 ;; TODO isn't this kinda messy? all these switch-to-foo-module &co...
 
 (eval-in-slave
@@ -94,7 +96,9 @@
       (define-constant +little-endian?+		true) ; this is needed by the compiler tests
       ;;(define-constant +target-triplet+	,(concat-strings target/cpu "-" target/vendor "-" target/os))
       (define-constant +word-size-in-bits+	,word-size)
-      (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
+      (define-constant +word-size-in-bytes+	,(/ word-size 8))
+
+      (define *target-module*			,*target-module*))))
 
 (switch-to-slave-module)
 
@@ -118,15 +122,15 @@
 
 (switch-to-host-module)
 
+(when-at-expand evolving?
+  ;; this is used in env-min.l and is not available in the prevous stage
+  (define-form is (type obj)
+    `(= ,type (type-of ,obj))))
+
+;; strictly speaking, this is just wrong, because we load one of the slave's source file into the host... but it works, and fails loud and early if not.
 (load "source/env-min.l")
 
-(define *target-module* (create-module "target"))
-
 ;; let's make all the slave's <form>s available in the *target-module*
-;; TODO FIXME when we are doing this we inherit the definition order of the primitive-functions
-;; from the host, and therefore we cannot reorder our own. this new setup also defines
-;; the order of the definitions in the asm output, as opposed to having it in the same order
-;; as in the source files.
 (copy-module-bindings *slave-module* *target-module*
                       (lambda (name value)
                         (and (= (type-of value) <form>)
@@ -161,12 +165,6 @@
     (define evolving?		,evolving?)
     ;;(define bootstrapping?	,bootstrapping?) this is always true here
 
-    ;; we want these variables to be lowered into the target, but not the arrays in them
-    (set *expanders*	())
-    (set *encoders*	())
-    (set *evaluators*	())
-    (set *applicators*	())
-
     (define define-form		,(slave-value define-form/target))
 
     (define qq/cons		,(slave-value qq/cons))
@@ -177,25 +175,17 @@
     (define-constant false 0)
     (define-constant true  1)))
 
-(assert (= 1 (target-value true)))
-(assert (= 0 (target-value false)))
-
-(define-function target-boolean (value)
-  (eval-in-target (if value 'true 'false)))
-
-(assert (= 1 (target-boolean "foo")))
-(assert (= 0 (target-boolean ())))
-
-(eval-in-slave
- `(let ()
-    (define *target-module*	,*target-module*)
-    ;;(define eval-in-target	,(host-value eval-in-target))
-    ;;(define target-value	,target-value)
-    (define target-boolean	,target-boolean)))
+(when evolving?
+  (eval-in-target
+   `(let ()
+      (define char-at		string-at)
+      (define set-char-at	set-string-at))))
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of << >> eval cons list car cdr
+(list-do name '(return address-of << >>
+                ;; to test if anything calls them before they get redefined:
+                ;; eval cons list car cdr
                 ;; TODO with-instance-accessors uses with-forms that needs form to be present in the target.
                 ;; because of that we can't rename new-<form> -> form
                 ;; form
@@ -207,8 +197,19 @@
 ;;   ;; they need to be <primitive-function>'s, so that encode doesn't insert them
 ;;   (eval-in-module *target-module* `(define ,name error)))
 
-(when evolving?
-  (eval-in-target
-   `(let ()
-      (define char-at		string-at)
-      (define set-char-at	set-string-at))))
+(define-function target-boolean (value)
+  (eval-in-target (if value 'true 'false)))
+
+(eval-in-slave
+ `(let ()
+    (define target-boolean	,target-boolean)))
+
+;; create a child environment now that will hold whatever gets defined by loading
+;; eval.l and its parts, i.e. the artifacts that we want to compile.
+(let ((child-env (environment (eval-in-module *target-module* '*globals*))))
+  (eval-in-module *target-module* `(set *globals* ,child-env)))
+
+(assert (= 1 (target-value true)))
+(assert (= 0 (target-value false)))
+(assert (= 1 (target-boolean "foo")))
+(assert (= 0 (target-boolean ())))
