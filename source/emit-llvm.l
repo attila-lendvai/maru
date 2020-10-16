@@ -71,7 +71,7 @@
          (error "llvm-type-bitsize: unexpected type "type))
        (cdr entry)))))
 
-(define-function %llvm-escape (str char-needs-wrapping? legal-char? . with-zero)
+(define-function %llvm-escape (prefix str char-needs-wrapping? legal-char? . with-zero)
   (let* ((mangled (array)) ; strings don't auto-expand, so we need to use arrays here
          (index   0)
          (outdex  0)
@@ -91,6 +91,9 @@
                          (putnext ?\\)
                          (putnext (digit-for (bitwise-shift c -4)))
                          (putnext (digit-for (bitwise-and c 0xf)))))))
+    (when prefix
+      (string-do c prefix
+        (write-char c)))
     (string-do c str
       (write-char c))
     (when with-zero
@@ -101,7 +104,8 @@
     (array->string mangled)))
 
 (define-function llvm/escape-string (str . with-zero)
-  (%llvm-escape str
+  (%llvm-escape ()
+                str
                 (lambda _ true) ; always wrap it in double quotes
                 ;; TODO this felxibility may be unnecessary; duplicate code below
                 (lambda (c)
@@ -110,12 +114,12 @@
                        (not (= ?\\ c))))
                 with-zero))
 
-(define-function llvm/escape-identifier (name)
+(define-function llvm/escape-identifier (prefix name)
+  ;; NOTE we don't need to escape ptr and word (two globally defined types that we use) because
+  ;; our globals are prefixed by llvm/escape-global-identifier.
   (set name (symbol->string name))
-  ;; we have two reserved keywords for the types
-  (when (= name "ptr")  (set name "_ptr_"))
-  (when (= name "word") (set name "_word_"))
-  (%llvm-escape name
+  (%llvm-escape prefix
+                name
                 (lambda (c)
                   (not (or (and (<= ?a c) (<= c ?z))
                            (and (<= ?A c) (<= c ?Z))
@@ -125,6 +129,12 @@
                   (and (<= 32 c) (<= c 127)
                        (not (= ?\" c))
                        (not (= ?\\ c))))))
+
+(define-function llvm/escape-local-identifier (name)
+  (llvm/escape-identifier () name))
+
+(define-function llvm/escape-global-identifier (name)
+  (llvm/escape-identifier "m_" name))
 
 ;;;
 ;;; Operands
@@ -138,18 +148,19 @@
 (define-form define-operand (name fields . printing)
   (let ((type-name (symbol->type-name name)))
     (eval `(define-record ,type-name () ,fields))
-    (eval `(define-function ,name ,fields
+    (eval `(define-function ,name ,(<record>-effective-slots (eval type-name))
              (let ((self (new ,type-name)))
                ,@(define-operand/make-setters type-name fields)
                self)))
     `(define-method do-print ,type-name () (print ,@printing))))
 
-(define-operand		GLOBAL		(name)		"@"(llvm/escape-identifier (<GLOBAL>-name self)))
-(define-operand		LOCAL		(name)		"%"(llvm/escape-identifier (<LOCAL>-name self)))
+(define-operand		GLOBAL		(name)		"@"(llvm/escape-global-identifier (<GLOBAL>-name self)))
+(define-operand		LIBC-GLOBAL	(name)		"@"(<LIBC-GLOBAL>-name self))
+(define-operand		LOCAL		(name)		"%"(llvm/escape-local-identifier (<LOCAL>-name self)))
 (define-operand		LITERAL		(value)		(<LITERAL>-value self))
 (define-operand		CONSTANT	(name value)	(<CONSTANT>-name self))
-(define-operand		TEMP		(id)		"%"(llvm/escape-identifier (concat-string "t" (long->string (<TEMP>-id self)))))
-(define-operand		LABEL		(name)		(llvm/escape-identifier (<LABEL>-name self)))
+(define-operand		TEMP		(id)		"%"(llvm/escape-local-identifier (concat-string "t" (long->string (<TEMP>-id self)))))
+(define-operand		LABEL		(name)		(llvm/escape-local-identifier (<LABEL>-name self)))
 (define-function	UNIQUE-LABEL	()		(LABEL (unique-name "L")))
 
 (define-function local? (obj)
@@ -259,9 +270,10 @@
       (print (ffi-type->llvm-type param-type)))
     (print ")")))
 
-(define-function emit-llvm-foreign-fn-type (ffn name)
+(define-function emit-llvm-foreign-fn-type (ffn print-name?)
   (print (ffi-type->llvm-type (<foreign-function>-return-type ffn)) " ")
-  (when name (print name))
+  (when print-name?
+    (print "@"(<foreign-function>-name ffn)))
   (print "(")
   (let ((first? true)
         (param-types (<foreign-function>-parameter-types ffn)))
@@ -313,8 +325,10 @@
   ;;       			  (println $1"   = private unnamed_addr global %ptr bitcast([" length " x i8]* getelementptr([" length " x i8], [" length " x i8]* "$1".c) to %ptr)")))
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
-  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)"))
-  ((GLOBAL foreign-function)	(print "declare ") (emit-llvm-foreign-fn-type $2 $1) (println)))
+  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)")))
+
+(define-instruction DECLARE	()
+  ((foreign-function)		(print "declare ") (emit-llvm-foreign-fn-type $1 true) (println)))
 
 (define-instruction ALLOCA	()
   ((TEMP)			(println "	"$1" = alloca %ptr")))
@@ -339,8 +353,9 @@
                                   (print "	"$reg1" = bitcast ")
                                   (emit-llvm-fn-type '%ptr param-types ())
                                   (println "* "$1" to %ptr")))
+  ;; TODO no need to dispatch on GLOBAL, $1 is unused
   ((GLOBAL foreign-function)	(print "	"$reg1" = bitcast ")
-				(emit-llvm-foreign-fn-type $2 ())
+				(emit-llvm-foreign-fn-type $2 ()) ; evolving? use false
 				(println "* @" (<foreign-function>-name $2) " to %ptr")))
 
 (define-instruction STORE	(t () ())
@@ -363,13 +378,13 @@
   ((GLOBAL pair)		(let ((param-types (map (lambda _ '%ptr) $2)))
                                   (emit-llvm-call $reg1 $1 $2 '%ptr param-types ())))
   ((foreign-function undefined)	(emit-llvm-call $reg1
-                                                (GLOBAL (<foreign-function>-name $1))
+                                                (LIBC-GLOBAL (<foreign-function>-name $1))
                                                 ()
                                                 (<foreign-function>-return-type $1)
                                                 (<foreign-function>-parameter-types $1)
                                                 (<foreign-function>-vararg? $1)))
   ((foreign-function pair)	(emit-llvm-call $reg1
-                                                (GLOBAL (<foreign-function>-name $1))
+                                                (LIBC-GLOBAL (<foreign-function>-name $1))
                                                 $2
                                                 (<foreign-function>-return-type $1)
                                                 (<foreign-function>-parameter-types $1)
@@ -578,7 +593,7 @@
     (list-do e body
       (comp e))
 
-    (emit/function-prologue (GLOBAL name) param-decls)
+    (emit/function-prologue (if (= name 'main) (LIBC-GLOBAL name) (GLOBAL name)) param-decls)
 
     (unless +function-parameters-are-read-only+
       (free-temps params))
@@ -604,6 +619,7 @@
     (emit/function-epilogue)))
 
 (define-function compile-call (op args -c-)
+  (assert op "compile-call: operator is nil")
   (let* ((op-is-a-var?	(variable? op))
          (op-value	(if op-is-a-var? (<variable>-value op) op))
          (arity		(list-length args))
@@ -924,7 +940,7 @@
 
 (define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
-(define-method compile-definition <foreign-function>	(name -c-)	(emit DEFINE (GLOBAL (<foreign-function>-name self)) self))
+(define-method compile-definition <foreign-function>	(name -c-)	(emit DECLARE self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 (define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
 
