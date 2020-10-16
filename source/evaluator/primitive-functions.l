@@ -297,7 +297,6 @@
 (define-primitive-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
 (define-primitive-function (pair? ())		(thing) (and (pair?   thing) symbol/true))
 (define-primitive-function (array? ())		(thing)	(and (array?  thing) symbol/true))
-(define-primitive-function (form ())		(fn (sym () ()))	(new-<form> fn sym))
 
 (define-primitive-function set-car ((pair <pair>) value)
   (put (<pair> head) pair value))

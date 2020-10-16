@@ -526,7 +526,7 @@
       (put (<expr> profiler-counter) obj (new-<long> 0)))
     obj))
 
-(define-function new-<form> (fn sym)
+(define-primitive-function form (fn (sym () ()))
   (let ((obj (new-record-instance <form>)))
     (put (<form> function)	obj fn)
     (put (<form> symbol)	obj sym)

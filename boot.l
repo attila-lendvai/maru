@@ -983,7 +983,7 @@
       (let* ((name    (first  binding))
              (fun     (second binding))
              (var     (third  binding))
-             (exp     `(form ,(make-with-form fun) ,(make-with-form var))))
+             (exp     (list form (make-with-form fun) (make-with-form var))))
         (environment-define env name (eval exp *env*))))
     `(let ()
        ,@(map-with expand body env))))
