@@ -891,9 +891,10 @@
 
         ((= head symbol/define)
          (assert (not (cdddr exp)) "illegal define form: " exp)
-         (let ((name	(cadr exp))
-               (value	(caddr exp)))
-           (list3 symbol/define name (expand value env))))
+         (let ((name	(second exp))
+               (value	(third exp)))
+           (gc/let* ((expanded-value (expand value env)))
+             (list3 symbol/define name expanded-value))))
 
         ((= head symbol/lambda)
          (let ((params	(cadr exp))
@@ -1146,9 +1147,8 @@
       (gc/let* ((env (environment (module-env *module*) 1 0)))
         (set res (expand-encode-eval res env))
         (when (= libc/stdin stream)
-          (gc/let* ((printer (cons res 0)))
-            (set printer (cons (cons symbol/quote printer) 0))
-            (set printer (cons (string->symbol "print") printer))
+          (gc/let* ((printer (list2 symbol/quote res)))
+            (set printer (list2 (string->symbol "print") printer))
             (expand-encode-eval printer env))
           (libc/flush-streams))))
     (and (= libc/stdin stream)
@@ -1382,23 +1382,22 @@
                (unless (and (pair? cla)
                             (pair? (get/tail cla)))
                  (fatal "--define requires two arguments"))
-               (let ((var (car  cla))
-                     (val (cadr cla)))
+               (gc/let* ((name	(first  cla))
+                         (value	(second cla)))
                  (put (<variable> value) cla-var (set cla (get/tail (get/tail cla)))) ; (pop *command-line-arguments*) x 2
                  ;; convert to long when possible
-                 (let* ((cstr	(get/string val))
+                 (let* ((cstr	(get/string value))
                         (endptr	cstr)
                         (i	(libc/strtoul cstr (address-of endptr) 0)))
                    ;; TODO investigate: why the hell does this behave differently than the one at the other call site of strtoul?
                    ;; (when (or (not (= -1 i))
                    ;;           (= 0 (libc/strcmp cstr "-1")))
-                   ;;   (set val (new-<long> i)))
+                   ;;   (set value (new-<long> i)))
                    (when (= 0 (char-at endptr 0))
-                     (set val (new-<long> i))))
-                 (gc/let* ((form (cons val ())))
-                   (set form (cons (string->symbol (get/string var)) form))
-                   (set form (cons symbol/define form))
-                   (expand-encode-eval form (module-env *module*)))))
+                     (set value (new-<long> i))))
+                 (environment-define (module-env *module*)
+                                     (string->symbol (get/string name))
+                                     value)))
 
               ;; read file as a program
               (else
