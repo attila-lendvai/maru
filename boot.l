@@ -126,9 +126,6 @@
         (set result (concat-symbol result (car args))))
       result)))
 
-(define qq/cons cons)
-(define qq/concat-list concat-list)
-
 ;; NOTE quasituote is broken with multi-level quasiquotes. see https://github.com/fare/fare-quasiquote
 (define quasiquote
   (form
@@ -139,13 +136,19 @@
                            (if (and (pair? obj)
                                     (= (car obj) 'unquote-splicing))
                                (if (cdr l)
-                                   (list 'qq/concat-list (cadr obj) (qq-list (cdr l)))
+                                   (list concat-list (cadr obj) (qq-list (cdr l)))
                                  (cadr obj))
                              (if (and (= 'unquote obj)
                                       (pair? (cdr l))
                                       (not (cddr l)))
                                  (cadr l)
-                               (list 'qq/cons (qq-object obj) (qq-list (cdr l))))))
+                               ;; we directly reference the cons definition (as opposed to 'cons) so that our
+                               ;; expansion will not depend on the environment of the module that is using us.
+                               ;; this is relevant in the bootstrap process when the *target-module* gets
+                               ;; filled with definitions and it redefines e.g. the cons evaluator
+                               ;; primitive with the lowlevel implementation that is going to be
+                               ;; level-shifted. same applies to car below.
+                               (list cons (qq-object obj) (qq-list (cdr l))))))
                        (list 'quote l))))
       (set qq-element (lambda (l)
                         (let ((head (car l)))

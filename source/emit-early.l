@@ -167,11 +167,6 @@
 
     (define define-form		,(slave-value define-form/target))
 
-    (define qq/cons		,(slave-value qq/cons))
-    ;; this will also be needed once a ,@ is at the "wrong" place, but then this is a closure,
-    ;; and as such the compiler tires to lower it and fails.
-    ;;(define qq/concat-list	,(slave-value qq/concat-list))
-
     (define-constant false 0)
     (define-constant true  1)))
 
