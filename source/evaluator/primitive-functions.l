@@ -233,7 +233,8 @@
 (define-primitive-function (read ()) _
   (if (= () -args-)
       (let ((obj (read libc/stdin)))
-        (and (= k/+end+ obj) (set obj ()))
+        (when (= +end+ obj)
+          (set obj ()))
         obj)
     (let ((arg (car -args-)))
       (or (string? arg) (fatal1 "read: argument is not a <string> "arg))
@@ -243,7 +244,7 @@
           (gc/let* ((head (cons () ()))
                     obj)
             (let ((tail head))      ; TODO use collecting macro
-              (while (!= k/+end+ (set obj (read stream)))
+              (while (!= +end+ (set obj (read stream)))
                 (set tail (put/tail tail (cons obj ()))))
               (libc/fclose stream)
               (get/tail head))))))))

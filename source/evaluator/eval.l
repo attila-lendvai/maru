@@ -240,7 +240,7 @@
     fixed-primitive-function/define
     fixed-primitive-function/set
 
-    k/+end+ ; a unique value that cannot ever be read from any source file; will be initialized at startup to an uninterned symbol
+    +end+ ; a unique value that cannot ever be read from any source file; it will be initialized at startup to an uninterned symbol.
 
     libc/stdin libc/stdout libc/stderr
 
@@ -1143,7 +1143,7 @@
              (when (= libc/stdin stream)
                (libc/printf ".")
                (libc/flush-streams))
-             (!= k/+end+ (set res (read stream))))
+             (!= +end+ (set res (read stream))))
       (gc/let* ((env (environment (module-env *module*) 1 0)))
         (set res (expand-encode-eval res env))
         (when (= libc/stdin stream)
@@ -1248,8 +1248,8 @@
       (set tmp (new-<long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
       (set tmp (new-<long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
-      (set k/+end+ (or k/+end+ (set tmp (new-<symbol> "+end+"))))
-      (environment-define env (string->symbol "+end+") k/+end+))
+      (set +end+ (or +end+ (set tmp (new-<symbol> "+end+"))))
+      (environment-define env (string->symbol "+end+") +end+))
 
     ;; make sure the symbol true evaluates to itself
     (environment-define env symbol/true symbol/true)
