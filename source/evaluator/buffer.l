@@ -6,7 +6,7 @@
 
 (define-vector-accessors <buffer> buffer- () byte-at copy-bytes move-bytes 1)
 
-(define-function new-<buffer> ()
+(define-function buffer ()
   (let ((initial-capacity 32))
     (with-instance-accessors self <buffer>
       (gc/let* ((self		(new-record-instance <buffer>)))

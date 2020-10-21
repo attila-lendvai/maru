@@ -92,7 +92,7 @@
     c))
 
 (define-function read/number (c stream)
-  (gc/let* ((buf (new-<buffer>)))
+  (gc/let* ((buf (buffer)))
     (let ((negative?	false)
           (base		10))
       (if (= ?- c)
@@ -118,7 +118,7 @@
         (new-<long> (if negative? (- result) result))))))
 
 (define-function read/symbol (c stream)
-  (gc/let* ((buf (new-<buffer>)))
+  (gc/let* ((buf (buffer)))
     (while (or (is_letter c) (is_digit10 c))
       (buffer-append buf c)
       (set c (libc/fgetc stream)))
@@ -126,7 +126,7 @@
     (string->symbol (buffer-contents buf))))
 
 (define-function read/string (c stream)
-  (gc/let* ((buf (new-<buffer>)))
+  (gc/let* ((buf (buffer)))
     (while (!= ?\" (set c (libc/fgetc stream)))
       (set c (read/char c stream))
       (when (= libc/EOF c)

@@ -881,7 +881,7 @@
                       (set fn-name (get/head (get/head body)))
                       (symbol? fn-name))
                  ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
-                 (gc/let* ((buf (new-<buffer>)))
+                 (gc/let* ((buf (buffer)))
                    (buffer-append-string buf "set-")
                    (buffer-append-string buf (get/symbol fn-name))
                    (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
