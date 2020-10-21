@@ -3,6 +3,8 @@
 ;; NOTE for debugging only, because this breaks the output due to multiline string literals escaping the line-comment syntax
 (define *compiler-verbose* '())
 
+(define-constant +maru-label-prefix+ "m_")
+
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 

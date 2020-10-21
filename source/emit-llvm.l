@@ -134,7 +134,7 @@
   (llvm/escape-identifier () name))
 
 (define-function llvm/escape-global-identifier (name)
-  (llvm/escape-identifier "m_" name))
+  (llvm/escape-identifier +maru-label-prefix+ name))
 
 ;;;
 ;;; Operands

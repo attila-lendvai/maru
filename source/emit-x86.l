@@ -30,7 +30,7 @@
 ;; TODO decide: left in for now, but maybe this should be the only option? a little extra complexity, but nice speed gain, and simpler compiler output
 (define-constant +direct-calls+	true)
 
-(define-constant +label-prefix+
+(define-constant +global-label-prefix+
     ;; TODO use case
     (cond
       ((= (target-value +operating-system+) 'darwin)	"_")
@@ -48,16 +48,18 @@
 ;;; DEFINE-OPERAND
 
 (define-function define-operand/make-setters (type-name fields)
-  (if (pair? fields)
-      (cons `(set (,(concat-symbols type-name '- (car fields)) self) ,(car fields))
-            (define-operand/make-setters type-name (cdr fields)))))
+  (when (pair? fields)
+    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
+          (define-operand/make-setters type-name (cdr fields)))))
 
-(define-form define-operand (name fields . printing)
-  (let ((type-name (symbol->type-name name)))
-    (eval `(define-record ,type-name () ,fields))
-    (eval `(define-function ,name ,fields
+(define-form define-operand (name super direct-fields . printing)
+  (let* ((type-name	(symbol->type-name name))
+         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super)) ,direct-fields)))
+         (effective-fields (<record>-effective-slots type)))
+    (assert (is <record> type))
+    (eval `(define-function ,name ,effective-fields
              (let ((self (new ,type-name)))
-               ,@(define-operand/make-setters type-name fields)
+               ,@(define-operand/make-setters type-name effective-fields)
                self)))
     `(define-method do-print ,type-name () (print ,@printing))))
 
@@ -127,14 +129,15 @@
 ;;;
 ;;; IA32 -- OPERANDS
 ;;;
-(define-operand LABEL (name)    +label-prefix+ (mangle-label (<LABEL>-name self)))
+(define-operand LABEL () (name)		+maru-label-prefix+ (mangle-label (<LABEL>-name self)))		; a label that we generate
+(define-operand GLOBAL-LABEL LABEL ()	+global-label-prefix+ (<LABEL>-name self))			; a label in the global C namespace
 ;; global, literal, and temp pointers
-(define-operand GI32 (name)     (<GI32>-name self))
-(define-operand LI32 (value)    (<LI32>-value self))
-(define-operand TI32 (offset)   (<TI32>-offset self)"(%esp)")
+(define-operand GI32 () (name)		(<GI32>-name self))
+(define-operand LI32 () (value)		(<LI32>-value self))
+(define-operand TI32 () (offset)	(<TI32>-offset self)"(%esp)")
 
-(define-function UNIQUE-LABEL ()
-  (LABEL (unique-name "L_")))
+(define-function UNIQUE-LABEL args
+  (LABEL (unique-name (or (first args) "L"))))
 
 (define-function temp?		(obj)	(= <TI32> (type-of obj)))
 (define-function literal?	(obj)	(= <LI32> (type-of obj)))
@@ -148,8 +151,9 @@
 (define-emit    (DATA)				(println "	.data"))
 (define-emit    (SECTION string)		(println "	.section "$1))
 
-(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
-(define-emit    (GLOBAL LABEL)			(println "	.globl "$1))
+;;(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
+(define-emit    (EXPORT LABEL)			(println "	.globl "$1))
+(define-emit    (EXPORT GLOBAL-LABEL)		(println "	.globl "$1)) ; TODO add support for inheritance for multimethods, and delete the specializations on GLOBAL-LABEL
 
 (define-emit    (ALIGN long)			(println "	.align " $1))
 
@@ -159,6 +163,7 @@
 (define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
 
 (define-emit    (DEFLABEL LABEL)		(println $1":"))
+(define-emit    (DEFLABEL GLOBAL-LABEL)		(println $1":"))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): http://agner.org/optimize
 (define-emit    (ENTER long)			(println "	pushl	%ebp")
@@ -273,6 +278,7 @@
 
 (define-emit    (CALL long)			(println "	call	*%eax"))
 (define-emit    (CALL LABEL)			(println "	call	"$1))
+(define-emit    (CALL GLOBAL-LABEL)		(println "	call	"$1))
 
 (define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
@@ -423,8 +429,10 @@
   (let* ((main? (= 'main name))
          (body (<expr>-body self))
          (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
-         (entry-label (LABEL (concat-string (symbol->string name)
-                                            (if (or main? +direct-calls+) "" "_body"))))
+         (entry-label (if main?
+                          (GLOBAL-LABEL "main")
+                        (LABEL (concat-string (symbol->string name)
+                                              (if +direct-calls+ "" "_body")))))
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
          (params (map init-param (<expr>-parameters self))))
@@ -439,7 +447,7 @@
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
       (emit TEXT)
       (when main?
-        (emit GLOBAL entry-label))
+        (emit EXPORT entry-label))
       (emit DEFLABEL entry-label)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit -c-)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
@@ -449,10 +457,11 @@
       (emit LEAVE (- frm-size 8)))
     (unless (or main?
                 +direct-calls+)
-      (let ((-c- parent-comp))
+      (let ((-c- parent-comp)
+            (label (LABEL name)))
         (emit DATA)
-        (emit GLOBAL (LABEL name))
-        (emit DEFLABEL (LABEL name))
+        (emit EXPORT label)
+        (emit DEFLABEL label)
         (emit LONG entry-label)))))
 
 (define-function compile-call (op args -c-)
@@ -467,10 +476,10 @@
         (cond
           ((expr? op-value)
            (when +direct-calls+
-             (set target-name (symbol->string (<variable>-name op))))
+             (set target-name (LABEL (symbol->string (<variable>-name op)))))
            (set n-params (<expr>-n-required-parameters op-value)))
           ((= (type-of op-value) <foreign-function>)
-           (set target-name (<foreign-function>-name op-value))
+           (set target-name (GLOBAL-LABEL (<foreign-function>-name op-value)))
            (unless (<foreign-function>-vararg? op-value)
              (set n-params (list-length (<foreign-function>-parameter-types op-value)))))
           (else
@@ -492,7 +501,7 @@
 
       (cond
         (target-name
-         (gen CALL (LABEL target-name)))
+         (gen CALL target-name))
         (op-is-global?
          (comp op)
          (gen CALL arity))
@@ -680,7 +689,7 @@
          ((subtype? (type-of value) <type>)
           (gen LOAD (LI32 (eval-in-slave `(<type>-slave-id ,value)))))
          ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
-          (gen LOAD (LI32 (LABEL (<foreign-function>-name value)))))
+          (gen LOAD (LI32 (GLOBAL-LABEL (<foreign-function>-name value)))))
          ((and +direct-calls+
                (subtype? (type-of value) <expr>))
           (gen LOAD (LI32 (LABEL self.name))))
@@ -690,7 +699,7 @@
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
-  (let ((label (UNIQUE-LABEL)))
+  (let ((label (UNIQUE-LABEL "str")))
     (gen DATA)
     (gen DEFLABEL label)
     (gen ASCIZ self)
@@ -728,7 +737,7 @@
   (emit LONG self))
 
 ;; (define-method compile-definition <string> (name -c-)
-;;   (let ((temp (UNIQUE-LABEL)))
+;;   (let ((temp (UNIQUE-LABEL "str")))
 ;;     (emit DATA)
 ;;     (emit DEFLABEL temp)
 ;;     (emit ASCIZ self)
