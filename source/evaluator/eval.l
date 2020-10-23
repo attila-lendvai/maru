@@ -222,6 +222,16 @@
                    body))))))))
 
 ;;;
+;;; libc
+;;; ----------------------------------------------------------------
+
+(define-libc-ffi)
+
+(define-function libc/flush-streams ()
+  (libc/fflush libc/stdout)
+  (libc/fflush libc/stderr))
+
+;;;
 ;;; forward definitions, so that the variables get created early enough for building the graph
 ;;; ----------------------------------------------------------------
 (define-form define-forwards names
@@ -242,21 +252,9 @@
 
     +end+ ; a unique value that cannot ever be read from any source file; it will be initialized at startup to an uninterned symbol.
 
-    libc/stdin libc/stdout libc/stderr
-
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
     print println read encode expand eval string->symbol k/%accessor-typecheck)
-
-;;;
-;;; libc
-;;; ----------------------------------------------------------------
-
-(define-foreign-functions/libc)
-
-(define-function libc/flush-streams ()
-  (libc/fflush libc/stdout)
-  (libc/fflush libc/stderr))
 
 ;;;
 ;;; utils
@@ -1178,8 +1176,8 @@
 
 (when-at-expand feature/profiler
   ;; these are coming from profiler.c
-  (define-foreign-function install_profiler_handler void install_profiler_handler (*))
-  (define-foreign-function set_profiler_interval void set_profiler_interval (int))
+  (define-C-function install_profiler_handler void install_profiler_handler (*))
+  (define-C-function set_profiler_interval void set_profiler_interval (int))
 
   (define profiler/sample-counter 0)
 
@@ -1279,15 +1277,6 @@
 
 (define-function main (argc argv)
   (debug (libc/printf "alive\n"))
-
-  (set libc/stdin  (libc/fdopen 0 "r"))
-  (set libc/stdout (libc/fdopen 1 "a"))
-  (set libc/stderr (libc/fdopen 2 "a"))
-
-  (libc/setbuf libc/stdout 0)
-  ;; (when-at-expand (not (= target/os "darwin"))
-  ;;   ;; TODO investigate: when enabled this crashes any following fprintf's to stderr on darwin
-  ;;   (libc/setbuf libc/stderr 0))
 
   (gc/initialise)
 

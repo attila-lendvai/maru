@@ -11,28 +11,37 @@
 ;;;
 ;;; FFI
 ;;;
-(define-record <foreign-function> ()
+(define-record <C-function> ()
   (name
    return-type
    parameter-types
    n-params
    vararg?))
 
-(define-method do-print <foreign-function> ()
-  (print "<<foreign-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
+(define-method do-print <C-function> ()
+  (print "<<C-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
 
-(define-function foreign-function (return-type foreign-name parameter-types)
+(define-function C-function (return-type foreign-name parameter-types)
   (let* ((rev-types (list-reverse parameter-types))
          (vararg? (= '... (first rev-types))))
     (when vararg?
       (pop rev-types))
     (set parameter-types (list-reverse! rev-types))
-    (make <foreign-function>
+    (make <C-function>
       (name		foreign-name)
       (return-type	return-type)
       (parameter-types	parameter-types)
       (n-params		(list-length parameter-types))
       (vararg?		vararg?))))
+
+(define-record <C-variable> ()
+  (name
+   type))
+
+(define-function C-variable (foreign-name type)
+  (make <C-variable>
+    (name	foreign-name)
+    (type	type)))
 
 ;;;
 ;;; Utils

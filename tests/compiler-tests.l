@@ -5,6 +5,10 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
+(define-libc-ffi)
+
+(define *exit-code* 0)
+
 (eval-in-module *slave-module*
   '(define *tests* ()))
 
@@ -34,10 +38,6 @@
       (set tests (rest tests)))
     `(let ()
        ,@forms)))
-
-(define-foreign-functions/libc)
-
-(define *exit-code* 0)
 
 (define uninitialized-global)
 (define global42 42)

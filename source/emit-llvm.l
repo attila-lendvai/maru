@@ -37,28 +37,41 @@
  '(define-form bitwise-not (value)
    `(bitwise-xor ,value -1)))
 
-(define *ffi-type->llvm-type*
+(define *C-type->llvm-type*
     ;; TODO use case
-    (cond
-      ((= 32 (target-value +word-size-in-bits+))
-       '((*		%ptr)
-         (int		i32)
-         (long		i32)
-         (unsigned-long	i32)
-         (size_t	i32)))
-      ((= 64 (target-value +word-size-in-bits+))
-       '((*		%ptr)
-         (int		i32)
-         (long		i64)
-         (unsigned-long	i64)
-         (size_t	i32)))
-      (else (error "unexpected word size in +word-size-in-bits+: "(target-value +word-size-in-bits+)))))
+    (concat-list
+     '((void		void))
+     (cond
+       ((= 32 (target-value +word-size-in-bits+))
+        '((int			i32)
+          (long			i32)
+          (unsigned-long	i32)
+          (size_t		i32)))
+       ((= 64 (target-value +word-size-in-bits+))
+        '((int			i32)
+          (long			i64)
+          (unsigned-long	i64)
+          (size_t		i32)))
+       (else
+        (error "unexpected word size in +word-size-in-bits+: "(target-value +word-size-in-bits+))))))
 
-(define-function ffi-type->llvm-type (type)
-  (let ((entry (assq type *ffi-type->llvm-type*)))
-    (if entry
-        (second entry)
-      type)))
+(define-function C-type->llvm-type (type)
+  (cond
+    ((pair? type)
+     (cond
+       ((= '* (first type))
+        (concat-string (symbol->string (C-type->llvm-type (second type)))
+                       "*"))
+       (else
+        (error "C-type->llvm-type has failed for "type))))
+    ((= '* type)
+     '%ptr)
+    ((string? type)                     ; KLUDGE or is it?
+     type)
+    (else
+     (aif (assq type *C-type->llvm-type*)
+         (second it)
+       (error "C-type->llvm-type has failed for "type)))))
 
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
@@ -195,14 +208,18 @@
 (define-function %emit-form/mm-params (index types)
   (when (pair? types)
     (let ((param-name (string->symbol (concat-string "$" (long->string index)))))
-      (cons (list (symbol->type-name (car types)) param-name)
+      (cons (list (awhen (and (not (= (first types) '_))
+                              (first types))
+                    (symbol->type-name it))
+                  param-name)
             (%emit-form/mm-params (+ index 1) (cdr types))))))
 
 (define-function %emit-form/reg-accessors (index)
   (when (>= index 0)
     ;; TODO name the last one as $output?
-    (let ((var-name (string->symbol (concat-string "$reg" (long->string (+ index 1))))))
-      (cons (list var-name () `((_) (list 'array-at '__regs__ ,index)))
+    (let ((var-name (string->symbol (concat-string "$reg" (long->string (+ index 1)))))
+          (body `(array-at __regs__ ,index)))
+      (cons (list var-name () `((_) ',body))
             (%emit-form/reg-accessors (- index 1))))))
 
 (define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
@@ -267,28 +284,26 @@
       (if first?
           (set first? ())
         (print ", "))
-      (print (ffi-type->llvm-type param-type)))
+      (print param-type))
     (print ")")))
 
-(define-function emit-llvm-foreign-fn-type (ffn print-name?)
-  (print (ffi-type->llvm-type (<foreign-function>-return-type ffn)) " ")
+(define-function emit-llvm-C-fn-type (ffn print-name?)
+  (print (C-type->llvm-type (<C-function>-return-type ffn)) " ")
   (when print-name?
-    (print "@"(<foreign-function>-name ffn)))
+    (print "@"(<C-function>-name ffn)))
   (print "(")
   (let ((first? true)
-        (param-types (<foreign-function>-parameter-types ffn)))
-    (list-do param-type (if (<foreign-function>-vararg? ffn)
+        (param-types (<C-function>-parameter-types ffn)))
+    (list-do param-type (if (<C-function>-vararg? ffn)
                             (concat-list param-types (list "..."))
                           param-types)
       (if first?
           (set first? ())
         (print ", "))
-      (print (ffi-type->llvm-type param-type))))
+      (print (C-type->llvm-type param-type))))
   (print ")"))
 
 (define-function emit-llvm-call (result-reg name args return-type param-types vararg?)
-  (set return-type (ffi-type->llvm-type return-type))
-  (set param-types (map ffi-type->llvm-type param-types))
   (let ((void? (= return-type 'void)))
     (print "	")
     (unless void?
@@ -328,16 +343,20 @@
   ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)")))
 
 (define-instruction DECLARE	()
-  ((foreign-function)		(print "declare ") (emit-llvm-foreign-fn-type $1 true) (println)))
+  ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
+  ((C-variable)			(println "@"(<C-variable>-name $1)" = external global "(C-type->llvm-type (<C-variable>-type $1)))))
 
 (define-instruction ALLOCA	()
   ((TEMP)			(println "	"$1" = alloca %ptr")))
 
 (define-instruction SEXT	(t 1 t)
-  ((LOCAL symbol symbol)	(println "	"$reg1" = sext "$2" "$1" to "$3)))
+  ((LOCAL _ _)			(println "	"$reg1" = sext "$2" "$1" to "$3)))
 
 (define-instruction INTTOPTR	(t 1 t)
-  ((LOCAL symbol)		(println "	"$reg1" = inttoptr "$2" "$1" to %ptr")))
+  ((LOCAL _)			(println "	"$reg1" = inttoptr "$2" "$1" to %ptr")))
+
+(define-instruction BITCAST	(t 1 t)
+  ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
 (define-instruction RET		(() 1 ())
   ((LOCAL)			(println "	ret %ptr "$1))
@@ -346,60 +365,50 @@
 
 (define-instruction LOAD	(() 1 t)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %ptr"))
-  ((TEMP    undefined)		(println "	"$reg1" = load %ptr, %ptr* "$1))
-  ((GLOBAL  long)		(println "	"$reg1" = load %ptr, %ptr* "$1))
-  ((GLOBAL  undefined)		(println "	"$reg1" = load %ptr, %ptr* "$1))
+  ((TEMP    _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
+  ((GLOBAL  _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL  expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2))))
                                   (print "	"$reg1" = bitcast ")
                                   (emit-llvm-fn-type '%ptr param-types ())
                                   (println "* "$1" to %ptr")))
-  ;; TODO no need to dispatch on GLOBAL, $1 is unused
-  ((GLOBAL foreign-function)	(print "	"$reg1" = bitcast ")
-				(emit-llvm-foreign-fn-type $2 ()) ; evolving? use false
-				(println "* @" (<foreign-function>-name $2) " to %ptr")))
+  ((GLOBAL  C-function)		(print "	"$reg1" = bitcast ")
+				(emit-llvm-C-fn-type $2 ()) ; evolving? use false
+				(println "* @" (<C-function>-name $2) " to %ptr"))
+  ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
+                                  (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
 
-(define-instruction STORE	(t () ())
-  ((LOCAL TEMP)			(println "	store %ptr "$1", %ptr* "$2))
-  ((LOCAL GLOBAL)		(println "	store %ptr "$1", %ptr* "$2)))
+(define-instruction STORE	(t 0 ())
+  ((LOCAL _)			(println "	store %ptr "$1", %ptr* "$2))
+  ((LOCAL C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
+				  (println "	store "type" "$1", "type"* @"(<C-variable>-name $2)))))
 
 (define-instruction ADDR	(() 2 t)
   ((CONSTANT)			(let* ((str (<CONSTANT>-value $1))
                                        (length (+ 1 (string-length str))))
                                   (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "(<CONSTANT>-name $1)", %word 0, %word 0")))
-  ((TEMP)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
-				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr"))
-  ((LOCAL)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
-				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr"))
-  ((GLOBAL)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
+  ((_)				(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
 				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
 
 (define-instruction CALL	(() 1 t)
-  ((GLOBAL undefined)		(println "	"$reg1" = call %ptr "$1"()"))
-  ((GLOBAL pair)		(let ((param-types (map (lambda _ '%ptr) $2)))
-                                  (emit-llvm-call $reg1 $1 $2 '%ptr param-types ())))
-  ((foreign-function undefined)	(emit-llvm-call $reg1
-                                                (LIBC-GLOBAL (<foreign-function>-name $1))
-                                                ()
-                                                (<foreign-function>-return-type $1)
-                                                (<foreign-function>-parameter-types $1)
-                                                (<foreign-function>-vararg? $1)))
-  ((foreign-function pair)	(emit-llvm-call $reg1
-                                                (LIBC-GLOBAL (<foreign-function>-name $1))
+  ((GLOBAL _)			(emit-llvm-call $reg1
+                                                $1
                                                 $2
-                                                (<foreign-function>-return-type $1)
-                                                (<foreign-function>-parameter-types $1)
-                                                (<foreign-function>-vararg? $1))))
+                                                '%ptr
+                                                (map (lambda _ '%ptr) $2) ; param types
+                                                ()))
+  ((C-function _)		(emit-llvm-call $reg1
+                                                (LIBC-GLOBAL (<C-function>-name $1))
+                                                $2
+                                                (C-type->llvm-type (<C-function>-return-type $1))
+                                                (map C-type->llvm-type (<C-function>-parameter-types $1))
+                                                (<C-function>-vararg? $1))))
 
 (define-instruction CALLPTR	(t 2 t)
-  ((LOCAL pair)			(let ((param-types (map (lambda _ '%ptr) $2)))
+  ((LOCAL _)			(let ((param-types (map (lambda _ '%ptr) $2)))
                                   (print "	"$reg1" = bitcast %ptr "$1" to ")
                                   (emit-llvm-fn-type '%ptr param-types ())
                                   (println "*")
-                                  (emit-llvm-call $reg2 $reg1 $2 '%ptr param-types ())))
-  ((LOCAL undefined)		(print "	"$reg1" = bitcast %ptr "$1" to ")
-				(emit-llvm-fn-type '%ptr () ())
-				(println "*")
-				(emit-llvm-call $reg2 $reg1 () '%ptr () ())))
+                                  (emit-llvm-call $reg2 $reg1 $2 '%ptr param-types ()))))
 
 (define-instruction DEFLABEL	()
   ((LABEL)			(println $1":")))
@@ -637,8 +646,8 @@
              ((expr? op-value)
               (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
               (set n-params (<expr>-n-required-parameters op-value)))
-             ((= (type-of op-value) <foreign-function>)
-              (let ((param-types (<foreign-function>-parameter-types op-value)))
+             ((= (type-of op-value) <C-function>)
+              (let ((param-types (<C-function>-parameter-types op-value)))
                 (gen COMMENT (list "	casting FFI args"))
                 ;; for FFI calls we need to cast the non-pointer llvm args
                 ;; using ptrtoint to the specific llvm type.
@@ -648,7 +657,8 @@
                       (arg-lst		arg-regs)
                       (param-lst	param-types))
                   (while (set arg (pop arg-lst))
-                    (set param-type (ffi-type->llvm-type (pop param-lst)))
+                    (set param-type (awhen (pop param-lst)
+                                      (C-type->llvm-type it)))
                     (if (or (= ()    param-type) ; vararg calls have more args than params
                             (= '%ptr param-type))
                         (push new-arg-regs arg)
@@ -659,7 +669,7 @@
                   ;; gen the call itself
                   (gen CALL op-value (list-reverse! new-arg-regs)))
                 ;; convert return value
-                (let ((return-type (ffi-type->llvm-type (<foreign-function>-return-type op-value))))
+                (let ((return-type (C-type->llvm-type (<C-function>-return-type op-value))))
                   (cond
                     ((= '%ptr return-type)) ; all good
                     ((= 'void return-type)
@@ -675,7 +685,7 @@
                          ((> bitsize word-size)
 	                  (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " return-type))))
                      (gen INTTOPTR '%word))))
-                (unless (<foreign-function>-vararg? op-value)
+                (unless (<C-function>-vararg? op-value)
                   (set n-params (list-length param-types)))))
              (else
               (error "Don't know how to emit call to global value "op-value", in variable "op)))
@@ -794,10 +804,18 @@
          (value	(<variable>-value var)))
     (comp (third expr))
     (cond
-      ;; NOTE the LLVM IR is SSA, locals cannot be written
-      ((temp? value)		(gen STORE value))
-      ((global-variable? var)	(gen STORE (GLOBAL (<variable>-name var))))
-      (else			(error "compile/set failed for variable " (<variable>-name var) ", holding value " value)))))
+      ;; NOTE the LLVM IR is SSA, LOCALs cannot be written
+      ((temp? value)
+       (gen STORE value))
+      ((global-variable? var)
+       (cond
+         ((is <C-variable> value)
+          (gen BITCAST '%ptr (C-type->llvm-type (<C-variable>-type value)))
+          (gen STORE value))
+         (else
+          (gen STORE (GLOBAL (<variable>-name var))))))
+      (else
+       (error "compile/set failed for variable " (<variable>-name var) ", holding value " value)))))
 
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
@@ -902,15 +920,19 @@
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))
       ((temp? value)		(gen LOAD value ()))
-      ((global-variable? self)	(cond
-                                  ((= 'true self.name)
-                                   (let ((true-value (target-value true)))
-                                     (gen LOAD (LITERAL true-value) true-value)))
-                                  ((subtype? (type-of value) <type>)
-                                   ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                   (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
-                                  (else
-                                   (gen LOAD (GLOBAL self.name) value))))
+      ((global-variable? self)	(let ((value-type (type-of value)))
+                                  (cond
+                                    ((= 'true self.name)
+                                     (let ((true-value (target-value true)))
+                                       (gen LOAD (LITERAL true-value) true-value)))
+                                    ((subtype? value-type <type>)
+                                     ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
+                                     (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
+                                    ((subtype? value-type <C-variable>)
+                                     (gen LOAD (GLOBAL (<C-variable>-name value)) value)
+                                     (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%ptr))
+                                    (else
+                                     (gen LOAD (GLOBAL self.name) value)))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
@@ -940,7 +962,8 @@
 
 (define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
-(define-method compile-definition <foreign-function>	(name -c-)	(emit DECLARE self))
+(define-method compile-definition <C-function>		(name -c-)	(emit DECLARE self))
+(define-method compile-definition <C-variable>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 (define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
 
@@ -955,4 +978,6 @@
     ;; bitcode output to chose the proper target triplet.
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
     (emit INLINE (concat-strings "%word = type i" (long->string word-size) "\n"))
-    (emit INLINE "%ptr = type i8*\n")))
+    (emit INLINE "%ptr = type i8*\n")
+    ;; KLUDGE
+    (emit INLINE "%struct._IO_FILE = type opaque\n")))

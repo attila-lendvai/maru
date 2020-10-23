@@ -478,10 +478,10 @@
            (when +direct-calls+
              (set target-name (LABEL (symbol->string (<variable>-name op)))))
            (set n-params (<expr>-n-required-parameters op-value)))
-          ((= (type-of op-value) <foreign-function>)
-           (set target-name (GLOBAL-LABEL (<foreign-function>-name op-value)))
-           (unless (<foreign-function>-vararg? op-value)
-             (set n-params (list-length (<foreign-function>-parameter-types op-value)))))
+          ((= (type-of op-value) <C-function>)
+           (set target-name (GLOBAL-LABEL (<C-function>-name op-value)))
+           (unless (<C-function>-vararg? op-value)
+             (set n-params (list-length (<C-function>-parameter-types op-value)))))
           (else
            (error "Don't know how to emit call to global value "op-value", in variable "op)))
         (when (and n-params
@@ -573,12 +573,17 @@
     (gen BT l/body)))
 
 (define-function compile/set (expr -c-)
-  (let* ((var (cadr expr))
-         (val (<variable>-value var)))
-    (comp (caddr expr))
+  (let* ((var	(second expr))
+         (value	(<variable>-value var)))
+    (comp (third expr))
     (cond
-      ((temp? val)   (gen STORE val))
-      (else          (gen STORE (GI32 (LABEL (<variable>-name var))))))))
+      ((temp? value)
+       (gen STORE value))
+      ((is <C-variable> value)
+       ;; TODO dispatch on the type of the C-variable
+       (gen STORE (GI32 (GLOBAL-LABEL (<C-variable>-name value)))))
+      (else
+       (gen STORE (GI32 (LABEL (<variable>-name var))))))))
 
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
@@ -688,10 +693,13 @@
           (gen LOAD (LI32 (target-value true))))
          ((subtype? (type-of value) <type>)
           (gen LOAD (LI32 (eval-in-slave `(<type>-slave-id ,value)))))
-         ((subtype? (type-of value) <foreign-function>) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
-          (gen LOAD (LI32 (GLOBAL-LABEL (<foreign-function>-name value)))))
+         ((is <C-function> value) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
+          (gen LOAD (LI32 (GLOBAL-LABEL (<C-function>-name value)))))
+         ((is <C-variable> value)
+          ;; TODO dispatch on the type of the C-variable
+          (gen LOAD (GI32 (GLOBAL-LABEL (<C-variable>-name value)))))
          ((and +direct-calls+
-               (subtype? (type-of value) <expr>))
+               (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
          (else
           (gen LOAD (GI32 (LABEL self.name))))))
@@ -729,7 +737,8 @@
 
 (define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
-(define-method compile-definition <foreign-function>	(name -c-)	(emit COMMENT (list "foreign function "name))) ; it will be handled at the call site
+(define-method compile-definition <C-function>		(name -c-)	(emit COMMENT (list "C function "name))) ; it will be handled at the call site
+(define-method compile-definition <C-variable>		(name -c-)	(emit COMMENT (list "C variable "name))) ; it will be handled at the site of reference
 
 (define-method compile-definition <long> (name -c-)
   (emit DATA)
