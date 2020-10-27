@@ -331,6 +331,7 @@
            ,(when (defined? 'feature/profiler)
               (eval '(not (= feature/profiler 0))))))
 
+(define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))
 (define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))

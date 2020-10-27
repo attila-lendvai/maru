@@ -1172,19 +1172,24 @@
 
   (define profiler/sample-counter 0)
 
+  (define-function profiler/take-sample-at-frame (frame)
+    (let* ((callee	(<call-frame>-callee frame))
+           (callee-type	(type-of callee)))
+      (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
+        (cond
+          ((= callee-type <expr>)
+           (incr-boxed (<expr>-profiler-counter callee)))
+
+          ((= callee-type <primitive-function>)
+           (incr (<primitive-function>-profiler-counter callee)))))))
+
   (define-function profiler/take-sample (_)
     (incr profiler/sample-counter)
-    (let ((frame (current-call-frame)))
-      (when frame
-        (let* ((callee		(<call-frame>-callee frame))
-               (callee-type	(type-of callee)))
-          (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
-            (cond
-              ((= callee-type <expr>)
-               (incr-boxed (<expr>-profiler-counter callee)))
-
-              ((= callee-type <primitive-function>)
-               (incr (<primitive-function>-profiler-counter callee)))))))))
+    (if-at-expand feature/profiler/cumulative
+        (for (i 0 *call-stack-index*)
+          (profiler/take-sample-at-frame (array-at *call-stack* i)))
+      (awhen (current-call-frame)
+        (profiler/take-sample-at-frame it))))
 
   (define-function profiler/disable ()
     (set_profiler_interval 0)
