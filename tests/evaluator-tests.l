@@ -53,6 +53,13 @@
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
   (test-assert (= -1		(bitwise-shift -1 -100))))
 
+(define-test eval/for/1 ()
+  (let ((x ()))
+    (for (i 5 0 -1)
+      (push x i))
+    (println x)
+    (test-assert (equal x '(1 2 3 4 5)))))
+
 (define-test eval/string/insert ()
   (let ((x "alma"))
     (string-insert x 2 ?z)
