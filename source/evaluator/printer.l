@@ -19,6 +19,7 @@
   ;; NOTE: be prepared to handle uninitialized objects!
   (debug/identities (libc/printf "{%p}" obj))
   (let ((type (type-of obj)))
+    ;; TODO use typecase
     (cond
       ((= type <undefined>)		(libc/fputs "()" stream))
       ((= type <long>)			(libc/fprintf stream "%ld" (get/long obj)))

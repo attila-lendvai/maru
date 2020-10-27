@@ -14,14 +14,14 @@
 
 (define-form failure (format . args)
   `(let ()
-     (libc/printf ,(concat-strings "\n\n\033[1;31m*** FAILURE\033[0m " format "\n") ,@args)
+     (libc/fprintf libc/stdout ,(concat-strings "\n\n\033[1;31m*** FAILURE\033[0m " format "\n") ,@args)
      (set *exit-code* -1)))
 
 (define-form define-test (name form expected-value)
   (push *tests* name)
   (let ((name-as-string (symbol->string name)))
     `(define-function ,name ()
-       (libc/printf ,(concat-strings name-as-string ", "))
+       (libc/fprintf libc/stdout ,(concat-strings name-as-string ", "))
        (let ((expected ,expected-value)
              (actual ,form))
          (if (not (= actual expected))
@@ -374,7 +374,6 @@
            (value 0x316b756b)           ; "1kuk"
            (index 2))
       (set (oop-at buf index) value)
-      (libc/puts buf)
       (libc/strcmp buf
                    (cond
                      ((= 32 +word-size-in-bits+)
@@ -428,24 +427,26 @@
 ;;   42)
 
 (define-function main (argc argv)
-  (libc/printf "Printing command line args:\n")
+  (libc/fputs "Printing test command line args:\n" libc/stdout)
   (for (i 0 argc)
-    (libc/printf "  %.2d %s\n" i (oop-at argv i)))
+    (libc/fprintf libc/stdout "  %.2d %s\n" i (oop-at argv i)))
 
   (let ((idx argc))
     (while (< 0 (set idx (- idx 1)))
-      (libc/printf "--%.2d %s\n" idx (oop-at argv idx))))
+      (libc/fprintf libc/stdout "--%.2d %s\n" idx (oop-at argv idx))))
 
   (while (< 0 (set argc (- argc 1)))
-    (libc/printf "++%.2d %s\n" argc (oop-at argv argc)))
+    (libc/fprintf libc/stdout "++%.2d %s\n" argc (oop-at argv argc)))
 
   (when uninitialized-global
     (failure "uninitialized-global is %ld" uninitialized-global))
   (unless (= global42 42)
     (failure "global42 is %ld" global42))
 
-  (libc/printf "About to start running the compiled tests\n")
+  (set libc/stdout (libc/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
+
+  (libc/fputs "\e[32mAbout to start running the compiled tests\e[m\n" libc/stdout)
   (run-tests)
-  (libc/printf "\nFinished running the compiled tests\n")
+  (libc/fputs "\n\e[32mFinished running the compiled tests\e[m\n" libc/stdout)
 
   (return *exit-code*))

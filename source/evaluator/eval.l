@@ -103,12 +103,22 @@
 (define-form move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
+;; records in the target are raw memory blocks, i.e. they don't necessarily have a GC <header> (well, <header> *itself* is a record!).
+;; therefore we cannot have feature/typecheck-slot-access here, that's what we have the get/put protocol.
+;; TODO it would be nice to eliminate the separate get/put protocol, or at least reverse the two: the get/put API should serve for the raw memory access.
+;; TODO or add a specialized raw-record type whose accessors don't try to accessor-typecheck?
+(define-form slot-value (type-name slot-name object)
+  (let* ((type		(eval type-name))
+         (slot-index	(record/slot-index type slot-name)))
+    `(oop-at ,object ,slot-index)))
+
+;; TODO decide which one is better
+;; an alternative way to integrate with normal accessors.
 ;; redefine %accessor-typecheck with a macro that redirects to a kernel version that drops the slot-name,
 ;; because the compiler cannot emit symbols yet
-;; TODO this is ugly for now
-(define-form %accessor-typecheck (expected-type-id slot-name object)
-  ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
-  object)
+;; (define-form %accessor-typecheck (expected-type-id slot-name object)
+;;   ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
+;;   object)
 
 ;;;
 ;;; primitive-function infrasrtucture
@@ -185,10 +195,11 @@
                                     `(set ,arg-name ,default-value)
                                   `(error ,(symbol->string prim-name)": too few arguments: "-args-))))))
           (set entries (cdr entries)))
+        ;; handle &rest arg
         (unless (= '_ entries)
-          (push binders (if entries
+          (push binders (if entries ; i.e. it was in a cdr position
                             `(set ,entries __args)
-                          `(assert (not __args) ,(symbol->string prim-name)": too many arguments: "-args-)))
+                          `(safety 1 (assert (not __args) ,(symbol->string prim-name)": too many arguments: "-args-))))
           (when entries
             (push arg-names entries))))
       (set binders	(list-reverse! binders))
@@ -770,13 +781,13 @@
         (while (<= 0 (decr i))
           (let ((call-frame (array-at *call-stack* i)))
             (libc/printf "%3ld: " i)
-	    (dumpln (<call-frame>-callee-designator call-frame))
+	    (println (<call-frame>-callee-designator call-frame))
             (awhen (<call-frame>-callee call-frame)
               (libc/printf "\tcallee: ")
-	      (dumpln it))
+	      (println it))
             (awhen (<call-frame>-arguments call-frame)
               (libc/printf "\targs: ")
-	      (dumpln it))
+	      (println it))
             (libc/flush-streams))))
     (libc/fprintf libc/stderr "print-backtrace: call-frame tracking is disabled in this build. current call depth is %ld\n" *call-stack-index*)))
 
@@ -816,6 +827,7 @@
   (safety 1 (assert fun "apply: fun is null"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
+      ;; TODO use typecase
       (cond
         ((= type <expr>)
          (apply/expr fun arguments ctx))
@@ -861,6 +873,7 @@
       (set (<call-frame>-callee			-call-frame-) head)
       (set (<call-frame>-arguments		-call-frame-) exp))
     (let (expander)
+      ;; TODO use switch
       (cond
         ((= head symbol/let)
          ;; TODO use a collecting macro to simplify this
@@ -891,6 +904,11 @@
         ((= head symbol/set)
          (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
          (debug (libc/printf "expand/set on form ") (dumpln exp))
+         ;; TODO this expands all the way down before it tries to convert (set (place-accessor) value) forms.
+         ;; consequently, defining e.g. a set-slot-value form has no effect, because the slot-value form expands
+         ;; all the way down to an oop-at, that then gets converted to set-oop-at at the end.
+         ;; trying to set-convert in every step while expanding would mean that we need to check for (defined? set-foo),
+         ;; which feels wrong.
          (gc/let* ((body (expand-all (get/tail exp) env)))
            (let (fn-name)
              (if (and (pair? body)
@@ -903,7 +921,7 @@
                    (buffer-append-string buf (get/symbol fn-name))
                    (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
                      (cons (string->symbol (buffer-contents buf))
-                                 args)))
+                           args)))
                (cons symbol/set body)))))
 
         ((= head symbol/define)
@@ -934,21 +952,18 @@
 
 (define-function expand/symbol (exp env)
   (debug (libc/printf "expand/symbol, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
-  (let (expander)
-    (cond
-      ((set expander (maybe-form-in-env/symbol env exp))
-       ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
-       (gc/let* ((args (list2 env exp))
-                 (expansion (apply expander args ())))
-         (debug (libc/printf "expand/symbol, found in local env, expanded to ") (dumpln expansion))
-         (expand expansion env)))
-
-      (else
-       exp))))
+  (aif (maybe-form-in-env/symbol env exp)
+      ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
+      (gc/let* ((args (list2 env exp))
+                (expansion (apply it args ())))
+        (debug (libc/printf "expand/symbol, found in local env, expanded to ") (dumpln expansion))
+        (expand expansion env))
+    exp))
 
 (define-primitive-function expand (exp (env <env> (get (<context> env) -ctx-)))
   (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
   (with-new-call-frame (symbol/expand () exp)
+    ;; TODO use typecase
     (cond
       ((pair? exp)	(expand/pair	exp env -call-frame-))
       ((symbol? exp)	(expand/symbol	exp env))
@@ -976,6 +991,7 @@
   (gc/let* ((head (encode (get/head exp) env))
             (tail (get/tail exp)))
     (debug (libc/printf "encode/pair of head ") (dump head) (libc/printf ", in env ") (dumpln env))
+    ;; TODO use switch
     (cond
       ((= head fixed-primitive-function/let)
        ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
@@ -1060,6 +1076,7 @@
   (debug (libc/printf "encode of exp ") (dump exp) (libc/printf ", in env ") (dumpln env))
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
+    ;; TODO use typecase
     (cond
       ((pair? exp)	(encode/pair	exp env))
       ((symbol? exp)	(encode/symbol	exp env))
@@ -1116,6 +1133,7 @@
 (define-function eval (exp ctx)
   (verbosity 3 (libc/printf "  E  ") (dump exp) (libc/printf " ") (dumpln ctx) (libc/flush-streams))
   (let ((type (type-of exp)))
+    ;; TODO use typecase
     (cond
       ((= type <undefined>)	exp)
       ((= type <long>)		exp)
@@ -1207,6 +1225,7 @@
     (let* ((callee	(<call-frame>-callee frame))
            (callee-type	(type-of callee)))
       (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
+        ;; TODO use typecase
         (cond
           ((= callee-type <expr>)
            (incr-boxed (<expr>-profiler-counter callee)))
@@ -1331,6 +1350,8 @@
   (populate-module-with-maru-primitives *maru-module*)
   (set *module* (new-<module> "maru-user"))
   (capture-well-known-module-values)			(debug (libc/printf "finished module initialization\n"))
+
+  (assert (= <primitive-function> (type-of (get/variable-value "cons"))) "(= <primitive-function> (type-of (get/variable-value "cons")))")
 
   (debug (libc/printf "start processing argv\n"))
 

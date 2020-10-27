@@ -77,7 +77,7 @@
   (assert (symbol? type))
   (cond
     ((= type '%ptr)	(target-value +word-size-in-bits+))
-    ((= type 'void)	())
+    ((= type 'void)	0)
     (else
      (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
        (unless entry
@@ -148,7 +148,7 @@
 (define-function llvm/escape-string (str . with-zero)
   (%llvm-escape ()
                 str
-                (lambda _ true) ; always wrap it in double quotes
+                (lambda _ true)           ; always wrap it in double quotes
                 ;; TODO this felxibility may be unnecessary; duplicate code below
                 (lambda (c)
                   (and (<= 32 c) (<= c 127)
@@ -243,13 +243,15 @@
                   param-name)
             (%emit-form/mm-params (+ index 1) (cdr types))))))
 
+(define-function %emit-form/reg-accessor (index)
+  (let ((var-name (string->symbol (concat-string "$reg" (long->string (+ index 1)))))
+        (body `(array-at __regs__ ,index)))
+    (list var-name () `((_) ',body))))
+
 (define-function %emit-form/reg-accessors (index)
-  (when (>= index 0)
-    ;; TODO name the last one as $output?
-    (let ((var-name (string->symbol (concat-string "$reg" (long->string (+ index 1)))))
-          (body `(array-at __regs__ ,index)))
-      (cons (list var-name () `((_) ',body))
-            (%emit-form/reg-accessors (- index 1))))))
+  (when (<= 0 index)
+    (cons (%emit-form/reg-accessor index)
+          (%emit-form/reg-accessors (- index 1)))))
 
 (define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
   (when (pair? emit-forms)

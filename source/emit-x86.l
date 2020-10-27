@@ -189,7 +189,7 @@
 (define-emit    (DEFLABEL LABEL)		(println $1":"))
 (define-emit    (DEFLABEL GLOBAL-LABEL)		(println $1":"))
 
-;; ENTER is slow, so don't use it (LEAVE is fine): http://agner.org/optimize
+;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
 (define-emit    (ENTER long)			(println "	pushl	%ebp")
 						(println "	movl	%esp, %ebp")
 						(unless (= 0 $1)
@@ -577,7 +577,8 @@
     (set expr (cdr expr))
     (while expr
       (comp (car expr))
-      (and (set expr (cdr expr)) (gen BF done)))
+      (when (set expr (cdr expr))
+        (gen BF done)))
     (gen DEFLABEL done)))
 
 (define-function compile/or (expr -c-)
@@ -585,7 +586,8 @@
     (set expr (cdr expr))
     (while expr
       (comp (car expr))
-      (and (set expr (cdr expr)) (gen BT done)))
+      (when (set expr (cdr expr))
+        (gen BT done)))
     (gen DEFLABEL done)))
 
 (define-function compile/if (expr -c-)

@@ -172,6 +172,7 @@
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
          (type (type-of lhs)))
+    ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (string? rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
@@ -182,6 +183,7 @@
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-)))
          (type (type-of lhs)))
+    ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
       ((= type <string>)	(and (string? rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
@@ -211,6 +213,7 @@
 (define-primitive-function (libc/format ()) ((fmt <string>) oarg)
   (let ((typ (type-of oarg))
         (arg ()))
+    ;; TODO use typecase
     (cond
       ((= typ <undefined>))
       ((= typ <long>)		(set arg (get/long oarg)))
@@ -277,6 +280,7 @@
 (define-primitive-function (warn ()) _
   (list-do arg -args-
     (let ((type (type-of arg)))
+      ;; TODO use typecase
       (cond
         ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
         ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
@@ -295,8 +299,8 @@
 (define-primitive-function (type-of ())	(thing) (new-<long> (type-of thing)))
 (define-primitive-function (string? ())	(thing) (and (string? thing) symbol/true))
 (define-primitive-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
-(define-primitive-function (pair? ())		(thing) (and (pair?   thing) symbol/true))
-(define-primitive-function (array? ())		(thing)	(and (array?  thing) symbol/true))
+(define-primitive-function (pair?   ())	(thing) (and (pair?   thing) symbol/true))
+(define-primitive-function (array?  ())	(thing)	(and (array?  thing) symbol/true))
 
 (define-primitive-function set-car ((pair <pair>) value)
   (put (<pair> head) pair value))

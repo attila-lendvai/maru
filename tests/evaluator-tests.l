@@ -57,8 +57,36 @@
   (let ((x ()))
     (for (i 5 0 -1)
       (push x i))
-    (println x)
     (test-assert (equal x '(1 2 3 4 5)))))
+
+(define-test eval/apply/1 ()
+  (test-assert (equal (apply - '(1 2 3)) -4))
+  (test-assert (equal (map (lambda args (apply ensure-list args)) '(1 2 3))
+                      '((1) (2) (3))))
+  (test-assert (equal (map (lambda args (first (apply ensure-list args))) '(1 (x 2) 3))
+                      '(1 x 3)))
+  (test-assert (equal ((lambda args (first (apply ensure-list args))) 42)
+                      42))
+  (let ((fn (lambda args (first (apply ensure-list args)))))
+    (test-assert (equal (fn 42) 42)))
+  (let* ((a ensure-list)
+         (b first)
+         (fn (lambda args (b (apply a args)))))
+    (test-assert (equal (fn 42) 42)))
+  ;; TODO this misbehaves in an ugly way...
+  ;; (let ((compose (lambda (a b)
+  ;;                  (assert (is <expr> a))
+  ;;                  (assert (= b first))
+  ;;                  (lambda args
+  ;;                    (assert (is <expr> a) "'a' is not an <expr> anymore?! it is: "a)
+  ;;                    (assert (= b first))
+  ;;                    (b (apply a args))))))
+  ;;   (test-assert (equal ((compose ensure-list first) 42) 42)))
+  ;; (test-assert (equal ((compose ensure-list first) 42)
+  ;;                     42))
+  ;; (test-assert (equal (map (compose ensure-list first) '(1 (x 2) 3))
+  ;;                     '(1 x 3)))
+  )
 
 (define-test eval/string/insert ()
   (let ((x "alma"))
@@ -70,6 +98,14 @@
 (define-test eval/string/concat ()
   (test-assert (= "alma.x\x00y.korte"
                   (concat-strings "alma." "x\x00y" ".korte"))))
+
+(define-test eval/string/bug/1 ()
+  (let ((str (string)))
+    (set (string-at str 0) ?a)
+    (set (string-at str 1) ?l)
+    (set (string-at str 2) ?m)
+    (set (string-at str 3) ?a)
+    (test-assert (= "alma" str))))
 
 (define-test eval/array/insert ()
   (let ((x (list->array '(1 2 3 4))))
@@ -189,6 +225,57 @@
     (test-assert (= 1 (list-length bindings)))
     (test-assert (= <variable> (type-of x-var)))
     (test-assert (not (global-variable? x-var)))))
+
+(define-generic test-generic)
+(define-record <test-generic-1> () ())
+(define-record <test-generic-2> <test-generic-1> ())
+
+(define-multimethod test-generic ((<pair> a) (<long> b) (<long> c))
+  (list <pair> a <long> b <long> c))
+
+(define-multimethod test-generic ((<pair> a) b (<long> c))
+  (list <pair> a () b <long> c))
+
+(define-multimethod test-generic ((<pair> a) b (() c))
+  (list <pair> a () b () c))
+
+(define-multimethod test-generic ((<pair> a) (<pair> b) (() c))
+  (list <pair> a <pair> b () c))
+
+(define-multimethod test-generic ((<pair> a) (<test-generic-1> b) c)
+  (list <pair> a <test-generic-1> b () c))
+
+(define-multimethod test-generic ((<long> a) (<test-generic-1> b) (<long> c))
+  (list <long> a <test-generic-1> b <long> c))
+
+(define-multimethod test-generic (a (<test-generic-2> b) c)
+  (list () a <test-generic-2> b () c))
+
+(define-multimethod test-generic (a (<test-generic-2> b) (<long> c))
+  (list () a <test-generic-2> b <long> c))
+
+(define-multimethod test-generic ((<pair> a) (<test-generic-1> b) (<long> c))
+  (list <pair> a <test-generic-1> b <long> c))
+
+(define-multimethod test-generic ((<pair> a) (<test-generic-2> b) c)
+  (list <pair> a <test-generic-2> b () c))
+
+(define-test eval/multimethods/1 ()
+  (test-assert (equal (list <pair> '(42) <long> 43    <long> 44)	(test-generic '(42) 43    44)))
+  (test-assert (equal (list <pair> '(42) ()     "43"  <long> 44)	(test-generic '(42) "43"  44)))
+  (test-assert (equal (list <pair> '(42) <pair> '(43) ()     44)	(test-generic '(42) '(43) 44)))
+  (test-assert (equal (list <pair> '(42) <pair> '(43) ()     '(44))	(test-generic '(42) '(43) '(44))))
+  (test-assert (equal (list <pair> '(42) ()     "43"  <long> 44)	(test-generic '(42) "43" 44)))
+
+  (let ((tg1 (new <test-generic-1>))
+        (tg2 (new <test-generic-2>)))
+    (test-assert (equal (list <long>	42	<test-generic-1>	tg1	<long>	44)	(test-generic 42 tg1 44)))
+    (test-assert (equal (list ()	42	<test-generic-2>	tg2	()	'(44))	(test-generic 42 tg2 '(44))))
+    (test-assert (equal (list <long>	42	<test-generic-1>	tg2	<long>	44)	(test-generic 42 tg2 44)))
+    (test-assert (equal (list ()	"42"	<test-generic-2>	tg2	<long>	44)	(test-generic "42" tg2 44)))
+    (test-assert (equal (list <pair>	'(42)	<test-generic-2>	tg2	()	44)	(test-generic '(42) tg2 44)))
+    (test-assert (equal (list <pair>	'(42)	<test-generic-1>	tg1	<long>	44)	(test-generic '(42) tg1 44)))
+    ))
 
 (define-function run-tests ()
   (println "\nAbout to run the interpreter tests.")

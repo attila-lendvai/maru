@@ -573,6 +573,7 @@
 ;;; the <foo> global definitions are also holding full maru type objects.
 
 (define-form is (type obj)
+  ;; TODO use subtype?
   `(= ,type (type-of ,obj)))
 
 (define type-id-of type-of) ; we will replace type-of later
@@ -1241,6 +1242,7 @@
             (set methods (or (array-at methods index)
                              (set (array-at methods index) (array 32)))))
           (set types (cdr types)))
+        ;; the last one:
         (set (array-at methods (aif (car types)
                                    (+ (<type>-id (eval it))
                                       +multimethod-type-id-offset+)
@@ -1413,7 +1415,7 @@
         (cond
           ((< c 0)	(set hi (- m 1)))
           ((> c 0)	(set lo (+ m 1)))
-          (else		(let () (set ix m) (set lo (+ hi 1)))))))
+          (else		(set ix m) (set lo (+ hi 1))))))
     ix))
 
 (define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))

@@ -48,7 +48,7 @@
         (cond
           ((= c ?a)                     ?\a)
           ((= c ?b)                     ?\b)
-          ((= c ?e)                     ?\x1b) ; NOTE this is not a standard escape char in C, and it's not in the eval.exe yet. once not evolving? anymore, then it can be changed to \e
+          ((= c ?e)                     ?\x1b) ; NOTE this is not a standard escape char in C, and it's not in the eval.exe yet. once not evolving? anymore, then it can be changed to \e. see e.g. Reflections on Trusting Trust by KEN THOMPSON
           ((= c ?f)                     ?\f)
           ((= c ?n)                     ?\n)
           ((= c ?r)                     ?\r)
