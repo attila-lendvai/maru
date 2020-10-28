@@ -192,7 +192,8 @@
 ;; ENTER is slow, so don't use it (LEAVE is fine): http://agner.org/optimize
 (define-emit    (ENTER long)			(println "	pushl	%ebp")
 						(println "	movl	%esp, %ebp")
-						(println "	subl	$"$1", %esp"))
+						(unless (= 0 $1)
+                                                  (println "	subl	$"$1", %esp")))
 
 (define-emit    (LEAVE long)			(println "	leave")
 						(println "	ret"))
@@ -209,15 +210,25 @@
 
 (define-emit    (MUL TI32)			(println "	mull	"$1))
 
-(define-emit    (MUL LI32)			(println "	movl	$"$1", %ecx")
-						(println "	mull	%ecx"))
+(define-emit    (MUL LI32)			(cond
+                                                  ((= (<LI32>-value $1) 1)) ; nothing to do
+                                                  ;; TODO emit shifts when possible
+						  (else
+                                                   (println "	movl	$"$1", %ecx")
+						   (println "	mull	%ecx"))))
 
-(define-emit    (DIV TI32)			(println "	movl	$0, %edx")
+(define-emit    (DIV TI32)			(println "	xorl	%edx, %edx")
 						(println "	divl	"$1))
 
-(define-emit    (DIV LI32)			(println "	movl	$0, %edx")
-						(println "	movl	$"$1", %ecx")
-						(println "	divl	%ecx"))
+(define-emit    (DIV LI32)			(cond
+                                                  ((= (<LI32>-value $1) 1)
+                                                   ;; remainder is zero, %eax is unchanged
+                                                   (println "	xorl	%edx, %edx"))
+                                                  ;; TODO emit shifts when possible
+                                                  (else
+                                                   (println "	movl	$0, %edx")
+						   (println "	movl	$"$1", %ecx")
+						   (println "	divl	%ecx"))))
 
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
 (define-emit    (AND LI32)			(println "	andl	$"$1", %eax"))
@@ -304,7 +315,9 @@
 (define-emit    (CALL LABEL)			(println "	call	"$1))
 (define-emit    (CALL GLOBAL-LABEL)		(println "	call	"$1))
 
-(define-emit    (LOAD LI32)			(println "	movl	$"$1", %eax"))
+(define-emit    (LOAD LI32)			(if (= 0 (<LI32>-value $1))
+                                                    (println "	xorl	%eax, %eax")
+                                                  (println "	movl	$"$1", %eax")))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
 (define-emit    (LOAD GI32)			(println "	movl	"$1", %eax"))
 (define-emit    (LOAD TI32)			(println "	movl	"$1", %eax"))
