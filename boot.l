@@ -499,6 +499,33 @@
 
 (define-form cond clauses (%cond clauses))
 
+;;; case
+
+(define self-evaluating-value?) ; forward
+
+(define-function %case-test (values)
+  (if (pair? values)
+      (let ((value (car values)))
+        (unless (self-evaluating-value? value)
+          (set value `(quote ,value)))
+        (cons `(= __value__ ,value)
+              (%case-test (cdr values))))))
+
+(define-function %case (clauses)
+  (if (pair? clauses)
+      (let* ((clause (car clauses))
+             (value  (car clause))
+             (body   (cdr clause)))
+        (if (= 'else value)
+            (%maybe-progn body)
+          `(if (or ,@(%case-test (ensure-list value)))
+               ,(%maybe-progn body)
+             ,(%case (cdr clauses)))))))
+
+(define-form case (value . clauses)
+  `(let ((__value__ ,value))
+     ,(%case clauses)))
+
 ;;; iteration
 
 (define-function %generic-do (get len var col body)
@@ -968,6 +995,10 @@
 
 (define-function global-variable? (var)
   (= 0 (<env>-level (<variable>-env var))))
+
+(define-function self-evaluating-value? (x)
+  (or (is <string> x)
+      (is <long> x)))
 
 (define-form define-expand (type args . body)   `(set-array-at *expanders*   ,(<type>-id (eval type)) (lambda ,args ,@body)))
 (define-form define-encode (type args . body)   `(set-array-at *encoders*    ,(<type>-id (eval type)) (lambda ,args ,@body)))

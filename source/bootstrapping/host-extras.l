@@ -43,3 +43,35 @@
   `(define ,name (form () (lambda _ ',replacement))))
 
 (define-symbol-form *module* (current-module))
+
+;; case is new
+(define-function ensure-list (obj)
+  (if (pair? obj) obj (list obj)))
+
+(define-function self-evaluating-value? (x)
+  (let ((type (type-of x)))
+    (or (= type <string>)
+        (= type <long>))))
+
+(define-function %case-test (values)
+  (if (pair? values)
+      (let ((value (car values)))
+        (unless (self-evaluating-value? value)
+          (set value `(quote ,value)))
+        (cons `(= __value__ ,value)
+              (%case-test (cdr values))))))
+
+(define-function %case (clauses)
+  (if (pair? clauses)
+      (let* ((clause (car clauses))
+             (value  (car clause))
+             (body   (cdr clause)))
+        (if (= 'else value)
+            (%maybe-progn body)
+          `(if (or ,@(%case-test (ensure-list value)))
+               ,(%maybe-progn body)
+             ,(%case (cdr clauses)))))))
+
+(define-form case (value . clauses)
+  `(let ((__value__ ,value))
+     ,(%case clauses)))
