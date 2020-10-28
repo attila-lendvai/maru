@@ -84,37 +84,66 @@
          (error "llvm-type-bitsize: unexpected type "type))
        (cdr entry)))))
 
+(if-at-expand evolving?
+    (define-function %llvm-escape (prefix str char-needs-wrapping? legal-char? . with-zero)
+      (let* ((mangled (array)) ; strings don't auto-expand, so we need to use arrays here
+             (index   0)
+             (outdex  0)
+             (wrap-result? ())
+             (putnext (lambda (c)
+                        (set-array-at mangled outdex c)
+                        (incr outdex)))
+             (digit-for (lambda (c)
+                          (if (< c 10)
+                              (+ c ?0)
+                            (+ c (- ?A 10)))))
+             (write-char (lambda (c)
+                           (when (char-needs-wrapping? c)
+                             (set wrap-result? true))
+                           (if (legal-char? c)
+                               (putnext c)
+                             (putnext ?\\)
+                             (putnext (digit-for (bitwise-shift c -4)))
+                             (putnext (digit-for (bitwise-and c 0xf)))))))
+        (when prefix
+          (string-do c prefix
+            (write-char c)))
+        (string-do c str
+          (write-char c))
+        (when with-zero
+          (write-char ?\x00))
+        (when wrap-result?
+          (putnext ?\")
+          (array-insert mangled 0 ?\"))
+        (array->string mangled)))
 (define-function %llvm-escape (prefix str char-needs-wrapping? legal-char? . with-zero)
-  (let* ((mangled (array)) ; strings don't auto-expand, so we need to use arrays here
-         (index   0)
-         (outdex  0)
-         (wrap-result? ())
-         (putnext (lambda (c)
-                    (set-array-at mangled outdex c)
-                    (incr outdex)))
-         (digit-for (lambda (c)
-                      (if (< c 10)
-                          (+ c ?0)
-                        (+ c (- ?A 10)))))
-         (write-char (lambda (c)
-                       (when (char-needs-wrapping? c)
-                         (set wrap-result? true))
-                       (if (legal-char? c)
-                           (putnext c)
-                         (putnext ?\\)
-                         (putnext (digit-for (bitwise-shift c -4)))
-                         (putnext (digit-for (bitwise-and c 0xf)))))))
-    (when prefix
-      (string-do c prefix
-        (write-char c)))
-    (string-do c str
-      (write-char c))
-    (when with-zero
-      (write-char ?\x00))
-    (when wrap-result?
-      (putnext ?\")
-      (array-insert mangled 0 ?\"))
-    (array->string mangled)))
+  (with-forms ((putnext ((c) `(string-append mangled ,c))))
+    (let* ((mangled (string))
+           (wrap-result? ())
+           (digit-for (lambda (c)
+                        (if (< c 10)
+                            (+ c ?0)
+                          (+ c (- ?A 10)))))
+           (write-char (lambda (c)
+                         (when (char-needs-wrapping? c)
+                           (set wrap-result? true))
+                         (if (legal-char? c)
+                             (putnext c)
+                           (putnext ?\\)
+                           (putnext (digit-for (bitwise-shift c -4)))
+                           (putnext (digit-for (bitwise-and c 0xf)))))))
+      (when prefix
+        (string-do c prefix
+          (write-char c)))
+      (string-do c str
+        (write-char c))
+      (when with-zero
+        (write-char ?\x00))
+      (when wrap-result?
+        (putnext ?\")
+        (string-insert mangled 0 ?\"))
+      mangled)))
+)
 
 (define-function llvm/escape-string (str . with-zero)
   (%llvm-escape ()
