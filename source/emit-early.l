@@ -205,7 +205,10 @@
 
 (eval-in-slave
  `(let ()
-    (define target-boolean	,target-boolean)))
+    (define target-boolean	,target-boolean)
+    ;; we rebind these to point to the actual definitions, so that CONS can be redefined in the target and the expansion of quasiquotes still work as expected
+    (define qq-concat-list	concat-list)
+    (define qq-cons		cons)))
 
 ;; create a child environment now that will hold whatever gets defined by loading
 ;; eval.l and its parts, i.e. the artifacts that we want to compile.
