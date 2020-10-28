@@ -1250,13 +1250,26 @@
     (or (defined? method) (eval (list 'define-generic method)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
+(define %generic-lookup/inheritance) ; forward
+
 (define-function %generic-lookup (method arg)
   (if (and arg (array? method))
       (or (%generic-lookup (array-at method (+ +multimethod-type-id-offset+ (type-id-of (car arg))))
                            (cdr arg))
+          ;; if failed then also try the inheritance chain upwards
+          (%generic-lookup/inheritance (type-of (car arg)) method arg)
+          ;; when all else failed, try the no-dispatch path
           (%generic-lookup (array-at method 0)
                            (cdr arg)))
     method))
+
+(define-function %generic-lookup/inheritance (type method arg)
+  (awhen (and type
+              (is <record> type)
+              (<record>-super type))
+    (or (%generic-lookup (array-at method (+ +multimethod-type-id-offset+ (<type>-id it)))
+                         (cdr arg))
+        (%generic-lookup/inheritance it method arg))))
 
 (define-apply <generic> (self . arguments)
   (let ((method (%generic-lookup (<generic>-methods self) arguments)))
