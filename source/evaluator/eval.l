@@ -46,6 +46,9 @@
 (define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
 (define-constant feature/object-canary		(or () (<= 3 *safety*)))
 (define-constant feature/debug-output		(or () (<= 3 *safety*)))
+;; TODO set up proper framework for optimization control, merge with *optimised*
+(define-constant feature/optimize-space		())
+(define-constant feature/optimize-speed		(and (not feature/optimize-space) (<= *safety* 2)))
 
 (define-form debug		prog ())
 (define-form debug/identities	prog ())
@@ -359,6 +362,26 @@
 
 (define-type-of)
 
+(when-at-expand feature/optimize-speed
+  (define-form is (type-name obj)
+    (let ((type (eval type-name)))
+      (cond
+        ((is <record> type) ; NOTE IS in the form bodies will remain to be the one in slave-module, regardless of our new definition of IS in the target
+         `(let ((__obj__ ,obj))
+            (and __obj__
+                 (oop? __obj__)
+                 (= ,(<type>-slave-id type)
+                    (<header>-type (gc/header-of __obj__))))))
+        ((is <immediate-type> type)
+         (let* ((tag-value	(<immediate-type>-tag-value type))
+                (tag-width	(<immediate-type>-tag-width type)))
+           (if tag-width
+               (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                 `(= ,tag-value (bitwise-and ,obj ,tag-mask)))
+             `(= ,tag-value ,obj))))
+        (else
+         `(= ,type-name (type-of ,obj)))))))
+
 (define-function k/%accessor-typecheck (expected-type-id object)
   (let ((type (type-of object)))
     (or (= type expected-type-id)
@@ -392,11 +415,19 @@
           ,value)))
 
 ;; shorthands (and optimizations)
-(define-form long?		(obj)		`(is <long> ,obj))
-(define-form pair?		(obj)		`(is <pair> ,obj))
-(define-form string?		(obj)		`(is <string> ,obj))
-(define-form symbol?		(obj)		`(is <symbol> ,obj))
-(define-form array?		(obj)		`(is <array> ,obj))
+(if-at-expand feature/optimize-space
+    (let ()
+      (define-function long?	(obj)	(is <long>	obj))
+      (define-function pair?	(obj)	(is <pair>	obj))
+      (define-function string?	(obj)	(is <string>	obj))
+      (define-function symbol?	(obj)	(is <symbol>	obj))
+      (define-function array?	(obj)	(is <array>	obj)))
+  (define-form long?		(obj)	`(is <long>	,obj))
+  (define-form pair?		(obj)	`(is <pair>	,obj))
+  (define-form string?		(obj)	`(is <string>	,obj))
+  (define-form symbol?		(obj)	`(is <symbol>	,obj))
+  (define-form array?		(obj)	`(is <array>	,obj)))
+
 (define-form get/long		(obj)		(if (immediate-type? <long>)
                                                     (if (< *safety* 2)
                                                         `(>> ,obj ,(<immediate-type>-tag-width <long>))
