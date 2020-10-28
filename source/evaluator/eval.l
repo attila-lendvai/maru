@@ -150,9 +150,9 @@
       (set impl-name (pop name-and-props))
       (set impl-name? true))
     (list-do prop name-and-props
-      (cond
-        ((= prop 'fixed)	(set fixed? true))
-        (else			(error "define-primitive-function: unexpected property "prop))))
+      (case prop
+        (fixed	(set fixed? true))
+        (else	(error "define-primitive-function: unexpected property "prop))))
     (let* ((stub-name		(concat-symbol prim-name '/evaluator-stub))
            (arg-names		())
            (binders		()))
@@ -171,9 +171,9 @@
                   (set default-value ())
                 (set default-value? true)))
             (list-do prop entry
-              (cond
-                ((= prop 'nounbox)	(set unbox? ()))
-                (else			(error "define-primitive-function: unexpected property "prop))))
+              (case prop
+                (nounbox	(set unbox? ()))
+                (else		(error "define-primitive-function: unexpected property "prop))))
             (assert (or (not type) (symbol? type)))
             (push arg-names arg-name)
             (let* ((type-entry		(when type

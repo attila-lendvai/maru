@@ -38,16 +38,15 @@
    `(bitwise-xor ,value -1)))
 
 (define *C-type->llvm-type*
-    ;; TODO use case
     (concat-list
      '((void		void))
-     (cond
-       ((= 32 (target-value +word-size-in-bits+))
+     (case (target-value +word-size-in-bits+)
+       (32
         '((int			i32)
           (long			i32)
           (unsigned-long	i32)
           (size_t		i32)))
-       ((= 64 (target-value +word-size-in-bits+))
+       (64
         '((int			i32)
           (long			i64)
           (unsigned-long	i64)
@@ -75,9 +74,9 @@
 
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
-  (cond
-    ((= type '%ptr)	(target-value +word-size-in-bits+))
-    ((= type 'void)	0)
+  (case type
+    (%ptr	(target-value +word-size-in-bits+))
+    (void	0)
     (else
      (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
        (unless entry
@@ -701,9 +700,9 @@
                   (gen CALL op-value (list-reverse! new-arg-regs)))
                 ;; convert return value
                 (let ((return-type (C-type->llvm-type (<C-function>-return-type op-value))))
-                  (cond
-                    ((= '%ptr return-type)) ; all good
-                    ((= 'void return-type)
+                  (case return-type
+                    (%ptr) ; all good
+                    (void
                      (gen COMMENT (list "	void FFI call return value"))
                      (gen LOAD (LITERAL 0) 0))
                     (else
@@ -756,9 +755,9 @@
 (define-function %compile/and-or (op expr -c-)
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
-    (gen LOAD (LITERAL (cond
-                         ((= op 'and) (target-value true))
-                         ((= op 'or)  (target-value false))))
+    (gen LOAD (LITERAL (case op
+                         (and (target-value true))
+                         (or  (target-value false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
@@ -767,9 +766,9 @@
         (gen LOAD (LITERAL 0) 0)
         (gen EQ value-reg))
       (let ((lcont (UNIQUE-LABEL)))
-        (cond
-          ((= op 'and) (gen BRIF lend  lcont))
-          ((= op 'or)  (gen BRIF lcont lend)))
+        (case op
+          (and (gen BRIF lend  lcont))
+          (or  (gen BRIF lcont lend)))
         (gen DEFLABEL lcont)))
     (gen BR lend)
     (gen DEFLABEL lend)

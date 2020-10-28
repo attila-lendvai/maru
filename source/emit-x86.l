@@ -31,16 +31,15 @@
 (define-constant +direct-calls+	true)
 
 (define-constant +global-label-prefix+
-    ;; TODO use case
-    (cond
-      ((= (target-value +operating-system+) 'darwin)	"_")
-      (else						"")))
+    (case (target-value +operating-system+)
+      (darwin	"_")
+      (else	"")))
 
 (define-constant +call-frame-alignmet+
-    (cond
-      ((= (target-value +operating-system+) 'darwin)	16)
-      (else						(/ (target-value +word-size-in-bits+)
-                                                           8))))
+    (case (target-value +operating-system+)
+      (darwin	16)
+      (else	(/ (target-value +word-size-in-bits+)
+                   8))))
 
 (unless (= 32 (target-value +word-size-in-bits+))
   (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))

@@ -7,10 +7,10 @@
       (libc/fputs "\"" stream)
       (while (set c (char-at cstr i))
         (if (and (<= 32 c) (<= c 126))
-            (cond
-              ((= c ?\")        (libc/fputs "\\\"" stream))      ; \"
-              ((= c ?\\)        (libc/fputs "\\\\" stream))      ; \\
-              (else             (libc/fprintf stream "%c" c)))
+            (case c
+              (?\"	(libc/fputs "\\\"" stream))
+              (?\\	(libc/fputs "\\\\" stream))
+              (else	(libc/fprintf stream "%c" c)))
           (libc/fprintf stream "\\%03o" c))
         (incr i))
       (libc/fputs "\"" stream))))

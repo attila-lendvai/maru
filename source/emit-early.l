@@ -81,15 +81,12 @@
 
 (eval-in-slave
  (let (arch word-size)
-   (cond
-     ((or (= target/cpu "x86_64"))
-
+   (case target/cpu
+     ("x86_64"
       (set arch		'x86-64)
       (set word-size	64))
 
-     ((or (= target/cpu "i686")
-          (= target/cpu "i386"))
-
+     (("i686" "i386")
       (set arch		'IA-32)
       (set word-size	32))
 
