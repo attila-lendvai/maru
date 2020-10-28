@@ -1252,6 +1252,9 @@
   (or default (set default `(args (error "no method in generic "',name" corresponding to: "args", of types: " (map type-of args)))))
   `(define ,name (generic ',name (lambda ,@default))))
 
+;; we store the no-dispatch case at index 0
+(define-constant +multimethod-type-id-offset+ 1)
+
 (define-function %add-multimethod (mm types method)
   (when-at-expand (and feature/track-expr-names
                        (not bootstrapping?))
@@ -1261,27 +1264,38 @@
       (let ((methods (or (<generic>-methods mm)
                          (set (<generic>-methods mm) (array 32)))))
         (while (cdr types)
-          (let* ((type (eval (car types)))
-                 (type-id (<type>-id type)))
-            (set methods (or (array-at methods type-id)
-                             (set (array-at methods type-id) (array 32)))))
+          (let* ((type	(awhen (car types)
+                          (eval it)))
+                 (index	(if type
+                            (+ (<type>-id type) +multimethod-type-id-offset+)
+                          ;; we store the no-dispatch case at index 0
+                          0)))
+            (set methods (or (array-at methods index)
+                             (set (array-at methods index) (array 32)))))
           (set types (cdr types)))
-        (set (array-at methods (<type>-id (eval (car types)))) method))
+        (set (array-at methods (aif (car types)
+                                   (+ (<type>-id (eval it))
+                                      +multimethod-type-id-offset+)
+                                 0))
+             method))
     (set (<generic>-methods mm) method)))
 
 (define-form define-multimethod (method typed-args . body)
-  (let ((args  (map cadr typed-args))
-        (types (map car  typed-args)))
+  (let ((args  (map (lambda (x) (if (pair? x) (second x) x))	typed-args))
+        (types (map (lambda (x) (when (pair? x) (first x)))	typed-args)))
     (or (defined? method) (eval (list 'define-generic method)))
     `(%add-multimethod ,method (list ,@types) (lambda ,args ,@body))))
 
+(define-function %generic-lookup (method arg)
+  (if (and arg (array? method))
+      (or (%generic-lookup (array-at method (+ +multimethod-type-id-offset+ (type-id-of (car arg))))
+                           (cdr arg))
+          (%generic-lookup (array-at method 0)
+                           (cdr arg)))
+    method))
+
 (define-apply <generic> (self . arguments)
-  (let ((method (<generic>-methods self))
-        (arg     arguments))
-    (while (and arg method)
-      ;; see NOTE at define-apply <selector>
-      (set method (array-at method (type-id-of (car arg))))
-      (set arg (cdr arg)))
+  (let ((method (%generic-lookup (<generic>-methods self) arguments)))
     (if (and method (not (array? method)))
         (apply method arguments)
       (let ((default (<generic>-default self)))
