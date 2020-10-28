@@ -388,9 +388,6 @@
 (define-function list->array (list)
   (%list->array list 0))
 
-;; TODO move this to be a primitive once subr creation/mapping is more automated
-(define-function array-append (arr val)
-  (set-array-at arr (array-length arr) val))
 
 (define-function map1 (function list)
   (let ((head (cons)))
@@ -1346,6 +1343,10 @@
 (define-function character->string (c)
   (let ((s (string 1)))
     (set-string-at s 0 c) s))
+
+(when-at-expand evolving?
+  (define-function array-append (arr val)
+    (set-array-at arr (array-length arr) val)))
 
 (define-function array-append-all (a s)
   (string-do e s (array-append a e))

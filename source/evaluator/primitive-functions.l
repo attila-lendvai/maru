@@ -363,6 +363,13 @@
   (string-insert string index value)
   (new-<long> value))
 
+(define-primitive-function (array-append ()) ((array <array>) value))
+
+(define-primitive-function (string-append ()) ((string <string> _ nounbox) (value <long>))
+  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(new-<long> value)))
+  (string-append string value)
+  (new-<long> value))
+
 (define-primitive-function symbol->string (symbol)
   ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
   (if (string? symbol)
