@@ -43,11 +43,11 @@
 ;;;
 
 (define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
-(define-constant feature/backtrace		(or true  feature/profiler (< 0 *safety*)))
+(define-constant feature/backtrace		(or true feature/profiler (< 0 *safety*)))
 (define-constant feature/object-canary		(or () (<= 3 *safety*)))
 (define-constant feature/debug-output		(or () (<= 3 *safety*)))
 ;; TODO set up proper framework for optimization control, merge with *optimised*
-(define-constant feature/optimize-space		())
+(define-constant feature/optimize-space		true)
 (define-constant feature/optimize-speed		(and (not feature/optimize-space) (<= *safety* 2)))
 
 (define-form debug		prog ())
@@ -121,6 +121,95 @@
 ;;   object)
 
 ;;;
+;;; forward definitions, so that the variables get created early enough for building the graph
+;;; ----------------------------------------------------------------
+(define-form define-forwards names
+  `(let ()
+     ,@(map (lambda (name) (list 'define name))
+            names)))
+
+(define-forwards
+    *module* *maru-module* *symbols*
+
+    *expanders* *encoders* *evaluators* *applicators*
+
+    fixed-primitive-function/quote
+    fixed-primitive-function/lambda
+    fixed-primitive-function/let
+    fixed-primitive-function/define
+    fixed-primitive-function/set
+
+    +end+ ; a unique value that cannot ever be read from any source file; it will be initialized at startup to an uninterned symbol.
+
+    ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
+    print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
+    print println read encode expand eval string->symbol k/%accessor-typecheck
+    abort new-<string>-from-cstring
+    ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
+    ;; bodies of our impl functions below, leading to primfns reaching the compiler.
+    environment-define defined?
+    )
+
+;; cache some symbols into the symbol/foo global variables
+(define-form define-symbol-cache symbols
+  `(let ()
+     ,@(map (lambda (name)
+              `(define ,(concat-symbol 'symbol/ name)))
+            symbols)
+     (define-function initialize-symbol-cache ()
+       ,@(map (lambda (name)
+                `(set ,(concat-symbol 'symbol/ name)
+                      (string->symbol ,(symbol->string name))))
+              symbols))))
+
+(define-symbol-cache
+    true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
+    lambda let *globals*)
+
+;;;
+;;; libc ffi
+;;; ----------------------------------------------------------------
+
+(define-libc-ffi)
+
+(define-function libc/flush-streams ()
+  (libc/fflush libc/stdout)
+  (libc/fflush libc/stderr))
+
+;;;
+;;; error handling
+;;; ----------------------------------------------------------------
+
+;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
+;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
+(define-function %fatal-prologue ()
+  (libc/fputs "FATAL: " libc/stderr))
+
+(define-function fatal  (fmt)           (%fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal1 (fmt arg)       (%fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal2 (fmt arg1 arg2) (%fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
+
+(define-function %error-prologue ()
+  (libc/printf "ERROR: "))
+
+(define-function %error-epilogue ()
+  (libc/printf "\n")
+  (abort))
+
+(define-form error args
+  `(let ()
+     (%error-prologue)
+     ,@(map (lambda (arg)
+              ;; string literals are turned into pointers to .asciz, therefore
+              ;; we need to print them using libc/printf (or instantiate
+              ;; them into Maru objects using new-<string>-from-cstring).
+              (if (string? arg)
+                  `(libc/printf ,arg)
+                `(print ,arg)))
+            args)
+     (%error-epilogue)))
+
+;;;
 ;;; primitive-function infrasrtucture
 ;;; ----------------------------------------------------------------
 
@@ -135,10 +224,15 @@
        (<pair>			(pair?))
        (<array>			(array?))))))
 
-;; TODO shrink the expansion, and check its speed penalty
+(define-function %not-enough-arguments (name args)
+  (error (new-<string>-from-cstring name)": not enough arguments: "args))
+
+(define-function %too-many-arguments (name args)
+  (error (new-<string>-from-cstring name)": not enough arguments: "args))
+
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
-  ;; ARGS: may be _ to don't do any arg parsing
+  ;; ARGS: may be _ to skip arg parsing
   ;;       otherwise a list of entries like:
   ;;         (arg-name (or arg-type null) (or default-value _) . (properties: nounbox))
   (set name-and-props (ensure-list name-and-props))
@@ -193,13 +287,13 @@
                                    (set __args (get/tail __args)))
                                ,(if default-value?
                                     `(set ,arg-name ,default-value)
-                                  `(error ,(symbol->string prim-name)": too few arguments: "-args-))))))
+                                  `(%not-enough-arguments ,(symbol->string prim-name) -args-))))))
           (set entries (cdr entries)))
         ;; handle &rest arg
         (unless (= '_ entries)
-          (push binders (if entries ; i.e. it was in a cdr position
+          (push binders (if entries    ; i.e. it was in a cdr position
                             `(set ,entries __args)
-                          `(safety 1 (assert (not __args) ,(symbol->string prim-name)": too many arguments: "-args-))))
+                          `(safety 1 (when __args (%too-many-arguments ,(symbol->string prim-name) -args-)))))
           (when entries
             (push arg-names entries))))
       (set binders	(list-reverse! binders))
@@ -223,44 +317,12 @@
                      `((,effective-impl-name ,@arg-names))
                    body))))))))
 
-;;;
-;;; libc
-;;; ----------------------------------------------------------------
-
-(define-libc-ffi)
-
-(define-function libc/flush-streams ()
-  (libc/fflush libc/stdout)
-  (libc/fflush libc/stderr))
-
-;;;
-;;; forward definitions, so that the variables get created early enough for building the graph
-;;; ----------------------------------------------------------------
-(define-form define-forwards names
-  `(let ()
-     ,@(map (lambda (name) (list 'define name))
-            names)))
-
-(define-forwards
-    *module* *maru-module* *symbols*
-
-    *expanders* *encoders* *evaluators* *applicators*
-
-    fixed-primitive-function/quote
-    fixed-primitive-function/lambda
-    fixed-primitive-function/let
-    fixed-primitive-function/define
-    fixed-primitive-function/set
-
-    +end+ ; a unique value that cannot ever be read from any source file; it will be initialized at startup to an uninterned symbol.
-
-    ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
-    print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    print println read encode expand eval string->symbol k/%accessor-typecheck
-    ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
-    ;; bodies of our impl functions below, i.e. primfns end up reaching the compiler.
-    environment-define defined?
-    )
+(define-primitive-function abort _
+  (libc/printf "ABORTED\n")
+  (print-backtrace)
+  (libc/flush-streams)
+  ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
+  (libc/exit -1))
 
 ;;;
 ;;; utils
@@ -272,62 +334,6 @@
 (define *call-stack-index*	0)
 (when-at-expand feature/backtrace
   (define *call-stack*		0))
-
-;; cache some symbols into the symbol/foo global variables
-(define-form define-symbol-cache symbols
-  `(let ()
-     ,@(map (lambda (name)
-              `(define ,(concat-symbol 'symbol/ name)))
-            symbols)
-     (define-function initialize-symbol-cache ()
-       ,@(map (lambda (name)
-                `(set ,(concat-symbol 'symbol/ name)
-                      (string->symbol ,(symbol->string name))))
-              symbols))))
-
-(define-symbol-cache
-    true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
-    lambda let *globals*)
-
-;;;
-;;; error handling
-;;; ----------------------------------------------------------------
-
-(define-primitive-function abort _
-  (libc/printf "ABORTED\n")
-  (print-backtrace)
-  (libc/flush-streams)
-  ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
-  (libc/exit -1))
-
-;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
-;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
-(define-function %fatal-prologue ()
-  (libc/fputs "FATAL: " libc/stderr))
-
-(define-function fatal  (fmt)           (%fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal1 (fmt arg)       (%fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal2 (fmt arg1 arg2) (%fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
-
-(define-function %error-prologue ()
-  (libc/printf "ERROR: "))
-
-(define-function %error-epilogue ()
-  (libc/printf "\n")
-  (abort))
-
-(define-form error args
-  `(let ()
-     (%error-prologue)
-     ,@(map (lambda (arg)
-              ;; string literals are turned into pointers to .asciz, therefore
-              ;; we need to print them using libc/printf (or instantiate
-              ;; them into Maru objects using new-<string>-from-cstring).
-              (if (string? arg)
-                  `(libc/printf ,arg)
-                `(print ,arg)))
-            args)
-     (%error-epilogue)))
 
 ;;;
 ;;; copy the types here that should be visible to the target code
