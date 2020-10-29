@@ -302,25 +302,32 @@
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
-(define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (abort))
-(define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (abort))
-(define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (abort))
+(define-function %fatal-prologue ()
+  (libc/fputs "FATAL: " libc/stderr))
 
-;; FIXME it would be nice for ERROR to be a function (or at least expand to a breakpoint'able function call),
-;; but that would need the compiler to support variable nr of args, or literal lists
+(define-function fatal  (fmt)           (%fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal1 (fmt arg)       (%fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal2 (fmt arg1 arg2) (%fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
+
+(define-function %error-prologue ()
+  (libc/printf "ERROR: "))
+
+(define-function %error-epilogue ()
+  (libc/printf "\n")
+  (abort))
+
 (define-form error args
   `(let ()
-     (libc/printf "\nerror: ")
+     (%error-prologue)
      ,@(map (lambda (arg)
               ;; string literals are turned into pointers to .asciz, therefore
               ;; we need to print them using libc/printf (or instantiate
               ;; them into Maru objects using new-<string>-from-cstring).
               (if (string? arg)
                   `(libc/printf ,arg)
-                  `(print ,arg)))
+                `(print ,arg)))
             args)
-     (libc/printf "\n")
-     (abort)))
+     (%error-epilogue)))
 
 ;;;
 ;;; copy the types here that should be visible to the target code
