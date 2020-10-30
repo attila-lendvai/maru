@@ -24,12 +24,12 @@
         (when (pair? binding)
           (let ((var  (get/head binding))
                 (prog (get/tail binding)))
-            (debug (libc/printf "let primitive-function is initializing var ") (dump var) (libc/printf " in context ") (dumpln -ctx-))
+            (debug (libc/printf "let primitive-function is initializing var ") (print var) (libc/printf " in context ") (println -ctx-))
             (set tmp ())
             (while (pair? prog)
               (set tmp (eval (get/head prog) -ctx-))
               (set prog (get/tail prog)))
-            (debug (libc/printf "let primitive-function is setting var ") (dump var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (dumpln -ctx-))
+            (debug (libc/printf "let primitive-function is setting var ") (print var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (println -ctx-))
             (set (array-at locals (get/long (get (<variable> index) var))) tmp))))
       (set tmp ())
       (list-do exp body
@@ -43,12 +43,12 @@
         (put (<variable> value) var value)
       (let ((delta (- (get/long (get (<env> level) (get (<context>  env) -ctx-)))
                   (get/long (get (<env> level) (get (<variable> env) var))))))
-        (debug (libc/printf "set primitive-function is writing local var ") (dump var) (libc/printf " with delta %ld\n" delta))
+        (debug (libc/printf "set primitive-function is writing local var ") (print var) (libc/printf " with delta %ld\n" delta))
         (while (< 0 delta)
           (set -ctx- (get (<context> home) -ctx-))
           (decr delta))
         (let ((index (get/long (get (<variable> index) var))))
-          (debug (libc/printf "set primitive-function is setting local var in context ") (dump -ctx-) (libc/printf " at index %ld, to value " index) (dumpln value))
+          (debug (libc/printf "set primitive-function is setting local var in context ") (print -ctx-) (libc/printf " at index %ld, to value " index) (println value))
           (set (array-at (get (<context> bindings) -ctx-) index) value))))))
 
 (define-primitive-function (while () fixed) _
@@ -396,7 +396,7 @@
   (new-<module> name))
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
-  (debug (libc/printf "eval-in-module: form ") (dumpln form))
+  (debug (libc/printf "eval-in-module: form ") (println form))
   (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
     (with-current-module module
       (expand-encode-eval form env))))

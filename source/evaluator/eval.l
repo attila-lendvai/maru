@@ -765,7 +765,7 @@
                 (set frame.callee-designator	())
                 (set frame.callee		())
                 (set frame.arguments		())))))
-       ;;(debug (libc/printf "with-new-call-frame returning with result: ") (dumpln __result__))
+       ;;(debug (libc/printf "with-new-call-frame returning with result: ") (println __result__))
        __result__)))
 
 (when-at-expand feature/backtrace
@@ -810,7 +810,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function apply/expr (fun arguments parent-ctx)
-  (verbosity 3 (libc/printf "  A  ") (dump fun)  (libc/printf " ")  (dump arguments) (libc/printf " ") (dumpln parent-ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  A  ") (print fun)  (libc/printf " ")  (print arguments) (libc/printf " ") (println parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
     (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
@@ -836,7 +836,7 @@
         result))))
 
 (define-function apply (fun arguments ctx)
-  (debug (libc/printf "apply, function ") (dump fun) (libc/printf ", arguments: ") (dump arguments) (libc/printf "\n"))
+  (debug (libc/printf "apply, function ") (print fun) (libc/printf ", arguments: ") (print arguments) (libc/printf "\n"))
   (safety 1 (assert fun "apply: fun is null"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
@@ -907,7 +907,7 @@
 
 (define-function expand/pair (exp env -call-frame-)
   (gc/let* ((head (expand (get/head exp) env)))
-    (debug (libc/printf "expand/pair on head ") (dumpln head))
+    (debug (libc/printf "expand/pair on head ") (println head))
     (when-at-expand feature/backtrace
       (set (<call-frame>-callee			-call-frame-) head)
       (set (<call-frame>-arguments		-call-frame-) exp))
@@ -942,7 +942,7 @@
 
         ((= head symbol/set)
          (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
-         (debug (libc/printf "expand/set on form ") (dumpln exp))
+         (debug (libc/printf "expand/set on form ") (println exp))
          ;; try to convert (set (place-accessor ...) value) forms while expanding. try "more abstract" set-foo forms first,
          ;; and only recursively expand the body if they are not defined.
          ;; this setup allows defining e.g. a SET-SLOT-VALUE form to override its behavior. the old way was to first expand
@@ -983,7 +983,7 @@
          ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
          (gc/let* ((args (cons env (get/tail exp)))
                    (expansion (apply expander args ())))
-           (debug (libc/printf "expand/pair, found in local env, expanded to ") (dumpln expansion))
+           (debug (libc/printf "expand/pair, found in local env, expanded to ") (println expansion))
            (expand expansion env)))
 
         (else
@@ -992,17 +992,17 @@
            (cons head tail)))))))
 
 (define-function expand/symbol (exp env)
-  (debug (libc/printf "expand/symbol, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
+  (debug (libc/printf "expand/symbol, exp ") (print exp) (libc/printf ", env ") (println env))
   (aif (maybe-form-in-env/symbol env exp)
       ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
       (gc/let* ((args (list2 env exp))
                 (expansion (apply it args ())))
-        (debug (libc/printf "expand/symbol, found in local env, expanded to ") (dumpln expansion))
+        (debug (libc/printf "expand/symbol, found in local env, expanded to ") (println expansion))
         (expand expansion env))
     exp))
 
 (define-primitive-function expand (exp (env <env> (get (<context> env) -ctx-)))
-  (debug (libc/printf "expand, exp ") (dump exp) (libc/printf ", env ") (dumpln env))
+  (debug (libc/printf "expand, exp ") (print exp) (libc/printf ", env ") (println env))
   (with-new-call-frame (symbol/expand () exp)
     ;; TODO use typecase
     (cond
@@ -1031,7 +1031,7 @@
 (define-function encode/pair (exp env)
   (gc/let* ((head (encode (get/head exp) env))
             (tail (get/tail exp)))
-    (debug (libc/printf "encode/pair of head ") (dump head) (libc/printf ", in env ") (dumpln env))
+    (debug (libc/printf "encode/pair of head ") (print head) (libc/printf ", in env ") (println env))
     ;; TODO use switch
     (cond
       ((= head fixed-primitive-function/let)
@@ -1042,7 +1042,7 @@
            ;; phase 1: first define the let variables into new-env
            (let (vars/last)
              (list-do entry (first tail)
-               (debug (libc/printf "encode/let visiting entry ") (dumpln entry))
+               (debug (libc/printf "encode/let visiting entry ") (println entry))
                (let* ((var-name	(first entry))
                       (var-obj	(environment-define new-env var-name ())))
                  (set vars/last (if vars
@@ -1099,7 +1099,7 @@
     (cons head tail)))
 
 (define-function encode/symbol (exp env)
-  (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (dumpln env))
+  (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (println env))
   (let ((var (or (defined? exp env)
                  (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
@@ -1114,7 +1114,7 @@
     var))
 
 (define-primitive-function encode (exp (env <env> (get (<context> env) -ctx-)))
-  (debug (libc/printf "encode of exp ") (dump exp) (libc/printf ", in env ") (dumpln env))
+  (debug (libc/printf "encode of exp ") (print exp) (libc/printf ", in env ") (println env))
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
     ;; TODO use typecase
@@ -1150,7 +1150,7 @@
          (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
          (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
        (gc/let* ((evaled-head (eval (get/head exp) ctx)))
-         (debug (libc/printf "eval of pair, head eval'ed to ") (dumpln evaled-head))
+         (debug (libc/printf "eval of pair, head eval'ed to ") (println evaled-head))
          (when-at-expand feature/backtrace
            (set (<call-frame>-callee -call-frame-) evaled-head))
 	 (if (is <fixed> evaled-head)
@@ -1172,7 +1172,7 @@
          exp)))))
 
 (define-function eval (exp ctx)
-  (verbosity 3 (libc/printf "  E  ") (dump exp) (libc/printf " ") (dumpln ctx) (libc/flush-streams))
+  (verbosity 3 (libc/printf "  E  ") (print exp) (libc/printf " ") (println ctx) (libc/flush-streams))
   (let ((type (type-of exp)))
     ;; TODO use typecase
     (cond
@@ -1181,17 +1181,17 @@
       ((= type <string>)	exp)
       ((= type <variable>)	(if (global-variable? exp)
 				    (let ()
-                                      (debug (libc/printf "eval is reading global var ") (dumpln exp))
+                                      (debug (libc/printf "eval is reading global var ") (println exp))
                                       (get (<variable> value) exp))
 				  (let ((delta (- (get/long (get (<env> level) (get (<context>  env) ctx)))
 					      (get/long (get (<env> level) (get (<variable> env) exp))))))
-				    (debug (libc/printf "eval is reading local var ") (dump exp) (libc/printf " with delta %ld\n" delta))
+				    (debug (libc/printf "eval is reading local var ") (print exp) (libc/printf " with delta %ld\n" delta))
 				    (while (< 0 delta)
 				      (set ctx (get (<context> home) ctx))
 				      (decr delta))
                                     (let* ((index (get/long (get (<variable> index) exp)))
                                            (value (array-at (get (<context> bindings) ctx) index)))
-                                      (debug (libc/printf "eval is reading local var from context ") (dump ctx) (libc/printf " at index %ld, holding value " index) (dumpln value))
+                                      (debug (libc/printf "eval is reading local var from context ") (print ctx) (libc/printf " at index %ld, holding value " index) (println value))
 				      value))))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(eval/with-call-frame type exp ctx)))))
@@ -1201,12 +1201,12 @@
   (debug (libc/printf "expand-encode-eval for form ") (println form))
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
-					(verbosity 2 (libc/printf ";;; ? ")		(dumpln x))
-    (set x (expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(dumpln x))
-    (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(dumpln x))
+					(verbosity 2 (libc/printf ";;; ? ")		(println x))
+    (set x (expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(println x))
+    (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(println x))
     (set x (eval   x ctx))
-					(verbosity 2 (libc/printf ";;; => ")		(dumpln x))
-    (debug (libc/printf "expand-encode-eval for form ") (dump form) (libc/printf " is returning with ") (dumpln x))
+					(verbosity 2 (libc/printf ";;; => ")		(println x))
+    (debug (libc/printf "expand-encode-eval for form ") (print form) (libc/printf " is returning with ") (println x))
     x))
 
 ;; TODO unexport?
