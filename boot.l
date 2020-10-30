@@ -925,11 +925,26 @@
     (set (<immediate-type>-tag-width	type) tag-width)
     type))
 
-(define-form define-immediate-type (name tag-value tag-width)
+(define-form define-immediate (name tag-value tag-width)
   `(define ,name ,(new-<immediate-type> name (eval tag-value) (eval tag-width))))
 
 (define-function immediate-type? (type)
   (subtype? (type-of type) <immediate-type>))
+
+;;; boxed type
+
+(define-record <boxed-type> <type> (one-word?))
+
+(define-function new-<boxed-type> (name one-word?)
+  (let ((type (new-type-instance name <boxed-type>)))
+    (set (<boxed-type>-one-word? type) one-word?)
+    type))
+
+(define-form define-boxed-word (name)
+  `(define ,name ,(new-<boxed-type> name true)))
+
+(define-form define-boxed (name)
+  `(define ,name ,(new-<boxed-type> name false)))
 
 ;;; classes
 
@@ -953,9 +968,12 @@
 ;; such a setup would hopefully also simplify the bootstrapping dance above.
 (define-type		<data>)					; some blob; used for stuff like the elements of <string> and <array>
 
-(define-immediate-type	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
-(define-immediate-type	<long>			1 1)
-;(define-record		<long>			() (_bits))	; bootstrap is about 25% slower
+(define-immediate	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
+(if-at-expand true
+  (define-immediate	<long>			1 1)
+  (define-boxed-word	<long>))				; provides a full-word integer, but bootstrap is about 25% slower
+(define-boxed-word	<target-vm-pointer>)			; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
+(define-boxed		<symbol>)				; a cstr is inline into the object's body
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
@@ -969,8 +987,6 @@
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))
 (define-record		<module>		() (globals (when-at-expand feature/debug-info name)))		; globals is the <variable> that holds '*globals*
-(define-record		<target-vm-pointer>	() (_bits))		; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
-(define-record		<symbol>		() (_bits))
 (define-record		<pair>			() (head tail))
 
 ;; TODO why are some of these here, and some are primitive-functions? unify one way or another!

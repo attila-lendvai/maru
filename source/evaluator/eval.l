@@ -385,6 +385,28 @@
 ;;; the primitive-functions encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
 
+(define-function %allocate-boxed (type-id payload)
+  (let ((obj (gc/allocate-opaque type-id (words-to-bytes 1))))
+    (set (oop-at obj 0) payload)
+    obj))
+
+(define-form box (type-name payload)
+  (assert (is <boxed-type> (eval type-name)))
+  (assert (<boxed-type>-one-word? (eval type-name)) "cannot know how to allocate a boxed type that is not one-word?")
+  `(%allocate-boxed ,type-name ,payload))
+
+(define-form unbox (type-name payload)
+  (let ((type (eval type-name)))
+    (if (<boxed-type>-one-word? type)
+        `(oop-at ,(if feature/typecheck-slot-access
+                      `(k/%accessor-typecheck ,type-name ,payload)
+                    payload)
+                 0)
+      ;; we just return its address, the payload is right there inlined
+      (if feature/typecheck-slot-access
+          `(k/%accessor-typecheck ,type-name ,payload)
+        payload))))
+
 (define-form define-type-of ()
   (let ((conds-early	())
         (conds-late	()))
@@ -480,17 +502,17 @@
                                                       `(let ((__obj__ ,obj))
                                                          (assert (long? __obj__))
                                                          (>> __obj__ ,(<immediate-type>-tag-width <long>))))
-                                                  (if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <long> '_bits))	`(get (<long> _bits) ,obj))))
+                                                  `(unbox <long> ,obj)))
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
 (define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
 
 ;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
-(define-form get/tvmptr		(obj)		`(get (<target-vm-pointer> _bits) ,obj))
+(define-form get/tvmptr		(obj)		`(unbox <target-vm-pointer> ,obj))
 
 (define-form get/string		(obj)		`(get (<string> elements) (string-ensure-zero-terminated ,obj)))
-(define-form get/symbol		(obj)		`(get (<symbol> _bits) ,obj))
+(define-form get/symbol		(obj)		`(unbox <symbol> ,obj))
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
@@ -540,14 +562,7 @@
   (if (immediate-type? <long>)
       `(+ (<< ,bits ,(<immediate-type>-tag-width <long>))
           ,(<immediate-type>-tag-value <long>))
-    `(let ((obj (new-record-instance/opaque <long>)))
-       (set (<long>-_bits obj) ,bits)
-       obj)))
-
-(define-function new-<target-vm-pointer> (bits)
-  (let ((obj (new-record-instance/opaque <target-vm-pointer>)))
-    (set (<target-vm-pointer>-_bits obj) bits)
-    obj))
+    `(box <long> ,bits)))
 
 (define-primitive-function cons ((head () ()) (tail () ()))
   (let ((obj (new-record-instance <pair>)))
@@ -569,11 +584,9 @@
     obj))
 
 (define-function new-<symbol> (cstr)
-  (let ((len (libc/strlen cstr)))    ; +1 is for the zero termination
-    (gc/let* ((obj  (new-record-instance <symbol>))
-              (bits (allocate-data (+ len 1))))
-      (libc/memcpy bits cstr (+ len 1))
-      (put (<symbol> _bits) obj bits)
+  (let ((len (+ 1 (libc/strlen cstr)))) ; +1 is for the zero termination
+    (gc/let* ((obj (gc/allocate-opaque <symbol> len)))
+      (libc/memcpy obj cstr len)
       obj)))
 
 (define-primitive-function array ((capacity <long> 0))

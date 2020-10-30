@@ -197,7 +197,7 @@
 
 (define-primitive-function (libc/fopen ()) ((path <string>) (mode <string>))
   (let ((stream (libc/fopen path mode)))
-    (and stream (new-<target-vm-pointer> stream))))
+    (and stream (box <target-vm-pointer> stream))))
 
 (define-primitive-function (libc/fclose ()) ((stream <target-vm-pointer>))
   (libc/fclose stream))
