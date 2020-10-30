@@ -180,25 +180,36 @@
 ;;; error handling
 ;;; ----------------------------------------------------------------
 
-;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
-;; ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
-(define-function %fatal-prologue ()
+(define *errors-got-nested* false)
+
+(define-function check-error-nesting ()
+  (if *errors-got-nested*
+      (let ()
+        (libc/fprintf libc/stderr "NESTED ERROR, giving up...\n")
+        (libc/exit -1))
+    (set *errors-got-nested* true)))
+
+(define-function fatal-prologue ()
+  (check-error-nesting)
   (libc/fputs "FATAL: " libc/stderr))
 
-(define-function fatal  (fmt)           (%fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal1 (fmt arg)       (%fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal2 (fmt arg1 arg2) (%fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
-
-(define-function %error-prologue ()
+(define-function error-prologue ()
+  (check-error-nesting)
   (libc/printf "ERROR: "))
 
-(define-function %error-epilogue ()
+(define-function error-epilogue ()
   (libc/printf "\n")
   (abort))
 
+;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
+;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
+(define-function fatal  (fmt)           (fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal1 (fmt arg)       (fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal2 (fmt arg1 arg2) (fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
+
 (define-form error args
   `(let ()
-     (%error-prologue)
+     (error-prologue)
      ,@(map (lambda (arg)
               ;; string literals are turned into pointers to .asciz, therefore
               ;; we need to print them using libc/printf (or instantiate
@@ -207,7 +218,7 @@
                   `(libc/printf ,arg)
                 `(print ,arg)))
             args)
-     (%error-epilogue)))
+     (error-epilogue)))
 
 ;;;
 ;;; primitive-function infrasrtucture
