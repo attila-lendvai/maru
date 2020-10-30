@@ -260,6 +260,7 @@ Assorted TODO:
   define a different version of `car` in the level-shifted code (as opposed to the current
   `k/car` isolation done by hand).
 - directly generate IA-32 machine code and thus eliminate the dependency on an external assembler
+- massage `eval.l` until it can both be loaded and run verbatim in the evaluator *and* compiled to assembly. metacircularity!
 
 ### History and perspective
 

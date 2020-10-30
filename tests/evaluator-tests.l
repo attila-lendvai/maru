@@ -10,7 +10,8 @@
 (define-form test-assert (condition . printing)
   `(let ((__cond__ ,condition))
      (unless __cond__
-       (println "\n\n\033[1;31m*** FAILURE\033[0m form: " ',condition " " ,@printing))))
+       (println "\n\n\033[1;31m*** FAILURE\033[0m form: " ',condition " " ,@printing)
+       (println))))
 
 (define-form run-tests ()
   (let ((tests *tests*)
@@ -59,6 +60,13 @@
       (push x i))
     (test-assert (equal x '(1 2 3 4 5)))))
 
+(define-test eval/apply/bug/1 ()
+  (let ((compose (lambda (a b c)
+                   (lambda (x y)
+                     (list a b c x y)))))
+    ;; it returns (42 43 3 42 43) in piumarta's eval.l, but not in eval.c
+    (test-assert (equal ((compose 1 2 3) 42 43) '(1 2 3 42 43)))))
+
 (define-test eval/apply/1 ()
   (test-assert (equal (apply - '(1 2 3)) -4))
   (test-assert (equal (map (lambda args (apply ensure-list args)) '(1 2 3))
@@ -73,20 +81,20 @@
          (b first)
          (fn (lambda args (b (apply a args)))))
     (test-assert (equal (fn 42) 42)))
-  ;; TODO this misbehaves in an ugly way...
-  ;; (let ((compose (lambda (a b)
-  ;;                  (assert (is <expr> a))
-  ;;                  (assert (= b first))
-  ;;                  (lambda args
-  ;;                    (assert (is <expr> a) "'a' is not an <expr> anymore?! it is: "a)
-  ;;                    (assert (= b first))
-  ;;                    (b (apply a args))))))
-  ;;   (test-assert (equal ((compose ensure-list first) 42) 42)))
-  ;; (test-assert (equal ((compose ensure-list first) 42)
-  ;;                     42))
-  ;; (test-assert (equal (map (compose ensure-list first) '(1 (x 2) 3))
-  ;;                     '(1 x 3)))
-  )
+  (let ((compose (lambda (a b)
+                   (test-assert (is <expr> a))
+                   (test-assert (= b first))
+                   (lambda args
+                     (test-assert (is <expr> a) "'a' is not an <expr> anymore?! it is: "a)
+                     ;;(assert (is <expr> a) "'a' is not an <expr> anymore?! it is: "a)
+                     (test-assert (= b first) "'b' is not 'first anymore, it's: "b)
+                     (b (apply a args))))))
+    ((compose ensure-list first) 42)
+    (test-assert (equal ((compose ensure-list first) 42) 42)))
+  (test-assert (equal ((compose ensure-list first) 42)
+                      42))
+  (test-assert (equal (map (compose ensure-list first) '(1 (x 2) 3))
+                      '(1 x 3))))
 
 (define-test eval/string/insert ()
   (let ((x "alma"))
@@ -174,6 +182,28 @@
                         (+ eval/expand/bug/1/helper-form
                            y))
                       40 2))))
+
+(define-form pace-for-set-test (str i)
+  `(accessor-for-set-test ,str ,i))
+
+(define-form accessor-for-set-test (str i)
+  `(char-at ,str ,i))
+
+(define-form set-accessor-for-set-test (str i v)
+  `(set (char-at ,str ,i) ,(if (= i 1)
+                               ?j ; a joker that writes ?j at index 1, no matter what
+                             v)))
+
+;; TODO need to reshape expand so that it checks for a set-foo form at every step while expanding.
+;; for that we need to have a separate expand-1 from expand that the set-transformer can use.
+(define-test eval/expand/set-forms/1 ()
+  (let ((str "abcd"))
+    (test-assert (= ?c (pace-for-set-test str 2)))
+    (set (pace-for-set-test str 2) ?x)
+    (test-assert (= str "abxd"))
+    (set (pace-for-set-test str 1) ?x)
+    (test-assert (= str "ajxd"))
+    ))
 
 (define *a-global-holding-42* 42)
 

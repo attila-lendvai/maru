@@ -660,6 +660,8 @@
 (define-function compile-call (op args -c-)
   (assert op "compile-call: operator is nil")
   (let* ((op-is-a-var?	(variable? op))
+         (op-is-global?	(and op-is-a-var?
+                             (global-variable? op)))
          (op-value	(if op-is-a-var? (<variable>-value op) op))
          (arity		(list-length args))
          (handler	()))
@@ -669,8 +671,7 @@
                            (<compiler>-current-value -c-))
                          args)))
       (cond
-        ((and op-is-a-var?
-              (global-variable? op))
+        (op-is-global?
          (let ((n-params ()))
            (cond
              ((expr? op-value)

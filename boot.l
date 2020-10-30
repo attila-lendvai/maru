@@ -392,6 +392,9 @@
 (define-function list->array (list)
   (%list->array list 0))
 
+(define-function compose (a b)
+  (lambda args
+    (b (apply a args))))
 
 (define-function map1 (function list)
   (let ((head (cons)))
@@ -948,7 +951,7 @@
 ;; reflect the fact that editing these and bringing it out of sync with the
 ;; level-shifted binary is not an option without grave consequences.
 ;; such a setup would hopefully also simplify the bootstrapping dance above.
-(define-type		<data>)					; some opaque blob; used for stuff like the elements of <string> and <array>
+(define-type		<data>)					; some blob; used for stuff like the elements of <string> and <array>
 
 (define-immediate-type	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
 (define-immediate-type	<long>			1 1)

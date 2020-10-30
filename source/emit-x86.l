@@ -28,6 +28,7 @@
 ;;;   - *foo* is a global
 
 ;; TODO decide: left in for now, but maybe this should be the only option? a little extra complexity, but nice speed gain, and simpler compiler output
+;; OTOH, this makes redefinition impossible. what about the llvm backend? it doesn't even have the option...
 (define-constant +direct-calls+	true)
 
 (define-constant +global-label-prefix+

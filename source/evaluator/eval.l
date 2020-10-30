@@ -103,7 +103,12 @@
 (define-form move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-;; records in the target are raw memory blocks, i.e. they don't necessarily have a GC <header> (well, <header> *itself* is a record!).
+;;;
+;;; override slot access with a specialized getter and setter
+;;; for the possibility of implementing e.g. read/write barriers.
+;;; ----------------------------------------------------------------
+
+;; records in the target are raw blocks of memory, i.e. they don't necessarily have a GC <header> (well, <header> *itself* is a record!).
 ;; therefore we cannot have feature/typecheck-slot-access here, that's what we have the get/put protocol.
 ;; TODO it would be nice to eliminate the separate get/put protocol, or at least reverse the two: the get/put API should serve for the raw memory access.
 ;; TODO or add a specialized raw-record type whose accessors don't try to accessor-typecheck?
@@ -111,6 +116,12 @@
   (let* ((type		(eval type-name))
          (slot-index	(record/slot-index type slot-name)))
     `(oop-at ,object ,slot-index)))
+
+;; TODO this requires fixing expand, see test eval/expand/set-forms/1
+;; (define-form set-slot-value (type-name slot-name object value)
+;;   (let* ((type		(eval type-name))
+;;          (slot-index	(record/slot-index type slot-name)))
+;;     `(set-oop-at ,object ,slot-index ,value)))
 
 ;; TODO decide which one is better
 ;; an alternative way to integrate with normal accessors.
@@ -686,10 +697,10 @@
      __result__))
 
 ;; TODO this is ready to be moved into env-min.l, but then it redefines the host's defined?
-;; and breaks something. think this true: the host hands over to us <env>'s in e.g. <form>s
+;; and breaks something when it's loaded while not bootstrapping.
+;; think this through: the host hands over to us <env>'s in e.g. <form>s
 ;; or as the module's env, and we need to access them, even while we load our own stuff
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
-;; all the functions that deal with objects that the host gives us.
 (define-primitive-function defined? ((name <symbol>) (env <env> (module-env *module*)))
   ;; TODO add these to the macro
   ;; (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
@@ -822,8 +833,8 @@
   (verbosity 3 (libc/printf "  A  ") (print fun)  (libc/printf " ")  (print arguments) (libc/printf " ") (println parent-ctx) (libc/flush-streams))
   (let ((env	(get (<expr> env) fun))
         (params	(get (<expr> parameters) fun)))
-    (gc/let* ((new-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
-      (let ((locals (get (<context> bindings) new-ctx))
+    (gc/let* ((innter-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
+      (let ((locals (get (<context> bindings) innter-ctx))
             (args   arguments))
         (while (pair? params)
           (or (pair? args) (error "too few arguments for "fun": "arguments))
@@ -831,6 +842,7 @@
                (get/head args))
           (set params	(get/tail params))
           (set args	(get/tail args)))
+        ;; the cdr position
         (when (is <variable> params)
           (set (array-at locals (get/long (get (<variable> index) params))) args)
           (set args ()))
@@ -839,9 +851,9 @@
       (let ((prg (get (<expr> body) fun))
             (result ()))
         (list-do exp prg
-          (set result (eval exp new-ctx)))
+          (set result (eval exp innter-ctx)))
         (when (get (<env> stable) env)
-          (put (<context> callee) new-ctx ()))
+          (put (<context> callee) innter-ctx ()))
         result))))
 
 (define-function apply (fun arguments ctx)
@@ -927,7 +939,7 @@
          ;; TODO use a collecting macro to simplify this
          (gc/let* ((new-bindings ()))
            (let ((bindings (cadr exp))
-                 new-bindings-last)
+                 new-bindings/last)
              (list-do entry bindings
                (let (var-name)
                  (gc/let* (var-init-prog)
@@ -938,8 +950,8 @@
                      (set var-name	entry)
                      (set var-init-prog	(cons () ())))
                    (gc/let* ((new-entry (cons var-name var-init-prog)))
-                     (set new-bindings-last (if new-bindings
-                                                (put/tail new-bindings-last (cons new-entry ()))
+                     (set new-bindings/last (if new-bindings
+                                                (put/tail new-bindings/last (cons new-entry ()))
                                               (set new-bindings (cons new-entry ())))))))))
            (gc/let* ((tmp (expand-all (cddr exp) env))) ; the body
              (set tmp (cons new-bindings tmp))
@@ -950,7 +962,7 @@
          (cons symbol/quote (get/tail exp)))
 
         ((= head symbol/set)
-         (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
+         (safety 1 (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp))
          (debug (libc/printf "expand/set on form ") (println exp))
          ;; try to convert (set (place-accessor ...) value) forms while expanding. try "more abstract" set-foo forms first,
          ;; and only recursively expand the body if they are not defined.
@@ -975,7 +987,7 @@
                        (list3 symbol/set expanded-place value)))))))))
 
         ((= head symbol/define)
-         (assert (not (cdddr exp)) "illegal define form: " exp)
+         (safety 1 (assert (not (cdddr exp)) "illegal define form: " exp))
          (let ((name	(second exp))
                (value	(third exp)))
            (gc/let* ((expanded-value (expand value env)))
@@ -1047,19 +1059,20 @@
        ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
        (unless (is <env> (first tail))
          (gc/let* ((vars	())
-                   (new-env	(environment env 0 (get/long (get (<env> offset) env)))))
-           ;; phase 1: first define the let variables into new-env
+                   (inner-env	(environment env 0 (get/long (get (<env> offset) env)))))
+           ;; phase 1: first define the let variables into inner-env
            (let (vars/last)
              (list-do entry (first tail)
                (debug (libc/printf "encode/let visiting entry ") (println entry))
                (let* ((var-name	(first entry))
-                      (var-obj	(environment-define new-env var-name ())))
+                      ;; TODO check: eval.c calls:	var= findLocalVariable(innerEnv, var);
+                      (var-obj	(environment-define inner-env var-name ())))
                  (set vars/last (if vars
                                     (put/tail vars/last (cons var-obj ()))
                                   (set vars (cons var-obj ())))))))
            ;; update the offset of the parent env to "skip" the indices of our let variables
            (put (<env> offset) env
-                (get (<env> offset) new-env))
+                (get (<env> offset) inner-env))
            ;; phase 2: encode-all the init-progs and build the new bindings list
            (gc/let* (var
                      new-bindings)
@@ -1070,21 +1083,21 @@
                    (set new-bindings/last (if new-bindings
                                               (put/tail new-bindings/last (cons new-entry ()))
                                             (set new-bindings (cons new-entry ())))))))
-             (set tail (encode-all (cdr tail) new-env)) ; encode the body
+             (set tail (encode-all (cdr tail) inner-env)) ; encode the body
              (set tail (cons new-bindings tail))
-             (set tail (cons new-env tail))))))
+             (set tail (cons inner-env tail))))))
 
       ((= head fixed-primitive-function/lambda)
        (let ((args (first tail)))
          (unless (is <env> args)
-           (gc/let* ((new-env (environment env 1 0)))
+           (gc/let* ((inner-env (environment env 1 0)))
              (while (pair? args)
-               (environment-define new-env (get/head args) ())
+               (environment-define inner-env (get/head args) ())
                (set args (get/tail args)))
              (when args
-               (environment-define new-env args ()))
-             (set tail (encode-all tail new-env))
-             (set tail (cons new-env tail))))))
+               (environment-define inner-env args ()))
+             (set tail (encode-all tail inner-env))
+             (set tail (cons inner-env tail))))))
 
       ((= head fixed-primitive-function/define)
        (unless (is <variable> (first tail))
