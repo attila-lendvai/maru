@@ -625,23 +625,21 @@
     obj))
 
 ;; (define-function new-<context> (home caller env)
-;;   (let ((obj (new-record-instance <env>)))
-;;     (gc/protect (obj)
-;;       (set (<context>-home     obj) home)
-;;       (set (<context>-env      obj) env)
-;;       (set (<context>-bindings obj) (array 0))
-;;       obj)))
+;;   (let ((obj ()))
+;;     (if (and caller
+;;              (set obj (get (<context> callee) caller)))
+;;         (let ()
+;;           (put (<context> home) obj home)
+;;           (put (<context> env)  obj env))
+;;       (set obj (new-base-<context> home caller env))
+;;       (when caller
+;;         (put (<context> callee) caller obj)))
+;;     obj))
 
 (define-function new-<context> (home caller env)
-  (let ((obj ()))
-    (if (and caller
-             (set obj (get (<context> callee) caller)))
-        (let ()
-          (put (<context> home) obj home)
-          (put (<context> env)  obj env))
-      (set obj (new-base-<context> home caller env))
-      (when caller
-        (put (<context> callee) caller obj)))
+  (let ((obj (new-base-<context> home caller env)))
+    (when caller
+      (put (<context> callee) caller obj))
     obj))
 
 ;;;
