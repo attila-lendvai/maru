@@ -121,7 +121,7 @@
                    (or (not negative?)
                        (not (= 0 (libc/strcmp str "1")))))
           (fatal1 "invalid number in source code, libc/strtoul failed for '%s' (printed without the sign here)" str))
-        (new-<long> (if negative? (- result) result))))))
+        (box <long> (if negative? (- result) result))))))
 
 (define-function read/symbol (c stream)
   (gc/let* ((buf (buffer)))
@@ -168,7 +168,7 @@
     (let ((c (libc/fgetc stream)))
       (cond
         ((is_blank c)   ())
-        ((= ?? c)       (return (new-<long> (read/char (libc/fgetc stream) stream))))
+        ((= ?? c)       (return (box <long> (read/char (libc/fgetc stream) stream))))
         ((= ?- c)       (return (if (is_digit10 (libc/ungetc (libc/fgetc stream) stream))
                                     (read/number c stream)
                                     (read/symbol c stream))))

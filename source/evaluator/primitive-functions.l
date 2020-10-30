@@ -30,7 +30,7 @@
               (set tmp (eval (get/head prog) -ctx-))
               (set prog (get/tail prog)))
             (debug (libc/printf "let primitive-function is setting var ") (print var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (println -ctx-))
-            (set (array-at locals (get/long (get (<variable> index) var))) tmp))))
+            (set (array-at locals (unbox <long> (get (<variable> index) var))) tmp))))
       (set tmp ())
       (list-do exp body
         (set tmp (eval exp -ctx-)))
@@ -41,13 +41,13 @@
   (let ((value (eval value-form -ctx-)))
     (if (global-variable? var)
         (put (<variable> value) var value)
-      (let ((delta (- (get/long (get (<env> level) (get (<context>  env) -ctx-)))
-                  (get/long (get (<env> level) (get (<variable> env) var))))))
+      (let ((delta (- (unbox <long> (get (<env> level) (get (<context>  env) -ctx-)))
+                  (unbox <long> (get (<env> level) (get (<variable> env) var))))))
         (debug (libc/printf "set primitive-function is writing local var ") (print var) (libc/printf " with delta %ld\n" delta))
         (while (< 0 delta)
           (set -ctx- (get (<context> home) -ctx-))
           (decr delta))
-        (let ((index (get/long (get (<variable> index) var))))
+        (let ((index (unbox <long> (get (<variable> index) var))))
           (debug (libc/printf "set primitive-function is setting local var in context ") (print -ctx-) (libc/printf " at index %ld, to value " index) (println value))
           (set (array-at (get (<context> bindings) -ctx-) index) value))))))
 
@@ -92,63 +92,63 @@
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-primitive-function (- ()) _
   (or (pair? -args-) (error "operator '-' called with zero arguments"))
-  (let ((result	(get/long (get/head -args-)))
+  (let ((result	(unbox <long> (get/head -args-)))
         (rest	(get/tail -args-)))
     (if (pair? rest)
         (while (let ()
-                 (set result (- result (get/long (get/head rest))))
+                 (set result (- result (unbox <long> (get/head rest))))
                  (pair? (set rest (get/tail rest)))))
       (set result (- result)))
-    (new-<long> result)))
+    (box <long> result)))
 
 (define-primitive-function (+ ()) _
   (let ((result	0)
         (rest	()))
     (when (pair? -args-)
-      (set result (get/long (get/head -args-)))
+      (set result (unbox <long> (get/head -args-)))
       (set rest   (get/tail -args-)))
     (while (pair? rest)
-      (set result (+ result (get/long (get/head rest))))
+      (set result (+ result (unbox <long> (get/head rest))))
       (set rest (get/tail rest)))
-    (new-<long> result)))
+    (box <long> result)))
 
 (define-primitive-function (/ ()) _
   (or (pair? -args-) (error "operator '/' called with zero arguments"))
-  (let ((result	(get/long (get/head -args-)))
+  (let ((result	(unbox <long> (get/head -args-)))
         (rest	(get/tail -args-)))
     (if (pair? rest)
         (while (let ()
-                 (set result (/ result (get/long (get/head rest))))
+                 (set result (/ result (unbox <long> (get/head rest))))
                  (pair? (set rest (get/tail rest)))))
       (set result (/ 1 result)))
-    (new-<long> result)))
+    (box <long> result)))
 
 (define-primitive-function (* ()) _
   (let ((result	1)
         (rest	()))
     (when (pair? -args-)
-      (set result (get/long (get/head -args-)))
+      (set result (unbox <long> (get/head -args-)))
       (set rest   (get/tail -args-)))
     (while (pair? rest)
-      (set result (* result (get/long (get/head rest))))
+      (set result (* result (unbox <long> (get/head rest))))
       (set rest (get/tail rest)))
-    (new-<long> result)))
+    (box <long> result)))
 
 (define-form define-binary-operator (op)
   `(define-primitive-function (,op ()) ((lhs <long>) (rhs <long>))
-     (new-<long> (,op lhs rhs))))
+     (box <long> (,op lhs rhs))))
 
 (define-binary-operator bitwise-and)
 (define-binary-operator bitwise-or)
 (define-binary-operator bitwise-xor)
 
 (define-primitive-function (bitwise-not ()) ((value <long>))
-  (new-<long> (bitwise-not value)))
+  (box <long> (bitwise-not value)))
 
 (define-primitive-function (bitwise-shift ()) ((value <long>) (shift <long>))
   (let* ((bit-length-of-<long> 31) ; TODO FIXME arrange for using the actual value here
          (max-shift (- bit-length-of-<long> 1)))
-    (new-<long>
+    (box <long>
      (cond
        ((< max-shift shift)	0)
        ((< 0 shift)		(<< value shift))
@@ -174,7 +174,7 @@
          (type (type-of lhs)))
     ;; TODO use typecase
     (cond
-      ((= type <long>)		(and (long? rhs) (= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <long>)		(and (long? rhs) (= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
       ((= type <string>)	(and (string? rhs) (not (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
@@ -185,7 +185,7 @@
          (type (type-of lhs)))
     ;; TODO use typecase
     (cond
-      ((= type <long>)		(and (long? rhs) (!= (get/long lhs) (get/long rhs)) symbol/true))
+      ((= type <long>)		(and (long? rhs) (!= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
       ((= type <string>)	(and (string? rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
       (else                     (and (!= lhs rhs) symbol/true)))))
 
@@ -205,10 +205,10 @@
 (define-primitive-function (libc/fgetc ()) ((stream <target-vm-pointer>))
   (let ((c (libc/fgetc stream)))
     (and (>= c 0)
-         (new-<long> c))))
+         (box <long> c))))
 
 (define-primitive-function (libc/fputc ()) ((char <long>) (stream <target-vm-pointer>))
-  (new-<long> (libc/fputc char stream)))
+  (box <long> (libc/fputc char stream)))
 
 (define-primitive-function (libc/format ()) ((fmt <string>) oarg)
   (let ((typ (type-of oarg))
@@ -216,9 +216,9 @@
     ;; TODO use typecase
     (cond
       ((= typ <undefined>))
-      ((= typ <long>)		(set arg (get/long oarg)))
+      ((= typ <long>)		(set arg (unbox <long> oarg)))
       ((= typ <string>)		(set arg (get/string oarg)))
-      ((= typ <symbol>)		(set arg (get/symbol oarg)))
+      ((= typ <symbol>)		(set arg (unbox <symbol> oarg)))
       (else			(set arg oarg)))
     (let ((size 100)
           (result ()))
@@ -282,9 +282,9 @@
     (let ((type (type-of arg)))
       ;; TODO use typecase
       (cond
-        ((= type <string>) (libc/fprintf libc/stderr "%s" (get/string arg)))
-        ((= type <symbol>) (libc/fprintf libc/stderr "%s" (get/symbol arg)))
-        ((= type <long>)   (libc/fprintf libc/stderr "%ld" (get/long   arg)))
+        ((= type <string>) (libc/fprintf libc/stderr "%s"  (get/string arg)))
+        ((= type <symbol>) (libc/fprintf libc/stderr "%s"  (unbox <symbol> arg)))
+        ((= type <long>)   (libc/fprintf libc/stderr "%ld" (unbox <long>   arg)))
         (else
          ;; TODO
          (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)))))
@@ -296,7 +296,7 @@
     ;; TODO resolve this naming anomaly somehow
     (expand-encode-eval (car -args-) env)))
 
-(define-primitive-function (type-of ())	(thing) (new-<long> (type-of thing)))
+(define-primitive-function (type-of ())	(thing) (box <long> (type-of thing)))
 (define-primitive-function (string? ())	(thing) (and (string? thing) symbol/true))
 (define-primitive-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
 (define-primitive-function (pair?   ())	(thing) (and (pair?   thing) symbol/true))
@@ -314,17 +314,17 @@
 (define-primitive-function copy-bytes		(from to (count <long>)))
 
 (define-primitive-function byte-at (base (index <long>))
-  (new-<long> (byte-at base index)))
+  (box <long> (byte-at base index)))
 
 (define-primitive-function set-byte-at (base (index <long>) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(new-<long> value)))
+  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
   (set (byte-at base index) value))
 
 (define-primitive-function (address-of ()) (thing)
   ;; TODO what about when <long> is a tagged immediate and the address is truncated?
   ;; or return a target-vm-pointer here and define pointer arithmetics?
   ;; or implement various boxed data types and return a word-sized integer here?
-  (new-<long> thing))
+  (box <long> thing))
 
 (define-primitive-function (array-length ()) ((arg <array>))
   (get (<array> size) arg))
@@ -336,11 +336,11 @@
   (array-at array index))
 
 (define-primitive-function (string-at ()) ((string <string> _ nounbox) (index <long>))
-  (new-<long> (string-at string index)))
+  (box <long> (string-at string index)))
 
 ;; adding [set-]char-at to the evaluator makes it source-level compatible with the level-shifted code, and with that enables us to load files like buffer.l into both worlds
 (define-primitive-function (char-at ()) ((string <string> _ nounbox) (index <long>))
-  (new-<long> (string-at string index)))
+  (box <long> (string-at string index)))
 
 (define-primitive-function (set-array-at ()) ((array <array>) (index <long>) value)
   (set (array-at array index) value))
@@ -350,35 +350,35 @@
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 1 (assert (<= index (string-length string))))
   (set (string-at string index) value)
-  (new-<long> value))
+  (box <long> value))
 
 (define-primitive-function (set-char-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 1 (assert (<= index (string-length string))))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-char-at: value is out of range: "(new-<long> value)))
+  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-char-at: value is out of range: "(box <long> value)))
   (set (string-at string index) value)
-  (new-<long> value))
+  (box <long> value))
 
 (define-primitive-function (array-insert ()) ((array <array>) (index <long>) value))
 
 (define-primitive-function (string-insert ()) ((string <string> _ nounbox) (index <long>) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(new-<long> value)))
+  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(box <long> value)))
   (string-insert string index value)
-  (new-<long> value))
+  (box <long> value))
 
 (define-primitive-function (array-append ()) ((array <array>) value))
 
 (define-primitive-function (string-append ()) ((string <string> _ nounbox) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(new-<long> value)))
+  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
   (string-append string value)
-  (new-<long> value))
+  (box <long> value))
 
 (define-primitive-function symbol->string (symbol)
   ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
   (if (string? symbol)
       symbol
-    (new-<string>-from-cstring (get/symbol symbol))))
+    (new-<string>-from-cstring (unbox <symbol> symbol))))
 
 (define-primitive-function long->string ((arg <long>))
   (let ((buf (allocate-data 32))) ; safe up until 64 bits
@@ -389,7 +389,7 @@
   (let* ((endptr	str)
          (result	(libc/strtol str (address-of endptr) 10)))
     (if (= (char-at endptr 0) ?\x00)
-        (new-<long> result)
+        (box <long> result)
       (error "invalid number in string->long, libc/strtol has failed for string " (new-<string>-from-cstring str)))))
 
 (define-primitive-function (create-module ()) ((name <string> _ nounbox))

@@ -24,9 +24,8 @@
 ;;;
 ;;; oop    - Ordinary Object Pointer, pointing to a lisp value.
 ;;;
-;;; get, put, is
-;;;        - These are the kernel "accessors" for Maru values.
-;;;          They are also used as a namespace, e.g. get/long.
+;;; get, put
+;;;        - These are the kernel "accessors" for low-level Maru values.
 ;;;
 ;;; *foo* is global
 ;;; +foo+ is a constant
@@ -239,9 +238,9 @@
   '(let ()
     (define *primitive-function-registry* ())
     (define *primitive-function-type-accessors*
-     '((<long>			(long?)				get/long)
-       (<string>		(string?)			get/string)
-       (<target-vm-pointer>	(is <target-vm-pointer>)	get/tvmptr)
+     '((<long>			(long?)				(unbox <long>))
+       (<string>		(string?)			(get/string))
+       (<target-vm-pointer>	(is <target-vm-pointer>)	(unbox <target-vm-pointer>))
        (<symbol>		(symbol?))
        (<pair>			(pair?))
        (<array>			(array?))))))
@@ -296,16 +295,16 @@
                                           (or (assq type *primitive-function-type-accessors*)
                                               `(,type (is ,type) ()))))
                    (type-checker	(second type-entry))
-                   (getter		(third type-entry)))
+                   (unboxer		(third type-entry)))
               (push binders `(if (pair? __args)
                                  (let ()
                                    (set ,arg-name (get/head __args))
                                    ,@(when type-checker
                                        `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string prim-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
                                    ,@(when (and unbox?
-                                                getter)
-                                       ;; qq is broken... `((set ,arg-name (,getter arg-name)))
-                                       (list (list 'set arg-name (list getter arg-name))))
+                                                unboxer)
+                                       ;; qq is broken... `((set ,arg-name (,unboxer arg-name)))
+                                       (list (list 'set arg-name (concat-list unboxer (cons arg-name ())))))
                                    (set __args (get/tail __args)))
                                ,(if default-value?
                                     `(set ,arg-name ,default-value)
@@ -391,21 +390,41 @@
     obj))
 
 (define-form box (type-name payload)
-  (assert (is <boxed-type> (eval type-name)))
-  (assert (<boxed-type>-one-word? (eval type-name)) "cannot know how to allocate a boxed type that is not one-word?")
-  `(%allocate-boxed ,type-name ,payload))
-
-(define-form unbox (type-name payload)
   (let ((type (eval type-name)))
-    (if (<boxed-type>-one-word? type)
-        `(oop-at ,(if feature/typecheck-slot-access
-                      `(k/%accessor-typecheck ,type-name ,payload)
-                    payload)
-                 0)
-      ;; we just return its address, the payload is right there inlined
-      (if feature/typecheck-slot-access
-          `(k/%accessor-typecheck ,type-name ,payload)
-        payload))))
+    (cond
+      ((is <boxed-type> type)
+       (assert (<boxed-type>-one-word? (eval type-name)) "cannot know how to allocate a boxed type that is not one-word?")
+       `(%allocate-boxed ,type-name ,payload))
+      ((is <immediate-type> type)
+       ;; TODO error when overflow
+       `(bitwise-or (<< ,payload ,(<immediate-type>-tag-width type))
+                    ,(<immediate-type>-tag-value type)))
+      (else
+       (error "box: don't know how to deal with "type)))))
+
+(define-form unbox (type-name obj)
+  (let ((type (eval type-name)))
+    (cond
+      ((is <boxed-type> type)
+       (if (<boxed-type>-one-word? type)
+           `(oop-at ,(if feature/typecheck-slot-access
+                         `(k/%accessor-typecheck ,type-name ,obj)
+                       obj)
+                    0)
+         ;; then we just return its address, the payload is right there inlined
+         (if feature/typecheck-slot-access
+             `(k/%accessor-typecheck ,type-name ,obj)
+           obj)))
+
+      ((is <immediate-type> type)
+       (if (< *safety* 2)
+           `(>> ,obj ,(<immediate-type>-tag-width <long>))
+         `(let ((__obj__ ,obj))
+            (assert (is ,type-name __obj__))
+            (>> __obj__ ,(<immediate-type>-tag-width <long>)))))
+
+      (else
+       (error "unbox: don't know how to deal with "type)))))
 
 (define-form define-type-of ()
   (let ((conds-early	())
@@ -496,23 +515,12 @@
   (define-form symbol?		(obj)	`(is <symbol>	,obj))
   (define-form array?		(obj)	`(is <array>	,obj)))
 
-(define-form get/long		(obj)		(if (immediate-type? <long>)
-                                                    (if (< *safety* 2)
-                                                        `(>> ,obj ,(<immediate-type>-tag-width <long>))
-                                                      `(let ((__obj__ ,obj))
-                                                         (assert (long? __obj__))
-                                                         (>> __obj__ ,(<immediate-type>-tag-width <long>))))
-                                                  `(unbox <long> ,obj)))
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
 (define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
 
-;;(define-form is/tvmptr	(obj)		`(is <target-vm-pointer> ,obj))
-(define-form get/tvmptr		(obj)		`(unbox <target-vm-pointer> ,obj))
-
 (define-form get/string		(obj)		`(get (<string> elements) (string-ensure-zero-terminated ,obj)))
-(define-form get/symbol		(obj)		`(unbox <symbol> ,obj))
 
 (define-form get/variable-value	(var)		`(get (<variable> value)
                                                       ,(if (string? var)
@@ -524,6 +532,7 @@
                                                            `(defined? (string->symbol ,var) (module-env *module*))
                                                          var)
                                                       ,val))
+
 ;; TODO should we turn these into macros? or introduce compiler macros?
 (define-primitive-function car (list)
   (when list
@@ -558,12 +567,6 @@
   (assert (subtype? (type-of type) <record>))
   `(gc/allocate-opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
 
-(define-form new-<long> (bits)
-  (if (immediate-type? <long>)
-      `(+ (<< ,bits ,(<immediate-type>-tag-width <long>))
-          ,(<immediate-type>-tag-value <long>))
-    `(box <long> ,bits)))
-
 (define-primitive-function cons ((head () ()) (tail () ()))
   (let ((obj (new-record-instance <pair>)))
     (set (<pair>-head obj) head)
@@ -572,7 +575,7 @@
 
 (define-primitive-function string ((length <long> 0))
   (gc/let* ((str (new-record-instance <string>)))
-    (put (<string> size) str (new-<long> length))
+    (put (<string> size) str (box <long> length))
     (when (> length 0)
       (put (<string> elements) str (allocate-data length)))
     str))
@@ -591,7 +594,7 @@
 
 (define-primitive-function array ((capacity <long> 0))
   (gc/let* ((arr (new-record-instance <array>)))
-    (put (<array> size) arr (new-<long> 0))
+    (put (<array> size) arr (box <long> 0))
     (when (> capacity 0)
       (put (<array> elements) arr (allocate <data> capacity)))
     arr))
@@ -603,7 +606,7 @@
     (put (<expr> env)		obj env)
     (put (<expr> ctx)		obj ctx)
     (when-at-expand feature/profiler
-      (put (<expr> profiler-counter) obj (new-<long> 0)))
+      (put (<expr> profiler-counter) obj (box <long> 0)))
     obj))
 
 (define-primitive-function form (fn (sym () ()))
@@ -630,14 +633,14 @@
     (put (<variable> name)	obj name)
     (put (<variable> value)	obj value)
     (put (<variable> env)	obj env)
-    (put (<variable> index)	obj (new-<long> index))
+    (put (<variable> index)	obj (box <long> index))
     obj))
 
-(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (get/long (get (<env> offset) parent))))
+(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (get (<env> offset) parent))))
   (gc/let* ((obj (new-record-instance <env>)))
     (put (<env> parent)		obj parent)
-    (put (<env> level)		obj (new-<long> (if parent (+ (get/long (get (<env> level) parent)) level) 0)))
-    (put (<env> offset)		obj (new-<long> offset))
+    (put (<env> level)		obj (box <long> (if parent (+ (unbox <long> (get (<env> level) parent)) level) 0)))
+    (put (<env> offset)		obj (box <long> offset))
     (put (<env> bindings)	obj (array 0))
     obj))
 
@@ -729,13 +732,13 @@
   (safety 1 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (find-variable env name)
     (return it))
-  (let ((offset (get/long (get (<env> offset) env))))
+  (let ((offset (unbox <long> (get (<env> offset) env))))
     (gc/let* ((var (variable name () env offset)))
-      (put (<env> offset) env (new-<long> (+ offset 1)))
+      (put (<env> offset) env (box <long> (+ offset 1)))
       (array-append (get (<env> bindings) env) var))))
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
-  (debug (libc/printf "environment-define called, name is %s\n" (get/symbol name)))
+  (debug (libc/printf "environment-define called, name is %s\n" (unbox <symbol> name)))
   (let ((var (ensure-variable env name)))
     (put (<variable> value) var value)
     var))
@@ -744,7 +747,7 @@
   (array-binary-search *symbols*
                        string
                        (lambda (item candidate)
-                         (libc/strcmp item (get/symbol candidate)))
+                         (libc/strcmp item (unbox <symbol> candidate)))
                        (lambda (array index item)
                          (debug (libc/printf "interning %s\n" item))
                          (gc/let* ((sym (new-<symbol> item)))
@@ -768,7 +771,7 @@
 ;; level-shifted code that automatically do the unboxing of slot values
 (define-function global-variable? (var)
   (let ((env (get (<variable> env) var)))
-    (= 0 (get/long (get (<env> level) env)))))
+    (= 0 (unbox <long> (get (<env> level) env)))))
 
 (load "source/evaluator/reader.l")
 (load "source/evaluator/printer.l")
@@ -851,13 +854,13 @@
             (args   arguments))
         (while (pair? params)
           (or (pair? args) (error "too few arguments for "fun": "arguments))
-          (set (array-at locals (get/long (get (<variable> index) (get/head params))))
+          (set (array-at locals (unbox <long> (get (<variable> index) (get/head params))))
                (get/head args))
           (set params	(get/tail params))
           (set args	(get/tail args)))
         ;; the cdr position
         (when (is <variable> params)
-          (set (array-at locals (get/long (get (<variable> index) params))) args)
+          (set (array-at locals (unbox <long> (get (<variable> index) params))) args)
           (set args ()))
         (when args
           (error "too many arguments for "fun": "arguments)))
@@ -916,7 +919,7 @@
 (define-function setter-name-for (fn-name env)
   (gc/let* ((buf (buffer)))
     (buffer-append-string buf "set-")
-    (buffer-append-string buf (get/symbol fn-name))
+    (buffer-append-string buf (unbox <symbol> fn-name))
     (let ((setter-name (string->symbol (buffer-contents buf))))
       (when (maybe-object-in-env env setter-name ())
         setter-name))))
@@ -1072,7 +1075,7 @@
        ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
        (unless (is <env> (first tail))
          (gc/let* ((vars	())
-                   (inner-env	(environment env 0 (get/long (get (<env> offset) env)))))
+                   (inner-env	(environment env 0 (unbox <long> (get (<env> offset) env)))))
            ;; phase 1: first define the let variables into inner-env
            (let (vars/last)
              (list-do entry (first tail)
@@ -1134,7 +1137,7 @@
     (cons head tail)))
 
 (define-function encode/symbol (exp env)
-  (debug (libc/printf "encode/symbol of %s" (get/symbol exp)) (libc/printf ", in env ") (println env))
+  (debug (libc/printf "encode/symbol of %s" (unbox <symbol> exp)) (libc/printf ", in env ") (println env))
   (let ((var (or (defined? exp env)
                  (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
@@ -1143,8 +1146,8 @@
                     (is <fixed> val))
             (return val)))
       (let ((venv (get (<variable> env) var)))
-        (unless (= (get/long (get (<env> level) venv))
-                   (get/long (get (<env> level) env)))
+        (unless (= (unbox <long> (get (<env> level) venv))
+                   (unbox <long> (get (<env> level) env)))
           (put (<env> stable) venv symbol/true))))
     var))
 
@@ -1218,13 +1221,13 @@
 				    (let ()
                                       (debug (libc/printf "eval is reading global var ") (println exp))
                                       (get (<variable> value) exp))
-				  (let ((delta (- (get/long (get (<env> level) (get (<context>  env) ctx)))
-					      (get/long (get (<env> level) (get (<variable> env) exp))))))
+				  (let ((delta (- (unbox <long> (get (<env> level) (get (<context>  env) ctx)))
+					      (unbox <long> (get (<env> level) (get (<variable> env) exp))))))
 				    (debug (libc/printf "eval is reading local var ") (print exp) (libc/printf " with delta %ld\n" delta))
 				    (while (< 0 delta)
 				      (set ctx (get (<context> home) ctx))
 				      (decr delta))
-                                    (let* ((index (get/long (get (<variable> index) exp)))
+                                    (let* ((index (unbox <long> (get (<variable> index) exp)))
                                            (value (array-at (get (<context> bindings) ctx) index)))
                                       (debug (libc/printf "eval is reading local var from context ") (print ctx) (libc/printf " at index %ld, holding value " index) (println value))
 				      value))))
@@ -1246,7 +1249,7 @@
 
 ;; TODO unexport?
 (define-primitive-function repl-stream ((stream <target-vm-pointer>))
-  ;;(put/variable-value *input* (new-<long> stream))
+  ;;(put/variable-value *input* (box <long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -1300,7 +1303,7 @@
   (define-function profiler/take-sample-at-frame (frame)
     (let* ((callee	(<call-frame>-callee frame))
            (callee-type	(type-of callee)))
-      (with-forms ((incr-boxed ((place) `(set ,place (new-<long> (+ 1 (get/long ,place)))))))
+      (with-forms ((incr-boxed ((place) `(set ,place (box <long> (+ 1 (unbox <long> ,place)))))))
         ;; TODO use typecase
         (cond
           ((= callee-type <expr>)
@@ -1328,10 +1331,10 @@
                 (counter ()))
             (cond
               ((and (= type <expr>)
-                    (< 0 (set counter (get/long (<expr>-profiler-counter obj)))))
+                    (< 0 (set counter (unbox <long> (<expr>-profiler-counter obj)))))
                (set name (<expr>-name obj))
                (when name
-                 (set name (get/symbol name))))
+                 (set name (unbox <symbol> name))))
 
               ((and (= type <primitive-function>)
                     (< 0 (set counter (<primitive-function>-profiler-counter obj))))
@@ -1365,8 +1368,8 @@
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-      (set tmp (new-<long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
-      (set tmp (new-<long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
+      (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
+      (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
       (set +end+ (or +end+ (set tmp (new-<symbol> "+end+"))))
       (environment-define env (string->symbol "+end+") +end+))
@@ -1406,8 +1409,8 @@
 
   (debug (libc/printf "gc initialized\n"))
 
-  (assert (= <long>	(type-of (new-<long> 42))) "type-of for <long> is broken")
-  (assert (= 42	(get/long (new-<long> 42))) "get/long is broken")
+  (assert (= <long>	(type-of (box <long> 42)))	"type-of for <long> is broken")
+  (assert (= 42		(unbox <long> (box <long> 42)))	"unbox of <long> is broken")
 
   (gc/push-root (address-of *module*))
   (gc/push-root (address-of *maru-module*))
@@ -1455,13 +1458,13 @@
               ;; -v
               ((not (libc/strcmp arg "-v"))
                (incr *verbosity*)
-               (set tmp (new-<long> *verbosity*))
+               (set tmp (box <long> *verbosity*))
                (put/variable-value "*verbosity*" tmp))
 
               ;; -O
               ((not (libc/strcmp arg "-O"))
                (incr *optimised*)
-               (set tmp (new-<long> *optimised*))
+               (set tmp (box <long> *optimised*))
                (put/variable-value "*optimised*" tmp))
 
               ;; -p
@@ -1505,9 +1508,9 @@
                    ;; TODO investigate: why the hell does this behave differently than the one at the other call site of strtoul?
                    ;; (when (or (not (= -1 i))
                    ;;           (= 0 (libc/strcmp cstr "-1")))
-                   ;;   (set value (new-<long> i)))
+                   ;;   (set value (box <long> i)))
                    (when (= 0 (char-at endptr 0))
-                     (set value (new-<long> i))))
+                     (set value (box <long> i))))
                  (environment-define (module-env *module*)
                                      (string->symbol (get/string name))
                                      value)))

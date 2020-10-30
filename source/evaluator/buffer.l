@@ -10,7 +10,7 @@
   (let ((initial-capacity 32))
     (with-instance-accessors self <buffer>
       (gc/let* ((self		(new-record-instance <buffer>)))
-        (set self.size		(new-<long> 0))
+        (set self.size		(box <long> 0))
         (set self.elements	(allocate-data initial-capacity))
         self))))
 

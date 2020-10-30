@@ -26,8 +26,8 @@
       ;; TODO use typecase
       (cond
         ((= type <undefined>)		(libc/fputs "()" stream))
-        ((= type <long>)		(libc/fprintf stream "%ld" (get/long obj)))
-        ((= type <symbol>)		(libc/fprintf stream "%s" (get/symbol obj)))
+        ((= type <long>)		(libc/fprintf stream "%ld" (unbox <long> obj)))
+        ((= type <symbol>)		(libc/fprintf stream "%s" (unbox <symbol> obj)))
 
         ((= type <string>)
          (if storing?
@@ -99,7 +99,7 @@
                (bindings	(get (<env> bindings)	obj))
                (offset	(get (<env> offset)	obj)))
            (if (and level bindings offset)
-               (libc/fprintf stream "Env<Lv%ld,Off%ld,#%ld>" (get/long level) (get/long offset) (array-length bindings))
+               (libc/fprintf stream "Env<Lv%ld,Off%ld,#%ld>" (unbox <long> level) (unbox <long> offset) (array-length bindings))
              (libc/fputs "Env<>" stream))))
 
         ((= type <context>)

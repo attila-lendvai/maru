@@ -928,8 +928,8 @@
 (define-form define-immediate (name tag-value tag-width)
   `(define ,name ,(new-<immediate-type> name (eval tag-value) (eval tag-width))))
 
-(define-function immediate-type? (type)
-  (subtype? (type-of type) <immediate-type>))
+(define-function immediate-type? (obj)
+  (subtype? (type-of obj) <immediate-type>))
 
 ;;; boxed type
 

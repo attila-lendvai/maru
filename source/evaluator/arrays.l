@@ -14,7 +14,7 @@
         (zeroed-name (concat-symbol basename 'ensure-zero-terminated)))
     `(let ()
        (define-function ,length-name (obj)
-         (get/long (get (,type-name size) obj)))
+         (unbox <long> (get (,type-name size) obj)))
 
        (define-function ,getter-name (obj idx)
          (safety 1 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
@@ -42,7 +42,7 @@
                (set elements (put (,type-name elements) obj new-elements))))
            (when (<= size idx)
              ;; record the largest ever written index + 1 (aka size) in the size slot
-             (put (,type-name size) obj (new-<long> (+ 1 idx))))
+             (put (,type-name size) obj (box <long> (+ 1 idx))))
            (set (,accessor elements idx) val)))
 
        (define-function ,append-name (obj val)
@@ -64,7 +64,7 @@
        (define-function ,zeroed-name (obj)
          (let ((size (,length-name obj)))
            (,setter-name obj size 0)
-           (put (,type-name size) obj (new-<long> size)))
+           (put (,type-name size) obj (box <long> size)))
          obj))))
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
