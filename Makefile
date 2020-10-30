@@ -279,9 +279,9 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-$(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
+$(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
-#	$(call ensure-built,$(GEN_EVAL))
+	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')

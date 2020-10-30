@@ -313,12 +313,12 @@
 (define-primitive-function set-oop-at		(base (index <long>) value))
 (define-primitive-function copy-bytes		(from to (count <long>)))
 
-(define-primitive-function byte-at (base (index <long>))
+(define-primitive-function (byte-at ()) (base (index <long>))
   (box <long> (byte-at base index)))
 
-(define-primitive-function set-byte-at (base (index <long>) (value <long>))
+(define-primitive-function (set-byte-at ()) (base (index <long>) (value <long>))
   (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
-  (set (byte-at base index) value))
+  (set-byte-at base index value))
 
 (define-primitive-function (address-of ()) (thing)
   ;; TODO what about when <long> is a tagged immediate and the address is truncated?
@@ -343,13 +343,13 @@
   (box <long> (string-at string index)))
 
 (define-primitive-function (set-array-at ()) ((array <array>) (index <long>) value)
-  (set (array-at array index) value))
+  (set-array-at array index value))
 
 (define-primitive-function (set-string-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 1 (assert (<= index (string-length string))))
-  (set (string-at string index) value)
+  (set-string-at string index value)
   (box <long> value))
 
 (define-primitive-function (set-char-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
@@ -357,7 +357,7 @@
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 1 (assert (<= index (string-length string))))
   (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-char-at: value is out of range: "(box <long> value)))
-  (set (string-at string index) value)
+  (set-string-at string index value)
   (box <long> value))
 
 (define-primitive-function (array-insert ()) ((array <array>) (index <long>) value))
