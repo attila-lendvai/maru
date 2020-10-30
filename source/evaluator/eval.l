@@ -879,6 +879,32 @@
         (cons head tail))
     (expand list env)))
 
+(define-function setter-name-for (fn-name env)
+  (gc/let* ((buf (buffer)))
+    (buffer-append-string buf "set-")
+    (buffer-append-string buf (get/symbol fn-name))
+    (let ((setter-name (string->symbol (buffer-contents buf))))
+      (when (maybe-object-in-env env setter-name ())
+        setter-name))))
+
+(define-function maybe-fn-name-from-expr (expr)
+  (when (pair? expr)
+    (let ((fn-name (get/head expr)))
+      (when (symbol? fn-name)
+        fn-name))))
+
+(define-function attempt-set-convert (place value env)
+  (let ((fn-name (maybe-fn-name-from-expr place)))
+    (when fn-name
+      ;; it's a set form such as: (set (fn-name a b c) new-value). let's try to convert it to
+      ;; (set-fn-name a b c new-value) if set-fn-name is defined.
+      (awhen (setter-name-for fn-name env)
+        (gc/let* ((args (get/tail place))
+                  (last (cons value ())))
+          (set args (expand-all args env))
+          (set args (concat-list args last))
+          (cons it args))))))
+
 (define-function expand/pair (exp env -call-frame-)
   (gc/let* ((head (expand (get/head exp) env)))
     (debug (libc/printf "expand/pair on head ") (dumpln head))
@@ -917,25 +943,27 @@
         ((= head symbol/set)
          (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp)
          (debug (libc/printf "expand/set on form ") (dumpln exp))
-         ;; TODO this expands all the way down before it tries to convert (set (place-accessor) value) forms.
-         ;; consequently, defining e.g. a set-slot-value form has no effect, because the slot-value form expands
-         ;; all the way down to an oop-at, that then gets converted to set-oop-at at the end.
-         ;; trying to set-convert in every step while expanding would mean that we need to check for (defined? set-foo),
-         ;; which feels wrong.
-         (gc/let* ((body (expand-all (get/tail exp) env)))
-           (let (fn-name)
-             (if (and (pair? body)
-                      (pair? (get/head body))
-                      (set fn-name (get/head (get/head body)))
-                      (symbol? fn-name))
-                 ;; convert set forms: (set (foo a b c) new-value) -> (set-foo a b c new-value)
-                 (gc/let* ((buf (buffer)))
-                   (buffer-append-string buf "set-")
-                   (buffer-append-string buf (get/symbol fn-name))
-                   (gc/let* ((args (concat-list (get/tail (get/head body)) (get/tail body))))
-                     (cons (string->symbol (buffer-contents buf))
-                           args)))
-               (cons symbol/set body)))))
+         ;; try to convert (set (place-accessor ...) value) forms while expanding. try "more abstract" set-foo forms first,
+         ;; and only recursively expand the body if they are not defined.
+         ;; this setup allows defining e.g. a SET-SLOT-VALUE form to override its behavior. the old way was to first expand
+         ;; the body, i.e. a (SLOT-VALUE ...) form into an (OOP-AT ...) form, and only then attempt to set-convert it to SET-OOP-AT.
+         (let ((vanilla-place	(second exp)))
+           (gc/let* ((value	(expand (third exp) env))
+                     (converted	(attempt-set-convert vanilla-place value env)))
+             (if converted
+                 (expand converted env)
+               (gc/let* ((expanded-place (expand vanilla-place env)))
+                 (if (set converted (attempt-set-convert expanded-place value env))
+                     (expand converted env)
+                   (let ((fn-name (maybe-fn-name-from-expr expanded-place)))
+                     ;; we need to "look ahead" and only attempt recursive expansion when there's any work left to do.
+                     ;; otherwise this would lead to infinite recursion: (set (without-set-version ...) ...)
+                     (if (and fn-name
+                              (setter-name-for fn-name env))
+                         (let ()
+                           (set converted (list3 symbol/set expanded-place value))
+                           (expand converted env))
+                       (list3 symbol/set expanded-place value)))))))))
 
         ((= head symbol/define)
          (assert (not (cdddr exp)) "illegal define form: " exp)
