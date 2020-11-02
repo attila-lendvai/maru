@@ -190,21 +190,13 @@
 ;;; error handling
 ;;; ----------------------------------------------------------------
 
-(define *errors-got-nested* false)
-
-(define-function check-error-nesting ()
-  (if *errors-got-nested*
-      (let ()
-        (libc/fprintf libc/stderr "NESTED ERROR, giving up...\n")
-        (libc/exit -1))
-    (set *errors-got-nested* true)))
-
-(define-function fatal-prologue ()
-  (check-error-nesting)
-  (libc/fputs "FATAL: " libc/stderr))
+(define *error-level* 0)
 
 (define-function error-prologue ()
-  (check-error-nesting)
+  (incr *error-level*)
+  (when (< 1 *error-level*)
+    (libc/fprintf libc/stderr "NESTED ERROR, giving up...\n")
+    (libc/exit -1))
   (libc/printf "ERROR: "))
 
 (define-function error-epilogue ()
@@ -213,9 +205,9 @@
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
-(define-function fatal  (fmt)           (fatal-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal1 (fmt arg)       (fatal-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal2 (fmt arg1 arg2) (fatal-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal  (fmt)           (error-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal1 (fmt arg)       (error-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal2 (fmt arg1 arg2) (error-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
 
 (define-form error args
   `(let ()
