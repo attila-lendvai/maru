@@ -27,10 +27,6 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-;; TODO decide: left in for now, but maybe this should be the only option? a little extra complexity, but nice speed gain, and simpler compiler output
-;; OTOH, this makes redefinition impossible. what about the llvm backend? it doesn't even have the option...
-(define-constant +direct-calls+	true)
-
 (define-constant +global-label-prefix+
     (case (target-value +operating-system+)
       (darwin	"_")
@@ -469,7 +465,7 @@
          (entry-label (if main?
                           (GLOBAL-LABEL "main")
                         (LABEL (concat-string (symbol->string name)
-                                              (if +direct-calls+ "" "_body")))))
+                                              (if feature/redefinable-functions-in-target "_body" "")))))
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
          (params (map init-param (<expr>-parameters self))))
@@ -492,8 +488,8 @@
       (and (<compiler>-epilogue -c-)
            (emit DEFLABEL (<compiler>-epilogue -c-)))
       (emit LEAVE (- frm-size 8)))
-    (unless (or main?
-                +direct-calls+)
+    (when (and (not main?)
+               feature/redefinable-functions-in-target)
       (let ((-c- parent-comp)
             (label (LABEL name)))
         (emit DATA)
@@ -513,7 +509,7 @@
       (let ((n-params	()))
         (cond
           ((expr? op-value)
-           (when +direct-calls+
+           (unless feature/redefinable-functions-in-target
              (set target-name (LABEL (symbol->string (<variable>-name op)))))
            (set n-params (<expr>-n-required-parameters op-value)))
           ((= (type-of op-value) <C-function>)
@@ -633,9 +629,9 @@
                 (eval form))))
     ;; TODO this silently miscompiles closures that capture some variables
     (compile-expr expr name -c-)
-    (gen LOAD (if +direct-calls+
-                  (LI32 (LABEL name))
-                (GI32 (LABEL name))))))
+    (gen LOAD (if feature/redefinable-functions-in-target
+                  (GI32 (LABEL name))
+                (LI32 (LABEL name))))))
 
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
@@ -739,7 +735,7 @@
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
           (gen LOAD (GI32 (GLOBAL-LABEL (<C-variable>-name value)))))
-         ((and +direct-calls+
+         ((and (not feature/redefinable-functions-in-target)
                (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
          (else

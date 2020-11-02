@@ -8,6 +8,8 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
+(define-constant feature/redefinable-functions-in-target true)
+
 ;;;
 ;;; FFI
 ;;;
