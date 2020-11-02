@@ -62,17 +62,6 @@
 
 (load "source/list-min.l")
 
-(define memq
-  (lambda (object list)
-    (let ((result ()))
-      (while (pair? list)
-        (if (= object (car list))
-            (let ()
-              (set result list)
-              (set list ()))
-          (set list (cdr list))))
-      result)))
-
 (define assq
   (lambda (object list)
     (let ((result ()))
@@ -774,7 +763,7 @@
     (while (pair? f)
       (unless (symbol? (car f))
         (error "slot is not symbol?: "(car f)))
-      (and (memq (car f) (cdr f))
+      (and (member? (car f) (cdr f))
            (error "slot '"(car f)"' multiply-defined in record: "record" "slots))
       (set f (cdr f)))))
 

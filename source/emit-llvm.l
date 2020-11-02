@@ -165,7 +165,7 @@
                   (not (or (and (<= ?a c) (<= c ?z))
                            (and (<= ?A c) (<= c ?Z))
                            (and (<= ?0 c) (<= c ?9))
-                           (memq c '(?- ?$ ?. ?_)))))
+                           (member? c '(?- ?$ ?. ?_)))))
                 (lambda (c)
                   (and (<= 32 c) (<= c 127)
                        (not (= ?\" c))
