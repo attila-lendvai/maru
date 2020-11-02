@@ -217,6 +217,24 @@
       (+ y 2))
   42)
 
+(when-at-expand feature/redefinable-functions-in-target
+  (define-function returns-42 ()
+    (return 42))
+
+  (define-function returns-43 ()
+    (return 43))
+
+  (define-function returner ()
+    (return -1))
+
+  (define-test compile/redefinable-functions-in-target/1
+      (let ((result 0))
+        (set returner returns-42)
+        (set result (returner))
+        (set returner returns-43)
+        (+ result (returner)))
+    85))
+
 (define-test compile/while/1
     (let ((x 5)
           (sum 1))

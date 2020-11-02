@@ -370,7 +370,12 @@
   ;;       			  (println $1"   = private unnamed_addr global %ptr bitcast([" length " x i8]* getelementptr([" length " x i8], [" length " x i8]* "$1".c) to %ptr)")))
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
-  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)")))
+  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)"))
+  ((GLOBAL expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2)))
+                                      (entry-label (GLOBAL (concat-string (symbol->string (<GLOBAL>-name $1)) ".body"))))
+                                  (print $1" = global %ptr bitcast (")
+                                  (emit-llvm-fn-type '%ptr param-types ())
+                                  (println "* "entry-label" to %ptr)"))))
 
 (define-instruction DECLARE	()
   ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
@@ -397,10 +402,12 @@
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %ptr"))
   ((TEMP    _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL  _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
-  ((GLOBAL  expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2))))
-                                  (print "	"$reg1" = bitcast ")
-                                  (emit-llvm-fn-type '%ptr param-types ())
-                                  (println "* "$1" to %ptr")))
+  ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
+                                    (println "	"$reg1" = load %ptr, %ptr* "$1) ; this could be a call-next-method
+                                  (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2))))
+                                    (print "	"$reg1" = bitcast ")
+                                    (emit-llvm-fn-type '%ptr param-types ())
+                                    (println "* "$1" to %ptr"))))
   ((GLOBAL  C-function)		(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 ()) ; evolving? use false
 				(println "* @" (<C-function>-name $2) " to %ptr"))
@@ -615,9 +622,14 @@
   (println "}"))
 
 (define-function compile-expr (self name parent-comp)
-  (let* ((-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
-         (parameters	(<expr>-parameters self))
+  (let* ((main?		(= 'main name))
          (body		(<expr>-body self))
+         (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
+         (entry-label	(if main?
+                            (LIBC-GLOBAL name)
+                          (GLOBAL (concat-string (symbol->string name)
+                                                 (if feature/redefinable-functions-in-target ".body" "")))))
+         (parameters	(<expr>-parameters self))
          (init-param	(lambda (var)
                           (set (<variable>-value var)
                                (if +function-parameters-are-read-only+
@@ -632,7 +644,7 @@
     (list-do e body
       (comp e))
 
-    (emit/function-prologue (if (= name 'main) (LIBC-GLOBAL name) (GLOBAL name)) param-decls)
+    (emit/function-prologue entry-label param-decls)
 
     (unless +function-parameters-are-read-only+
       (free-temps params))
@@ -655,7 +667,11 @@
     (unless (= <RET> (type-of (previous-instruction -c-)))
       (emit RET (or (<compiler>-current-value -c-)
                     (LITERAL "null"))))
-    (emit/function-epilogue)))
+    (emit/function-epilogue)
+    (when (and (not main?)
+               feature/redefinable-functions-in-target)
+      (let ((-c- parent-comp))
+        (emit DEFINE (GLOBAL name) self)))))
 
 (define-function compile-call (op args -c-)
   (assert op "compile-call: operator is nil")
@@ -675,7 +691,11 @@
          (let ((n-params ()))
            (cond
              ((expr? op-value)
-              (gen CALL (GLOBAL (<variable>-name op)) arg-regs)
+              (if feature/redefinable-functions-in-target
+                  (let ()
+                    (comp op)
+                    (gen CALLPTR arg-regs))
+                (gen CALL (GLOBAL (<variable>-name op)) arg-regs))
               (set n-params (<expr>-n-required-parameters op-value)))
              ((= (type-of op-value) <C-function>)
               (let ((param-types (<C-function>-parameter-types op-value)))

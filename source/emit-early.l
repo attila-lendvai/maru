@@ -8,7 +8,7 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
-(define-constant feature/redefinable-functions-in-target true)
+(define-constant feature/redefinable-functions-in-target ()) ; costs about 20-30% time increase in the bootstrap process
 
 ;;;
 ;;; FFI
@@ -176,6 +176,7 @@
     ;;(define bootstrapping?	,bootstrapping?) this is always true here
 
     (define define-form		,(slave-value define-form/target))
+    (define-constant feature/redefinable-functions-in-target ,feature/redefinable-functions-in-target) ; TODO introduce a better mechanism for this
 
     (define-constant false 0)
     (define-constant true  1)))
