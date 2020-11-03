@@ -386,6 +386,9 @@
     (set (<compiler>-gen-buffer		self) (array))
     self))
 
+;; KLUDGE
+(define *compiler-factory* compiler)
+
 (define-form gen args
   `(array-append (<compiler>-gen-buffer -c-) (list ,@args)))
 

@@ -257,7 +257,7 @@
     (let* ((emit-form (first emit-forms))
            (args (first emit-form))
            (body (rest emit-form)))
-      (cons `(define-multimethod emit-instruction ((<compiler> -c-) (,type-name self) ,@(%emit-form/mm-params 1 args))
+      (cons `(define-multimethod emit-instruction ((<llvm-compiler> -c-) (,type-name self) ,@(%emit-form/mm-params 1 args))
                ;;(println "; emitting " self)
                (let ((__regs__ (<instruction>-regs self)))
                  (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
@@ -287,20 +287,26 @@
 (define-record <compiler> ()
   (level
    temp-counter
-   reg-counter
    temps
    gen-buffer
    current-value ; the output of the previous-instruction
    ))
 
-(define-function compiler (level)
-  (make <compiler>
-        (level			level)
-        (temp-counter		0)
-        (reg-counter		0)
-        (gen-buffer		(array))
-        (current-value		())
-        ))
+(define-record <llvm-compiler> <compiler>
+  (reg-counter
+   ))
+
+(define-function llvm-compiler (level)
+  (make <llvm-compiler>
+    (level			level)
+    (temp-counter		0)
+    (reg-counter		0)
+    (gen-buffer			(array))
+    (current-value		())
+    ))
+
+;; KLUDGE
+(define *compiler-factory* llvm-compiler)
 
 ;;;
 ;;; LLVM IR Instructions
@@ -549,7 +555,7 @@
     (set (<instruction>-regs instr)
          (let ((temps ()))
            (times-do (<instruction>-n-regs instr)
-             (push temps (LOCAL (concat-string "r" (long->string (incr (<compiler>-reg-counter -c-)))))))
+             (push temps (LOCAL (concat-string "r" (long->string (incr (<llvm-compiler>-reg-counter -c-)))))))
            (list->array temps)))
     ;; update current-value
     (when (<instruction>-produces-output? instr)
@@ -624,7 +630,7 @@
 (define-function compile-expr (self name parent-comp)
   (let* ((main?		(= 'main name))
          (body		(<expr>-body self))
-         (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
+         (-c-		(llvm-compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label	(if main?
                             (LIBC-GLOBAL name)
                           (GLOBAL (concat-string (symbol->string name)
@@ -713,7 +719,7 @@
                     (if (or (= ()    param-type) ; vararg calls have more args than params
                             (= '%ptr param-type))
                         (push new-arg-regs arg)
-                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<compiler>-reg-counter -c-)))))))
+                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<llvm-compiler>-reg-counter -c-)))))))
                         ;; TODO check for value range issues?
                         (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
                         (push new-arg-regs cast-reg))))
@@ -1018,7 +1024,7 @@
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
 (define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
 
-(define-method emit-prelude <compiler> ()
+(define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet	(slave-value target-triplet))
         (word-size		(target-value +word-size-in-bits+))
         (-c- self))
