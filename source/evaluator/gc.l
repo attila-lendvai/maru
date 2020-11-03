@@ -183,7 +183,7 @@
 
 (define-function gc/allocate (type requested-size)
   (gc/debug (libc/printf "gc/allocate type %ld %ld\n" type requested-size))
-  (safety 1 (assert (not (= 0 type)) "gc/allocate: type is 0"))
+  (safety 2 (assert type "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
   (and (= gc/alloc-count gc/frequency)
        (gc/collect))
@@ -257,9 +257,9 @@
 
 (define-function gc/pop-root (ptr)
   (gc/debug (libc/printf "gc/pop-root %ld at %p\n" gc/root-count ptr))
-  (safety 1 (assert (< 0 gc/root-count) "root table underflow"))
+  (safety 2 (assert (< 0 gc/root-count) "root table underflow"))
   (decr gc/root-count)
-  (safety 1 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
+  (safety 2 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
   (set (oop-at gc/roots gc/root-count) ()))
 
 (define-function gc/initialise ()

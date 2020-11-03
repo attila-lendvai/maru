@@ -434,7 +434,7 @@
          ,@conds-early
          ((oop? ptr)	(let ((header (gc/header-of ptr)))
                           (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
-                          (safety 1 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
+                          (safety 2 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
                           (<header>-type header)))
          ,@conds-late
          (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
@@ -528,12 +528,12 @@
 ;; TODO should we turn these into macros? or introduce compiler macros?
 (define-primitive-function car (list)
   (when list
-    (safety 1 (assert (pair? list) "car called on non-list: " list))
+    (safety 2 (assert (pair? list) "car called on non-list: " list))
     (get/head list)))
 
 (define-primitive-function cdr (list)
   (when list
-    (safety 1 (assert (pair? list) "cdr called on non-list: " list))
+    (safety 2 (assert (pair? list) "cdr called on non-list: " list))
     (get/tail list)))
 
 (load "source/list-min.l")
@@ -711,8 +711,8 @@
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
 (define-primitive-function defined? ((name <symbol>) (env <env> (module-env *module*)))
   ;; TODO add these to the macro
-  ;; (safety 1 (assert (is <env> env) "defined?: env is not an <env>: "env))
-  ;; (safety 1 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
+  ;; (safety 2 (assert (is <env> env) "defined?: env is not an <env>: "env))
+  ;; (safety 2 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
   (let ((result ()))
     (while (and env
                 (not (set result (find-variable env name))))
@@ -720,8 +720,8 @@
     result))
 
 (define-function ensure-variable (env name)
-  (safety 1 (assert (is <env> env)	"ensure-variable: env arg is not of type <env>: "env))
-  (safety 1 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
+  (safety 2 (assert (is <env> env)	"ensure-variable: env arg is not of type <env>: "env))
+  (safety 2 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (find-variable env name)
     (return it))
   (let ((offset (unbox <long> (get (<env> offset) env))))
@@ -802,7 +802,7 @@
     (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
-          (safety 1 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
+          (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
         (gc/let* ((new-frame (new-record-instance <call-frame>)))
           (set (array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
@@ -866,7 +866,7 @@
 
 (define-function apply (fun arguments ctx)
   (debug (libc/printf "apply, function ") (print fun) (libc/printf ", arguments: ") (print arguments) (libc/printf "\n"))
-  (safety 1 (assert fun "apply: fun is null"))
+  (safety 2 (assert fun "apply: fun is null"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
       ;; TODO use typecase

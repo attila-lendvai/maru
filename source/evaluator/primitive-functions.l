@@ -317,7 +317,7 @@
   (box <long> (byte-at base index)))
 
 (define-primitive-function (set-byte-at ()) (base (index <long>) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
+  (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
   (set-byte-at base index value))
 
 (define-primitive-function (address-of ()) (thing)
@@ -348,29 +348,29 @@
 (define-primitive-function (set-string-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
-  (safety 1 (assert (<= index (string-length string))))
+  (safety 2 (assert (<= index (string-length string))))
   (set-string-at string index value)
   (box <long> value))
 
 (define-primitive-function (set-char-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
-  (safety 1 (assert (<= index (string-length string))))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "set-char-at: value is out of range: "(box <long> value)))
+  (safety 2 (assert (<= index (string-length string))))
+  (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-char-at: value is out of range: "(box <long> value)))
   (set-string-at string index value)
   (box <long> value))
 
 (define-primitive-function (array-insert ()) ((array <array>) (index <long>) value))
 
 (define-primitive-function (string-insert ()) ((string <string> _ nounbox) (index <long>) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(box <long> value)))
+  (safety 2 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(box <long> value)))
   (string-insert string index value)
   (box <long> value))
 
 (define-primitive-function (array-append ()) ((array <array>) value))
 
 (define-primitive-function (string-append ()) ((string <string> _ nounbox) (value <long>))
-  (safety 1 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
+  (safety 2 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
   (string-append string value)
   (box <long> value))
 

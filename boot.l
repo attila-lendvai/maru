@@ -25,7 +25,7 @@
 ;; 2: non-trivial runtime costs
 ;; 3: catch my bug no matter what!
 ;; 4: run a gc before every allocation
-(define *safety* 0)
+(define *safety* 1)
 
 (define unit-testing? '(t))
 
@@ -327,7 +327,7 @@
 (define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))
-(define-constant feature/typecheck-slot-access	(and (< 0 *safety*) (<= *optimised* 0)))
+(define-constant feature/typecheck-slot-access	(and (<= 2 *safety*) (<= *optimised* 0)))
 
 ;;; list
 
