@@ -1031,8 +1031,16 @@
 (define-form with-instance-accessors (var-name type-name . body)
   (let ((type-object (eval type-name)))
     (if (subtype? (type-of type-object) <record>)
-        `(with-forms ,(make-instance-accessors var-name type-name (<record>-effective-slots type-object))
-           ,@body)
+        (let ((accessors ())
+              (super type-object))
+          (while super
+            (list-do accessor (make-instance-accessors var-name
+                                                       (<type>-name super)
+                                                       (<record>-direct-slots super))
+              (push accessors accessor))
+            (set super (<record>-super super)))
+          `(with-forms ,accessors
+             ,@body))
       `(let ()
          ,@body))))
 
@@ -1046,14 +1054,15 @@
        _self_)))
 
 (define-function %make-make-inits (prefix inits)
-  (and inits
-       (cons (list 'set (list (concat-symbol prefix (caar inits)) 'self) (cadar inits))
-             (%make-make-inits prefix (cdr inits)))))
+  (when inits
+    (let ((entry (first inits)))
+      (cons `(set ,(concat-symbol prefix (first entry)) ,(second entry))
+            (%make-make-inits prefix (cdr inits))))))
 
 (define-form make (type . inits)
   `(let ((self (new ,type)))
      (with-instance-accessors self ,type
-       ,@(%make-make-inits (concat-symbol type '-) inits)
+       ,@(%make-make-inits 'self. inits)
        self)))
 
 ;;; selector/method (single dispatch on the type of the first argument)
