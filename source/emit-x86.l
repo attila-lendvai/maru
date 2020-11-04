@@ -349,8 +349,17 @@
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
 
-(define-emit    (STORE-OOP LI32 LI32)		(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
-						(println "	movl	$"$2", (%ecx)"))
+(define-emit    (STORE-OOP LI32 LI32)		(if-at-expand true ; feature/strict-semantics-for-compiled-set
+                                                    (let ()
+                                                      (if (= 0 (<LI32>-value $1))
+                                                          (println "	movl	%eax, %ecx")
+                                                        (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
+                                                      (println "	movl	$"$2", %eax")
+                                                      (println "	movl	%eax, (%ecx)"))
+                                                  (if (= 0 (<LI32>-value $1))
+                                                      (println "	movl	$"$2", (%eax)")
+                                                    (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
+                                                    (println "	movl	$"$2", (%ecx)"))))
 
 ;;;
 ;;; Compiler Infrastructure

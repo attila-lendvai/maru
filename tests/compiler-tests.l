@@ -419,6 +419,17 @@
          (oop-at buf 1)))
   9942)
 
+(define-test compile/set-oop-at/4
+    (let* ((place (libc/malloc 16)))
+      (set (oop-at place 0) 42))
+  42)
+
+(define-test compile/set-oop-at/5
+    (let* ((place (libc/malloc 16))
+           (value 42))
+      (set (oop-at place 0) value))
+  42)
+
 (define-test compile/set/bug/1
     (let ((argc 2))
       (< 0 (set argc (- argc 1))))
