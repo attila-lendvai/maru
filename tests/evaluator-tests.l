@@ -54,6 +54,11 @@
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
   (test-assert (= -1		(bitwise-shift -1 -100))))
 
+(define-test eval/equality/string ()
+  (test-assert (=  "alma" "alma"))
+  (test-assert (!= "alma" "korte"))
+  (test-assert (not (!= "alma" "alma"))))
+
 (define-test eval/for/1 ()
   (let ((x ()))
     (for (i 5 0 -1)

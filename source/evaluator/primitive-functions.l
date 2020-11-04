@@ -186,7 +186,7 @@
     ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (!= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs) (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true)
+      ((= type <string>)	(and (string? rhs) (!= 0 (libc/strcmp (get/string lhs) (get/string rhs))) symbol/true))
       (else                     (and (!= lhs rhs) symbol/true)))))
 
 (define-primitive-function (exit ()) ((exit-code <long> 0))
