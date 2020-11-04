@@ -180,11 +180,13 @@
 
 (define-emit    (ADD TI32)			(println "	addl	"$1", %eax"))
 
-(define-emit    (ADD LI32)			(println "	addl	$"$1", %eax"))
+(define-emit    (ADD LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	addl	$"$1", %eax")))
 
 (define-emit    (SUB TI32)			(println "	subl	"$1", %eax"))
 
-(define-emit    (SUB LI32)			(println "	subl	$"$1", %eax"))
+(define-emit    (SUB LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	subl	$"$1", %eax")))
 
 (define-emit    (MUL TI32)			(println "	mull	"$1))
 
@@ -209,11 +211,14 @@
 						   (println "	divl	%ecx"))))
 
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
-(define-emit    (AND LI32)			(println "	andl	$"$1", %eax"))
+(define-emit    (AND LI32)			(unless (= -1 (<LI32>-value $1))
+                                                  (println "	andl	$"$1", %eax")))
 (define-emit    (OR  TI32)			(println "	orl	"$1", %eax"))
-(define-emit    (OR  LI32)			(println "	orl	$"$1", %eax"))
+(define-emit    (OR  LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	orl	$"$1", %eax")))
 (define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
-(define-emit    (XOR LI32)			(println "	xorl	$"$1", %eax"))
+(define-emit    (XOR LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	xorl	$"$1", %eax")))
 (define-emit    (BITWISE-NOT)			(println "	notl	%eax"))
 
 (define-emit    (LOGIC-NOT)			(println "	cmpl	$0, %eax")
@@ -274,12 +279,14 @@
 (define-emit    (ASL TI32)			(println "	movl	"$1", %ecx")
 						(println "	shll	%cl, %eax"))
 
-(define-emit    (ASL LI32)			(println "	shll	$"$1", %eax"))
+(define-emit    (ASL LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	shll	$"$1", %eax")))
 
 (define-emit    (ASR TI32)			(println "	movl	"$1", %ecx")
 						(println "	sarl	%cl, %eax"))
 
-(define-emit    (ASR LI32)			(println "	sarl	$"$1", %eax"))
+(define-emit    (ASR LI32)			(unless (= 0 (<LI32>-value $1))
+                                                  (println "	sarl	$"$1", %eax")))
 
 (define-emit    (BR LABEL)			(println "	jmp	"$1))
 
@@ -316,9 +323,11 @@
 						(println "	xorl	%eax, %eax")
 						(println "	movb	(%ecx), %al"))
 
-(define-emit    (LOAD-I8 LI32)			(println "	leal	"$1"(%eax), %ecx")
+(define-emit    (LOAD-I8 LI32)			(if (= 0 (<LI32>-value $1))
+                                                    (println "	movl	%eax, %ecx")
+                                                  (println "	leal	"$1"(%eax), %ecx"))
 						(println "	xorl	%eax, %eax")
-						(println "	movb	(%ecx), %al"))
+						(println "	movb	(%ecx), %al")) ; TODO what about sign extension?
 
 (define-emit    (STORE-I8 TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
@@ -329,7 +338,9 @@
 						(println "	leal	(%eax, %ecx), %ecx")
 						(println "	movb	$"$2", (%ecx)"))
 
-(define-emit    (STORE-I8 LI32 TI32)		(println "	leal	"$1"(%eax), %ecx")
+(define-emit    (STORE-I8 LI32 TI32)		(if (= 0 (<LI32>-value $1))
+                                                    (println "	movl	%eax, %ecx")
+                                                  (println "	leal	"$1"(%eax), %ecx"))
 						(println "	movl	"$2", %eax")
 						(println "	movb	%al, (%ecx)"))
 
@@ -337,7 +348,9 @@
 						(println "	leal	(%eax, %ecx, 4), %ecx")
 						(println "	movl	(%ecx), %eax"))
 
-(define-emit    (LOAD-OOP LI32)			(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
+(define-emit    (LOAD-OOP LI32)			(if (= 0 (<LI32>-value $1))
+                                                    (println "	movl	%eax, %ecx")
+                                                  (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
 						(println "	movl	(%ecx), %eax"))
 
 (define-emit    (STORE-OOP TI32 TI32)		(println "	movl	"$1", %ecx")
@@ -345,7 +358,9 @@
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
 
-(define-emit    (STORE-OOP LI32 TI32)		(println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
+(define-emit    (STORE-OOP LI32 TI32)		(if (= 0 (<LI32>-value $1))
+                                                    (println "	movl	%eax, %ecx")
+                                                  (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
 
