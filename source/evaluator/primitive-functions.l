@@ -15,7 +15,7 @@
 
 (define-primitive-function (lambda () fixed) ((env <env>) parameters . body)
   (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
-  (new-<expr> parameters body env -ctx-))
+  (expr parameters body env -ctx-))
 
 (define-primitive-function (let () fixed) (env bindings . body)
   (let ((locals (<context>-bindings -ctx-)))
@@ -228,7 +228,7 @@
           (let ((n (libc/snprintf buf size fmt arg)))
             (if (and (<= 0 n)
                      (< n size))
-                (set result (new-<string>-from-cstring buf))
+                (set result (string-from-cstring buf))
               (set size (* size 2))))))
       result)))
 
@@ -378,22 +378,22 @@
   ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
   (if (string? symbol)
       symbol
-    (new-<string>-from-cstring (unbox <symbol> symbol))))
+    (string-from-cstring (unbox <symbol> symbol))))
 
 (define-primitive-function long->string ((arg <long>))
   (let ((buf (allocate-data 32))) ; safe up until 64 bits
     (libc/sprintf buf "%ld" arg)
-    (new-<string>-from-cstring buf)))
+    (string-from-cstring buf)))
 
 (define-primitive-function string->long ((str <string>))
   (let* ((endptr	str)
          (result	(libc/strtol str (address-of endptr) 10)))
     (if (= (char-at endptr 0) ?\x00)
         (box <long> result)
-      (error "invalid number in string->long, libc/strtol has failed for string " (new-<string>-from-cstring str)))))
+      (error "invalid number in string->long, libc/strtol has failed for string " (string-from-cstring str)))))
 
 (define-primitive-function (create-module ()) ((name <string> _ nounbox))
-  (new-<module> name))
+  (module name))
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
   (debug (libc/printf "eval-in-module: form ") (println form))

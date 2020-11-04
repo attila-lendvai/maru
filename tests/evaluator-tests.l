@@ -106,7 +106,10 @@
     (string-insert x 2 ?z)
     (test-assert (= x "alzma"))
     (string-insert x 5 ?x)
-    (test-assert (= x "alzmax"))))
+    (test-assert (= x "alzmax")))
+  (let ((x (string 8)))
+    (string-append x ?y)
+    (test-assert (= x "y"))))
 
 (define-test eval/string/concat ()
   (test-assert (= "alma.x\x00y.korte"
@@ -188,7 +191,7 @@
                            y))
                       40 2))))
 
-(define-form pace-for-set-test (str i)
+(define-form place-for-set-test (str i)
   `(accessor-for-set-test ,str ,i))
 
 (define-form accessor-for-set-test (str i)
@@ -199,15 +202,15 @@
                                ?j ; a joker that writes ?j at index 1, no matter what
                              v)))
 
-;; TODO need to reshape expand so that it checks for a set-foo form at every step while expanding.
-;; for that we need to have a separate expand-1 from expand that the set-transformer can use.
+;; expand needs to check for a set-foo form at every step while expanding, and do
+;; the set-conversion if available.
 (define-test eval/expand/set-forms/1 ()
   (let ((str "abcd"))
-    (test-assert (= ?c (pace-for-set-test str 2)))
-    (set (pace-for-set-test str 2) ?x)
+    (test-assert (= ?c (place-for-set-test str 2)))
+    (set (place-for-set-test str 2) ?x)
     (test-assert (= str "abxd"))
-    (set (pace-for-set-test str 1) ?x)
-    (test-assert (= str "ajxd"))
+    (set (place-for-set-test str 1) ?x)
+    (test-assert (= str "ajxd")) ; *not* "axxd" if SET-ACCESSOR-FOR-SET-TEST is properly picked up by expand
     ))
 
 (define *a-global-holding-42* 42)

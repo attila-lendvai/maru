@@ -115,7 +115,7 @@
          (slot-index	(record/slot-index type slot-name)))
     `(oop-at ,(if (and feature/typecheck-slot-access
                        (not (member? type-name +raw-records+)))
-                  `(k/%accessor-typecheck ,type-name ,object)
+                  `(%accessor-typecheck ,type-name ,object)
                 object)
              ,slot-index)))
 
@@ -125,7 +125,7 @@
          (slot-index	(record/slot-index type slot-name)))
     `(set (oop-at ,(if (and feature/typecheck-slot-access
                             (not (member? type-name +raw-records+)))
-                       `(k/%accessor-typecheck ,type-name ,object)
+                       `(%accessor-typecheck ,type-name ,object)
                      object)
                   ,slot-index)
           ,value)))
@@ -153,8 +153,8 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    print println read encode expand eval string->symbol k/%accessor-typecheck
-    abort new-<string>-from-cstring
+    print println read encode expand eval string->symbol %accessor-typecheck
+    abort string-from-cstring
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
     environment-define defined?
@@ -205,7 +205,7 @@
      ,@(map (lambda (arg)
               ;; string literals are turned into pointers to .asciz, therefore
               ;; we need to print them using libc/printf (or instantiate
-              ;; them into Maru objects using new-<string>-from-cstring).
+              ;; them into Maru objects using string-from-cstring).
               (if (string? arg)
                   `(libc/printf ,arg)
                 `(print ,arg)))
@@ -228,10 +228,10 @@
        (<array>			(array?))))))
 
 (define-function %not-enough-arguments (name args)
-  (error (new-<string>-from-cstring name)": not enough arguments: "args))
+  (error (string-from-cstring name)": not enough arguments: "args))
 
 (define-function %too-many-arguments (name args)
-  (error (new-<string>-from-cstring name)": not enough arguments: "args))
+  (error (string-from-cstring name)": not enough arguments: "args))
 
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
@@ -392,12 +392,12 @@
       ((is <boxed-type> type)
        (if (<boxed-type>-one-word? type)
            `(oop-at ,(if feature/typecheck-slot-access
-                         `(k/%accessor-typecheck ,type-name ,obj)
+                         `(%accessor-typecheck ,type-name ,obj)
                        obj)
                     0)
          ;; then we just return its address, the payload is right there inlined
          (if feature/typecheck-slot-access
-             `(k/%accessor-typecheck ,type-name ,obj)
+             `(%accessor-typecheck ,type-name ,obj)
            obj)))
 
       ((is <immediate-type> type)
@@ -453,7 +453,9 @@
         (else
          `(= ,type-name (type-of ,obj)))))))
 
-(define-function k/%accessor-typecheck (expected-type-id object)
+;; NOTE this is not exactly the same as the one in the user-land, it lacks the slot-name
+;; parameter (because the compiler cannot deal with symbol literals yet).
+(define-function %accessor-typecheck (expected-type-id object)
   (let ((type (type-of object)))
     (or (= type expected-type-id)
         (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
@@ -530,7 +532,7 @@
               ((or (is <type> type)
                    (is <record> type))
                ;; KLUDGE we need to disable accessor typecheck here, because when it's a <record>, then it gets triggereed, because the target universe is unaware of inheritance
-               (with-forms ((k/%accessor-typecheck ((type obj) obj)))
+               (with-forms ((%accessor-typecheck ((type obj) obj)))
                  (unbox <long> (<type>-id type))))
               (else
                (error "allocate: illegal type specifier: "type)))
@@ -550,13 +552,13 @@
     (elements	(when (< 0 length)
                   (allocate-data length)))))
 
-(define-function new-<string>-from-cstring (cstr)
+(define-function string-from-cstring (cstr)
   (let* ((len (cstring-length cstr))
          (obj (string len)))
     (libc/memcpy (<string>-elements obj) cstr len)
     obj))
 
-(define-function new-<symbol> (cstr)
+(define-function symbol (cstr)
   (let ((len (+ 1 (cstring-length cstr)))) ; +1 is for the zero termination
     (gc/let* ((obj (gc/allocate-opaque <symbol> len)))
       (libc/memcpy obj cstr len)
@@ -568,7 +570,7 @@
     (elements	(when (> capacity 0)
                   (allocate <data> capacity)))))
 
-(define-function new-<expr> (parameters body env ctx)
+(define-function expr (parameters body env ctx)
   (make <expr>
     (parameters	parameters)
     (body	body)
@@ -586,7 +588,7 @@
   (make <fixed>
     (function fn)))
 
-(define-function new-<primitive-function> (_imp _name)
+(define-function primitive-function (_imp _name)
   (make/opaque <primitive-function>
     (_imp		_imp)
     (_name		_name)
@@ -607,26 +609,26 @@
     (offset	(box <long> offset))
     (bindings	(array 0))))
 
-(define-function new-base-<context> (home caller env)
+(define-function base-context (home env)
   (make <context>
     (home	home)
     (env	env)
     (bindings	(array 0))))
 
-;; (define-function new-<context> (home caller env)
+;; (define-function context (home caller env)
 ;;   (let ((obj ()))
 ;;     (if (and caller
 ;;              (set obj (<context>-callee caller)))
 ;;         (let ()
 ;;           (set (<context>-home obj) home)
 ;;           (set (<context>-env  obj) env))
-;;       (set obj (new-base-<context> home caller env))
+;;       (set obj (base-context home env))
 ;;       (when caller
 ;;         (set (<context>-callee caller) obj)))
 ;;     obj))
 
-(define-function new-<context> (home caller env)
-  (let ((obj (new-base-<context> home caller env)))
+(define-function context (home caller env)
+  (let ((obj (base-context home env)))
     (when caller
       (set (<context>-callee caller) obj))
     obj))
@@ -664,7 +666,8 @@
 (define-primitive-function set-current-module ((module <module>))
   (debug (libc/printf "set-current-module {%p}\n" module))
   (set *module* module)
-  (capture-well-known-module-values))
+  (capture-well-known-module-values)
+  module)
 
 (define-form with-current-module (module . body)
   `(gc/let* ((__previous-module__ *module*)
@@ -712,7 +715,7 @@
                          (cstring-compare item (unbox <symbol> candidate)))
                        (lambda (array index item)
                          (debug (libc/printf "interning %s\n" item))
-                         (gc/let* ((sym (new-<symbol> item)))
+                         (gc/let* ((sym (symbol item)))
                            (array-insert array index sym)
                            sym))))
 
@@ -811,7 +814,7 @@
   (verbosity 3 (libc/printf "  A  ") (print fun)  (libc/printf " ")  (print arguments) (libc/printf " ") (println parent-ctx) (libc/flush-streams))
   (let ((env	(<expr>-env fun))
         (params	(<expr>-parameters fun)))
-    (gc/let* ((innter-ctx (new-<context> (<expr>-ctx fun) parent-ctx env)))
+    (gc/let* ((innter-ctx (context (<expr>-ctx fun) parent-ctx env)))
       (let ((locals (<context>-bindings innter-ctx))
             (args   arguments))
         (while (pair? params)
@@ -898,6 +901,7 @@
       ;; it's a set form such as: (set (fn-name a b c) new-value). let's try to convert it to
       ;; (set-fn-name a b c new-value) if set-fn-name is defined.
       (awhen (setter-name-for fn-name env)
+        ;; TODO the value should be inserted as the first arg to not disrupt &rest parsing
         (gc/let* ((args (get/tail place))
                   (last (cons value ())))
           (set args (expand-all args env one-step?))
@@ -942,7 +946,7 @@
         ((= head symbol/set)
          (safety 1 (assert (and (cddr exp) (not (cdddr exp))) "illegal set form: " exp))
          (debug (libc/printf "expand/set on form ") (println exp))
-         ;; try to convert (set (place-accessor ...) value) forms while expanding. try "more abstract" set-foo forms first,
+         ;; try to set-transform (set (place-accessor ...) value) forms while expanding. try "more abstract" set-foo forms first,
          ;; and only recursively expand the body if they are not defined.
          ;; this setup allows defining e.g. a SET-SLOT-VALUE form to override its behavior. the old way was to first expand
          ;; the body, i.e. a (SLOT-VALUE ...) form into an (OOP-AT ...) form, and only then attempt to set-convert it to SET-OOP-AT.
@@ -1209,7 +1213,7 @@
 (define-function expand-encode-eval (form env)
   (debug (libc/printf "expand-encode-eval for form ") (println form))
   (gc/let* ((x form)
-            (ctx (new-base-<context> () () env)))
+            (ctx (base-context () env)))
 					(verbosity 2 (libc/printf ";;; ? ")		(println x))
     (set x (expand x env false))	(verbosity 2 (libc/printf ";;; expd--> ")	(println x))
     (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(println x))
@@ -1220,7 +1224,7 @@
 
 ;; TODO unexport?
 (define-primitive-function repl-stream ((stream <target-vm-pointer>))
-  ;;(set (variable-value *input* <target-vm-pointer>) stream)
+  ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -1240,20 +1244,23 @@
          (libc/printf "\nmorituri te salutant\n"))
     res))
 
-(define-function new-<module> (name)
-  (debug (libc/printf "new-<module>\n"))
+(define-function module (name)
+  (debug (libc/printf "module constructor\n"))
   (gc/let* ((module (new <module>))
             (env    (environment () 0 0))
             tmp)
     (when-at-expand feature/debug-info
       (set (<module>-name module)
-	   (new-<string>-from-cstring (or name ""))))
+	   (string-from-cstring (or name ""))))
 
     (set (<module>-globals module)
 	 (environment-define env symbol/*globals* env))
 
     (when *maru-module*
-      (copy-module-bindings *maru-module* module (lambda (name value) (not (= name symbol/*globals*)))))
+      ;; *globals* is special in that it should point back to the module's env, therefore we skip that
+      (copy-module-bindings *maru-module* module
+                            (lambda (name value)
+                              (not (= name symbol/*globals*)))))
 
     ;; overwrite these with empty arrays in the new module. TODO why?
     (set tmp (array 0))		(environment-define env (string->symbol "*expanders*")		tmp)
@@ -1261,7 +1268,7 @@
     (set tmp (array 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
     (set tmp (array 0))		(environment-define env (string->symbol "*applicators*")	tmp)
 
-    (debug (libc/printf "new-<module> returning with ") (println module))
+    (debug (libc/printf "module constructor returning with ") (println module))
     module))
 
 (when-at-expand feature/profiler
@@ -1322,7 +1329,7 @@
 (load "source/evaluator/primitive-functions.l")
 
 (define-function instantiate-primitive-function (module name imp fixed?)
-  (gc/let* ((tmp (new-<primitive-function> imp name)))
+  (gc/let* ((tmp (primitive-function imp name)))
     (when fixed?
       (set tmp (fixed tmp)))
     (environment-define (module-env module) (string->symbol name) tmp)))
@@ -1342,7 +1349,7 @@
       (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
       (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
       ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
-      (set +end+ (or +end+ (set tmp (new-<symbol> "+end+"))))
+      (set +end+ (or +end+ (set tmp (symbol "+end+"))))
       (environment-define env (string->symbol "+end+") +end+))
 
     ;; make sure the symbol true evaluates to itself
@@ -1395,8 +1402,8 @@
   (initialize-symbol-cache)
   (debug (libc/printf "initialized *symbols*\n"))
 
-  (set *maru-module* (new-<module> "maru"))
+  (set *maru-module* (module "maru"))
   (populate-module-with-maru-primitives *maru-module*)
-  (set *module* (new-<module> "maru-user"))
+  (set *module* (module "maru-user"))
   (capture-well-known-module-values)
   (debug (libc/printf "finished module initialization\n")))

@@ -138,7 +138,7 @@
       (when (= libc/EOF c)
         (error "unterminated string literal"))
       (buffer-append buf c))
-    (new-<string>-from-cstring (buffer-contents buf))))
+    (string-from-cstring (buffer-contents buf))))
 
 (define-function read/list (delim stream)
   (let* ((head (cons () ()))

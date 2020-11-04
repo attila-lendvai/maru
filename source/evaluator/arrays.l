@@ -53,7 +53,7 @@
          (let ((size (,length-name obj)))
            (when (<= idx size)
              ;; TODO how about insering far out into the new territory?
-             (,append-name obj 0)    ; ensure that we have enough room
+             (,append-name obj 0)    ; ensure that we have enough room, and that the size slot gets updated
              (when (< idx size)
                (let* ((elements	(slot-value ,type-name elements obj))
                       (src	(+ elements (* idx ,element-size-in-bytes)))

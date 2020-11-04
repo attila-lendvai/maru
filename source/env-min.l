@@ -39,7 +39,6 @@
       (let* ((var	(array-at from-bindings i))
              (name	(<variable>-name var))
              (value	(<variable>-value var)))
-        ;; *globals* is special in that it should point to the module's env, therefore we skip that
         (when (or (not filter)
                   (filter name value))
           (environment-define to-env name value))))

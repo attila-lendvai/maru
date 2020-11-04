@@ -5,7 +5,7 @@
 
 (define-record <selector> () (name methods default))
 
-(define-function selector? (obj) (= <selector> (type-of obj)))
+(define-function selector? (obj) (is <selector> obj))
 
 (define-function <selector>-inherit (methods type)
   (when (subtype? (type-of type) <record>)
