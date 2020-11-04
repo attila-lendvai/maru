@@ -75,3 +75,7 @@
 (define-form case (value . clauses)
   `(let ((__value__ ,value))
      ,(%case clauses)))
+
+;; new
+(define-form is (type obj)
+  `(= ,type (type-of ,obj)))

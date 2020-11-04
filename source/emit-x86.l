@@ -41,24 +41,6 @@
 (unless (= 32 (target-value +word-size-in-bits+))
   (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))
 
-;;; DEFINE-OPERAND
-
-(define-function define-operand/make-setters (type-name fields)
-  (when (pair? fields)
-    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
-          (define-operand/make-setters type-name (cdr fields)))))
-
-(define-form define-operand (name super direct-fields . printing)
-  (let* ((type-name	(symbol->type-name name))
-         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super)) ,direct-fields)))
-         (effective-fields (<record>-effective-slots type)))
-    (assert (is <record> type))
-    (eval `(define-function ,name ,effective-fields
-             (let ((self (new ,type-name)))
-               ,@(define-operand/make-setters type-name effective-fields)
-               self)))
-    `(define-method do-print ,type-name () (print ,@printing))))
-
 ;;; DEFINE-INSTRUCTION
 
 (define-form define-instruction (name)
@@ -373,21 +355,32 @@
 ;;;
 ;;; Compiler Infrastructure
 ;;;
-(define-record <compiler> () (level param-counter arg-counter arg-limit tmp-counter tmp-limit temps epilogue gen-buffer))
+(define-record <x86-compiler> <compiler>
+  (param-offset
+   arg-offset
+   arg-limit
+   fn-epilogue-label))
 
-(define-function compiler (level)
-  (let ((self (new <compiler>)))
-    (set (<compiler>-level		self) level)
-    (set (<compiler>-param-counter	self) 0)
-    (set (<compiler>-arg-counter	self) 0)
-    (set (<compiler>-arg-limit		self) 0)
-    (set (<compiler>-tmp-counter	self) 0)
-    (set (<compiler>-tmp-limit		self) 0)
-    (set (<compiler>-gen-buffer		self) (array))
-    self))
+(define-function x86-compiler (level)
+  (make <x86-compiler>
+    (level			level)
+    (temp-counter		0)
+    (temp-limit			0)
+    (gen-buffer			(array))
+
+    (param-offset		0)
+    (arg-offset			0)
+    (arg-limit			0)))
 
 ;; KLUDGE
-(define *compiler-factory* compiler)
+(define *compiler-factory* x86-compiler)
+
+(define-function new-temp (-c-)
+  (TI32 (* (new-temp-index -c-) (eval-at-expand (target-value +word-size-in-bytes+)))))
+
+(define-function %free-temp (-c- obj)
+  (when (is <TI32> obj)
+    (push (<compiler>-temps -c-) obj)))
 
 (define-form gen args
   `(array-append (<compiler>-gen-buffer -c-) (list ,@args)))
@@ -396,39 +389,29 @@
   (array-do entry (<compiler>-gen-buffer -c-)
     (apply emit-instruction entry)))
 
-(define-function new-param (comp)
-  (let* ((i (<compiler>-param-counter comp))
-         (t (TI32 i)))
-    (set (<compiler>-param-counter comp) (+ i 4))
-    t))
+(define-function new-param (c)
+  (with-instance-accessors c <x86-compiler>
+    (let* ((offset	c.param-offset)
+           (temp	(TI32 offset)))
+      (incr c.param-offset 4)
+      temp)))
 
-(define-function new-arg (comp)
-  (let* ((i (<compiler>-arg-counter comp))
-         (t (TI32 i)))
-    (set (<compiler>-arg-counter comp) (+ i 4))
-    t))
+(define-function new-arg (c)
+  (with-instance-accessors c <x86-compiler>
+    (let* ((index	c.arg-offset)
+           (temp	(TI32 index)))
+      (incr c.arg-offset 4)
+      temp)))
 
-(define-function free-args (comp args)
-  (and (< (<compiler>-arg-limit comp) (<compiler>-arg-counter comp))
-       (set (<compiler>-arg-limit comp) (<compiler>-arg-counter comp)))
-  (set (<compiler>-arg-counter comp) 0))
+(define-function free-args (c args)
+  (with-instance-accessors c <x86-compiler>
+    (when (< c.arg-limit c.arg-offset)
+      (set c.arg-limit c.arg-offset))
+    (set c.arg-offset 0)))
 
-(define-function new-temp (comp)
-  (let* ((i (<compiler>-tmp-counter comp))
-         (t (TI32 i)))
-    (set (<compiler>-tmp-counter comp) (+ i 4))
-    (and (< (<compiler>-tmp-limit comp) (<compiler>-tmp-counter comp))
-         (set (<compiler>-tmp-limit comp) (<compiler>-tmp-counter comp)))
-    t))
-
-(define-function alloc-temp (comp)
-  (or (pop (<compiler>-temps comp))
-      (new-temp comp)))
-
-(define-function %free-temp (comp temp)		(when (temp? temp) (push (<compiler>-temps comp) temp)))
-(define-function %free-temps (comp temps)	(list-do temp temps (%free-temp comp temp)))
-(define-form free-temp (temp)			`(%free-temp -c- ,temp))
-(define-form free-temps (temp)			`(%free-temps -c- ,temp))
+;;;
+;;; Compiling
+;;;
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
@@ -437,9 +420,6 @@
 
 (define-selector compile)
 
-;;;
-;;; Compiling
-;;;
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp-or-literal
@@ -464,7 +444,7 @@
 (define-function compile-expr (self name parent-comp)
   (let* ((main? (= 'main name))
          (body (<expr>-body self))
-         (-c- (compiler (+ 1 (<compiler>-level parent-comp))))
+         (-c- (x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (if main?
                           (GLOBAL-LABEL "main")
                         (LABEL (concat-string (symbol->string name)
@@ -476,8 +456,9 @@
     (list-do e body
       (and e (comp e)))
     ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
-    (let* ((arg-size (align +call-frame-alignmet+             (<compiler>-arg-limit -c-) ))
-           (tmp-size (align +call-frame-alignmet+ (+ arg-size (<compiler>-tmp-limit -c-))))
+    (let* ((arg-size (align +call-frame-alignmet+             (<x86-compiler>-arg-limit -c-) ))
+           (tmp-size (align +call-frame-alignmet+ (+ arg-size (* (<compiler>-temp-limit -c-)
+                                                                 (target-value +word-size-in-bytes+)))))
            (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
       (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
@@ -485,11 +466,11 @@
       (when main?
         (emit EXPORT entry-label))
       (emit DEFLABEL entry-label)
-      (emit COMMENT (list "frame "arg-size" "(<compiler>-tmp-limit -c-)" "tmp-size" "frm-size))
+      (emit COMMENT (list "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size))
       (emit ENTER (- frm-size 8))
       (emit-gen-buffer -c-)
-      (and (<compiler>-epilogue -c-)
-           (emit DEFLABEL (<compiler>-epilogue -c-)))
+      (awhen (<x86-compiler>-fn-epilogue-label -c-)
+        (emit DEFLABEL it))
       (emit LEAVE (- frm-size 8)))
     (when (and (not main?)
                feature/redefinable-functions-in-target)
@@ -639,8 +620,8 @@
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (gen BR (or (<compiler>-epilogue -c-)
-              (set (<compiler>-epilogue -c-) (UNIQUE-LABEL)))))
+  (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
+              (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -798,4 +779,4 @@
 (define-method compile-definition <expr> (name parent-comp)
   (compile-expr self name parent-comp))
 
-(define-method emit-prelude <compiler> ())
+(define-method emit-prelude <x86-compiler> ())

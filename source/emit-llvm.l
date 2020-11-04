@@ -181,28 +181,14 @@
 ;;; Operands
 ;;;
 
-(define-function define-operand/make-setters (type-name fields)
-  (if (pair? fields)
-      (cons `(set (,(concat-symbol (concat-symbol type-name '-) (car fields)) self) ,(car fields))
-            (define-operand/make-setters type-name (cdr fields)))))
-
-(define-form define-operand (name fields . printing)
-  (let ((type-name (symbol->type-name name)))
-    (eval `(define-record ,type-name () ,fields))
-    (eval `(define-function ,name ,(<record>-effective-slots (eval type-name))
-             (let ((self (new ,type-name)))
-               ,@(define-operand/make-setters type-name fields)
-               self)))
-    `(define-method do-print ,type-name () (print ,@printing))))
-
-(define-operand		GLOBAL		(name)		"@"(llvm/escape-global-identifier (<GLOBAL>-name self)))
-(define-operand		LIBC-GLOBAL	(name)		"@"(<LIBC-GLOBAL>-name self))
-(define-operand		LOCAL		(name)		"%"(llvm/escape-local-identifier (<LOCAL>-name self)))
-(define-operand		LITERAL		(value)		(<LITERAL>-value self))
-(define-operand		CONSTANT	(name value)	(<CONSTANT>-name self))
-(define-operand		TEMP		(id)		"%"(llvm/escape-local-identifier (concat-string "t" (long->string (<TEMP>-id self)))))
-(define-operand		LABEL		(name)		(llvm/escape-local-identifier (<LABEL>-name self)))
-(define-function	UNIQUE-LABEL	()		(LABEL (unique-name "L")))
+(define-operand		GLOBAL		() (name)		"@"(llvm/escape-global-identifier (<GLOBAL>-name self)))
+(define-operand		LIBC-GLOBAL	() (name)		"@"(<LIBC-GLOBAL>-name self))
+(define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier (<LOCAL>-name self)))
+(define-operand		LITERAL		() (value)		(<LITERAL>-value self))
+(define-operand		CONSTANT	() (name value)		(<CONSTANT>-name self))
+(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (long->string (<TEMP>-id self)))))
+(define-operand		LABEL		() (name)		(llvm/escape-local-identifier (<LABEL>-name self)))
+(define-function	UNIQUE-LABEL	() ()			(LABEL (unique-name "L")))
 
 (define-function local? (obj)
   (= <LOCAL> (type-of obj)))
@@ -222,8 +208,7 @@
    produces-output?
    ))
 
-(define-generic emit-instruction op-args
-  (error "no emit-instruction defined for: " op-args ", types: " (map type-of op-args)))
+(define-generic emit-instruction)
 
 (define-form emit (instr-name . args)
   `(%emit -c- ,instr-name (list ,@args)))
@@ -284,29 +269,28 @@
 ;;;
 ;;; Compiler early
 ;;;
-(define-record <compiler> ()
-  (level
-   temp-counter
-   temps
-   gen-buffer
-   current-value ; the output of the previous-instruction
-   ))
-
 (define-record <llvm-compiler> <compiler>
-  (reg-counter
-   ))
+  (reg-counter))
 
 (define-function llvm-compiler (level)
   (make <llvm-compiler>
     (level			level)
     (temp-counter		0)
-    (reg-counter		0)
+    (temp-limit			0)
     (gen-buffer			(array))
     (current-value		())
-    ))
+
+    (reg-counter		0)))
 
 ;; KLUDGE
 (define *compiler-factory* llvm-compiler)
+
+(define-function new-temp (-c-)
+  (TEMP (new-temp-index -c-)))
+
+(define-function %free-temp (-c- obj)
+  (when (is <TEMP> obj)
+    (push (<compiler>-temps -c-) obj)))
 
 ;;;
 ;;; LLVM IR Instructions
@@ -579,18 +563,6 @@
            (args (rest entry)))
       (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args))
       (apply emit-instruction (cons -c- (cons instr args))))))
-
-(define-function new-temp (comp)
-  (TEMP (incr (<compiler>-temp-counter comp))))
-
-(define-function alloc-temp (comp)
-  (or (pop (<compiler>-temps comp))
-      (new-temp comp)))
-
-(define-function %free-temp (comp temp)		(when (= <TEMP> (type-of temp)) (push (<compiler>-temps comp) temp)))
-(define-function %free-temps (comp temps)	(list-do temp temps (%free-temp comp temp)))
-(define-form free-temp (temp)			`(%free-temp -c- ,temp))
-(define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))

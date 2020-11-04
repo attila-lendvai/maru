@@ -74,6 +74,57 @@
     n-params))
 
 ;;;
+;;; Operands
+;;;
+
+(define-function define-operand/make-setters (type-name fields)
+  (when (pair? fields)
+    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
+          (define-operand/make-setters type-name (cdr fields)))))
+
+(define-form define-operand (name super direct-slots . printing)
+  (let* ((type-name	(symbol->type-name name))
+         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super)) ,direct-slots)))
+         (effective-slots (<record>-effective-slots type)))
+    (assert (is <record> type))
+    (eval `(define-function ,name ,effective-slots
+             (let ((self (new ,type-name)))
+               ,@(define-operand/make-setters type-name effective-slots)
+               self)))
+    `(define-method do-print ,type-name () (print ,@printing))))
+
+;;; compiler infrastructure
+;;;
+
+(define-record <compiler> ()
+  (level
+   temp-counter
+   temp-limit
+   temps
+   gen-buffer
+   current-value              ; the output of the previous-instruction
+   ))
+
+(define new-temp) ; forward
+(define %free-temp) ; forward
+
+(define-function new-temp-index (c)
+  (with-instance-accessors c <compiler>
+    (let ((i c.temp-counter))
+      (incr c.temp-counter)
+      (when (< c.temp-limit c.temp-counter)
+        (set c.temp-limit c.temp-counter))
+      i)))
+
+(define-function alloc-temp (-c-)
+  (or (pop (<compiler>-temps -c-))
+      (new-temp -c-)))
+
+(define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
+(define-form free-temp (temp)			`(%free-temp -c- ,temp))
+(define-form free-temps (temp)			`(%free-temps -c- ,temp))
+
+;;;
 ;;; target module setup
 ;;;
 
