@@ -141,11 +141,20 @@ veryclean:
 
 stats: $(foreach backend,${BACKENDS},stats-$(backend))
 
+define count-loc
+  echo -n $(1); cat $(2) | sed 's/.*debug.*//;s/.*assert.*//;s/;.*//' | grep -v '^$$' | wc -l; echo "Files:" $(2); echo
+endef
+
+define collect-files
+  $(GEN_EVAL) boot.l tools-for-build/file-list-from-require.l $(1)
+endef
+
 $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
+	@$(call ensure-built,$(GEN_EVAL))
 	@echo -e '\nBackend $(BLUE)$*$(RESET):\n'
-	cat boot.l $(EMIT_FILES_$*)			| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat $(EVALUATOR_FILES)				| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l $(EMIT_FILES_$*) $(EVALUATOR_FILES)	| sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
+	@files=`$(call collect-files,boot.l $(EMIT_FILES_$*))`;				$(call count-loc,"Compiler LoC: ",$$files)
+	@files=`$(call collect-files,$(EVALUATOR_FILES))`;				$(call count-loc,"Evaluator LoC: ",$$files)
+	@files=`$(call collect-files,boot.l $(EMIT_FILES_$*) $(EVALUATOR_FILES))`;	$(call count-loc,"Alltogether LoC: ",$$files)
 
 ###
 ### eval and bootstrapping
