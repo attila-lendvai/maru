@@ -669,7 +669,7 @@
 (define-record <parser> () (source result position))
 
 (define-function parser (type stream)
-  (let ((self (new type)))
+  (let ((self (new* type)))
     (set (<parser>-source self) stream)
     self))
 

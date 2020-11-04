@@ -166,6 +166,13 @@
 
 (require "source/control-structures.l")
 
+;; this smells like a KLUDGE: we let gc/let* leak here from eval.l so that we can use
+;; certain constructs in the implementation of the evaluator. ideally, the compiler
+;; should be smart enough to inform the GC about ephemeral GC roots on the stack.
+(if-at-expand evolving?
+    (define gc/let* let*)
+  (define-symbol-form gc/let* let*))
+
 (define-form assert (test . args)
   (unless args
     (set args (list "assertion failed: " `(quote ,test))))
@@ -287,25 +294,41 @@
       `(let ()
          ,@body))))
 
-(define-form new (type . inits)
-  (let ((i -1))
+(define-form new (type-name . inits)
+  (let* ((i -1)
+         (type (eval type-name))
+         (allocate-form `(allocate ,(if-at-expand evolving? (<type>-id type) type-name)
+                                   ,(type/slot-count-of-instances type))))
     ;; TODO singletons for types whose instances have no slots?
-    `(let* ((_type_ ,type)
-            (_self_ (allocate (<type>-id _type_) (type/slot-count-of-instances _type_))))
-       ;; TODO the usefulness of this is questionable... delme and rename make to new?
+    (if inits
+        `(gc/let* ((_self_ ,allocate-form))
+           ;; TODO the usefulness of this is questionable... delme and rename make to new?
+           ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+           _self_)
+      allocate-form)))
+
+(define-form new* (type . inits)
+  ;; this one doesn't need to know the type at expand-time
+  (let ((i -1))
+    `(gc/let* ((_type_ ,type)
+               (_self_ (allocate (<type>-id _type_)
+                                 (type/slot-count-of-instances _type_))))
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 
-(define-function %make-make-inits (prefix inits)
+(define-function %make-make-inits (env prefix inits)
   (when inits
     (let ((entry (first inits)))
-      (cons `(set ,(concat-symbol prefix (first entry)) ,(second entry))
-            (%make-make-inits prefix (cdr inits))))))
+      (when (= (first entry) 'when-at-expand) ; well, if we look at it as a DSL... or is it a KLUDGE?
+        (set entry (expand entry env)))
+      (when entry
+        (cons `(set ,(concat-symbol prefix (first entry)) ,(second entry))
+              (%make-make-inits env prefix (cdr inits)))))))
 
 (define-form make (type . inits)
-  `(let ((self (new ,type)))
+  `(gc/let* ((self (new ,type)))
      (with-instance-accessors self ,type
-       ,@(%make-make-inits 'self. inits)
+       ,@(%make-make-inits *env* 'self. inits)
        self)))
 
 (require "source/selector.l")

@@ -350,6 +350,7 @@
             names)))
 
 (define-target-types
+    <type> <record>
     <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <primitive-function>
     <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>)
 
@@ -501,35 +502,58 @@
 ;;; object instantiation
 ;;; ----------------------------------------------------------------
 
-(define-primitive-function allocate ((type <long>) (slot-count <long>))
-  ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
+(when-at-expand evolving?
+  ;; we need to force its expansion becuase the allocate primfn of the previous stage only accepts <long> as type
+  ;; but we don't want <type>-slave-id calls leak into this anywhere...
+  (define-form new (type-name . inits)
+    (let* ((i -1)
+           (type (eval type-name))
+           ;; we need to simplify
+           (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
+      (if inits
+          `(let* ((_self_ ,allocate-form))
+             ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+             _self_)
+        allocate-form))))
+
+;; TODO try to eliminate this opaque anomaly leaking here... maybe by annotating this on the type?
+(define-form make/opaque (type-name . inits)
+  (let ((type (eval type-name)))
+    `(gc/let* ((self (gc/allocate-opaque ,type-name ,(words-to-bytes (record/effective-slot-count type)))))
+       (with-instance-accessors self ,type-name
+         ,@(%make-make-inits *env* 'self. inits)
+         self))))
+
+(define-function allocate (type slot-count)
   (gc/allocate type (words-to-bytes slot-count)))
+
+(define-primitive-function (allocate ()) (type (slot-count <long>))
+  ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
+  (allocate (cond
+              ((is <long> type)
+               (unbox <long> type))
+              ((or (is <type> type)
+                   (is <record> type))
+               ;; KLUDGE we need to disable accessor typecheck here, because when it's a <record>, then it gets triggereed, because the target universe is unaware of inheritance
+               (with-forms ((k/%accessor-typecheck ((type obj) obj)))
+                 (unbox <long> (<type>-id type))))
+              (else
+               (error "allocate: illegal type specifier: "type)))
+            slot-count))
 
 (define-primitive-function allocate-data ((byte-size <long>))
   (gc/allocate-opaque <data> byte-size))
 
-(define-form new-record-instance (type)
-  (set type (eval type))
-  (assert (subtype? (type-of type) <record>))
-  `(gc/allocate ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
-
-(define-form new-record-instance/opaque (type)
-  (set type (eval type))
-  (assert (subtype? (type-of type) <record>))
-  `(gc/allocate-opaque ,(<type>-slave-id type) ,(words-to-bytes (record/effective-slot-count type))))
-
 (define-primitive-function cons ((head () ()) (tail () ()))
-  (let ((obj (new-record-instance <pair>)))
-    (set (<pair>-head obj) head)
-    (set (<pair>-tail obj) tail)
-    obj))
+  (make <pair>
+    (head head)
+    (tail tail)))
 
 (define-primitive-function string ((length <long> 0))
-  (gc/let* ((str (new-record-instance <string>)))
-    (set (<string>-size str) (box <long> length))
-    (when (> length 0)
-      (set (<string>-elements str) (allocate-data length)))
-    str))
+  (make <string>
+    (size	(box <long> length))
+    (elements	(when (< 0 length)
+                  (allocate-data length)))))
 
 (define-function new-<string>-from-cstring (cstr)
   (let* ((len (cstring-length cstr))
@@ -544,63 +568,55 @@
       obj)))
 
 (define-primitive-function array ((capacity <long> 0))
-  (gc/let* ((arr (new-record-instance <array>)))
-    (set (<array>-size arr) (box <long> 0))
-    (when (> capacity 0)
-      (set (<array>-elements arr) (allocate <data> capacity)))
-    arr))
+  (make <array>
+    (size	(box <long> 0))
+    (elements	(when (> capacity 0)
+                  (allocate <data> capacity)))))
 
 (define-function new-<expr> (parameters body env ctx)
-  (let ((obj (new-record-instance <expr>)))
-    (set (<expr>-parameters	obj) parameters)
-    (set (<expr>-body		obj) body)
-    (set (<expr>-env		obj) env)
-    (set (<expr>-ctx		obj) ctx)
+  (make <expr>
+    (parameters	parameters)
+    (body	body)
+    (env	env)
+    (ctx	ctx)
     (when-at-expand feature/profiler
-      (set (<expr>-profiler-counter obj) (box <long> 0)))
-    obj))
+      (profiler-counter (box <long> 0)))))
 
 (define-primitive-function form (fn (sym () ()))
-  (let ((obj (new-record-instance <form>)))
-    (set (<form>-function	obj)	fn)
-    (set (<form>-symbol		obj)	sym)
-    obj))
+  (make <form>
+    (function	fn)
+    (symbol	sym)))
 
 (define-primitive-function fixed (fn)
-  (let ((obj (new-record-instance <fixed>)))
-    (set (<fixed>-function obj) fn)
-    obj))
+  (make <fixed>
+    (function fn)))
 
 (define-function new-<primitive-function> (_imp _name)
-  (let ((obj (new-record-instance/opaque <primitive-function>)))
-    (set (<primitive-function>-_imp		obj) _imp)
-    (set (<primitive-function>-_name		obj) _name)
+  (make/opaque <primitive-function>
+    (_imp		_imp)
+    (_name		_name)
     (when-at-expand feature/profiler
-      (set (<primitive-function>-profiler-counter obj) 0))
-    obj))
+      (profiler-counter	0))))
 
 (define-primitive-function variable ((name <symbol>) value (env <env>) (index <long>))
-  (gc/let* ((obj (new-record-instance <variable>)))
-    (set (<variable>-name	obj) name)
-    (set (<variable>-value	obj) value)
-    (set (<variable>-env	obj) env)
-    (set (<variable>-index	obj) (box <long> index))
-    obj))
+  (make <variable>
+    (name	name)
+    (value	value)
+    (env	env)
+    (index	(box <long> index))))
 
 (define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (<env>-offset parent))))
-  (gc/let* ((obj (new-record-instance <env>)))
-    (set (<env>-parent		obj) parent)
-    (set (<env>-level		obj) (box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
-    (set (<env>-offset		obj) (box <long> offset))
-    (set (<env>-bindings	obj) (array 0))
-    obj))
+  (make <env>
+    (parent	parent)
+    (level	(box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
+    (offset	(box <long> offset))
+    (bindings	(array 0))))
 
 (define-function new-base-<context> (home caller env)
-  (gc/let* ((obj (new-record-instance <context>)))
-    (set (<context>-home	obj) home)
-    (set (<context>-env		obj) env)
-    (set (<context>-bindings	obj) (array 0))
-    obj))
+  (make <context>
+    (home	home)
+    (env	env)
+    (bindings	(array 0))))
 
 ;; (define-function new-<context> (home caller env)
 ;;   (let ((obj ()))
@@ -762,7 +778,7 @@
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
-        (gc/let* ((new-frame (new-record-instance <call-frame>)))
+        (gc/let* ((new-frame (new <call-frame>)))
           (set (array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
       (with-instance-accessors frame <call-frame>
@@ -1221,7 +1237,7 @@
 
 (define-function new-<module> (name)
   (debug (libc/printf "new-<module>\n"))
-  (gc/let* ((module (new-record-instance <module>))
+  (gc/let* ((module (new <module>))
             (env    (environment () 0 0))
             tmp)
     (when-at-expand feature/debug-info
