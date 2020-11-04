@@ -1431,7 +1431,7 @@
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
-        (while (< 0 (decr idx))
+        (while (< 0 (decr idx)) ; skip the first, which is the name of the executable
           (debug (libc/printf "processing argv %ld = %s\n" idx (oop-at argv idx)))
           (set tmp (cons () tmp))
           (put/head tmp (new-<string>-from-cstring (oop-at argv idx)))))
@@ -1440,12 +1440,15 @@
     (debug (libc/printf "*command-line-arguments* is initialized\n"))
 
     ;; process *cla*
-    (let (cla tmp)
-      (while (pair? (set cla (get (<variable> value) cla-var)))
-        (let* ((arg-string	(get/head cla))
-               (arg		(get/string arg-string)))
-          (gc/protect (arg-string tmp)
-            (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
+    (let (cla
+          arg)
+      (gc/let* (arg-string
+                tmp)
+        (with-forms ((pop-cla (_ '(put (<variable> value) cla-var (set cla (get/tail cla))))))
+          (while (pair? (set cla (get (<variable> value) cla-var)))
+            (set arg-string	(get/head cla))
+            (set arg		(get/string arg-string))
+            (pop-cla)
             (cond
               ;; -v
               ((not (libc/strcmp arg "-v"))
@@ -1479,7 +1482,7 @@
                  (fatal "--call requires an argument"))
                (set arg-string (get/head cla))
                (set arg (get/string arg-string))
-               (put (<variable> value) cla-var (set cla (get/tail cla))) ; (pop *command-line-arguments*)
+               (pop-cla)
                (let ((sym (string->symbol arg)))
                  (gc/let* ((form (cons sym ())))
                    (expand-encode-eval form (module-env *module*)))))
@@ -1492,7 +1495,8 @@
                  (fatal "--define requires two arguments"))
                (gc/let* ((name	(first  cla))
                          (value	(second cla)))
-                 (put (<variable> value) cla-var (set cla (get/tail (get/tail cla)))) ; (pop *command-line-arguments*) x 2
+                 (pop-cla)
+                 (pop-cla)
                  ;; convert to long when possible
                  (let* ((cstr	(get/string value))
                         (endptr	cstr)
