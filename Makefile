@@ -105,7 +105,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
-EVALUATOR_FILES	= $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l) \
+EVALUATOR_FILES	= $(addprefix source/evaluator/,platform-libc.l buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l) \
  $(addprefix source/,list-min.l env-min.l)
 
 # for some optional C files, e.g. profiler.c
@@ -186,7 +186,7 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/vendor			$(TARGET_VENDOR)	\
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_x86)					\
-		source/evaluator/eval.l					\
+		source/evaluator/platform-libc.l				\
 		source/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -206,18 +206,18 @@ $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 		--define target/vendor			$(TARGET_VENDOR)	\
 		--define target/os			$(TARGET_OS)		\
 		$(EMIT_FILES_llvm)					\
-		source/evaluator/eval.l					\
+		source/evaluator/platform-libc.l				\
 		source/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval2 is the second iteration of us that gets built by our compiler animated by our eval executable.
 # eval2 is just a test: eval2.s should be the exact same file as eval1.s
 $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/eval.l,$@)
+	$(call compile-x86,$(BUILD_x86)/eval1,source/evaluator/platform-libc.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/eval.l,$@)
+	$(call compile-llvm,$(BUILD_llvm)/eval1,source/evaluator/platform-libc.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 $(HOST_DIR)/eval:

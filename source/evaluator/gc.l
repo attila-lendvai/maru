@@ -230,7 +230,7 @@
   (safety 2 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
   (set (oop-at gc/roots gc/root-count) ()))
 
-(define-function gc/initialise ()
+(define-function gc/initialize ()
   (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
     (set gc/memory-base ptr)
     (set gc/memory-last ptr))
