@@ -1,4 +1,8 @@
-;; (define %make-accessor %make-unsafe-accessor)
+;;; -*- mode: lisp; coding: us-ascii -*-
+
+(require "source/unit-test.l")
+(require "source/files.l")
+(require "source/sequences.l")
 
 (define-selector $at-end)
 (define-selector $peek)

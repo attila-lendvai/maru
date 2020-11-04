@@ -40,3 +40,14 @@
      (while ,test
        ,@body
        ,@(%loop-steps bindings))))
+
+(define-function %vector-do (get len var col body)
+  `(let* ((_col_ ,col)
+          (_idx_ 0)
+          (_end_ (,len _col_)))
+     (while (< _idx_ _end_)
+       (let ((,var (,get _col_ _idx_))) ,@body)
+       (set _idx_ (+ _idx_ 1)))))
+
+(define-form array-do	(var arr . body)	(%vector-do array-at  array-length  var arr body))
+(define-form string-do	(var str . body)	(%vector-do string-at string-length var str body))

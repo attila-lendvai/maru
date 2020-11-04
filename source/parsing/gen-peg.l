@@ -16,6 +16,8 @@
 
 (progress "loading dependencies")
 
+(require "source/files.l")
+(require "source/unit-test.l")
 (require "source/parsing/parser.l")
 (require "source/parsing/peg-compiler.l")
 
