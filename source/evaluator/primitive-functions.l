@@ -2,15 +2,15 @@
 
 (define-primitive-function (define () fixed) ((variable <variable>) value-form)
   (let ((value (eval value-form -ctx-)))
-    (put (<variable> value) variable value)
+    (set (<variable>-value variable) value)
     ;; maybe set the <expr>'s name slot
     (when-at-expand feature/track-expr-names
       (let ((tmp value))
         (when (is <form> tmp)
-          (set tmp (get (<form> function) tmp)))
+          (set tmp (<form>-function tmp)))
         (when (and (is <expr> tmp)
-                   (not (get (<expr> name) tmp)))
-          (put (<expr> name) tmp (get (<variable> name) variable)))))
+                   (not (<expr>-name tmp)))
+          (set (<expr>-name tmp) (<variable>-name variable)))))
     value))
 
 (define-primitive-function (lambda () fixed) ((env <env>) parameters . body)
@@ -18,7 +18,7 @@
   (new-<expr> parameters body env -ctx-))
 
 (define-primitive-function (let () fixed) (env bindings . body)
-  (let ((locals (get (<context> bindings) -ctx-)))
+  (let ((locals (<context>-bindings -ctx-)))
     (gc/let* (tmp)
       (list-do binding bindings
         (when (pair? binding)
@@ -30,7 +30,7 @@
               (set tmp (eval (get/head prog) -ctx-))
               (set prog (get/tail prog)))
             (debug (libc/printf "let primitive-function is setting var ") (print var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (println -ctx-))
-            (set (array-at locals (unbox <long> (get (<variable> index) var))) tmp))))
+            (set (array-at locals (unbox <long> (<variable>-index var))) tmp))))
       (set tmp ())
       (list-do exp body
         (set tmp (eval exp -ctx-)))
@@ -40,16 +40,16 @@
   (debug (libc/printf "SET ") (print var) (print value-form) (libc/printf " IN ") (println -ctx-))
   (let ((value (eval value-form -ctx-)))
     (if (global-variable? var)
-        (put (<variable> value) var value)
-      (let ((delta (- (unbox <long> (get (<env> level) (get (<context>  env) -ctx-)))
-                  (unbox <long> (get (<env> level) (get (<variable> env) var))))))
+        (set (<variable>-value var) value)
+      (let ((delta (- (unbox <long> (<env>-level (<context>-env -ctx-)))
+                  (unbox <long> (<env>-level (<variable>-env var))))))
         (debug (libc/printf "set primitive-function is writing local var ") (print var) (libc/printf " with delta %ld\n" delta))
         (while (< 0 delta)
-          (set -ctx- (get (<context> home) -ctx-))
+          (set -ctx- (<context>-home -ctx-))
           (decr delta))
-        (let ((index (unbox <long> (get (<variable> index) var))))
+        (let ((index (unbox <long> (<variable>-index var))))
           (debug (libc/printf "set primitive-function is setting local var in context ") (print -ctx-) (libc/printf " at index %ld, to value " index) (println value))
-          (set (array-at (get (<context> bindings) -ctx-) index) value))))))
+          (set (array-at (<context>-bindings -ctx-) index) value))))))
 
 (define-primitive-function (while () fixed) _
   (let ((test	(car -args-))
@@ -303,10 +303,10 @@
 (define-primitive-function (array?  ())	(thing)	(and (array?  thing) symbol/true))
 
 (define-primitive-function set-car ((pair <pair>) value)
-  (put (<pair> head) pair value))
+  (set (<pair>-head pair) value))
 
 (define-primitive-function set-cdr ((pair <pair>) value)
-  (put (<pair> tail) pair value))
+  (set (<pair>-tail pair) value))
 
 (define-primitive-function copy-oops		(from to (wordcount <long>)))
 (define-primitive-function oop-at		(base (index <long>)))
@@ -327,10 +327,10 @@
   (box <long> thing))
 
 (define-primitive-function (array-length ()) ((arg <array>))
-  (get (<array> size) arg))
+  (<array>-size arg))
 
 (define-primitive-function (string-length ()) ((arg <string> _ nounbox))
-  (get (<string> size) arg))
+  (<string>-size arg))
 
 (define-primitive-function (array-at ()) ((array <array>) (index <long>))
   (array-at array index))

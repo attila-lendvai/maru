@@ -14,18 +14,18 @@
         (zeroed-name (concat-symbol basename 'ensure-zero-terminated)))
     `(let ()
        (define-function ,length-name (obj)
-         (unbox <long> (get (,type-name size) obj)))
+         (unbox <long> (slot-value ,type-name size obj)))
 
        (define-function ,getter-name (obj idx)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
-         (let ((elements (get (,type-name elements) obj))
+         (let ((elements (slot-value ,type-name elements obj))
                (size     (,length-name obj)))
            (and (< idx size)
                 (,accessor elements idx))))
 
        (define-function ,setter-name (obj idx val)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string setter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
-         (let* ((elements	(get (,type-name elements) obj))
+         (let* ((elements	(slot-value ,type-name elements obj))
                 (size		(,length-name obj))
                 (capacity	(if elements
                                     (/ (gc/object-size elements)
@@ -39,10 +39,10 @@
              (gc/let* ((new-elements (,@(if elements-are-pointers? '(allocate <data>) '(allocate-data))
                                         (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
                (,copier elements new-elements size)
-               (set elements (put (,type-name elements) obj new-elements))))
+               (set elements (set (slot-value ,type-name elements obj) new-elements))))
            (when (<= size idx)
              ;; record the largest ever written index + 1 (aka size) in the size slot
-             (put (,type-name size) obj (box <long> (+ 1 idx))))
+             (set (slot-value ,type-name size obj) (box <long> (+ 1 idx))))
            (set (,accessor elements idx) val)))
 
        (define-function ,append-name (obj val)
@@ -55,7 +55,7 @@
              ;; TODO how about insering far out into the new territory?
              (,append-name obj 0)    ; ensure that we have enough room
              (when (< idx size)
-               (let* ((elements	(get (,type-name elements) obj))
+               (let* ((elements	(slot-value ,type-name elements obj))
                       (src	(+ elements (* idx ,element-size-in-bytes)))
                       (dest	(+ src ,element-size-in-bytes)))
                  (,mover src dest (- size idx))))))
@@ -64,7 +64,7 @@
        (define-function ,zeroed-name (obj)
          (let ((size (,length-name obj)))
            (,setter-name obj size 0)
-           (put (,type-name size) obj (box <long> size)))
+           (set (slot-value ,type-name size obj) (box <long> size)))
          obj))))
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	move-oops	+word-size-in-bytes+)

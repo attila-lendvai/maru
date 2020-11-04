@@ -105,30 +105,42 @@
 ;;;
 ;;; override slot access with a specialized getter and setter
 ;;; for the possibility of implementing e.g. read/write barriers.
+;;;
+;;; the customized slot-value is used for accessing heap objects
+;;; that have a <header>. on high enough safety level all slot access
+;;; is typechecked at runtime.
+;;;
+;;; "one of the reasons for having all accesses to object fields go
+;;; through get() and set() was to make it ridiculously easy to add
+;;; read and write barriers" - Piumarta (NOTE: that get/set has been
+;;; replaced by the [set-]slot-value macro choke-points below)
+;;;
 ;;; ----------------------------------------------------------------
 
-;; records in the target are raw blocks of memory, i.e. they don't necessarily have a GC <header> (well, <header> *itself* is a record!).
-;; therefore we cannot have feature/typecheck-slot-access here, that's what we have the get/put protocol.
-;; TODO it would be nice to eliminate the separate get/put protocol, or at least reverse the two: the get/put API should serve for the raw memory access.
-;; TODO or add a specialized raw-record type whose accessors don't try to accessor-typecheck?
+;; raw records are records that have no gc <header>, i.e. no runtime
+;; type info, and thus we can't typecheck them.
+;; TODO maybe this should be annotated on the type? this is rather similar to e.g. type info of slots, and automatic boxing/unboxing in the accessors (not yet implemented)
+(define-constant +raw-records+ ''(<header>))
+
 (define-form slot-value (type-name slot-name object)
   (let* ((type		(eval type-name))
          (slot-index	(record/slot-index type slot-name)))
-    `(oop-at ,object ,slot-index)))
+    `(oop-at ,(if (and feature/typecheck-slot-access
+                       (not (member? type-name +raw-records+)))
+                  `(k/%accessor-typecheck ,type-name ,object)
+                object)
+             ,slot-index)))
 
-;; TODO this requires fixing expand, see test eval/expand/set-forms/1
-;; (define-form set-slot-value (type-name slot-name object value)
-;;   (let* ((type		(eval type-name))
-;;          (slot-index	(record/slot-index type slot-name)))
-;;     `(set-oop-at ,object ,slot-index ,value)))
-
-;; TODO decide which one is better
-;; an alternative way to integrate with normal accessors.
-;; redefine %accessor-typecheck with a macro that redirects to a kernel version that drops the slot-name,
-;; because the compiler cannot emit symbols yet
-;; (define-form %accessor-typecheck (expected-type-id slot-name object)
-;;   ;; TODO? `(k/%accessor-typecheck ,expected-type-id ,object)
-;;   object)
+;; TODO to fully hook this in, expand needs to be fixed. see test eval/expand/set-forms/1
+(define-form set-slot-value (type-name slot-name object value)
+  (let* ((type		(eval type-name))
+         (slot-index	(record/slot-index type slot-name)))
+    `(set (oop-at ,(if (and feature/typecheck-slot-access
+                            (not (member? type-name +raw-records+)))
+                       `(k/%accessor-typecheck ,type-name ,object)
+                     object)
+                  ,slot-index)
+          ,value)))
 
 ;;;
 ;;; forward definitions, so that the variables get created early enough for building the graph
@@ -468,32 +480,6 @@
         (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
   object)
 
-;; "one of the reasons for having all accesses to object fields go through get() and set() was to make it ridiculously easy to add read and write barriers" - Piumarta
-(define-form get (designator object)
-  (let* ((type-name	(first designator))
-         (slot		(second designator))
-         (type		(eval type-name)))
-    (assert (not (cddr designator)) "malformed get designator: "designator)
-    ;; we could use the accessors, too:
-    ;; (,(concat-symbol (concat-symbol type-name '-) slot) __obj__)
-    `(oop-at ,(if feature/typecheck-slot-access
-                  `(k/%accessor-typecheck ,type-name ,object)
-                object)
-             ,(record/slot-index type slot))))
-
-(define-form put (designator object value)
-  (let* ((type-name	(first designator))
-         (slot		(second designator))
-         (type		(eval type-name)))
-    (assert (not (cddr designator)) "malformed put designator: "designator)
-    ;; we could use the accessors, too:
-    ;; (set (,(concat-symbol (concat-symbol type-name '-) slot) __obj__) ,value)
-    `(set (oop-at ,(if feature/typecheck-slot-access
-                       `(k/%accessor-typecheck ,type-name ,object)
-                     object)
-                  ,(record/slot-index type slot))
-          ,value)))
-
 ;; shorthands (and optimizations)
 (if-at-expand feature/optimize-space
     (let ()
@@ -508,22 +494,16 @@
   (define-form symbol?		(obj)	`(is <symbol>	,obj))
   (define-form array?		(obj)	`(is <array>	,obj)))
 
-(define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(get (<pair> head) ,obj)))
-(define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(put (<pair> head) ,obj ,val)))
-(define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(get (<pair> tail) ,obj)))
-(define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(put (<pair> tail) ,obj ,val)))
+(define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(<pair>-head ,obj)))
+(define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(set (<pair>-head ,obj) ,val)))
+(define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(<pair>-tail ,obj)))
+(define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(set (<pair>-tail ,obj) ,val)))
 
-(define-form get/string		(obj)		`(get (<string> elements) (string-ensure-zero-terminated ,obj)))
+(define-form get/string		(obj)		`(<string>-elements (string-ensure-zero-terminated ,obj)))
 
-(define-form get/variable-value	(var)		`(get (<variable> value)
-                                                      ,(if (string? var)
-                                                           `(defined? (string->symbol ,var) (module-env *module*))
-                                                         var)))
-
-(define-form put/variable-value	(var val)	`(put (<variable> value)
-                                                      ,(if (string? var)
-                                                           `(defined? (string->symbol ,var) (module-env *module*))
-                                                         var)
+(define-form set-variable-value	(var val)	`(set (<variable>-value ,(if (string? var)
+                                                                             `(defined? (string->symbol ,var) (module-env *module*))
+                                                                           var))
                                                       ,val))
 
 ;; TODO should we turn these into macros? or introduce compiler macros?
@@ -568,15 +548,15 @@
 
 (define-primitive-function string ((length <long> 0))
   (gc/let* ((str (new-record-instance <string>)))
-    (put (<string> size) str (box <long> length))
+    (set (<string>-size str) (box <long> length))
     (when (> length 0)
-      (put (<string> elements) str (allocate-data length)))
+      (set (<string>-elements str) (allocate-data length)))
     str))
 
 (define-function new-<string>-from-cstring (cstr)
   (let* ((len (libc/strlen cstr))
          (obj (string len)))
-    (libc/memcpy (get (<string> elements) obj) cstr len)
+    (libc/memcpy (<string>-elements obj) cstr len)
     obj))
 
 (define-function new-<symbol> (cstr)
@@ -587,79 +567,79 @@
 
 (define-primitive-function array ((capacity <long> 0))
   (gc/let* ((arr (new-record-instance <array>)))
-    (put (<array> size) arr (box <long> 0))
+    (set (<array>-size arr) (box <long> 0))
     (when (> capacity 0)
-      (put (<array> elements) arr (allocate <data> capacity)))
+      (set (<array>-elements arr) (allocate <data> capacity)))
     arr))
 
 (define-function new-<expr> (parameters body env ctx)
   (let ((obj (new-record-instance <expr>)))
-    (put (<expr> parameters)	obj parameters)
-    (put (<expr> body)		obj body)
-    (put (<expr> env)		obj env)
-    (put (<expr> ctx)		obj ctx)
+    (set (<expr>-parameters	obj) parameters)
+    (set (<expr>-body		obj) body)
+    (set (<expr>-env		obj) env)
+    (set (<expr>-ctx		obj) ctx)
     (when-at-expand feature/profiler
-      (put (<expr> profiler-counter) obj (box <long> 0)))
+      (set (<expr>-profiler-counter obj) (box <long> 0)))
     obj))
 
 (define-primitive-function form (fn (sym () ()))
   (let ((obj (new-record-instance <form>)))
-    (put (<form> function)	obj fn)
-    (put (<form> symbol)	obj sym)
+    (set (<form>-function	obj)	fn)
+    (set (<form>-symbol		obj)	sym)
     obj))
 
 (define-primitive-function fixed (fn)
   (let ((obj (new-record-instance <fixed>)))
-    (put (<fixed> function)	obj fn)
+    (set (<fixed>-function obj) fn)
     obj))
 
 (define-function new-<primitive-function> (_imp _name)
   (let ((obj (new-record-instance/opaque <primitive-function>)))
-    (put (<primitive-function> _imp)		obj _imp)
-    (put (<primitive-function> _name)		obj _name)
+    (set (<primitive-function>-_imp		obj) _imp)
+    (set (<primitive-function>-_name		obj) _name)
     (when-at-expand feature/profiler
-      (put (<primitive-function> profiler-counter) obj 0))
+      (set (<primitive-function>-profiler-counter obj) 0))
     obj))
 
 (define-primitive-function variable ((name <symbol>) value (env <env>) (index <long>))
   (gc/let* ((obj (new-record-instance <variable>)))
-    (put (<variable> name)	obj name)
-    (put (<variable> value)	obj value)
-    (put (<variable> env)	obj env)
-    (put (<variable> index)	obj (box <long> index))
+    (set (<variable>-name	obj) name)
+    (set (<variable>-value	obj) value)
+    (set (<variable>-env	obj) env)
+    (set (<variable>-index	obj) (box <long> index))
     obj))
 
-(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (get (<env> offset) parent))))
+(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (<env>-offset parent))))
   (gc/let* ((obj (new-record-instance <env>)))
-    (put (<env> parent)		obj parent)
-    (put (<env> level)		obj (box <long> (if parent (+ (unbox <long> (get (<env> level) parent)) level) 0)))
-    (put (<env> offset)		obj (box <long> offset))
-    (put (<env> bindings)	obj (array 0))
+    (set (<env>-parent		obj) parent)
+    (set (<env>-level		obj) (box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
+    (set (<env>-offset		obj) (box <long> offset))
+    (set (<env>-bindings	obj) (array 0))
     obj))
 
 (define-function new-base-<context> (home caller env)
   (gc/let* ((obj (new-record-instance <context>)))
-    (put (<context> home)	obj home)
-    (put (<context> env)	obj env)
-    (put (<context> bindings)	obj (array 0))
+    (set (<context>-home	obj) home)
+    (set (<context>-env		obj) env)
+    (set (<context>-bindings	obj) (array 0))
     obj))
 
 ;; (define-function new-<context> (home caller env)
 ;;   (let ((obj ()))
 ;;     (if (and caller
-;;              (set obj (get (<context> callee) caller)))
+;;              (set obj (<context>-callee caller)))
 ;;         (let ()
-;;           (put (<context> home) obj home)
-;;           (put (<context> env)  obj env))
+;;           (set (<context>-home obj) home)
+;;           (set (<context>-env  obj) env))
 ;;       (set obj (new-base-<context> home caller env))
 ;;       (when caller
-;;         (put (<context> callee) caller obj)))
+;;         (set (<context>-callee caller) obj)))
 ;;     obj))
 
 (define-function new-<context> (home caller env)
   (let ((obj (new-base-<context> home caller env)))
     (when caller
-      (put (<context> callee) caller obj))
+      (set (<context>-callee caller) obj))
     obj))
 
 ;;;
@@ -725,15 +705,15 @@
   (safety 2 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
   (awhen (find-variable env name)
     (return it))
-  (let ((offset (unbox <long> (get (<env> offset) env))))
+  (let ((offset (unbox <long> (<env>-offset env))))
     (gc/let* ((var (variable name () env offset)))
-      (put (<env> offset) env (box <long> (+ offset 1)))
-      (array-append (get (<env> bindings) env) var))))
+      (set (<env>-offset env) (box <long> (+ offset 1)))
+      (array-append (<env>-bindings env) var))))
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
   (debug (libc/printf "environment-define called, name is %s\n" (unbox <symbol> name)))
   (let ((var (ensure-variable env name)))
-    (put (<variable> value) var value)
+    (set (<variable>-value var) value)
     var))
 
 (define-primitive-function string->symbol ((string <string>))
@@ -751,7 +731,7 @@
   (let ((tmp var))
     (and tmp
          (is <variable> tmp)
-         (set tmp (get (<variable> value) tmp))
+         (set tmp (<variable>-value tmp))
          (or (not type)
              (= type (type-of tmp)))
          tmp)))
@@ -763,8 +743,8 @@
 ;; TODO move this also into env-min.l, but for that we need smart accessors in the
 ;; level-shifted code that automatically do the unboxing of slot values
 (define-function global-variable? (var)
-  (let ((env (get (<variable> env) var)))
-    (= 0 (unbox <long> (get (<env> level) env)))))
+  (let ((env (<variable>-env var)))
+    (= 0 (unbox <long> (<env>-level env)))))
 
 (load "source/evaluator/reader.l")
 (load "source/evaluator/printer.l")
@@ -840,29 +820,29 @@
 
 (define-function apply/expr (fun arguments parent-ctx)
   (verbosity 3 (libc/printf "  A  ") (print fun)  (libc/printf " ")  (print arguments) (libc/printf " ") (println parent-ctx) (libc/flush-streams))
-  (let ((env	(get (<expr> env) fun))
-        (params	(get (<expr> parameters) fun)))
-    (gc/let* ((innter-ctx (new-<context> (get (<expr> ctx) fun) parent-ctx env)))
-      (let ((locals (get (<context> bindings) innter-ctx))
+  (let ((env	(<expr>-env fun))
+        (params	(<expr>-parameters fun)))
+    (gc/let* ((innter-ctx (new-<context> (<expr>-ctx fun) parent-ctx env)))
+      (let ((locals (<context>-bindings innter-ctx))
             (args   arguments))
         (while (pair? params)
           (or (pair? args) (error "too few arguments for "fun": "arguments))
-          (set (array-at locals (unbox <long> (get (<variable> index) (get/head params))))
+          (set (array-at locals (unbox <long> (<variable>-index (get/head params))))
                (get/head args))
           (set params	(get/tail params))
           (set args	(get/tail args)))
         ;; the cdr position
         (when (is <variable> params)
-          (set (array-at locals (unbox <long> (get (<variable> index) params))) args)
+          (set (array-at locals (unbox <long> (<variable>-index params))) args)
           (set args ()))
         (when args
           (error "too many arguments for "fun": "arguments)))
-      (let ((prg (get (<expr> body) fun))
+      (let ((prg (<expr>-body fun))
             (result ()))
         (list-do exp prg
           (set result (eval exp innter-ctx)))
-        (when (get (<env> stable) env)
-          (put (<context> callee) innter-ctx ()))
+        (when (<env>-stable env)
+          (set (<context>-callee innter-ctx) ()))
         result))))
 
 (define-function apply (fun arguments ctx)
@@ -876,7 +856,7 @@
          (apply/expr fun arguments ctx))
 
         ((= type <primitive-function>)
-         ((get (<primitive-function> _imp) fun) arguments ctx))
+         ((<primitive-function>-_imp fun) arguments ctx))
 
         (else
          (aif (and *applicators*
@@ -896,11 +876,11 @@
 
 (define-function maybe-form-in-env/function (env name)
   (awhen (maybe-object-in-env env name <form>)
-    (get (<form> function) it)))
+    (<form>-function it)))
 
 (define-function maybe-form-in-env/symbol (env name)
   (awhen (maybe-object-in-env env name <form>)
-    (get (<form> symbol) it)))
+    (<form>-symbol it)))
 
 (define-function expand-all (list env)
   (if (pair? list)
@@ -1031,7 +1011,7 @@
         (expand expansion env))
     exp))
 
-(define-primitive-function expand (exp (env <env> (get (<context> env) -ctx-)))
+(define-primitive-function expand (exp (env <env> (<context>-env -ctx-)))
   (debug (libc/printf "expand, exp ") (print exp) (libc/printf ", env ") (println env))
   (with-new-call-frame (symbol/expand () exp)
     ;; TODO use typecase
@@ -1068,7 +1048,7 @@
        ;; KLUDGE? to make encode idempotent, this is how we detect that this let has already been encoded. same below.
        (unless (is <env> (first tail))
          (gc/let* ((vars	())
-                   (inner-env	(environment env 0 (unbox <long> (get (<env> offset) env)))))
+                   (inner-env	(environment env 0 (unbox <long> (<env>-offset env)))))
            ;; phase 1: first define the let variables into inner-env
            (let (vars/last)
              (list-do entry (first tail)
@@ -1080,8 +1060,7 @@
                                     (put/tail vars/last (cons var-obj ()))
                                   (set vars (cons var-obj ())))))))
            ;; update the offset of the parent env to "skip" the indices of our let variables
-           (put (<env> offset) env
-                (get (<env> offset) inner-env))
+           (set (<env>-offset env) (<env>-offset inner-env))
            ;; phase 2: encode-all the init-progs and build the new bindings list
            (gc/let* (var
                      new-bindings)
@@ -1134,17 +1113,17 @@
   (let ((var (or (defined? exp env)
                  (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
-        (let ((val (get (<variable> value) var)))
+        (let ((val (<variable>-value var)))
           (when (or (is <form> val)
                     (is <fixed> val))
             (return val)))
-      (let ((venv (get (<variable> env) var)))
-        (unless (= (unbox <long> (get (<env> level) venv))
-                   (unbox <long> (get (<env> level) env)))
-          (put (<env> stable) venv symbol/true))))
+      (let ((venv (<variable>-env var)))
+        (unless (= (unbox <long> (<env>-level venv))
+                   (unbox <long> (<env>-level env)))
+          (set (<env>-stable venv) symbol/true))))
     var))
 
-(define-primitive-function encode (exp (env <env> (get (<context> env) -ctx-)))
+(define-primitive-function encode (exp (env <env> (<context>-env -ctx-)))
   (debug (libc/printf "encode of exp ") (print exp) (libc/printf ", in env ") (println env))
   (with-new-call-frame (symbol/encode () exp)
     (debug (libc/printf "encode is dispatching on type %ld\n" (type-of exp)))
@@ -1185,7 +1164,7 @@
          (when-at-expand feature/backtrace
            (set (<call-frame>-callee -call-frame-) evaled-head))
 	 (if (is <fixed> evaled-head)
-	     (apply (get (<fixed> function) evaled-head) (get/tail exp) ctx)
+	     (apply (<fixed>-function evaled-head) (get/tail exp) ctx)
 	   (gc/let* ((args (eval-all (get/tail exp) ctx)))
              (when-at-expand feature/backtrace
                (set (<call-frame>-arguments -call-frame-) args))
@@ -1213,15 +1192,15 @@
       ((= type <variable>)	(if (global-variable? exp)
 				    (let ()
                                       (debug (libc/printf "eval is reading global var ") (println exp))
-                                      (get (<variable> value) exp))
-				  (let ((delta (- (unbox <long> (get (<env> level) (get (<context>  env) ctx)))
-					      (unbox <long> (get (<env> level) (get (<variable> env) exp))))))
+                                      (<variable>-value exp))
+				  (let ((delta (- (unbox <long> (<env>-level (<context>-env ctx)))
+					      (unbox <long> (<env>-level (<variable>-env exp))))))
 				    (debug (libc/printf "eval is reading local var ") (print exp) (libc/printf " with delta %ld\n" delta))
 				    (while (< 0 delta)
-				      (set ctx (get (<context> home) ctx))
+				      (set ctx (<context>-home ctx))
 				      (decr delta))
-                                    (let* ((index (unbox <long> (get (<variable> index) exp)))
-                                           (value (array-at (get (<context> bindings) ctx) index)))
+                                    (let* ((index (unbox <long> (<variable>-index exp)))
+                                           (value (array-at (<context>-bindings ctx) index)))
                                       (debug (libc/printf "eval is reading local var from context ") (print ctx) (libc/printf " at index %ld, holding value " index) (println value))
 				      value))))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
@@ -1242,7 +1221,7 @@
 
 ;; TODO unexport?
 (define-primitive-function repl-stream ((stream <target-vm-pointer>))
-  ;;(put/variable-value *input* (box <long> stream))
+  ;;(set-variable-value *input* (box <long> stream))
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -1423,8 +1402,6 @@
   (set *module* (new-<module> "maru-user"))
   (capture-well-known-module-values)			(debug (libc/printf "finished module initialization\n"))
 
-  (assert (= <primitive-function> (type-of (get/variable-value "cons"))) "(= <primitive-function> (type-of (get/variable-value "cons")))")
-
   (debug (libc/printf "start processing argv\n"))
 
   ;; *command-line-arguments*
@@ -1436,7 +1413,7 @@
           (debug (libc/printf "processing argv %ld = %s\n" idx (oop-at argv idx)))
           (set tmp (cons () tmp))
           (put/head tmp (new-<string>-from-cstring (oop-at argv idx)))))
-      (put (<variable> value) cla-var tmp))
+      (set (<variable>-value cla-var) tmp))
 
     (debug (libc/printf "*command-line-arguments* is initialized\n"))
 
@@ -1445,8 +1422,8 @@
           arg)
       (gc/let* (arg-string
                 tmp)
-        (with-forms ((pop-cla (_ '(put (<variable> value) cla-var (set cla (get/tail cla))))))
-          (while (pair? (set cla (get (<variable> value) cla-var)))
+        (with-forms ((pop-cla (_ '(set (<variable>-value cla-var) (set cla (get/tail cla))))))
+          (while (pair? (set cla (<variable>-value cla-var)))
             (set arg-string	(get/head cla))
             (set arg		(get/string arg-string))
             (pop-cla)
@@ -1455,13 +1432,13 @@
               ((not (libc/strcmp arg "-v"))
                (incr *verbosity*)
                (set tmp (box <long> *verbosity*))
-               (put/variable-value "*verbosity*" tmp))
+               (set-variable-value "*verbosity*" tmp))
 
               ;; -O
               ((not (libc/strcmp arg "-O"))
                (incr *optimised*)
                (set tmp (box <long> *optimised*))
-               (put/variable-value "*optimised*" tmp))
+               (set-variable-value "*optimised*" tmp))
 
               ;; -p
               ((not (libc/strcmp arg "-p"))
