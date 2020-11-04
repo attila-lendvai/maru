@@ -292,6 +292,7 @@
                                  (let ()
                                    (set ,arg-name (get/head __args))
                                    ,@(when type-checker
+                                       ;; TODO this emits quite some duplicity
                                        `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string prim-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
                                    ,@(when (and unbox?
                                                 unboxer)
@@ -1522,7 +1523,7 @@
   (debug (libc/printf "main is on the way out\n"))
 
   (gc/collect)
-  (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free)
+  (verbosity 1 (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free))
   (when-at-expand feature/profiler
     (profiler/disable))
   (libc/flush-streams)

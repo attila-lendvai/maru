@@ -383,7 +383,7 @@ test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembl
 	./build/test-elf
 
 tests/parsing/%.g.l: tests/parsing/%.g source/parsing/parser.l source/parsing/peg.g.l
-	$(call maybe-build-gen-eval)
+	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
