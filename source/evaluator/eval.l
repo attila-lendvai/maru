@@ -876,12 +876,12 @@
   (awhen (maybe-object-in-env env name <form>)
     (<form>-symbol it)))
 
-(define-function expand-all (list env)
+(define-function expand-all (list env one-step?)
   (if (pair? list)
-      (gc/let* ((head (expand		(get/head list) env))
-                (tail (expand-all	(get/tail list) env)))
+      (gc/let* ((head (expand		(get/head list) env one-step?))
+                (tail (expand-all	(get/tail list) env one-step?)))
         (cons head tail))
-    (expand list env)))
+    (expand list env one-step?)))
 
 (define-function setter-name-for (fn-name env)
   (gc/let* ((buf (buffer)))
@@ -897,7 +897,7 @@
       (when (symbol? fn-name)
         fn-name))))
 
-(define-function attempt-set-convert (place value env)
+(define-function attempt-set-convert (place value env one-step?)
   (let ((fn-name (maybe-fn-name-from-expr place)))
     (when fn-name
       ;; it's a set form such as: (set (fn-name a b c) new-value). let's try to convert it to
@@ -905,12 +905,12 @@
       (awhen (setter-name-for fn-name env)
         (gc/let* ((args (get/tail place))
                   (last (cons value ())))
-          (set args (expand-all args env))
+          (set args (expand-all args env one-step?))
           (set args (concat-list args last))
           (cons it args))))))
 
-(define-function expand/pair (exp env -call-frame-)
-  (gc/let* ((head (expand (get/head exp) env)))
+(define-function expand/pair (exp env one-step? -call-frame-)
+  (gc/let* ((head (expand (get/head exp) env one-step?)))
     (debug (libc/printf "expand/pair on head ") (println head))
     (when-at-expand feature/backtrace
       (set (<call-frame>-callee			-call-frame-) head)
@@ -929,14 +929,14 @@
                    (if (pair? entry)
                        (let ()
                          (set var-name		(get/head entry))
-                         (set var-init-prog	(expand-all (get/tail entry) env)))
+                         (set var-init-prog	(expand-all (get/tail entry) env one-step?)))
                      (set var-name	entry)
                      (set var-init-prog	(cons () ())))
                    (gc/let* ((new-entry (cons var-name var-init-prog)))
                      (set new-bindings/last (if new-bindings
                                                 (put/tail new-bindings/last (cons new-entry ()))
                                               (set new-bindings (cons new-entry ())))))))))
-           (gc/let* ((tmp (expand-all (cddr exp) env))) ; the body
+           (gc/let* ((tmp (expand-all (cddr exp) env one-step?))) ; the body
              (set tmp (cons new-bindings tmp))
              (set tmp (cons symbol/let tmp))
              tmp)))
@@ -952,34 +952,39 @@
          ;; this setup allows defining e.g. a SET-SLOT-VALUE form to override its behavior. the old way was to first expand
          ;; the body, i.e. a (SLOT-VALUE ...) form into an (OOP-AT ...) form, and only then attempt to set-convert it to SET-OOP-AT.
          (let ((vanilla-place	(second exp)))
-           (gc/let* ((value	(expand (third exp) env))
-                     (converted	(attempt-set-convert vanilla-place value env)))
+           (gc/let* ((value	(expand (third exp) env one-step?))
+                     (converted	(attempt-set-convert vanilla-place value env one-step?)))
              (if converted
-                 (expand converted env)
-               (gc/let* ((expanded-place (expand vanilla-place env)))
-                 (if (set converted (attempt-set-convert expanded-place value env))
-                     (expand converted env)
+                 (if one-step?
+                     converted
+                   (expand converted env one-step?))
+               ;; we descend here with one-step? = true, so that we can attempt the set-conversion at each step of expansion
+               (gc/let* ((expanded-place (expand vanilla-place env true)))
+                 (if (set converted (attempt-set-convert expanded-place value env one-step?))
+                     (if one-step?
+                         converted
+                       (expand converted env one-step?))
                    (let ((fn-name (maybe-fn-name-from-expr expanded-place)))
                      ;; we need to "look ahead" and only attempt recursive expansion when there's any work left to do.
-                     ;; otherwise this would lead to infinite recursion: (set (without-set-version ...) ...)
-                     (if (and fn-name
+                     ;; otherwise the following form would lead to infinite recursion: (set (without-set-version ...) ...)
+                     (set converted (list3 symbol/set expanded-place value))
+                     (if (and (not one-step?)
+                              fn-name
                               (setter-name-for fn-name env))
-                         (let ()
-                           (set converted (list3 symbol/set expanded-place value))
-                           (expand converted env))
-                       (list3 symbol/set expanded-place value)))))))))
+                         (expand converted env one-step?)
+                       converted))))))))
 
         ((= head symbol/define)
          (safety 1 (assert (not (cdddr exp)) "illegal define form: " exp))
          (let ((name	(second exp))
                (value	(third exp)))
-           (gc/let* ((expanded-value (expand value env)))
+           (gc/let* ((expanded-value (expand value env one-step?)))
              (list3 symbol/define name expanded-value))))
 
         ((= head symbol/lambda)
          (let ((params	(cadr exp))
                (body	(cddr exp)))
-           (gc/let* ((tmp (expand-all body env)))
+           (gc/let* ((tmp (expand-all body env one-step?)))
              (set tmp (cons params tmp))
              (cons symbol/lambda tmp))))
 
@@ -988,30 +993,35 @@
          (gc/let* ((args (cons env (get/tail exp)))
                    (expansion (apply expander args ())))
            (debug (libc/printf "expand/pair, found in local env, expanded to ") (println expansion))
-           (expand expansion env)))
+           (if one-step?
+               expansion
+             (expand expansion env one-step?))))
 
         (else
          ;; head is not a <form> nor a fixed special form
-         (gc/let* ((tail (expand-all (get/tail exp) env)))
+         (gc/let* ((tail (expand-all (get/tail exp) env one-step?)))
            (cons head tail)))))))
 
-(define-function expand/symbol (exp env)
+(define-function expand/symbol (exp env one-step?)
   (debug (libc/printf "expand/symbol, exp ") (print exp) (libc/printf ", env ") (println env))
   (aif (maybe-form-in-env/symbol env exp)
       ;; head is a <form> found in *env* (which may hold lexically scoped forms, and i think delegates all the way up to the module's env)
       (gc/let* ((args (list2 env exp))
                 (expansion (apply it args ())))
         (debug (libc/printf "expand/symbol, found in local env, expanded to ") (println expansion))
-        (expand expansion env))
+        (if one-step?
+            expansion
+          (expand expansion env one-step?)))
     exp))
 
-(define-primitive-function expand (exp (env <env> (<context>-env -ctx-)))
+;; TODO that <long> for the boolean is not ok
+(define-primitive-function expand (exp (env <env> (<context>-env -ctx-)) (one-step? <long> false))
   (debug (libc/printf "expand, exp ") (print exp) (libc/printf ", env ") (println env))
   (with-new-call-frame (symbol/expand () exp)
     ;; TODO use typecase
     (cond
-      ((pair? exp)	(expand/pair	exp env -call-frame-))
-      ((symbol? exp)	(expand/symbol	exp env))
+      ((pair? exp)	(expand/pair	exp env one-step? -call-frame-))
+      ((symbol? exp)	(expand/symbol	exp env one-step?))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
        (aif (and *expanders*
@@ -1206,7 +1216,7 @@
   (gc/let* ((x form)
             (ctx (new-base-<context> () () env)))
 					(verbosity 2 (libc/printf ";;; ? ")		(println x))
-    (set x (expand x env))		(verbosity 2 (libc/printf ";;; expd--> ")	(println x))
+    (set x (expand x env false))	(verbosity 2 (libc/printf ";;; expd--> ")	(println x))
     (set x (encode x env))		(verbosity 2 (libc/printf ";;; encd--> ")	(println x))
     (set x (eval   x ctx))
 					(verbosity 2 (libc/printf ";;; => ")		(println x))
