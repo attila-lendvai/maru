@@ -480,11 +480,6 @@
 
 (define-form get/string		(obj)		`(<string>-elements (string-ensure-zero-terminated ,obj)))
 
-(define-form set-variable-value	(var val)	`(set (<variable>-value ,(if (string? var)
-                                                                             `(defined? (string->symbol ,var) (module-env *module*))
-                                                                           var))
-                                                      ,val))
-
 ;; TODO should we turn these into macros? or introduce compiler macros?
 (define-primitive-function car (list)
   (when list
@@ -1225,7 +1220,7 @@
 
 ;; TODO unexport?
 (define-primitive-function repl-stream ((stream <target-vm-pointer>))
-  ;;(set-variable-value *input* (box <long> stream))
+  ;;(set (variable-value *input* <target-vm-pointer>) stream)
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))
@@ -1357,11 +1352,12 @@
 
     (instantiate-primitive-functions module)
 
-    (set fixed-primitive-function/quote		(variable-value env symbol/quote))
-    (set fixed-primitive-function/lambda	(variable-value env symbol/lambda))
-    (set fixed-primitive-function/let		(variable-value env symbol/let))
-    (set fixed-primitive-function/define	(variable-value env symbol/define))
-    (set fixed-primitive-function/set		(variable-value env symbol/set))
+    (with-forms ((var-value ((name) `(<variable>-value (defined? ,name env)))))
+      (set fixed-primitive-function/quote	(var-value symbol/quote))
+      (set fixed-primitive-function/lambda	(var-value symbol/lambda))
+      (set fixed-primitive-function/let		(var-value symbol/let))
+      (set fixed-primitive-function/define	(var-value symbol/define))
+      (set fixed-primitive-function/set		(var-value symbol/set)))
 
     (assert (and (is <fixed> fixed-primitive-function/quote) (is <fixed> fixed-primitive-function/lambda) (is <fixed> fixed-primitive-function/let) (is <fixed> fixed-primitive-function/define) (is <fixed> fixed-primitive-function/set)) "populate-module-with-maru-primitives: final assert")))
 

@@ -52,7 +52,12 @@
     (and (= name (<variable>-name -variable-))
          -variable-)))
 
-(define-function variable-value (env name)
-  (aif (defined? name env)
+(define-function global-variable-value (name)
+  (aif (defined? name (module-env *module*))
       (<variable>-value it)
-    (error "variable-value: undefined variable '"name"'")))
+    (error "global-variable-value: undefined variable '"name"' in module "*module*)))
+
+(define-function set-global-variable-value (name value)
+  (aif (defined? name (module-env *module*))
+      (set (<variable>-value it) value)
+    (error "set-global-variable-value: undefined variable '"name"' in module "*module*)))

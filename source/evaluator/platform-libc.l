@@ -65,13 +65,13 @@
               ((cstring= arg "-v")
                (incr *verbosity*)
                (set tmp (box <long> *verbosity*))
-               (set-variable-value "*verbosity*" tmp))
+               (set (global-variable-value (string->symbol "*verbosity*")) tmp))
 
               ;; -O
               ((cstring= arg "-O")
                (incr *optimised*)
                (set tmp (box <long> *optimised*))
-               (set-variable-value "*optimised*" tmp))
+               (set (global-variable-value (string->symbol "*optimised*")) tmp))
 
               ;; -p
               ((cstring= arg "-p")
