@@ -169,9 +169,7 @@
 ;; this smells like a KLUDGE: we let gc/let* leak here from eval.l so that we can use
 ;; certain constructs in the implementation of the evaluator. ideally, the compiler
 ;; should be smart enough to inform the GC about ephemeral GC roots on the stack.
-(if-at-expand evolving?
-    (define gc/let* let*)
-  (define-symbol-form gc/let* let*))
+(define-symbol-form gc/let* let*)
 
 (define-form assert (test . args)
   (unless args
@@ -297,8 +295,7 @@
 (define-form new (type-name . inits)
   (let* ((i -1)
          (type (eval type-name))
-         (allocate-form `(allocate ,(if-at-expand evolving? (<type>-id type) type-name)
-                                   ,(type/slot-count-of-instances type))))
+         (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
     ;; TODO singletons for types whose instances have no slots?
     (if inits
         `(gc/let* ((_self_ ,allocate-form))

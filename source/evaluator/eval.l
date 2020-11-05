@@ -117,7 +117,7 @@
   (define-form is (type-name obj)
     (let ((type (eval type-name)))
       (cond
-        ((is <record> type) ; NOTE IS in the form bodies will remain to be the one in slave-module, regardless of our new definition of IS in the target
+        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
          `(let ((__obj__ ,obj))
             (and __obj__
                  (oop? __obj__)
@@ -178,20 +178,6 @@
 ;;;
 ;;; object instantiation
 ;;; ----------------------------------------------------------------
-
-(when-at-expand evolving?
-  ;; we need to force its expansion becuase the allocate primfn of the previous stage only accepts <long> as type
-  ;; but we don't want <type>-slave-id calls leak into this anywhere...
-  (define-form new (type-name . inits)
-    (let* ((i -1)
-           (type (eval type-name))
-           ;; we need to simplify
-           (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
-      (if inits
-          `(let* ((_self_ ,allocate-form))
-             ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
-             _self_)
-        allocate-form))))
 
 ;; TODO try to eliminate this opaque anomaly leaking here... maybe by annotating this on the type?
 (define-form make/opaque (type-name . inits)
@@ -1075,6 +1061,8 @@
   (debug (libc/printf "gc initialized\n"))
   (assert (= <long>	(type-of (box <long> 42)))	"type-of for <long> is broken")
   (assert (= 42		(unbox <long> (box <long> 42)))	"unbox of <long> is broken")
+  (assert (= 1 true)	"true is not 1")
+  (assert (= 0 false)	"false is not 0")
 
   (gc/push-root (address-of *module*))
   (gc/push-root (address-of *maru-module*))

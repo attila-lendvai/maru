@@ -74,36 +74,6 @@
        (define-multimethod emit-instruction ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
          ,@body))))
 
-(if-at-expand evolving?
-    (define-function mangle-label (name)
-      (let* ((plain   (symbol->string name))
-             (length  (string-length plain))
-             (mangled (array)) ; strings don't auto-expand, so we need to use arrays here
-             (index   0)
-             (outdex  0)
-             (putnext (lambda (c)
-                        (set (array-at mangled outdex) c)
-                        (incr outdex)))
-             (digit-for (lambda (c)
-                          (if (< c 10)
-                              (+ c ?0)
-                            (+ c (- ?A 10))))))
-        (while (< index length)
-          (let ((c (string-at plain index)))
-            (cond
-              ((or (and (<= ?a c) (<= c ?z))
-                   (and (<= ?A c) (<= c ?Z))
-                   (and (<= ?0 c) (<= c ?9)))
-               (putnext c))
-              ((or (= ?- c)
-                   (= ?_ c))
-               (putnext ?_))
-              (else
-               (putnext ?_)
-               (putnext (digit-for (bitwise-shift c -4)))
-               (putnext (digit-for (bitwise-and c 0xf))))))
-          (incr index))
-        (array->string mangled)))
 (define-function mangle-label (name)
   (with-forms ((putnext ((c) `(string-append mangled ,c))))
     (let* ((plain   (symbol->string name))
@@ -126,7 +96,6 @@
            (putnext (digit-for (bitwise-shift c -4)))
            (putnext (digit-for (bitwise-and c 0xf))))))
       mangled)))
-)
 
 ;;;
 ;;; IA32 -- OPERANDS
@@ -633,9 +602,7 @@
 
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
-        (expr (if-at-expand evolving?
-                  (eval-encoded form)
-                (eval form))))
+        (expr (eval form)))
     ;; TODO this silently miscompiles closures that capture some variables
     (compile-expr expr name -c-)
     (gen LOAD (if feature/redefinable-functions-in-target

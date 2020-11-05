@@ -1,9 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(when-at-expand evolving?
-  (define-function array-append (arr val)
-    (set-array-at arr (array-length arr) val)))
-
 ;; (define-function array-append-all (arr . vals)
 ;;   (list-do val vals (array-append arr val)))
 ;; (define-function array-append-all (a s)

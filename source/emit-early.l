@@ -189,11 +189,6 @@
 
 (switch-to-host-module)
 
-(when-at-expand evolving?
-  ;; this is used in env-min.l and is not available in the prevous stage
-  (define-form is (type obj)
-    `(= ,type (type-of ,obj))))
-
 ;; strictly speaking, this is just wrong, because we load one of the slave's source file into the host... but it works, and fails loud and early if not.
 (load "source/env-min.l")
 
@@ -214,10 +209,6 @@
 (define-function switch-to-target-module ()
   (set *module* *target-module*))
 
-(when evolving?
-  ;; there's a nasty bug in the host with expand that prevents us from redefining false using define-constant...
-  (eval-in-target '(eval-encoded (encode '(set false -42)))))
-
 (eval-in-target
  `(let ()
     (define *host-module*	,*module*)
@@ -237,12 +228,6 @@
 
     (define-constant false 0)
     (define-constant true  1)))
-
-(when evolving?
-  (eval-in-target
-   `(let ()
-      (define char-at		string-at)
-      (define set-char-at	set-string-at))))
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
