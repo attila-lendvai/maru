@@ -217,7 +217,7 @@
     (define *host-module*	,*module*)
     (define *slave-module*	,*slave-module*)
     (define slave-value		,slave-value)
-    ;;(define eval-in-slave	,eval-in-slave)
+    (define eval-in-slave	,eval-in-slave)
     ;;(define eval-in-host	,(slave-value eval-in-host))
     ;; this cannot be a function because functions are supposed to be lowered to the target VM
     ;; (define-form switch-to-host-module ()

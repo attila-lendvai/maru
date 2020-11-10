@@ -255,15 +255,15 @@
 (define-primitive-function (load ()) (path)
   (let* ((stream	(or (cond
                               ((string? path)
-                               (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\n" (get/string path)))
+                               (verbosity 1 (platform/print-diagnostics "loading file: " (get/string path) "\n"))
                                (libc/fopen (get/string path) "r"))
                               ((not path)
-                               (verbosity 1 (libc/fprintf libc/stderr "loading from stdin\n"))
+                               (verbosity 1 (platform/print-diagnostics "loading from stdin\n"))
                                (libc/fdopen libc/stdin "r"))
                               (else
                                (error "load: don't know how to open "path)))
                             (error "load: fopen failed on "path)))
-         (result	(repl-stream stream)))
+         (result	(eval-stream stream)))
     (libc/fclose stream)
     result))
 
@@ -282,9 +282,9 @@
     (let ((type (type-of arg)))
       ;; TODO use typecase
       (cond
-        ((= type <string>) (libc/fprintf libc/stderr "%s"  (get/string arg)))
-        ((= type <symbol>) (libc/fprintf libc/stderr "%s"  (unbox <symbol> arg)))
-        ((= type <long>)   (libc/fprintf libc/stderr "%ld" (unbox <long>   arg)))
+        ((= type <string>) (platform/print-diagnostics (get/string arg)))
+        ((= type <symbol>) (platform/print-diagnostics (unbox <symbol> arg)))
+        ((= type <long>)   (platform/print-diagnostics (get/string (long->string (unbox <long> arg)))))
         (else
          ;; TODO
          (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)))))
