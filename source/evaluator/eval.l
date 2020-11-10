@@ -654,6 +654,7 @@
 
 (load "source/evaluator/arrays.l")
 (load "source/evaluator/buffer.l")
+(load "source/sequences-min.l")
 
 ;;;
 ;;; env

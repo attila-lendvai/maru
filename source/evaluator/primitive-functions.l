@@ -380,10 +380,7 @@
       symbol
     (string-from-cstring (unbox <symbol> symbol))))
 
-(define-primitive-function long->string ((arg <long>))
-  (let ((buf (allocate-data 32))) ; safe up until 64 bits
-    (libc/sprintf buf "%ld" arg)
-    (string-from-cstring buf)))
+(define-primitive-function long->string ((arg <long>)))
 
 (define-primitive-function string->long ((str <string>))
   (let* ((endptr	str)
