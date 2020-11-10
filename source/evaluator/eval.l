@@ -548,13 +548,14 @@
 
 (define-primitive-function string ((length <long> 0))
   (make <string>
-    (size	(box <long> length))
+    (size	(box <long> 0))
     (elements	(when (< 0 length)
                   (allocate-data length)))))
 
 (define-function string-from-cstring (cstr)
   (let* ((len (cstring-length cstr))
          (obj (string len)))
+    (set (slot-value <string> size obj) (box <long> len))
     (libc/memcpy (<string>-elements obj) cstr len)
     obj))
 
