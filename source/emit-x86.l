@@ -120,7 +120,8 @@
 
 (define-emit    (TEXT)				(println "	.text"))
 (define-emit    (DATA)				(println "	.data"))
-(define-emit    (SECTION string)		(println "	.section "$1))
+(define-emit    (RODATA)			(println "	.section .rodata"))
+;;(define-emit    (SECTION string)		(println "	.section "$1))
 
 ;;(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
 (define-emit    (EXPORT LABEL)			(println "	.globl "$1))
@@ -434,18 +435,21 @@
         (gen STORE temp)
         temp))))
 
-(define-function compile-expr (self name parent-comp)
+(define-function compile-expr (self name indirection-allowed? parent-comp)
+  (emit COMMENT (list "compiling fn "name", body: "(<expr>-body self)))
   (let* ((main? (= 'main name))
+         (indirect?	(and (not main?)
+                             indirection-allowed?
+                             feature/redefinable-functions-in-target))
          (body (<expr>-body self))
          (-c- (x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (if main?
                           (GLOBAL-LABEL "main")
                         (LABEL (concat-string (symbol->string name)
-                                              (if feature/redefinable-functions-in-target "_body" "")))))
+                                              (if indirect? "_body" "")))))
          (init-param (lambda (var)
                        (set (<variable>-value var) (new-param -c-))))
          (params (map init-param (<expr>-parameters self))))
-    (emit COMMENT (list "compiling fn "name", body: " body))
     (list-do e body
       (and e (comp e)))
     ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
@@ -465,10 +469,8 @@
       (awhen (<x86-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
       (emit LEAVE (- frm-size 8)))
-    (when (and (not main?)
-               feature/redefinable-functions-in-target)
-      (let ((-c- parent-comp)
-            (label (LABEL name)))
+    (when indirect?
+      (let ((label (LABEL name)))
         (emit DATA)
         (emit EXPORT label)
         (emit DEFLABEL label)
@@ -493,6 +495,9 @@
            (set target-name (GLOBAL-LABEL (<C-function>-name op-value)))
            (unless (<C-function>-vararg? op-value)
              (set n-params (list-length (<C-function>-parameter-types op-value)))))
+          ((is (slave-value <selector>) op-value)
+           ;; TODO extract n-params
+           (set target-name (LABEL (symbol->string (eval-in-slave `(<selector>-name ,op-value))))))
           (else
            (error "Don't know how to emit call to global value "op-value", in variable "op)))
         (when (and n-params
@@ -603,8 +608,7 @@
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
         (expr (eval form)))
-    ;; TODO this silently miscompiles closures that capture some variables
-    (compile-expr expr name -c-)
+    (compile-expr expr name false -c-)
     (gen LOAD (if feature/redefinable-functions-in-target
                   (GI32 (LABEL name))
                 (LI32 (LABEL name))))))
@@ -722,10 +726,24 @@
 
 (define-method compile <string> (-c-)
   (let ((label (UNIQUE-LABEL "str")))
-    (gen DATA)
-    (gen DEFLABEL label)
-    (gen ASCIZ self)
-    (gen TEXT)
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (emit ASCIZ self)
+    (gen LOAD label)))
+
+;; this is used when emitting the literal dispatch tables of <selectors>
+(define-method compile <array> (-c-)
+  (let ((label (UNIQUE-LABEL "arr")))
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (array-do el self
+      (cond
+        ((not el)
+         (emit LONG 0))
+        ((and (is <variable> el)
+              (is <expr> (<variable>-value el)))
+         (emit LONG (LABEL (<variable>-name el))))
+        (else (error "don't know how to emit constant array element "el))))
     (gen LOAD label)))
 
 (define-method compile <pair> (-c-)
@@ -770,6 +788,6 @@
 ;;     ))
 
 (define-method compile-definition <expr> (name parent-comp)
-  (compile-expr self name parent-comp))
+  (compile-expr self name true parent-comp))
 
 (define-method emit-prelude <x86-compiler> ())

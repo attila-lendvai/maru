@@ -327,6 +327,25 @@
   ;;       			  (println $1"   = private unnamed_addr global %ptr bitcast([" length " x i8]* getelementptr([" length " x i8], [" length " x i8]* "$1".c) to %ptr)")))
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
+  ((CONSTANT array)		(let ((first? true))
+                                  ;; TODO this is fishy. i'm not sure this is the right way to emit <selector> dispatch tables...
+				  (print $1" = private unnamed_addr constant [" (array-length $2) " x %ptr] [")
+                                  (array-do el $2
+                                    (if first?
+                                        (set first? false)
+                                      (print ", "))
+                                    (print "%ptr ")
+                                    (if el
+                                        (cond
+                                          ((and (is <variable> el)
+                                                (is <expr> (<variable>-value el)))
+                                           (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters (<variable>-value el)))))
+                                             (print "bitcast (")
+                                             (emit-llvm-fn-type '%ptr param-types false)
+                                             (print "* "(GLOBAL (<variable>-name el))" to %ptr)")))
+                                          (else (error "don't know how to emit constant array element "el)))
+                                      (print "inttoptr(%word 0 to %ptr)")))
+                                  (println "]")))
   ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)"))
   ((GLOBAL expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2)))
                                       (entry-label (GLOBAL (concat-string (symbol->string (<GLOBAL>-name $1)) ".body"))))
@@ -377,10 +396,14 @@
 				  (println "	store "type" "$1", "type"* @"(<C-variable>-name $2)))))
 
 (define-instruction ADDR	(() 2 t)
-  ((CONSTANT)			(let* ((str (<CONSTANT>-value $1))
+  ((CONSTANT string)		(let* ((str (<CONSTANT>-value $1))
                                        (length (+ 1 (string-length str))))
                                   (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "(<CONSTANT>-name $1)", %word 0, %word 0")))
-  ((_)				(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
+  ((CONSTANT array)		(let* ((arr (<CONSTANT>-value $1))
+                                       (length (array-length arr)))
+                                  (println "	"$reg1" = getelementptr [" length " x %ptr], [" length " x %ptr]* "(<CONSTANT>-name $1)", %word 0, %word 0")
+                                  (println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
+  ((_ _)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
 				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
 
 (define-instruction CALL	(() 1 t)
@@ -566,14 +589,17 @@
 (define-function emit/function-epilogue ()
   (println "}"))
 
-(define-function compile-expr (self name parent-comp)
+(define-function compile-expr (self name indirection-allowed? parent-comp)
   (let* ((main?		(= 'main name))
+         (indirect?	(and (not main?)
+                             indirection-allowed?
+                             feature/redefinable-functions-in-target))
          (body		(<expr>-body self))
          (-c-		(llvm-compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label	(if main?
                             (LIBC-GLOBAL name)
                           (GLOBAL (concat-string (symbol->string name)
-                                                 (if feature/redefinable-functions-in-target ".body" "")))))
+                                                 (if indirect? ".body" "")))))
          (parameters	(<expr>-parameters self))
          (init-param	(lambda (var)
                           (set (<variable>-value var)
@@ -613,10 +639,8 @@
       (emit RET (or (<compiler>-current-value -c-)
                     (LITERAL "null"))))
     (emit/function-epilogue)
-    (when (and (not main?)
-               feature/redefinable-functions-in-target)
-      (let ((-c- parent-comp))
-        (emit DEFINE (GLOBAL name) self)))))
+    (when indirect?
+      (emit DEFINE (GLOBAL name) self))))
 
 (define-function compile-call (op args -c-)
   (assert op "compile-call: operator is nil")
@@ -683,6 +707,8 @@
                      (gen INTTOPTR '%word))))
                 (unless (<C-function>-vararg? op-value)
                   (set n-params (list-length param-types)))))
+             ((is (slave-value <selector>) op-value)
+              (gen CALL (GLOBAL (<selector>-name op-value)) arg-regs))
              (else
               (error "Don't know how to emit call to global value "op-value", in variable "op)))
            (when (and n-params
@@ -817,7 +843,7 @@
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
         (expr (eval form)))
-    (compile-expr expr name -c-)
+    (compile-expr expr name false -c-)
     (gen LOAD (GLOBAL name) expr)))
 
 (define-function compile/return (form -c-)
@@ -832,9 +858,11 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (gen ADDR (GLOBAL (<variable>-name var))))
+         (gen ADDR (GLOBAL (<variable>-name var)) val))
+        ((temp? val)
+         (gen ADDR val ()))
         (else
-         (gen ADDR val))))))
+         (error "compile/address-of don't know how to handle "var", holding value "val))))))
 
 (define +special-forms+ (list
   (cons (target-value let)		compile/let)
@@ -934,7 +962,12 @@
 (define-method compile <string> (-c-)
   (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
     (emit DEFINE const self)
-    (gen ADDR const)))
+    (gen ADDR const self)))
+
+(define-method compile <array> (-c-)
+  (let ((const (CONSTANT (GLOBAL (unique-name "arr")) self)))
+    (emit DEFINE const self)
+    (gen ADDR const self)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -960,7 +993,7 @@
 (define-method compile-definition <C-function>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <C-variable>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
-(define-method compile-definition <expr>		(name -c-)	(compile-expr self name -c-))
+(define-method compile-definition <expr>		(name -c-)	(compile-expr self name true -c-))
 
 (define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet	(slave-value target-triplet))
