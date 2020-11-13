@@ -389,9 +389,6 @@
         (box <long> result)
       (error "invalid number in string->long, libc/strtol has failed for string " (string-from-cstring str)))))
 
-(define-primitive-function (create-module ()) ((name <string> _ nounbox))
-  (module name))
-
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
   (debug (libc/printf "eval-in-module: form ") (println form))
   (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?

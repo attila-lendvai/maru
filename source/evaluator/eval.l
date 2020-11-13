@@ -920,7 +920,7 @@
       (set res (expand-encode-eval form env)))
     res))
 
-(define-function module (name)
+(define-primitive-function module ((name <string>))
   (debug (libc/printf "module constructor\n"))
   (gc/let* ((module (new <module>))
             (env    (environment () 0 0))

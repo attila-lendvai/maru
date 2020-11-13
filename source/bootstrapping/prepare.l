@@ -1,7 +1,13 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; create-module got renamed to module
+;; this cannot be guarded by EVOLVING? at this early point
+;; TODO delme at the next stage
+(if-at-expand (not (defined? 'module))
+    (define module create-module))
+
 (let ((host-module (current-module))
-      (slave-module (create-module "slave")))
+      (slave-module (module "slave")))
   (define *slave-module* slave-module)
   (define-function switch-to-slave-module ()
     ;;(warn "--- switching to the slave module\n")

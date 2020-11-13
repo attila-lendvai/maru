@@ -128,7 +128,7 @@
 ;;; target module setup
 ;;;
 
-(define *target-module* (create-module "target"))
+(define *target-module* (module "target"))
 
 ;; TODO isn't this kinda messy? all these switch-to-foo-module &co...
 
