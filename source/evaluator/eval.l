@@ -218,34 +218,44 @@
 ;;; error handling
 ;;; ----------------------------------------------------------------
 
+(define *error-level* 0)
+
 (define-function die ()
   (libc/fprintf libc/stderr "\nDIE called...\n")
   (libc/flush-streams)
   (print-backtrace)
   (libc/flush-streams)
-  (libc/abort))
+  (libc/exit -1))
+
+(define-function error-prologue ()
+  (incr *error-level*)
+  (when (< 1 *error-level*)
+    (libc/fprintf libc/stderr "NESTED ERROR, giving up...\n")
+    (libc/exit -1))
+  (libc/printf "ERROR: "))
+
+(define-function error-epilogue ()
+  (libc/fprintf libc/stderr "\n")
+  (die))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
-;; K/ERROR goes through the maru printing facility (i.e. must not be called with an .asciz).
-(define-function fatal  (fmt)           (libc/fprintf libc/stderr fmt)           (libc/fprintf libc/stderr "\n") (die))
-(define-function fatal1 (fmt arg)       (libc/fprintf libc/stderr fmt arg)       (libc/fprintf libc/stderr "\n") (die))
-(define-function fatal2 (fmt arg1 arg2) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fprintf libc/stderr "\n") (die))
+;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
+(define-function fatal  (fmt)           (error-prologue) (libc/fprintf libc/stderr fmt)           (error-epilogue))
+(define-function fatal1 (fmt arg)       (error-prologue) (libc/fprintf libc/stderr fmt arg)       (error-epilogue))
+(define-function fatal2 (fmt arg1 arg2) (error-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (error-epilogue))
 
-;; FIXME it would be nice for K/ERROR to be a function (or at least expand to a breakpoint'able function call),
-;; but that would need the compiler to support variable nr of args, or literal lists
 (define-form k/error args
   `(let ()
-     (libc/printf "\nerror: ")
+     (error-prologue)
      ,@(map (lambda (arg)
               ;; string literals are turned into pointers to .asciz, therefore
               ;; we need to print them using libc/printf (or instantiate
-              ;; them into Maru objects using new-<string>-from-cstring).
+              ;; them into Maru objects using string-from-cstring).
               (if (string? arg)
                   `(libc/printf ,arg)
-                  `(k/print ,arg)))
+                `(k/print ,arg)))
             args)
-     (libc/printf "\n")
-     (die)))
+     (error-epilogue)))
 
 ;;;
 ;;; garbage collector
