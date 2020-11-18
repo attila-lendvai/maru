@@ -831,6 +831,7 @@
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))
          (value	(<variable>-value var)))
+    (lexical-variable-or-die var -c-)
     (comp (third expr))
     (cond
       ;; NOTE the LLVM IR is SSA, LOCALs cannot be written
@@ -945,6 +946,7 @@
   (gen LOAD (LITERAL self) self))
 
 (define-method compile <variable> (-c-)
+  (lexical-variable-or-die self -c-)
   (let ((value self.value))
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))

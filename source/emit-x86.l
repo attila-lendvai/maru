@@ -620,6 +620,7 @@
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))
          (value	(<variable>-value var)))
+    (lexical-variable-or-die var -c-)
     (comp (third expr))
     (cond
       ((temp? value)
@@ -727,6 +728,7 @@
 (define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
 (define-method compile <variable> (-c-)
+  (lexical-variable-or-die self -c-)
   (let ((value self.value))
     (cond
       ((or (temp? value)

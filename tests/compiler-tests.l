@@ -448,12 +448,17 @@
     (set-second-to-first 33 99)
   99)
 
-;; TODO instead of silent miscompilation, this should error explicitly noting that the lambda is capturing x, which is currently not supported.
+;; this should error, explicitly noting that the lambda is capturing x, which is currently not supported.
 ;; the LLVM IR type system actually catches this bug, but the x86 backend silently miscompiles it currently
-;; (define-test compile/set/bug/4
-;;     (let ((x 40))
-;;       ((lambda (y) (+ x y)) 2))
-;;   42)
+;; (define-test compile/closures/1
+;;     (let ((a 40)
+;;           (b 0))
+;;       (+ ((lambda (y)
+;;             (set b 42)
+;;             (+ a y))
+;;           2)
+;;          b))
+;;   (* 2 42))
 
 (define-function main (argc argv)
   (libc/fputs "Printing test command line args:\n" libc/stdout)
