@@ -21,8 +21,9 @@
   `(while (not ,condition) ,@body))
 
 (define-form times-do (count . body)
-  `(for (__i__ 0 ,count)
-     ,@body))
+  `(let ((__i__ ,count))
+     (while (<= 0 (decr __i__))
+       ,@body)))
 
 (define-function %loop-inits (bindings)
   (and bindings
