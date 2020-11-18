@@ -150,9 +150,13 @@
 
 (define-function error-prologue ()
   (incr *error-level*)
-  (when (< 1 *error-level*)
-    (platform/print-diagnostics "NESTED ERROR, giving up...\n")
-    (platform/exit -1))
+  (cond
+    ((= 2 *error-level*)
+     (platform/print "NESTED ERROR 1, attempting to print a limited backtrace\n")
+     (abort))
+    ((< 2 *error-level*)
+     (platform/print "NESTED ERROR 2, giving up...\n")
+     (libc/exit -1)))
   (libc/printf "ERROR: "))
 
 (define-function error-epilogue ()
