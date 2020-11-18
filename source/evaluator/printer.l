@@ -81,7 +81,7 @@
 
         ((= type <primitive-function>)
          (error-if-storing)
-         (libc/fprintf stream "Primitive-Function<%s>" (<primitive-function>-_name obj)))
+         (libc/fprintf stream ".%s" (<primitive-function>-_name obj)))
 
         ((= type <variable>)
          (error-if-storing)
@@ -114,9 +114,19 @@
          (do-print stream (module-env obj) storing?)
          (libc/fputs ">" stream))
 
+        ((= type <type>)
+         (error-if-storing)
+         (libc/fprintf stream "Type%s" (unbox <symbol> (<type>-name obj))))
+
+        ((= type <record>)
+         (error-if-storing)
+         ;; KLUDGE we need to disable accessor typecheck here, because the target universe is unaware of inheritance
+         (libc/fprintf stream "Record%s" (unbox <symbol> (with-forms ((%accessor-typecheck ((type obj) obj)))
+                                                           (<type>-name obj)))))
+
         (else
          (error-if-storing)
-         (libc/fprintf stream "[Type:%ld]" type))))))
+         (libc/fprintf stream "[instof:%ld]" type))))))
 
 (define-function print		(obj) (do-print libc/stdout obj false))
 (define-function println	(obj) (do-print libc/stdout obj false) (libc/fputs "\n" libc/stdout))
