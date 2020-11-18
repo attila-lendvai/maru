@@ -283,7 +283,7 @@
     (if (subtype? (type-of type-object) <record>)
         (let ((accessors ())
               (super type-object))
-          (while super
+          (while (is <record> super)
             (list-do accessor (make-instance-accessors var-name
                                                        (<type>-name super)
                                                        (<record>-direct-slots super))

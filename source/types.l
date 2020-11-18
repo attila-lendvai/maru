@@ -165,19 +165,22 @@
 (define-function type-name-of (obj)
   (name-of-type (type-of obj)))
 
+(define subtype?) ; forward
+
 (define-function record-inherits-from? (type super)
   (and type
        (or (= type super)
-           (record-inherits-from? (<record>-super type) super))))
+           (and (subtype? (type-of type) <record>)
+                (record-inherits-from? (<record>-super type) super)))))
 
 (define-function subtype? (subtype supertype)
   (assert (and subtype supertype))
   (or (= subtype supertype)
-      (and (subtype? (type-of subtype) <record>)
-           (record-inherits-from? subtype supertype))))
+      (record-inherits-from? subtype supertype)))
 
 (assert (subtype? (type-of <type>) <record>))
 (assert (subtype? <record> <type>))
+(assert (not (subtype? <type> <record>)))
 
 (define-function sanity-check-record-slots (record slots)
   (let ((f slots))
@@ -190,6 +193,7 @@
 
 (define-function %record/compute-effective-slots (type)
   (and type
+       (subtype? (type-of type) <record>)
        (concat-list (%record/compute-effective-slots (<record>-super type))
                     (<record>-direct-slots type))))
 
@@ -270,6 +274,7 @@
   (%make-accessor-forms (<type>-name type)
                         (<record>-direct-slots type)
                         (or (and (<record>-super type)
+                                 (subtype? (<record>-super type) <record>)
                                  (record/effective-slot-count (<record>-super type)))
                             0)
                         ()))
@@ -308,7 +313,7 @@
     `(define ,name ,type)))
 
 (define-function new-<record> (name super slots)
-  (assert (or (not super) (and (not (pair? super)) (subtype? (type-of super) <record>))))
+  (assert (or (not super) (and (not (pair? super)) (subtype? (type-of super) <type>))))
   (let ((type (new-type-instance name <record>)))
     (set (<record>-super		type) super)
     (set (<record>-direct-slots		type) slots)

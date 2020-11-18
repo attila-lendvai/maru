@@ -11,7 +11,8 @@
   (when (subtype? (type-of type) <record>)
     (let ((method ())
           (probe  type))
-      (while (and (set probe (<record>-super probe))
+      (while (and (set probe (and (is <record> probe)
+                                  (<record>-super probe)))
                   (not (set method (array-at methods (<type>-id probe))))))
       ;; (and method (set (array-at methods type) method))	; copy down the method for performance
       method)))
