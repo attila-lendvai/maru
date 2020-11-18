@@ -488,24 +488,26 @@
     (put (<context> bindings)	obj (new-<array> 0))
     obj))
 
+;; TODO see the relevant part of eval.c for the comment: fix escape analysis for nested lambdas with free variables
+;; with this version below the following breaks:
+;; (define compose (lambda (a b c)
+;;                  (lambda (x y)
+;;                    (list a b c x y))))
+;; ((compose 1 2 3) 42 43)
+;;
 ;; (define-function new-<context> (home caller env)
-;;   (let ((obj (new-record-instance <env>)))
-;;     (gc/protect (obj)
-;;       (set (<context>-home     obj) home)
-;;       (set (<context>-env      obj) env)
-;;       (set (<context>-bindings obj) (new-<array> 0))
-;;       obj)))
+;;   (let ((obj ()))
+;;     (if (and caller (set obj (get <context> callee caller)))
+;; 	(let ()
+;; 	  (put <context> home obj home)
+;; 	  (put <context> env  obj env))
+;;       (set obj (new-base-<context> home caller env))
+;;       (and caller (put <context> callee caller obj)))
+;;     obj))
 
 (define-function new-<context> (home caller env)
-  (let ((obj ()))
-    (if (and caller
-             (set obj (get (<context> callee) caller)))
-        (let ()
-          (put (<context> home) obj home)
-          (put (<context> env)  obj env))
-      (set obj (new-base-<context> home caller env))
-      (when caller
-        (put (<context> callee) caller obj)))
+  (let ((obj (new-base-<context> home caller env)))
+    (and caller (put (<context> callee) caller obj))
     obj))
 
 ;;;
