@@ -94,7 +94,7 @@
   (let ((conds-early	())
         (conds-late	()))
     (types-do type
-      (when (immediate-type? type)
+      (when (is <immediate-type> type)
         (let* ((tag-value	(<immediate-type>-tag-value type))
                (tag-width	(<immediate-type>-tag-width type)))
           (if tag-width
@@ -212,8 +212,8 @@
               ((or (is <type> type)
                    (is <record> type))
                ;; KLUDGE we need to disable accessor typecheck here, because when it's a <record>, then it gets triggereed, because the target universe is unaware of inheritance
-               (with-forms ((%accessor-typecheck ((type obj) obj)))
-                 (unbox <long> (<type>-id type))))
+               (unbox <long> (with-forms ((%accessor-typecheck ((type obj) obj)))
+                               (<type>-id type))))
               (else
                (error "allocate: illegal type specifier: "type)))
             slot-count))
@@ -371,7 +371,7 @@
   ;; (safety 2 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
   (let ((result ()))
     (while (and env
-                (not (set result (find-variable env name))))
+                (not (set result (find-local-variable env name))))
       (set env (<env>-parent env)))
     result))
 
@@ -385,7 +385,7 @@
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
   (debug (platform/print-diagnostics "environment-define called, name is "(unbox <symbol> name)"\n"))
-  (let ((var (find-variable env name)))
+  (let ((var (find-local-variable env name)))
     (if var
         (let ()
           ;; TODO
@@ -495,6 +495,7 @@
                         (<call-frame>-arguments call-frame))
               (platform/print "\targs: ")
 	      (println it))))
+        ;; man exit says that it's flushed, but looks like it's not. plus there's this: https://wiki.sei.cmu.edu/confluence/display/c/FIO23-C.+Do+not+exit+with+unflushed+data+in+stdout+or+stderr
         (platform/flush-streams))
     (platform/print-diagnostics "print-backtrace: call-frame tracking is disabled in this build. current call depth is "(get/string (long->string *call-stack-index*))"\n")))
 
@@ -532,7 +533,7 @@
 
 (define-function apply (fun arguments ctx)
   (debug (libc/printf "apply, function ") (print fun) (libc/printf ", arguments: ") (print arguments) (libc/printf "\n"))
-  (safety 2 (assert fun "apply: fun is null"))
+  (safety 2 (assert fun "apply: fun is nil"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
       ;; TODO use typecase
@@ -546,11 +547,11 @@
         (else
          (aif (and *applicators*
                    (set it (maybe-object-in-variable *applicators* <array>))
-                   (array-at it (type-of fun)))
-             (gc/let* ((args arguments))
-               (set args (cons fun args))
+                   (array-at it type))
+             (gc/let* ((args (cons fun arguments)))
                (apply it args ctx))
-           (error "cannot apply: " fun)))))))
+           (error "cannot apply: "fun", current module: "*module*", *applicators* is: "
+                  (and *applicators* (<variable>-value *applicators*)))))))))
 
 (define-primitive-function (apply ()) (fn args)
   (apply fn args -ctx-))
@@ -605,7 +606,8 @@
   (gc/let* ((head (expand (get/head exp) env one-step?)))
     (debug (libc/printf "expand/pair on head ") (println head))
     (when-at-expand feature/backtrace
-      (set (<call-frame>-callee			-call-frame-) head)
+      (unless (= head (get/head exp))
+        (set (<call-frame>-callee		-call-frame-) head))
       (set (<call-frame>-arguments		-call-frame-) exp))
     (let (expander)
       ;; TODO use switch
@@ -750,7 +752,6 @@
              (list-do entry (first tail)
                (debug (libc/printf "encode/let visiting entry ") (println entry))
                (let* ((var-name	(first entry))
-                      ;; TODO check: eval.c calls:	var= findLocalVariable(innerEnv, var);
                       (var-obj	(environment-define inner-env var-name ())))
                  (set vars/last (if vars
                                     (put/tail vars/last (cons var-obj ()))
@@ -831,8 +832,7 @@
        (aif (and *encoders*
                  (set it (maybe-object-in-variable *encoders* <array>))
                  (array-at it (type-of exp)))
-           (gc/let* ((args (cons env ())))
-             (set args (cons exp args))
+           (gc/let* ((args (list2 exp env)))
              (debug (libc/printf "encode/other: applying fn: ") (println it) (libc/printf " ") (print args) (libc/printf " ") (println env))
              (apply it args ()))
          exp)))))

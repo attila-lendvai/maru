@@ -3,7 +3,7 @@
 ;; TODO find the set of necessary primitives and install them as primitive-functions
 ;; and then use those primitives to implement here whatever else is needed.
 
-;; this could be a visitor function using closures, but results in some 5-10% slowdown when used in find-variable
+;; this could be a visitor function using closures, but results in some 5-10% slowdown when used in find-local-variable
 (define-form %env-do-reverse (env . body)
   `(let* ((-bindings-	(<env>-bindings ,env))
           (-index-	(array-length -bindings-))
@@ -44,9 +44,9 @@
           (environment-define to-env name value))))
     ()))
 
-(define-function find-variable (env name)
-  (safety 2 (assert (is <env> env) "find-variable: env is not an <env>: "env))
-  (safety 2 (assert (symbol? name) "find-variable: name is not a <symbol>: "name))
+(define-function find-local-variable (env name)
+  (safety 2 (assert (is <env> env) "find-local-variable: env is not an <env>: "env))
+  (safety 2 (assert (symbol? name) "find-local-variable: name is not a <symbol>: "name))
   (%env-do-reverse env
     (and (= name (<variable>-name -variable-))
          -variable-)))

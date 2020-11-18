@@ -185,7 +185,7 @@
 ;; even when used in the target, i.e. in eval.l.
 (define-form define-form/target (name args . body)
   (let ((form-form	`(form (lambda (*env* ,@args) ,@body))))
-    `(define ,name (eval-in-module *slave-module* ',form-form))))
+    `(define ,name (eval-in-slave ',form-form))))
 
 (switch-to-host-module)
 

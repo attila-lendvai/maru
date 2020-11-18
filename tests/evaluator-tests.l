@@ -63,7 +63,11 @@
   (let ((x ()))
     (for (i 5 0 -1)
       (push x i))
-    (test-assert (equal x '(1 2 3 4 5)))))
+    (test-assert (equal x '(1 2 3 4 5))))
+  (let ((x ()))
+    (times-do 3
+      (push x 42))
+    (test-assert (equal x '(42 42 42)))))
 
 (define-test eval/apply/bug/1 ()
   (let ((compose (lambda (a b c)
@@ -313,6 +317,36 @@
     (test-assert (equal (list ()	"42"	<test-generic-2>	tg2	<long>	44)	(test-generic "42" tg2 44)))
     (test-assert (equal (list <pair>	'(42)	<test-generic-2>	tg2	()	44)	(test-generic '(42) tg2 44)))
     (test-assert (equal (list <pair>	'(42)	<test-generic-1>	tg1	<long>	44)	(test-generic '(42) tg1 44)))
+    ))
+
+(define-type <a-type>)
+(define-record <a-record-1> <a-type> (a b))
+(define-record <a-record-2> <a-record-1> (c))
+
+(define-method a-record-selector <a-record-1> ()
+  (<a-record-1>-a self))
+
+(define-method a-record-selector <a-record-2> ()
+  (list (<a-record-1>-b self) (<a-record-2>-c self)))
+
+(define-selector a-record-selector2)
+
+(define-test eval/records/1 ()
+  (test-assert (subtype? <a-record-2> <a-record-1>))
+  (test-assert (subtype? <a-record-2> <a-type>))
+  (let ((x (make <a-record-2>
+             (a 'a)
+             (b 'b)
+             (c 'c))))
+    (test-assert (equal 'a (<a-record-1>-a x)))
+    (test-assert (equal 'b (<a-record-1>-b x)))
+    (test-assert (equal 'c (<a-record-2>-c x)))
+    (test-assert (equal 'a (a-record-selector (make <a-record-1>
+                                                (a 'a)
+                                                (b 'b)))))
+    (test-assert (equal '(b c) (a-record-selector x)))
+    ;; this should signal a proper error that no method was found, not die in some other way
+    ;; (a-record-selector2 x)
     ))
 
 (define-function run-tests ()

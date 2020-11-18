@@ -243,10 +243,10 @@
   (or (is <string> x)
       (is <long> x)))
 
-(define-form define-expand (type args . body)   `(set-array-at *expanders*   ,(<type>-id (eval type)) (lambda ,args ,@body)))
-(define-form define-encode (type args . body)   `(set-array-at *encoders*    ,(<type>-id (eval type)) (lambda ,args ,@body)))
-(define-form define-eval   (type args . body)   `(set-array-at *evaluators*  ,(<type>-id (eval type)) (lambda ,args ,@body)))
-(define-form define-apply  (type args . body)   `(set-array-at *applicators* ,(<type>-id (eval type)) (lambda ,args ,@body)))
+(define-form define-expand (type args . body)   `(set (array-at *expanders*	,(<type>-id (eval type))) (lambda ,args ,@body)))
+(define-form define-encode (type args . body)   `(set (array-at *encoders*	,(<type>-id (eval type))) (lambda ,args ,@body)))
+(define-form define-eval   (type args . body)   `(set (array-at *evaluators*	,(<type>-id (eval type))) (lambda ,args ,@body)))
+(define-form define-apply  (type args . body)   `(set (array-at *applicators*	,(<type>-id (eval type))) (lambda ,args ,@body)))
 
 ;;; local syntax
 
@@ -280,7 +280,7 @@
 
 (define-form with-instance-accessors (var-name type-name . body)
   (let ((type-object (eval type-name)))
-    (if (subtype? (type-of type-object) <record>)
+    (if (is <record> type-object)
         (let ((accessors ())
               (super type-object))
           (while (is <record> super)
@@ -437,8 +437,9 @@
 
 ;;; conversion
 
-(define-function string->number-base (str radix)
-  (let ((n 0)
+(define-function string->number (str . rest)
+  (let ((radix (if rest (first rest) 10))
+        (n 0)
         (i 0)
         (l (string-length str))
         (s 1))
@@ -458,9 +459,6 @@
               (set i (+ i 1)))
           (set l i))))
     (* s n)))
-
-(define-function string->number (str)
-  (string->number-base str 10))
 
 (define-function array->string (arr)
   (let* ((ind 0)

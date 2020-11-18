@@ -7,7 +7,7 @@
         (step  (or (cadddr var-init-limit-step) 1)))
     `(let ((,var ,init)
            (_limit_ ,limit))
-       (while (not (= ,var _limit_))
+       (while (not (= ,var _limit_)) ; this should be using = because step may be both +/-
          ,@body
          (set ,var (+ ,var ,step))))))
 

@@ -13,8 +13,11 @@
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
 #  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
+# to force a full bootstrap cycle all the way down from the/a bottom stage:
+#  make PREVIOUS_STAGE_EXTRA_TARGETS=veryclean test-bootstrap || beep
 #
-# the makefile parallelism is mostly only between the backends.
+# the makefile parallelism is mostly only between the backends. don't use it
+# while bootstrapping all the way from a bottom stage, it's broken somewhere.
 
 ##
 ## configuration
@@ -106,7 +109,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
 EVALUATOR_FILES	= $(addprefix source/evaluator/,platform-libc.l buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l) \
- $(addprefix source/,list-min.l env-min.l sequences-min.l)
+ $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l)
 
 # for some optional C files, e.g. profiler.c
 EVAL_OBJ_x86	=

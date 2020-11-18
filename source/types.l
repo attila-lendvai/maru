@@ -187,8 +187,8 @@
     (while (pair? f)
       (unless (symbol? (car f))
         (error "slot is not symbol?: "(car f)))
-      (and (member? (car f) (cdr f))
-           (error "slot '"(car f)"' multiply-defined in record: "record" "slots))
+      (when (member? (car f) (cdr f))
+        (error "slot '"(car f)"' multiply-defined in record: "record" "slots))
       (set f (cdr f)))))
 
 (define-function %record/compute-effective-slots (type)
@@ -277,7 +277,7 @@
                                  (subtype? (<record>-super type) <record>)
                                  (record/effective-slot-count (<record>-super type)))
                             0)
-                        ()))
+                        false))
 
 ;; redefine the preliminary bootstrap accessors with full featured ones
 (eval `(let ()
@@ -342,9 +342,6 @@
 
 (define-form define-immediate (name tag-value tag-width)
   `(define ,name ,(new-<immediate-type> name (eval tag-value) (eval tag-width))))
-
-(define-function immediate-type? (obj)
-  (subtype? (type-of obj) <immediate-type>))
 
 ;;; boxed type
 
