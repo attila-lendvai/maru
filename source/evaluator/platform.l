@@ -136,7 +136,7 @@
 
 (define-symbol-cache
     true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
-    lambda let *globals*)
+    lambda let *globals* *expanders* *encoders* *evaluators* *applicators*)
 
 ;;;
 ;;; error handling

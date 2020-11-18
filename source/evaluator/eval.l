@@ -375,11 +375,9 @@
       (set env (<env>-parent env)))
     result))
 
-(define-function ensure-variable (env name)
-  (safety 2 (assert (is <env> env)	"ensure-variable: env arg is not of type <env>: "env))
-  (safety 2 (assert (symbol? name)	"ensure-variable: name arg is not of type <symbol>: "name))
-  (awhen (find-variable env name)
-    (return it))
+(define-function new-variable (env name)
+  (safety 2 (assert (is <env> env)	"new-variable: env arg is not of type <env>: "env))
+  (safety 2 (assert (symbol? name)	"new-variable: name arg is not of type <symbol>: "name))
   (let ((offset (unbox <long> (<env>-offset env))))
     (gc/let* ((var (variable name () env offset)))
       (set (<env>-offset env) (box <long> (+ offset 1)))
@@ -387,7 +385,14 @@
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
   (debug (platform/print-diagnostics "environment-define called, name is "(unbox <symbol> name)"\n"))
-  (let ((var (ensure-variable env name)))
+  (let ((var (find-variable env name)))
+    (if var
+        (let ()
+          ;; TODO
+          ;;(error "environment-define: variable "it" is already defined in env "env)
+          ;;(platform/print-diagnostics "warning: environment-define: variable '"(unbox <symbol> (<variable>-name var))"' is already defined in this env.\n")
+          )
+      (set var (new-variable env name)))
     (set (<variable>-value var) value)
     var))
 
@@ -780,7 +785,7 @@
 
       ((= head fixed-primitive-function/define)
        (unless (is <variable> (first tail))
-         (let ((var (ensure-variable (module-env *module*) (first tail))))
+         (let ((var (environment-define (module-env *module*) (first tail) ())))
            (set tail (encode-all (cdr tail) env))
            (set tail (cons var tail)))))
 
@@ -939,11 +944,16 @@
                             (lambda (name value)
                               (not (= name symbol/*globals*)))))
 
-    ;; overwrite these with empty arrays in the new module. TODO why?
-    (set tmp (array 0))		(environment-define env (string->symbol "*expanders*")		tmp)
-    (set tmp (array 0))		(environment-define env (string->symbol "*encoders*")		tmp)
-    (set tmp (array 0))		(environment-define env (string->symbol "*evaluators*")		tmp)
-    (set tmp (array 0))		(environment-define env (string->symbol "*applicators*")	tmp)
+    ;; overwrite these with empty arrays in the new module. TODO why? maybe clone the array instead?
+    (let ((doit (lambda (env name)
+                  (gc/let* ((tmp (array 0)))
+                    (set (<variable>-value (or (defined? name env)
+                                               (new-variable env name)))
+                         tmp)))))
+      (doit env symbol/*expanders*)
+      (doit env symbol/*encoders*)
+      (doit env symbol/*evaluators*)
+      (doit env symbol/*applicators*))
 
     (debug (libc/printf "module constructor returning with ") (println module))
     module))
@@ -1049,10 +1059,10 @@
   (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set *expanders*	(defined? (string->symbol "*expanders*") env))
-    (set *encoders*	(defined? (string->symbol "*encoders*") env))
-    (set *evaluators*	(defined? (string->symbol "*evaluators*") env))
-    (set *applicators*	(defined? (string->symbol "*applicators*") env)))
+    (set *expanders*	(defined? symbol/*expanders*	env))
+    (set *encoders*	(defined? symbol/*encoders*	env))
+    (set *evaluators*	(defined? symbol/*evaluators*	env))
+    (set *applicators*	(defined? symbol/*applicators*	env)))
 
   (debug (libc/printf "capture-well-known-module-values is done\n")))
 
