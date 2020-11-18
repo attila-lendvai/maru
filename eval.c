@@ -1941,7 +1941,7 @@ static subr(putc)
   if (!isLong(chr)) { fprintf(stderr, "putc: non-integer character: ");  fdumpln(stderr, chr);  fatal(0); }
   if (!isLong(arg)) { fprintf(stderr, "putc: non-integer argument: ");  fdumpln(stderr, arg);  fatal(0); }
   FILE *stream= (FILE *)getLong(arg);
-  int c= putwc(getLong(chr), stream);
+  int c= fputwc(getLong(chr), stream);
   return (WEOF == c) ? nil : chr;
 }
 
