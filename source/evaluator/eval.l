@@ -474,8 +474,8 @@
 
 (define-function print-backtrace ()
   (if-at-expand feature/backtrace
-      (let ((i *call-stack-index*))
-        (while (<= 0 (decr i))
+      (let ()
+        (for (i 0 *call-stack-index*)
           (let ((call-frame (array-at *call-stack* i))
                 (index-label (long->string i)))
             (times-do (- 3 (string-length index-label))
@@ -486,7 +486,8 @@
             (awhen (<call-frame>-callee call-frame)
               (platform/print "\tcallee: ")
 	      (println it))
-            (awhen (<call-frame>-arguments call-frame)
+            (awhen (and (<= *error-level* 1)
+                        (<call-frame>-arguments call-frame))
               (platform/print "\targs: ")
 	      (println it))))
         (platform/flush-streams))
