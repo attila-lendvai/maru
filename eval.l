@@ -1772,10 +1772,10 @@
            (new-<long> c)))))
 
 (define-subr libc/fputc
-  (let ((stream (k/car -args-))
-        (obj (k/cadr -args-)))
+  (let ((obj	(k/car -args-))
+        (stream	(k/cadr -args-)))
     (or stream (set stream (get/variable-value var/*input*)))
-    (new-<long> (libc/fputc (get/tptr stream) (get/long obj)))))
+    (new-<long> (libc/fputc (get/long obj) (get/tptr stream)))))
 
 (define-subr (libc/format 2)
   (let ((ofmt (k/car -args-))
