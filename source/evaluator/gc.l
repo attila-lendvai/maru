@@ -22,7 +22,8 @@
 
 (define-form gc/valid-header-canary? (header)
   (if feature/object-canary
-      `(= (<header>-canary ,header) ,+canary-value+)
+      `(and (<= gc/memory-base ,header)
+            (= (<header>-canary ,header) ,+canary-value+))
     true))
 
 (define-form gc/initialize-header-canary (header)
