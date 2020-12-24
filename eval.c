@@ -1,7 +1,6 @@
 // last edited: 2012-10-05 09:11:14 by piumarta on emilia.local
 
-#define _ISOC99_SOURCE 1
-#define _BSD_SOURCE 1
+#define _DEFAULT_SOURCE 1
 
 #include <stddef.h>
 #include <stdio.h>
@@ -2052,7 +2051,7 @@ static subr(format)
   oop     oarg= cadr(args);
   wchar_t *fmt= get(ofmt, String,bits);
   int     farg= 0;
-  union { long l;  void *p;  double d; } arg;
+  union { long l;  void *p;  double d; } arg = {0};
   switch (getType(oarg)) {
       case Undefined:					  break;
       case Long:	arg.l= getLong(oarg);		  break;

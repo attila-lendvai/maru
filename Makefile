@@ -4,7 +4,7 @@ NOW = $(shell date '+%Y%m%d.%H%M')
 SYS = $(shell uname)
 
 OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -Wall -Wno-comment -g $(OFLAGS)
+CFLAGS = -std=c99 -Wall -Wno-comment -g $(OFLAGS)
 CC32 = $(CC) -m32
 
 ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
@@ -27,14 +27,14 @@ endif
 
 all : eval
 
-eval : $(BUILD)/eval3
+eval : $(BUILD)/eval2
 	cp $(BUILD)/eval2 eval
 
 test-bootstrap : $(BUILD)/eval3 .force
 	diff $(BUILD)/eval2.s $(BUILD)/eval3.s
 
 $(BUILD)/eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
-	mkdir --parents $(BUILD)
+	mkdir -p $(BUILD)
 	$(CC) -g $(CFLAGS) -o $(BUILD)/eval1 eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
@@ -42,10 +42,10 @@ osdefs.k : $(BUILD)/mkosdefs
 	$(BUILD)/mkosdefs > $@
 
 $(BUILD)/mkosdefs : mkosdefs.c
-	mkdir --parents $(BUILD)
+	mkdir -p $(BUILD)
 	$(CC) -o $@ $<
 
-$(BUILD)/eval2 : emit.l eval.l $(BUILD)/eval1 osdefs.k
+$(BUILD)/eval2 : $(BUILD)/eval1 emit.l eval.l osdefs.k
 	$(TIME) $(BUILD)/eval1 -O emit.l eval.l > $(BUILD)/eval2.s && $(CC32) -c -o $(BUILD)/eval2.o $(BUILD)/eval2.s && size $(BUILD)/eval2.o && $(CC32) -o $(BUILD)/eval2 $(BUILD)/eval2.o
 
 time : .force
