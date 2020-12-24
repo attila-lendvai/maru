@@ -131,12 +131,8 @@
     (error "cannot access variable "var", closures are not supported yet.")))
 
 ;;;
-;;; target module setup
+;;; target env setup
 ;;;
-
-(define *target-module* (module "target"))
-
-;; TODO isn't this kinda messy? all these switch-to-foo-module &co...
 
 (eval-in-slave
  (let (arch word-size)
@@ -152,9 +148,6 @@
      (else
       (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
 
-   ;; we want these constants (i.e. <form>s) to be present both in the slave and in the target module,
-   ;; so that later forms can access them in both modules (forms will be run in the slave module
-   ;; while constants will be referenced both directly from the target and in the form bodies).
    `(let ()
       (define-constant +architecture+		'',arch)
       (define-constant +operating-system+	'',(string->symbol target/os))
@@ -163,9 +156,7 @@
       (define-constant +little-endian?+		true) ; this is needed by the compiler tests
       ;;(define-constant +target-triplet+	,(concat-strings target/cpu "-" target/vendor "-" target/os))
       (define-constant +word-size-in-bits+	,word-size)
-      (define-constant +word-size-in-bytes+	,(/ word-size 8))
-
-      (define *target-module*			,*target-module*))))
+      (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
 (switch-to-slave-module)
 
@@ -180,54 +171,69 @@
       (* value  +word-size-in-bytes+)
     `(* ,value ,+word-size-in-bytes+)))
 
-;; redefine DEFINE-FORM with one that evaluates the body in *slave-module*.
-;; this way the body code can use everything that's available in the slave module
-;; even when used in the target, i.e. in eval.l.
-(define-form define-form/target (name args . body)
-  (let ((form-form	`(form (lambda (*env* ,@args) ,@body))))
-    `(define ,name (eval-in-slave ',form-form))))
+;; we rebind these to point to the actual definitions (as opposed to the symbols naming them),
+;; so that CONS can be redefined in the target and the expansion of quasiquotes still work as expected
+(define qq-concat-list	concat-list)
+(define qq-cons		cons)
 
-(switch-to-host-module)
+;; *slave-env* is the direct parent of *target-env* (i.e. lookup is delegated to it).
+;; you can think of *slave-env* as the syntax-module of the target: all macros,
+;; constants, and any meta-level stuff are defined and evaluated in that environment.
+(define *slave-env* *globals*)
 
-;; strictly speaking, this is just wrong, because we load one of the slave's source file into the host... but it works, and fails loud and early if not.
-(load "source/env-min.l")
+(define-function eval-in-slave (form)
+  ;; we can't just simply (eval form *slave-env*) because DEFINE defines into the module's *globals*.
+  ;; without this extra dance (eval-in-slave '(define foo 42)) would define into the env created for the target.
+  (let ((prev-globals *globals*)
+        result)
+    (set *globals* *slave-env*)
+    (set result (eval form))
+    (set *globals* prev-globals)
+    result))
 
-;; let's make all the slave's <form>s available in the *target-module*
-(copy-module-bindings *slave-module* *target-module*
-                      (lambda (name value)
-                        (and (= (type-of value) <form>)
-                             ;; *module* will be a global variable in the target, while in the interpreter
-                             ;; it's a ([set-]current-module), because we need to update some caches when it's set.
-                             (not (member? name '(*module*))))))
+;; create an empty env to hold the definitions that will be level-shifted to the target.
+(set *globals* (environment *globals*))
 
-(define-function eval-in-target (form)
-  (eval-in-module *target-module* form))
+(safety 3
+  (eval-in-slave '(define %im-a-test 42))
+  (eval-in-host `(assert (defined? '%im-a-test ,*slave-env*))))
 
-(define-form target-value (form)
-  `(eval-in-module *target-module* ',form))
+;; hide DEFINE-FORM in the target env with one that expand/encode/eval the body in the slave env.
+;; this way the body code can use everything that's available in the slave module,
+;; even when it is redefined in the target (e.g. CONS in the form body vs. the target's definition
+;; of CONS, i.e. the one that implements it).
+(define-form define-form (name args . body)
+  (let* ((thunk	(eval-in-slave `(lambda (*env* ,@args) ,@body)))
+         (form	(form (lambda rtargs
+                        (let ((prev-globals *globals*)
+                              (result ()))
+                          (set *globals* *slave-env*)
+                          (set result (apply thunk rtargs))
+                          (set *globals* prev-globals)
+                          result)))))
+    `(define ,name ,form)))
 
-(define-function switch-to-target-module ()
-  (set *module* *target-module*))
+(assert (not (= define-form (eval-in-slave 'define-form))))
 
-(eval-in-target
- `(let ()
-    (define *host-module*	,*module*)
-    (define *slave-module*	,*slave-module*)
-    (define slave-value		,slave-value)
-    (define eval-in-slave	,eval-in-slave)
-    ;;(define eval-in-host	,(slave-value eval-in-host))
-    ;; this cannot be a function because functions are supposed to be lowered to the target VM
-    ;; (define-form switch-to-host-module ()
-    ;;   `(set *module* *host-module*))
+;; hide DEFINE-CONSTANT in the target env with one that defines the constant into the slave env.
+;; this way constants will be available inside the form bodies, too.
+(define-form define-constant (name value-form)
+  ;; NOTE as per the custom DEFINE-FORM above, we are expanded/encoded in the slave env,
+  ;; but at runtime we're run in the target env.
+  (let* ((value		(eval value-form))
+         (form-obj	(eval `(form () (lambda _ ',value))))
+         (definer-form	`(define ,name ',form-obj)))
+    (eval definer-form) ; this way it will define into *slave-env*
+    ()))
 
-    (define evolving?		,evolving?)
-    ;;(define bootstrapping?	,bootstrapping?) this is always true here
+(define-constant false 0)
+(define-constant true  1)
 
-    (define define-form		,(slave-value define-form/target))
-    (define-constant feature/redefinable-functions-in-target ,feature/redefinable-functions-in-target) ; TODO introduce a better mechanism for this
-
-    (define-constant false 0)
-    (define-constant true  1)))
+;; redefine DEFINE-RECORD so that it defines into the slave env (sometimes forms, i.e. constant
+;; want to access types, e.g. <header> in gc.l).
+(define-form define-record (name super slots)
+  (eval `(define-record ,name ,super ,slots)) ; this way it will define into *slave-env*
+  ())
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
@@ -235,29 +241,21 @@
                 ;; to test if anything calls them before they get redefined:
                 ;; eval cons list car cdr form
                 )
-  (eval-in-target `(define ,name (fixed (lambda args (print ',name " encountered in interpreted code with args " args "\n") (abort))))))
+  (environment-define *slave-env* name (fixed (lambda args (print name " encountered in interpreted code with args " args "\n") (abort)))))
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()
-;;   ;; they need to be <primitive-function>'s, so that encode doesn't insert them as it inserts <fixed>'s.
+;;   ;; they need to be <primitive-function>'s (why?)
 ;;   (eval-in-module *target-module* `(define ,name error)))
 
-(define-function target-boolean (value)
-  (eval-in-target (if value 'true 'false)))
+(switch-to-host-module)
 
-(eval-in-slave
- `(let ()
-    (define target-boolean	,target-boolean)
-    ;; we rebind these to point to the actual definitions, so that CONS can be redefined in the target and the expansion of quasiquotes still work as expected
-    (define qq-concat-list	concat-list)
-    (define qq-cons		cons)))
+;; the *globals* of the slave-module is the env that holds the target's definitions
+(define-function eval-in-target (form)
+  (eval-in-module *slave-module* form))
 
-;; create a child environment now that will hold whatever gets defined by loading
-;; eval.l and its parts, i.e. the artifacts that we want to compile.
-(let ((child-env (environment (eval-in-module *target-module* '*globals*))))
-  (eval-in-module *target-module* `(set *globals* ,child-env)))
+(define-form target-value (form)
+  `(eval-in-module *slave-module* ',form))
 
 (assert (= 1 (target-value true)))
 (assert (= 0 (target-value false)))
-(assert (= 1 (target-boolean "foo")))
-(assert (= 0 (target-boolean ())))

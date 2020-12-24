@@ -1012,7 +1012,7 @@
      ,@(map (lambda (entry)
               (let* (((name fixed?)	entry)
                      (impl-name		(concat-symbol name '/evaluator-stub)))
-                `(instantiate-primitive-function __module__ ,(symbol->string name) ,impl-name ,(target-boolean fixed?))))
+                `(instantiate-primitive-function __module__ ,(symbol->string name) ,impl-name ,(if fixed? 'true 'false))))
             *primitive-function-registry*)))
 
 (define-function populate-module-with-maru-primitives (module)

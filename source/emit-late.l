@@ -19,36 +19,7 @@
 ;;;
 ;;; API visible in the target
 ;;;
-(set *module* *target-module*)
-
-;; redefine DEFINE-CONSTANT so that it defines it both into the slave and into the target.
-(define-form define-constant (name value-form)
-  ;; NOTE as per the custom DEFINE-FORM above, we are expanded/encoded in the slave module,
-  ;; but at apply time *module* will be the target module.
-  ;; TODO the wizardry here smells like accidental complexity, or at least it's semantics with a high congnitive load.
-  (let* ((value		(eval `(eval-in-module *slave-module* ',value-form)))
-         (form-obj	(eval `(eval-in-module *slave-module* '(form () (lambda _ ',value)))))
-         (definer-form	`(define ,name ',form-obj)))
-    (eval `(eval-in-module *slave-module* ',definer-form))
-    definer-form))
-
-;; (define-constant +test+ 42)
-;; (eval-in-module *slave-module* `(assert (= +test+ 42)))
-;; (eval-in-module *slave-module* `(println "+test+ in target is " ,+test+))
-
-;; redefine DEFINE-RECORD so that it defines both into the slave and the target.
-(define-form define-record (name super slots)
-  (let* ((definer-form	`(define-record ,name ,super ,slots))
-         (type		(eval `(eval-in-module *slave-module* ',definer-form)))
-         (accessors	(eval `(eval-in-module *slave-module* '(%make-record-accessors ,type)))))
-    `(let ()
-       (define ,name ,type)
-       ,@accessors
-       ())))
-
-;; an alternative that almost works
-;; (define-form define-record (name super slots)
-;;   (eval `(eval-in-module *slave-module* '(encode (expand '(define-record ,name ,super ,slots))))))
+(switch-to-slave-module)
 
 (define-form define-C-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
