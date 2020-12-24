@@ -284,13 +284,17 @@ the `maru.x` branches in this repo).
 #### Other instances
 
 There are a few different copies/versions of Maru online. Here are the ones
-that I know about and contain non-trivial work:
+that I know about and contain interesting code:
 
 - [github.com/melvinzhang/maru](https://github.com/melvinzhang/maru)
 
+- [below-the-top](https://github.com/jbulow/below-the-top) is some kind of
+  generic sexp tokenizer and evaluator written in Common Lisp that can be
+  configured so that it can bootstrap Maru. I haven't tried it myself.
+
 #### Related projects
 
-A list of projects that I think is worth mentioning in this context:
+A list of projects that are worth mentioning in this context:
 
   - [Project Oberon](http://www.projectoberon.com/): a project which encompasses CPU,
     language, operating system and user interface, and which can be run on a relatively
