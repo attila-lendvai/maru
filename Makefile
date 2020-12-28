@@ -28,7 +28,8 @@ HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
 
 ifeq ($(HOST_OS),Linux)
-  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
+#  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
+  LLVM_VERSION	=
   TARGET_VENDOR	?= linux
   TARGET_OS	?= gnu
   TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
