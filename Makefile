@@ -1,8 +1,8 @@
 CFLAGS = -Wall -std=c99 -D_ISOC99_SOURCE
 
-all: eval-opt
+all: eval
 
-eval-opt: eval.c
+eval: eval.c
 	$(CC) $(CFLAGS) -O3 -fomit-frame-pointer -DNDEBUG -o eval eval.c
 
 eval-debug: eval.c
