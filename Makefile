@@ -21,16 +21,16 @@
 # backends to build
 BACKENDS		= x86 llvm
 
-LLVM_VERSION	= 8
+#LLVM_VERSION	= -8
+LLVM_VERSION	=
 LLVM_ARGS	= -O3
 
 TARGET_VENDOR	= pc-linux
 TARGET_OS	= gnu
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
-
 #TARGET_llvm	?= i686-$(TARGET_VENDOR)-$(TARGET_OS)
-TARGET_llvm	?= $(shell llvm-config-$(LLVM_VERSION) --host-target)
+TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
 # use this eval to execute any tests or code generation from the makefile
 TEST_EVAL	= $(BUILD_llvm)/eval2
@@ -50,7 +50,7 @@ ifeq ($(TARGET_CPU_llvm),x86_64)
 else ifeq ($(TARGET_CPU_llvm),i686)
   TARGET_WORD_SIZE_llvm	= 32
   BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
-else
+else ifneq ($(TARGET_CPU_llvm),)
   $(error "Couldn't extract the target's word size from the llvm triplet '$(TARGET_llvm)'. Extracted CPU: '$(TARGET_CPU_llvm)'")
 endif
 
@@ -61,9 +61,9 @@ GREEN		= $(shell tput setaf 2)
 BLUE		= $(shell tput setaf 4)
 RESET		= $(shell tput sgr0)
 
-LLC		= llc-$(LLVM_VERSION) $(LLVM_ARGS)
-LLVM_OPT	= opt-$(LLVM_VERSION) $(LLVM_ARGS)
-CLANG		= clang-$(LLVM_VERSION) $(LLVM_ARGS)
+LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
+LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
+CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
 DIFF		= diff --unified --ignore-all-space
 STRIP		= strip
 TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
