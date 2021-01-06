@@ -18,16 +18,11 @@
       method)))
 
 (define-apply <selector> (self . arguments)
-  ;; NOTE if we wanted to be super precise while bootstrapping, then this should be
-  ;; (<type>-id (type-of (car arguments))), so that type-of can map the host type to
-  ;; that of the slave. this causes a major slowdown though, and it's probably not needed,
-  ;; because emit.l is loaded into the host, so the type dispatches in it work as expected.
-  ;; the fast version is: (type-id-of (car arguments))
-  ;; same applies to generics.
   (apply (or (array-at (<selector>-methods self)
+                       ;; TODO implement the same for generics
                        (if-at-expand (and bootstrapping?
                                           (= 0 *optimised*))
-                           ;; more correct version that considers the type mappings while bootstrapping (i.e. pretty printing works properly while bootstrapping).
+                           ;; the more correct version that considers the type mappings while bootstrapping (e.g. pretty printing works properly while bootstrapping).
                            ;; this slows down the bootstrap by about 10% though.
                            (<type>-id (type-of (car arguments)))
                          (type-id-of (car arguments))))
@@ -36,11 +31,10 @@
          arguments))
 
 (define-function selector (name default)
-  (let ((self (new <selector>)))
-    (set (<selector>-name    self) name)
-    (set (<selector>-methods self) (array))
-    (set (<selector>-default self) default)
-    self))
+  (make <selector>
+    (name      name)
+    (methods   (array))
+    (default   default)))
 
 (define-function <selector>-add-method (self type method)
   (when-at-expand (and feature/track-expr-names
