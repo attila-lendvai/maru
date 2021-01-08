@@ -119,7 +119,7 @@
              (result	(libc/strtoul str (address-of endptr) base)))
         (when (and (= -1 result)
                    (or (not negative?)
-                       (not (cstring= str "1"))))
+                       (not (libc/string= str "1"))))
           (fatal1 "invalid number in source code, libc/strtoul failed for '%s' (printed without the sign here)" str))
         (box <long> (if negative? (- result) result))))))
 

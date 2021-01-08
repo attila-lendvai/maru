@@ -298,6 +298,9 @@
 (define-function max (a b)
   (if (> a b) a b))
 
+(define-function min (a b)
+  (if (< a b) a b))
+
 ;;;
 ;;; copy the types here that should be visible to the target code
 ;;; ----------------------------------------------------------------

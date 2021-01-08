@@ -70,6 +70,24 @@
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	move-bytes	1)
 
+;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
+;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
+
+(define-function compare-characters (buf-a len-a buf-b len-b)
+  (let ((diff (compare-bytes buf-a buf-b (min len-a len-b))))
+    (cond
+      ((or (not (= 0 diff))
+           (= len-a len-b))
+       diff)
+      ((< len-a len-b)
+       (- 0 (byte-at buf-b len-a)))
+      (else ;; (> len-a len-b)
+       (- (byte-at buf-a len-b) 0)))))
+
+;; (define-primitive-function string-compare ((a <string>) (b <string>))
+;;   (compare-characters (get/string a) (string-length a)
+;;                       (get/string b) (string-length b)))
+
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)
         (hi (- (array-length array) 1)))

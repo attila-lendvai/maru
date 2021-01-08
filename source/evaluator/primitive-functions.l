@@ -175,7 +175,11 @@
     ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs) (cstring= (get/string lhs) (get/string rhs)) symbol/true))
+      ((= type <string>)	(and (string? rhs)
+                                     (let ((len (string-length lhs)))
+                                       (= (string-length rhs) len)
+                                       (= 0 (compare-bytes (get/string lhs) (get/string rhs) len)))
+                                     symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
 ;; FIXME restore arity check
@@ -186,7 +190,11 @@
     ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (!= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs) (not (cstring= (get/string lhs) (get/string rhs))) symbol/true))
+      ((= type <string>)	(and (string? rhs)
+                                     (let ((len (string-length lhs)))
+                                       (or (not (= (string-length rhs) len))
+                                           (compare-bytes (get/string lhs) (get/string rhs) len)))
+                                     symbol/true))
       (else                     (and (!= lhs rhs) symbol/true)))))
 
 (define-primitive-function (exit ()) ((exit-code <long> 0))

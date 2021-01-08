@@ -20,14 +20,13 @@
 (define-form move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-;; for sorting
-(define-form cstring-compare (a b)
-  `(libc/strcmp ,a ,b))
+(define-form compare-bytes (a b count)
+  `(libc/memcmp ,a ,b ,count))
 
-(define-form cstring= (a b)
+(define-form libc/string= (a b)
   `(= 0 (libc/strcmp ,a ,b)))
 
-(define-form cstring-length (cstr)
+(define-form platform/string-length (cstr)
   `(libc/strlen ,cstr))
 
 (define-form platform/flush-streams ()
@@ -70,6 +69,15 @@
 ;;   (safety 1 (assert (= <target-vm-pointer> (type-of libc-handle))))
 ;;   (make <libc-stream>
 ;;     (handle		libc-handle)))
+
+;;;
+;;; garbage collector
+;;; ----------------------------------------------------------------
+
+(load "source/evaluator/gc.l")
+
+(define-function allocate (type slot-count)
+  (gc/allocate type (words-to-bytes slot-count)))
 
 (load "source/evaluator/eval.l")
 
@@ -124,19 +132,19 @@
             (pop-cla)
             (cond
               ;; -v
-              ((cstring= arg "-v")
+              ((libc/string= arg "-v")
                (incr *verbosity*)
                (set tmp (box <long> *verbosity*))
                (set (global-variable-value (string->symbol "*verbosity*")) tmp))
 
               ;; -O
-              ((cstring= arg "-O")
+              ((libc/string= arg "-O")
                (incr *optimised*)
                (set tmp (box <long> *optimised*))
                (set (global-variable-value (string->symbol "*optimised*")) tmp))
 
               ;; -p
-              ((cstring= arg "-p")
+              ((libc/string= arg "-p")
                (if-at-expand feature/profiler
                    (let ((usecs 1000))
                      (install_profiler_handler profiler/take-sample)
@@ -145,11 +153,11 @@
                  (libc/fprintf libc/stderr "WARNING: this build has no profiler, ignoring -p\n")))
 
               ;; -
-              ((cstring= arg "-")
+              ((libc/string= arg "-")
                (repl-stream libc/stdin))
 
               ;; --call to call a function
-              ((cstring= arg "--call")
+              ((libc/string= arg "--call")
                (debug (libc/printf "processing a --call\n"))
                (unless (pair? cla)
                  (fatal "--call requires an argument"))
@@ -161,7 +169,7 @@
                    (expand-encode-eval form (module-env *module*)))))
 
               ;; --define to define a variable
-              ((cstring= arg "--define")
+              ((libc/string= arg "--define")
                (debug (libc/printf "processing a --define\n"))
                (unless (and (pair? cla)
                             (pair? (get/tail cla)))
@@ -176,7 +184,7 @@
                         (i	(libc/strtoul cstr (address-of endptr) 0)))
                    ;; TODO investigate: why the hell does this behave differently than the one at the other call site of strtoul?
                    ;; (when (or (not (= -1 i))
-                   ;;           (cstring= cstr "-1"))
+                   ;;           (libc/string= cstr "-1"))
                    ;;   (set value (box <long> i)))
                    (when (= 0 (char-at endptr 0))
                      (set value (box <long> i))))

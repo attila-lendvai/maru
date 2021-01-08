@@ -35,12 +35,6 @@
 ;;; size means bytes; if not, then it should be indicated.
 
 ;;;
-;;; garbage collector
-;;; ----------------------------------------------------------------
-
-(load "source/evaluator/gc.l")
-
-;;;
 ;;; types and their kernel accessors (get, put, is)
 ;;;
 ;;; unsurprisingly, types are represented in the target as integers.
@@ -187,9 +181,6 @@
          ,@(%make-make-inits *env* 'self. inits)
          self))))
 
-(define-function allocate (type slot-count)
-  (gc/allocate type (words-to-bytes slot-count)))
-
 (define-primitive-function (allocate ()) (type (slot-count <long>))
   ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
   (allocate (cond
@@ -220,14 +211,14 @@
 
 ;; TODO merge this into the box/unbox API?
 (define-function string-from-cstring (cstr)
-  (let* ((len (cstring-length cstr))
+  (let* ((len (platform/string-length cstr))
          (obj (string len)))
     (set (slot-value <string> size obj) (box <long> len))
     (copy-bytes cstr (<string>-elements obj) len)
     obj))
 
 (define-function symbol (cstr)
-  (let ((len (+ 1 (cstring-length cstr)))) ; +1 is for the zero termination
+  (let ((len (+ 1 (platform/string-length cstr)))) ; +1 is for the zero termination (TODO libc leakage)
     (gc/let* ((obj (gc/allocate-opaque <symbol> len)))
       (copy-bytes cstr obj len)
       obj)))
@@ -382,14 +373,20 @@
     (set (<variable>-value var) value)
     var))
 
-(define-primitive-function string->symbol ((string <string>))
+(define-primitive-function string->symbol ((str <string>))
   (array-binary-search *symbols*
-                       string
-                       (lambda (item candidate)
-                         (cstring-compare item (unbox <symbol> candidate)))
-                       (lambda (array index item)
-                         (debug (platform/print-diagnostics "interning "item"\n"))
-                         (gc/let* ((sym (symbol item)))
+                       str
+                       (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
+                         ;; NOTE this assumes that the payload in our strings has the
+                         ;; same representation as that of symbols.
+                         (let ((candidate-payload (unbox <symbol> candidate)))
+                           ;; TODO this could be simpler/faster if closures could capture
+                           ;; TODO eliminate libc/strlen
+                           (compare-characters str (libc/strlen str)
+                                               candidate-payload (libc/strlen candidate-payload))))
+                       (lambda (array index str)
+                         (debug (platform/print-diagnostics "interning "(get/string str)"\n"))
+                         (gc/let* ((sym (symbol str)))
                            (array-insert array index sym)
                            sym))))
 
