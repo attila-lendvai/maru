@@ -1,7 +1,20 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; These are the common definitions of the platform API, assuming a von Neuman architecture under us.
+;;; These are the common definitions of the platform API.
 ;;;
+;;; Various examples of platforms:
+;;;   libc
+;;;   metacircular: eval.exe running the code in eval.l
+;;;   raspberry-pi: running directly on an ARM board
+;;;
+;;; A platform needs to provide the following API:
+;;;  - strings
+;;;  - integers
+;;;  - memory
+;;;    - provide chunk(s) of memory for our GC
+;;;    - moving, copying, comparing oops, bytes
+;;;  - basic input/output
+;;;  - entry point and exit into/from our universe (e.g. libc's main and exit)
 
 (define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
 (define-constant feature/backtrace		(or true feature/profiler (< 0 *safety*)))
@@ -81,7 +94,6 @@
                 object)
              ,slot-index)))
 
-;; TODO to fully hook this in, expand needs to be fixed. see test eval/expand/set-forms/1
 (define-form set-slot-value (type-name slot-name object value)
   (let* ((type		(eval type-name))
          (slot-index	(record/slot-index type slot-name)))
@@ -186,16 +198,15 @@
 ;;; primitive-function infrasrtucture
 ;;; ----------------------------------------------------------------
 
-(eval-in-slave
- `(let ()
-    (define *primitive-function-registry* ())
-    (define *primitive-function-type-accessors*
-        '((<long>		(long?)				(unbox <long>))
-          (<string>		(string?)			(get/string))
-          (<target-vm-pointer>	(is <target-vm-pointer>)	(unbox <target-vm-pointer>))
-          (<symbol>		(symbol?))
-          (<pair>		(pair?))
-          (<array>		(array?))))))
+(begin-for-syntax
+ (define *primitive-function-registry* ())
+ (define *primitive-function-type-accessors*
+     '((<long>			(long?)				(unbox <long>))
+       (<string>		(string?)			(get/string))
+       (<target-vm-pointer>	(is <target-vm-pointer>)	(unbox <target-vm-pointer>))
+       (<symbol>		(symbol?))
+       (<pair>			(pair?))
+       (<array>			(array?)))))
 
 (define-function %not-enough-arguments (name args)
   (error (string-from-cstring name)": not enough arguments: "args))

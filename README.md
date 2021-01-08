@@ -231,20 +231,28 @@ Assorted TODO:
   - Simplify the types-are-objects part and its bootstrap, and maybe even
     make it optional?
 
-  - Compile to, and bootstrap on the bare metal of some interesting target
-    (C64? an ARM board?).
+  - Compile to, and bootstrap on the bare metal of some interesting
+    targets. The simplest would be a static executable that treats the
+    linux kernel as a VM; i.e. without linking with libc, and using a
+    few [`syscall`'s to talk to "the
+    hardware"](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux)?
+    See `tests/test-elf.l`. An alternative could be
+    [pc-bios](https://github.com/cirosantilli/x86-bare-metal-examples),
+    because it's easily testable using QEMU. Later attempt an ARM
+    board (like Raspberry Pi), or even C64?
 
   - Rewrite the build process in Maru; eliminate dependency on GNU Make.
 
-  - Implement modules and phase separation along what is outlined in
+  - Implement modules and phase separation along with what is outlined in
     [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
     Part of this is already done and is used in the bootstrap process.
 
   - Merge the language and API that the compiler and the evaluator understands;
     i.e. make the level-shifted code (`eval.l` & co.) less different than code
-    meant for the evaluator. This would mean that we can e.g. load/compile
+    understood by the evaluator. This would mean that we can e.g. load/compile
     `source/buffer.l` both into the level-shifted code and into the evaluator.
-    This is partially done, but there are still loose ends to deal with.
+    This is slowly happening, but it's nowhere near done, and I'm not even sure
+    what done means here.
 
   - Directly generate IA-32 machine code and thus eliminate the dependency on
     an external assembler. Then use this to implement a JIT that attempts to

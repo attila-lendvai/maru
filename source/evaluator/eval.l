@@ -210,6 +210,7 @@
                   (allocate-data length)))))
 
 ;; TODO merge this into the box/unbox API?
+;; TODO would be nice if we could get rid of this
 (define-function string-from-cstring (cstr)
   (let* ((len (platform/string-length cstr))
          (obj (string len)))

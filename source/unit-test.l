@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define unit-testing? '(t))
+(define-constant unit-testing? false)
 
 (define-form unit-fail (expr)
   `(error "UNIT FAIL "unit-name": "',expr))

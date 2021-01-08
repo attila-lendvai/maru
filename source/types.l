@@ -59,6 +59,10 @@
 
 (if-at-expand bootstrapping?
     (let ()
+      ;; if we want to e.g. use the host's multimethods on the slave's types
+      ;; (for example in the compiler) while we are being bootstrapped, then
+      ;; we need to "bind" the slave's <type> and <record> to their
+      ;; respective versions in the host.
       (define type-id-of-<type>		(eval-in-host '(<type>-id <type>)))
       (define type-id-of-<record>	(eval-in-host '(<type>-id <record>)))
       (define slots-of-<type>		(eval-in-host '(<record>-direct-slots <type>)))

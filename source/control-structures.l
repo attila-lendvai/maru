@@ -71,6 +71,7 @@
 (define-function %case-test (values)
   (if (pair? values)
       (let ((value (car values)))
+        ;; we need to do this so that the expansion is simple enough for the compiler
         (unless (self-evaluating-value? value)
           (set value `(quote ,value)))
         (cons `(= __value__ ,value)

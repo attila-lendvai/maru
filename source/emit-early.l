@@ -191,6 +191,9 @@
     (set *globals* prev-globals)
     result))
 
+(define-form begin-for-syntax forms
+  `(eval-in-slave '(let () ,@forms)))
+
 ;; create an empty env to hold the definitions that will be level-shifted to the target.
 (set *globals* (environment *globals*))
 

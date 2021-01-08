@@ -166,7 +166,6 @@
 (define-relation >=)
 (define-relation >)
 
-;; FIXME strcmp is inappropriate for strings that contain zeros
 ;; FIXME restore arity check
 (define-primitive-function (= ()) _
   (let* ((lhs  (get/head -args-))

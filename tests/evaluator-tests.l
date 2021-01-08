@@ -207,14 +207,14 @@
                              v)))
 
 ;; expand needs to check for a set-foo form at every step while expanding, and do
-;; the set-conversion if available.
+;; the set-conversion as early as a set-foo is available.
 (define-test eval/expand/set-forms/1 ()
   (let ((str "abcd"))
     (test-assert (= ?c (place-for-set-test str 2)))
     (set (place-for-set-test str 2) ?x)
     (test-assert (= str "abxd"))
     (set (place-for-set-test str 1) ?x)
-    (test-assert (= str "ajxd")) ; *not* "axxd" if SET-ACCESSOR-FOR-SET-TEST is properly picked up by expand
+    (test-assert (= str "ajxd")) ; "axxd" if SET-ACCESSOR-FOR-SET-TEST is not picked up by EXPAND
     ))
 
 (define *a-global-holding-42* 42)

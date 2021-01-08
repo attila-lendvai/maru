@@ -128,8 +128,8 @@
 
 (define-emit    (ALIGN long)			(println "	.align " $1))
 
-(define-emit    (LONG long)			(println "	.long	"$1))
-(define-emit    (LONG LABEL)			(println "	.long	"$1))
+(define-emit    (LONG long)			(println "	.4byte	"$1))
+(define-emit    (LONG LABEL)			(println "	.4byte	"$1))
 
 (define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
 

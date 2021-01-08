@@ -1,34 +1,32 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; Platform hooks when running under libc.
-
-(define-libc-ffi)
-
-(define-function libc/flush-streams ()
-  (libc/fflush libc/stdout)
-  (libc/fflush libc/stderr))
-
-(define-form copy-oops (from to wordcount)
-  `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
+;;; Platform API when running under a Maru evaluator.
+;;;
+;;; This is nowhere near ready...
+;;;
+;;; TODO:
+;;;  - find out how to deal with strings. the libc platform provides cstring (zero terminated ASCII bytes)
+;;;  - how to hook into the allocate of the super's GC
 
 (define-form move-oops (from to wordcount)
-  `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
-
-(define-form copy-bytes (from to count)
-  `(libc/memcpy ,to ,from ,count))
+  `(copy-oops ,from ,to ,wordcount))
 
 (define-form move-bytes (from to count)
-  `(libc/memmove ,to ,from ,count))
+  `(copy-bytes ,to ,from ,count))
 
-(define-form compare-bytes (a b count)
-  `(libc/memcmp ,a ,b ,count))
+;; for compare-bytes
+;; (let ((i		0)
+;;       (limit	(min len-a len-b)))
+;;   (while (< i limit)
+;;     (let ((diff (- (byte-at buf-a)
+;;                    (byte-at buf-b))))
+;;       (when (not (= 0 diff))
+;;         (return diff)))
+;;     (incr i)))
 
 (define-form libc/string= (a b)
   `(= 0 (libc/strcmp ,a ,b)))
 
-;; TODO clean up this libc and cstring mess. if we use the same string representation in
-;; our string payloads as libc, it doesn't mean that we should use libc stuff directly to
-;; manipulate it.
 (define-form platform/string-length (cstr)
   `(libc/strlen ,cstr))
 
@@ -64,7 +62,7 @@
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   (libc/exit -1))
 
-;; (load "source/streams.l")
+(load "source/streams.l")
 
 ;; (define-record <libc-stream> <stream> (handle))
 
@@ -72,15 +70,6 @@
 ;;   (safety 1 (assert (= <target-vm-pointer> (type-of libc-handle))))
 ;;   (make <libc-stream>
 ;;     (handle		libc-handle)))
-
-;;;
-;;; garbage collector
-;;; ----------------------------------------------------------------
-
-(load "source/evaluator/gc.l")
-
-(define-function allocate (type slot-count)
-  (gc/allocate type (words-to-bytes slot-count)))
 
 (load "source/evaluator/eval.l")
 
