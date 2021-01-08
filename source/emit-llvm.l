@@ -436,9 +436,9 @@
 (define-cmp-instruction LT "slt")
 (define-cmp-instruction LE "sle")
 (define-cmp-instruction EQ "eq")
-(define-cmp-instruction NE "ne")
 (define-cmp-instruction GE "sge")
 (define-cmp-instruction GT "sgt")
+;;(define-cmp-instruction NE "ne")
 
 (define-form define-arithmetic-instruction (instr-name llvm-op)
   `(define-instruction ,instr-name (t 4 t)
@@ -884,7 +884,7 @@
              ;; binary
              ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
               (bitwise-and  ,AND) (bitwise-or   ,OR ) (bitwise-xor ,XOR)
-              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (!= ,NE) (>= ,GE) (> ,GT)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
               (<< ,ASL) (>>  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)

@@ -182,21 +182,6 @@
                                      symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
-;; FIXME restore arity check
-(define-primitive-function (!= ()) _
-  (let* ((lhs  (get/head -args-))
-         (rhs  (get/head (get/tail -args-)))
-         (type (type-of lhs)))
-    ;; TODO use typecase
-    (cond
-      ((= type <long>)		(and (long? rhs) (!= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs)
-                                     (let ((len (string-length lhs)))
-                                       (or (not (= (string-length rhs) len))
-                                           (compare-bytes (get/string lhs) (get/string rhs) len)))
-                                     symbol/true))
-      (else                     (and (!= lhs rhs) symbol/true)))))
-
 (define-primitive-function (exit ()) ((exit-code <long> 0))
   (when-at-expand feature/profiler
     (profiler/disable))

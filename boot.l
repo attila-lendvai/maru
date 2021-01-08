@@ -164,6 +164,9 @@
       `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
     `(let () ,@body)))
 
+(define-form != (a b)
+  `(not (= ,a ,b)))
+
 (require "source/control-structures.l")
 
 ;; this smells like a KLUDGE: we let gc/let* leak here from eval.l so that we can use

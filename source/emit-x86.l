@@ -211,9 +211,9 @@
 (define-emit/comparator LT "setl")
 (define-emit/comparator LE "setle")
 (define-emit/comparator EQ "sete")
-(define-emit/comparator NE "setne")
 (define-emit/comparator GE "setge")
 (define-emit/comparator GT "setg")
+;;(define-emit/comparator NE "setne")
 
 ;; TODO deal with shifts that are out of range
 ;; (define-emit    (ASH TI32)			(let ((exit-label (UNIQUE-LABEL))
@@ -671,7 +671,7 @@
              ;; binary
              ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
               (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
-              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (!= ,NE) (>= ,GE) (> ,GT)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
               ;;(bitwise-shift ,ASH)
               (<< ,ASL) (>>  ,ASR)
               (char-at		,LOAD-I8)
