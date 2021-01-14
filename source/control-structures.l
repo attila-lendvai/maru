@@ -66,7 +66,7 @@
 
 ;;; case
 
-(define self-evaluating-value?) ; forward
+(define-function self-evaluating-value? (x) ()) ; forward
 
 (define-function %case-test (values)
   (if (pair? values)

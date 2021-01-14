@@ -234,8 +234,8 @@
 
 ;; redefine DEFINE-RECORD so that it defines into the slave env (sometimes forms, i.e. constant
 ;; want to access types, e.g. <header> in gc.l).
-(define-form define-record (name super slots)
-  (eval `(define-record ,name ,super ,slots)) ; this way it will define into *slave-env*
+(define-form define-record args
+  (eval `(define-record ,@args)) ; this way it will define into *slave-env*
   ())
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,

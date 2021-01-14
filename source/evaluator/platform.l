@@ -80,16 +80,10 @@
 ;;;
 ;;; ----------------------------------------------------------------
 
-;; raw records are records that have no gc <header>, i.e. no runtime
-;; type info, and thus we can't typecheck them.
-;; TODO maybe this should be annotated on the type? this is rather similar to e.g. type info of slots, and automatic boxing/unboxing in the accessors (not yet implemented)
-(define-constant +raw-records+ ''(<header>))
-
 (define-form slot-value (type-name slot-name object)
   (let* ((type		(eval type-name))
          (slot-index	(record/slot-index type slot-name)))
-    `(oop-at ,(if (and feature/typecheck-slot-access
-                       (not (member? type-name +raw-records+)))
+    `(oop-at ,(if feature/typecheck-slot-access
                   `(%accessor-typecheck ,type-name ,object)
                 object)
              ,slot-index)))
@@ -97,8 +91,7 @@
 (define-form set-slot-value (type-name slot-name object value)
   (let* ((type		(eval type-name))
          (slot-index	(record/slot-index type slot-name)))
-    `(set (oop-at ,(if (and feature/typecheck-slot-access
-                            (not (member? type-name +raw-records+)))
+    `(set (oop-at ,(if feature/typecheck-slot-access
                        `(%accessor-typecheck ,type-name ,object)
                      object)
                   ,slot-index)

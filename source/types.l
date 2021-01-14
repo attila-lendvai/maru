@@ -43,16 +43,16 @@
   (define-function allocate-type-id ()
     (incr %last-type-id)))
 
-(define-function %make-accessor-forms (type-name slot-names slot-index disable-typecheck)
+(define-function %make-accessor-forms (type-name slot-names slot-index raw-slot-access?)
   (when slot-names
     (cons (let* ((slot-name (car slot-names))
                  (accessor-name (concat-symbol type-name (concat-symbol '- slot-name))))
-            (if disable-typecheck
+            (if raw-slot-access?
                 `(define-form ,accessor-name (obj)
                    (list 'oop-at obj ,slot-index))
               `(define-form ,accessor-name (obj)
                  (list 'slot-value ',type-name ',slot-name obj))))
-          (%make-accessor-forms type-name (cdr slot-names) (+ 1 slot-index) disable-typecheck))))
+          (%make-accessor-forms type-name (cdr slot-names) (+ 1 slot-index) raw-slot-access?))))
 
 (define <type>)
 (define <record>)
@@ -273,7 +273,7 @@
     ((subtype? (type-of type) <type>)	0)
     (else				(error "type/slot-count-of-instances: called with something unexpected: " type))))
 
-(define-function %make-record-accessors (type)
+(define-function %make-record-accessors (type raw-slot-access?)
   (assert (subtype? (type-of type) <record>) "%make-record-accessors called with a non-record type " type)
   (%make-accessor-forms (<type>-name type)
                         (<record>-direct-slots type)
@@ -281,12 +281,12 @@
                                  (subtype? (<record>-super type) <record>)
                                  (record/effective-slot-count (<record>-super type)))
                             0)
-                        false))
+                        raw-slot-access?))
 
 ;; redefine the preliminary bootstrap accessors with full featured ones
 (eval `(let ()
-         ,@(%make-record-accessors <type>)
-         ,@(%make-record-accessors <record>)))
+         ,@(%make-record-accessors <type> false)
+         ,@(%make-record-accessors <record> false)))
 
 (verbosity 2 (warn "type bootstrap finished\n"))
 
@@ -324,14 +324,19 @@
     (set (<record>-effective-slots	type) (record/compute-effective-slots type))
     type))
 
-(define-form define-record (name super slots)
+(define-form define-record (name super slots . props)
   (set slots (map-with expand slots *env*))
   (set slots (list-remove () slots))
-  (let ((record-type (new-<record> name (eval super) slots)))
+  (let ((record-type		(new-<record> name (eval super) slots))
+        (raw-slot-access?	false))
+    (list-do prop props
+      (case prop
+        (raw-slot-access	(set raw-slot-access? true))
+        (else			(error "define-record: unexpected property "prop))))
     (eval `(define ,name ,record-type))
     `(let ((type-obj ,record-type))
        (define ,name type-obj)
-       ,@(%make-record-accessors record-type)
+       ,@(%make-record-accessors record-type raw-slot-access?)
        type-obj)))
 
 ;;; immediate type

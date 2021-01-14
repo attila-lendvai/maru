@@ -4,7 +4,9 @@
 ;;;
 
 ;; the header of heap objects
-(define-record <header> () (size flags next type (when-at-expand feature/object-canary canary)))
+(define-record <header> ()
+  (next size flags type (when-at-expand feature/object-canary canary))
+  raw-slot-access)
 
 (define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
 
