@@ -101,7 +101,7 @@
 
 (define-form make-string	(exp)		`(and ,exp (set self.result (list->string self.result))))
 (define-form make-symbol	(exp)		`(and ,exp (set self.result (string->symbol (list->string self.result)))))
-(define-form make-number	(base exp)	`(and ,exp (set self.result (string->number-base (list->string self.result) ,base))))
+(define-form make-number	(base exp)	`(and ,exp (set self.result (string->number (list->string self.result) ,base))))
 
 (define-form assign-result (name exp)	`(let ((_s ,exp)) (and _s (let () (set ,name self.result) _s))))
 (define-form result-expr (exp)		`(let () (peg-source-range-begin self) (set self.result ,exp) (peg-source-range-end self) 1))
