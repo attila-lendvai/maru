@@ -197,7 +197,8 @@
 (define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))
-(define-constant feature/typecheck-slot-access	(and (<= 2 *safety*) (<= *optimised* 0)))
+(define-constant feature/typecheck-slot-access	(or (<= 3 *safety*)
+                                                    (and (<= 2 *safety*) (<= *optimised* 0))))
 
 (define-function compose (a b)
   (lambda args
