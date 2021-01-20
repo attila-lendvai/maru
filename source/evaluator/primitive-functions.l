@@ -13,6 +13,20 @@
           (set (<expr>-name tmp) (<variable>-name variable)))))
     value))
 
+;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment (module-env *module*) 1 0)))
+(define-primitive-function (eval ()) _
+  (gc/let* ((env (if (cdr -args-) ; let's not tolerate being called with nil env
+                     (cadr -args-)
+                   (environment (module-env *module*) 1 0))))
+    ;; TODO resolve this naming anomaly somehow
+    (expand-encode-eval (car -args-) env)))
+
+(define-primitive-function (eval-in-module ()) ((module <module>) form)
+  (debug (libc/printf "eval-in-module: form ") (println form))
+  (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
+    (with-current-module module
+      (expand-encode-eval form env))))
+
 (define-primitive-function (lambda () fixed) ((env <env>) parameters . body)
   (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
   (expr parameters body env -ctx-))
@@ -290,12 +304,6 @@
          (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)))))
   (libc/flush-streams))
 
-(define-primitive-function (eval ()) _
-  (gc/let* ((env (or (cadr -args-)
-                     (environment (module-env *module*) 1 0))))
-    ;; TODO resolve this naming anomaly somehow
-    (expand-encode-eval (car -args-) env)))
-
 (define-primitive-function (type-of ())	(thing) (box <long> (type-of thing)))
 (define-primitive-function (string? ())	(thing) (and (string? thing) symbol/true))
 (define-primitive-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
@@ -388,12 +396,6 @@
     (if (= (char-at endptr 0) ?\x00)
         (box <long> result)
       (error "invalid number in string->long, libc/strtol has failed for string " (string-from-cstring str)))))
-
-(define-primitive-function (eval-in-module ()) ((module <module>) form)
-  (debug (libc/printf "eval-in-module: form ") (println form))
-  (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
-    (with-current-module module
-      (expand-encode-eval form env))))
 
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (data)

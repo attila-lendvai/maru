@@ -366,9 +366,6 @@
 ;; or as the module's env, and we need to access them, even while we load our own stuff
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
 (define-primitive-function defined? ((name <symbol>) (env <env> (module-env *module*)))
-  ;; TODO add these to the macro
-  ;; (safety 2 (assert (is <env> env) "defined?: env is not an <env>: "env))
-  ;; (safety 2 (assert (symbol? name) "defined?: name is not a <symbol>: "name))
   (let ((result ()))
     (while (and env
                 (not (set result (find-local-variable env name))))
@@ -539,7 +536,6 @@
 
 (define-function apply (fun arguments ctx)
   (debug (libc/printf "apply, function ") (print fun) (libc/printf ", arguments: ") (print arguments) (libc/printf "\n"))
-  (safety 2 (assert fun "apply: fun is nil"))
   (with-new-call-frame (symbol/apply fun arguments)
     (let ((type (type-of fun)))
       ;; TODO use typecase
