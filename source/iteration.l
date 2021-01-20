@@ -25,6 +25,10 @@
 ;;        (let*  ((,var (cdar _list_))) ,@body)
 ;;        (set _list_ (cdr _list_)))))
 
+(define-form until (test . body)
+  `(while (not ,test)
+     ,@body))
+
 ;;; generic iteration
 
 (define-method for-each <pair>   (function)	(list-do   _elt_ self (function _elt_)))
