@@ -202,43 +202,6 @@
   (libc/flush-streams)
   (libc/exit exit-code))
 
-(define-primitive-function (libc/fopen ()) ((path <string>) (mode <string>))
-  (let ((stream (libc/fopen path mode)))
-    (and stream (box <target-vm-pointer> stream))))
-
-(define-primitive-function (libc/fclose ()) ((stream <target-vm-pointer>))
-  (libc/fclose stream))
-
-(define-primitive-function (libc/fgetc ()) ((stream <target-vm-pointer>))
-  (let ((c (libc/fgetc stream)))
-    (and (>= c 0)
-         (box <long> c))))
-
-(define-primitive-function (libc/fputc ()) ((char <long>) (stream <target-vm-pointer>))
-  (box <long> (libc/fputc char stream)))
-
-(define-primitive-function (libc/format ()) ((fmt <string>) oarg)
-  (let ((typ (type-of oarg))
-        (arg ()))
-    ;; TODO use typecase
-    (cond
-      ((= typ <undefined>))
-      ((= typ <long>)		(set arg (unbox <long> oarg)))
-      ((= typ <string>)		(set arg (get/string oarg)))
-      ((= typ <symbol>)		(set arg (unbox <symbol> oarg)))
-      (else			(set arg oarg)))
-    (let ((size 100)
-          (result ()))
-      (gc/let* ((buf ()))
-        (while (not result)
-          (set buf (allocate-data size))
-          (let ((n (libc/snprintf buf size fmt arg)))
-            (if (and (<= 0 n)
-                     (< n size))
-                (set result (string-from-cstring buf))
-              (set size (* size 2))))))
-      result)))
-
 ;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
 (define-primitive-function (read ()) _
   (if (= () -args-)

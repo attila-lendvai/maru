@@ -43,9 +43,6 @@
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))
 
-(define-form platform/exit result
-  `(libc/exit ,@result))
-
 ;; TODO a possible #optimization: set things up so, that platform-libc.l can override long->string
 ;; with its own? or just rely on a future tree-shaker?
 ;; (define-primitive-function long->string ((arg <long>))

@@ -45,9 +45,6 @@
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))
 
-(define-form platform/exit result
-  `(libc/exit ,@result))
-
 ;; TODO a possible #optimization: set things up so, that platform-libc.l can override long->string
 ;; with its own? or just rely on a future tree-shaker?
 ;; (define-primitive-function long->string ((arg <long>))
@@ -64,15 +61,6 @@
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   (libc/exit -1))
 
-;; (load "source/streams.l")
-
-;; (define-record <libc-stream> <stream> (handle))
-
-;; (define-function libc-stream (libc-handle)
-;;   (safety 1 (assert (= <target-vm-pointer> (type-of libc-handle))))
-;;   (make <libc-stream>
-;;     (handle		libc-handle)))
-
 ;;;
 ;;; garbage collector
 ;;; ----------------------------------------------------------------
@@ -83,6 +71,45 @@
   (gc/allocate type (words-to-bytes slot-count)))
 
 (load "source/evaluator/eval.l")
+
+(define-primitive-function (libc/fopen ()) ((path <string>) (mode <string>))
+  (let ((stream (libc/fopen path mode)))
+    (and stream (box <target-vm-pointer> stream))))
+
+(define-primitive-function (libc/fclose ()) ((stream <target-vm-pointer>))
+  (libc/fclose stream))
+
+(define-primitive-function (libc/fgetc ()) ((stream <target-vm-pointer>))
+  (let ((c (libc/fgetc stream)))
+    (and (>= c 0)
+         (box <long> c))))
+
+(define-primitive-function (libc/fputc ()) ((char <long>) (stream <target-vm-pointer>))
+  (box <long> (libc/fputc char stream)))
+
+(define-primitive-function (libc/format ()) ((fmt <string>) oarg)
+  (let ((typ (type-of oarg))
+        (arg ()))
+    ;; TODO use typecase
+    (cond
+      ((= typ <undefined>))
+      ((= typ <long>)		(set arg (unbox <long> oarg)))
+      ((= typ <string>)		(set arg (get/string oarg)))
+      ((= typ <symbol>)		(set arg (unbox <symbol> oarg)))
+      (else			(set arg oarg)))
+    (let ((size 100)
+          (result ()))
+      (gc/let* ((buf ()))
+        (while (not result)
+          (set buf (allocate-data size))
+          (let ((n (libc/snprintf buf size fmt arg)))
+            (if (and (<= 0 n)
+                     (< n size))
+                (set result (string-from-cstring buf))
+              (set size (* size 2))))))
+      result)))
+
+(load "source/streams-libc.l")
 
 (define-function repl-stream (stream)
   ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
