@@ -201,7 +201,7 @@
   (error (string-from-cstring name)": not enough arguments: "args))
 
 (define-function %too-many-arguments (name args)
-  (error (string-from-cstring name)": not enough arguments: "args))
+  (error (string-from-cstring name)": too many arguments: "args))
 
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
