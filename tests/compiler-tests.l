@@ -9,8 +9,8 @@
 
 (define *exit-code* 0)
 
-(eval-in-module *slave-module*
-  '(define *tests* ()))
+(begin-for-syntax
+ (define *tests* ()))
 
 (define-form failure (format . args)
   `(let ()
@@ -217,7 +217,7 @@
       (+ y 2))
   42)
 
-(when-at-expand feature/redefinable-functions-in-target
+(when-at-expand (host-value feature/redefinable-functions-in-target)
   (define-function returns-42 ()
     (return 42))
 
