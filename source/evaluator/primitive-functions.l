@@ -23,6 +23,7 @@
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
   (debug (libc/printf "eval-in-module: form ") (println form))
+  (verbosity 2 (platform/print ";;; ? ") (print module) (platform/print " ") (println form))
   (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
     (with-current-module module
       (expand-encode-eval form env))))
