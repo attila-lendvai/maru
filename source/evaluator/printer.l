@@ -109,20 +109,26 @@
         ((= type <module>)
          (error-if-storing)
          (if-at-expand feature/debug-info
-             (libc/fprintf stream "Module<%s," (get/string (<module>-name obj)))
+             (libc/fprintf stream "Module<%s," (aif (<module>-name obj)
+                                                   (get/string it)
+                                                 "?"))
            (libc/fputs "Module<" stream))
          (do-print stream (module-env obj) storing?)
          (libc/fputs ">" stream))
 
         ((= type <type>)
          (error-if-storing)
-         (libc/fprintf stream "Type%s" (unbox <symbol> (<type>-name obj))))
+         (libc/fprintf stream "Type%s" (aif (<type>-name obj)
+                                           (unbox <symbol> it)
+                                         "?")))
 
         ((= type <record>)
          (error-if-storing)
          ;; KLUDGE we need to disable accessor typecheck here, because the target universe is unaware of inheritance
-         (libc/fprintf stream "Record%s" (unbox <symbol> (with-forms ((%accessor-typecheck ((type obj) obj)))
-                                                           (<type>-name obj)))))
+         (libc/fprintf stream "Record%s" (aif (with-forms ((%accessor-typecheck ((type obj) obj)))
+                                                (<type>-name obj))
+                                             (unbox <symbol> it)
+                                           "?")))
 
         (else
          (error-if-storing)
