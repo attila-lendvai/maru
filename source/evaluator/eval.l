@@ -772,6 +772,10 @@
 
       ((= head fixed-primitive-function/define)
        (unless (is <variable> (first tail))
+         ;; DEFINE unconditionally defines into *globals*
+         ;; TODO ponder about this... it leads to a somewhat confusing behavior.
+         ;; maybe DEFINE should define locally that sometimes happens to be *globals*?
+         ;; what about this: (define foo (lambda (arg) (define nested 42)))
          (let ((var (environment-define (module-env *module*) (first tail) ())))
            (set tail (encode-all (cdr tail) env))
            (set tail (cons var tail)))))

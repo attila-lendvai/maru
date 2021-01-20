@@ -176,30 +176,37 @@
 (define qq-concat-list	concat-list)
 (define qq-cons		cons)
 
-;; *slave-env* is the direct parent of *target-env* (i.e. lookup is delegated to it).
-;; you can think of *slave-env* as the syntax-module of the target: all macros,
-;; constants, and any meta-level stuff are defined and evaluated in that environment.
-(define *slave-env* *globals*)
+;; make these also available in the slave module
+(define *slave-env*   (host-value *slave-env*))
+(define eval-in-slave (host-value eval-in-slave))
 
-(define-function eval-in-slave (form)
-  ;; we can't just simply (eval form *slave-env*) because DEFINE defines into the module's *globals*.
-  ;; without this extra dance (eval-in-slave '(define foo 42)) would define into the env created for the target.
-  (let ((prev-globals *globals*)
-        result)
-    (set *globals* *slave-env*)
-    (set result (eval form))
-    (set *globals* prev-globals)
-    result))
+(safety 1
+  (eval-in-host
+   `(let ()
+      (assert (is <env> ,*slave-env*))
+      (assert (is <expr> ,eval-in-slave)))))
 
 (define-form begin-for-syntax forms
   `(eval-in-slave '(let () ,@forms)))
 
-;; create an empty env to hold the definitions that will be level-shifted to the target.
+;;;
+;;; create an empty env to hold the definitions that will be
+;;; level-shifted to the target. let's mention *target-env* here for
+;;; grep'ability.
+;;;
 (set *globals* (environment *globals*))
 
-(safety 3
+(safety 1
+  (assert (not (= *globals* *slave-env*)))
+  (assert (not (= *globals* (host-value *slave-env*))))
+  (assert (= 42 (eval-in-slave '(+ 40 2))))
+  (assert (= 42 ((eval-in-slave '(lambda () 42)))))
   (eval-in-slave '(define %im-a-test 42))
-  (eval-in-host `(assert (defined? '%im-a-test ,*slave-env*))))
+  (assert (defined? '%im-a-test))
+  ;; (eval-in-host `(load "source/env-min.l"))
+  ;; (eval-in-host `(assert (not (find-local-variable ,*globals* '%im-a-test))))
+  ;; (eval-in-host `(assert (find-local-variable *slave-env* '%im-a-test)))
+  (eval-in-host `(assert (defined? '%im-a-test *slave-env*))))
 
 ;; hide DEFINE-FORM in the target env with one that expand/encode/eval the body in the slave env.
 ;; this way the body code can use everything that's available in the slave module,
@@ -226,11 +233,18 @@
   (let* ((value		(eval value-form))
          (form-obj	(eval `(form () (lambda _ ',value))))
          (definer-form	`(define ,name ',form-obj)))
-    (eval definer-form) ; this way it will define into *slave-env*
+    (eval definer-form)     ; this way it will define into *slave-env*
     ()))
 
 (define-constant false 0)
 (define-constant true  1)
+
+(safety 1
+  (define-form %im-a-test () (+ true 41)))
+(safety 1
+  ;; (assert (not (find-local-variable *globals* '%im-a-test)))
+  (assert (defined? '%im-a-test *slave-env*))
+  (assert (= 42 (%im-a-test))))
 
 ;; redefine DEFINE-RECORD so that it defines into the slave env (sometimes forms, i.e. constant
 ;; want to access types, e.g. <header> in gc.l).

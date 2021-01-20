@@ -1,14 +1,15 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(let ((host-module (current-module))
-      (slave-module (module "slave")))
+(define *host-module* (current-module))
+
+(let ((slave-module (module "slave")))
   (define *slave-module* slave-module)
   (define-function switch-to-slave-module ()
     ;;(warn "--- switching to the slave module\n")
     (set (current-module) *slave-module*))
   (switch-to-slave-module)
   ;; in the slave, set the global variable called 'host' to hold the host-module
-  (eval-in-module *slave-module* `(define *host-module* ,host-module)))
+  (eval-in-module *slave-module* `(define *host-module* ,*host-module*)))
 
 ;; NOTE: we are in the slave module now, and the following forms will be read/interned into the slave.
 ;; NOTE: the slave module doesn't have boot.l loaded at this point, we only have the primitives.
@@ -32,9 +33,28 @@
 
 (switch-to-host-module)
 
+;; *slave-env* will be the direct parent of *target-env* (i.e. lookup is delegated to it).
+;; you can think of *slave-env* as the syntax-module of the target: all macros,
+;; constants, and any meta-level stuff are defined and evaluated in that environment.
+;; *target-env* will be set up in emit-early.l.
+(define *slave-env* (eval-in-module *slave-module* '*globals*))
+
 (define-function eval-in-slave (form)
+  ;; NOTE don't optimize this to (eval form *slave-env*) when (=
+  ;; *module* *slave-module*) because the ENCODE of DEFINE defines
+  ;; into the *globals* of the current module, not the passed env.
+  (let ((wrapped `(let ((prev-globals *globals*)
+                        result)
+                    (set *globals* ,*slave-env*)
+                    (set result (,eval ',form)) ; let's capture the EVAL fixed here, because otherwise it would be encoded to EVAL from the target env
+                    (set *globals* prev-globals)
+                    result)))
+    (eval-in-module *slave-module*
+      wrapped)))
+
+(define-function eval-in-target (form)
+  (assert (not (= *slave-env* (eval-in-module *slave-module* '*globals*))) "eval-in-target called too early in the bootstrap process?!")
   (eval-in-module *slave-module* form))
 
 (define-form slave-value (form)
-  ;; we don't use eval-in-slave in our expansion so that the expansion only uses primitives and *slave-module*. this way it can be used in the target module as is.
-  `(eval-in-module *slave-module* ',form))
+  `(eval-in-slave ',form))
