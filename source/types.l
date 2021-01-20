@@ -416,10 +416,14 @@
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
 
 (when-at-expand bootstrapping?
-  ;; let's map the following host types to their respective slave equivalents
-  ;; so that type-of on one of their instances will return the slave type object.
-  ;; this is mainly needed to interact with the data that the host's reader returns
-  ;; e.g. to be able to specialize methods on them while in the bootstrap process.
+  ;; let's map the following host types to their respective slave
+  ;; equivalents, so that calling the slave's TYPE-OF on one of their
+  ;; instances will return the slave type object instead of that of
+  ;; the host's. this is mainly needed to seamlessly interact with the
+  ;; data that the host's reader returns; e.g. to be able to install
+  ;; <selector> methods on these types in the slave, and expect them
+  ;; to be called when e.g. DO-PRINT is used on some source code while
+  ;; in the bootstrap process.
   (list-do entry `(("" ,<string>) (42 ,<long>) (t ,<symbol>) ((1) ,<pair>) (() ,<undefined>))
     (apply (lambda (instance type)
              (set (array-at %type-id-map/host->slave (type-id-of instance))

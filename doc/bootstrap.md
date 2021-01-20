@@ -91,3 +91,50 @@ optional "shortcuts" in the bootstrap process.
 
 It's possible to skip these shortcuts and run the bootstrap procedure all the way from
 the/a bottom stage by `make PREVIOUS_STAGE_EXTRA_TARGETS=veryclean test-bootstrap`.
+
+## Bootstrap "leakage"
+
+In the bootstrap process most abstractions are present twice: the old
+versions in the host module, and the new versions loaded into in the
+slave module. At certain parts of the codebase these potentially
+incompatible definitions can mix:
+
+  - The compiler is running in the host's environment, but compiles
+    the definitions of the slave. Thus, it inherently needs to cross
+    the host-slave boundary (ideally, always in a controlled and
+    explicit way, guarded by asserts).
+
+  - A lot of the `forms` (macros) of the slave must be
+    executed/expanded while building up the set of definitions that
+    are meant to be level-shifted by the compiler to the target
+    universe. These forms sometimes need to deal with the lexical
+    environment (of type `<env>`) that is instantiated by the host.
+    The object layout of these `<env>` objects will be that of which
+    was specified in the host's codebase at the time of generating an
+    eval executable from it. (The constructor function of `<env>`s is
+    called `environment` in `eval.l`. When `eval.l` is compiled, it
+    "captures" the object layout through the slot-index literals in
+    the expansion of the accessor forms. Accessors expand to `oop-at`
+    forms with literal indexes, and these are directly compiled to
+    machine instructions).
+
+A list of types and occasions where such leakage happens (meant to be
+exhaustive, but it's probably not yet):
+
+  - objects in the slave's source code: <pair>, <long>, <string>,
+    <symbol>, (), i.e. objects that are created by the host's reader
+    while parsing the slave's codebase into an object graph.
+
+  - <primitive-function>, <expr>, <env>, <fixed>: the source code of the slave gets
+    `encode`d by the host, therefore it may also contain objects of
+    these types besides the list above.
+
+  - <env>: whenever environments are passed to slave code, e.g. the
+    forms defined in the slave will receive instances of the host's
+    <env> type.
+
+  - <type>, <record>: if we want to dispatch on the slave types while
+    the host executable is bringing the slave to life, then the slave
+    types need to integrate into that of the host's. What this means
+    is that in the bootstrap process the slave does not create its own
+    <type> and <record> instances, but "borrows" them from the host.

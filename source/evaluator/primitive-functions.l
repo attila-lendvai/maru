@@ -301,6 +301,8 @@
   (set (<pair>-tail pair) value))
 
 (define-primitive-function copy-oops		(from to (wordcount <long>)))
+;; TODO in high safety, add an assert that OOP-AT doesn't access beyond the object, based on the size in the GC header.
+;; interpreted code shouldn't ever need to reach beyond object boundaries.
 (define-primitive-function oop-at		(base (index <long>)))
 (define-primitive-function set-oop-at		(base (index <long>) value))
 (define-primitive-function copy-bytes		(from to (count <long>)))
