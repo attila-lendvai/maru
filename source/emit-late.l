@@ -3,6 +3,9 @@
 (define-function compile-env (env -c-)
   (verbosity 1 (warn "begin compiling\n"))
   (emit-prelude -c-)
+  ;; NOTE this array-do will not pick up any new definitions added to
+  ;; the env after the iterations has begun (see e.g. the
+  ;; COMPILE-DEFINITION of <selector>).
   (array-do var (<env>-bindings env)
     (let* ((name		(<variable>-name  var))
            (value		(<variable>-value var))

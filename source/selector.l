@@ -53,9 +53,10 @@
         (if (selector? (<variable>-value var))
             `(quote ,(<variable>-value var))
           (error name" is already defined as non-selector: " (<variable>-value var)))
-      (or default (set default `(args (error "selector '"',name
-                                             "' has no method for "(type-name-of (car args))
-                                             ": "(cons (car args) (map type-name-of (cdr args)))))))
+      (unless default
+        (set default `(args (error "selector '"',name
+                                   "' has no method for "(type-name-of (car args))
+                                   ": "(cons (car args) (map type-name-of (cdr args)))))))
       `(define ,name (selector ',name (lambda ,@default))))))
 
 (define-selector add-method)

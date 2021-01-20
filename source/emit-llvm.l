@@ -642,7 +642,7 @@
                     (gen CALLPTR arg-regs))
                 (gen CALL (GLOBAL (<variable>-name op)) arg-regs))
               (set n-params (<expr>-n-required-parameters op-value)))
-             ((= (type-of op-value) <C-function>)
+             ((is <C-function> op-value)
               (let ((param-types (<C-function>-parameter-types op-value)))
                 (gen COMMENT (list "	casting FFI args"))
                 ;; for FFI calls we need to cast the non-pointer llvm args
@@ -817,7 +817,6 @@
 (define-function compile/lambda (form -c-)
   (let ((name (unique-name "closure-"))
         (expr (eval form)))
-    ;; TODO this silently miscompiles closures that capture some variables
     (compile-expr expr name -c-)
     (gen LOAD (GLOBAL name) expr)))
 

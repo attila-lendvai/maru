@@ -489,7 +489,7 @@
            (unless feature/redefinable-functions-in-target
              (set target-name (LABEL (symbol->string (<variable>-name op)))))
            (set n-params (<expr>-n-required-parameters op-value)))
-          ((= (type-of op-value) <C-function>)
+          ((is <C-function> op-value)
            (set target-name (GLOBAL-LABEL (<C-function>-name op-value)))
            (unless (<C-function>-vararg? op-value)
              (set n-params (list-length (<C-function>-parameter-types op-value)))))
