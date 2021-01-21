@@ -147,7 +147,10 @@
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
 (define-form define-symbol-form (name replacement)
-  `(define ,name (form () (lambda _ ',replacement))))
+  ;; NOTE unless we instantiate the FORM in the body of the macro
+  ;; then in the bootstrap environment it will be bound to the target
+  ;; implementation of FORM.
+  `(define ,name ,(form () (lambda _ replacement))))
 
 (define-symbol-form *module* (current-module))
 
