@@ -1,9 +1,26 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
+
 ;;;
-;;; Platform hooks when running under libc.
+;;; The libc FFI
+;;;
+(define-C-variable libc/stdin  stdin  (* "%struct._IO_FILE")) ; KLUDGE ideally we should grovel this type, but that would be more complex than this entire project
+(define-C-variable libc/stdout stdout (* "%struct._IO_FILE"))
+(define-C-variable libc/stderr stderr (* "%struct._IO_FILE"))
 
-(define-libc-ffi)
+(define-C-functions libc/
+  (void abort ()) (void exit (int))
+  (* malloc (size_t)) (void free (*)) (* realloc (* size_t)) (* memset (* int size_t)) (* memcpy (* * size_t)) (* memmove (* * size_t)) (int memcmp (* * size_t))
+  (int printf (* ...)) (int fprintf (* * ...)) (int sprintf (* * ...)) (int snprintf (* size_t * ...))
+  (int puts (*)) (int fputs (* *)) (int fputc (* *)) (int fgetc (*)) (int ungetc (int *)) (* fopen (* *)) (* fdopen (int *))
+  (int fclose (*)) (int fflush (*)) (int fscanf (* * ...)) (int feof (*)) (void setbuf (* *))
+  (size_t strlen (*)) (* strcpy (* *)) (* strncpy (* * size_t)) (int strcmp (* *)) (int strncmp (* * size_t)) (* strdup (*)) (unsigned-long strtoul (* * int)) (long strtol (* * int))
+  )
 
+(define-constant libc/EOF -1)
+
+;;;
+;;; Platform API implementation when running under libc.
+;;;
 (define-function libc/flush-streams ()
   (libc/fflush libc/stdout)
   (libc/fflush libc/stderr))
@@ -109,7 +126,7 @@
               (set size (* size 2))))))
       result)))
 
-(load "source/streams-libc.l")
+(load "source/evaluator/platforms/libc/streams.l")
 
 (define-function repl-stream (stream)
   ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
