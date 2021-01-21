@@ -202,41 +202,6 @@
   (libc/flush-streams)
   (libc/exit exit-code))
 
-;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
-(define-primitive-function (read ()) _
-  (if (= () -args-)
-      (let ((obj (read libc/stdin)))
-        (when (= +end+ obj)
-          (set obj ()))
-        obj)
-    (let ((arg (car -args-)))
-      (or (string? arg) (fatal1 "read: argument is not a <string> "arg))
-      (let ((stream (libc/fopen (get/string arg) "r")))
-        ;; TODO error handling
-        (when stream
-          (gc/let* ((head (cons () ()))
-                    obj)
-            (let ((tail head))      ; TODO use collecting macro
-              (while (!= +end+ (set obj (read stream)))
-                (set tail (put/tail tail (cons obj ()))))
-              (libc/fclose stream)
-              (get/tail head))))))))
-
-(define-primitive-function (load ()) (path)
-  (let* ((stream	(or (cond
-                              ((string? path)
-                               (verbosity 1 (platform/print-diagnostics "loading file: " (get/string path) "\n"))
-                               (libc/fopen (get/string path) "r"))
-                              ((not path)
-                               (verbosity 1 (platform/print-diagnostics "loading from stdin\n"))
-                               (libc/fdopen libc/stdin "r"))
-                              (else
-                               (error "load: don't know how to open "path)))
-                            (error "load: fopen failed on "path)))
-         (result	(eval-stream stream)))
-    (libc/fclose stream)
-    result))
-
 (define-primitive-function (dump ()) _
   (list-do arg -args-
     (dump arg))

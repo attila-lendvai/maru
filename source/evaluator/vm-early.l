@@ -227,6 +227,7 @@
     (let* ((stub-name		(concat-symbol prim-name '/evaluator-stub))
            (arg-names		())
            (binders		()))
+      ;; TODO what about redefining a function? e.g. number->string in libc.l
       (push *primitive-function-registry* (list prim-name fixed?))
       (let ((entries args))
         (while (pair? entries)

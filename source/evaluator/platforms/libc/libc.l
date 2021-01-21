@@ -69,7 +69,7 @@
 ;;     (libc/sprintf buf "%ld" arg)
 ;;     (string-from-cstring buf)))
 
-(load "source/evaluator/platform.l")
+(load "source/evaluator/vm-early.l")
 
 (define-primitive-function abort _
   (libc/printf "ABORTED\n")
@@ -86,6 +86,8 @@
 
 (define-function allocate (type slot-count)
   (gc/allocate type (words-to-bytes slot-count)))
+
+(require "source/streams.l")
 
 (load "source/evaluator/eval.l")
 
@@ -128,29 +130,93 @@
 
 (load "source/evaluator/platforms/libc/streams.l")
 
+;; TODO eventually we could do something like this... but this would access the current module!
+;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
+(define *standard-input*)
+(define *standard-output*)
+(define *standard-error*)
+
+(define-function initialize-streams ()
+  (gc/let* (tmp)
+    (with-forms ((doit ((libc-name our-name)
+                        `(let ()
+                           (set tmp (libc-stream (box <target-vm-pointer> ,libc-name)))
+                           ;; TODO add support for compiling symbols
+                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)
+                           (set ,our-name tmp)))))
+      (doit libc/stdin	*standard-input*)
+      (doit libc/stdout	*standard-output*)
+      (doit libc/stderr	*standard-error*))))
+
+(define-form with-input-from-file (var file-name . body)
+  `(let* ((__file-name ,file-name)
+          (__file-handle (libc/fopen __file-name "r")))
+     (or __file-handle (error "no such file: " __file-name))
+     (gc/let* ((,var (libc-stream (box <target-vm-pointer> __file-handle))))
+       (let ((__result ,@body))
+         (libc/fclose __file-handle)
+         __result))))
+
+;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
+(define-primitive-function (read ()) _
+  (if (= () -args-)
+      (let ((obj (read *standard-input*)))
+        (when (= +end+ obj)
+          (set obj ()))
+        obj)
+    (with-input-from-file stream (get/string (car -args-))
+      (gc/let* ((head (cons () ()))
+                obj)
+        (let ((tail head))              ; TODO use collecting macro
+          (while (!= +end+ (set obj (read stream)))
+            (set tail (put/tail tail (cons obj ()))))
+          (get/tail head))))))
+
+;; TODO put it where?
+;; TODO rename to expand-encode-eval-stream?
+(define-function eval-stream (stream)
+  (gc/let* (form
+            res
+            env)
+    (while (!= +end+ (set form (read stream)))
+      (set env (environment (module-env *module*) 1 0))
+      (set res (expand-encode-eval form env)))
+    res))
+
+(define-primitive-function (load ()) (path)
+  (with-input-from-file stream (get/string path)
+    (eval-stream stream)))
+
+(load "source/evaluator/vm-late.l")
+
 (define-function repl-stream (stream)
   ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
-  (unless (= libc/stdin stream)
-    (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
-  (gc/let* ((res ()))
-    (while (let ()
-             (when (= libc/stdin stream)
-               (libc/printf ".")
-               (libc/flush-streams))
-             (!= +end+ (set res (read stream))))
-      (gc/let* ((env (environment (module-env *module*) 1 0)))
-        (set res (expand-encode-eval res env))
-        (when (= libc/stdin stream)
-          (gc/let* ((printer (list2 symbol/quote res)))
-            (set printer (list2 (string->symbol "print") printer))
-            (expand-encode-eval printer env))
-          (libc/flush-streams))))
-    (and (= libc/stdin stream)
-         (libc/printf "\nmorituri te salutant\n"))
-    res))
+  (let ((stdin?		(= *standard-input* stream))
+        (libc-handle	(unbox <target-vm-pointer> (<libc-stream>-handle stream))))
+    (unless stdin?
+      (libc/fscanf libc-handle "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
+    (gc/let* ((res ()))
+      (while (let ()
+               (when stdin?
+                 (libc/printf ".")
+                 (libc/flush-streams))
+               (and (not (= +end+ (set res (read stream))))
+                    (not (libc/feof libc-handle))))
+        (unless (= +end+ res)
+          (gc/let* ((env (environment (module-env *module*) 1 0)))
+            (set res (expand-encode-eval res env))
+            (when stdin?
+              (gc/let* ((printer (list2 symbol/quote res)))
+                (set printer (list2 (string->symbol "print") printer))
+                (expand-encode-eval printer env))
+              (libc/flush-streams)))))
+      (when stdin?
+        (libc/printf "\nmorituri te salutant\n"))
+      res)))
 
 (define-function main (argc argv)
   (initialize-vm)
+  (initialize-streams)
 
   (debug (libc/printf "start processing argv\n"))
 
@@ -201,7 +267,7 @@
 
               ;; -
               ((libc/string= arg "-")
-               (repl-stream libc/stdin))
+               (repl-stream *standard-input*))
 
               ;; --call to call a function
               ((libc/string= arg "--call")
@@ -242,10 +308,11 @@
               ;; read file as a program
               (else
                (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
-               (let ((stream (libc/fopen arg "r")))
-                 (or stream (fatal1 "no such file: %s" arg))
-                 (repl-stream stream)
-                 (libc/fclose stream)))))))))
+               (let ((file-handle (libc/fopen arg "r")))
+                 (or file-handle (fatal1 "no such file: %s" arg))
+                 (gc/let* ((stream (libc-stream (box <target-vm-pointer> file-handle))))
+                   (repl-stream stream)
+                   (libc/fclose file-handle))))))))))
 
   (debug (libc/printf "main is on the way out\n"))
 

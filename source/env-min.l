@@ -59,4 +59,5 @@
 (define-function set-global-variable-value (name value)
   (aif (defined? name (module-env *module*))
       (set (<variable>-value it) value)
-    (error "set-global-variable-value: undefined variable '"name"' in module "*module*)))
+    (environment-define (module-env *module*) name value)
+    value))

@@ -14,29 +14,29 @@
 
 ;;;----------------------------------------------------------------
 
-(define-record <string-stream> <stream> (string size position))
+;; (define-record <string-stream> <stream> (string size position))
 
-(define-function string-stream (str)
-  (make <string-stream>
-    (string	str)
-    (size	(string-length str))
-    (position	0)))
+;; (define-function string-stream (str)
+;;   (make <string-stream>
+;;     (string	str)
+;;     (size	(string-length str))
+;;     (position	0)))
 
-(define-method at-end? <string-stream> ()
-  (= self.position self.size))
+;; (define-method at-end? <string-stream> ()
+;;   (= self.position self.size))
 
-(define-method peek <string-stream> ()
-  (if (< self.position self.size)
-      (string-at self.string self.position)
-    +end+))
+;; (define-method peek <string-stream> ()
+;;   (if (< self.position self.size)
+;;       (string-at self.string self.position)
+;;     +end+))
 
-(define-method next <string-stream> ()
-  (let ((pos self.position))
-    (if (< pos self.size)
-	(let ((value (string-at self.string pos)))
-	  (set self.position (+ pos 1))
-	  value)
-      +end+)))
+;; (define-method next <string-stream> ()
+;;   (let ((pos self.position))
+;;     (if (< pos self.size)
+;; 	(let ((value (string-at self.string pos)))
+;; 	  (set self.position (+ pos 1))
+;; 	  value)
+;;       +end+)))
 
 ;; (unit-test "<string-stream>"
 ;;   (let ((s (string-stream "xhello"))
