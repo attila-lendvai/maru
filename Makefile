@@ -8,6 +8,7 @@
 #  alias beep='(paplay some-file.ogg &)'
 #  make -j test-bootstrap || beep
 #  make test-bootstrap-llvm || beep
+#  make test-bootstrap-x86 || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
