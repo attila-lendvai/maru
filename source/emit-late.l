@@ -42,7 +42,7 @@
                                      (<variable>-name el))
                                    (<expr>-parameters impl-fn)))
               (assert (= (first parameters) 'self)))
-            (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (long->string slave-type-id)))))
+            (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
               (set (array-at target-methods slave-type-id)
                    ;(LABEL impl-name)
                    (environment-define target-env impl-name impl-fn))

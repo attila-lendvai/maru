@@ -7,11 +7,11 @@
 	 (n (array-at %type-names t)))
     (if n
 	(port-write p (symbol->string n))
-      (port-write p "<type="(long->string t)">"))))
+      (port-write p "<type="(number->string t)">"))))
 
 (define-method do-pretty <long>		(port col)	(port-write port (symbol->string self)))
 (define-method do-pretty <undefined>	(port col)	(port-write port "()"))
-(define-method do-pretty <long>		(port col)	(port-write port (long->string self)))
+(define-method do-pretty <long>		(port col)	(port-write port (number->string self)))
 (define-method do-pretty <double>	(port col)	(port-write port (double->string self)))
 (define-method do-pretty <string>	(port col)	(port-write port "\""self"\""))
 (define-method do-pretty <symbol>	(port col)	(port-write port (symbol->string self)))

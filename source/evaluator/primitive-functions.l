@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/conversion-min.l")
+
 (define-primitive-function (define () fixed) ((variable <variable>) value-form)
   (let ((value (eval value-form -ctx-)))
     (set (<variable>-value variable) value)
@@ -311,14 +313,11 @@
       symbol
     (string-from-cstring (unbox <symbol> symbol))))
 
-(define-primitive-function long->string ((arg <long>)))
+(define-primitive-function number->string ((num <long>))
+  (long->string num))
 
-(define-primitive-function string->long ((str <string>))
-  (let* ((endptr	str)
-         (result	(libc/strtol str (address-of endptr) 10)))
-    (if (= (char-at endptr 0) ?\x00)
-        (box <long> result)
-      (error "invalid number in string->long, libc/strtol has failed for string " (string-from-cstring str)))))
+(define-primitive-function string->number ((str <string> _ nounbox))
+  (string->long str))
 
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (data)

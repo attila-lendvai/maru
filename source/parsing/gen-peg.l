@@ -16,6 +16,7 @@
 
 (progress "loading dependencies")
 
+(require "source/conversion.l")
 (require "source/files.l")
 (require "source/unit-test.l")
 (require "source/parsing/parser.l")

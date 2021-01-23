@@ -50,7 +50,7 @@
 ;;;
 (let ((counter 0))
   (define-function unique-name (prefix)
-    (concat-string prefix (long->string (incr counter)))))
+    (concat-string prefix (number->string (incr counter)))))
 
 (define-function align (alignment value)
   (bitwise-and (+ value (- alignment 1))

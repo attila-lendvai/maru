@@ -62,13 +62,6 @@
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))
 
-;; TODO a possible #optimization: set things up so, that platform-libc.l can override long->string
-;; with its own? or just rely on a future tree-shaker?
-;; (define-primitive-function long->string ((arg <long>))
-;;   (let ((buf (allocate-data 32))) ; safe up until 64 bits
-;;     (libc/sprintf buf "%ld" arg)
-;;     (string-from-cstring buf)))
-
 (load "source/evaluator/vm-early.l")
 
 (define-primitive-function abort _
@@ -90,6 +83,22 @@
 (require "source/streams.l")
 
 (load "source/evaluator/eval.l")
+
+;; TODO possible #optimization: even in the current setup, libc.l can override number->string with its own.
+;; (define-function long->string (num)
+;;   ;; TODO introduce alloca?
+;;   (let ((buf (allocate-data 32)))       ; safe up until 64 bits
+;;     (libc/sprintf buf "%ld" num)
+;;     (string-from-cstring buf)))
+
+;; TODO possible #optimization
+;; (define-function string->long (str)
+;;   (let* ((cstr		(get/string str))
+;;          (endptr	cstr)
+;;          (result	(libc/strtol cstr (address-of endptr) 10)))
+;;     (if (= (char-at endptr 0) ?\x00)
+;;         (box <long> result)
+;;       (error "invalid number in string->long, libc/strtol has failed for string " str))))
 
 (define-primitive-function (libc/fopen ()) ((path <string>) (mode <string>))
   (let ((stream (libc/fopen path mode)))

@@ -311,9 +311,10 @@
         (cons (get/head head) new-tail))
     tail))
 
-(load "source/evaluator/arrays.l")
-(load "source/evaluator/buffer.l")
-(load "source/sequences-min.l")
+(require "source/evaluator/arrays.l")
+(require "source/conversion-min.l")
+(require "source/evaluator/buffer.l")
+(require "source/sequences-min.l")
 
 ;;;
 ;;; env

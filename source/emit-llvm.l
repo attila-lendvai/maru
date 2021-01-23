@@ -153,7 +153,7 @@
 (define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier (<LOCAL>-name self)))
 (define-operand		LITERAL		() (value)		(<LITERAL>-value self))
 (define-operand		CONSTANT	() (name value)		(<CONSTANT>-name self))
-(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (long->string (<TEMP>-id self)))))
+(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string (<TEMP>-id self)))))
 (define-operand		LABEL		() (name)		(llvm/escape-local-identifier (<LABEL>-name self)))
 (define-function	UNIQUE-LABEL	() ()			(LABEL (unique-name "L")))
 
@@ -187,7 +187,7 @@
 
 (define-function %emit-form/mm-params (index types)
   (when (pair? types)
-    (let ((param-name (string->symbol (concat-string "$" (long->string index)))))
+    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
       (cons (list (awhen (and (not (= (first types) '_))
                               (first types))
                     (symbol->type-name it))
@@ -195,7 +195,7 @@
             (%emit-form/mm-params (+ index 1) (cdr types))))))
 
 (define-function %emit-form/reg-accessor (index)
-  (let ((var-name (string->symbol (concat-string "$reg" (long->string (+ index 1)))))
+  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
         (body `(array-at __regs__ ,index)))
     (list var-name () `((_) ',body))))
 
@@ -529,7 +529,7 @@
     (set (<instruction>-regs instr)
          (let ((temps ()))
            (times-do (<instruction>-n-regs instr)
-             (push temps (LOCAL (concat-string "r" (long->string (incr (<llvm-compiler>-reg-counter -c-)))))))
+             (push temps (LOCAL (concat-string "r" (number->string (incr (<llvm-compiler>-reg-counter -c-)))))))
            (list->array temps)))
     ;; update current-value
     (when (<instruction>-produces-output? instr)
@@ -682,7 +682,7 @@
                     (if (or (= ()    param-type) ; vararg calls have more args than params
                             (= '%ptr param-type))
                         (push new-arg-regs arg)
-                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (long->string (incr (<llvm-compiler>-reg-counter -c-)))))))
+                      (let ((cast-reg (LOCAL (concat-string "ffi-cast" (number->string (incr (<llvm-compiler>-reg-counter -c-)))))))
                         ;; TODO check for value range issues?
                         (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
                         (push new-arg-regs cast-reg))))
@@ -1005,7 +1005,7 @@
     ;; our output is less specific, so allow the makefile, or whoever builds the
     ;; bitcode output to chose the proper target triplet.
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
-    (emit INLINE (concat-strings "%word = type i" (long->string word-size) "\n"))
+    (emit INLINE (concat-strings "%word = type i" (number->string word-size) "\n"))
     (emit INLINE "%ptr = type i8*\n")
     ;; KLUDGE
     (emit INLINE "%struct._IO_FILE = type opaque\n")))

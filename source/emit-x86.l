@@ -58,7 +58,7 @@
 (define-generic emit-instruction)
 
 (define-function %define-emit-param-name (index)
-  (string->symbol (concat-string "$" (long->string index))))
+  (string->symbol (concat-string "$" (number->string index))))
 
 (define-function %define-emit-params (index types)
   (when (pair? types)

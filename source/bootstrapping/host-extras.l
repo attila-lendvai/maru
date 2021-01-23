@@ -11,3 +11,6 @@
 ;;;
 ;;; Temporary definitions that are needed to enable our host to bootstrap us.
 ;;;
+
+;; this got renamed
+(define number->string long->string)
