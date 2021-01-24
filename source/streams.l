@@ -1,12 +1,12 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/unit-test.l")
+;; TODO this file is meant to be loadable into both the evaluator and
+;; the compiled code, but it requires the handling of boxing/unboxing
+;; to be merged between interpreted and compiled code.
 
-;(define-type <stream>)
+;; (require "source/unit-test.l")
+;;(define-type <stream>)
 (define-record <stream> () ())
-
-;; (eval-in-slave `(println "in target: " ,<stream>))
-;; (eval-in-slave `(println "in slave: " <stream>))
 
 (define-selector at-end?	(stream) (error "missing method for at-end?"))
 (define-selector peek		(stream) (error "missing method for peek"))
@@ -14,27 +14,33 @@
 
 ;;;----------------------------------------------------------------
 
+;; TODO delete size
+;; TODO WARNING this can override the one in parsing/parser.l
 ;; (define-record <string-stream> <stream> (string size position))
 
 ;; (define-function string-stream (str)
+;;   (assert (is <string> str))
 ;;   (make <string-stream>
 ;;     (string	str)
-;;     (size	(string-length str))
-;;     (position	0)))
+;;     (size	(box <long> (string-length str)))
+;;     (position	(box <long> 0))))
 
 ;; (define-method at-end? <string-stream> ()
 ;;   (= self.position self.size))
 
 ;; (define-method peek <string-stream> ()
-;;   (if (< self.position self.size)
-;;       (string-at self.string self.position)
-;;     +end+))
+;;   (let ((pos	(unbox <long> self.position))
+;;         (size	(unbox <long> self.size)))
+;;     (if (< pos size)
+;;         (string-at self.string pos)
+;;       +end+)))
 
 ;; (define-method next <string-stream> ()
-;;   (let ((pos self.position))
-;;     (if (< pos self.size)
+;;   (let ((pos (unbox <long> self.position))
+;;         (size	(unbox <long> self.size)))
+;;     (if (< pos size)
 ;; 	(let ((value (string-at self.string pos)))
-;; 	  (set self.position (+ pos 1))
+;; 	  (set self.position (box <long> (+ pos 1)))
 ;; 	  value)
 ;;       +end+)))
 

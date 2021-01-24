@@ -80,8 +80,6 @@
 (define-function allocate (type slot-count)
   (gc/allocate type (words-to-bytes slot-count)))
 
-(require "source/streams.l")
-
 (load "source/evaluator/eval.l")
 
 ;; TODO possible #optimization: even in the current setup, libc.l can override number->string with its own.
@@ -163,14 +161,16 @@
       (doit libc/stdout	*standard-output*)
       (doit libc/stderr	*standard-error*))))
 
-(define-form with-input-from-file (var file-name . body)
-  `(let* ((__file-name ,file-name)
-          (__file-handle (libc/fopen __file-name "r")))
-     (or __file-handle (error "no such file: " __file-name))
-     (gc/let* ((,var (libc-stream (box <target-vm-pointer> __file-handle))))
-       (let ((__result ,@body))
-         (libc/fclose __file-handle)
-         __result))))
+(define-form with-input-from-file (args . body)
+  (let ((var		(first args))
+        (file-name	(second args)))
+    `(let* ((__file-name ,file-name)
+            (__file-handle (libc/fopen __file-name "r")))
+       (or __file-handle (error "no such file: " __file-name))
+       (gc/let* ((,var (libc-stream (box <target-vm-pointer> __file-handle))))
+         (let ((__result ,@body))
+           (libc/fclose __file-handle)
+           __result)))))
 
 ;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
 (define-primitive-function (read ()) _
@@ -179,7 +179,7 @@
         (when (= +end+ obj)
           (set obj ()))
         obj)
-    (with-input-from-file stream (get/string (car -args-))
+    (with-input-from-file (stream (get/string (car -args-)))
       (gc/let* ((head (cons () ()))
                 obj)
         (let ((tail head))              ; TODO use collecting macro
@@ -199,7 +199,7 @@
     res))
 
 (define-primitive-function (load ()) (path)
-  (with-input-from-file stream (get/string path)
+  (with-input-from-file (stream (get/string path))
     (eval-stream stream)))
 
 (load "source/evaluator/vm-late.l")

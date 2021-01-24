@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/streams.l")
+
 (define-function is_blank (c)   (or      ( = ?   c)                     ; sp
                                          ( = ?\t c)                     ; ht
                                          ( = ?\n c)                     ; nl
