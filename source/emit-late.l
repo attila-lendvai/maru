@@ -27,13 +27,17 @@
   (let ((target-env		(slave-value *globals*))
         (methods		(eval-in-slave `(<selector>-methods ,self)))
         (target-methods		(array))
-        (parameters		()))
+        (parameters		())
+        (index-min		())
+        (index-max		0))
     ;; the specialized methods
     (for (i 0 (array-length methods))
       (let ((impl-fn (array-at methods i)))
         (when impl-fn
           (let ((slave-type-id (eval-in-slave `(<type>-slave-id ,(type-object-for-id i)))))
             (emit COMMENT (list "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn)))
+            (or index-min (set index-min slave-type-id))
+            (set index-max slave-type-id)
             ;; NOTE this takes the parameter signature of the first method
             ;; and assumes it's the same for the rest.
             (if parameters
@@ -43,26 +47,26 @@
                                    (<expr>-parameters impl-fn)))
               (assert (= (first parameters) 'self)))
             (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
-              (set (array-at target-methods slave-type-id)
+              (set (array-at target-methods (- slave-type-id index-min))
                    ;(LABEL impl-name)
                    (environment-define target-env impl-name impl-fn))
               (compile-definition impl-fn impl-name -c-))))))
     ;; the dispatch table
-    (emit COMMENT (list "<selector> dispatch table for "name))
+    (emit COMMENT (list "<selector> dispatch table for "name", from "index-min", to "index-max))
     ;; the selector function
     (emit COMMENT (list "<selector> stub for "name))
     (let ((stub	(eval-in-target
                  `(,lambda ,parameters
                     (let ((type (type-of self)))
                       (safety 1
-                        (unless (and (<= 0 type)
-                                     (< type ,(array-length target-methods)))
+                        (unless (and (<= ,index-min type)
+                                     (<= type ,index-max))
                           ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
                           (error "selector '",(symbol->string name)" has no method for type " (box <long> type))))
                       ;; we include the dispatch table as a literal
                       ;; array here. it will be emitted with a
                       ;; generated name into the read-only space.
-                      ((oop-at ,target-methods type) ,@parameters))))))
+                      ((oop-at ,target-methods (- type ,index-min)) ,@parameters))))))
       (compile-expr stub name () -c-))))
 
 ;;;
