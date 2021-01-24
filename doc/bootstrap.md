@@ -1,6 +1,6 @@
 # Maru's bootstrap process
 
-## Overview - bootstrap stages
+## Overview
 
 A language evolves by the introduction of new features (optimizations, new primitives, etc).
 If you want to use such a novel language feature in its own implementation,

@@ -139,8 +139,14 @@
 
 (load "source/evaluator/platforms/libc/streams.l")
 
-;; TODO eventually we could do something like this... but this would access the current module!
+;; TODO eventually we could do something like this... note that this would access the current module!
+;; NOTE binding this into the interpreter's env is only useful/meaningful if its LIBC-STREAM type is also
+;; properly initialized in the interpreter's env. otherwise it would be there an object of an unknown type.
+;; TODO add compilation of symbols and drop the string->symbol call
+;; (define-symbol-form *standard-input*  (global-variable-value (string->symbol "*standard-input*")))
 ;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
+;; (define-symbol-form *standard-error*  (global-variable-value (string->symbol "*standard-error*")))
+
 (define *standard-input*)
 (define *standard-output*)
 (define *standard-error*)
