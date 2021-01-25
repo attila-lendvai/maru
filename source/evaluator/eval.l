@@ -84,49 +84,6 @@
       (else
        (error "unbox: don't know how to deal with "type)))))
 
-(define-form define-type-of ()
-  (let ((conds-early	())
-        (conds-late	()))
-    (types-do type
-      (when (is <immediate-type> type)
-        (let* ((tag-value	(<immediate-type>-tag-value type))
-               (tag-width	(<immediate-type>-tag-width type)))
-          (if tag-width
-              (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
-                (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
-            (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
-    `(define-function type-of (ptr)
-       (cond
-         ,@conds-early
-         ((oop? ptr)	(let ((header (gc/header-of ptr)))
-                          (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
-                          (safety 2 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
-                          (<header>-type header)))
-         ,@conds-late
-         (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
-
-(define-type-of)
-
-(when-at-expand feature/optimize-speed
-  (define-form is (type-name obj)
-    (let ((type (eval type-name)))
-      (cond
-        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
-         `(let ((__obj__ ,obj))
-            (and __obj__
-                 (oop? __obj__)
-                 (= ,(<type>-slave-id type)
-                    (<header>-type (gc/header-of __obj__))))))
-        ((is <immediate-type> type)
-         (let* ((tag-value	(<immediate-type>-tag-value type))
-                (tag-width	(<immediate-type>-tag-width type)))
-           (if tag-width
-               (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
-                 `(= ,tag-value (bitwise-and ,obj ,tag-mask)))
-             `(= ,tag-value ,obj))))
-        (else
-         `(= ,type-name (type-of ,obj)))))))
-
 ;; NOTE this is not exactly the same as the one in the user-land, it lacks the slot-name
 ;; parameter (because the compiler cannot deal with symbol literals yet).
 (define-function %accessor-typecheck (expected-type-id object)
@@ -441,8 +398,8 @@
 
 (when-at-expand feature/backtrace
   (define-function %new-call-frame (callee-designator callee args)
-    (safety 3 (unless (or (not callee-designator)	(gc/valid-maru-value? callee-designator))	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
-    (safety 3 (unless (or (not callee)			(gc/valid-maru-value? callee))			(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
+    (safety 3 (unless (gc/valid-maru-value? callee-designator)	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
+    (safety 3 (unless (gc/valid-maru-value? callee)		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))

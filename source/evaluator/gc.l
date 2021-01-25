@@ -3,28 +3,9 @@
 ;;; A naive precise mark-and-sweep GC.
 ;;;
 
-(define-constant oop/alignment-in-bytes		+word-size-in-bytes+)
-(define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
-(define-constant oop/payload-mask		(- oop/alignment-in-bytes))
-(define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
-
-(verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n"))
-
-(define-form oop/align (value)
-  `(bitwise-and (+ ,value ,oop/align-padding)
-                ,oop/payload-mask))
-
-(define-form aligned-to-oop? (ptr)
-  `(= 0 (bitwise-and ,ptr
-                     ,oop/tag-mask)))
-
-(define-form oop? (word)
-  `(aligned-to-oop? ,word))
-
-(define-form immediate? (word)
-  `(not (oop? ,word)))
-
-;; the header of heap objects
+;;;
+;;; GC header
+;;;
 (define-record <header> ()
   (next size flags type (when-at-expand feature/object-canary canary))
   raw-slot-access)
@@ -61,6 +42,36 @@
     true))
 
 ;;;
+;;; tagging
+;;;
+(define-constant oop/alignment-in-bytes		+word-size-in-bytes+)
+(define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
+(define-constant oop/payload-mask		(- oop/alignment-in-bytes))
+(define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
+
+(verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n"))
+
+(define-form oop/align (value)
+  `(bitwise-and (+ ,value ,oop/align-padding)
+                ,oop/payload-mask))
+
+(define-form aligned-to-oop? (ptr)
+  `(= 0 (bitwise-and ,ptr
+                     ,oop/tag-mask)))
+
+;; TODO unreified abstraction: NIL is now defined as a full-word
+;; immediate using define-immediate in types.l. these macros should be
+;; derived based on the actual set of defined types.
+;; TODO should this also include a canary check? then it would fail gracefully when used in an (assert (oop? ...))
+(define-form oop? (word)
+  `(and ,word
+        (aligned-to-oop? ,word)))
+
+;; TODO should this check/assert for the actual set of tags? to detect invalid immediate values...
+(define-form immediate? (word)
+  `(not (oop? ,word)))
+
+;;;
 ;;; The GC's state
 ;;;
 (define gc/minimum-growth-unit	(* 50 1024))
@@ -78,6 +89,53 @@
 (define gc/memory-last          0)
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
+
+;;;
+;;; type-of
+;;;
+(define-form define-type-of ()
+  (let ((conds-early	())
+        (conds-late	()))
+    (types-do type
+      (when (is <immediate-type> type)
+        (let* ((tag-value	(<immediate-type>-tag-value type))
+               (tag-width	(<immediate-type>-tag-width type)))
+          (if tag-width
+              (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
+            (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
+    `(define-function type-of (ptr)
+       (cond
+         ,@conds-early
+         ;; strictly speaking, this should be OOP?, but that would add an extra non-nil check
+         ((aligned-to-oop? ptr)
+	  (let ((header (gc/header-of ptr)))
+            (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
+            (safety 2 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
+            (<header>-type header)))
+         ,@conds-late
+         (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
+
+(define-type-of)
+
+(when-at-expand feature/optimize-speed
+  (define-form is (type-name obj)
+    (let ((type (eval type-name)))
+      (cond
+        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
+         `(let ((__obj__ ,obj))
+            (and (oop? __obj__)
+                 (= ,(<type>-slave-id type)
+                    (<header>-type (gc/header-of __obj__))))))
+        ((is <immediate-type> type)
+         (let* ((tag-value	(<immediate-type>-tag-value type))
+                (tag-width	(<immediate-type>-tag-width type)))
+           (if tag-width
+               (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                 `(= ,tag-value (bitwise-and ,obj ,tag-mask)))
+             `(= ,tag-value ,obj))))
+        (else
+         `(= ,type-name (type-of ,obj)))))))
 
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (libc/malloc size)))
@@ -139,8 +197,7 @@
     (debug (libc/printf "GC: %ld used, %ld free, %ld allocations\n" nused nfree gc/alloc-count))))
 
 (define-function gc/mark-and-trace (obj)
-  (and obj
-       (not (immediate? obj))
+  (and (not (immediate? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (libc/printf "mark and trace %p (%p) flags %ld size %ld type %ld\n" obj header flags (<header>-size header) (<header>-type header)))
