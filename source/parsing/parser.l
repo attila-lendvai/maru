@@ -5,7 +5,7 @@
 (require "source/sequences.l")
 (require "source/conversion.l")
 
-(define-selector $at-end)
+(define-selector $at-end?)
 (define-selector $peek)
 (define-selector $next)
 
@@ -42,7 +42,7 @@
     (size	(string-length string))
     (position	0)))
 
-(define-method $at-end <string-stream> ()
+(define-method $at-end? <string-stream> ()
   (= self.position self.size))
 
 (define-method $peek <string-stream> ()
@@ -83,7 +83,7 @@
   (make <list-stream>
     (source	source)))
 
-(define-method $at-end <list-stream> ()
+(define-method $at-end? <list-stream> ()
   (not self.source))
 
 (define-method $peek <list-stream> ()
@@ -120,7 +120,7 @@
     (source	source)
     (srcpos	(cons path 1))))
 
-(define-method $at-end <input-stream> ()
+(define-method $at-end? <input-stream> ()
   (= () ($peek self)))
 
 (define-method $peek <input-stream> ()
@@ -487,7 +487,7 @@
 
 (define-function parser-input-stream (source)	(new <parser-input-stream> source))
 
-(define-method $at-end <parser-input-stream>		() ($at-end self.source))
+(define-method $at-end? <parser-input-stream>		() ($at-end? self.source))
 (define-method $peek <parser-input-stream>		() (or ($peek self.source) +end+))
 (define-method $next <parser-input-stream>		() (or ($next self.source) +end+))
 (define-method $source-position <parser-input-stream>	() ($source-position self.source))
