@@ -134,20 +134,20 @@
 ;;; target env setup
 ;;;
 
-(eval-in-slave
- (let (arch word-size)
-   (case target/cpu
-     ("x86_64"
-      (set arch		'x86-64)
-      (set word-size	64))
+(let (arch word-size)
+  (case target/cpu
+    ("x86_64"
+     (set arch		'x86-64)
+     (set word-size	64))
 
-     (("i686" "i386")
-      (set arch		'IA-32)
-      (set word-size	32))
+    (("i686" "i386")
+     (set arch		'IA-32)
+     (set word-size	32))
 
-     (else
-      (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
+    (else
+     (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
 
+  (eval-in-slave
    `(let ()
       (define-constant +architecture+		'',arch)
       (define-constant +operating-system+	'',(string->symbol target/os))

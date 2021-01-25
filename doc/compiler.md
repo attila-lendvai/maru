@@ -63,7 +63,10 @@ place that holds the variable's value when the compiled code is
 executed. Global variables are placed at fixed memory addresses.
 
 TODO: it would be nice to merge the anomaly between the treatment of
-global and local variables. Aren't global variables simply the local
-variables of an imaginary extra lambda that encapsulates all the
-toplevel definitions? This could come together with the introduction
-of nested local `define`s.
+global and local variables. Aren't global variables simply the
+captured variables of an imaginary extra lambda that encapsulates all
+the toplevel definitions? IOW, a for a lambda a captured variable is
+basically a global=external=outside variable.
+
+This could come together with the introduction of nested local
+`define`s, too.

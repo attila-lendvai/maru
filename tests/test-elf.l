@@ -37,7 +37,7 @@
 (define-function pushlI (src)		(PUSHLi src ()))
 (define-function addlIR (src dst)	(ADDLir src dst ()))
 (define-function sublIR (src dst)	(SUBLir src dst ()))
-(define-function intI (src)		(_B () 0xCD) (_B () src))
+(define-function int (n)		(_B () 0xCD) (_B () n))
 
 (define-function assemble (program)
   (list-do insn program
@@ -95,14 +95,14 @@ section-headers
 	(.def	section-header-size (- $ section-headers)) ; of *one* section header
 	;; (.align	0x1000)
 entry-point
-	(movlIR	4 _EAX)
-	(movlIR	1 _EBX)
+	(movlIR	4 _EAX) ; write
+	(movlIR	1 _EBX) ; fd
 	(movlIR	msg _ECX)
 	(movlIR	msglen _EDX)
-	(intI	0x80)
-	(movlIR	1 _EAX)
-	(movlIR	0 _EBX)
-	(intI	0x80)
+	(int	0x80)
+	(movlIR	1 _EAX) ; exit
+	(movlIR	0 _EBX) ; exit code
+	(int	0x80)
 msg	(.ascii	"Hello, world! From an elf binary!\n")
 	(.def	msglen (- $ msg))
 	;;(.def	code-size (- $ entry-point))
@@ -112,7 +112,7 @@ msg	(.ascii	"Hello, world! From an elf binary!\n")
 
 (buffer-save code (println "./build/test-elf"))
 
-;; for details on int 0x80 see:
+;; for details on int 0x80 and syscall see:
 ;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 ;; /usr/include/asm/unistd_32.h
 
@@ -126,7 +126,7 @@ msg	(.ascii	"Hello, world! From an elf binary!\n")
 	(movlIR	2 _EBX)				; stderr
 	(movlIR	msg _ECX)			; buffer
 	(movlIR	msglen _EDX)			; strlen(buffer)
-	(intI	0x80)
+	(int	0x80)
 	;;(movlRM	_EAX 0)				; crash! for testing...
 	(RET	0)
 msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
@@ -141,10 +141,10 @@ msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
 	(movlIR	1 _EBX)				; stdout
 	(movlIR	msg _ECX)			; buffer
 	(movlIR	msglen _EDX)			; strlen(buffer)
-	(intI	0x80)
+	(int	0x80)
 	(movlIR	1 _EAX)				; exit
 	(movlIR	0 _EBX)				; status
-	(intI	0x80)
+	(int	0x80)
 msg	(.ascii	"Now run ./a.out for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 

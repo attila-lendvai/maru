@@ -237,6 +237,12 @@ Assorted TODO:
   - Simplify the types-are-objects part and its bootstrap, and maybe even
     make it optional?
 
+  - Introduce a simplified language that drops some langauge features,
+    e.g. remove *forms* and the *expand* protocol. Make sure that this
+    language can bootstrap itself off of C99. Then reintroduce *forms*
+    and *expand* by using this simplified Maru as the implementation
+    language.
+
   - Compile to, and bootstrap on the bare metal of some interesting
     targets. The simplest would be a static executable that treats the
     linux kernel as a VM; i.e. without linking with libc, and using a

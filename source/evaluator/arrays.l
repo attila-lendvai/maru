@@ -90,6 +90,7 @@
 ;;   (compare-characters (get/string a) (string-length a)
 ;;                       (get/string b) (string-length b)))
 
+;; NOTE there's a variant of this in parser.l
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)
         (hi (- (array-length array) 1)))

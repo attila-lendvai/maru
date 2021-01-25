@@ -15,6 +15,7 @@
 
 (<selector>-add-method $at <string> string-at)
 
+;; NOTE there's a variant of this in arrays.l
 (define-function binary-search (seq obj cmp)
   (let ((lo 0)
 	(hi (- ($size seq) 1))
@@ -350,10 +351,10 @@
 
 (define-function parser-input-stream (source)	(new <parser-input-stream> source))
 
-(define-method $at-end? <parser-input-stream>		() ($at-end? self.source))
-(define-method $peek <parser-input-stream>		() (or ($peek self.source) +end+))
-(define-method $next <parser-input-stream>		() (or ($next self.source) +end+))
-(define-method $source-position <parser-input-stream>	() ($source-position self.source))
+(define-method $at-end?		<parser-input-stream> () ($at-end? self.source))
+(define-method $peek		<parser-input-stream> () (or ($peek self.source) +end+))
+(define-method $next		<parser-input-stream> () (or ($next self.source) +end+))
+(define-method $source-position	<parser-input-stream> () ($source-position self.source))
 
 ;;;----------------------------------------------------------------
 

@@ -496,7 +496,7 @@
          (apply/expr fun arguments ctx))
 
         ((= type <primitive-function>)
-         (if-at-expand (<= *safety* 3)
+         (if-at-expand (<= 3 *safety*)
              (let ((result ((<primitive-function>-_imp fun) arguments ctx)))
                (or (gc/valid-maru-value? result)
                    (error "<primitive-function> "fun" returned with something unboxed"))

@@ -6,3 +6,4 @@ eval-x86
 etc
 source/parsing/peg.g.l
 source/assembler/asm-x86.l
+*.g.l
