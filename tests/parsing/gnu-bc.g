@@ -16,7 +16,7 @@ MINUS		= "-" _ ;
 
 #float		= ([+-]?[0-9]+"."[0-9]+("e"[+-]?[0-9]+)?)@$:n _	-> (string->double n)
 #          	| ([+-]?[0-9]+          "e"[+-]?[0-9]+  )@$:n _	-> (string->double n) ;
-integer		= ([+-]?[0-9]+)@$:n _				-> (string->long n) ;
+integer		= ([+-]?[0-9]+)@$:n _				-> (string->integer n) ;
 #number		= float | integer ;
 number		= integer ;
 

@@ -313,11 +313,17 @@
       symbol
     (string-from-cstring (unbox <symbol> symbol))))
 
-(define-primitive-function number->string ((num <long>))
-  (long->string num))
+(define-primitive-function number->string ((num <long>) (radix <long> 10))
+  (long->string* num radix))
 
-(define-primitive-function string->number ((str <string> _ nounbox))
-  (string->long str))
+(define-primitive-function integer->string ((num <long>) (radix <long> 10))
+  (long->string* num radix))
+
+(define-primitive-function string->number ((str <string> _ nounbox) (radix <long> 10))
+  (box <long> (string->long* str radix)))
+
+(define-primitive-function string->integer ((str <string> _ nounbox) (radix <long> 10))
+  (box <long> (string->long* str radix)))
 
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (data)
