@@ -754,6 +754,7 @@
          (arity		(list-length args))
          (handler	()))
     (emit COMMENT (list "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
+    ;; TODO add compiler-macros. use them to optimize e.g. (not (not ...)) -> (and ...), or use some other way to convert the generalized boolean.
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))

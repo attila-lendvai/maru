@@ -29,7 +29,10 @@ Maru's architecture is described in Ian Piumarta's paper:
 > which is entirely accurate in intent and approach,
 > if a little different in some implementation details (Ian Piumarta)
 
-### The Parts
+This readme aims to present only an overview. The documents in the
+[`doc/`](doc/) directory discuss some topics in detail.
+
+### The Parts - an overview
 
 * `eval.c` (in branch `maru.0.c99`) contains a reader and
 [evaluator](https://en.wikipedia.org/wiki/Interpreter_(computing)) (interpreter) for an
@@ -137,7 +140,10 @@ Patches are welcome for other platforms, including the extension of this readme.
 
 ## Who
 
-Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/), at around 2011.
+Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/),
+at around 2011. Full commit history is available in the
+[`piumarta`](https://github.com/attila-lendvai/maru/tree/piumarta)
+branch.
 
 This repo and readme is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
 

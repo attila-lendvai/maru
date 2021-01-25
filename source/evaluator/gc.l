@@ -3,6 +3,27 @@
 ;;; A naive precise mark-and-sweep GC.
 ;;;
 
+(define-constant oop/alignment-in-bytes		+word-size-in-bytes+)
+(define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
+(define-constant oop/payload-mask		(- oop/alignment-in-bytes))
+(define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
+
+(verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n"))
+
+(define-form oop/align (value)
+  `(bitwise-and (+ ,value ,oop/align-padding)
+                ,oop/payload-mask))
+
+(define-form aligned-to-oop? (ptr)
+  `(= 0 (bitwise-and ,ptr
+                     ,oop/tag-mask)))
+
+(define-form oop? (word)
+  `(aligned-to-oop? ,word))
+
+(define-form immediate? (word)
+  `(not (oop? ,word)))
+
 ;; the header of heap objects
 (define-record <header> ()
   (next size flags type (when-at-expand feature/object-canary canary))
