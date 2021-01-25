@@ -1,18 +1,9 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO this file is meant to be loadable into both the evaluator and
-;; the compiled code, but it requires the handling of boxing/unboxing
-;; to be merged between interpreted and compiled code.
+(require "source/unit-test.l")
+;;(require "source/streams-min.l")
 
-;; (require "source/unit-test.l")
-;;(define-type <stream>)
-(define-record <stream> () ())
 
-(define-selector at-end?	(stream) (error "missing method for at-end?"))
-(define-selector peek		(stream) (error "missing method for peek"))
-(define-selector next		(stream) (error "missing method for next"))
-
-;;;----------------------------------------------------------------
 
 ;; TODO delete size
 ;; TODO WARNING this can override the one in parsing/parser.l
