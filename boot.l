@@ -69,11 +69,7 @@
 (set load (lambda (path)
             (and (<= 1 *verbosity*) (warn "loading file: "path"\n"))
             (set *load-history* (cons path *load-history*))
-            (let ((exps (or (read path)
-                            (error "file not found or empty: "path))))
-              (while exps
-                (eval (car exps))
-                (set exps (cdr exps))))))
+            (primitive/load path)))
 
 (define require
   (lambda (path)

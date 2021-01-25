@@ -100,42 +100,45 @@
 ;;         (box <long> result)
 ;;       (error "invalid number in string->long, libc/strtol has failed for string " str))))
 
-(define-primitive-function (libc/fopen ()) ((path <string>) (mode <string>))
-  (let ((stream (libc/fopen path mode)))
-    (and stream (box <target-vm-pointer> stream))))
+;; TODO eliminate the "r" libcism?
+(define-primitive-function file-open ((path <string>) (mode <string>))
+  (awhen (libc/fopen path mode)
+    (box <target-vm-pointer> it)))
 
-(define-primitive-function (libc/fclose ()) ((stream <target-vm-pointer>))
-  (libc/fclose stream))
+(define-primitive-function file-close ((stream <target-vm-pointer>))
+  (box <long> (libc/fclose stream)))
 
-(define-primitive-function (libc/fgetc ()) ((stream <target-vm-pointer>))
+(define-primitive-function file-read-character ((stream <target-vm-pointer>))
   (let ((c (libc/fgetc stream)))
-    (and (>= c 0)
-         (box <long> c))))
+    (if (= libc/EOF c)
+        ()
+      (box <long> c))))
 
-(define-primitive-function (libc/fputc ()) ((char <long>) (stream <target-vm-pointer>))
-  (box <long> (libc/fputc char stream)))
+(define-primitive-function file-write-character ((char <long>) (stream <target-vm-pointer>))
+  (when (= libc/EOF (libc/fputc char stream))
+    (error "file-write-char: libc/fputc returned an error")))
 
-(define-primitive-function (libc/format ()) ((fmt <string>) oarg)
-  (let ((typ (type-of oarg))
-        (arg ()))
-    ;; TODO use typecase
-    (cond
-      ((= typ <undefined>))
-      ((= typ <long>)		(set arg (unbox <long> oarg)))
-      ((= typ <string>)		(set arg (get/string oarg)))
-      ((= typ <symbol>)		(set arg (unbox <symbol> oarg)))
-      (else			(set arg oarg)))
-    (let ((size 100)
-          (result ()))
-      (gc/let* ((buf ()))
-        (while (not result)
-          (set buf (allocate-data size))
-          (let ((n (libc/snprintf buf size fmt arg)))
-            (if (and (<= 0 n)
-                     (< n size))
-                (set result (string-from-cstring buf))
-              (set size (* size 2))))))
-      result)))
+;; (define-primitive-function (libc/format ()) ((fmt <string>) oarg)
+;;   (let ((typ (type-of oarg))
+;;         (arg ()))
+;;     ;; TODO use typecase
+;;     (cond
+;;       ((= typ <undefined>))
+;;       ((= typ <long>)		(set arg (unbox <long> oarg)))
+;;       ((= typ <string>)		(set arg (get/string oarg)))
+;;       ((= typ <symbol>)		(set arg (unbox <symbol> oarg)))
+;;       (else			(set arg oarg)))
+;;     (let ((size 100)
+;;           (result ()))
+;;       (gc/let* ((buf ()))
+;;         (while (not result)
+;;           (set buf (allocate-data size))
+;;           (let ((n (libc/snprintf buf size fmt arg)))
+;;             (if (and (<= 0 n)
+;;                      (< n size))
+;;                 (set result (string-from-cstring buf))
+;;               (set size (* size 2))))))
+;;       result)))
 
 (load "source/evaluator/platforms/libc/streams.l")
 
@@ -166,43 +169,17 @@
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
         (file-name	(second args)))
-    `(let* ((__file-name ,file-name)
-            (__file-handle (libc/fopen __file-name "r")))
-       (or __file-handle (error "no such file: " __file-name))
-       (gc/let* ((,var (libc-stream (box <target-vm-pointer> __file-handle))))
+    `(let* ((__file-name	,file-name)
+            (__file-handle	(file-open (get/string __file-name) "r")))
+       (or __file-handle (error "with-input-from-file: file-open failed for: " __file-name))
+       (gc/let* ((,var (libc-stream __file-handle)))
          (let ((__result ,@body))
-           (libc/fclose __file-handle)
+           (file-close (unbox <target-vm-pointer> __file-handle))
            __result)))))
 
-;; TODO which one is the actual primitive that we want to publish? maybe just a read-form?
-(define-primitive-function (read ()) _
-  (if (= () -args-)
-      (let ((obj (read *standard-input*)))
-        (when (= +end+ obj)
-          (set obj ()))
-        obj)
-    (with-input-from-file (stream (get/string (car -args-)))
-      (gc/let* ((head (cons () ()))
-                obj)
-        (let ((tail head))              ; TODO use collecting macro
-          (while (!= +end+ (set obj (read stream)))
-            (set tail (put/tail tail (cons obj ()))))
-          (get/tail head))))))
-
-;; TODO put it where?
-;; TODO rename to expand-encode-eval-stream?
-(define-function eval-stream (stream)
-  (gc/let* (form
-            res
-            env)
-    (while (!= +end+ (set form (read stream)))
-      (set env (environment (module-env *module*) 1 0))
-      (set res (expand-encode-eval form env)))
-    res))
-
 (define-primitive-function (load ()) (path)
-  (with-input-from-file (stream (get/string path))
-    (eval-stream stream)))
+  (with-input-from-file (stream path)
+    (expand-encode-eval-stream stream)))
 
 (load "source/evaluator/vm-late.l")
 

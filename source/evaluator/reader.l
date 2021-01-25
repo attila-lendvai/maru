@@ -220,5 +220,5 @@
        (error "unexpected close paren"))
       (else           (return (read-nested stream))))))
 
-(define-function read (stream)
-  (read-toplevel stream))
+(define-primitive-function read (input)
+  (read-toplevel input))

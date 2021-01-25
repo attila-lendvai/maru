@@ -87,9 +87,10 @@
 
 (define-function buffer-save (self path)
   (with-instance-accessors self <buffer>
-    (let ((f (or (libc/fopen path "w")
+    (let ((f (or (file-open path "w")
                  (error "cannot open for writing: "path)))
           (elements self.elements))
       (for (i 0 self.size)
-        (libc/fputc (byte-at elements i) f))
-      (libc/fclose f))))
+        ;; TODO file-write-byte?
+        (file-write-character (byte-at elements i) f))
+      (file-close f))))

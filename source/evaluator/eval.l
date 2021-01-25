@@ -876,6 +876,15 @@
     (debug (libc/printf "expand-encode-eval for form ") (print form) (libc/printf " is returning with ") (println x))
     x))
 
+(define-function expand-encode-eval-stream (stream)
+  (gc/let* (form
+            res
+            env)
+    (while (!= +end+ (set form (read stream)))
+      (set env (environment (module-env *module*) 1 0))
+      (set res (expand-encode-eval form env)))
+    res))
+
 (define-primitive-function module ((name <string>))
   (debug (libc/printf "module constructor\n"))
   (gc/let* ((module (new <module>))
