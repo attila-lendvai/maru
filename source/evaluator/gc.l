@@ -16,6 +16,9 @@
 (define-constant <header>-flags/opaque	2) ; the GC will not look inside opaque objects
 (define-constant <header>-flags/mark	4)
 
+(define-form gc/live-chunk? (header)
+  `(bitwise-and <header>-flags/used (<header>-flags ,header)))
+
 (define-form gc/header-of (arg)
   `(- ,arg ,size-of-<header>))
 
@@ -111,7 +114,7 @@
          ((aligned-to-oop? ptr)
 	  (let ((header (gc/header-of ptr)))
             (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
-            (safety 2 (or (bitwise-and <header>-flags/used (<header>-flags header)) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
+            (safety 2 (or (gc/live-chunk? header) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
             (<header>-type header)))
          ,@conds-late
          (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
@@ -157,7 +160,7 @@
   (<header>-size (gc/header-of obj)))
 
 (define-function %next-object-from-header (header)
-  (while (not (bitwise-and <header>-flags/used (<header>-flags header)))
+  (until (gc/live-chunk? header)
     (set header (<header>-next header))
     (when (= header gc/memory-base)
       (return 0)))
@@ -275,7 +278,7 @@
                   (set (<header>-type header) type)
                   (libc/memset obj 0 chunk-size)
                   (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
-                  (safety 4 (assert (bitwise-and <header>-flags/used (<header>-flags header)) "gc/allocate: was about to return with an object whose USED flag is unset"))
+                  (safety 4 (assert (gc/live-chunk? header) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))
                   (gc/debug (libc/printf "gc/allocate: returning with %p (header: %p), type %ld, size %ld\n" obj header (<header>-type header) (gc/object-size obj)))
                   (return obj)))))
