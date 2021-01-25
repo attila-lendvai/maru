@@ -38,11 +38,14 @@
     `(set (<header>-canary ,header) ,+canary-value+)))
 
 (define-form gc/valid-maru-value? (obj)
-  (if feature/object-canary
-      `(let ((__obj__ ,obj))
-         (or (immediate? __obj__)
-             (gc/valid-header-canary? (gc/header-of __obj__))))
-    true))
+  `(let ((__obj__ ,obj))
+     (or (immediate? __obj__)
+         ;; NOTE this is to catch low pointers. theoretically this may get false positives if we are running close to the 0 address.
+         ;; NOTE we can't use gc/memory-base here, because this may encounter stuff from the read-only memory segment
+         (and (< 10000 __obj__)
+              ,(if feature/object-canary
+                   '(gc/valid-header-canary? (gc/header-of __obj__))
+                 'true)))))
 
 ;;;
 ;;; tagging
