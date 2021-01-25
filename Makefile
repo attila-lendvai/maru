@@ -283,9 +283,9 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/generated/peg.g.l: source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
+$(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
 	@mkdir -p $(BUILD)/generated
-	$(call ensure-built,$(GEN_EVAL))
+#	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
@@ -296,9 +296,9 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-$(BUILD)/generated/asm-x86.l: source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
+$(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
-	$(call ensure-built,$(GEN_EVAL))
+#	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
@@ -392,8 +392,8 @@ test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembl
 	-readelf -el build/test-elf
 	./build/test-elf
 
-tests/parsing/%.g.l: tests/parsing/%.g source/parsing/parser.l source/parsing/peg.g.l
-	$(call ensure-built,$(GEN_EVAL))
+tests/parsing/%.g.l: tests/parsing/%.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l
+#	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
