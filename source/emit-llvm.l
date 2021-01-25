@@ -708,7 +708,7 @@
                 (unless (<C-function>-vararg? op-value)
                   (set n-params (list-length param-types)))))
              ((is (slave-value <selector>) op-value)
-              (gen CALL (GLOBAL (<selector>-name op-value)) arg-regs))
+              (gen CALL (GLOBAL (eval-in-slave `(<selector>-name ,op-value))) arg-regs))
              (else
               (error "Don't know how to emit call to global value "op-value", in variable "op)))
            (when (and n-params
