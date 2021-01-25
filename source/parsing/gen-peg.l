@@ -17,12 +17,7 @@
 (progress "loading dependencies")
 
 (require "source/conversion.l")
-(require "source/files.l")
-
 (require "source/unit-test.l")
-
-(define-constant unit-testing? true)
-
 (require "source/parsing/parser.l")
 (require "source/parsing/peg-compiler.l")
 
