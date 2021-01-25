@@ -53,14 +53,16 @@ TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
-# use this eval to execute any tests from the makefile.
-# in order of speed, as of this writing.
-#TEST_EVAL	= build/llvm/i686-pc-linux-gnu/eval1
-#TEST_EVAL	= $(BUILD_llvm)/eval1
-TEST_EVAL	= $(BUILD_x86)/eval1
-
+# used when generating maru sources during the build process
+# in the order of speed
 #GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval1
-GEN_EVAL	= $(BUILD_llvm)/eval1
+#GEN_EVAL	= $(BUILD_llvm)/eval1
+GEN_EVAL	= $(BUILD_x86)/eval1
+#GEN_EVAL	= $(BUILD_llvm)/eval1
+
+# used when executing tests
+TEST_EVAL	= $(GEN_EVAL)
+
 
 ##
 ## internal variables
@@ -111,7 +113,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
 EVALUATOR_FILES	= $(addprefix source/evaluator/platforms/libc/,libc.l streams.l) \
- $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l) \
+ $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l)
 
 # for some optional C files, e.g. profiler.c
@@ -135,7 +137,7 @@ endif
 all: eval
 
 clean:
-	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend) eval-$(backend)) eval
+	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend) eval-$(backend)) $(BUILD)/generated/ eval
 	-git checkout --quiet $(BUILD)
 
 distclean: clean
@@ -337,6 +339,8 @@ run: $(TEST_EVAL)
 
 run-bare: $(TEST_EVAL)
 	rlwrap --no-warning $(TEST_EVAL) -
+
+test: test-evaluator test-bootstrap test-parser test-elf
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 

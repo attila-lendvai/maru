@@ -22,7 +22,6 @@
 ;;;
 ;;; <selector>
 ;;;
-
 (define-method compile-definition (slave-value <selector>) (name -c-)
   (let ((target-env		(slave-value *globals*))
         (methods		(eval-in-slave `(<selector>-methods ,self)))
@@ -48,7 +47,6 @@
               (assert (= (first parameters) 'self)))
             (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
               (set (array-at target-methods (- slave-type-id index-min))
-                   ;(LABEL impl-name)
                    (environment-define target-env impl-name impl-fn))
               (compile-definition impl-fn impl-name -c-))))))
     ;; the dispatch table

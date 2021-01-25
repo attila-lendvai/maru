@@ -30,4 +30,5 @@
 
 (define-function character->string (c)
   (let ((s (string 1)))
-    (set-string-at s 0 c) s))
+    (set (string-at s 0) c)
+    s))

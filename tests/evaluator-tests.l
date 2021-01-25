@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/conversion.l")
+
 (define *tests* ())
 
 (define-form define-test (name args . body)

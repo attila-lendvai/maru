@@ -172,10 +172,14 @@
 
 (require "source/control-structures.l")
 
-;; this smells like a KLUDGE: we let gc/let* leak here from eval.l so that we can use
-;; certain constructs in the implementation of the evaluator. ideally, the compiler
-;; should be smart enough to inform the GC about ephemeral GC roots on the stack.
+;; KLUDGE: the compiler cannot yet automatically keep track of gc
+;; roots. to be able to share code between the evaluator and the
+;; compiler, we register a few NOPs in the interpreter.
 (define-symbol-form gc/let* let*)
+(define-form box (type value)
+  value)
+(define-form unbox (type value)
+  value)
 
 (define-form assert (test . args)
   (unless args

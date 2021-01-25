@@ -126,6 +126,7 @@
     (let ((type (eval type-name)))
       (cond
         ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
+         ;; TODO this ignores inheritance
          `(let ((__obj__ ,obj))
             (and (oop? __obj__)
                  (= ,(<type>-slave-id type)
@@ -200,6 +201,7 @@
     (debug (libc/printf "GC: %ld used, %ld free, %ld allocations\n" nused nfree gc/alloc-count))))
 
 (define-function gc/mark-and-trace (obj)
+  ;; (safety 3 (or (immediate? obj) (< 1000 obj) (fatal1 "gc/mark-and-trace: encountered a low pointer: %p" obj)))
   (and (not (immediate? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
@@ -216,6 +218,13 @@
                      (while index
                        (decr index)
                        (gc/debug (libc/printf "@%ld %p\n" index (oop-at obj index)))
+                       ;; (safety 3 (let ((next (oop-at obj index)))
+                       ;;             (unless (or (immediate? next)
+                       ;;                         (< 1000 next))
+                       ;;               (libc/fprintf libc/stderr "gc/mark-and-trace: about to recurse on bogus value: %p; found in the slot %ld of object %p of type %ld\n"
+                       ;;                             next index obj (<header>-type header))
+                       ;;               ;; enter the debugger
+                       ;;               (oop-at 0 0))))
                        (gc/mark-and-trace (oop-at obj index))))))))))
 
 (define-function gc/collect ()

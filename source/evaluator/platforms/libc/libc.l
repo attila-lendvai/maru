@@ -83,14 +83,16 @@
 (load "source/evaluator/eval.l")
 
 ;; TODO possible #optimization: even in the current setup, libc.l can override number->string with its own.
-;; (define-function long->string (num)
+;; (define-function long->string (num radix)
 ;;   ;; TODO introduce alloca?
+;;   ;; TODO handle radix
 ;;   (let ((buf (allocate-data 32)))       ; safe up until 64 bits
 ;;     (libc/sprintf buf "%ld" num)
 ;;     (string-from-cstring buf)))
 
 ;; TODO possible #optimization
-;; (define-function string->long (str)
+;; (define-function string->long (str radix)
+;;   ;; TODO handle radix
 ;;   (let* ((cstr		(get/string str))
 ;;          (endptr	cstr)
 ;;          (result	(libc/strtol cstr (address-of endptr) 10)))

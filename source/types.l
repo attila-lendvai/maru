@@ -13,7 +13,7 @@
 ;;; the <foo> global definitions are also holding full maru type objects.
 
 (define-form is (type obj)
-  ;; TODO use subtype?
+  ;; TODO use subtype? because this ignores inheritance
   `(= ,type (type-of ,obj)))
 
 (define type-id-of type-of) ; we will replace type-of later

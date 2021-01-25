@@ -25,9 +25,10 @@
   (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
   (let ((env (module-env module)))
     (gc/let* ((tmp))
+      ;; TODO this way *verbosity* in the evaluator and in the target is not in sync. see how *standard-output* is defined.
       (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
       (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
-      ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated any other way
+      ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated in any other way
       (set +end+ (or +end+ (set tmp (symbol "+end+"))))
       (environment-define env (string->symbol "+end+") +end+))
 

@@ -221,6 +221,9 @@
                           (set result (apply thunk rtargs))
                           (set *globals* prev-globals)
                           result)))))
+    ;; NOTE we define the form into the target env, because we want to
+    ;; redefine the meaning of stuff like ERROR only in the target
+    ;; env, not on its syntax-level (the slave module).
     `(define ,name ,form)))
 
 (assert (not (= define-form (eval-in-slave 'define-form))))

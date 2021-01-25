@@ -3,6 +3,7 @@
 (require "source/unit-test.l")
 (require "source/files.l")
 (require "source/sequences.l")
+(require "source/conversion.l")
 
 (define-selector $at-end)
 (define-selector $peek)
@@ -36,11 +37,10 @@
 (define-record <string-stream> () (string size position))
 
 (define-function string-stream (string)
-  (let ((self (new <string-stream>)))
-    (set (<string-stream>-string   self) string)
-    (set (<string-stream>-size     self) (string-length string))
-    (set (<string-stream>-position self) 0)
-    self))
+  (make <string-stream>
+    (string	string)
+    (size	(string-length string))
+    (position	0)))
 
 (define-method $at-end <string-stream> ()
   (= self.position self.size))
@@ -80,9 +80,8 @@
 (define-record <list-stream> () (source))
 
 (define-function list-stream (source)
-  (let ((self (new <list-stream>)))
-    (set (<list-stream>-source self) source)
-    self))
+  (make <list-stream>
+    (source	source)))
 
 (define-method $at-end <list-stream> ()
   (not self.source))
@@ -117,10 +116,9 @@
 (define-record <input-stream> () (source pending srcpos))
 
 (define-function input-stream (source path)
-  (let ((self (new <input-stream>)))
-    (set (<input-stream>-source self) source)
-    (set (<input-stream>-srcpos self) (cons path 1))
-    self))
+  (make <input-stream>
+    (source	source)
+    (srcpos	(cons path 1))))
 
 (define-method $at-end <input-stream> ()
   (= () ($peek self)))
@@ -133,7 +131,6 @@
 		(let ()
 		  (and (= ?\n c) (set self.srcpos (cons (car self.srcpos) (+ 1 (cdr self.srcpos)))))
 		  (set self.pending c))
-	      ;;(or (= self.source *input*) (file-close self.source)) ;; the caller should close the stream
 	      (set self.source ())
 	      (set self.pending +end+)))
 	(set self.pending +end+))))
@@ -179,11 +176,10 @@
 (define-function new-<token> () (new <token>))
 
 (define-function token (value index srcpos)
-  (let ((self (new <token>)))
-    (set (<token>-value    self) value)
-    (set (<token>-index    self) index)
-    (set (<token>-position self) srcpos)
-    self))
+  (make <token>
+    (value	value)
+    (index	index)
+    (position	srcpos)))
 
 (define-method do-print <token> ()
   (print "<token "self.index" "(format "%c" self.value))
@@ -331,11 +327,10 @@
 ;;    self))
 
 (define-function parser-stream (source)
-  (let ((self (new <parser-stream>)))
-    (set (<parser-stream>-source self)   source)
-    (set (<parser-stream>-position self) (token ($next source) 0 ($source-position (<parser-stream>-source self))))
-    (set (<parser-stream>-index self) 0)
-    self))
+  (make <parser-stream>
+    (source	source)
+    (position	(token ($next source) 0 ($source-position (<parser-stream>-source self))))
+    (index	0)))
 
 (define-function parser-stream-at-end (self)
   (and (= +end+ (<token>-value (<parser-stream>-position self)))))

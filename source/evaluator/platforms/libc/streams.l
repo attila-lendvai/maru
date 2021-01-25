@@ -6,7 +6,6 @@
 
 (define-function libc-stream (handle)
   (assert (is <target-vm-pointer> handle))
-  (assert (unbox <target-vm-pointer> handle))
   (make <libc-stream>
     (handle handle)))
 
