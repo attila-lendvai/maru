@@ -478,26 +478,36 @@
   (if-at-expand feature/backtrace
       (let ()
         (for (i 0 *call-stack-index*)
-          (let ((call-frame (array-at *call-stack* i))
-                (index-label (long->string i)))
+          (platform/flush-streams) ; seems like that in case of a sigsegv it doesn't get flushed
+          (let* ((call-frame	(array-at *call-stack* i))
+                 (index-label	(long->string i))
+                 (callee-des	(<call-frame>-callee-designator call-frame))
+                 (expand-or-encode? (or (= callee-des symbol/expand)
+                                        (= callee-des symbol/encode))))
             (times-do (- 3 (string-length index-label))
               (string-insert index-label 0 ?\ ))
             (print index-label)
             (platform/print ": ")
 	    (println (<call-frame>-callee-designator call-frame))
 
-            (platform/print "\tcallee:\t")
-	    (println (<call-frame>-callee call-frame))
+            (unless expand-or-encode?
+              (platform/print "\tcallee:\t")
+	      (println (<call-frame>-callee call-frame)))
 
-            (when (and (<= *error-level* 1)
-                       (<call-frame>-arguments call-frame))
-              (let ((arg-index 0))
-                (list-do arg (<call-frame>-arguments call-frame)
-                  (platform/print "\targ ")
-                  (print (long->string arg-index))
-                  (platform/print ":\t")
-                  (println arg)
-                  (incr arg-index))))))
+            (when (<= *error-level* 1)
+              (let ((args (<call-frame>-arguments call-frame)))
+                (cond
+                  (expand-or-encode?
+                   (platform/print "\texpr: ")
+                   (println args))
+                  (else
+                   (let ((arg-index 0))
+                     (list-do arg args
+                       (platform/print "\targ ")
+                       (print (long->string arg-index))
+                       (platform/print ":\t")
+                       (println arg)
+                       (incr arg-index)))))))))
         ;; man exit says that it's flushed, but looks like it's not. plus there's this: https://wiki.sei.cmu.edu/confluence/display/c/FIO23-C.+Do+not+exit+with+unflushed+data+in+stdout+or+stderr
         (platform/flush-streams))
     (platform/print-diagnostics "print-backtrace: call-frame tracking is disabled in this build. current call depth is "(get/string (long->string *call-stack-index*))"\n")))
@@ -724,6 +734,7 @@
                  (set it (maybe-object-in-variable *expanders* <array>))
                  (array-at it (type-of exp)))
            (gc/let* ((args (cons exp ())))
+             ;; deliberate simplification: the next APPLY will record the callee and the args in the backtrace anyway
              (apply it args ()))
          exp)))))
 
@@ -835,6 +846,7 @@
                  (set it (maybe-object-in-variable *encoders* <array>))
                  (array-at it (type-of exp)))
            (gc/let* ((args (list2 exp env)))
+             ;; deliberate simplification: the next APPLY will record the callee and the args in the backtrace anyway
              (debug (libc/printf "encode/other: applying fn: ") (println it) (libc/printf " ") (print args) (libc/printf " ") (println env))
              (apply it args ()))
          exp)))))
@@ -875,7 +887,8 @@
                  (array-at it type))
 	   (gc/let* ((args (cons exp ())))
 	     (when-at-expand feature/backtrace
-               (set (<call-frame>-callee -call-frame-) it))
+               (set (<call-frame>-callee -call-frame-) it)
+               (set (<call-frame>-arguments -call-frame-) args))
 	     (apply it args ctx))
          exp)))))
 
