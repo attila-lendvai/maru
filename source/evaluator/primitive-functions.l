@@ -251,7 +251,7 @@
 
 (define-primitive-function (set-byte-at ()) (base (index <long>) (value <long>))
   (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
-  (set-byte-at base index value))
+  (box <long> (set-byte-at base index value)))
 
 (define-primitive-function (address-of ()) (thing)
   ;; TODO what about when <long> is a tagged immediate and the address is truncated?
