@@ -284,20 +284,16 @@
           (make-instance-accessors var-name type-name (cdr slots)))))
 
 (define-form with-instance-accessors (var-name type-name . body)
-  (let ((type-object (eval type-name)))
-    (if (is <record> type-object)
-        (let ((accessors ())
-              (super type-object))
-          (while (is <record> super)
-            (list-do accessor (make-instance-accessors var-name
-                                                       (<type>-name super)
-                                                       (<record>-direct-slots super))
-              (push accessors accessor))
-            (set super (<record>-super super)))
-          `(with-forms ,accessors
-             ,@body))
-      `(let ()
-         ,@body))))
+  (let ((accessors	())
+        (super		(eval type-name)))
+    (while (is <record> super)
+      (list-do accessor (make-instance-accessors var-name
+                                                 (<type>-name super)
+                                                 (<record>-direct-slots super))
+        (push accessors accessor))
+      (set super (<record>-super super)))
+    `(with-forms ,accessors
+       ,@body)))
 
 (define-form new (type-name . inits)
   (let* ((i -1)
