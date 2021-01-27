@@ -10,6 +10,10 @@
 
 (define-constant feature/redefinable-functions-in-target ()) ; costs about 20-30% time increase in the bootstrap process
 
+(define-selector compile)
+(define-selector compile-definition)
+(define-selector compile-call-to)
+
 ;;;
 ;;; FFI
 ;;;

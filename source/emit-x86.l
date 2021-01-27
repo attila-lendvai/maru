@@ -65,7 +65,10 @@
 
 (define-function %define-emit-params (index types)
   (when (pair? types)
-    (cons (list (symbol->type-name (car types)) (%define-emit-param-name index))
+    (cons (list (awhen (and (not (= (first types) '_))
+                              (first types))
+                  (symbol->type-name it))
+                (%define-emit-param-name index))
           (%define-emit-params (+ index 1) (cdr types)))))
 
 (define-form define-emit (op-args . body)
@@ -269,9 +272,9 @@
 (define-emit    (BT LABEL)			(println "	cmpl	$0, %eax")
 						(println "	jne	"$1))
 
-(define-emit    (CALL long)			(println "	call	*%eax"))
-(define-emit    (CALL LABEL)			(println "	call	"$1))
-(define-emit    (CALL GLOBAL-LABEL)		(println "	call	"$1))
+(define-emit    (CALLPTR _)			(println "	call	*%eax"))
+(define-emit    (CALL LABEL _)			(println "	call	"$1))
+(define-emit    (CALL GLOBAL-LABEL _)		(println "	call	"$1))
 
 (define-emit    (LOAD LI32)			(if (= 0 (<LI32>-value $1))
                                                     (println "	xorl	%eax, %eax")
@@ -415,8 +418,6 @@
      (emit COMMENT (list "COMPILE of "__obj__))
      (compile __obj__ -c-)))
 
-(define-selector compile)
-
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp-or-literal
@@ -478,58 +479,6 @@
         (emit EXPORT label)
         (emit DEFLABEL label)
         (emit LONG entry-label)))))
-
-(define-function compile-call (op args -c-)
-  (assert op "compile-call: operator is nil")
-  (let* ((op-is-a-var?	(variable? op))
-         (op-is-global?	(and op-is-a-var?
-                             (global-variable? op)))
-         (op-value	(if op-is-a-var? (<variable>-value op) op))
-         (arity		(list-length args))
-         (target-name	()))
-    (when op-is-global?
-      (let ((n-params	()))
-        (cond
-          ((expr? op-value)
-           (unless feature/redefinable-functions-in-target
-             (set target-name (LABEL (symbol->string (<variable>-name op)))))
-           (set n-params (<expr>-n-required-parameters op-value)))
-          ((is <C-function> op-value)
-           (set target-name (GLOBAL-LABEL (<C-function>-name op-value)))
-           (unless (<C-function>-vararg? op-value)
-             (set n-params (list-length (<C-function>-parameter-types op-value)))))
-          ((is (slave-value <selector>) op-value)
-           ;; TODO extract n-params
-           (set target-name (LABEL (symbol->string (eval-in-slave `(<selector>-name ,op-value))))))
-          (else
-           (error "Don't know how to emit call to global value "op-value", in variable "op)))
-        (when (and n-params
-                   (not (= n-params arity)))
-          (error "compile: calling " op-value
-                 " with the wrong number of arguments: " args
-                 ", while expecting " n-params))))
-    ;; NOTE this implements a left-to-right evaluation order, including the operator
-    (let ((op-tmp	(unless (or target-name
-                                    op-is-global?)
-                          (compile/expr-into-temp-or-literal op -c-)))
-          (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
-          (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
-      ;; set up the stack for the call
-      (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
-      (free-temps arg-tmps)
-
-      (cond
-        (target-name
-         (gen CALL target-name))
-        (op-is-global?
-         (comp op)
-         (gen CALL arity))
-        (else
-         (gen LOAD op-tmp)
-         (gen CALL arity)))
-
-      (free-args -c- arg-locs)
-      (free-temp op-tmp))))
 
 ;;;
 ;;; Special Forms
@@ -749,10 +698,42 @@
         (else (error "don't know how to emit constant array element "el))))
     (gen LOAD label)))
 
+(define-function compile-call (op args -c-)
+  ;; NOTE this implements a left-to-right evaluation order, including the operator.
+  ;; i.e. moving this op-tmp means changing the evaluation order!
+  (let ((op-tmp	(when (pair? op)
+                  ;; we can spare a STORE/LOAD when we know that op
+                  ;; doesn't evaluate anything; i.e. we can reorder
+                  ;; its evaluation to the final, COMPILE-CALL-TO
+                  ;; step.
+                  (compile/expr-into-temp-or-literal op -c-)))
+        (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
+        (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
+    ;; set up the stack for the call
+    (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
+    (free-temps arg-tmps)
+
+    (let ((n-params	(compile-call-to (cond
+                                           (op-tmp		op-tmp)
+                                           ((variable? op)	(<variable>-value op))
+                                           (else		op))
+                         op arg-locs -c-))
+          (arity	(list-length args)))
+      (when (and n-params
+                 (not (= n-params arity)))
+        (error "compile: calling "op" with the wrong number of arguments: "
+               args", while expecting "n-params)))
+
+    (free-args -c- arg-locs)
+    (free-temp op-tmp)))
+
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
          (op-is-a-var?	(variable? op))
-         (op-value	(if op-is-a-var? (<variable>-value op) op))
+         (op-value	(if op-is-a-var?
+                            (or (<variable>-value op)
+                                (error "error: calling undefined function: "op))
+                          op))
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
@@ -766,11 +747,38 @@
       (else
        (compile-call op args -c-)))))
 
+(define-method compile-call-to <TI32> (op arg-locs -c-)
+  (gen LOAD self)
+  (gen CALLPTR arg-locs)
+  ())
+
+(define-method compile-call-to <pair> (op arg-locs -c-)
+  (comp op)
+  (gen CALLPTR arg-locs)
+  ())
+
+(define-method compile-call-to <expr> (op arg-locs -c-)
+  (if feature/redefinable-functions-in-target
+      (let ()
+        (comp op)
+        (gen CALLPTR arg-locs))
+    (gen CALL (LABEL (symbol->string (<variable>-name op))) arg-locs))
+  ;; TODO FIXME self.n-required-parameters should work
+  (<expr>-n-required-parameters self))
+
+(define-method compile-call-to <C-function> (op arg-locs -c-)
+  (gen CALL (GLOBAL-LABEL (<C-function>-name self)) arg-locs)
+  (unless (<C-function>-vararg? self)
+    (list-length (<C-function>-parameter-types self))))
+
+(define-method compile-call-to (slave-value <selector>) (op arg-locs -c-)
+  (gen CALL (LABEL (symbol->string (eval-in-slave `(<selector>-name ,self)))) arg-locs)
+  ;; TODO extract and return n-params
+  ())
+
 ;;;
 ;;; COMPILE-DEFINITION
 ;;;
-(define-selector compile-definition)
-
 (define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <C-function>		(name -c-)	(emit COMMENT (list "C function "name))) ; it will be handled at the call site
