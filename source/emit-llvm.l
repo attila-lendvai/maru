@@ -573,15 +573,18 @@
     (gen STORE temp)
     temp))
 
-(define-function emit/function-prologue (name params)
-  (print "define %ptr "name"(")
+(define-function emit/comma-separated-%ptrs (params)
   (let ((first? true))
     (list-do param params
       (if first?
           (set first? ())
         (print ", "))
       (print "%ptr ")
-      (print param)))
+      (print param))))
+
+(define-function emit/function-prologue (name params)
+  (print "define %ptr "name"(")
+  (emit/comma-separated-%ptrs params)
   (println ") {"))
 
 (define-function emit/function-epilogue ()
@@ -783,6 +786,50 @@
         (else
          (error "compile/address-of don't know how to handle "var", holding value "val))))))
 
+;;;
+;;; linux syscalls
+;;;
+
+(define-instruction LINUX-SYSCALL (() 1 t)
+  ((pair)
+   (println "	"$reg1" = call %ptr asm sideeffect \"")
+   (let ((arg-index	1)
+         mov syscall regs)
+     (case (slave-value +architecture+)
+       (IA-32
+        (set mov	"movl")
+        (set syscall	"	int	$$0x80")
+        (set regs	+linux/syscall-registers/32+))
+       (x86-64
+        (set mov	"movq")
+        (set syscall	"	syscall")
+        (set regs	+linux/syscall-registers/64+))
+       (else
+        (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
+     (list-do _ $1
+       (println "	"mov"	$"arg-index", "(pop regs))
+       (incr arg-index))
+     (println syscall"\", ")
+     (print "	\"=A")
+     (list-do _ $1
+       ;; TODO this should be (print ",r") to use rigsters, but then
+       ;; on 32 bits it fails because movl doesn't support the
+       ;; register combination (or something like that):
+       ;; error: invalid operand for instruction
+       ;;  movl    %rdx, %eax
+       (print ",m"))
+     (print "\"\n	(")
+     (emit/comma-separated-%ptrs $1)
+     (println ")"))))
+
+(define-function compile/linux-syscall (expr -c-)
+  (let ((args		(cdr expr))
+        (arg-locs	()))
+    (while args
+      (comp (pop args))
+      (push arg-locs (<compiler>-current-value -c-)))
+    (gen LINUX-SYSCALL (list-reverse! arg-locs))))
+
 (define +special-forms+ (list
   (cons (target-value let)		compile/let)
   (cons (target-value and)		compile/and)
@@ -792,7 +839,9 @@
   (cons (target-value set)		compile/set)
   (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
-  (cons (target-value address-of)	compile/address-of)))
+  (cons (target-value address-of)	compile/address-of)
+  (cons (target-value linux-syscall)	compile/linux-syscall)
+  ))
 
 ;;;
 ;;; Special Operators

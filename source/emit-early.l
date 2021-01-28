@@ -162,6 +162,34 @@
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
+;; KLUDGE move this somewhere into a 'linux' namespace
+(define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(%eax %ebx %ecx %edx %esi %edi %ebp))))
+(define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(%rax %rdi %rsi %rdx %r10 %r8 %r9))))
+(eval-in-slave
+ '(let ()
+   (define-constant linux/O_RDONLY		0)
+   (define-constant linux/O_WRONLY		1)
+   (define-constant linux/O_RDWR		2)
+   (define-constant linux/O_CREAT		64)
+   (define-constant linux/SEEK_SET		0)
+   (define-constant linux/SEEK_CUR		1)
+   (define-constant linux/SEEK_END		2)
+   (cond
+     ((= +architecture+ 'IA-32)
+      (define-constant linux/read		3)
+      (define-constant linux/write		4)
+      (define-constant linux/open		5)
+      (define-constant linux/close		6)
+      (define-constant linux/lseek		19)
+      )
+     ((= +architecture+ 'x86-64)
+      (define-constant linux/read		0)
+      (define-constant linux/write		1)
+      (define-constant linux/open		2)
+      (define-constant linux/close		3)
+      (define-constant linux/lseek		8)
+      ))))
+
 (switch-to-slave-module)
 
 ;; FIXME these would be too much trouble to define above because nested quasiquote doesn't work
@@ -240,7 +268,7 @@
   (let* ((value		(eval value-form))
          (form-obj	(eval `(form () (lambda _ ',value))))
          (definer-form	`(define ,name ',form-obj)))
-    (eval definer-form)     ; this way it will define into *slave-env*
+    (eval definer-form)     ; this way it will define into *slave-env* due to using the custom define-form above
     ()))
 
 (define-constant false 0)
@@ -261,7 +289,7 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of << >>
+(list-do name '(return address-of linux-syscall << >>
                 ;; to test if anything calls them before they get redefined:
                 ;; eval cons list car cdr form
                 )

@@ -588,6 +588,27 @@
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
+;;;
+;;; linux syscalls
+;;;
+(define-emit    (LINUX-SYSCALL pair)
+  (let ((args	$1)
+        (regs	+linux/syscall-registers/32+))
+    (while args
+      (println "	movl	"(pop args)", "(pop regs))))
+  (println "	int	$0x80"))
+
+(define-function compile/linux-syscall (expr -c-)
+  (let ((args		(cdr expr))
+        (arg-locs	()))
+    (while args
+      (push arg-locs (compile/expr-into-temp-or-literal (pop args) -c-)))
+    (free-temps arg-locs)
+    (gen LINUX-SYSCALL (list-reverse! arg-locs))))
+
+;;;
+;;; +special-forms+
+;;;
 (define +special-forms+ (list
   (cons (target-value let)		compile/let)
   (cons (target-value and)		compile/and)
@@ -597,7 +618,9 @@
   (cons (target-value set)		compile/set)
   (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
-  (cons (target-value address-of)	compile/address-of)))
+  (cons (target-value address-of)	compile/address-of)
+  (cons (target-value linux-syscall)	compile/linux-syscall)
+  ))
 
 ;;;
 ;;; Special Operators
