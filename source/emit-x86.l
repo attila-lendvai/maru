@@ -110,7 +110,7 @@
 (define-operand GLOBAL-LABEL LABEL ()	+global-label-prefix+ (<LABEL>-name self))			; a label in the global C namespace
 ;; global, literal, and temp pointers
 (define-operand GI32 () (name)		(<GI32>-name self))
-(define-operand LI32 () (value)		(<LI32>-value self))
+(define-operand LI32 () (value)		"$"(<LI32>-value self))
 (define-operand TI32 () (offset)	(<TI32>-offset self)"(%esp)")
 
 (define-function UNIQUE-LABEL args
@@ -157,12 +157,12 @@
 (define-emit    (ADD TI32)			(println "	addl	"$1", %eax"))
 
 (define-emit    (ADD LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	addl	$"$1", %eax")))
+                                                  (println "	addl	"$1", %eax")))
 
 (define-emit    (SUB TI32)			(println "	subl	"$1", %eax"))
 
 (define-emit    (SUB LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	subl	$"$1", %eax")))
+                                                  (println "	subl	"$1", %eax")))
 
 (define-emit    (MUL TI32)			(println "	mull	"$1))
 
@@ -170,7 +170,7 @@
                                                   ((= (<LI32>-value $1) 1)) ; nothing to do
                                                   ;; TODO emit shifts when possible
 						  (else
-                                                   (println "	movl	$"$1", %ecx")
+                                                   (println "	movl	"$1", %ecx")
 						   (println "	mull	%ecx"))))
 
 (define-emit    (DIV TI32)			(println "	xorl	%edx, %edx")
@@ -183,18 +183,18 @@
                                                   ;; TODO emit shifts when possible
                                                   (else
                                                    (println "	movl	$0, %edx")
-						   (println "	movl	$"$1", %ecx")
+						   (println "	movl	"$1", %ecx")
 						   (println "	divl	%ecx"))))
 
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
 (define-emit    (AND LI32)			(unless (= -1 (<LI32>-value $1))
-                                                  (println "	andl	$"$1", %eax")))
+                                                  (println "	andl	"$1", %eax")))
 (define-emit    (OR  TI32)			(println "	orl	"$1", %eax"))
 (define-emit    (OR  LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	orl	$"$1", %eax")))
+                                                  (println "	orl	"$1", %eax")))
 (define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
 (define-emit    (XOR LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	xorl	$"$1", %eax")))
+                                                  (println "	xorl	"$1", %eax")))
 (define-emit    (BITWISE-NOT)			(println "	notl	%eax"))
 
 (define-emit    (LOGIC-NOT)			(println "	cmpl	$0, %eax")
@@ -211,7 +211,7 @@
        (println "	" ,x86-name "	%al")
        (println "	movzbl	%al, %eax"))
      (define-emit (,maru-name LI32)
-       (println "	cmpl	$"$1", %eax")
+       (println "	cmpl	"$1", %eax")
        (println "	" ,x86-name "	%al")
        (println "	movzbl	%al, %eax"))))
 
@@ -256,13 +256,13 @@
 						(println "	shll	%cl, %eax"))
 
 (define-emit    (ASL LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	shll	$"$1", %eax")))
+                                                  (println "	shll	"$1", %eax")))
 
 (define-emit    (ASR TI32)			(println "	movl	"$1", %ecx")
 						(println "	sarl	%cl, %eax"))
 
 (define-emit    (ASR LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	sarl	$"$1", %eax")))
+                                                  (println "	sarl	"$1", %eax")))
 
 (define-emit    (BR LABEL)			(println "	jmp	"$1))
 
@@ -278,7 +278,7 @@
 
 (define-emit    (LOAD LI32)			(if (= 0 (<LI32>-value $1))
                                                     (println "	xorl	%eax, %eax")
-                                                  (println "	movl	$"$1", %eax")))
+                                                  (println "	movl	"$1", %eax")))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
 (define-emit    (LOAD GI32)			(println "	movl	"$1", %eax"))
 (define-emit    (LOAD TI32)			(println "	movl	"$1", %eax"))
@@ -292,16 +292,17 @@
 (define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	movl	%ecx, "$2))
 
-(define-emit    (MOVE LI32 TI32)		(println "	movl	$"$1", "$2))
+(define-emit    (MOVE LI32 TI32)		(println "	movl	"$1", "$2))
 
 (define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
 						(println "	xorl	%eax, %eax")
 						(println "	movb	(%ecx), %al"))
 
-(define-emit    (LOAD-I8 LI32)			(if (= 0 (<LI32>-value $1))
-                                                    (println "	movl	%eax, %ecx")
-                                                  (println "	leal	"$1"(%eax), %ecx"))
+(define-emit    (LOAD-I8 LI32)			(let ((offset (<LI32>-value $1)))
+                                                  (if (= 0 offset)
+                                                      (println "	movl	%eax, %ecx")
+                                                    (println "	leal	"offset"(%eax), %ecx")))
 						(println "	xorl	%eax, %eax")
 						(println "	movb	(%ecx), %al")) ; TODO what about sign extension?
 
@@ -312,11 +313,12 @@
 
 (define-emit    (STORE-I8 TI32 LI32)		(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
-						(println "	movb	$"$2", (%ecx)"))
+						(println "	movb	"$2", (%ecx)"))
 
-(define-emit    (STORE-I8 LI32 TI32)		(if (= 0 (<LI32>-value $1))
-                                                    (println "	movl	%eax, %ecx")
-                                                  (println "	leal	"$1"(%eax), %ecx"))
+(define-emit    (STORE-I8 LI32 TI32)		(let ((offset (<LI32>-value $1)))
+                                                  (if (= 0 offset)
+                                                      (println "	movl	%eax, %ecx")
+                                                    (println "	leal	"offset"(%eax), %ecx")))
 						(println "	movl	"$2", %eax")
 						(println "	movb	%al, (%ecx)"))
 
@@ -324,9 +326,10 @@
 						(println "	leal	(%eax, %ecx, 4), %ecx")
 						(println "	movl	(%ecx), %eax"))
 
-(define-emit    (LOAD-OOP LI32)			(if (= 0 (<LI32>-value $1))
-                                                    (println "	movl	%eax, %ecx")
-                                                  (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
+(define-emit    (LOAD-OOP LI32)			(let ((offset (<LI32>-value $1)))
+                                                  (if (= 0 offset)
+                                                      (println "	movl	%eax, %ecx")
+                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")))
 						(println "	movl	(%ecx), %eax"))
 
 (define-emit    (STORE-OOP TI32 TI32)		(println "	movl	"$1", %ecx")
@@ -334,23 +337,25 @@
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
 
-(define-emit    (STORE-OOP LI32 TI32)		(if (= 0 (<LI32>-value $1))
-                                                    (println "	movl	%eax, %ecx")
-                                                  (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
+(define-emit    (STORE-OOP LI32 TI32)		(let ((offset (<LI32>-value $1)))
+                                                  (if (= 0 offset)
+                                                      (println "	movl	%eax, %ecx")
+                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")))
 						(println "	movl	"$2", %eax")
 						(println "	movl	%eax, (%ecx)"))
 
-(define-emit    (STORE-OOP LI32 LI32)		(if-at-expand true ; feature/strict-semantics-for-compiled-set
-                                                    (let ()
-                                                      (if (= 0 (<LI32>-value $1))
-                                                          (println "	movl	%eax, %ecx")
-                                                        (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx"))
-                                                      (println "	movl	$"$2", %eax")
-                                                      (println "	movl	%eax, (%ecx)"))
-                                                  (if (= 0 (<LI32>-value $1))
-                                                      (println "	movl	$"$2", (%eax)")
-                                                    (println "	leal	"(* 4 (<LI32>-value $1))"(%eax), %ecx")
-                                                    (println "	movl	$"$2", (%ecx)"))))
+(define-emit    (STORE-OOP LI32 LI32)		(let ((offset (<LI32>-value $1)))
+                                                  (if-at-expand true ; feature/strict-semantics-for-compiled-set
+                                                      (let ()
+                                                        (if (= 0 offset)
+                                                            (println "	movl	%eax, %ecx")
+                                                          (println "	leal	"(* 4 offset)"(%eax), %ecx"))
+                                                        (println "	movl	"$2", %eax") ; also leave the return value in %eax
+                                                        (println "	movl	%eax, (%ecx)"))
+                                                    (if (= 0 offset)
+                                                        (println "	movl	"$2", (%eax)")
+                                                      (println "	leal	"(* 4 offset)"(%eax), %ecx")
+                                                      (println "	movl	"$2", (%ecx)")))))
 
 ;;;
 ;;; Compiler Infrastructure
