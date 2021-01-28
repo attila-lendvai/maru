@@ -194,15 +194,15 @@
       ((= type <string>)	(and (string? rhs)
                                      (let ((len (string-length lhs)))
                                        (= (string-length rhs) len)
-                                       (= 0 (compare-bytes (get/string lhs) (get/string rhs) len)))
+                                       (= 0 (platform/compare-bytes (get/string lhs) (get/string rhs) len)))
                                      symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))
 
 (define-primitive-function (exit ()) ((exit-code <long> 0))
   (when-at-expand feature/profiler
     (profiler/disable))
-  (libc/flush-streams)
-  (libc/exit exit-code))
+  (platform/flush-streams)
+  (platform/halt exit-code))
 
 (define-primitive-function (dump ()) _
   (list-do arg -args-
@@ -219,13 +219,14 @@
     (let ((type (type-of arg)))
       ;; TODO use typecase
       (cond
-        ((= type <string>) (platform/print-diagnostics (get/string arg)))
-        ((= type <symbol>) (platform/print-diagnostics (unbox <symbol> arg)))
-        ((= type <long>)   (platform/print-diagnostics (get/string (long->string (unbox <long> arg)))))
+        ((= type <string>) (platform/print-diag (get/string arg)))
+        ((= type <symbol>) (platform/print-diag (unbox <symbol> arg)))
+        ((= type <long>)   (platform/print-diag (get/string (long->string (unbox <long> arg)))))
         (else
          ;; TODO
-         (libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)))))
-  (libc/flush-streams))
+         ;;(libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)
+         (platform/print-diag "warn: unable to print this object")))))
+  (platform/flush-streams))
 
 (define-primitive-function (type-of ())	(thing) (box <long> (type-of thing)))
 (define-primitive-function (string? ())	(thing) (and (string? thing) symbol/true))
@@ -239,9 +240,9 @@
 (define-primitive-function set-cdr ((pair <pair>) value)
   (set (<pair>-tail pair) value))
 
-(define-primitive-function copy-oops		(from to (wordcount <long>)))
-;; TODO in high safety, add an assert that OOP-AT doesn't access beyond the object, based on the size in the GC header.
+;; TODO in high safety, add asserts that OOP-AT & friends doesn't access beyond the object (based on the size in the GC header).
 ;; interpreted code shouldn't ever need to reach beyond object boundaries.
+(define-primitive-function copy-oops		(from to (wordcount <long>)))
 (define-primitive-function oop-at		(base (index <long>)))
 (define-primitive-function set-oop-at		(base (index <long>) value))
 (define-primitive-function copy-bytes		(from to (count <long>)))

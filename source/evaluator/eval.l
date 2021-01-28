@@ -317,13 +317,13 @@
       (array-append (<env>-bindings env) var))))
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
-  (debug (platform/print-diagnostics "environment-define called, name is "(unbox <symbol> name)"\n"))
+  (debug (platform/print "environment-define called, name is "(unbox <symbol> name)"\n"))
   (let ((var (find-local-variable env name)))
     (if var
         (let ()
           ;; TODO
           ;;(error "environment-define: variable "it" is already defined in env "env)
-          ;;(platform/print-diagnostics "warning: environment-define: variable '"(unbox <symbol> (<variable>-name var))"' is already defined in this env.\n")
+          ;;(platform/print "warning: environment-define: variable '"(unbox <symbol> (<variable>-name var))"' is already defined in this env.\n")
           )
       (set var (new-variable env name)))
     (set (<variable>-value var) value)
@@ -338,10 +338,12 @@
                          (let ((candidate-payload (unbox <symbol> candidate)))
                            ;; TODO this could be simpler/faster if closures could capture
                            ;; TODO eliminate libc/strlen
-                           (compare-characters str (libc/strlen str)
-                                               candidate-payload (libc/strlen candidate-payload))))
+                           (compare-characters str
+                                               (platform/string-length str)
+                                               candidate-payload
+                                               (platform/string-length candidate-payload))))
                        (lambda (array index str)
-                         (debug (platform/print-diagnostics "interning "(get/string str)"\n"))
+                         (debug (platform/print "interning "(get/string str)"\n"))
                          (gc/let* ((sym (symbol str)))
                            (array-insert array index sym)
                            sym))))
@@ -393,7 +395,7 @@
                 (set frame.callee-designator	())
                 (set frame.callee		())
                 (set frame.arguments		())))))
-       ;;(debug (platform/print-diagnostics "with-new-call-frame returning with result: ") (println __result__))
+       ;;(debug (platform/print "with-new-call-frame returning with result: ") (println __result__))
        __result__)))
 
 (when-at-expand feature/backtrace
@@ -452,7 +454,7 @@
                        (incr arg-index)))))))))
         ;; man exit says that it's flushed, but looks like it's not. plus there's this: https://wiki.sei.cmu.edu/confluence/display/c/FIO23-C.+Do+not+exit+with+unflushed+data+in+stdout+or+stderr
         (platform/flush-streams))
-    (platform/print-diagnostics "print-backtrace: call-frame tracking is disabled in this build. current call depth is "(get/string (long->string *call-stack-index*))"\n")))
+    (platform/print "print-backtrace: call-frame tracking is disabled in this build. current call depth is "(get/string (long->string *call-stack-index*))"\n")))
 
 ;;;
 ;;; apply
@@ -952,7 +954,7 @@
   (define-function profiler/disable ()
     (set_profiler_interval 0)
     (when (< 0 profiler/sample-counter)
-      (platform/print-diagnostics "Profiler took "(get/string (long->string profiler/sample-counter)) " samples:\n")
+      (platform/print-diag "Profiler took "(get/string (long->string profiler/sample-counter)) " samples:\n")
       (let ((obj (gc/first-object)))
         (while obj
           (let ((type (type-of obj))
@@ -969,5 +971,5 @@
                     (< 0 (set counter (<primitive-function>-profiler-counter obj))))
                (set name (<primitive-function>-_name obj))))
             (when counter
-              (platform/print-diagnostics (get/string (long->string counter)) "\t" (or name "n/a") "\n")))
+              (platform/print-diag (get/string (long->string counter)) "\t" (or name "n/a") "\n")))
           (set obj (gc/next-object obj)))))))

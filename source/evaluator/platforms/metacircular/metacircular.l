@@ -8,10 +8,10 @@
 ;;;  - find out how to deal with strings. the libc platform provides cstring (zero terminated ASCII bytes)
 ;;;  - how to hook into the allocate of the super's GC
 
-(define-form move-oops (from to wordcount)
+(define-form platform/move-oops (from to wordcount)
   `(copy-oops ,from ,to ,wordcount))
 
-(define-form move-bytes (from to count)
+(define-form platform/move-bytes (from to count)
   `(copy-bytes ,to ,from ,count))
 
 ;; for compare-bytes
@@ -38,7 +38,7 @@
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stdout))
             cstrs)))
 
-(define-form platform/print-diagnostics cstrs
+(define-form platform/print-diag cstrs
   `(let ()
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))

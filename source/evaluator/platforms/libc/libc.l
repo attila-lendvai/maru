@@ -21,23 +21,27 @@
 ;;;
 ;;; Platform API implementation when running under libc.
 ;;;
-(define-function libc/flush-streams ()
+(define-function platform/flush-streams ()
   (libc/fflush libc/stdout)
   (libc/fflush libc/stderr))
 
+;; TODO these two are exported into the evaluator to provide the same api in interpreted code. how shall this be?
 (define-form copy-oops (from to wordcount)
   `(libc/memcpy ,to ,from (words-to-bytes ,wordcount)))
-
-(define-form move-oops (from to wordcount)
-  `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
 
 (define-form copy-bytes (from to count)
   `(libc/memcpy ,to ,from ,count))
 
-(define-form move-bytes (from to count)
+(define-form platform/move-oops (from to wordcount)
+  `(libc/memmove ,to ,from (words-to-bytes ,wordcount)))
+
+(define-form platform/move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-(define-form compare-bytes (a b count)
+(define-form platform/clear-bytes (from count)
+  `(libc/memset ,from 0 ,count))
+
+(define-form platform/compare-bytes (a b count)
   `(libc/memcmp ,a ,b ,count))
 
 (define-form libc/string= (a b)
@@ -49,31 +53,34 @@
 (define-form platform/string-length (cstr)
   `(libc/strlen ,cstr))
 
-(define-form platform/flush-streams ()
-  `(libc/flush-streams))
-
 (define-form platform/print cstrs
   `(let ()
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stdout))
             cstrs)))
 
-(define-form platform/print-diagnostics cstrs
+(define-form platform/print-diag cstrs
   `(let ()
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))
+
+(define-form platform/halt args
+  `(libc/exit ,@(or args '(-1))))
 
 (load "source/evaluator/vm-early.l")
 
 (define-primitive-function abort _
   (libc/printf "ABORTED\n")
   (print-backtrace)
-  (libc/flush-streams)
+  (platform/flush-streams)
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   (libc/exit -1))
 
 ;;;
 ;;; garbage collector
 ;;; ----------------------------------------------------------------
+
+(define-form platform/acquire-memory (size)
+  `(libc/malloc ,size))
 
 (load "source/evaluator/gc.l")
 
@@ -99,24 +106,6 @@
 ;;     (if (= (char-at endptr 0) ?\x00)
 ;;         (box <long> result)
 ;;       (error "invalid number in string->long, libc/strtol has failed for string " str))))
-
-;; TODO eliminate the "r" libcism?
-(define-primitive-function file-open ((path <string>) (mode <string>))
-  (awhen (libc/fopen path mode)
-    (box <target-vm-pointer> it)))
-
-(define-primitive-function file-close ((stream <target-vm-pointer>))
-  (box <long> (libc/fclose stream)))
-
-(define-primitive-function file-read-character ((stream <target-vm-pointer>))
-  (let ((c (libc/fgetc stream)))
-    (if (= libc/EOF c)
-        ()
-      (box <long> c))))
-
-(define-primitive-function file-write-character ((char <long>) (stream <target-vm-pointer>))
-  (when (= libc/EOF (libc/fputc char stream))
-    (error "file-write-char: libc/fputc returned an error")))
 
 ;; (define-primitive-function (libc/format ()) ((fmt <string>) oarg)
 ;;   (let ((typ (type-of oarg))
@@ -193,7 +182,7 @@
       (while (let ()
                (when stdin?
                  (libc/printf ".")
-                 (libc/flush-streams))
+                 (platform/flush-streams))
                (and (not (= +end+ (set res (read stream))))
                     (not (libc/feof libc-handle))))
         (unless (= +end+ res)
@@ -203,7 +192,7 @@
               (gc/let* ((printer (list2 symbol/quote res)))
                 (set printer (list2 (string->symbol "print") printer))
                 (expand-encode-eval printer env))
-              (libc/flush-streams)))))
+              (platform/flush-streams)))))
       (when stdin?
         (libc/printf "\nmorituri te salutant\n"))
       res)))
@@ -313,7 +302,7 @@
   (verbosity 1 (gc/collect) (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free))
   (when-at-expand feature/profiler
     (profiler/disable))
-  (libc/flush-streams)
+  (platform/flush-streams)
 
   (debug (libc/printf "main is returning normally\n"))
   (return 0))

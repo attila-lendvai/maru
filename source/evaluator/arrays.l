@@ -69,14 +69,14 @@
            (set (slot-value ,type-name size obj) (box <long> size)))
          obj))))
 
-(define-vector-accessors <array>	array-		true	oop-at		copy-oops	move-oops	+word-size-in-bytes+)
-(define-vector-accessors <string>	string-		()	byte-at		copy-bytes	move-bytes	1)
+(define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
+(define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
 
 ;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 
 (define-function compare-characters (buf-a len-a buf-b len-b)
-  (let ((diff (compare-bytes buf-a buf-b (min len-a len-b))))
+  (let ((diff (platform/compare-bytes buf-a buf-b (min len-a len-b))))
     (cond
       ((or (not (= 0 diff))
            (= len-a len-b))

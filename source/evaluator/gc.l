@@ -145,7 +145,7 @@
          `(= ,type-name (type-of ,obj)))))))
 
 (define-function gc/acquire-new-heap-space (size)
-  (let ((ptr (libc/malloc size)))
+  (let ((ptr (platform/acquire-memory size)))
     (or ptr (fatal "out of memory"))
     (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
@@ -288,7 +288,7 @@
                        (obj (gc/payload-of header)))
                   (set (<header>-flags header) <header>-flags/used)
                   (set (<header>-type header) type)
-                  (libc/memset obj 0 chunk-size)
+                  (platform/clear-bytes obj chunk-size)
                   (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (assert (gc/live-chunk? header) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))

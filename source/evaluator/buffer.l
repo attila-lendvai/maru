@@ -4,7 +4,7 @@
 
 (define-record <buffer> () (size elements))
 
-(define-vector-accessors <buffer> buffer- () byte-at copy-bytes move-bytes 1)
+(define-vector-accessors <buffer> buffer- () byte-at copy-bytes platform/move-bytes 1)
 
 (define-constant +buffer-initial-capacity+ 32)
 

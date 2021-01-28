@@ -2,6 +2,31 @@
 
 (require "source/streams-min.l")
 
+;;;
+;;; files
+;;;
+
+(define-primitive-function file-open ((path <string>) (mode <string>))
+  (awhen (libc/fopen path mode)
+    (box <target-vm-pointer> it)))
+
+(define-primitive-function file-close ((stream <target-vm-pointer>))
+  (box <long> (libc/fclose stream)))
+
+(define-primitive-function file-read-character ((stream <target-vm-pointer>))
+  (let ((c (libc/fgetc stream)))
+    (if (= libc/EOF c)
+        ()
+      (box <long> c))))
+
+(define-primitive-function file-write-character ((char <long>) (stream <target-vm-pointer>))
+  (when (= libc/EOF (libc/fputc char stream))
+    (error "file-write-char: libc/fputc returned an error")))
+
+;;;
+;;; <libc-stream>
+;;;
+
 (define-record <libc-stream> <stream> (handle))
 
 (define-function libc-stream (handle)

@@ -140,16 +140,16 @@
      (abort))
     ((< 2 *error-level*)
      (platform/print "NESTED ERROR 2, giving up...\n")
-     (libc/exit -1)))
-  (libc/printf "ERROR: "))
+     (platform/halt)))
+  (platform/print "ERROR: "))
 
 (define-function error-epilogue ()
-  (libc/printf "\n")
+  (platform/print "\n")
   (abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
-(define-function fatal  (fmt)           (error-prologue) (libc/fputs fmt libc/stderr)             (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal  (fmt)           (error-prologue) (platform/print-diag fmt)                (platform/print-diag "\n")    (abort))
 (define-function fatal1 (fmt arg)       (error-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
 (define-function fatal2 (fmt arg1 arg2) (error-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
 
@@ -158,10 +158,10 @@
      (error-prologue)
      ,@(map (lambda (arg)
               ;; string literals are turned into pointers to .asciz, therefore
-              ;; we need to print them using libc/printf (or instantiate
+              ;; we need to print them using libc/fputs (or instantiate
               ;; them into Maru objects using string-from-cstring).
               (if (string? arg)
-                  `(libc/printf ,arg)
+                  `(platform/print ,arg)
                 `(print ,arg)))
             args)
      (error-epilogue)))
