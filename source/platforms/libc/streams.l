@@ -21,7 +21,7 @@
 
 (define-primitive-function file-write-character ((char <long>) (stream <target-vm-pointer>))
   (when (= libc/EOF (libc/fputc char stream))
-    (error "file-write-char: libc/fputc returned an error")))
+    (error "file-write-character: libc/fputc returned an error")))
 
 ;;;
 ;;; <libc-stream>

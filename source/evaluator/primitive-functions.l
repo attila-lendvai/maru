@@ -194,6 +194,7 @@
       ((= type <string>)	(and (string? rhs)
                                      (let ((len (string-length lhs)))
                                        (= (string-length rhs) len)
+                                       ;; TODO add string-equals to arrays.l? search for this, there are other occurrances, too
                                        (= 0 (platform/compare-bytes (get/string lhs) (get/string rhs) len)))
                                      symbol/true))
       (else                     (and (= lhs rhs) symbol/true)))))

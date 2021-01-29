@@ -376,6 +376,7 @@ $(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(TEST_EVAL) tests/compiler-test
 	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
 $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(TEST_EVAL) tests/compiler-tests.l $(EMIT_FILES_llvm)
+	@mkdir -p $(BITCODE_DIR)
 	@mkdir -p $(BUILD_llvm)
 #	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))

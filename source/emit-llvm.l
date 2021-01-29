@@ -1049,7 +1049,7 @@
 (define-method compile-definition <expr>		(name -c-)	(compile-expr self name true -c-))
 
 (define-method emit-prelude <llvm-compiler> ()
-  (let (;;(target-triplet	(slave-value target-triplet))
+  (let (;;(target-triplet		(slave-value +target-triplet+))
         (word-size		(target-value +word-size-in-bits+))
         (-c- self))
     (verbosity 1 (warn "\nCompiling for word size: " word-size " bits\n\n"))

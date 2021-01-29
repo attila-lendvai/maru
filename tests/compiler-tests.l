@@ -34,6 +34,7 @@
         (test)
         (forms ()))
     (while (set test (first tests))
+      (push forms '(platform/flush-streams))
       (push forms `(,test))
       (set tests (rest tests)))
     `(let ()
@@ -459,6 +460,42 @@
 ;;           2)
 ;;          b))
 ;;   (* 2 42))
+
+(begin-for-syntax
+ (define-function string+length (str)
+   (list str (string-length str))))
+
+(define-test compile/syscall/1
+    (let ()
+      ;; (eval-at-expand
+      ;;  `(linux-syscall linux/write 2 ,@(string+length "\n\t*** compile/syscall/1 is printing this to fd 2\n")))
+      (let ((fd (linux-syscall linux/open "/dev/null" linux/O_RDONLY)))
+        (<= 0 fd)))
+  true)
+
+(define-test compile/syscall/2
+    (let ((fd (linux-syscall linux/open
+                             "/tmp/_maru-test"
+                             (bitwise-or linux/O_RDWR
+                                         linux/O_CREAT)
+                             420 ; "rw-r--r--"
+                             )))
+      (eval-at-expand
+       `(linux-syscall linux/write fd ,@(string+length "1234")))
+      (let ((char ?5))
+        (linux-syscall linux/write fd (address-of char) 1))
+      (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
+      (let ((char 0)
+            (result 0))
+        (linux-syscall linux/read fd (address-of char) 1)
+        ;; TODO FIXME on llvm 64 bits it fails when the char is not printed?! probably due to some optimization.
+        (libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
+        (incr result (- char ?0))
+        (linux-syscall linux/lseek fd 4 linux/SEEK_SET)
+        (linux-syscall linux/read fd (address-of char) 1)
+        (libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
+        (incr result (- char ?0))))
+  (+ 3 5))
 
 (define-function main (argc argv)
   (libc/fputs "Printing test command line args:\n" libc/stdout)
