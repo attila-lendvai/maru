@@ -275,6 +275,12 @@
                      `((,effective-impl-name ,@arg-names))
                    body))))))))
 
+(define-primitive-function abort _
+  (platform/print-diag "ABORTED\n")
+  (print-backtrace)
+  (platform/flush-streams)
+  (platform/halt))
+
 ;;;
 ;;; utils
 ;;; ----------------------------------------------------------------
