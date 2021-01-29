@@ -5,7 +5,7 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
-(define-libc-ffi)
+(require "source/platforms/libc/libc.l")
 
 (define *exit-code* 0)
 
