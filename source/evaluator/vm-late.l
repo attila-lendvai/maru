@@ -165,14 +165,8 @@
                  (pop-cla)
                  (pop-cla)
                  ;; convert to long when possible
-                 (let* ((cstr	(get/string value))
-                        (endptr	cstr)
-                        (i	(libc/strtoul cstr (address-of endptr) 0)))
-                   ;; TODO investigate: why the hell does this behave differently than the one at the other call site of strtoul?
-                   ;; (when (or (not (= -1 i))
-                   ;;           (libc/string= cstr "-1"))
-                   ;;   (set value (box <long> i)))
-                   (when (= 0 (char-at endptr 0))
+                 (let ((i (string->long* value 10)))
+                   (unless (= +end+ i)
                      (set value (box <long> i))))
                  (environment-define (module-env *module*)
                                      (string->symbol (get/string name))
