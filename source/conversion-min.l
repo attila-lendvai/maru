@@ -31,6 +31,10 @@
   (long->string* num 10))
 
 (define-function string->long* (str radix)
+  ;; KLUDGE this is ugly: we use +END+ as a marker that the parsing
+  ;; didn't finish cleanly. to clean this up the compiler needs to
+  ;; support returning multiple values, or something else to
+  ;; communicate success/failure.
   (safety 1 (assert (and (< 0 radix) (<= radix 35))))
   (let ((num	0)
         (i	0)
@@ -46,13 +50,16 @@
                   ((and (<= ?0 c) (<= c ?9))	      (- c ?0) )
                   ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
                   ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
-                  (else				radix          ))))
-        (if (< d radix)
-            (let ()
-              (set num (+ (* radix num) d))
-              (incr i))
-          (set len i))))
+                  (else
+		   (return +end+)))))
+        (unless (< d radix)
+          (return +end+))
+        (set num (+ (* radix num) d))
+        (incr i)))
     (* sign num)))
 
 (define-function string->long (str)
-  (string->long* str 10))
+  (let ((res (string->long* str 10)))
+    (when (= res +end+)
+      (error "string->long: failed for "str))
+    res))

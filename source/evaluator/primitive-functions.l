@@ -322,10 +322,16 @@
   (long->string* num radix))
 
 (define-primitive-function string->number ((str <string> _ nounbox) (radix <long> 10))
-  (box <long> (string->long* str radix)))
+  (let ((res (string->long* str radix)))
+    (when (= res +end+)
+      (error "string->number: failed for "str))
+    (box <long> res)))
 
 (define-primitive-function string->integer ((str <string> _ nounbox) (radix <long> 10))
-  (box <long> (string->long* str radix)))
+  (let ((res (string->long* str radix)))
+    (when (= res +end+)
+      (error "string->integer: failed for "str))
+    (box <long> res)))
 
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (data)
