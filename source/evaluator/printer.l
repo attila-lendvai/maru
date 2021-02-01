@@ -139,3 +139,13 @@
 
 (define-function dump		(obj) (do-print libc/stdout obj true))
 (define-function dumpln		(obj) (do-print libc/stdout obj true) (libc/fputs "\n" libc/stdout))
+
+(define-primitive-function (dump ()) _
+  (list-do arg -args-
+    (dump arg))
+  (first -args-))
+
+(define-primitive-function (print ()) _
+  (list-do arg -args-
+    (print arg))
+  (first -args-))

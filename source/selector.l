@@ -3,6 +3,10 @@
 ;;; selector: functions that dispatch on the type of the first argument, aka single dispatch
 ;;;
 
+;; FIXME the slave's slectors cannot be applied in the host while
+;; bootstrapping. this leads to e.g. ASSERT not working properly in
+;; macros, because the host cannot apply the slave's DO-PRINT.
+
 (define-record <selector> () (name methods default))
 
 (define-function selector? (obj) (is <selector> obj))

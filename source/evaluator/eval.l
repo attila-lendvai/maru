@@ -956,7 +956,7 @@
   (define-function profiler/disable ()
     (set_profiler_interval 0)
     (when (< 0 profiler/sample-counter)
-      (platform/print-diag "Profiler took "(get/string (long->string profiler/sample-counter)) " samples:\n")
+      (platform/print-diag "Profiler took "(get/string (long->string profiler/sample-counter))" samples:\n")
       (let ((obj (gc/first-object)))
         (while obj
           (let ((type (type-of obj))

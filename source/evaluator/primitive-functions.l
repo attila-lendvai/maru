@@ -205,16 +205,6 @@
   (platform/flush-streams)
   (platform/halt exit-code))
 
-(define-primitive-function (dump ()) _
-  (list-do arg -args-
-    (dump arg))
-  (first -args-))
-
-(define-primitive-function (print ()) _
-  (list-do arg -args-
-    (print arg))
-  (first -args-))
-
 (define-primitive-function (warn ()) _
   (list-do arg -args-
     (let ((type (type-of arg)))

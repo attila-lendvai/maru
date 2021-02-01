@@ -96,7 +96,7 @@ section-headers
 	;; (.align	0x1000)
 entry-point
 	(movlIR	4 _EAX) ; write
-	(movlIR	1 _EBX) ; fd
+	(movlIR	1 _EBX) ; fd, stdout
 	(movlIR	msg _ECX)
 	(movlIR	msglen _EDX)
 	(int	0x80)
