@@ -28,8 +28,9 @@
       ;; TODO this way *verbosity* in the evaluator and in the target is not in sync. see how *standard-output* is defined.
       (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
       (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
-      ;; an uninterned singleton symbol, i.e. a unique identity that cannot be recreated in any other way
-      (set +end+ (or +end+ (set tmp (symbol "+end+"))))
+      ;; create an uninterned singleton symbol (i.e. a unique identity that cannot be recreated in any other way)
+      (set +end+ (or +end+ (set tmp (symbol (string-from-cstring "+end+")))))
+      ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
       (environment-define env (string->symbol "+end+") +end+))
 
     ;; make sure the symbol true evaluates to itself

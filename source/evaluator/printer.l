@@ -27,7 +27,7 @@
       (cond
         ((= type <undefined>)		(libc/fputs "()" stream))
         ((= type <long>)		(libc/fprintf stream "%ld" (unbox <long> obj)))
-        ((= type <symbol>)		(libc/fprintf stream "%s" (unbox <symbol> obj)))
+        ((= type <symbol>)		(do-print stream (<symbol>-name obj) false))
 
         ((= type <string>)
          (if storing?
@@ -118,17 +118,17 @@
 
         ((= type <type>)
          (error-if-storing)
-         (libc/fprintf stream "Type%s" (aif (<type>-name obj)
-                                           (unbox <symbol> it)
-                                         "?")))
+         (do-print stream (string-from-cstring "Type") storing?)
+         (do-print stream (or (<type>-name obj)
+                              (string-from-cstring "?")) storing?))
 
         ((= type <record>)
          (error-if-storing)
+         (do-print stream (string-from-cstring "Record") storing?)
          ;; KLUDGE we need to disable accessor typecheck here, because the target universe is unaware of inheritance
-         (libc/fprintf stream "Record%s" (aif (with-forms ((%accessor-typecheck ((type obj) obj)))
-                                                (<type>-name obj))
-                                             (unbox <symbol> it)
-                                           "?")))
+         (do-print stream (or (with-forms ((%accessor-typecheck ((type obj) obj)))
+                                (<type>-name obj))
+                              (string-from-cstring "?")) storing?))
 
         (else
          (error-if-storing)

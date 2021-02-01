@@ -394,7 +394,8 @@
   (define-immediate	<long>			1 1)
   (define-boxed-word	<long>))				; provides a full-word integer, but bootstrap is about 25% slower
 (define-boxed-word	<target-vm-pointer>)			; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
-(define-boxed		<symbol>)				; a cstr is inline into the object's body
+;;(define-boxed		<symbol>)				; a cstr is inline into the object's body
+(define-record		<symbol>		() (name))
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))

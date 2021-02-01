@@ -221,7 +221,7 @@
       ;; TODO use typecase
       (cond
         ((= type <string>) (platform/print-diag (get/string arg)))
-        ((= type <symbol>) (platform/print-diag (unbox <symbol> arg)))
+        ((= type <symbol>) (platform/print-diag (get/string (<symbol>-name arg))))
         ((= type <long>)   (platform/print-diag (get/string (long->string (unbox <long> arg)))))
         (else
          ;; TODO
@@ -313,7 +313,8 @@
   ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
   (if (string? symbol)
       symbol
-    (string-from-cstring (unbox <symbol> symbol))))
+    ;; TODO it's dangerous to return the uncopied name as a mutable string
+    (<symbol>-name symbol)))
 
 (define-primitive-function number->string ((num <long>) (radix <long> 10))
   (long->string* num radix))

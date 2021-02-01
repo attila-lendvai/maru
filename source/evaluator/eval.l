@@ -175,11 +175,10 @@
     (copy-bytes cstr (<string>-elements obj) len)
     obj))
 
-(define-function symbol (cstr)
-  (let ((len (+ 1 (platform/string-length cstr)))) ; +1 is for the zero termination (TODO libc leakage)
-    (gc/let* ((obj (gc/allocate-opaque <symbol> len)))
-      (copy-bytes cstr obj len)
-      obj)))
+(define-function symbol (name)
+  (safety 1 (assert (string? name)))
+  (make <symbol>
+    (name	name)))
 
 (define-primitive-function array ((capacity <long> 0))
   (make <array>
@@ -317,7 +316,7 @@
       (array-append (<env>-bindings env) var))))
 
 (define-primitive-function environment-define ((env <env>) (name <symbol>) value)
-  (debug (platform/print "environment-define called, name is "(unbox <symbol> name)"\n"))
+  (debug (platform/print "environment-define called, name is "(get/string (<symbol>-name name))"\n"))
   (let ((var (find-local-variable env name)))
     (if var
         (let ()
@@ -335,16 +334,19 @@
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
                          ;; NOTE this assumes that the payload in our strings has the
                          ;; same representation as that of symbols.
-                         (let ((candidate-payload (unbox <symbol> candidate)))
+                         (let ((candidate-payload (get/string (<symbol>-name candidate))))
                            ;; TODO this could be simpler/faster if closures could capture
-                           ;; TODO eliminate libc/strlen
+                           ;; TODO both of these are strings now, rewrite COMPARE-CHARACTERS
                            (compare-characters str
                                                (platform/string-length str)
                                                candidate-payload
                                                (platform/string-length candidate-payload))))
                        (lambda (array index str)
                          (debug (platform/print "interning "(get/string str)"\n"))
-                         (gc/let* ((sym (symbol str)))
+                         ;; NOTE we want to make a copy of str here, because strings are mutable
+                         ;; TODO instantiate a read-only string
+                         (gc/let* ((name	(string-from-cstring str))
+                                   (sym		(symbol name)))
                            (array-insert array index sym)
                            sym))))
 
@@ -539,7 +541,7 @@
 (define-function setter-name-for (fn-name env)
   (gc/let* ((buf (buffer)))
     (buffer-append-string buf "set-")
-    (buffer-append-string buf (unbox <symbol> fn-name))
+    (buffer-append-string buf (get/string (<symbol>-name fn-name)))
     (let ((setter-name (string->symbol (buffer-contents buf))))
       (when (maybe-object-in-env env setter-name ())
         setter-name))))
@@ -772,7 +774,7 @@
     (cons head tail)))
 
 (define-function encode/symbol (exp env)
-  (debug (libc/printf "encode/symbol of %s" (unbox <symbol> exp)) (libc/printf ", in env ") (println env))
+  (debug (print "encode/symbol of '") (print exp) (print "', in env ") (println env))
   (let ((var (or (defined? exp env)
                  (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
@@ -965,7 +967,7 @@
                     (< 0 (set counter (unbox <long> (<expr>-profiler-counter obj)))))
                (set name (<expr>-name obj))
                (when name
-                 (set name (unbox <symbol> name))))
+                 (set name (get/string (<symbol>-name name)))))
 
               ((and (= type <primitive-function>)
                     (< 0 (set counter (<primitive-function>-profiler-counter obj))))
