@@ -31,6 +31,7 @@ PREVIOUS_STAGE_BACKEND	= llvm
 
 HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
+PLATFORM	?= libc
 
 ifeq ($(HOST_OS),Linux)
 #  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
@@ -44,6 +45,10 @@ else ifeq ($(HOST_OS),Darwin)
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
   TIME		= time
+endif
+
+ifeq ($(PLATFORM),linux)
+  CFLAGS	+= -nostdlib -Wl,-Bstatic
 endif
 
 LLVM_ARGS	= -O3
@@ -77,11 +82,18 @@ TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
 TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
 ifeq ($(TARGET_CPU_llvm),x86_64)
-  BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
+  BITCODE_DIR		= $(BUILD)/llvm/$(PLATFORM)-64bit-le
 else ifeq ($(TARGET_CPU_llvm),i686)
-  BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
+  BITCODE_DIR		= $(BUILD)/llvm/$(PLATFORM)-32bit-le
 else
   $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
+endif
+
+ifeq ($(TARGET_CPU_x86),x86_64)
+else ifeq ($(TARGET_CPU_x86),i386)
+  CFLAGS	+= -m32
+else
+  $(error "Couldn't extract the target's word size from TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
 endif
 
 # see https://stackoverflow.com/a/20983251/14464
@@ -103,8 +115,8 @@ ASM_FILE_EXT_llvm	= ll
 
 BUILD		= build
 
-BUILD_x86	= $(BUILD)/x86/$(TARGET_x86)
-BUILD_llvm	= $(BUILD)/llvm/$(TARGET_llvm)
+BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
+BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
@@ -112,7 +124,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
-EVALUATOR_FILES	= $(addprefix source/platforms/libc/,libc.l eval.l streams.l) \
+EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l streams.l) \
  $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l)
 
@@ -137,7 +149,7 @@ endif
 all: eval
 
 clean:
-	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend) eval-$(backend)) $(BUILD)/generated/ eval
+	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend)-$(PLATFORM) eval-$(backend)) $(BUILD)/generated/ eval
 	-git checkout --quiet $(BUILD)
 
 distclean: clean
@@ -194,7 +206,7 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
 		$(EMIT_FILES_x86)						\
-		source/platforms/libc/eval.l					\
+		source/platforms/$(PLATFORM)/eval.l				\
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -214,18 +226,18 @@ $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
 		$(EMIT_FILES_llvm)						\
-		source/platforms/libc/eval.l					\
+		source/platforms/$(PLATFORM)/eval.l				\
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval2 is the second iteration of us that gets built by our compiler animated by our eval executable.
 # eval2 is just a test: eval2.s should be the exact same file as eval1.s
 $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(BUILD_x86)/eval1,source/platforms/libc/eval.l,$@)
+	$(call compile-x86,$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval1,source/platforms/libc/eval.l,$@)
+	$(call compile-llvm,$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 $(HOST_DIR)/eval:
@@ -311,12 +323,12 @@ source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
 ###
 $(BUILD_x86)/%: $(BUILD_x86)/%.s
 	@mkdir -p $(@D)
-	$(CC) -m32 -o $@ $(EVAL_OBJ_x86) $<
+	$(CC) $(CFLAGS) -o $@ $(EVAL_OBJ_x86) $<
 	@-$(STRIP) $@ -o $@.stripped
 
 $(BUILD_x86)/%.o: source/evaluator/%.c
 	@mkdir -p $(@D)
-	$(CC) -m32 -c -o $@ $<
+	$(CC) $(CFLAGS) -m32 -c -o $@ $<
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
