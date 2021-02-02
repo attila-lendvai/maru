@@ -22,7 +22,7 @@
             *primitive-function-registry*)))
 
 (define-function populate-module-with-maru-primitives (module)
-  (debug (libc/printf "populate-module-with-maru-primitives for module {%p}\n" module))
+  (debug-print "populate-module-with-maru-primitives for module "module)
   (let ((env (module-env module)))
     (gc/let* ((tmp))
       ;; TODO this way *verbosity* in the evaluator and in the target is not in sync. see how *standard-output* is defined.
@@ -50,7 +50,7 @@
     (assert (and (is <fixed> fixed-primitive-function/quote) (is <fixed> fixed-primitive-function/lambda) (is <fixed> fixed-primitive-function/let) (is <fixed> fixed-primitive-function/define) (is <fixed> fixed-primitive-function/set)) "populate-module-with-maru-primitives: final assert")))
 
 (define-function capture-well-known-module-values ()
-  (debug (libc/printf "capture-well-known-module-values from *module*, which is %p\n" *module*))
+  (debug-print "capture-well-known-module-values from *module*, which is "module)
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
     (set *expanders*	(defined? symbol/*expanders*	env))
@@ -58,15 +58,15 @@
     (set *evaluators*	(defined? symbol/*evaluators*	env))
     (set *applicators*	(defined? symbol/*applicators*	env)))
 
-  (debug (libc/printf "capture-well-known-module-values is done\n")))
+  (debug-print "capture-well-known-module-values is done"))
 
 (define-function initialize-vm ()
-  (debug (libc/printf "alive\n"))
+  (debug (platform/print-diag "alive\n"))
 
   (gc/initialize)
 
   (safety 4 (set gc/frequency 1))
-  (debug (libc/printf "gc initialized\n"))
+  (debug (platform/print-diag "gc initialized\n"))
   (assert (= <long>	(type-of (box <long> 42)))	"type-of for <long> is broken")
   (assert (= 42		(unbox <long> (box <long> 42)))	"unbox of <long> is broken")
   (assert (= 1 true)	"true is not 1")
@@ -77,22 +77,22 @@
   (gc/push-root (address-of *symbols*))
 
   (when-at-expand feature/backtrace
-    (debug (libc/printf "initializing *call-stack*\n"))
+    (debug-print "initializing *call-stack*")
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (array 32)))
 
   (set *symbols* (array 32))
   (initialize-symbol-cache)
-  (debug (libc/printf "initialized *symbols*\n"))
+  (debug-print "initialized *symbols*")
 
   (set *maru-module* (module "maru"))
   (populate-module-with-maru-primitives *maru-module*)
   (set *module* (module "maru-user"))
   (capture-well-known-module-values)
-  (debug (libc/printf "finished module initialization\n")))
+  (debug-print "finished module initialization"))
 
 (define-function process-command-line-arguments (argc argv)
-  (debug (libc/printf "start processing argv\n"))
+  (debug-print "start processing argv")
 
   ;; *command-line-arguments*
   (let ((cla-var (environment-define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
@@ -102,10 +102,10 @@
         (while (< 0 (decr idx)) ; skip the first, which is the name of the executable
           (set tmp (cons () tmp))
           (put/head tmp (string-from-cstring (oop-at argv idx)))
-          (debug (libc/printf "processing argv %ld = %s; parsed into " idx (oop-at argv idx)) (println (get/head tmp)))))
+          (debug-print "processing argv "(box <long> idx)" = "(get/head tmp))))
       (set (<variable>-value cla-var) tmp))
 
-    (debug (libc/printf "*command-line-arguments* is initialized: ") (println (<variable>-value cla-var)))
+    (debug-print "*command-line-arguments* is initialized to: " (<variable>-value cla-var))
 
     ;; process *cla*
     (let (cla
@@ -136,8 +136,8 @@
                    (let ((usecs 1000))
                      (install_profiler_handler profiler/take-sample)
                      (set_profiler_interval usecs)
-                     (libc/fprintf libc/stderr "profiling at every %ld uSec(s)\n" usecs))
-                 (libc/fprintf libc/stderr "WARNING: this build has no profiler, ignoring -p\n")))
+                     (platform/print-diag "profiling at every %ld uSec(s)\n" usecs))
+                 (platform/print-diag "WARNING: this build has no profiler, ignoring -p\n")))
 
               ;; -
               ((libc/string= arg "-")
@@ -145,7 +145,7 @@
 
               ;; --call to call a function
               ((libc/string= arg "--call")
-               (debug (libc/printf "processing a --call\n"))
+               (debug-print "processing a --call")
                (unless (pair? cla)
                  (fatal "--call requires an argument"))
                (set arg-string (get/head cla))
@@ -157,7 +157,7 @@
 
               ;; --define to define a variable
               ((libc/string= arg "--define")
-               (debug (libc/printf "processing a --define\n"))
+               (debug-print "processing a --define")
                (unless (and (pair? cla)
                             (pair? (get/tail cla)))
                  (fatal "--define requires two arguments"))
@@ -175,9 +175,6 @@
 
               ;; read file as a program
               (else
-               (verbosity 1 (libc/fprintf libc/stderr "loading file: %s\t(as a CLA)\n" arg))
-               (let ((file-handle (libc/fopen arg "r")))
-                 (or file-handle (fatal1 "no such file: %s" arg))
-                 (gc/let* ((stream (libc-stream (box <target-vm-pointer> file-handle))))
-                   (repl-stream stream)
-                   (libc/fclose file-handle)))))))))))
+               (verbosity 1 (platform/print-diag "loading file: "arg"\t(as a CLA)\n"))
+               (with-input-from-file (stream arg-string)
+                 (repl-stream stream))))))))))

@@ -24,7 +24,7 @@
     (expand-encode-eval (car -args-) env)))
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
-  (debug (libc/printf "eval-in-module: form ") (println form))
+  (debug-print "eval-in-module: form "form)
   (verbosity 2 (platform/print ";;; ? ") (print module) (platform/print " ") (println form))
   (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
     (with-current-module module
@@ -41,12 +41,12 @@
         (when (pair? binding)
           (let ((var  (get/head binding))
                 (prog (get/tail binding)))
-            (debug (libc/printf "let primitive-function is initializing var ") (print var) (libc/printf " in context ") (println -ctx-))
+            (debug-print "let primitive-function is initializing var "var" in context "-ctx-)
             (set tmp ())
             (while (pair? prog)
               (set tmp (eval (get/head prog) -ctx-))
               (set prog (get/tail prog)))
-            (debug (libc/printf "let primitive-function is setting var ") (print var) (libc/printf " to value ") (print tmp) (libc/printf " in context ") (println -ctx-))
+            (debug-print "let primitive-function is setting var "var" to value "tmp" in context "-ctx-)
             (set (array-at locals (unbox <long> (<variable>-index var))) tmp))))
       (set tmp ())
       (list-do exp body
@@ -54,18 +54,18 @@
       tmp)))
 
 (define-primitive-function (set () fixed) ((var <variable>) value-form)
-  (debug (libc/printf "SET ") (print var) (print value-form) (libc/printf " IN ") (println -ctx-))
+  (debug-print "SET "var" = "value-form" IN "-ctx-)
   (let ((value (eval value-form -ctx-)))
     (if (global-variable? var)
         (set (<variable>-value var) value)
       (let ((delta (- (unbox <long> (<env>-level (<context>-env -ctx-)))
                   (unbox <long> (<env>-level (<variable>-env var))))))
-        (debug (libc/printf "set primitive-function is writing local var ") (print var) (libc/printf " with delta %ld\n" delta))
+        (debug-print "set primitive-function is writing local var "var" with delta "(box <long> delta))
         (while (< 0 delta)
           (set -ctx- (<context>-home -ctx-))
           (decr delta))
         (let ((index (unbox <long> (<variable>-index var))))
-          (debug (libc/printf "set primitive-function is setting local var in context ") (print -ctx-) (libc/printf " at index %ld, to value " index) (println value))
+          (debug-print "set primitive-function is setting local var in context "-ctx-" at index "(box <long> index)", to value "value)
           (set (array-at (<context>-bindings -ctx-) index) value))))))
 
 (define-primitive-function (while () fixed) _
@@ -326,18 +326,18 @@
 
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (data)
-    (debug (libc/printf "call-IA-32-machine-code will call %p\n" data))
+    (debug-print "call-IA-32-machine-code will call "data)
     (assert (is <data> data) "call-IA-32-machine-code: cannot call object of type "(type-of data)", printing as "data)
     (data)
-    (debug (libc/printf "call-IA-32-machine-code got back the control from %p\n" data))
+    (debug-print "call-IA-32-machine-code got back the control from "data)
     ()))
 
 (when-at-expand (= +architecture+ 'x86-64)
   (define-primitive-function call-x86-64-machine-code (data)
-    (debug (libc/printf "call-x86-64-machine-code will call %p\n" data))
+    (debug-print "call-x86-64-machine-code will call "data)
     (assert (is <data> data) "call-x86-64-machine-code: cannot call object of type "(type-of data)", printing as "data)
     (data)
-    (debug (libc/printf "call-x86-64-machine-code got back the control from %p\n" data))
+    (debug-print "call-x86-64-machine-code got back the control from "data)
     ()))
 
 (when-at-expand feature/debug-output

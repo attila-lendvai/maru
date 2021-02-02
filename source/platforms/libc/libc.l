@@ -63,6 +63,9 @@
      ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
             cstrs)))
 
+(define-form platform/print-diag-fmt (format . args)
+  `(libc/fprintf libc/stderr ,format ,@args))
+
 (define-form platform/halt args
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   `(libc/exit ,@(or args '(-1))))

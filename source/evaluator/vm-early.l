@@ -36,6 +36,24 @@
   ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
   )
 
+(define-form print-all (stream . objs)
+  `(let ()
+     ,@(map (lambda (obj)
+              `(do-print ,stream ,obj false))
+            objs)))
+
+(define-form debug-print objs
+  `(debug
+    (print-all *debug-output*
+               ,@(map (lambda (obj)
+                        (if (is <string> obj)
+                            ;; TODO literal strings should be compiled into full objects
+                            `(string-from-cstring ,obj)
+                          obj))
+                      objs))
+    ;; TODO? use $put
+    (do-print *debug-output* (string-from-cstring "\n") false)))
+
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
 ;;(define-form assert		prog ())
 (define-form assert		(test . args)	`(or ,test (error ,@(or args (list "kernel assertion failed")))))
@@ -136,22 +154,22 @@
   (incr *error-level*)
   (cond
     ((= 2 *error-level*)
-     (platform/print "NESTED ERROR 1, attempting to print a limited backtrace\n")
+     (platform/print-diag "NESTED ERROR 1, attempting to print a limited backtrace\n")
      (abort))
     ((< 2 *error-level*)
-     (platform/print "NESTED ERROR 2, giving up...\n")
+     (platform/print-diag "NESTED ERROR 2, giving up...\n")
      (platform/halt)))
-  (platform/print "ERROR: "))
+  (platform/print-diag "ERROR: "))
 
 (define-function error-epilogue ()
-  (platform/print "\n")
+  (platform/print-diag "\n")
   (abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
 ;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
-(define-function fatal  (fmt)           (error-prologue) (platform/print-diag fmt)                (platform/print-diag "\n")    (abort))
-(define-function fatal1 (fmt arg)       (error-prologue) (libc/fprintf libc/stderr fmt arg)       (libc/fputs "\n" libc/stderr) (abort))
-(define-function fatal2 (fmt arg1 arg2) (error-prologue) (libc/fprintf libc/stderr fmt arg1 arg2) (libc/fputs "\n" libc/stderr) (abort))
+(define-function fatal  (fmt)           (error-prologue) (platform/print-diag fmt)               (platform/print-diag "\n") (abort))
+(define-function fatal1 (fmt arg)       (error-prologue) (platform/print-diag-fmt fmt arg)       (platform/print-diag "\n") (abort))
+(define-function fatal2 (fmt arg1 arg2) (error-prologue) (platform/print-diag-fmt fmt arg1 arg2) (platform/print-diag "\n") (abort))
 
 (define-form error args
   `(let ()
@@ -161,7 +179,7 @@
               ;; we need to print them using libc/fputs (or instantiate
               ;; them into Maru objects using string-from-cstring).
               (if (string? arg)
-                  `(platform/print ,arg)
+                  `(platform/print-diag ,arg)
                 `(print ,arg)))
             args)
      (error-epilogue)))

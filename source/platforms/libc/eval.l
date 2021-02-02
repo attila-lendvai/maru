@@ -3,6 +3,7 @@
 (define *standard-input*)
 (define *standard-output*)
 (define *standard-error*)
+(define *debug-output*)
 
 (require "source/platforms/libc/libc.l")
 
@@ -74,12 +75,13 @@
     (with-forms ((doit ((libc-name our-name)
                         `(let ()
                            (set tmp (libc-stream (box <target-vm-pointer> ,libc-name)))
+                           (set ,our-name tmp)
                            ;; TODO add support for compiling symbols
-                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)
-                           (set ,our-name tmp)))))
+                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)))))
       (doit libc/stdin	*standard-input*)
       (doit libc/stdout	*standard-output*)
-      (doit libc/stderr	*standard-error*))))
+      (doit libc/stderr	*standard-error*)
+      (set *debug-output* *standard-error*))))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
@@ -129,12 +131,14 @@
 
   (process-command-line-arguments argc argv)
 
-  (debug (libc/printf "main is on the way out\n"))
+  (debug-print "main is on the way out")
 
-  (verbosity 1 (gc/collect) (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free))
+  (verbosity 1
+    (gc/collect)
+    (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free))
   (when-at-expand feature/profiler
     (profiler/disable))
   (platform/flush-streams)
 
-  (debug (libc/printf "main is returning normally\n"))
-  (return 0))
+  (debug-print "main is returning normally")
+  0)
