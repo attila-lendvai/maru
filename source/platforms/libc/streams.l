@@ -60,3 +60,19 @@
     (if (= result libc/EOF)
         +end+
       result)))
+
+(define-method $put <libc-stream> (u/char)
+  (let* ((handle (unbox <target-vm-pointer> self.handle))
+         (result (libc/fputc u/char handle)))
+    (when (= result libc/EOF)
+      (error "<libc-stream> $put: fputc returned with error"))
+    u/char))
+
+;; TODO implemenet inheritance on compiled selectors
+(define-method $put-all <libc-stream> (elements)
+  (typecase elements
+    (<string>		(when (= libc/EOF (libc/fputs (get/string elements)
+                                                      (unbox <target-vm-pointer> self.handle)))
+                          (error "<libc-stream> $put-all: libc/fputs returned with error")))
+    (else		(error "<libc-stream> $put-all: unexpected elements: " elements)))
+  elements)

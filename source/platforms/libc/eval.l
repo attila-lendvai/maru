@@ -1,5 +1,9 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define *standard-input*)
+(define *standard-output*)
+(define *standard-error*)
+
 (require "source/platforms/libc/libc.l")
 
 (load "source/evaluator/vm-early.l")
@@ -64,10 +68,6 @@
 ;; (define-symbol-form *standard-input*  (global-variable-value (string->symbol "*standard-input*")))
 ;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
 ;; (define-symbol-form *standard-error*  (global-variable-value (string->symbol "*standard-error*")))
-
-(define *standard-input*)
-(define *standard-output*)
-(define *standard-error*)
 
 (define-function initialize-streams ()
   (gc/let* (tmp)
