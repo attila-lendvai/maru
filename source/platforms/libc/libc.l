@@ -41,11 +41,8 @@
 (define-form platform/clear-bytes (from count)
   `(libc/memset ,from 0 ,count))
 
-(define-form platform/compare-bytes (a b count)
-  `(libc/memcmp ,a ,b ,count))
-
-(define-form libc/string= (a b)
-  `(= 0 (libc/strcmp ,a ,b)))
+(define-form platform/string-compare (a b)
+  `(libc/strcmp ,a ,b))
 
 ;; TODO clean up this libc and cstring mess. if we use the same string representation in
 ;; our string payloads as libc, it doesn't mean that we should use libc stuff directly to

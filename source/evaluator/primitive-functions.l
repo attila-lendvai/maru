@@ -186,18 +186,17 @@
 ;; FIXME restore arity check
 (define-primitive-function (= ()) _
   (let* ((lhs  (get/head -args-))
-         (rhs  (get/head (get/tail -args-)))
-         (type (type-of lhs)))
-    ;; TODO use typecase
-    (cond
-      ((= type <long>)		(and (long? rhs) (= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs)
-                                     (let ((len (string-length lhs)))
-                                       (= (string-length rhs) len)
-                                       ;; TODO add string-equals to arrays.l? search for this, there are other occurrances, too
-                                       (= 0 (platform/compare-bytes (get/string lhs) (get/string rhs) len)))
-                                     symbol/true))
-      (else                     (and (= lhs rhs) symbol/true)))))
+         (rhs  (get/head (get/tail -args-))))
+    (typecase lhs
+      (<long>		(and (long? rhs)
+                             (= (unbox <long> lhs)
+                                (unbox <long> rhs))
+                             symbol/true))
+      (<string>		(and (string? rhs)
+                             (= 0 (compare-strings lhs rhs))
+                             symbol/true))
+      (else		(and (= lhs rhs)
+                             symbol/true)))))
 
 (define-primitive-function (exit ()) ((exit-code <long> 0))
   (when-at-expand feature/profiler

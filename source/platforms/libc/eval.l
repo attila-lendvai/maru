@@ -66,63 +66,24 @@
 ;; NOTE binding this into the interpreter's env is only useful/meaningful if its LIBC-STREAM type is also
 ;; properly initialized in the interpreter's env. otherwise it would be there an object of an unknown type.
 ;; TODO add compilation of symbols and drop the string->symbol call
-;; (define-symbol-form *standard-input*  (global-variable-value (string->symbol "*standard-input*")))
-;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
-;; (define-symbol-form *standard-error*  (global-variable-value (string->symbol "*standard-error*")))
+;; (define-symbol-form *standard-input*  (global-variable-value (u/string->symbol "*standard-input*")))
+;; (define-symbol-form *standard-output* (global-variable-value (u/string->symbol "*standard-output*")))
+;; (define-symbol-form *standard-error*  (global-variable-value (u/string->symbol "*standard-error*")))
 
 (define-function initialize-streams ()
   (gc/let* (tmp)
     (with-forms ((doit ((libc-name our-name)
                         `(let ()
-                           (set tmp (libc-stream (box <target-vm-pointer> ,libc-name)))
+                           (set tmp (file-stream (box <target-vm-pointer> ,libc-name)))
                            (set ,our-name tmp)
                            ;; TODO add support for compiling symbols
-                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)))))
+                           (set (global-variable-value (u/string->symbol ,(symbol->string our-name))) tmp)))))
       (doit libc/stdin	*standard-input*)
       (doit libc/stdout	*standard-output*)
       (doit libc/stderr	*standard-error*)
       (set *debug-output* *standard-error*))))
 
-(define-form with-input-from-file (args . body)
-  (let ((var		(first args))
-        (file-name	(second args)))
-    `(let* ((__file-name	,file-name)
-            (__file-handle	(file-open (get/string __file-name) "r")))
-       (or __file-handle (error "with-input-from-file: file-open failed for: " __file-name))
-       (gc/let* ((,var (libc-stream __file-handle)))
-         (let ((__result ,@body))
-           (file-close (unbox <target-vm-pointer> __file-handle))
-           __result)))))
-
-(define-primitive-function (load ()) (path)
-  (with-input-from-file (stream path)
-    (expand-encode-eval-stream stream)))
-
-(define-function repl-stream (stream)
-  ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
-  (let ((stdin?		(= *standard-input* stream))
-        (libc-handle	(unbox <target-vm-pointer> (<libc-stream>-handle stream))))
-    (unless stdin?
-      (libc/fscanf libc-handle "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
-    (gc/let* ((res ()))
-      (while (let ()
-               (when stdin?
-                 (libc/printf ".")
-                 (platform/flush-streams))
-               (and (not (= +end+ (set res (read stream))))
-                    (not (libc/feof libc-handle))))
-        (unless (= +end+ res)
-          (gc/let* ((env (environment (module-env *module*) 1 0)))
-            (set res (expand-encode-eval res env))
-            (when stdin?
-              (gc/let* ((printer (list2 symbol/quote res)))
-                (set printer (list2 (string->symbol "print") printer))
-                (expand-encode-eval printer env))
-              (platform/flush-streams)))))
-      (when stdin?
-        (libc/printf "\nmorituri te salutant\n"))
-      res)))
-
+(load "source/evaluator/vm-with-file-support.l")
 (load "source/evaluator/vm-late.l")
 
 (define-function main (argc argv)

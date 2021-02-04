@@ -117,7 +117,7 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    print println read encode expand eval string->symbol %accessor-typecheck
+    print println read encode expand eval u/string->symbol string->symbol %accessor-typecheck
     abort string-from-cstring
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
@@ -133,7 +133,7 @@
      (define-function initialize-symbol-cache ()
        ,@(map (lambda (name)
                 `(set ,(concat-symbol 'symbol/ name)
-                      (string->symbol ,(symbol->string name))))
+                      (u/string->symbol ,(symbol->string name))))
               symbols))))
 
 (define-symbol-cache

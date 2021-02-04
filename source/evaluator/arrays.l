@@ -75,8 +75,18 @@
 ;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 
-(define-function compare-characters (buf-a len-a buf-b len-b)
-  (let ((diff (platform/compare-bytes buf-a buf-b (min len-a len-b))))
+(define-function compare-strings (str-a str-b)
+  (let* ((len-a	(string-length str-a))
+         (len-b	(string-length str-b))
+         (buf-a	(get/string str-a))
+         (buf-b	(get/string str-b))
+         (limit	(min len-a len-b))
+         (diff	0)
+         (i	0))
+    (while (and (< i limit)
+                (= 0 (set diff (- (byte-at buf-a i)
+                                  (byte-at buf-b i)))))
+      (incr i))
     (cond
       ((or (not (= 0 diff))
            (= len-a len-b))
@@ -85,6 +95,9 @@
        (- 0 (byte-at buf-b len-a)))
       (else ;; (> len-a len-b)
        (- (byte-at buf-a len-b) 0)))))
+
+(define-function string= (a b)
+  (= 0 (compare-strings a b)))
 
 ;; (define-primitive-function string-compare ((a <string>) (b <string>))
 ;;   (compare-characters (get/string a) (string-length a)

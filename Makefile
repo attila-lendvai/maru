@@ -9,6 +9,7 @@
 #  make -j test-bootstrap || beep
 #  make test-bootstrap-llvm || beep
 #  make test-bootstrap-x86 || beep
+#  make PLATFORM=linux test-bootstrap-x86 || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
@@ -26,6 +27,7 @@
 
 # backends to build
 BACKENDS		= x86 llvm
+PLATFORMS		= libc linux
 # use this backend of the previous stage when it needs to be built.
 PREVIOUS_STAGE_BACKEND	= llvm
 
@@ -47,11 +49,20 @@ else ifeq ($(HOST_OS),Darwin)
   TIME		= time
 endif
 
-ifeq ($(PLATFORM),linux)
-  CFLAGS	+= -nostdlib -Wl,-Bstatic
-endif
+CFLAGS		+= -O3
+CFLAGS_x86	+= $(CFLAGS)
+CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
-LLVM_ARGS	= -O3
+ifeq ($(PLATFORM),linux)
+# TODO deal with this on debian:
+# dpkg --search crt1.o
+# libc6-dev-i386: /usr/lib32/crt1.o
+# libc6-dev:amd64: /usr/lib/x86_64-linux-gnu/crt1.o
+  CFLAGS	+= -nostdlib -Wl,-Bstatic
+  # TODO this only works on nixos, using nix-shell and the shell.nix to fetch these files for us
+  CFLAGS_x86	+= -Wl,$(BUILD_x86)/crt1.o
+  CFLAGS_llvm	+= -Wl,$(BUILD_llvm)/crt1.o
+endif
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
@@ -82,18 +93,25 @@ TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
 TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
 ifeq ($(TARGET_CPU_llvm),x86_64)
-  BITCODE_DIR		= $(BUILD)/llvm/$(PLATFORM)-64bit-le
+  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/64bit-le
 else ifeq ($(TARGET_CPU_llvm),i686)
-  BITCODE_DIR		= $(BUILD)/llvm/$(PLATFORM)-32bit-le
+  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/32bit-le
 else
   $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
 
 ifeq ($(TARGET_CPU_x86),x86_64)
 else ifeq ($(TARGET_CPU_x86),i386)
-  CFLAGS	+= -m32
+  CFLAGS_x86	+= -m32
 else
-  $(error "Couldn't extract the target's word size from TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
+  $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
+endif
+
+ifeq ($(TARGET_CPU_llvm),x86_64)
+else ifeq ($(TARGET_CPU_llvm),i686)
+  CFLAGS_llvm	+= -m32
+else
+  $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
 
 # see https://stackoverflow.com/a/20983251/14464
@@ -104,9 +122,9 @@ RESET		= $(shell tput sgr0)
 
 BACKDATE_FILE	= touch -t 200012312359
 
-LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
-LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
-CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
+LLC		= llc$(LLVM_VERSION)
+LLVM_OPT	= opt$(LLVM_VERSION)
+CLANG		= clang$(LLVM_VERSION)
 DIFF		= diff --unified --ignore-all-space
 STRIP		= strip
 
@@ -149,7 +167,8 @@ endif
 all: eval
 
 clean:
-	rm -rf $(foreach backend,${BACKENDS},$(BUILD)/$(backend)-$(PLATFORM) eval-$(backend)) $(BUILD)/generated/ eval
+	rm -rf $(foreach plat,${PLATFORMS},$(foreach back,${BACKENDS},$(BUILD)/$(back)-$(plat) eval-$(back))) \
+		$(BUILD)/generated/ eval
 	-git checkout --quiet $(BUILD)
 
 distclean: clean
@@ -323,25 +342,28 @@ source/assembler/asm-x86.l: $(BUILD)/generated/asm-x86.l
 ###
 $(BUILD_x86)/%: $(BUILD_x86)/%.s
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -o $@ $(EVAL_OBJ_x86) $<
+	$(CC) $(CFLAGS_x86) -o $@ $(EVAL_OBJ_x86) $<
 	@-$(STRIP) $@ -o $@.stripped
 
 $(BUILD_x86)/%.o: source/evaluator/%.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -m32 -c -o $@ $<
+	$(CC) $(CFLAGS_x86) -c -o $@ $<
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
-	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
-	$(CLANG) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
+# TODO shall we go through llc and link the .o file(s)? llc seems to
+# generate different code. is it better or worse than clang's output?
+	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
+	objdump --disassemble $@ >$@.dis.s
 	@-$(STRIP) $@ -o $@.stripped
-	@-$(LLC) -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
-#	$(CLANG) --target=$(TARGET_llvm) -S -o $@.clang.s $<
+#	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -S -o $@.clang.s $<
+#	$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
+#	@-$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
 
 $(BUILD_llvm)/%.o: source/evaluator/%.c
 	@mkdir -p $(@D)
-	$(CLANG) --target=$(TARGET_llvm) -c -o $@ $<
+	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -c -o $@ $<
 
 ###
 ### Tests

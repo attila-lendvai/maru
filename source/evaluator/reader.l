@@ -125,7 +125,7 @@
     (while (and (set c ($peek stream))
                 (or (is_letter c) (is_digit10 c)))
       (buffer-append buf ($next stream)))
-    (string->symbol (buffer-contents buf))))
+    (u/string->symbol (buffer-contents buf))))
 
 (define-function read/string-literal (stream)
   ($next stream) ; drop opening "

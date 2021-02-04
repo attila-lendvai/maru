@@ -593,7 +593,7 @@
   (println "}"))
 
 (define-function compile-expr (self name indirection-allowed? parent-comp)
-  (let* ((main?		(= 'main name))
+  (let* ((main?		(member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main)))
          (indirect?	(and (not main?)
                              indirection-allowed?
                              feature/redefinable-functions-in-target))
@@ -794,9 +794,11 @@
 ;;;
 
 (define-instruction LINUX-SYSCALL (() 1 t)
+  ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
    (println "	"$reg1" = call %ptr asm sideeffect \"")
    (let ((arg-index	1)
+         (clobbers	())
          mov syscall regs)
      (case (slave-value +architecture+)
        (IA-32
@@ -810,8 +812,10 @@
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
      (list-do _ $1
-       (println "	"mov"	$"arg-index", "(pop regs))
-       (incr arg-index))
+       (let ((reg (pop regs)))
+         (push clobbers reg)
+         (println "	"mov"	$"arg-index", "reg)
+         (incr arg-index)))
      (println syscall"\", ")
      (print "	\"=A")
      (list-do _ $1
@@ -821,6 +825,9 @@
        ;; error: invalid operand for instruction
        ;;  movl    %rdx, %eax
        (print ",m"))
+     ;; clobbered registers
+     (while clobbers
+       (print ",~{"(pop clobbers)"}"))
      (print "\"\n	(")
      (emit/comma-separated-%ptrs $1)
      (println ")"))))

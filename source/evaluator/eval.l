@@ -328,23 +328,19 @@
     (set (<variable>-value var) value)
     var))
 
-(define-primitive-function string->symbol ((str <string>))
+(define-function u/string->symbol (u/str)
+  (gc/let* ((name (string-from-cstring u/str)))
+    (string->symbol name)))
+
+(define-primitive-function string->symbol ((str <string> _ nounbox))
   (array-binary-search *symbols*
                        str
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
-                         ;; NOTE this assumes that the payload in our strings has the
-                         ;; same representation as that of symbols.
-                         (let ((candidate-payload (get/string (<symbol>-name candidate))))
-                           ;; TODO this could be simpler/faster if closures could capture
-                           ;; TODO both of these are strings now, rewrite COMPARE-CHARACTERS
-                           (compare-characters str
-                                               (platform/string-length str)
-                                               candidate-payload
-                                               (platform/string-length candidate-payload))))
+                         (compare-strings str (<symbol>-name candidate)))
                        (lambda (array index str)
-                         ;; NOTE we want to make a copy of str here, because strings are mutable
+                         ;; NOTE we want to make a copy of str here, because str may be mutable
                          ;; TODO instantiate a read-only string
-                         (gc/let* ((name	(string-from-cstring str))
+                         (gc/let* ((name	(string-from-cstring (get/string str)))
                                    (sym		(symbol name)))
                            (debug-print "interning "name)
                            (array-insert array index sym)
@@ -542,7 +538,7 @@
   (gc/let* ((buf (buffer)))
     (buffer-append-string buf "set-")
     (buffer-append-string buf (get/string (<symbol>-name fn-name)))
-    (let ((setter-name (string->symbol (buffer-contents buf))))
+    (let ((setter-name (u/string->symbol (buffer-contents buf))))
       (when (maybe-object-in-env env setter-name ())
         setter-name))))
 

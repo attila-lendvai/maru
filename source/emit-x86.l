@@ -446,14 +446,15 @@
 
 (define-function compile-expr (self name indirection-allowed? parent-comp)
   (emit COMMENT (list "compiling fn "name", body: "(<expr>-body self)))
-  (let* ((main? (= 'main name))
+  ;; KLUDGE __libc_csu_init & co.
+  (let* ((main?		(member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main)))
          (indirect?	(and (not main?)
                              indirection-allowed?
                              feature/redefinable-functions-in-target))
          (body (<expr>-body self))
          (-c- (x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (entry-label (if main?
-                          (GLOBAL-LABEL "main")
+                          (GLOBAL-LABEL name)
                         (LABEL (concat-string (symbol->string name)
                                               (if indirect? "_body" "")))))
          (init-param (lambda (var)
