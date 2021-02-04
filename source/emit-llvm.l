@@ -370,9 +370,11 @@
   ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
 (define-instruction RET		(() 1 ())
-  ((LOCAL)			(println "	ret %ptr "$1))
-  ((TEMP)			(println "	"$reg1" = load %ptr, %ptr* "$1)
-				(println "	ret %ptr "$reg1)))
+  ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %ptr")
+                                (println "	ret %ptr "$reg1))
+  ;; ((TEMP)			(println "	"$reg1" = load %ptr, %ptr* "$1)
+  ;;       			(println "	ret %ptr "$reg1))
+  ((LOCAL)			(println "	ret %ptr "$1)))
 
 (define-instruction LOAD	(() 1 t)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %ptr"))
@@ -632,13 +634,14 @@
              (emit STORE local temp))
            param-decls params))
 
+    ;; make sure we finish off with a ret
+    (unless (= <RET> (type-of (previous-instruction -c-)))
+      (gen RET (or (<compiler>-current-value -c-)
+                   (LITERAL 0))))
+
     ;; emit the body from the gen buffer
     (emit-gen-buffer -c-)
 
-    ;; make sure we finish off with a ret
-    (unless (= <RET> (type-of (previous-instruction -c-)))
-      (emit RET (or (<compiler>-current-value -c-)
-                    (LITERAL "null"))))
     (emit/function-epilogue)
     (when indirect?
       (emit DEFINE (GLOBAL name) self))))
