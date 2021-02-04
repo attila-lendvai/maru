@@ -18,6 +18,16 @@
       (set lst (cons (array-at arr ind) lst)))
     lst))
 
+(define-function %list->array (list index)
+  (if (pair? list)
+      (let ((a (%list->array (cdr list) (+ 1 index))))
+        (set (array-at a index) (car list))
+        a)
+    (array index)))
+
+(define-function list->array (list)
+  (%list->array list 0))
+
 (define-function list->string (list)
   (let* ((len (list-length list))
          (str (string len))

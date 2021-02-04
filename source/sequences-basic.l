@@ -81,16 +81,6 @@
       (set curr next))
     prev))
 
-(define-function %list->array (list index)
-  (if (pair? list)
-      (let ((a (%list->array (cdr list) (+ 1 index))))
-        (set (array-at a index) (car list))
-        a)
-    (array index)))
-
-(define-function list->array (list)
-  (%list->array list 0))
-
 (define-function map1 (function list)
   (let ((head (cons)))
     (let ((tail head))

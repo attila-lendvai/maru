@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/conversion.l")
+
 ;; NOTE for debugging only, because this breaks the output due to multiline string literals escaping the line-comment syntax
 (define *compiler-verbose* '())
 
