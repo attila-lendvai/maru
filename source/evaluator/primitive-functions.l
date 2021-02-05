@@ -201,7 +201,9 @@
     ;; TODO use typecase
     (cond
       ((= type <long>)		(and (long? rhs) (!= (unbox <long> lhs) (unbox <long> rhs)) symbol/true))
-      ((= type <string>)	(and (string? rhs) (not (cstring= (get/string lhs) (get/string rhs))) symbol/true))
+      ((= type <string>)	(or (not (string? rhs))
+                                    (not (cstring= (get/string lhs) (get/string rhs)))
+                                    ()))
       (else                     (and (!= lhs rhs) symbol/true)))))
 
 (define-primitive-function (exit ()) ((exit-code <long> 0))
