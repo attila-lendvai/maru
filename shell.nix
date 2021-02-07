@@ -5,21 +5,24 @@
 
 # https://nixos.wiki/wiki/Packaging/32bit_Applications
 #pkgs.mkShell {
-#multiStdenv.mkDerivation {
-pkgsi686Linux.stdenv.mkDerivation {
+#pkgs.stdenv.mkDerivation {
+#pkgsi686Linux.stdenv.mkDerivation {
+pkgs.multiStdenv.mkDerivation {
   name = "maru";
 
-  buildInputs = with pkgs; [
-    coreutils time ncurses posix_man_pages bash-completion less
-    gitFull diffutils
-    gnumake
-    libffi.dev
-    gcc gdb binutils
-    llvm_11 clang_11
+  buildInputs = with pkgs;
+    [
+      coreutils time ncurses posix_man_pages bash-completion less
+      #lorri direnv
+      gitFull diffutils
+      gnumake
+      #libffi.dev
+      gdb binutils
+      llvm_11 clang_11
 
-    # keep this line if you use bash
-    bashInteractive
-  ];
+      # keep this line if you use bash
+      bashInteractive
+    ];
 
   buildCommand = ''
     make test-bootstrap
