@@ -2,15 +2,15 @@
 
 ## Overview
 
-Maru, the language, is implemented as an evaluator (an interpreter, a
+Maru, the language, is implemented as an evaluator (aka an interpreter, a
 VM). But Maru is also self-hosting, which means that the
 implementation language of this evaluator is also Maru, although only
 a subset of the full language.
 
-The compiler compiles a list of definitions (an *environment*) to the
+The compiler compiles a list of named definitions (an *environment*) to the
 target language; i.e. to the language of the foundational platform
 that was chosen to build the Maru VM on top of (e.g. x86 machine code,
-LLVM, etc).
+LLVM, libc, the Linux kernel, etc).
 
 This subset of Maru is basically a list of the following toplevel
 definitions (see `compile-definition`):
@@ -34,6 +34,12 @@ This seems rather limited at first sight, but keep in mind that the
 meta level that is assembling this environment can use the full Maru
 language (as brought to life by the Maru evaluator that is hosting the
 bootstrap process).
+
+The two compiler backends currently emit text files. Therefore, for now, a
+C toolchain is required for a full cycle of bootstrap even on x86. With the addition
+of an IA-32 assembler that directly outputs machine code this requirement
+can be eliminated; i.e. there's no inherent external dependency on the C
+infrastructure in the codebase.
 
 ## Compile-time phases: `expand` and `encode`
 

@@ -75,6 +75,29 @@ whose semantics they are assuming, i.e. the `eval1` executable of the `maru.2`
 stage is built by the `eval` executable, the `boot.l`, and the `emit.l` files
 of the previous, `maru.1` stage.
 
+### Repo layout
+
+The developmental stages of the language are kept in separate git branches. When a new stage is opened,
+this readme is replaced in the old branch to only document what's new/relevant for that specific stage
+(i.e. if you switch branches on github you'll see it right away).
+
+Naming convention of the branches (no `master`):
+
+`[language name].[bootstrap stage]`, e.g `maru.1`.
+
+Optionally, e.g. for stage zero in the bootstrap, it may also include the name of the
+parent language, from which this "bootstrap sprout" grows out:
+
+`[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
+the bootstrap implementation written in C.
+
+During the build the previous stage is `git checkout`'ed locally under `./build/`,
+and its own build process is invoked in that directory. Note that this potentially
+becomes a recursive process until a stage is reached that can be built using some
+external dependency. This may happen by reaching an `eval.c` in the bottom stage/branch
+called `maru.0.c99` that can be built using a C compiler, or by reaching a higher level
+stage that has its build output checked into the git repo.
+
 ### Bootstrap "shortcuts"
 
 Starting with `maru.5`, the LLVM IR output (`eval2.ll`) is committed into the repo under

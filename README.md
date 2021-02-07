@@ -20,6 +20,12 @@ and formally expressing that which is mostly treated as black magic:
 the bootstrapping of a language on top of other languages (which
 includes the previous developmental stage of the same language).
 
+## Meta
+
+This document aims to present an overview of Maru. There are various
+documents in the [`doc/`](doc/) directory that discuss some topics in
+more detail.
+
 ## How
 
 Maru's architecture is described in Ian Piumarta's paper:
@@ -28,9 +34,6 @@ Maru's architecture is described in Ian Piumarta's paper:
 > it is a sketch of how Maru's generalised eval works,
 > which is entirely accurate in intent and approach,
 > if a little different in some implementation details (Ian Piumarta)
-
-This readme aims to present only an overview. The documents in the
-[`doc/`](doc/) directory discuss some topics in detail.
 
 ### The Parts - an overview
 
@@ -52,59 +55,40 @@ the metacircular evaluator in `eval.l` escape from the "infinite metacircular re
 to a language grounded in hardware. A possible metaphor of this is a "target universe"
 implemented by some electric circuits (i.e. transistors wired to each other in a CPU)
 that provide you a set of axiomatic foundations to build upon while compiling the
-abstract to the concrete; while implementing your new universe (the Maru language in this case).
+abstract to the concrete; while implementing your new universe (the Maru language in
+this case). More details are available in [the compiler's doc](doc/compiler.md).
 
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by
 `emit.l`; it's written in the s-expression language.
-
-### Build architecture
-
-The details of [the bootstrap process](doc/bootstrap.md) are in a standalone
-document. This is only a bird's eye view.
-
-#### Repo layout
-
-The developmental stages of the language are kept in separate git branches. When a new stage is opened,
-this readme is replaced in the old branch to only document what's new/relevant for that specific stage
-(i.e. if you switch branches on github you'll see it right away).
-
-Naming convention of the branches (no `master`):
-
-`[language name].[bootstrap stage]`, e.g `maru.1`.
-
-Optionally, e.g. for stage zero in the bootstrap, it may also include the name of the
-parent language, from which this "bootstrap sprout" grows out:
-
-`[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
-the bootstrap implementation written in C.
-
-During the build the previous stage is `git checkout`'ed locally under `./build/`,
-and its own build process is invoked in that directory. Note that this potentially
-becomes a recursive process until a stage is reached that can be built using some
-external dependency. This may happen by reaching an `eval.c` in the bottom stage/branch
-called `maru.0.c99` that can be built using a C compiler, or by reaching a higher level
-stage that has its build output checked into the git repo.
 
 ### Build instructions
 
 To test a bootstrap cycle using one or all of the backends:
 
 ```
-make test-bootstrap[-llvm,-x86]
+make test-bootstrap-x86    # defaults to the libc platform
+make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 ```
 
 #### Linux
 
-You may need LLVM (any version beyond 8 should work):
 ```
-sudo apt-get install llvm-8 clang-8
+sudo apt install make time rlwrap
 ```
 
-If you want to test the x86 backend then you will need to have support for compiling and
-running 32 bit C code. On Debian based x86_64 systems:
+You will need LLVM, and/or a C compiler (any version beyond LLVM 8 should work):
 
 ```
-sudo apt-get install gcc-multilib
+sudo apt install llvm clang
+```
+
+For now the x86 backend only supports 32 bit mode. To use it you will
+need to have support for compiling and running 32 bit C code. On
+Debian based x86_64 systems this will install all the necessary
+libraries:
+
+```
+sudo apt install gcc-multilib
 ```
 
 #### MacOS
@@ -136,7 +120,7 @@ source ~/.bash_profile
 Currently Maru should work everywhere where there's a `libc`, and either the
 GNU toolchain, or LLVM is available.
 
-Patches are welcome for other platforms, including the extension of this readme.
+Patches are welcome for other platforms.
 
 ## Who
 
@@ -152,16 +136,6 @@ This repo and readme is maintained by [attila@lendvai.name](mailto:attila@lendva
 Bugs and patches: [maru github page](https://github.com/attila-lendvai/maru).
 
 Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru-dev).
-
-## Contribution
-
-You are very welcome to contribute, but beware that until further notice
-**this repo will receive forced pushes** (i.e.
-**`git push -f`** rewriting git history (except the `piumarta` branch)). This will stop
-eventually when I settle with
-a build setup that nicely facilitates bootstrapping multiple, parallel paths of
-language development. Please make sure that you open a branch for your work,
-and/or that you are ready for some `git fetch` and `git rebase`.
 
 ## Why
 
@@ -184,6 +158,16 @@ deserves a repo and a maintainer.
 
 * This work is full of puzzles that are a whole lot of fun to resolve!
 
+## Contribution
+
+You are very welcome to contribute, but beware that until further notice
+**this repo will receive forced pushes** (i.e.
+**`git push -f`** rewriting git history (except the `piumarta` branch)). This will stop
+eventually when I settle with
+a build setup that nicely facilitates bootstrapping multiple, parallel paths of
+language development. Please make sure that you open a branch for your work,
+and/or that you are ready for some `git fetch` and `git rebase`.
+
 ## Status
 
 ### Maru's status
@@ -205,8 +189,25 @@ different paths:
     stepping stone in the bootstrap process, and then I left it
     behind.
 
+### Notable new features
+
 There are several Maru stages/branches now, introducing non-trivial
 new features. Some that are worth mentioning:
+
+  - Introduction of *platforms*: they are the "holding environments"
+    where the implementation of `eval` can be brought alive. Notably,
+    besides the original `libc` platform, there is now a `linux`
+    platform that compiles to a statically linked executable that runs
+    directly on top of the Linux kernel,
+    [using `syscall`s](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
+    i.e. without linking anything from `libc`, or `ld-linux.so`. From
+    a practical perspective this is equivalent with running directly
+    on the bare metal (i.e. all dynamically allocated memory is
+    provided by our own GC, etc).
+
+    List of platforms: `libc`, `linux`, `metacircular` (only planned:
+    loading the evaluator's implementation into another instance of
+    the evaluator, as opposed to compiling it to machine code).
 
   - The host and the slave are isolated while bootstrapping which makes it possible to
     do things like reordering types (changing their type id in the target),
@@ -221,21 +222,25 @@ new features. Some that are worth mentioning:
 
   - The addition of an LLVM backend.
 
-The two compiler backends currently emit text files. Therefore, for now, a
-C toolchain is required for a full cycle of bootstrap even on x86. With the addition
-of an IA-32 assembler that directly outputs machine code this requirement
-can be eliminated; i.e. there's no inherent external dependency on the C
-infrastructure in the codebase (the basic IO and memory management services
-of `libc` are also pluggable).
+### Assorted TODO:
 
-Assorted TODO:
-  - Revive all the goodies in the `piumarta` branch, but in a structured way.
+  - Finish the proof of concept in `tests/test-elf.l` to compile the
+    Linux plaform directly into an ELF binary.
+
+  - Rewrite the build process in Maru; eliminate dependency on GNU Make.
 
   - Replace the hand-written parser in `eval.l` with something generated by the
-   [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) compiler.
+    [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) compiler.
 
-  - Simplify the types-are-objects part and its bootstrap, and maybe even
-    make it optional?
+  - Implement modules and phase separation along with what is outlined in
+    [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
+    Part of this is already done and is used in the bootstrap process.
+
+  - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
+    definitions to generate bytecode assemblers. It requires either
+    the reimplementation of the tablegen parser/logic in Maru (doesn't
+    seem to be trivial), or writing C++ code (uhh!) to compile the
+    data to the Maru definitions implementing an assembler.
 
   - Introduce a simplified language that drops some langauge features,
     e.g. remove *forms* and the *expand* protocol. Make sure that this
@@ -244,20 +249,16 @@ Assorted TODO:
     language.
 
   - Compile to, and bootstrap on the bare metal of some interesting
-    targets. The simplest would be a static executable that treats the
-    linux kernel as a VM; i.e. without linking with libc, and using a
-    few [`syscall`'s to talk to "the
-    hardware"](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux)?
-    See `tests/test-elf.l`. An alternative could be
+    targets. It's already demonstrated by the Linux platform. Another
+    one could be
     [pc-bios](https://github.com/cirosantilli/x86-bare-metal-examples),
-    because it's easily testable using QEMU. Later attempt an ARM
-    board (like Raspberry Pi), or even C64?
+    because it's easily testable using QEMU. Or port it on an ARM
+    board (like Raspberry Pi)? Or maybe even a C64 port?
 
-  - Rewrite the build process in Maru; eliminate dependency on GNU Make.
+  - Revive all the goodies in the `piumarta` branch, but in a structured way.
 
-  - Implement modules and phase separation along with what is outlined in
-    [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
-    Part of this is already done and is used in the bootstrap process.
+  - Simplify the types-are-objects part and its bootstrap, and maybe even
+    make it optional?
 
   - Merge the language and API that the compiler and the evaluator understands;
     i.e. make the level-shifted code (`eval.l` & co.) less different than code
@@ -266,10 +267,6 @@ Assorted TODO:
     This is slowly happening, but it's nowhere near done, and I'm not even sure
     what done means here.
 
-  - Directly generate IA-32 machine code and thus eliminate the dependency on
-    an external assembler. Then use this to implement a JIT that attempts to
-    compile closures to machine code instead of interpreting them.
-    
   - Understand and incorporate François René Rideau's model of
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),
     (see this [couple of page summary](https://github.com/fare/climbing), or
@@ -314,7 +311,7 @@ the `maru.x` branches in this repo).
 
 #### Other instances
 
-There are other copies/versions of Maru online. Here are the ones
+There are some other copies/versions of Maru. Here are the ones
 that I know about and contain interesting code:
 
 - [github.com/melvinzhang/maru](https://github.com/melvinzhang/maru)
