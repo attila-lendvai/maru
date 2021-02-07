@@ -62,6 +62,10 @@
 ;;; require
 ;;;
 
+;; TODO FIXME REQUIRE loads from the current directory. therefore the
+;; host, during the bootstrap process, loads the slave's
+;; definitions. fix LOAD so that the host's boot.l loads the host's
+;; files.
 (define *load-history* ())
 
 (define primitive/load load)
@@ -210,7 +214,6 @@
 (require "source/list-basic.l")
 (require "source/destructuring.l")
 (require "source/iteration-min.l")
-(require "source/sequences-basic.l")
 
 ;;; structural equality
 
@@ -234,6 +237,8 @@
 (define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
 (define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+
+(require "source/sequences-basic.l")
 
 (require "source/types.l")
 

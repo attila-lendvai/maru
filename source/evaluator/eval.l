@@ -885,7 +885,7 @@
   (gc/let* (form
             res
             env)
-    (while (!= +end+ (set form (read stream)))
+    (until (= +end+ (set form (read stream)))
       (set env (environment (module-env *module*) 1 0))
       (set res (expand-encode-eval form env)))
     res))

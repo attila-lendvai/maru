@@ -294,9 +294,8 @@
 (define-primitive-function (array-append ()) ((array <array>) value))
 
 (define-primitive-function (string-append ()) ((string <string> _ nounbox) (value <long>))
-  (safety 2 (assert (and (<= value 256) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
-  (string-append string value)
-  (box <long> value))
+  (safety 2 (assert (and (<= value 255) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
+  (box <long> (string-append string value)))
 
 (define-primitive-function symbol->string (symbol)
   ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.

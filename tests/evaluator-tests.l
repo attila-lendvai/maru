@@ -59,7 +59,8 @@
 (define-test eval/equality/string ()
   (test-assert (=  "alma" "alma"))
   (test-assert (!= "alma" "korte"))
-  (test-assert (not (!= "alma" "alma"))))
+  (test-assert (not (!= "alma" "alma")))
+  (test-assert (!= "foo" 'foo)))
 
 (define-test eval/for/1 ()
   (let ((x ()))

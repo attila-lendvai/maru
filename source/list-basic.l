@@ -4,7 +4,8 @@
   (if (pair? obj) obj (list obj)))
 
 (define-function member? (key list)
-  (while (and (pair? list) (!= key (car list)))
+  (while (and (pair? list)
+              (not (= key (car list))))
     (set list (cdr list)))
   (car list))
 

@@ -6,41 +6,41 @@
 ;;   (string-do e s (array-append a e))
 ;;   s)
 
-(define concat-string
-  (lambda (x y)
-    (let ((x-len (string-length x))
-          (y-len (string-length y)))
-      (let ((res (string (+ x-len y-len)))
-            (res-idx 0))
-        (let ((i 0))
-          (while (< i x-len)
-            (set-string-at res res-idx (string-at x i))
-            (set i (+ i 1))
-            (set res-idx (+ res-idx 1))))
-        (let ((i 0))
-          (while (< i y-len)
-            (set-string-at res res-idx (string-at y i))
-            (set i (+ i 1))
-            (set res-idx (+ res-idx 1))))
-        res))))
+;; TODO FIXME require loads from the current directory. therefore the
+;; bootstrap process is loading the slave's definitions, where incr is
+;; not present at this point yet. fix LOAD so that the host's boot.l
+;; loads the host's files. then use incr here below.
+(define-function concat-string (x y)
+  (let ((x-len (string-length x))
+        (y-len (string-length y)))
+    (let ((res (string (+ x-len y-len)))
+          (res-idx 0))
+      (let ((i 0))
+        (while (< i x-len)
+          (set (string-at res res-idx) (string-at x i))
+          (set i (+ i 1))
+          (set res-idx (+ res-idx 1))))
+      (let ((i 0))
+        (while (< i y-len)
+          (set (string-at res res-idx) (string-at y i))
+          (set i (+ i 1))
+          (set res-idx (+ res-idx 1))))
+      res)))
 
-(define concat-strings
-  (lambda args
-    (let ((result (car args)))
-      (while (set args (cdr args))
-        (set result (concat-string result (car args))))
-      result)))
+(define-function concat-strings args
+  (let ((result (car args)))
+    (while (set args (cdr args))
+      (set result (concat-string result (car args))))
+    result))
 
-(define concat-symbol
-  (lambda (x y)
-    (string->symbol (concat-string (symbol->string x) (symbol->string y)))))
+(define-function concat-symbol (x y)
+  (string->symbol (concat-string (symbol->string x) (symbol->string y))))
 
-(define concat-symbols
-  (lambda args
-    (let ((result (car args)))
-      (while (symbol? (car (set args (cdr args))))
-        (set result (concat-symbol result (car args))))
-      result)))
+(define-function concat-symbols args
+  (let ((result (car args)))
+    (while (symbol? (car (set args (cdr args))))
+      (set result (concat-symbol result (car args))))
+    result))
 
 (define-function list-length (list)
   (assert (or (not list) (pair? list)) "LIST-LENGTH called with an improper list: " list)

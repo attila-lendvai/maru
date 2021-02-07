@@ -393,6 +393,7 @@
 (if-at-expand true
   (define-immediate	<long>			1 1)
   (define-boxed-word	<long>))				; provides a full-word integer, but bootstrap is about 25% slower
+;; TODO rename to <target-vm-address> or <target-vm-word> ?
 (define-boxed-word	<target-vm-pointer>)			; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
 ;;(define-boxed		<symbol>)				; a cstr is inline into the object's body
 (define-record		<symbol>		() (name))
