@@ -601,6 +601,10 @@
 ;;;
 ;;; linux syscalls
 ;;;
+;;; TODO this should go into a separate file and only loaded as needed
+
+(eval-in-slave `(define linux-syscall (fixed (lambda args (print "linux-syscall encountered in interpreted code with args " args "\n") (abort)))))
+
 (define-emit    (LINUX-SYSCALL pair)
   (let ((args	$1)
         (regs	+linux/syscall-registers/32+))

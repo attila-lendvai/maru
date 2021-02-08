@@ -795,6 +795,8 @@
 ;;; https://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/
 ;;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 
+(eval-in-slave `(define linux-syscall (fixed (lambda args (print "linux-syscall encountered in interpreted code with args " args "\n") (abort)))))
+
 (define-instruction LINUX-SYSCALL (() 1 t)
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
