@@ -9,12 +9,6 @@
                                          ( = ?\f c)                     ; ff
                                          ( = ?\r c)))                   ; cr
 
-(define-function is_digit10 (c)     (and (<= ?0  c) (<= c ?9)))         ; 0 1 2 3 4 5 6 7 8 9
-
-(define-function is_digit16 (c) (or (and (<= ?0  c) (<= c ?9))          ; 0 1 2 3 4 5 6 7 8 9
-                                    (and (<= ?a  c) (<= c ?f))          ; a b c d e f
-                                    (and (<= ?A  c) (<= c ?F))))        ; A B C D E F
-
 (define-function is_alpha (c)   (or (and (<= ?a  c) (<= c ?z))          ; a b c d e f g h i j k l m n o p q r s t u v w x y z
                                     (and (<= ?A  c) (<= c ?Z))))        ; A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
 
@@ -30,11 +24,11 @@
                                          ( = ?|  c)                     ; |
                                          ( = ?~  c)))                   ; ~
 
-(define-function is_octal (c)           (and (<= ?0 c) (<= c ?7)))
-
-(define-function is_hexadecimal (c)     (or (and (<= ?0 c) (<= c ?9))
-                                            (and (<= ?a c) (<= c ?f))
-                                            (and (<= ?A c) (<= c ?F))))
+(define-function is_digit8  (c)     (and (<= ?0  c) (<= c ?7)))
+(define-function is_digit10 (c)     (and (<= ?0  c) (<= c ?9)))
+(define-function is_digit16 (c) (or (and (<= ?0  c) (<= c ?9))          ; 0 1 2 3 4 5 6 7 8 9
+                                    (and (<= ?a  c) (<= c ?f))          ; a b c d e f
+                                    (and (<= ?A  c) (<= c ?F))))        ; A B C D E F
 
 (define-function digit_value (c)
   (cond
@@ -60,20 +54,20 @@
                       (b ($next stream))
                       (c ($next stream))
                       (d ($next stream)))
-                  (or (and (is_hexadecimal a)
-                           (is_hexadecimal b)
-                           (is_hexadecimal c)
-                           (is_hexadecimal d))
+                  (or (and (is_digit16 a)
+                           (is_digit16 b)
+                           (is_digit16 c)
+                           (is_digit16 d))
                       (error "illegal character escape"))
                   (+ (<<	(digit_value a) 24)
                      (+ (<<	(digit_value b) 16)
                         (+ (<<	(digit_value c)  8)
                            (digit_value d))))))
           (?x	(let ((x 0))
-                  (if (and (is_hexadecimal ($peek stream))
+                  (if (and (is_digit16 ($peek stream))
                            (or (set x (digit_value ($next stream)))
                                true)
-                           (is_hexadecimal ($peek stream)))
+                           (is_digit16 ($peek stream)))
                       (set x (+ (* x 16) (digit_value ($next stream))))
                     (error "illegal hexadecimal character escape"))
                   x))
@@ -81,10 +75,10 @@
            (cond
              ((and (<= ?0 c) (<= c ?7))
               (let ((x (digit_value c)))
-                (if (and (is_octal ($peek stream))
+                (if (and (is_digit8 ($peek stream))
                          (or (set x (+ (* x 8) (digit_value ($next stream))))
                              true)
-                         (is_octal ($peek stream)))
+                         (is_digit8 ($peek stream)))
                     (set x (+ (* x 8) (digit_value ($next stream))))
                   (error "illegal octal character escape"))
                 x))
