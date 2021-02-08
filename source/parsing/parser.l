@@ -15,20 +15,6 @@
 
 (<selector>-add-method $at <string> string-at)
 
-;; NOTE there's a variant of this in arrays.l
-(define-function binary-search (seq obj cmp)
-  (let ((lo 0)
-	(hi (- ($size seq) 1))
-	(ix ()))
-    (while (and (not ix) (<= lo hi))
-      (let* ((m (/ (+ lo hi) 2))
-	     (s ($at seq m)))
-	(cond
-	  ((cmp obj s)	(set hi (- m 1)))
-	  ((cmp s obj)	(set lo (+ m 1)))
-	  (else		(set ix m)))))
-    (or ix -1)))
-
 ;;;----------------------------------------------------------------
 
 ;(define <token> <pair>)		(define token cons)			(define new-<token> cons)
@@ -261,8 +247,9 @@
 
 (define-function parser-stream-match-class (self class)
   (let ((obj (parser-stream-peek self)))
-    (and (long? obj) (<= 0 (binary-search class obj <))
-	 (parser-stream-next self))))
+    (and (long? obj)
+         (<= 0 (binary-search class $size $at obj -))
+         (parser-stream-next self))))
 
 (define-function parser-stream-fail (self position)
   (set (<parser-stream>-position self) position)

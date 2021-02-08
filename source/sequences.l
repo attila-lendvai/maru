@@ -104,19 +104,21 @@
   (%sort items string-at set-string-at (or (car options) <) 0 (- (string-length items) 1))
   items)
 
-(define-function %search (items length at obj compare)
+(define-function binary-search (seq length at obj compare)
   (let ((lo 0)
-        (hi (- (length items) 1))
+        (hi (- (length seq) 1))
         (ix ()))
     (while (<= lo hi)
-      (let* ((m (/ (+ lo hi) 2))
-             (s (at items m))
-             (c (compare obj s)))
+      (let* ((mid	(/ (+ lo hi) 2))
+             (cand	(at seq mid))
+             (diff	(compare obj cand)))
         (cond
-          ((< c 0)	(set hi (- m 1)))
-          ((> c 0)	(set lo (+ m 1)))
-          (else		(set ix m) (set lo (+ hi 1))))))
-    ix))
+          ((< diff 0)	(set hi (- mid 1)))
+          ((> diff 0)	(set lo (+ mid 1)))
+          (else		(set ix mid) (set lo (+ hi 1))))))
+    ;; (- lo) could communicate the insertion point for a missing
+    ;; element... except when the array is empty.
+    (or ix -1)))
 
-(define-function array-search  (arr obj . options)	(%search arr array-length  array-at  obj (or (car options) -)))
-(define-function string-search (str obj . options)	(%search str string-length string-at obj (or (car options) -)))
+;; (define-function array-search  (arr obj . options)	(binary-search arr array-length  array-at  obj (or (car options) -)))
+;; (define-function string-search (str obj . options)	(binary-search str string-length string-at obj (or (car options) -)))
