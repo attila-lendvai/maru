@@ -792,6 +792,8 @@
 ;;;
 ;;; linux syscalls
 ;;;
+;;; https://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/
+;;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 
 (define-instruction LINUX-SYSCALL (() 1 t)
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
@@ -808,7 +810,12 @@
        (x86-64
         (set mov	"movq")
         (set syscall	"	syscall")
-        (set regs	+linux/syscall-registers/64+))
+        (set regs	+linux/syscall-registers/64+)
+        ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
+        ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
+        ;; "The kernel destroys registers %rcx and %r11."
+        (push clobbers "%rcx")
+        (push clobbers "%r11"))
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
      (list-do _ $1
@@ -826,6 +833,7 @@
        ;;  movl    %rdx, %eax
        (print ",m"))
      ;; clobbered registers
+     (print ",~{memory}") ; this communicates to LLVM that our asm block may have written to arbitrary memory addresses.
      (while clobbers
        (print ",~{"(pop clobbers)"}"))
      (print "\"\n	(")
