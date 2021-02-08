@@ -522,6 +522,9 @@
 (define-form gen (instr-name . args)
   `(%gen -c- ,instr-name (list ,@args)))
 
+(define-function new-reg-name (base -c-)
+  (concat-string base (number->string (incr (<llvm-compiler>-reg-counter -c-)))))
+
 (define-function %gen (-c- factory args)
   (let ((instr (factory)))
     (when (<instruction>-has-input? instr)
@@ -531,7 +534,7 @@
     (set (<instruction>-regs instr)
          (let ((temps ()))
            (times-do (<instruction>-n-regs instr)
-             (push temps (LOCAL (concat-string "r" (number->string (incr (<llvm-compiler>-reg-counter -c-)))))))
+             (push temps (LOCAL (new-reg-name "r" -c-))))
            (list->array temps)))
     ;; update current-value
     (when (<instruction>-produces-output? instr)
@@ -563,7 +566,7 @@
      (<compiler>-current-value -c-)))
 
 ;;;
-;;; Compiling
+;;; Compiling lambdas
 ;;;
 
 (define-function compile/prog-into-temp (prog -c-)
@@ -645,6 +648,93 @@
     (emit/function-epilogue)
     (when indirect?
       (emit DEFINE (GLOBAL name) self))))
+
+;;;
+;;; Compiling calls
+;;;
+
+(define-function compile-call (op args -c-)
+  (assert op "compile-call: operator is nil")
+  (let ((arg-regs (map (lambda (arg)
+                         (gen COMMENT (list "arg " arg))
+                         (comp arg)
+                         (<compiler>-current-value -c-))
+                       args)))
+
+    (let ((n-params	(compile-call-to (if (variable? op)
+                                             (<variable>-value op)
+                                           op)
+                                         op arg-regs -c-))
+          (arity	(list-length args)))
+      (when (and n-params
+                 (not (= n-params arity)))
+        (error "compile: calling "op" with the wrong number of arguments: "
+               args", while expecting "n-params)))))
+
+(define-method compile-call-to <TEMP> (op arg-regs -c-)
+  (comp op)
+  (gen CALLPTR arg-regs)
+  ())
+
+(define-method compile-call-to <pair> (op arg-regs -c-)
+  (comp op)
+  (gen CALLPTR arg-regs)
+  ())
+
+(define-method compile-call-to <expr> (op arg-regs -c-)
+  (if feature/redefinable-functions-in-target
+      (let ()
+        (comp op)
+        (gen CALLPTR arg-regs))
+    (gen CALL (GLOBAL (<variable>-name op)) arg-regs))
+  (<expr>-n-required-parameters self))
+
+(define-method compile-call-to <C-function> (op arg-regs -c-)
+  (let ((param-types self.parameter-types))
+    (gen COMMENT (list "	casting FFI args"))
+    ;; for FFI calls we need to cast the non-pointer llvm args
+    ;; using ptrtoint to the specific llvm type.
+    (let ((param-type	())
+          (new-arg-regs	())
+          (arg		())
+          (arg-lst	arg-regs)
+          (param-lst	param-types))
+      (while (set arg (pop arg-lst))
+        (set param-type (awhen (pop param-lst)
+                          (C-type->llvm-type it)))
+        (if (or (= ()    param-type) ; vararg calls have more args than params
+                (= '%ptr param-type))
+            (push new-arg-regs arg)
+          (let ((cast-reg (LOCAL (new-reg-name "ffi-cast" -c-))))
+            ;; TODO check for value range issues?
+            (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
+            (push new-arg-regs cast-reg))))
+      ;; gen the call itself
+      (gen CALL self (list-reverse! new-arg-regs)))
+    ;; convert return value
+    (let ((return-type (C-type->llvm-type self.return-type)))
+      (case return-type
+        (%ptr)                          ; all good
+        (void
+         (gen COMMENT (list "	void FFI call return value"))
+         (gen LOAD (LITERAL 0) 0))
+        (else
+         (let ((bitsize	(llvm-type-bitsize return-type))
+               (word-size	(target-value +word-size-in-bits+)))
+           (cond
+             ((< bitsize word-size)
+	      (gen SEXT return-type '%word))
+
+             ((> bitsize word-size)
+	      (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " return-type))))
+         (gen INTTOPTR '%word))))
+    (unless (<C-function>-vararg? self)
+      (list-length param-types))))
+
+(define-method compile-call-to (slave-value <selector>) (op arg-regs -c-)
+  (gen CALL (GLOBAL (eval-in-slave `(<selector>-name ,self))) arg-regs)
+  ;; TODO extract and return n-params
+  ())
 
 ;;;
 ;;; Special Forms
@@ -963,24 +1053,6 @@
     (emit DEFINE const self)
     (gen ADDR const self)))
 
-(define-function compile-call (op args -c-)
-  (assert op "compile-call: operator is nil")
-  (let ((arg-regs (map (lambda (arg)
-                         (gen COMMENT (list "arg " arg))
-                         (comp arg)
-                         (<compiler>-current-value -c-))
-                       args)))
-
-    (let ((n-params	(compile-call-to (if (variable? op)
-                                             (<variable>-value op)
-                                           op)
-                                         op arg-regs -c-))
-          (arity	(list-length args)))
-      (when (and n-params
-                 (not (= n-params arity)))
-        (error "compile: calling "op" with the wrong number of arguments: "
-               args", while expecting "n-params)))))
-
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
          (op-is-a-var?	(variable? op))
@@ -999,71 +1071,6 @@
       (else
        (compile-call op args -c-)))))
 
-(define-method compile-call-to <TEMP> (op arg-regs -c-)
-  (comp op)
-  (gen CALLPTR arg-regs)
-  ())
-
-(define-method compile-call-to <pair> (op arg-regs -c-)
-  (comp op)
-  (gen CALLPTR arg-regs)
-  ())
-
-(define-method compile-call-to <expr> (op arg-regs -c-)
-  (if feature/redefinable-functions-in-target
-      (let ()
-        (comp op)
-        (gen CALLPTR arg-regs))
-    (gen CALL (GLOBAL (<variable>-name op)) arg-regs))
-  (<expr>-n-required-parameters self))
-
-(define-method compile-call-to <C-function> (op arg-regs -c-)
-  (let ((param-types self.parameter-types))
-    (gen COMMENT (list "	casting FFI args"))
-    ;; for FFI calls we need to cast the non-pointer llvm args
-    ;; using ptrtoint to the specific llvm type.
-    (let ((param-type	())
-          (new-arg-regs	())
-          (arg		())
-          (arg-lst	arg-regs)
-          (param-lst	param-types))
-      (while (set arg (pop arg-lst))
-        (set param-type (awhen (pop param-lst)
-                          (C-type->llvm-type it)))
-        (if (or (= ()    param-type) ; vararg calls have more args than params
-                (= '%ptr param-type))
-            (push new-arg-regs arg)
-          (let ((cast-reg (LOCAL (concat-string "ffi-cast" (number->string (incr (<llvm-compiler>-reg-counter -c-)))))))
-            ;; TODO check for value range issues?
-            (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
-            (push new-arg-regs cast-reg))))
-      ;; gen the call itself
-      (gen CALL self (list-reverse! new-arg-regs)))
-    ;; convert return value
-    (let ((return-type (C-type->llvm-type self.return-type)))
-      (case return-type
-        (%ptr)                          ; all good
-        (void
-         (gen COMMENT (list "	void FFI call return value"))
-         (gen LOAD (LITERAL 0) 0))
-        (else
-         (let ((bitsize	(llvm-type-bitsize return-type))
-               (word-size	(target-value +word-size-in-bits+)))
-           (cond
-             ((< bitsize word-size)
-	      (gen SEXT return-type '%word))
-
-             ((> bitsize word-size)
-	      (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " return-type))))
-         (gen INTTOPTR '%word))))
-    (unless (<C-function>-vararg? self)
-      (list-length param-types))))
-
-(define-method compile-call-to (slave-value <selector>) (op arg-regs -c-)
-  (gen CALL (GLOBAL (eval-in-slave `(<selector>-name ,self))) arg-regs)
-  ;; TODO extract and return n-params
-  ())
-
 ;;;
 ;;; COMPILE-DEFINITION
 ;;;
@@ -1078,7 +1085,7 @@
   (let (;;(target-triplet		(slave-value +target-triplet+))
         (word-size		(target-value +word-size-in-bits+))
         (-c- self))
-    (verbosity 1 (warn "\nCompiling for word size: " word-size " bits\n\n"))
+    (verbosity 1 (warn "\nCompiling to LLVM, word size: " word-size " bits\n\n"))
     ;;(assert (string?	target-triplet))
     (assert (long?	word-size))
     ;; our output is less specific, so allow the makefile, or whoever builds the
