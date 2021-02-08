@@ -68,7 +68,7 @@
 ;; TODO implemenet inheritance on compiled selectors
 (define-method $put-all <libc-stream> (elements)
   (typecase elements
-    (<string>		(when (= libc/EOF (libc/fputs (get/string elements) self.handle))
+    (<string>		(when (= libc/EOF (libc/fwrite (get/string elements) (string-length elements) 1 self.handle))
                           (error "<libc-stream> $put-all: libc/fputs returned with error")))
     (else		(error "<libc-stream> $put-all: unexpected elements: " elements)))
   elements)
