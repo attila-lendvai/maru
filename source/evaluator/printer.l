@@ -25,7 +25,7 @@
     (let ((type (type-of obj)))
       ;; TODO use typecase
       (cond
-        ((= type <undefined>)		($put-all stream (string-from-cstring "()")))
+        ((= type <undefined>)		($put-all stream "()"))
         ((= type <long>)		($put-all stream (long->string (unbox <long> obj))))
         ((= type <symbol>)		($put-all stream (<symbol>-name obj)))
 
@@ -41,14 +41,14 @@
            (when (pair? (set obj (get/tail obj)))
              ($put stream ?\ )))
          (when obj
-           ($put-all stream (string-from-cstring " . "))
+           ($put-all stream " . ")
            (do-print stream obj storing?))
          ($put stream ?\) ))
 
         ((= type <array>)
          (error-if-storing)
          (let ((len (array-length obj)))
-           ($put-all stream (string-from-cstring "Array("))
+           ($put-all stream "Array(")
            (for (i 0 len)
              (and i ($put stream ?\ ))
              (do-print stream (array-at obj i) storing?))
@@ -56,7 +56,7 @@
 
         ((= type <expr>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Expr<"))
+         ($put-all stream "Expr<")
          (when-at-expand feature/track-expr-names
            (aif (<expr>-name obj)
                (do-print stream it storing?)
@@ -67,7 +67,7 @@
 
         ((= type <form>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Form<"))
+         ($put-all stream "Form<")
          (do-print stream (<form>-function obj) storing?)
          ($put stream ?,)
          (do-print stream (<form>-symbol   obj) storing?)
@@ -75,14 +75,14 @@
 
         ((= type <fixed>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Fixed<"))
+         ($put-all stream "Fixed<")
          (do-print stream (<fixed>-function obj) storing?)
          ($put stream ?> ))
 
         ((= type <primitive-function>)
          (error-if-storing)
          ($put stream ?.)
-         ($put-all stream (string-from-cstring (<primitive-function>-_name obj))))
+         ($put-all stream (<primitive-function>-name obj)))
 
         ((= type <variable>)
          (error-if-storing)
@@ -101,45 +101,44 @@
                (offset		(<env>-offset	obj)))
            (if (and level bindings offset)
                (let ()
-                 ($put-all stream (string-from-cstring "Env<Lv"))
+                 ($put-all stream "Env<Lv")
                  (do-print stream level storing?)
-                 ($put-all stream (string-from-cstring ",Off"))
+                 ($put-all stream ",Off")
                  (do-print stream offset storing?)
-                 ($put-all stream (string-from-cstring ",#"))
+                 ($put-all stream ",#")
                  (do-print stream (box <long> (array-length bindings)) storing?))
-             ($put-all stream (string-from-cstring "Env<?>")))))
+             ($put-all stream "Env<?>"))))
 
         ((= type <context>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Context<>")))
+         ($put-all stream "Context<>"))
 
         ((= type <module>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Module<"))
+         ($put-all stream "Module<")
          (when-at-expand feature/debug-info
-           (do-print stream (or (<module>-name obj)
-                                (string-from-cstring "?")) false)
+           (do-print stream (or (<module>-name obj) "?") false)
            ($put stream ?,))
          (do-print stream (module-env obj) storing?)
          ($put stream ?>))
 
         ((= type <type>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Type"))
-         (do-print stream (or (<type>-name obj)
-                              (string-from-cstring "?")) false))
+         ($put-all stream "Type")
+         (do-print stream (or (<type>-name obj) "?") false))
 
         ((= type <record>)
          (error-if-storing)
-         ($put-all stream (string-from-cstring "Record"))
+         ($put-all stream "Record")
          ;; KLUDGE we need to disable accessor typecheck here, because the target universe is unaware of inheritance
          (do-print stream (or (with-forms ((%accessor-typecheck ((type obj) obj)))
                                 (<type>-name obj))
-                              (string-from-cstring "?")) false))
+                              "?")
+           false))
 
         (else
          (error-if-storing)
-         ($put-all stream (string-from-cstring "[instof:"))
+         ($put-all stream "[instof:")
          (do-print stream (box <long> type) storing?)
          ($put stream ?\] ))))))
 

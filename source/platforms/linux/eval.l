@@ -2,7 +2,7 @@
 
 (define *standard-input*)
 (define *standard-output*)
-(define *standard-error*)
+(define *error-output*)
 (define *debug-output*)
 
 (require "source/platforms/linux/linux.l")
@@ -25,9 +25,9 @@
 ;; NOTE binding this into the interpreter's env is only useful/meaningful if its LIBC-STREAM type is also
 ;; properly initialized in the interpreter's env. otherwise it would be there an object of an unknown type.
 ;; TODO add compilation of symbols and drop the string->symbol call
-;; (define-symbol-form *standard-input*  (global-variable-value (u/string->symbol "*standard-input*")))
-;; (define-symbol-form *standard-output* (global-variable-value (u/string->symbol "*standard-output*")))
-;; (define-symbol-form *standard-error*  (global-variable-value (u/string->symbol "*standard-error*")))
+;; (define-symbol-form *standard-input*  (global-variable-value (string->symbol "*standard-input*")))
+;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
+;; (define-symbol-form *error-output*  (global-variable-value (string->symbol "*standard-error*")))
 
 (define-function initialize-streams ()
   (gc/let* (tmp)
@@ -36,11 +36,11 @@
                            (set tmp (file-stream (box <target-vm-pointer> ,fd)))
                            (set ,our-name tmp)
                            ;; TODO add support for compiling symbols
-                           (set (global-variable-value (u/string->symbol ,(symbol->string our-name))) tmp)))))
+                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)))))
       (doit linux/stdin  *standard-input*)
       (doit linux/stdout *standard-output*)
-      (doit linux/stderr *standard-error*)
-      (set *debug-output* *standard-error*))))
+      (doit linux/stderr *error-output*)
+      (set *debug-output* *error-output*))))
 
 (load "source/evaluator/vm-with-file-support.l")
 (load "source/evaluator/vm-late.l")
@@ -55,13 +55,11 @@
 
   (verbosity 1
     (gc/collect)
-    (let ((out *standard-error*))
-      (do-print out (box <long> gc/objects-live) false)
-      (do-print out (string-from-cstring " objects in ") false)
-      (do-print out (box <long> gc/bytes-used) false)
-      (do-print out (string-from-cstring "  bytes,  ") false)
-      (do-print out (box <long> gc/bytes-free) false)
-      (do-print out (string-from-cstring " bytes free\n") false)))
+    (let ((out *error-output*))
+      (print-all *error-output*
+                 (box <long> gc/objects-live)" objects in "
+                 (box <long> gc/bytes-used)" bytes, "
+                 (box <long> gc/bytes-free)" bytes free\n")))
   (when-at-expand feature/profiler
     (profiler/disable))
   (platform/flush-streams)

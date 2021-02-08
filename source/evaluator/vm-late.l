@@ -8,10 +8,14 @@
 (load "source/evaluator/primitive-functions.l")
 
 (define-function instantiate-primitive-function (module name imp fixed?)
+  ;; NOTE <primitive-function> is an opaque object, but it's ok to use
+  ;; <symbols>'s as their name because they are held as gc roots by
+  ;; the *symbols* array.
   (gc/let* ((tmp (primitive-function imp name)))
     (when fixed?
       (set tmp (fixed tmp)))
-    (environment-define (module-env module) (u/string->symbol name) tmp)))
+    ;; NOTE string->symbol doesn't need gc/let* because *symbols* is a gc root
+    (environment-define (module-env module) (string->symbol name) tmp)))
 
 (define-form instantiate-primitive-functions (module)
   `(let ((__module__ ,module))
@@ -26,18 +30,17 @@
   (let ((env (module-env module)))
     (gc/let* ((tmp))
       ;; TODO this way *verbosity* in the evaluator and in the target is not in sync. see how *standard-output* is defined.
-      (set tmp (box <long> *verbosity*))	(environment-define env (u/string->symbol "*verbosity*")		tmp)
-      (set tmp (box <long> *optimised*))	(environment-define env (u/string->symbol "*optimised*")		tmp)
+      (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
+      (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
       ;; create an uninterned singleton symbol (i.e. a unique identity that cannot be recreated in any other way)
-      (gc/let* ((name (string-from-cstring "+end+")))
-        (set +end+ (or +end+ (set tmp (symbol name))))
-        ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
-        (environment-define env (string->symbol name) +end+)))
+      (set +end+ (or +end+ (set tmp (symbol "+end+"))))
+      ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
+      (environment-define env (string->symbol "+end+") +end+))
 
     ;; make sure the symbol true evaluates to itself
     (environment-define env symbol/true symbol/true)
 
-    (environment-define env (u/string->symbol "*maru-module*") *maru-module*)
+    (environment-define env (string->symbol "*maru-module*") *maru-module*)
 
     (instantiate-primitive-functions module)
 
@@ -68,16 +71,26 @@
 
   (safety 4 (set gc/frequency 1))
   (debug (platform/print-diag "gc initialized"))
-  (assert (= <long>	(type-of (box <long> 42)))	"type-of for <long> is broken")
-  (assert (= 42		(unbox <long> (box <long> 42)))	"unbox of <long> is broken")
-  (assert (= 1 true)	"true is not 1")
-  (assert (= 0 false)	"false is not 0")
 
   (gc/push-root (address-of *module*))
   (gc/push-root (address-of *maru-module*))
   (gc/push-root (address-of *symbols*))
 
   (debug (platform/print-diag "gc roots registered"))
+
+  (safety 2
+    (or (= <long> (type-of (box <long> 42)))		(fatal "type-of for <long> is broken"))
+    (or (= 42 (unbox <long> (box <long> 42)))		(fatal "unbox of <long> is broken"))
+    (or (= 1 true)					(fatal "true is not 1"))
+    (or (= 0 false)					(fatal "false is not 0"))
+    (let ((lit-str "a literal string"))
+      (or (= <string> (type-of lit-str))	(fatal "type-of a literal <string> is broken"))
+      (or (string? lit-str)			(fatal "string? for a literal <string> is broken"))
+      (or (= 16 (string-length lit-str))	(fatal "string-length broken for a literal <string>")))
+    (let ((str (string 16)))
+      (string-append-all str "foo")
+      (string-append-all str "bar")
+      (or (string= str "foobar") (fatal1 "string-append-all broken: '%s'" (string->C-string str)))))
 
   (when-at-expand feature/backtrace
     (debug (platform/print-diag "initializing *call-stack*"))

@@ -737,6 +737,53 @@
   ())
 
 ;;;
+;;; Compiling string literals
+;;;
+
+(define-function compile-string-to-object (self -c-)
+  ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
+  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+  (let ((elements	(unique-name "cstr"))
+        (object		(unique-name "str")))
+    (emit DEFINE (CONSTANT (GLOBAL elements) self) self)
+    ;; TODO use a string-output-stream to simplify this
+    (let ((buf ""))
+      (with-forms ((e (values `(let ()
+                                 ,@(map (lambda (value)
+                                          `(set buf (concat-string buf ,value)))
+                                        values)))))
+
+        ;; emit a constant <string> struct
+        (e "@"(llvm/escape-global-identifier object))
+        (e " = private unnamed_addr constant %\"<string>\" { %\"<header>\" { %ptr null, %word -1, %word ")
+        (e (number->string (slave-value (+ <header>-flags/used <header>-flags/opaque))))
+        (e ", %word ")
+        (e (number->string (eval-in-slave `(<type>-slave-id (type-of ,self)))))
+        (when (slave-value feature/object-canary)
+          (e ", %word "(number->string (slave-value +canary-value+))))
+        (e "}, %word ")
+        ;; KLUDGE see emit-x86.l for description
+        ;;(e (long->string (eval-in-target `(box <long> ,(string-length self)))))
+        (e (number->string (bitwise-or (bitwise-shift (string-length self) 1) 1)))
+        (e ", %ptr bitcast ([" (number->string (+ 1 (string-length self))) " x i8]* @"(llvm/escape-global-identifier elements)" to %ptr) }\n")
+        (emit INLINE buf)
+
+        ;; gen a load of it
+        (set buf (string 16))
+        (let ((reg1 (new-reg-name "r" -c-))
+              (reg2 (new-reg-name "r" -c-)))
+          (e "\t%"reg1" = getelementptr %\"<string>\", %\"<string>\"* @"(llvm/escape-global-identifier object)", i32 0, i32 1\n")
+          (e "\t%"reg2" = bitcast %word* %"reg1" to %ptr\n")
+          (gen INLINE buf)
+          ;; KLUDGE
+          (set (<compiler>-current-value -c-) (LOCAL reg2)))))))
+
+(define-function compile-string-to-C-string (self -c-)
+  (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
+    (emit DEFINE const self)
+    (gen ADDR const self)))
+
+;;;
 ;;; Special Forms
 ;;;
 
@@ -879,6 +926,12 @@
         (else
          (error "compile/address-of don't know how to handle "var", holding value "val))))))
 
+(define-function compile/C-string (expr -c-)
+  ;; just an optimization to compile string literals into a C string
+  ;; when they would be immediately converted anyway.
+  (assert (= (list-length expr) 2))
+  (compile-string-to-C-string (second expr) -c-))
+
 ;;;
 ;;; linux syscalls
 ;;;
@@ -951,6 +1004,7 @@
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
+  (cons (target-value C-string)		compile/C-string)
   ))
 
 ;;;
@@ -1044,9 +1098,7 @@
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
-  (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
-    (emit DEFINE const self)
-    (gen ADDR const self)))
+  (compile-string-to-object self -c-))
 
 (define-method compile <array> (-c-)
   (let ((const (CONSTANT (GLOBAL (unique-name "arr")) self)))
@@ -1093,5 +1145,12 @@
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
     (emit INLINE (concat-strings "%word = type i" (number->string word-size) "\n"))
     (emit INLINE "%ptr = type i8*\n")
+    ;; TODO this should be done by a general emitter
+    (emit INLINE (concat-strings "%\"<header>\" = type { %ptr, %word, %word, %word"
+                                 (if (slave-value feature/object-canary)
+                                     ", %word"
+                                   "")
+                                 " }\n"))
+    (emit INLINE (concat-strings "%\"<string>\" = type { %\"<header>\", %word, %ptr }\n"))
     ;; KLUDGE
     (emit INLINE "%struct._IO_FILE = type opaque\n")))

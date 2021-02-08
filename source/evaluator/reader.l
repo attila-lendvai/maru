@@ -90,48 +90,46 @@
     c))
 
 (define-function read/number (c stream)
-  (gc/let* ((buf (buffer)))
+  (gc/let* ((buf (string 16)))
     (let ((negative?	false)
           (base		10))
       (if (= ?- c)
           (set negative? true)
-        (buffer-append buf c))
+        (string-append buf c))
       (while (is_digit10 (set c ($peek stream)))
-        (buffer-append buf ($next stream)))
+        (string-append buf ($next stream)))
       ;; a 0x prefix?
       (when (and (= ?x c)
-                 (= 1 (buffer-length buf)))
+                 (= 1 (string-length buf)))
         ($next stream)
         (set base 16)
-        (set (<buffer>-size buf) (box <long> 0)) ; TODO introduce API for this
+        (set (<string>-size buf) (box <long> 0)) ; TODO introduce API for this
         (while (is_digit16 ($peek stream))
-          (buffer-append buf ($next stream))))
-      (let* ((str	(string-from-cstring (buffer-contents buf)))
-             (result	(string->long* str base)))
+          (string-append buf ($next stream))))
+      (let ((result	(string->long* buf base)))
         (when (= +end+ result)
-          (error "invalid number in source code, string->long* has failed for '"str"' (it's printed without the sign here)"))
+          (error "invalid number in source code, string->long* has failed for '"buf"' (it's printed without the sign here)"))
         (box <long> (if negative? (- result) result))))))
 
 (define-function read/symbol (c stream)
-  (gc/let* ((buf (buffer)))
+  (gc/let* ((buf (string 16)))
     (assert (or (is_letter c) (is_digit10 c)))
-    (buffer-append buf c)
+    (string-append buf c)
     (while (and (set c ($peek stream))
                 (or (is_letter c) (is_digit10 c)))
-      (buffer-append buf ($next stream)))
-    (u/string->symbol (buffer-contents buf))))
+      (string-append buf ($next stream)))
+    (string->symbol buf)))
 
 (define-function read/string-literal (stream)
   ($next stream) ; drop opening "
-  (gc/let* ((buf (buffer)))
+  (gc/let* ((buf (string 8)))
     (let (c)
       (until (= ?\" (set c ($next stream)))
         (set c (read/char c stream))
         (when (= +end+ c)
           (error "unterminated string literal"))
-        (buffer-append buf c)))
-    ;; FIXME this breaks with zeroes in the string
-    (string-from-cstring (buffer-contents buf))))
+        (string-append buf c)))
+    buf))
 
 (define read-nested) ; forward
 (define read-toplevel) ; forward

@@ -21,22 +21,21 @@
               (do-print *standard-output* res false)
               (platform/flush-streams)))))
       (when stdin?
-        ($put-all *standard-output* (string-from-cstring "\nmorituri te salutant\n")))
+        ($put-all *standard-output* "\nmorituri te salutant\n"))
       res)))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
         (file-name	(second args)))
     `(gc/let* ((__file-name	,file-name)
-               (__mode		(string-from-cstring "r"))
-               (__file-handle	(or (file-open __file-name __mode)
+               (__file-handle	(or (file-open __file-name "r")
                                     (error "with-input-from-file: file-open failed for: " __file-name)))
                (,var		(file-stream __file-handle))
                (__result	,@body))
        (file-close __file-handle)
        __result)))
 
-(define-primitive-function (load ()) ((path <string> _ nounbox))
+(define-primitive-function (load ()) ((path <string>))
   (with-input-from-file (stream path)
     (expand-encode-eval-stream stream)))
 
@@ -44,13 +43,13 @@
   (debug-print "start processing argv")
 
   ;; *command-line-arguments*
-  (let ((cla-var (environment-define (module-env *module*) (u/string->symbol "*command-line-arguments*") ())))
+  (let ((cla-var (environment-define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
         (while (< 0 (decr idx)) ; skip the first, which is the name of the executable
           (set tmp (cons () tmp))
-          (put/head tmp (string-from-cstring (oop-at argv idx)))
+          (put/head tmp (C-string->string (oop-at argv idx)))
           (debug-print "processing argv "(box <long> idx)" = "(get/head tmp))))
       (set (<variable>-value cla-var) tmp))
 
@@ -66,32 +65,32 @@
             (pop-cla)
             (cond
               ;; -v
-              ((string= arg (string-from-cstring "-v"))
+              ((string= "-v" arg)
                (incr *verbosity*)
                (set tmp (box <long> *verbosity*))
-               (set (global-variable-value (u/string->symbol "*verbosity*")) tmp))
+               (set (global-variable-value (string->symbol "*verbosity*")) tmp))
 
               ;; -O
-              ((string= arg (string-from-cstring "-O"))
+              ((string= "-O" arg)
                (incr *optimised*)
                (set tmp (box <long> *optimised*))
-               (set (global-variable-value (u/string->symbol "*optimised*")) tmp))
+               (set (global-variable-value (string->symbol "*optimised*")) tmp))
 
               ;; -p
-              ((string= arg (string-from-cstring "-p"))
+              ((string= "-p" arg)
                (if-at-expand feature/profiler
                    (let ((usecs 1000))
                      (install_profiler_handler profiler/take-sample)
                      (set_profiler_interval usecs)
-                     (platform/print-diag "profiling at every %ld uSec(s)\n" usecs))
-                 (platform/print-diag "WARNING: this build has no profiler, ignoring -p\n")))
+                     (platform/print-diag-fmt "profiling at every %ld uSec(s)" usecs))
+                 (platform/print-diag "WARNING: this build has no profiler, ignoring -p")))
 
               ;; -
-              ((string= arg (string-from-cstring "-"))
+              ((string= "-" arg)
                (repl-stream *standard-input*))
 
               ;; --call to call a function
-              ((string= arg (string-from-cstring "--call"))
+              ((string= "--call" arg)
                (debug-print "processing a --call")
                (unless (pair? cla)
                  (fatal "--call requires an argument"))
@@ -102,7 +101,7 @@
                    (expand-encode-eval form (module-env *module*)))))
 
               ;; --define to define a variable
-              ((string= arg (string-from-cstring "--define"))
+              ((string= "--define" arg)
                (debug-print "processing a --define")
                (unless (and (pair? cla)
                             (pair? (get/tail cla)))
@@ -121,6 +120,6 @@
 
               ;; read file as a program
               (else
-               (verbosity 1 (platform/print-diag "loading file: "(get/string arg)"\t(as a CLA)"))
+               (verbosity 1 (print-all *debug-output* "loading file: "arg"\t(as a CLA)\n"))
                (with-input-from-file (stream arg)
                  (repl-stream stream))))))))))

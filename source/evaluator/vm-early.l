@@ -44,15 +44,11 @@
 
 (define-form debug-print objs
   `(debug
-    (print-all *debug-output*
-               ,@(map (lambda (obj)
-                        (if (is <string> obj)
-                            ;; TODO literal strings should be compiled into full objects
-                            `(string-from-cstring ,obj)
-                          obj))
-                      objs))
-    ;; TODO? use $put
-    (do-print *debug-output* (string-from-cstring "\n") false)))
+    ;; only after streams are initialized. use platform/print-diag for debug output prior to that point.
+    (when *debug-output*
+      (print-all *debug-output* ,@objs)
+      ;; TODO? use $put
+      (do-print *debug-output* "\n" false))))
 
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
 ;;(define-form assert		prog ())
@@ -117,8 +113,8 @@
 
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
-    print println read encode expand eval u/string->symbol string->symbol %accessor-typecheck
-    abort string-from-cstring
+    print println read encode expand eval string->symbol %accessor-typecheck
+    abort %string->C-string
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
     environment-define defined?
@@ -133,7 +129,7 @@
      (define-function initialize-symbol-cache ()
        ,@(map (lambda (name)
                 `(set ,(concat-symbol 'symbol/ name)
-                      (u/string->symbol ,(symbol->string name))))
+                      (string->symbol ,(symbol->string name))))
               symbols))))
 
 (define-symbol-cache
@@ -150,6 +146,30 @@
 
 (define *error-level* 0)
 
+;;
+;; FATAL is a low-level facility, it directly uses the libc's printf
+;; (i.e. it cannot print maru objects, but works early in the init).
+;;
+(define-function fatal-prologue ()
+  (incr *error-level*)
+  (platform/print-diag "\nERROR:"))
+
+(define-function fatal-epilogue ()
+  (platform/print-diag) ; newline
+  (abort))
+
+;; NOTE: FATAL needs to be a form so that platform/print-diag expands
+;; to a C-string compiler special form; i.e. no advanced facility is
+;; called while early in the init.
+(define-form fatal  (fmt)           `(let () (fatal-prologue) (platform/print-diag ,fmt)                 (fatal-epilogue)))
+(define-form fatal1 (fmt arg)       `(let () (fatal-prologue) (platform/print-diag-fmt ,fmt ,arg)        (fatal-epilogue)))
+(define-form fatal2 (fmt arg1 arg2) `(let () (fatal-prologue) (platform/print-diag-fmt ,fmt ,arg1 ,arg2) (fatal-epilogue)))
+
+;;
+;; ERROR (and ASSERT!) goes through the maru printing facility
+;; (i.e. it must not get called with an unboxed .asciz, nor before
+;; streams and the VM is properly initialized).
+;;
 (define-function error-prologue ()
   (incr *error-level*)
   (unless *error-output*
@@ -167,22 +187,14 @@
   (platform/print-diag) ; newline
   (abort))
 
-;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
-;; ERROR goes through the maru printing facility (i.e. must not get called with an unboxed .asciz).
-(define-function fatal  (fmt)           (error-prologue) (platform/print-diag fmt)               (platform/print-diag "\n") (abort))
-(define-function fatal1 (fmt arg)       (error-prologue) (platform/print-diag-fmt fmt arg)       (platform/print-diag "\n") (abort))
-(define-function fatal2 (fmt arg1 arg2) (error-prologue) (platform/print-diag-fmt fmt arg1 arg2) (platform/print-diag "\n") (abort))
+(define-function %error (arg)
+  (do-print *error-output* arg false))
 
 (define-form error args
   `(let ()
      (error-prologue)
      ,@(map (lambda (arg)
-              ;; string literals are turned into pointers to .asciz, therefore
-              ;; we need to print them using libc/fputs (or instantiate
-              ;; them into Maru objects using string-from-cstring).
-              (if (string? arg)
-                  `(platform/print-diag ,arg)
-                `(print ,arg)))
+              `(%error ,arg))
             args)
      (error-epilogue)))
 
@@ -194,17 +206,17 @@
  (define *primitive-function-registry* ())
  (define *primitive-function-type-accessors*
      '((<long>			(long?)				(unbox <long>))
-       (<string>		(string?)			(get/string))
+       (<string>		(string?))
        (<target-vm-pointer>	(is <target-vm-pointer>)	(unbox <target-vm-pointer>))
        (<symbol>		(symbol?))
        (<pair>			(pair?))
        (<array>			(array?)))))
 
 (define-function %not-enough-arguments (name args)
-  (error (string-from-cstring name)": not enough arguments: "args))
+  (error name": not enough arguments: "args))
 
 (define-function %too-many-arguments (name args)
-  (error (string-from-cstring name)": too many arguments: "args))
+  (error name": too many arguments: "args))
 
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))

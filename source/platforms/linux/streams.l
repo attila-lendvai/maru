@@ -9,14 +9,14 @@
 ;;; files
 ;;;
 
-(define-primitive-function file-open ((path <string> _ nounbox) (mode <string> _ nounbox))
-  (let ((fd (linux-syscall linux/open (get/string path)
+(define-primitive-function file-open ((path <string>) (mode <string>))
+  (let ((fd (linux-syscall linux/open (string->C-string path)
                            (cond
                              ((or (not mode)
-                                  (string= mode (string-from-cstring "r")))
+                                  (string= mode "r"))
                               (bitwise-or linux/O_RDONLY
                                           linux/O_CREAT))
-                             ((string= mode (string-from-cstring "rw"))
+                             ((string= mode "rw")
                               linux/O_RDWR)
                              (else
                               (error "file-open: unexpected mode "mode" while opening "path)))
@@ -96,7 +96,7 @@
 (define-method $put-all <fd-stream> (elements)
   (typecase elements
     (<string>
-     (let ((buf	(get/string elements))
+     (let ((buf		(string->C-string elements))
            (size	(string-length elements)))
        (unless (= size (linux-syscall linux/write self.fd buf size))
          ;; TODO deal with EAGAIN and stuff...

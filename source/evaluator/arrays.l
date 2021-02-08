@@ -74,6 +74,15 @@
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
 
+(define-function string-insert-all (str idx insertion)
+  (string-do char insertion
+    (string-insert str idx char)
+    (incr idx))
+  str)
+
+(define-function string-append-all (str val)
+  (string-insert-all str (string-length str) val))
+
 ;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 

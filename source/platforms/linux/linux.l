@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/platforms/platform-c-based.l")
+
 (define-constant fd/stdin  0)
 (define-constant fd/stdout 1)
 (define-constant fd/stderr 2)
@@ -50,51 +52,30 @@
   `(for (i 0 ,count)
      (set (byte-at ,from i) 0)))
 
-(define-form platform/string-compare (a b)
-  `(let ((i	0)
-         (_a_	,a)
-         (_b_	,b)
-         (diff	0))
-     (while (and (= 0 (set diff (- (char-at _a_ i)
-                                   (char-at _b_ i))))
-                 (char-at _a_ i))
-       (incr i))
-     diff))
-
-;; TODO clean up this libc and cstring mess. if we use the same string representation in
-;; our string payloads as libc, it doesn't mean that we should use libc stuff directly to
-;; manipulate it.
-(define-form platform/string-length (cstr)
-  `(let ((i 0)
-         (_cstr_ ,cstr))
-     (while (char-at _cstr_ i)
-       (incr i))
-     i))
-
 (begin-for-syntax
  (define-function string+length (str)
    (let ((len (string-length str)))
      (assert (< 0 len))
-     (list str len))))
+     `((string->C-string ,str) ,len))))
 
-(define-form platform/print cstrs
+(define-form platform/print strs
   (let ((forms ()))
-    (list-do cstr cstrs
-      (push forms (if (is <string> cstr)
-                      `(linux-syscall linux/write fd/stdout ,@(string+length cstr))
-                    `(let ((x ,cstr))
-                       (linux-syscall linux/write fd/stdout x (platform/string-length x))))))
+    (list-do str strs
+      (push forms (if (is <string> str)
+                      `(linux-syscall linux/write fd/stdout ,@(string+length str))
+                    `(let ((x ,str))
+                       (linux-syscall linux/write fd/stdout (string->C-string x) (C-string-length x))))))
     `(let ()
        ,@(list-reverse! forms)
        (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
 
-(define-form platform/print-diag cstrs
+(define-form platform/print-diag strs
   (let ((forms ()))
-    (list-do cstr cstrs
-      (push forms (if (is <string> cstr)
-                      `(linux-syscall linux/write fd/stderr ,@(string+length cstr))
-                    `(let ((x ,cstr))
-                       (linux-syscall linux/write fd/stderr x (platform/string-length x))))))
+    (list-do str strs
+      (push forms (if (is <string> str)
+                      `(linux-syscall linux/write fd/stderr ,@(string+length str))
+                    `(let ((x ,str))
+                       (linux-syscall linux/write fd/stderr (string->C-string x) (C-string-length x))))))
     `(let ()
        ,@(list-reverse! forms)
        (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
@@ -104,7 +85,7 @@
   (let ((printer (if (is <string> format)
                      `(linux-syscall linux/write fd/stderr ,@(string+length format))
                    `(let ((x ,format))
-                      (linux-syscall linux/write fd/stderr x (platform/string-length x))))))
+                      (linux-syscall linux/write fd/stderr (string->C-string x) (C-string-length x))))))
     `(let ()
        ,printer
        (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))

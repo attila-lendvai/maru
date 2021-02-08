@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(require "source/platforms/platform-c-based.l")
+
 ;;;
 ;;; The libc FFI
 ;;;
@@ -22,9 +24,17 @@
 ;;;
 ;;; Platform API implementation when running under libc.
 ;;;
+
+;; NOTE OPTIMIZATION redefine the generic implementation with the one from libc
+;; this only works with the x86 backend: (set C-string-length libc/strlen)
+(define-form C-string-length (cstr)
+  `(libc/strlen ,cstr))
+
 (define-function platform/flush-streams ()
   (libc/fflush libc/stdout)
   (libc/fflush libc/stderr))
+
+;; NOTE copy means it may not overlap. move means they may overlap.
 
 ;; TODO these two are exported into the evaluator to provide the same api in interpreted code. how shall this be?
 (define-form copy-oops (from to wordcount)
@@ -42,30 +52,21 @@
 (define-form platform/clear-bytes (from count)
   `(libc/memset ,from 0 ,count))
 
-(define-form platform/string-compare (a b)
-  `(libc/strcmp ,a ,b))
-
-;; TODO clean up this libc and cstring mess. if we use the same string representation in
-;; our string payloads as libc, it doesn't mean that we should use libc stuff directly to
-;; manipulate it.
-(define-form platform/string-length (cstr)
-  `(libc/strlen ,cstr))
-
 (define-form platform/print strs
   `(let ()
-     ,@(map (lambda (str) `(libc/fputs ,str libc/stdout))
+     ,@(map (lambda (str) `(libc/fputs (string->C-string ,str) libc/stdout))
             strs)
      (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/print-diag strs
   `(let ()
-     ,@(map (lambda (str) `(libc/fputs ,str libc/stderr))
+     ,@(map (lambda (str) `(libc/fputs (string->C-string ,str) libc/stderr))
             strs)
      (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/print-diag-fmt (format . args)
   `(let ()
-     (libc/fprintf libc/stderr ,format ,@args)
+     (libc/fprintf libc/stderr (string->C-string ,format) ,@args)
      (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/halt args

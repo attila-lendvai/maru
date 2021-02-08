@@ -557,14 +557,22 @@
   ;; TODO extract and return n-params
   ())
 
-(define-function compile-string-literal-as-object (self -c-)
+;;;
+;;; Compiling string literals
+;;;
+
+(define-function emit-string-as-C-string (self -c-)
+  (let ((label (UNIQUE-LABEL "cstr")))
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (emit ASCIZ self)
+    label))
+
+(define-function emit-string-as-object (self -c-)
   ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
   ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((object-label	(UNIQUE-LABEL "str"))
-        (elements-label	(UNIQUE-LABEL "str-elts")))
-    (emit RODATA)
-    (emit DEFLABEL elements-label)
-    (emit ASCIZ self)
+  (let ((object-label	(UNIQUE-LABEL "ostr"))
+        (elements-label	(emit-string-as-C-string self -c-)))
     (emit ALIGN 4)
     ;; gc header
     (emit LONG 0)                    ; next
@@ -582,14 +590,7 @@
     ;; (emit LONG (eval-in-target `(box <long> ,(string-length self))))
     (emit LONG (bitwise-or (bitwise-shift (string-length self) 1) 1)) ; make it a boxed <long>
     (emit LONG elements-label)
-    (gen LOAD object-label)))
-
-(define-function compile-string-literal-as-cstring (self -c-)
-  (let ((label (UNIQUE-LABEL "str")))
-    (emit RODATA)
-    (emit DEFLABEL label)
-    (emit ASCIZ self)
-    (gen LOAD label)))
+    object-label))
 
 ;;;
 ;;; Special Forms
@@ -694,6 +695,13 @@
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
+(define-function compile/C-string (expr -c-)
+  ;; just an optimization to compile string literals into a C string
+  ;; when they would be immediately converted anyway.
+  (assert (= (list-length expr) 2))
+  (let ((label (emit-string-as-C-string (second expr) -c-)))
+    (gen LOAD label)))
+
 ;;;
 ;;; linux syscalls
 ;;;
@@ -716,9 +724,6 @@
     (free-temps arg-locs)
     (gen LINUX-SYSCALL (list-reverse! arg-locs))))
 
-;; TODO delme or put somewhere else
-(eval-in-slave `(define string-object (fixed (lambda args (print "string-object encountered in interpreted code with args " args "\n") (abort)))))
-
 ;;;
 ;;; +special-forms+
 ;;;
@@ -733,9 +738,7 @@
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
-  (cons (target-value string-object)	(lambda (expr -c-)
-                                          (assert (and (= (list-length expr) 2)))
-                                          (compile-string-literal-as-object (second expr) -c-)))
+  (cons (target-value C-string)		compile/C-string)
   ))
 
 ;;;
@@ -826,7 +829,8 @@
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
-  (compile-string-literal-as-cstring self -c-))
+  (let ((object-label (emit-string-as-object self -c-)))
+    (gen LOAD object-label)))
 
 ;; this is used when emitting the literal dispatch tables of <selectors>
 (define-method compile <array> (-c-)

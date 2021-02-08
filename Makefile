@@ -143,7 +143,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
 EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l streams.l) \
- $(addprefix source/evaluator/,buffer.l eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l) \
+ $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l)
 
 # for some optional C files, e.g. profiler.c

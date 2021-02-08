@@ -6,8 +6,8 @@
 ;;; files
 ;;;
 
-(define-primitive-function file-open ((path <string> _ nounbox) (mode <string> _ nounbox))
-  (awhen (libc/fopen (get/string path) (get/string mode))
+(define-primitive-function file-open ((path <string>) (mode <string>))
+  (awhen (libc/fopen (string->C-string path) (string->C-string mode))
     (box <target-vm-pointer> it)))
 
 (define-primitive-function file-close ((stream <target-vm-pointer> _ nounbox))
@@ -33,14 +33,6 @@
   (assert (is <target-vm-pointer> handle))
   (make/opaque <libc-stream>
     (handle	(unbox <target-vm-pointer> handle))))
-
-;; (define-function libc-stream-for-file (name mode)
-;;   (let ((handle (libc/fopen name mode)))
-;;     (unless handle
-;;       (error "libc-stream-for-file: failed to open file "
-;;              (string-from-cstring name)" in mode "
-;;              (string-from-cstring mode)))
-;;     (libc-stream (box <target-vm-pointer> handle))))
 
 (define-method $at-end? <libc-stream> ()
   ;; TODO make the FFI smarter to do this unboxing automatically. then we will be able to load this file as is into the interpreter
@@ -68,7 +60,7 @@
 ;; TODO implemenet inheritance on compiled selectors
 (define-method $put-all <libc-stream> (elements)
   (typecase elements
-    (<string>		(when (= libc/EOF (libc/fwrite (get/string elements) (string-length elements) 1 self.handle))
+    (<string>		(when (= libc/EOF (libc/fwrite (string->C-string elements) (string-length elements) 1 self.handle))
                           (error "<libc-stream> $put-all: libc/fputs returned with error")))
     (else		(error "<libc-stream> $put-all: unexpected elements: " elements)))
   elements)

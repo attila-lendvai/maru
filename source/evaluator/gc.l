@@ -212,6 +212,7 @@
 (define-function gc/mark-and-trace (obj)
   ;; (safety 3 (or (immediate? obj) (< 1000 obj) (fatal1 "gc/mark-and-trace: encountered a low pointer: %p" obj)))
   (and (not (immediate? obj))
+       (not (gc/read-only-object? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (platform/print-diag-fmt "mark and trace %p (%p) flags %ld size %ld type %ld" obj header flags (<header>-size header) (<header>-type header)))

@@ -243,30 +243,30 @@
 (define-primitive-function (array-length ()) ((arg <array>))
   (<array>-size arg))
 
-(define-primitive-function (string-length ()) ((arg <string> _ nounbox))
+(define-primitive-function (string-length ()) ((arg <string>))
   (<string>-size arg))
 
 (define-primitive-function (array-at ()) ((array <array>) (index <long>))
   (array-at array index))
 
-(define-primitive-function (string-at ()) ((string <string> _ nounbox) (index <long>))
+(define-primitive-function (string-at ()) ((string <string>) (index <long>))
   (box <long> (string-at string index)))
 
 ;; adding [set-]char-at to the evaluator makes it source-level compatible with the level-shifted code, and with that enables us to load files like buffer.l into both worlds
-(define-primitive-function (char-at ()) ((string <string> _ nounbox) (index <long>))
+(define-primitive-function (char-at ()) ((string <string>) (index <long>))
   (box <long> (string-at string index)))
 
 (define-primitive-function (set-array-at ()) ((array <array>) (index <long>) value)
   (set-array-at array index value))
 
-(define-primitive-function (set-string-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
+(define-primitive-function (set-string-at ()) ((string <string>) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 2 (assert (<= index (string-length string))))
   (set-string-at string index value)
   (box <long> value))
 
-(define-primitive-function (set-char-at ()) ((string <string> _ nounbox) (index <long>) (value <long>))
+(define-primitive-function (set-char-at ()) ((string <string>) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 2 (assert (<= index (string-length string))))
@@ -276,14 +276,14 @@
 
 (define-primitive-function (array-insert ()) ((array <array>) (index <long>) value))
 
-(define-primitive-function (string-insert ()) ((string <string> _ nounbox) (index <long>) (value <long>))
+(define-primitive-function (string-insert ()) ((string <string>) (index <long>) (value <long>))
   (safety 2 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(box <long> value)))
   (string-insert string index value)
   (box <long> value))
 
 (define-primitive-function (array-append ()) ((array <array>) value))
 
-(define-primitive-function (string-append ()) ((string <string> _ nounbox) (value <long>))
+(define-primitive-function (string-append ()) ((string <string>) (value <long>))
   (safety 2 (assert (and (<= value 255) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
   (box <long> (string-append string value)))
 
@@ -300,13 +300,13 @@
 (define-primitive-function integer->string ((num <long>) (radix <long> 10))
   (long->string* num radix))
 
-(define-primitive-function string->number ((str <string> _ nounbox) (radix <long> 10))
+(define-primitive-function string->number ((str <string>) (radix <long> 10))
   (let ((res (string->long* str radix)))
     (when (= res +end+)
       (error "string->number: failed for "str))
     (box <long> res)))
 
-(define-primitive-function string->integer ((str <string> _ nounbox) (radix <long> 10))
+(define-primitive-function string->integer ((str <string>) (radix <long> 10))
   (let ((res (string->long* str radix)))
     (when (= res +end+)
       (error "string->integer: failed for "str))

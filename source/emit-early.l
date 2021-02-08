@@ -301,7 +301,7 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of << >>
+(list-do name '(return address-of << >> C-string
                 ;; to test if anything calls them before they get redefined:
                 ;; eval cons list car cdr form
                 )

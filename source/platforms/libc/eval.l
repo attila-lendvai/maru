@@ -26,7 +26,7 @@
 ;;   ;; TODO handle radix
 ;;   (let ((buf (allocate-data 32)))       ; safe up until 64 bits
 ;;     (libc/sprintf buf "%ld" num)
-;;     (string-from-C-string buf)))
+;;     (C-string->string buf)))
 
 ;; TODO possible #optimization
 ;; (define-function string->long (str radix)
@@ -56,7 +56,7 @@
 ;;           (let ((n (libc/snprintf buf size fmt arg)))
 ;;             (if (and (<= 0 n)
 ;;                      (< n size))
-;;                 (set result (string-from-C-string buf))
+;;                 (set result (C-string->string buf))
 ;;               (set size (* size 2))))))
 ;;       result)))
 
@@ -77,7 +77,7 @@
                            (set tmp (file-stream (box <target-vm-pointer> ,libc-name)))
                            (set ,our-name tmp)
                            ;; TODO add support for compiling symbols
-                           (set (global-variable-value (u/string->symbol ,(symbol->string our-name))) tmp)))))
+                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)))))
       (doit libc/stdin	*standard-input*)
       (doit libc/stdout	*standard-output*)
       (doit libc/stderr	*error-output*)

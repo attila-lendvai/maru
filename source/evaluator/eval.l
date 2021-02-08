@@ -111,10 +111,6 @@
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(<pair>-tail ,obj)))
 (define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(set (<pair>-tail ,obj) ,val)))
 
-;; TODO rename to string->C-string
-;; TODO introduce a compiler special form for (string->C-string "a literal string") that emits it as a cstring
-(define-form get/string		(obj)		`(<string>-elements (string-ensure-zero-terminated ,obj)))
-
 ;; TODO should we turn these into macros? or introduce compiler macros?
 (define-primitive-function car (list)
   (when list
@@ -168,14 +164,10 @@
     (elements	(when (< 0 length)
                   (allocate-data length)))))
 
-;; TODO merge this into the box/unbox API?
-;; TODO would be nice if we could get rid of this
-(define-function string-from-cstring (cstr)
-  (let* ((len (platform/string-length cstr))
-         (obj (string len)))
-    (set (slot-value <string> size obj) (box <long> len))
-    (copy-bytes cstr (<string>-elements obj) len)
-    obj))
+(define-function ascii-bytes->string (buf length)
+  (let ((str (string length)))
+    (copy-bytes buf (<string>-elements str) length)
+    str))
 
 (define-function symbol (name)
   (safety 1 (assert (string? name)))
@@ -206,10 +198,10 @@
   (make <fixed>
     (function fn)))
 
-(define-function primitive-function (_imp _name)
+(define-function primitive-function (_imp name)
   (make/opaque <primitive-function>
     (_imp		_imp)
-    (_name		_name)
+    (name		name)
     (when-at-expand feature/profiler
       (profiler-counter	0))))
 
@@ -270,8 +262,20 @@
     tail))
 
 (require "source/evaluator/arrays.l")
+
+;; TODO these should be in platforms/platform-c-based.l, but they need
+;; arrays.l and other stuff.
+(define-function %string->C-string (obj)
+  (<string>-elements (string-ensure-zero-terminated obj)))
+
+(define-function C-string->string (cstr)
+  (let* ((len (C-string-length cstr))
+         (obj (string len)))
+    (set (slot-value <string> size obj) (box <long> len))
+    (copy-bytes cstr (<string>-elements obj) len)
+    obj))
+
 (require "source/conversion-min.l")
-(require "source/evaluator/buffer.l")
 (require "source/sequences-min.l")
 
 ;;;
@@ -330,21 +334,16 @@
     (set (<variable>-value var) value)
     var))
 
-(define-function u/string->symbol (u/str)
-  (gc/let* ((name (string-from-cstring u/str)))
-    (string->symbol name)))
-
-(define-primitive-function string->symbol ((str <string> _ nounbox))
+(define-primitive-function string->symbol ((str <string>))
   (array-binary-search *symbols*
                        str
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
                          (compare-strings str (<symbol>-name candidate)))
                        (lambda (array index str)
-                         ;; NOTE we want to make a copy of str here, because str may be mutable
-                         ;; TODO instantiate a read-only string
-                         (gc/let* ((name	(string-from-cstring (get/string str)))
-                                   (sym		(symbol name)))
-                           (debug-print "interning "name)
+                         ;; TODO do we want to make a copy of str here? because str may be mutable...
+                         ;; TODO instantiate a read-only string as the name?
+                         (gc/let* ((sym		(symbol str)))
+                           (debug (platform/print-diag "interning "str))
                            (array-insert array index sym)
                            sym))))
 
@@ -537,12 +536,15 @@
     (expand list env one-step?)))
 
 (define-function setter-name-for (fn-name env)
-  (gc/let* ((buf (buffer)))
-    (buffer-append-string buf "set-")
-    (buffer-append-string buf (get/string (<symbol>-name fn-name)))
-    (let ((setter-name (u/string->symbol (buffer-contents buf))))
-      (when (maybe-object-in-env env setter-name ())
-        setter-name))))
+  (let ((prefix		"set-")
+        (fn-name-str	(<symbol>-name fn-name)))
+    (gc/let* ((setter-name-str (string (+ (string-length fn-name-str)
+                                          (string-length prefix)))))
+      (string-append-all setter-name-str prefix)
+      (string-append-all setter-name-str fn-name-str)
+      (gc/let* ((setter-name (string->symbol setter-name-str)))
+        (when (maybe-object-in-env env setter-name ())
+          setter-name)))))
 
 (define-function maybe-fn-name-from-expr (expr)
   (when (pair? expr)
@@ -757,12 +759,16 @@
            (set tail (cons var tail)))))
 
       ((= head fixed-primitive-function/set)
-       (unless (is <variable> (first tail))
-         (let ((var (or (defined? (first tail) env)
-                        (error "set: undefined variable: " (first tail)))))
-           (assert (and (car tail) (not (cddr tail))) "encode: malformed SET expression: "exp)
-           (set tail (encode-all (cdr tail) env))
-           (set tail (cons var tail)))))
+       (typecase (first tail)
+         (<symbol>
+          (let ((var (or (defined? (first tail) env)
+                         (error "set: undefined variable: " (first tail)))))
+            (assert (and (car tail) (not (cddr tail))) "encode: malformed SET expression: "exp)
+            (set tail (encode-all (cdr tail) env))
+            (set tail (cons var tail))))
+         (<variable>) ; NOP, already encoded
+         (else
+          (error "encode/pair encountered an unexpected set form: "exp))))
 
       ((= head fixed-primitive-function/quote)) ; ignore quotes
 
@@ -892,17 +898,16 @@
       (set res (expand-encode-eval form env)))
     res))
 
-(define-primitive-function module ((name <string>))
+(define-primitive-function module ((module-name <string>))
   (debug (platform/print-diag "module constructor"))
   (gc/let* ((module (new <module>))
             (env    (environment () 0 0))
             tmp)
     (when-at-expand feature/debug-info
-      (set (<module>-name module)
-	   (string-from-cstring (or name ""))))
+      (set (<module>-name module) (or module-name "")))
 
     (set (<module>-globals module)
-	 (environment-define env symbol/*globals* env))
+         (environment-define env symbol/*globals* env))
 
     (when *maru-module*
       ;; *globals* is special in that it should point back to the module's env, therefore we skip that
@@ -954,7 +959,7 @@
   (define-function profiler/disable ()
     (set_profiler_interval 0)
     (when (< 0 profiler/sample-counter)
-      (platform/print-diag "Profiler took "(get/string (long->string profiler/sample-counter))" samples:\n")
+      (print-all *debug-output* "Profiler took "(box <long> profiler/sample-counter)" samples:")
       (let ((obj (gc/first-object)))
         (while obj
           (let ((type (type-of obj))
@@ -963,13 +968,11 @@
             (cond
               ((and (= type <expr>)
                     (< 0 (set counter (unbox <long> (<expr>-profiler-counter obj)))))
-               (set name (<expr>-name obj))
-               (when name
-                 (set name (get/string (<symbol>-name name)))))
+               (set name (<expr>-name obj)))
 
               ((and (= type <primitive-function>)
                     (< 0 (set counter (<primitive-function>-profiler-counter obj))))
-               (set name (<primitive-function>-_name obj))))
+               (set name (<primitive-function>-name obj))))
             (when counter
-              (platform/print-diag (get/string (long->string counter)) "\t" (or name "n/a") "\n")))
+              (print-all *debug-output* (box <long> counter)"\t"(or name "n/a"))))
           (set obj (gc/next-object obj)))))))
