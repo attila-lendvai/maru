@@ -111,6 +111,8 @@
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(<pair>-tail ,obj)))
 (define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(set (<pair>-tail ,obj) ,val)))
 
+;; TODO rename to string->C-string
+;; TODO introduce a compiler special form for (string->C-string "a literal string") that emits it as a cstring
 (define-form get/string		(obj)		`(<string>-elements (string-ensure-zero-terminated ,obj)))
 
 ;; TODO should we turn these into macros? or introduce compiler macros?
@@ -651,7 +653,7 @@
              (expand expansion env one-step?))))
 
         (else
-         ;; head is not a <form> nor a fixed special form
+         ;; head is not a <form> nor a <fixed> special form
          (gc/let* ((tail (expand-all (get/tail exp) env one-step?)))
            (cons head tail)))))))
 
@@ -775,7 +777,7 @@
                  (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
     (if (global-variable? var)
         (let ((val (<variable>-value var)))
-          (when (or (is <form> val)
+          (when (or (is <form> val) ; TODO ? how can <form>s show up here, after expand?
                     (is <fixed> val))
             (return val)))
       (let ((venv (<variable>-env var)))

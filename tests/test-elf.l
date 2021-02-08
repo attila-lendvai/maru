@@ -1,5 +1,8 @@
 (require "source/buffer.l")
 
+;; https://github.com/tonyg/pi-nothing/blob/4b2b59d42babd72cfd007cb71ed295dcdbf53d4a/nothingc/elf.rkt
+;; https://interrupt.memfault.com/blog/gnu-binutils
+
 (define code (buffer 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
 ;;(define $% 0)			;; file offset

@@ -347,6 +347,21 @@
       (libc/strcmp buf "bigyo"))
   0)
 
+(define-test compile/set-char-at/2
+    (let ((buf (libc/strdup "123")))
+      (set (char-at buf 0) ?x)
+      (libc/strcmp buf "x23"))
+  0)
+
+(define-test compile/set-char-at/3
+    (let* ((buf (libc/strdup "123"))
+           (ret (set (char-at buf 1) ?x)))
+      ;; let's not rely on the evaluation order of the args until
+      ;; there's a commitment in the compiler.
+      (+ ret
+         (libc/strcmp buf "1x3"))) ; should return 0 upon match
+  ?x)
+
 ;; NOTE one must be careful with those 0x123 constants when <long> is tagged, i.e. smaller than the target's word size
 ;; NOTE a 32 bit eval cannot read 64 bit numbers, so we need to >> everything by 32 bits there
 ;; NOTE shifting right is signed
@@ -473,7 +488,23 @@
         (<= 0 fd)))
   true)
 
+;; TODO FIXME broken on llvm 64
 (define-test compile/syscall/2
+    (let ((fd (linux-syscall linux/open
+                             "/tmp/_maru-test"
+                             (bitwise-or linux/O_RDWR
+                                         linux/O_CREAT)
+                             420 ; "rw-r--r--"
+                             )))
+      (eval-at-expand
+       `(linux-syscall linux/write fd ,@(string+length "1234")))
+      (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
+      (let ((buf 0))
+        (linux-syscall linux/read fd (address-of buf) 1)
+        (char-at (address-of buf) 0)))
+  ?3)
+
+(define-test compile/syscall/3
     (let ((fd (linux-syscall linux/open
                              "/tmp/_maru-test"
                              (bitwise-or linux/O_RDWR
@@ -485,15 +516,18 @@
       (let ((char ?5))
         (linux-syscall linux/write fd (address-of char) 1))
       (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
-      (let ((char 0)
+      (let ((buf 0)
+            (char 0)
             (result 0))
-        (linux-syscall linux/read fd (address-of char) 1)
+        (linux-syscall linux/read fd (address-of buf) 1)
+        (set char (char-at (address-of buf) 0))
         ;; TODO FIXME on llvm 64 bits it fails when the char is not printed?! probably due to some optimization.
-        (libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
+        ;;(libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
         (incr result (- char ?0))
         (linux-syscall linux/lseek fd 4 linux/SEEK_SET)
-        (linux-syscall linux/read fd (address-of char) 1)
-        (libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
+        (linux-syscall linux/read fd (address-of buf) 1)
+        (set char (char-at (address-of buf) 0))
+        ;;(libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
         (incr result (- char ?0))))
   (+ 3 5))
 

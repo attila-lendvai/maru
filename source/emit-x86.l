@@ -635,10 +635,15 @@
 ;;;
 ;;; Special Operators
 ;;;
+
 (define-function compile/unary-operator (op args -c-)
   (comp (car args))
   (gen op))
 
+;; FIXME? these implement a right-to-left evaluation order, while
+;; function calls implement the opposite. note that this is entangled
+;; with e.g. the LOAD/STORE instructions above, as they expect arg0 to
+;; be loaded in %eax.
 (define-function compile/binary-operator (op args -c-)
   (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
     (comp (car args))
@@ -742,8 +747,8 @@
   (let ((op-tmp	(when (pair? op)
                   ;; we can spare a STORE/LOAD when we know that op
                   ;; doesn't evaluate anything; i.e. we can reorder
-                  ;; its evaluation to the final, COMPILE-CALL-TO
-                  ;; step.
+                  ;; its evaluation, which is a simple LOAD, to the
+                  ;; final, COMPILE-CALL-TO step.
                   (compile/expr-into-temp-or-literal op -c-)))
         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
         (arg-locs	(map (lambda (_) (new-arg -c-)) args)))

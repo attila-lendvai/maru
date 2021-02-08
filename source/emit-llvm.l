@@ -869,6 +869,12 @@
   (comp (car args))
   (gen op))
 
+;; FIXME? these implement a right-to-left evaluation order, while
+;; function calls implement the opposite. note that this is entangled
+;; with e.g. the LOAD/STORE instructions above, as the ones that mark
+;; that they have an input will receive <compiler>-current-value as
+;; their first, $1 param. changing the order here needs to take care
+;; of that.
 (define-function compile/binary-operator (op args -c-)
   (comp (second args))
   (let ((arg2 (<compiler>-current-value -c-)))

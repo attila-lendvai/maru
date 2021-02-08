@@ -130,6 +130,7 @@
         (when (= +end+ c)
           (error "unterminated string literal"))
         (buffer-append buf c)))
+    ;; FIXME this breaks with zeroes in the string
     (string-from-cstring (buffer-contents buf))))
 
 (define read-nested) ; forward
