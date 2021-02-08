@@ -64,9 +64,11 @@
          (,setter-name obj idx value))
 
        (define-function ,zeroed-name (obj)
-         (let ((size (get-size obj)))
-           (,setter-name obj size 0)
-           (set (slot-value ,type-name size obj) (box <long> size)))
+         (if (gc/read-only-object? obj)
+             (safety 3 (assert (and (is <string> obj) (not (,getter-name obj (get-size obj))))))
+           (let ((size (get-size obj)))
+             (,setter-name obj size 0)
+             (set (slot-value ,type-name size obj) (box <long> size))))
          obj))))
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)

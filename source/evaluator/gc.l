@@ -29,8 +29,7 @@
 
 (define-form gc/valid-header-canary? (header)
   (if feature/object-canary
-      `(and (<= gc/memory-base ,header)
-            (= (<header>-canary ,header) ,+canary-value+))
+      `(= (<header>-canary ,header) ,+canary-value+)
     true))
 
 (define-form gc/initialize-header-canary (header)
@@ -46,6 +45,12 @@
               ,(if feature/object-canary
                    '(gc/valid-header-canary? (gc/header-of __obj__))
                  'true)))))
+
+;; TODO this assumes that the .text segment is loaded/mapped before
+;; the .data segment. it works on linux/elf, but probably requires
+;; more care on other platforms.
+(define-form gc/read-only-object? (obj)
+  `(< ,obj gc/memory-base))
 
 ;;;
 ;;; tagging
