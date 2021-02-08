@@ -294,6 +294,9 @@
 
 (define-emit    (MOVE LI32 TI32)		(println "	movl	"$1", "$2))
 
+;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
+;; in haskell the signed ones are called integer, and the unsigned one are called word.
+;; for now these are all unsigned, i.e. not sign extended.
 (define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx), %ecx")
 						(println "	xorl	%eax, %eax")
@@ -304,23 +307,32 @@
                                                       (println "	movl	%eax, %ecx")
                                                     (println "	leal	"offset"(%eax), %ecx")))
 						(println "	xorl	%eax, %eax")
-						(println "	movb	(%ecx), %al")) ; TODO what about sign extension?
+						(println "	movb	(%ecx), %al"))
 
-(define-emit    (STORE-I8 TI32 TI32)		(println "	movl	"$1", %ecx")
-						(println "	leal	(%eax, %ecx), %ecx")
-						(println "	movl	"$2", %eax")
-						(println "	movb	%al, (%ecx)"))
+(define-emit    (STORE-I8 TI32 _)		(if-at-expand feature/strict-semantics-for-compiled-set
+						    ;; NOTE this works out just fine for a TI32, too, because we are little-endian.
+                                                    (let ()
+                                                      (println "	movl	"$1", %ecx")
+						      (println "	leal	(%eax, %ecx), %ecx")
+                                                      (println "	xor	%eax, %eax")
+                                                      (println "	movb	"$2", %al")
+						      (println "	movb	%al, (%ecx)"))
+                                                  (println "	movl	"$1", %ecx")
+						  (println "	leal	(%eax, %ecx), %eax")
+						  (println "	movb	"$2", (%eax)")))
 
-(define-emit    (STORE-I8 TI32 LI32)		(println "	movl	"$1", %ecx")
-						(println "	leal	(%eax, %ecx), %ecx")
-						(println "	movb	"$2", (%ecx)"))
-
-(define-emit    (STORE-I8 LI32 TI32)		(let ((offset (<LI32>-value $1)))
-                                                  (if (= 0 offset)
-                                                      (println "	movl	%eax, %ecx")
-                                                    (println "	leal	"offset"(%eax), %ecx")))
-						(println "	movl	"$2", %eax")
-						(println "	movb	%al, (%ecx)"))
+(define-emit    (STORE-I8 LI32 _)		(let ((offset (<LI32>-value $1)))
+                                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                                      (let ()
+                                                        (if (= 0 offset)
+                                                            (println "	movl	%eax, %ecx")
+                                                          (println "	leal	"offset"(%eax), %ecx"))
+                                                        (println "	xor	%eax, %eax")
+                                                        (println "	movb	"$2", %al") ; this also leaves it as return value in %eax
+						        (println "	movb	%al, (%ecx)"))
+                                                    (unless (= 0 offset)
+                                                      (println "	leal	"offset"(%eax), %eax"))
+                                                    (println "	movb	"$2", (%eax)"))))
 
 (define-emit    (LOAD-OOP TI32)			(println "	movl	"$1", %ecx")
 						(println "	leal	(%eax, %ecx, 4), %ecx")
@@ -332,30 +344,27 @@
                                                     (println "	leal	"(* 4 offset)"(%eax), %ecx")))
 						(println "	movl	(%ecx), %eax"))
 
-(define-emit    (STORE-OOP TI32 TI32)		(println "	movl	"$1", %ecx")
-						(println "	leal	(%eax, %ecx, 4), %ecx")
-						(println "	movl	"$2", %eax")
-						(println "	movl	%eax, (%ecx)"))
+(define-emit    (STORE-OOP TI32 _)		(if-at-expand feature/strict-semantics-for-compiled-set
+                                                    (let ()
+                                                      (println "	movl	"$1", %ecx")
+						      (println "	leal	(%eax, %ecx, 4), %ecx")
+                                                      (println "	movl	"$2", %eax")
+						      (println "	movl	%eax, (%ecx)"))
+                                                  (println "	movl	"$1", %ecx")
+						  (println "	leal	(%eax, %ecx, 4), %eax")
+                                                  (println "	movl	"$2", (%eax)")))
 
-(define-emit    (STORE-OOP LI32 TI32)		(let ((offset (<LI32>-value $1)))
-                                                  (if (= 0 offset)
-                                                      (println "	movl	%eax, %ecx")
-                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")))
-						(println "	movl	"$2", %eax")
-						(println "	movl	%eax, (%ecx)"))
-
-(define-emit    (STORE-OOP LI32 LI32)		(let ((offset (<LI32>-value $1)))
-                                                  (if-at-expand true ; feature/strict-semantics-for-compiled-set
+(define-emit    (STORE-OOP LI32 _)		(let ((offset (<LI32>-value $1)))
+                                                  (if-at-expand feature/strict-semantics-for-compiled-set
                                                       (let ()
                                                         (if (= 0 offset)
                                                             (println "	movl	%eax, %ecx")
                                                           (println "	leal	"(* 4 offset)"(%eax), %ecx"))
-                                                        (println "	movl	"$2", %eax") ; also leave the return value in %eax
+                                                        (println "	movl	"$2", %eax") ; this also leaves it aas return value in %eax
                                                         (println "	movl	%eax, (%ecx)"))
-                                                    (if (= 0 offset)
-                                                        (println "	movl	"$2", (%eax)")
-                                                      (println "	leal	"(* 4 offset)"(%eax), %ecx")
-                                                      (println "	movl	"$2", (%ecx)")))))
+                                                    (unless (= 0 offset)
+                                                      (println "	leal	"(* 4 offset)"(%eax), %eax"))
+                                                    (println "	movl	"$2", (%eax)"))))
 
 ;;;
 ;;; Compiler Infrastructure
