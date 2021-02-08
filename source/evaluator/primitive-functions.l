@@ -24,8 +24,7 @@
     (expand-encode-eval (car -args-) env)))
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
-  (debug-print "eval-in-module: form "form)
-  (verbosity 2 (platform/print ";;; ? ") (print module) (platform/print " ") (println form))
+  (verbosity 2 (debug-print ";;; ? "module" "form))
   (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
     (with-current-module module
       (expand-encode-eval form env))))
@@ -206,16 +205,7 @@
 
 (define-primitive-function (warn ()) _
   (list-do arg -args-
-    (let ((type (type-of arg)))
-      ;; TODO use typecase
-      (cond
-        ((= type <string>) (platform/print-diag (get/string arg)))
-        ((= type <symbol>) (platform/print-diag (get/string (<symbol>-name arg))))
-        ((= type <long>)   (platform/print-diag (get/string (long->string (unbox <long> arg)))))
-        (else
-         ;; TODO
-         ;;(libc/fprintf libc/stderr "<unable to print {%p} of type %ld>" arg type)
-         (platform/print-diag "warn: unable to print this object")))))
+    (do-print *error-output* arg false))
   (platform/flush-streams))
 
 (define-primitive-function (type-of ())	(thing) (box <long> (type-of thing)))

@@ -121,6 +121,6 @@
 
               ;; read file as a program
               (else
-               (verbosity 1 (platform/print-diag "loading file: "(get/string arg)"\t(as a CLA)\n"))
+               (verbosity 1 (platform/print-diag "loading file: "(get/string arg)"\t(as a CLA)"))
                (with-input-from-file (stream arg)
                  (repl-stream stream))))))))))

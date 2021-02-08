@@ -27,9 +27,6 @@
 (define-form libc/string= (a b)
   `(= 0 (libc/strcmp ,a ,b)))
 
-(define-form platform/string-length (cstr)
-  `(libc/strlen ,cstr))
-
 (define-form platform/flush-streams ()
   `(libc/flush-streams))
 
@@ -48,7 +45,7 @@
 ;; (define-primitive-function long->string ((arg <long>))
 ;;   (let ((buf (allocate-data 32))) ; safe up until 64 bits
 ;;     (libc/sprintf buf "%ld" arg)
-;;     (string-from-cstring buf)))
+;;     (string-from-C-string buf)))
 
 (load "source/evaluator/platform.l")
 
@@ -103,7 +100,7 @@
       (let ((idx argc))
         (while (< 0 (decr idx)) ; skip the first, which is the name of the executable
           (set tmp (cons () tmp))
-          (put/head tmp (string-from-cstring (oop-at argv idx)))
+          (put/head tmp (string-from-C-string (oop-at argv idx)))
           (debug (libc/printf "processing argv %ld = %s; parsed into " idx (oop-at argv idx)) (println (get/head tmp)))))
       (set (<variable>-value cla-var) tmp))
 

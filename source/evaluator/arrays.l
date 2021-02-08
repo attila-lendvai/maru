@@ -65,7 +65,7 @@
 
        (define-function ,zeroed-name (obj)
          (if (gc/read-only-object? obj)
-             (safety 3 (assert (and (is <string> obj) (not (,getter-name obj (get-size obj))))))
+             (safety 3 (or (and (is <string> obj) (not (,getter-name obj (get-size obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
            (let ((size (get-size obj)))
              (,setter-name obj size 0)
              (set (slot-value ,type-name size obj) (box <long> size))))
@@ -78,10 +78,11 @@
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 
 (define-function compare-strings (str-a str-b)
+  (safety 2 (or (and (is <string> str-a) (is <string> str-b)) (fatal "compare-strings: called with non-string")))
   (let* ((len-a	(string-length str-a))
          (len-b	(string-length str-b))
-         (buf-a	(get/string str-a))
-         (buf-b	(get/string str-b))
+         (buf-a	(<string>-elements str-a))
+         (buf-b	(<string>-elements str-b))
          (limit	(min len-a len-b))
          (diff	0)
          (i	0))
@@ -98,12 +99,9 @@
       (else ;; (> len-a len-b)
        (- (byte-at buf-a len-b) 0)))))
 
+;; TODO how does this relate to the = primitive-function? maybe delme?
 (define-function string= (a b)
   (= 0 (compare-strings a b)))
-
-;; (define-primitive-function string-compare ((a <string>) (b <string>))
-;;   (compare-characters (get/string a) (string-length a)
-;;                       (get/string b) (string-length b)))
 
 ;; NOTE there's a variant of this in parser.l
 (define-function array-binary-search (array item comparator inserter)

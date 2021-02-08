@@ -454,7 +454,7 @@
                        (incr arg-index)))))))))
         ;; man exit says that it's flushed, but looks like it's not. plus there's this: https://wiki.sei.cmu.edu/confluence/display/c/FIO23-C.+Do+not+exit+with+unflushed+data+in+stdout+or+stderr
         (platform/flush-streams))
-    (platform/print "print-backtrace: call-frame tracking is disabled in this build. current call depth is "(get/string (long->string *call-stack-index*))"\n")))
+    (print-all *error-output* "print-backtrace: call-frame tracking is disabled in this build. current call depth is "*call-stack-index*"\n")))
 
 ;;;
 ;;; apply
@@ -462,7 +462,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-function apply/expr (fun arguments parent-ctx)
-  (verbosity 3 (platform/print "  A  ") (print fun)  (platform/print " ")  (print arguments) (platform/print " ") (println parent-ctx))
+  (verbosity 3 (debug-print "  A  "fun" "arguments" "parent-ctx))
   (let ((env	(<expr>-env fun))
         (params	(<expr>-parameters fun)))
     (gc/let* ((innter-ctx (context (<expr>-ctx fun) parent-ctx env)))
@@ -846,7 +846,7 @@
          exp)))))
 
 (define-function eval (exp ctx)
-  (verbosity 3 (platform/print "  E  ") (print exp) (platform/print " ") (println ctx))
+  (verbosity 3 (debug-print "  E  "exp" "ctx))
   (let ((type (type-of exp)))
     ;; TODO use typecase
     (cond
@@ -875,11 +875,11 @@
   (debug-print "expand-encode-eval for form "form)
   (gc/let* ((x form)
             (ctx (base-context () env)))
-					(verbosity 2 (platform/print ";;; ? ")		(println x))
-    (set x (expand x env false))	(verbosity 2 (platform/print ";;; expd--> ")	(println x))
-    (set x (encode x env))		(verbosity 2 (platform/print ";;; encd--> ")	(println x))
+					(verbosity 2 (debug-print ";;; ? "x))
+    (set x (expand x env false))	(verbosity 2 (debug-print ";;; expd--> "x))
+    (set x (encode x env))		(verbosity 2 (debug-print ";;; encd--> "x))
     (set x (eval   x ctx))
-					(verbosity 2 (platform/print ";;; => ")		(println x))
+					(verbosity 2 (debug-print ";;; => "x))
     (debug-print "expand-encode-eval for form "form" is returning with "x)
     x))
 
@@ -893,7 +893,7 @@
     res))
 
 (define-primitive-function module ((name <string>))
-  (debug-print "module constructor")
+  (debug (platform/print-diag "module constructor"))
   (gc/let* ((module (new <module>))
             (env    (environment () 0 0))
             tmp)
@@ -921,7 +921,7 @@
       (doit env symbol/*evaluators*)
       (doit env symbol/*applicators*))
 
-    (debug-print "module constructor returning with "module)
+    (debug (platform/print-diag-fmt "module constructor returning with %p"module))
     module))
 
 (when-at-expand feature/profiler

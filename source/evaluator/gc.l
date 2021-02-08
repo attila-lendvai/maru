@@ -155,7 +155,7 @@
     (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
-    (gc/debug (platform/print-diag-fmt "heap growth %p size %ld %ld/%ld\n" ptr size gc/alloc-count gc/frequency))
+    (gc/debug (platform/print-diag-fmt "heap growth %p size %ld %ld/%ld" ptr size gc/alloc-count gc/frequency))
     (assert (aligned-to-oop? ptr) "gc/acquire-new-heap-space: aligned-to-oop? has failed for ptr "ptr)
     ptr))
 
@@ -183,13 +183,13 @@
     (%next-object-from-header (<header>-next (gc/header-of obj)))))
 
 (define-function gc/sweep ()
-  (gc/debug (platform/print-diag "sweep\n"))
+  (gc/debug (platform/print-diag "sweep"))
   (let ((ptr gc/memory-base)
         (nobjs 0)
         (nused 0)
         (nfree 0))
     (while ptr
-      (gc/debug (platform/print-diag-fmt "sweep? %ld %p + %ld\n" (<header>-flags ptr) ptr (<header>-size ptr)))
+      (gc/debug (platform/print-diag-fmt "sweep? %ld %p + %ld" (<header>-flags ptr) ptr (<header>-size ptr)))
       (let ((flags (<header>-flags ptr)))
         (if (bitwise-and flags <header>-flags/mark)
             (let ()
@@ -197,7 +197,7 @@
               (set nused (+ nused (<header>-size ptr)))
               (set nobjs (+ nobjs 1))
               (set (<header>-flags ptr) (bitwise-xor flags <header>-flags/mark)))
-          (gc/debug (platform/print-diag-fmt "collect %p size %ld\n" ptr (<header>-size ptr)))
+          (gc/debug (platform/print-diag-fmt "collect %p size %ld" ptr (<header>-size ptr)))
           (set nfree (+ nfree (<header>-size ptr)))
           (set (<header>-flags ptr) 0)
           (set (<header>-type ptr) 0)))
@@ -206,7 +206,7 @@
     (set gc/objects-live nobjs)
     (set gc/bytes-used nused)
     (set gc/bytes-free nfree)
-    (debug (platform/print-diag-fmt "GC: %ld used, %ld free, %ld allocations\n" nused nfree gc/alloc-count)))
+    (debug (platform/print-diag-fmt "GC: %ld used, %ld free, %ld allocations" nused nfree gc/alloc-count)))
   ())
 
 (define-function gc/mark-and-trace (obj)
@@ -214,7 +214,7 @@
   (and (not (immediate? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
-         (gc/debug (platform/print-diag-fmt "mark and trace %p (%p) flags %ld size %ld type %ld\n" obj header flags (<header>-size header) (<header>-type header)))
+         (gc/debug (platform/print-diag-fmt "mark and trace %p (%p) flags %ld size %ld type %ld" obj header flags (<header>-size header) (<header>-type header)))
          (safety 3 (or (gc/valid-header-canary? header)		(fatal1 "gc/mark-and-trace: encountered an untagged pointer: %p" obj)))
          (safety 1 (or (bitwise-and <header>-flags/used flags)	(fatal1 "gc/mark-and-trace: attempt to mark dead object %p" header)))
          (or (bitwise-and flags <header>-flags/mark)
@@ -222,11 +222,11 @@
                (set (<header>-flags header) (bitwise-or flags <header>-flags/mark))
                (or (bitwise-and flags <header>-flags/opaque)
                    (let ((index (bytes-to-words (<header>-size header))))
-                     (gc/debug (platform/print-diag-fmt "mark %p wordsize %ld type %ld\n" header index (<header>-type header)))
+                     (gc/debug (platform/print-diag-fmt "mark %p wordsize %ld type %ld" header index (<header>-type header)))
                      (safety 2 (or (not (= 0 (<header>-type header))) (fatal1 "gc/mark-and-trace: encountered an object with zero type %p" header)))
                      (while index
                        (decr index)
-                       (gc/debug (platform/print-diag-fmt "@%ld %p\n" index (oop-at obj index)))
+                       (gc/debug (platform/print-diag-fmt "@%ld %p" index (oop-at obj index)))
                        ;; (safety 3 (let ((next (oop-at obj index)))
                        ;;             (unless (or (immediate? next)
                        ;;                         (< 1000 next))
@@ -239,20 +239,20 @@
 (define-function gc/collect ()
   (gc/debug
     (or (bitwise-and 1023 (set gc/collection-count (+ gc/collection-count 1)))
-        (platform/print-diag-fmt "%ld collections\n" gc/collection-count)))
-  (gc/debug (platform/print-diag-fmt "about to mark %ld gc roots stored at %p\n" gc/root-count gc/roots))
+        (platform/print-diag-fmt "%ld collections" gc/collection-count)))
+  (gc/debug (platform/print-diag-fmt "about to mark %ld gc roots stored at %p" gc/root-count gc/roots))
   (gc/mark-and-trace gc/roots) ; even though it's an opaque, we still need to mark the vector itself
   (for (i 0 gc/root-count)
     (let* ((root-ptr	(oop-at gc/roots i))
            (root	(oop-at root-ptr 0)))
-      (gc/debug (platform/print-diag-fmt "mark gc root %ld : %p -> %p (%p)\n" i root-ptr root (gc/header-of root)))
+      (gc/debug (platform/print-diag-fmt "mark gc root %ld : %p -> %p (%p)" i root-ptr root (gc/header-of root)))
       (gc/mark-and-trace root)))
-  (gc/debug (platform/print-diag "finished marking gc roots\n"))
+  (gc/debug (platform/print-diag "finished marking gc roots"))
   (gc/sweep)
   (set gc/alloc-count 0))
 
 (define-function gc/allocate (type requested-size)
-  (gc/debug (platform/print-diag-fmt "gc/allocate type %ld %ld\n" type requested-size))
+  (gc/debug (platform/print-diag-fmt "gc/allocate type %ld %ld" type requested-size))
   (safety 2 (assert type "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
   (and (= gc/alloc-count gc/frequency)
@@ -263,7 +263,7 @@
     (while 1
       (while
         (let ()
-          (gc/debug (platform/print-diag-fmt "alloc? %ld %p %p [%p] %ld >= %ld %ld\n" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) requested-size (<= requested-size (<header>-size chunk))))
+          (gc/debug (platform/print-diag-fmt "alloc? %ld %p %p [%p] %ld >= %ld %ld" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) requested-size (<= requested-size (<header>-size chunk))))
           (when (= 0 (<header>-flags chunk)) ;; i.e. free chunk
             (let ((chunk-size (<header>-size chunk)))
               (while (and (= 0 (<header>-flags (<header>-next chunk)))
@@ -276,17 +276,17 @@
               ;; TODO ? total-size includes the header while chunk-size is only the size of the payload space
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk
-                (gc/debug (platform/print-diag-fmt "chunk-size %ld\n" chunk-size))
+                (gc/debug (platform/print-diag-fmt "chunk-size %ld" chunk-size))
                 (when (> chunk-size total-size)
                   (let ((split (+ chunk total-size)))
-                    (gc/debug (platform/print-diag-fmt "split %ld: %p + %ld -> %p + %ld\n" chunk-size chunk requested-size split (- chunk-size total-size)))
+                    (gc/debug (platform/print-diag-fmt "split %ld: %p + %ld -> %p + %ld" chunk-size chunk requested-size split (- chunk-size total-size)))
                     (set (<header>-size  split) (- chunk-size total-size))
                     (set (<header>-flags split) 0)
                     (set (<header>-next  split) (<header>-next chunk))
                     (set (<header>-size  chunk) requested-size)
                     (set (<header>-next  chunk) split)
                     (set chunk-size requested-size)))
-                (gc/debug (platform/print-diag-fmt "alloc chunk %p\n" chunk))
+                (gc/debug (platform/print-diag-fmt "alloc chunk %p" chunk))
                 (set gc/memory-last chunk)
                 (set gc/alloc-count (+ gc/alloc-count 1))
                 ;; initialize the freshly reserved chunk
@@ -298,7 +298,7 @@
                   (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (assert (gc/live-chunk? header) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))
-                  (gc/debug (platform/print-diag-fmt "gc/allocate: returning with %p (header: %p), type %ld, size %ld\n" obj header (<header>-type header) (gc/object-size obj)))
+                  (gc/debug (platform/print-diag-fmt "gc/allocate: returning with %p (header: %p), type %ld, size %ld" obj header (<header>-type header) (gc/object-size obj)))
                   (return obj)))))
           (!= first (set chunk (<header>-next chunk)))))
       (gc/grow-heap (max (+ size-of-<header> requested-size)
@@ -317,7 +317,7 @@
     (set gc/roots new-roots)))
 
 (define-function gc/push-root (ptr)
-  (gc/debug (platform/print-diag-fmt "gc/push-root %ld at %p\n" gc/root-count ptr))
+  (gc/debug (platform/print-diag-fmt "gc/push-root %ld at %p" gc/root-count ptr))
   (set (oop-at gc/roots gc/root-count) ptr)
   (incr gc/root-count)
   ;; make sure that there's always space for the next root because otherwise our call to gc/allocate
@@ -326,7 +326,7 @@
     (gc/grow-root-vector)))
 
 (define-function gc/pop-root (ptr)
-  (gc/debug (platform/print-diag-fmt "gc/pop-root %ld at %p\n" gc/root-count ptr))
+  (gc/debug (platform/print-diag-fmt "gc/pop-root %ld at %p" gc/root-count ptr))
   (safety 2 (assert (< 0 gc/root-count) "root table underflow"))
   (decr gc/root-count)
   (safety 2 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))

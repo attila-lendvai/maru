@@ -1,23 +1,19 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (define-function do-dump/string (stream obj)
-  (let ((cstr (get/string obj)))
-    (let ((i 0)
-          (c 0))
-      ($put stream ?\")
-      (while (set c (char-at cstr i))
-        (if (and (<= 32 c) (<= c 126))
-            (case c
-              (?\"	($put stream ?\\) ($put stream ?\"))
-              (?\\	($put stream ?\\) ($put stream ?\\))
-              (else	($put stream c)))
-          ($put stream ?\\)
-          (let ((octal (long->string* c 8)))
-            (times-do (- 3 (string-length octal))
-              ($put stream ?0))
-            ($put-all stream octal)))
-        (incr i))
-      ($put stream ?\"))))
+  ($put stream ?\")
+  (string-do c obj
+    (if (and (<= 32 c) (<= c 126))
+        (case c
+          (?\"	($put stream ?\\) ($put stream ?\"))
+          (?\\	($put stream ?\\) ($put stream ?\\))
+          (else	($put stream c)))
+      ($put stream ?\\)
+      (let ((octal (long->string* c 8)))
+        (times-do (- 3 (string-length octal))
+          ($put stream ?0))
+        ($put-all stream octal))))
+  ($put stream ?\"))
 
 (define-function error/cannot-dump-object (obj)
   (error "cannot dump "obj))

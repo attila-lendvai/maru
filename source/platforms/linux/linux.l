@@ -85,7 +85,8 @@
                     `(let ((x ,cstr))
                        (linux-syscall linux/write fd/stdout x (platform/string-length x))))))
     `(let ()
-       ,@(list-reverse! forms))))
+       ,@(list-reverse! forms)
+       (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
 
 (define-form platform/print-diag cstrs
   (let ((forms ()))
@@ -95,14 +96,18 @@
                     `(let ((x ,cstr))
                        (linux-syscall linux/write fd/stderr x (platform/string-length x))))))
     `(let ()
-       ,@(list-reverse! forms))))
+       ,@(list-reverse! forms)
+       (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
 
 (define-form platform/print-diag-fmt (format . args)
   ;; TODO implement formatting within maru, and forget libc's printf
-  (if (is <string> format)
-      `(linux-syscall linux/write fd/stderr ,@(string+length format))
-    `(let ((x ,format))
-       (linux-syscall linux/write fd/stderr x (platform/string-length x)))))
+  (let ((printer (if (is <string> format)
+                     `(linux-syscall linux/write fd/stderr ,@(string+length format))
+                   `(let ((x ,format))
+                      (linux-syscall linux/write fd/stderr x (platform/string-length x))))))
+    `(let ()
+       ,printer
+       (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
 
 (define-form platform/halt args
   `(linux-syscall linux/exit ,@(or args '(-1))))

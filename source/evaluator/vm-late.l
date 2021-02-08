@@ -62,12 +62,12 @@
   (debug-print "capture-well-known-module-values is done"))
 
 (define-function initialize-vm ()
-  (debug (platform/print-diag "alive\n"))
+  (debug (platform/print-diag "alive"))
 
   (gc/initialize)
 
   (safety 4 (set gc/frequency 1))
-  (debug (platform/print-diag "gc initialized\n"))
+  (debug (platform/print-diag "gc initialized"))
   (assert (= <long>	(type-of (box <long> 42)))	"type-of for <long> is broken")
   (assert (= 42		(unbox <long> (box <long> 42)))	"unbox of <long> is broken")
   (assert (= 1 true)	"true is not 1")
@@ -77,17 +77,21 @@
   (gc/push-root (address-of *maru-module*))
   (gc/push-root (address-of *symbols*))
 
+  (debug (platform/print-diag "gc roots registered"))
+
   (when-at-expand feature/backtrace
-    (debug-print "initializing *call-stack*")
+    (debug (platform/print-diag "initializing *call-stack*"))
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (array 32)))
 
   (set *symbols* (array 32))
   (initialize-symbol-cache)
-  (debug-print "initialized *symbols*")
+  (debug (platform/print-diag "initialized *symbols*"))
 
   (set *maru-module* (module "maru"))
   (populate-module-with-maru-primitives *maru-module*)
+  (debug (platform/print-diag "initialized *maru-module*"))
+
   (set *module* (module "maru-user"))
   (capture-well-known-module-values)
-  (debug-print "finished module initialization"))
+  (debug (platform/print-diag "finished module initialization")))

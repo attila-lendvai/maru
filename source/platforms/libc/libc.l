@@ -51,18 +51,22 @@
 (define-form platform/string-length (cstr)
   `(libc/strlen ,cstr))
 
-(define-form platform/print cstrs
+(define-form platform/print strs
   `(let ()
-     ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stdout))
-            cstrs)))
+     ,@(map (lambda (str) `(libc/fputs ,str libc/stdout))
+            strs)
+     (libc/fputc ?\n libc/stderr)))
 
-(define-form platform/print-diag cstrs
+(define-form platform/print-diag strs
   `(let ()
-     ,@(map (lambda (cstr) `(libc/fputs ,cstr libc/stderr))
-            cstrs)))
+     ,@(map (lambda (str) `(libc/fputs ,str libc/stderr))
+            strs)
+     (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/print-diag-fmt (format . args)
-  `(libc/fprintf libc/stderr ,format ,@args))
+  `(let ()
+     (libc/fprintf libc/stderr ,format ,@args)
+     (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/halt args
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file

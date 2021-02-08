@@ -152,17 +152,19 @@
 
 (define-function error-prologue ()
   (incr *error-level*)
+  (unless *error-output*
+    (platform/print-diag "WARNING: error-prologue reached too early in init. We'll most probably crash before printing the actual error message."))
   (cond
     ((= 2 *error-level*)
-     (platform/print-diag "NESTED ERROR 1, attempting to print a limited backtrace\n")
+     (platform/print-diag "NESTED ERROR 1, attempting to print a limited backtrace")
      (abort))
     ((< 2 *error-level*)
-     (platform/print-diag "NESTED ERROR 2, giving up...\n")
+     (platform/print-diag "NESTED ERROR 2, giving up...")
      (platform/halt)))
-  (platform/print-diag "ERROR: "))
+  (platform/print-diag "\nERROR: "))
 
 (define-function error-epilogue ()
-  (platform/print-diag "\n")
+  (platform/print-diag) ; newline
   (abort))
 
 ;; FATAL directly uses the libc printf (i.e. it cannot print maru objects), while
@@ -294,7 +296,7 @@
                    body))))))))
 
 (define-primitive-function abort _
-  (platform/print-diag "ABORTED\n")
+  (platform/print-diag "ABORTED")
   (print-backtrace)
   (platform/flush-streams)
   (platform/halt))
