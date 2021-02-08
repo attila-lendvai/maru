@@ -53,7 +53,7 @@
        (define-function ,insert-name (obj idx value)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string insert-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
          (let ((size (get-size obj)))
-           (when (<= idx size)
+           (when (< idx size)
              ;; TODO how about insering far out into the new territory?
              (,append-name obj 0)    ; ensure that we have enough room, and that the size slot gets updated
              (when (< idx size)
