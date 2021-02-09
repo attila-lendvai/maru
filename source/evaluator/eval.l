@@ -419,7 +419,7 @@
 
 (define-function print-backtrace ()
   (if-at-expand feature/backtrace
-      (let ()
+      (let ((out *debug-output*))
         (for (i 0 *call-stack-index*)
           (platform/flush-streams) ; seems like that in case of a sigsegv it doesn't get flushed
           (let* ((call-frame	(array-at *call-stack* i))
@@ -429,27 +429,20 @@
                                         (= callee-des symbol/encode))))
             (times-do (- 3 (string-length index-label))
               (string-insert index-label 0 ?\ ))
-            (print index-label)
-            (platform/print ": ")
-	    (println (<call-frame>-callee-designator call-frame))
+            (print-all out index-label": "(<call-frame>-callee-designator call-frame)"\n")
 
             (unless expand-or-encode?
-              (platform/print "\tcallee:\t")
-	      (println (<call-frame>-callee call-frame)))
+              (print-all out "\tcallee:\t"(<call-frame>-callee call-frame)"\n"))
 
             (when (<= *error-level* 1)
               (let ((args (<call-frame>-arguments call-frame)))
                 (cond
                   (expand-or-encode?
-                   (platform/print "\texpr: ")
-                   (println args))
+                   (print-all out "\texpr: "args"\n"))
                   (else
                    (let ((arg-index 0))
                      (list-do arg args
-                       (platform/print "\targ ")
-                       (print (long->string arg-index))
-                       (platform/print ":\t")
-                       (println arg)
+                       (print-all out "\targ "(long->string arg-index)":\t"arg"\n")
                        (incr arg-index)))))))))
         ;; man exit says that it's flushed, but looks like it's not. plus there's this: https://wiki.sei.cmu.edu/confluence/display/c/FIO23-C.+Do+not+exit+with+unflushed+data+in+stdout+or+stderr
         (platform/flush-streams))

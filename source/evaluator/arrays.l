@@ -112,7 +112,7 @@
 (define-function string= (a b)
   (= 0 (compare-strings a b)))
 
-;; NOTE there's a variant of this in parser.l
+;; NOTE there's a variant of this in sequences.l, but it's not trivial to merge them.
 (define-function array-binary-search (array item comparator inserter)
   (let ((lo 0)
         (hi (- (array-length array) 1)))

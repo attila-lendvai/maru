@@ -152,7 +152,7 @@
 ;;
 (define-function fatal-prologue ()
   (incr *error-level*)
-  (platform/print-diag "\nERROR:"))
+  (platform/print-diag "\nERROR: "))
 
 (define-function fatal-epilogue ()
   (platform/print-diag) ; newline

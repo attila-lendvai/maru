@@ -246,6 +246,7 @@
       c)))
 
 (define-function parser-stream-match-class (self class)
+  ;; class is a string here, obj is a char (currently represented as <long>)
   (let ((obj (parser-stream-peek self)))
     (and (long? obj)
          (<= 0 (binary-search class $size $at obj -))

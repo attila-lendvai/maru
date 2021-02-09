@@ -104,6 +104,7 @@
   (%sort items string-at set-string-at (or (car options) <) 0 (- (string-length items) 1))
   items)
 
+;; NOTE there's a variant of this in evaluator/arrays.l, but it's not trivial to merge them.
 (define-function binary-search (seq length at obj compare)
   (let ((lo 0)
         (hi (- (length seq) 1))
@@ -122,3 +123,21 @@
 
 ;; (define-function array-search  (arr obj . options)	(binary-search arr array-length  array-at  obj (or (car options) -)))
 ;; (define-function string-search (str obj . options)	(binary-search str string-length string-at obj (or (car options) -)))
+
+;; (define-function binary-search* (seq length at item key comparator inserter)
+;;   (let ((lo		0)
+;;         (hi		(- (length seq) 1))
+;;         (match-index	()))
+;;     (while (<= lo hi)
+;;       (let* ((mid	(/ (+ lo hi) 2))
+;;              (cand	(at seq mid))
+;;              (diff	(comparator item (key cand))))
+;;         (cond
+;;           ((< diff 0)	(set hi (- mid 1)))
+;;           ((> diff 0)	(set lo (+ mid 1)))
+;;           (else
+;;            (set match-index mid)
+;;            (set lo (+ hi 1))))))
+;;     (cond
+;;       (match-index	(at seq match-index))
+;;       (inserter		(inserter lo)))))
