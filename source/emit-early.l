@@ -301,11 +301,37 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of << >> C-string
+(list-do name '(return address-of
+                arithmethic-shift-left arithmethic-shift-right
+                C-string
                 ;; to test if anything calls them before they get redefined:
                 ;; eval cons list car cdr form
                 )
   (environment-define *slave-env* name (fixed (lambda args (print name " encountered in interpreted code with args " args "\n") (abort)))))
+
+(define-function %bitwise-shift (value shift)
+  (cond
+    ((<= +word-size-in-bits+ shift)
+     0)
+    ((<= shift (- +word-size-in-bits+))
+     (if (< value 0) -1 0))
+    ((< 0 shift)
+     (arithmethic-shift-left value shift))
+    ((< shift 0)
+     (arithmethic-shift-right value (- shift)))))
+
+(define-form bitwise-shift (value shift)
+  (typecase shift
+    (<long>	(cond
+                  ((<= +word-size-in-bits+ shift)
+                   0)
+                  ((<= shift (- +word-size-in-bits+))
+                   (if (< value 0) -1 0))
+                  ((< 0 shift)
+                   `(arithmethic-shift-left ,value ,shift))
+                  ((< shift 0)
+                   `(arithmethic-shift-right ,value ,(- shift)))))
+    (else	`(%bitwise-shift ,value ,shift))))
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()

@@ -1050,7 +1050,7 @@
              ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
               (bitwise-and  ,AND) (bitwise-or   ,OR ) (bitwise-xor ,XOR)
               (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
-              (<< ,ASL) (>>  ,ASR)
+              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
               (oop-at		,LOAD-OOP))

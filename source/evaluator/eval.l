@@ -55,7 +55,7 @@
        `(%allocate-boxed ,type-name ,payload))
       ((is <immediate-type> type)
        ;; TODO error when overflow
-       `(bitwise-or (<< ,payload ,(<immediate-type>-tag-width type))
+       `(bitwise-or (bitwise-shift ,payload ,(<immediate-type>-tag-width type))
                     ,(<immediate-type>-tag-value type)))
       (else
        (error "box: don't know how to deal with "type)))))
@@ -76,10 +76,10 @@
 
       ((is <immediate-type> type)
        (if (< *safety* 2)
-           `(>> ,obj ,(<immediate-type>-tag-width <long>))
+           `(bitwise-shift ,obj ,(- (<immediate-type>-tag-width <long>)))
          `(let ((__obj__ ,obj))
             (assert (is ,type-name __obj__))
-            (>> __obj__ ,(<immediate-type>-tag-width <long>)))))
+            (bitwise-shift __obj__ ,(- (<immediate-type>-tag-width <long>))))))
 
       (else
        (error "unbox: don't know how to deal with "type)))))

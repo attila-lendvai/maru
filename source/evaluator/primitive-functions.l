@@ -162,15 +162,7 @@
   (box <long> (bitwise-not value)))
 
 (define-primitive-function (bitwise-shift ()) ((value <long>) (shift <long>))
-  (let* ((bit-length-of-<long> 31) ; TODO FIXME arrange for using the actual value here
-         (max-shift (- bit-length-of-<long> 1)))
-    (box <long>
-     (cond
-       ((< max-shift shift)	0)
-       ((< 0 shift)		(<< value shift))
-       ((< shift (- max-shift))	(if (< value 0) -1 0))
-       ((< shift 0)		(>> value (- shift)))
-       ((= 0 shift)		value)))))
+  (box <long> (bitwise-shift value shift)))
 
 (define-form define-relation (op)
   `(define-primitive-function (,op ()) ((lhs <long>) (rhs <long>))
