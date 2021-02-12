@@ -132,6 +132,15 @@
       (else
        (error "unbox: don't know how to deal with "type)))))
 
+(eval-in-slave
+ ;; "export" these up into the syntax level, because the compiler
+ ;; wants to call them for e.g. dumping strings, and eval-in-target
+ ;; wouldn't work from there, because the target has non-evaluatable
+ ;; definitions for stuff like bitwise-shift and <long>.
+ `(let ()
+    (define box		,box)
+    (define unbox	,unbox)))
+
 ;; NOTE this is not exactly the same as the one in the user-land, it lacks the slot-name
 ;; parameter (because the compiler cannot deal with symbol literals yet).
 (define-function %accessor-typecheck (expected-type-id object)

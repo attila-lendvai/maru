@@ -740,6 +740,8 @@
 ;;; Compiling string literals
 ;;;
 
+(assert (eval-in-slave '(is <immediate-type> <long>)) "emit-string-as-object only supports immediate <long> representation for now")
+
 (define-function compile-string-to-object (self -c-)
   ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
   ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
@@ -762,9 +764,8 @@
         (when (slave-value feature/object-canary)
           (e ", %word "(number->string (slave-value +canary-value+))))
         (e "}, %word ")
-        ;; KLUDGE see emit-x86.l for description
-        ;;(e (long->string (eval-in-target `(box <long> ,(string-length self)))))
-        (e (number->string (bitwise-or (bitwise-shift (string-length self) 1) 1)))
+        ;; FIXME this only works when <long> is an immediate
+        (e (number->string (eval-in-slave `(box <long> ,(string-length self)))))
         (e ", %ptr bitcast ([" (number->string (+ 1 (string-length self))) " x i8]* @"(llvm/escape-global-identifier elements)" to %ptr) }\n")
         (emit INLINE buf)
 

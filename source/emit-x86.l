@@ -538,27 +538,31 @@
     (emit ASCIZ self)
     label))
 
+(define-function emit-object-header (type-id)
+  (let ((object-label	(UNIQUE-LABEL "ostr")))
+    (emit RODATA)
+    (emit ALIGN 4)
+    ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
+    ;; (emit LONG -42)                   ; next
+    ;; (emit LONG -42)                   ; chunk size
+    (emit LONG (slave-value (+ <header>-flags/used <header>-flags/opaque))) ; flags
+    (emit LONG type-id)
+    (when (slave-value feature/object-canary)
+      (emit LONG (slave-value +canary-value+)))
+    ;; start of the gc chunk payload
+    (emit DEFLABEL object-label)
+    object-label))
+
+(assert (eval-in-slave '(is <immediate-type> <long>)) "emit-string-as-object only supports immediate <long> representation for now")
+
 (define-function emit-string-as-object (self -c-)
   ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
   ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((object-label	(UNIQUE-LABEL "ostr"))
-        (elements-label	(emit-string-as-C-string self -c-)))
-    (emit ALIGN 4)
-    ;; gc header
-    (emit LONG 0)                    ; next
-    (emit LONG -1)                   ; chunk size; it shouldn't matter
-    (emit LONG (slave-value (+ <header>-flags/used <header>-flags/opaque))) ; flags
-    (emit LONG (eval-in-slave `(<type>-slave-id (type-of ,self))))
-    (when (slave-value feature/object-canary)
-      (emit LONG (slave-value +canary-value+)))
+  (let ((elements-label	(emit-string-as-C-string self -c-))
+        (object-label	(emit-object-header (eval-in-slave `(<type>-slave-id (type-of ,self))))))
     ;; start of the gc chunk payload; as per the slots of <string>
-    (emit DEFLABEL object-label)
-    ;; KLUDGE the proper way is the eval-in-target call, but the >>
-    ;; and << needs to be replaced by bitwise-shift in BOX and UNBOX
-    ;; because here we want to run it in the evaluator. which in turn
-    ;; needs the finishing of the bootstrapping of bitwise-shift.
-    ;; (emit LONG (eval-in-target `(box <long> ,(string-length self))))
-    (emit LONG (bitwise-or (bitwise-shift (string-length self) 1) 1)) ; make it a boxed <long>
+    ;; FIXME this only works when <long> is an immediate
+    (emit LONG (eval-in-slave `(box <long> ,(string-length self))))
     (emit LONG elements-label)
     object-label))
 
