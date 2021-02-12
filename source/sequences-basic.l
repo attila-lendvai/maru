@@ -6,10 +6,6 @@
 ;;   (string-do e s (array-append a e))
 ;;   s)
 
-;; TODO FIXME require loads from the current directory. therefore the
-;; bootstrap process is loading the slave's definitions, where incr is
-;; not present at this point yet. fix LOAD so that the host's boot.l
-;; loads the host's files. then use incr here below.
 (define-function concat-string (x y)
   (let ((x-len (string-length x))
         (y-len (string-length y)))
@@ -18,13 +14,13 @@
       (let ((i 0))
         (while (< i x-len)
           (set (string-at res res-idx) (string-at x i))
-          (set i (+ i 1))
-          (set res-idx (+ res-idx 1))))
+          (incr i)
+          (incr res-idx)))
       (let ((i 0))
         (while (< i y-len)
           (set (string-at res res-idx) (string-at y i))
-          (set i (+ i 1))
-          (set res-idx (+ res-idx 1))))
+          (incr i)
+          (incr res-idx)))
       res)))
 
 (define-function concat-strings args
@@ -47,7 +43,7 @@
   (if (pair? list)
       (let ((len 1))
         (while (set list (cdr list))
-          (set len (+ len 1)))
+          (incr len))
         len)
     0))
 

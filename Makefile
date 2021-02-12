@@ -136,6 +136,7 @@ BUILD		= build
 BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
+SLAVE_DIR	= $(CURDIR)
 
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
@@ -213,8 +214,11 @@ eval-llvm: $(BUILD_llvm)/eval1
 $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval -O -v						\
-		$(HOST_DIR)/boot.l						\
+		--define *host-directory* 	"$(HOST_DIR)"			\
+		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
+		boot.l								\
+		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
 		source/bootstrapping/host-extras.l				\
 		source/bootstrapping/early.l					\
 		--define feature/profiler 	$(PROFILER)			\
@@ -233,8 +237,11 @@ $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(HOST_DIR)/eval) # we need to move the dependency here, mimicing the currently commented out version of eval2.ll rule below
 	$(TIME) $(HOST_DIR)/eval -O -v						\
-		$(HOST_DIR)/boot.l						\
+		--define *host-directory* 	"$(HOST_DIR)"			\
+		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
+		boot.l								\
+		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
 		source/bootstrapping/host-extras.l				\
 		source/bootstrapping/early.l					\
 		--define feature/profiler  	$(PROFILER)			\
@@ -273,8 +280,11 @@ $(HOST_DIR)/eval:
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
   $(TIME) $(1) $(PROFILER_ARG) -O -v						\
-	boot.l									\
+	--define *host-directory* 	"$(SLAVE_DIR)"				\
+	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
+	boot.l									\
+	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
 	source/bootstrapping/early.l						\
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
@@ -290,8 +300,11 @@ endef
 
 define compile-llvm
   $(TIME) $(1) $(PROFILER_ARG) -O -v						\
-	boot.l									\
+	--define *host-directory* 	"$(SLAVE_DIR)"				\
+	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
+	boot.l									\
+	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
 	source/bootstrapping/early.l						\
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
