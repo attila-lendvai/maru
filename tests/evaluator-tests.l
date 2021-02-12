@@ -51,10 +51,16 @@
 
 (define-test eval/arithmetic/shift ()
   (test-assert (= 0xffffff	(bitwise-shift 0xffffff0 -4)))
+  (test-assert (= 1		(bitwise-shift 0xfffffff -27)))
+  (test-assert (= 0		(bitwise-shift 0xfffffff -28)))
   (test-assert (= 0xffffff0	(bitwise-shift 0xffffff 4)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 10000)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
-  (test-assert (= -1		(bitwise-shift -1 -100))))
+  (test-assert (= -1		(bitwise-shift -1 -100)))
+  ;; shifting a positive number into the sign bit
+  ;; FIXME
+  (test-assert (< 0		(bitwise-shift 0xfffffff 4)))
+  (test-assert (< 0		(bitwise-shift 0xfffffff 68))))
 
 (define-test eval/equality/string ()
   (test-assert (=  "alma" "alma"))

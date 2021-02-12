@@ -686,6 +686,9 @@
       (println "	movl	"(pop args)", "(pop regs))))
   (println "	int	$0x80"))
 
+;; TODO add a primitive-function for this? or add a macro whose
+;; expansion contains a literal x86 asm LINUX-SYSCALL instruction that
+;; is passed through all the way to emit?
 (define-function compile/linux-syscall (expr -c-)
   (let ((args		(cdr expr))
         (arg-locs	()))

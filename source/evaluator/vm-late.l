@@ -54,7 +54,7 @@
     (assert (and (is <fixed> fixed-primitive-function/quote) (is <fixed> fixed-primitive-function/lambda) (is <fixed> fixed-primitive-function/let) (is <fixed> fixed-primitive-function/define) (is <fixed> fixed-primitive-function/set)) "populate-module-with-maru-primitives: final assert")))
 
 (define-function capture-well-known-module-values ()
-  (debug-print "capture-well-known-module-values from *module*, which is "module)
+  (debug-print "capture-well-known-module-values from *module*, which is "*module*)
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
     (set *expanders*	(defined? symbol/*expanders*	env))
@@ -66,6 +66,20 @@
 
 (define-function initialize-vm ()
   (debug (platform/print-diag "alive"))
+
+  (safety 2
+    (or (= 42 (unbox <long> (box <long> 42)))		(fatal "box-unbox of <long> is broken"))
+    (when-at-expand (eval-in-slave '(is <immediate-type> <long>))
+      (or (= 85 (box <long> 42))			(fatal "box of <long> is broken"))
+      (or (= 42 (unbox <long> 85))			(fatal "unbox of <long> is broken")))
+    (or (= <long> (type-of (box <long> 42)))		(fatal "type-of for <long> is broken"))
+    (or (= 42 (unbox <long> (box <long> 42)))		(fatal "unbox of <long> is broken"))
+    (or (= 1 true)					(fatal "true is not 1"))
+    (or (= 0 false)					(fatal "false is not 0"))
+    (let ((lit-str "a literal string"))
+      (or (= <string> (type-of lit-str))	(fatal "type-of a literal <string> is broken"))
+      (or (string? lit-str)			(fatal "string? for a literal <string> is broken"))
+      (or (= 16 (string-length lit-str))	(fatal "string-length broken for a literal <string>"))))
 
   (gc/initialize)
 
@@ -79,14 +93,6 @@
   (debug (platform/print-diag "gc roots registered"))
 
   (safety 2
-    (or (= <long> (type-of (box <long> 42)))		(fatal "type-of for <long> is broken"))
-    (or (= 42 (unbox <long> (box <long> 42)))		(fatal "unbox of <long> is broken"))
-    (or (= 1 true)					(fatal "true is not 1"))
-    (or (= 0 false)					(fatal "false is not 0"))
-    (let ((lit-str "a literal string"))
-      (or (= <string> (type-of lit-str))	(fatal "type-of a literal <string> is broken"))
-      (or (string? lit-str)			(fatal "string? for a literal <string> is broken"))
-      (or (= 16 (string-length lit-str))	(fatal "string-length broken for a literal <string>")))
     (let ((str (string 16)))
       (string-append-all str "foo")
       (string-append-all str "bar")

@@ -42,6 +42,54 @@
 ;;; the primitive-functions encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
 
+;;;
+;;; type-of
+;;;
+(define-form define-type-of ()
+  (let ((conds-early	())
+        (conds-late	()))
+    (types-do type
+      (when (is <immediate-type> type)
+        (let* ((tag-value	(<immediate-type>-tag-value type))
+               (tag-width	(<immediate-type>-tag-width type)))
+          (if tag-width
+              (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                (push conds-late `((= ,tag-value (bitwise-and ptr ,tag-mask)) ,(<type>-name type))))
+            (push conds-early `((= ,tag-value ptr) ,(<type>-name type)))))))
+    `(define-function type-of (ptr)
+       (cond
+         ,@conds-early
+         ;; strictly speaking, this should be OOP?, but that would add an extra non-nil check
+         ((aligned-to-oop? ptr)
+	  (let ((header (gc/header-of ptr)))
+            (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
+            (safety 2 (or (gc/live-chunk? header) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
+            (<header>-type header)))
+         ,@conds-late
+         (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
+
+(define-type-of)
+
+(when-at-expand feature/optimize-speed
+  (define-form is (type-name obj)
+    (let ((type (eval type-name)))
+      (cond
+        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
+         ;; TODO this ignores inheritance
+         `(let ((__obj__ ,obj))
+            (and (oop? __obj__)
+                 (= ,(<type>-slave-id type)
+                    (<header>-type (gc/header-of __obj__))))))
+        ((is <immediate-type> type)
+         (let* ((tag-value	(<immediate-type>-tag-value type))
+                (tag-width	(<immediate-type>-tag-width type)))
+           (if tag-width
+               (let ((tag-mask (bitwise-not (- (bitwise-shift 1 tag-width)))))
+                 `(= ,tag-value (bitwise-and ,obj ,tag-mask)))
+             `(= ,tag-value ,obj))))
+        (else
+         `(= ,type-name (type-of ,obj)))))))
+
 (define-function %allocate-boxed (type-id payload)
   (let ((obj (gc/allocate-opaque type-id (words-to-bytes 1))))
     (set (oop-at obj 0) payload)
@@ -646,6 +694,8 @@
            (if one-step?
                expansion
              (expand expansion env one-step?))))
+
+        ;; TODO also handle literal <form> objects here?
 
         (else
          ;; head is not a <form> nor a <fixed> special form

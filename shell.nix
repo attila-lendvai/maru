@@ -24,6 +24,15 @@ pkgs.multiStdenv.mkDerivation {
       bashInteractive
     ];
 
+  # TODO this doesn't work: make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
+  # https://github.com/NixOS/nixpkgs/issues/36947
+  # Programs should be finding it from ${gcc.lib}/lib/libgcc.so
+  #
+  # NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgsi686Linux; [
+  #   libgcc.out
+  # ]);
+  # NIX_LDFLAGS_FOR_TARGET = "-L ${pkgsi686Linux.libgcc.out}/lib/ -L ${pkgsi686Linux.glibc.out}/lib/";
+
   buildCommand = ''
     make test-bootstrap
   '';

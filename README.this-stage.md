@@ -11,13 +11,31 @@ that the reason I cannot implement the new slave-target isolation is
 some of these bugs, then I just opened a new stage.
 
 
-## Assorted smaller changes
+## Assorted changes
 
- - rework the slave-target isolation so that there are only two
-   modules now (`host` and `slave`), and the target is just a nested
-   environment that delegates to the slave modules `*globals*`. this
-   paves the way, hopefully, to continue working on the compilation of
-   `<slector>`'s, which paves the way for streams in the target.
+ - [Switch](commit/7b4c52e730d5a7f0054e827097c9707b57fac1d6) compiled
+   literal string representation to full objects: they used to be
+   compiled into zero terminated cstrings, but now they are just like
+   full heap <string>'s, except that they are emitted into the
+   read-only segment, and the GC leaves them alone. This greatly
+
+ - Rework the [slave-target
+   isolation](commit/6b486df42e9bc7975049e84ea16f5029133879f7) so that
+   once again there are only two modules (`host` and `slave`), and the
+   target is just a nested environment that delegates to the slave
+   module's `*globals*`. This paved the way to continue working on the
+   compilation of `<slector>`'s, which paved the way for the
+   introduction of streams in the target code.
+
+ - Introduced *platforms*, and [added the *Linux*
+   platform](commit/03bdd99ab25d855b7255b583d1162f823f8378b7) that
+   builds into a static executable that directly communicates with the
+   Linux kernel through syscalls. The *libc* platform is almost
+   completely factored out from the rest of the codebase.
+
+ - Fix build thinko: the host's `boot.l` `require`'d the slave's files
+   because of the previously missing/ignored concept of the *working
+   directory*.
 
 ## Stats
 
