@@ -212,24 +212,45 @@
 (define-primitive-function set-cdr ((pair <pair>) value)
   (set (<pair>-tail pair) value))
 
-;; TODO in high safety, add asserts that OOP-AT & friends doesn't access beyond the object (based on the size in the GC header).
-;; interpreted code shouldn't ever need to reach beyond object boundaries.
-(define-primitive-function copy-oops		(from to (wordcount <long>)))
-(define-primitive-function oop-at		(base (index <long>)))
-(define-primitive-function set-oop-at		(base (index <long>) value))
-(define-primitive-function copy-bytes		(from to (count <long>)))
+(define-form define-oop-at-primfn (name args)
+  `(define-primitive-function (,name ()) (base (wordindex <long>) ,@args)
+     (safety 2
+       (let ((header (gc/header-of base)))
+         (assert (and (gc/valid-header-canary? header)
+                      (<= 0 wordindex)
+                      (<= (words-to-bytes (+ 1 wordindex)) (<header>-size header)))
+                 ,(concat-string (symbol->string name) ": trying to access beyond the gc chunk boundaries"))))
+     (,name base wordindex ,@args)))
+
+(define-oop-at-primfn oop-at		())
+(define-oop-at-primfn set-oop-at	(value))
+
+;; (define-primitive-function (copy-oops ()) (from to (wordcount <long>))
+;;   (error "copy-oops: who called me in interpreted code?! TODO i need proper bounds checking added.")
+;;   (copy-oops from to wordcount))
+
+;; bytes stuff is used by buffer.l, which is in turn is used by test-elf.l
+;; TODO this should better be done by some magic that automatically exports
+;; a kernel buffer.l implementation with types and functions into the evaluator
+(define-primitive-function (copy-bytes ()) (from to (count <long>))
+  ;; TODO check bounds
+  (copy-bytes from to count))
 
 (define-primitive-function (byte-at ()) (base (index <long>))
+  ;; TODO check bounds
   (box <long> (byte-at base index)))
 
 (define-primitive-function (set-byte-at ()) (base (index <long>) (value <long>))
+  ;; TODO check bounds
   (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
   (box <long> (set-byte-at base index value)))
 
+;; NOTE used by the assembler proof-of-concept in test-elf.l
 (define-primitive-function (address-of ()) (thing)
-  ;; TODO what about when <long> is a tagged immediate and the address is truncated?
-  ;; or return a target-vm-pointer here and define pointer arithmetics?
-  ;; or implement various boxed data types and return a word-sized integer here?
+  ;; KLUDGE when <long> is a tagged immediate then the address may get truncated.
+  ;; add an assert?
+  ;; or return a <target-pointer> here and define arithmetics on them?
+  ;; or implement various boxed data types and return a boxed word-sized integer here?
   (box <long> thing))
 
 (define-primitive-function (array-length ()) ((arg <array>))

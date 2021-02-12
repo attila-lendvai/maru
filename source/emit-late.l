@@ -9,7 +9,7 @@
   (array-do var (<env>-bindings env)
     (let* ((name		(<variable>-name  var))
            (value		(<variable>-value var))
-           (type-blacklist	(list <form>))
+           (type-blacklist	(list <form> <fixed>))
            (name-blacklist	'()))
       (unless (or (member? (type-of value) type-blacklist)
                   (member? name name-blacklist))

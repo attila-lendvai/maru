@@ -272,6 +272,11 @@
     ;; env, not on its syntax-level (the slave module).
     `(define ,name ,form)))
 
+;; TODO the body of WITH-FORMS is executed in the target env, but it's used
+;; here and there (e.g. disable %ACCESSOR-TYPECHECK locally), so we can't just do this:
+;; (define-form with-forms args
+;;   (error "with-forms is not yet supported in the kernel code: "args))
+
 (assert (not (= define-form (eval-in-slave 'define-form))))
 
 ;; hide DEFINE-CONSTANT in the target env with one that defines the constant into the slave env.
@@ -303,13 +308,12 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of
+(list-do name '(return address-of byte-at set-byte-at
                 arithmethic-shift-left arithmethic-shift-right
                 C-string
-                ;; to test if anything calls them before they get redefined:
-                ;; eval cons list car cdr form
-                )
-  (environment-define *slave-env* name (fixed (lambda args (print name " encountered in interpreted code with args " args "\n") (abort)))))
+                ;; nothing should call these before their target version gets defined:
+                eval cons list car cdr form)
+  (environment-define *globals* name (fixed (lambda args (eval-in-slave `(error ',name" encountered in interpreted code with args "',args))))))
 
 (define-function %bitwise-shift (value shift)
   (cond

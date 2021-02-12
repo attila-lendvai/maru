@@ -12,23 +12,22 @@
         (append-name (concat-symbol basename 'append))
         (insert-name (concat-symbol basename 'insert))
         (zeroed-name (concat-symbol basename 'ensure-zero-terminated)))
-    ;; TODO fix nested quasiquotes
-    `(with-forms ((get-size ((obj) (list 'unbox '<long> (list 'slot-value ',type-name 'size obj)))))
+    `(let ()
 
        (define-function ,length-name (obj)
-         (get-size obj))
+         (unbox <long> (slot-value ,type-name size obj)))
 
        (define-function ,getter-name (obj idx)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
          (let ((elements (slot-value ,type-name elements obj))
-               (size     (get-size obj)))
+               (size     (,length-name obj)))
            (and (< idx size)
                 (,accessor elements idx))))
 
        (define-function ,setter-name (obj idx val)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string setter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
          (let* ((elements	(slot-value ,type-name elements obj))
-                (size		(get-size obj))
+                (size		(,length-name obj))
                 (capacity	(if elements
                                     (/ (gc/object-size elements)
                                        ,element-size-in-bytes)
@@ -48,11 +47,11 @@
            (set (,accessor elements idx) val)))
 
        (define-function ,append-name (obj val)
-         (,setter-name obj (get-size obj) val))
+         (,setter-name obj (,length-name obj) val))
 
        (define-function ,insert-name (obj idx value)
          (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string insert-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
-         (let ((size (get-size obj)))
+         (let ((size (,length-name obj)))
            (when (< idx size)
              ;; TODO how about insering far out into the new territory?
              (,append-name obj 0)    ; ensure that we have enough room, and that the size slot gets updated
@@ -65,8 +64,8 @@
 
        (define-function ,zeroed-name (obj)
          (if (gc/read-only-object? obj)
-             (safety 3 (or (and (is <string> obj) (not (,getter-name obj (get-size obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
-           (let ((size (get-size obj)))
+             (safety 3 (or (and (is <string> obj) (not (,getter-name obj (,length-name obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
+           (let ((size (,length-name obj)))
              (,setter-name obj size 0)
              (set (slot-value ,type-name size obj) (box <long> size))))
          obj))))
