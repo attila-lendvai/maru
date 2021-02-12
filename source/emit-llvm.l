@@ -224,7 +224,7 @@
         (type-name		(symbol->type-name instr-name)))
     `(let ()
        (define-record ,type-name <instruction> ())
-       ;;(define-method do-print ,type-name () (print ,(symbol->string name)))
+       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
        (define-function ,instr-name ()
          (let ((i (new ,type-name)))
            (set (<instruction>-has-input? i)		',has-input?)

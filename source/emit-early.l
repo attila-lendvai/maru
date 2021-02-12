@@ -27,8 +27,8 @@
    n-params
    vararg?))
 
-(define-method do-print <C-function> ()
-  (print "<<C-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
+(define-print-method <C-function>
+  (print-all -stream- "<<C-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
 
 (define-function C-function (return-type foreign-name parameter-types)
   (let* ((rev-types (list-reverse parameter-types))
@@ -98,7 +98,7 @@
              (let ((self (new ,type-name)))
                ,@(define-operand/make-setters type-name effective-slots)
                self)))
-    `(define-method do-print ,type-name () (print ,@printing))))
+    `(define-print-method ,type-name (print-all -stream- ,@printing))))
 
 ;;; compiler infrastructure
 ;;;

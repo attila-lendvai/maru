@@ -31,13 +31,13 @@
     (index	index)
     (position	srcpos)))
 
-(define-method do-print <token> ()
-  (print "<token "self.index" "(character->string self.value))
+(define-print-method <token>
+  (print-all -stream- "<token "self.index" "(character->string self.value))
 ;  (map (lambda (x)
 ;	 (and (symbol? (car x))
 ;	      (print " "(car x))))
 ;       self.notes)
-  (print ">"))
+  (print-all -stream- ">"))
 
 ;(define <token> <pair>)		;(define token cons)			;(define new-<token> cons)
 ;(define <token>-value car)	(define set-<token>-value set-car)
@@ -62,15 +62,15 @@
     (set (<group>-last  self) last)
     self))
 
-(define-method do-print <group> ()
-  (print "{ ")
+(define-print-method <group>
+  (print-all -stream- "{ ")
   (let ((pos (<group>-first self))
 	(lim (<group>-last  self)))
     (while (!= pos lim)
-      (dump (<token>-value pos))
-      (print " ")
+      (dump-all -stream- (<token>-value pos))
+      (print-all -stream- " ")
       (set pos (<token>-tail pos))))
-  (print "}"))
+  (print-all -stream- "}"))
 
 (define-function token-preceeds (a b)
   (while (and a (!= (<token>-tail a) b))
@@ -354,17 +354,18 @@
     (set (<rule>-body self) body)
     self))
 
-(define-method do-print <rule> ()
-  (print "<rule "self.name"="self.body">"))
+(define-print-method <rule>
+  (print-all -stream- "<rule "self.name"="self.body">"))
 
 ;;;----------------------------------------------------------------
 
 (define-record <grammar> () (name base fields rules type))
 
-(define-method do-print <grammar> ()
-  (print "Grammar["(<grammar>-name self)":"(<grammar>-base self)(<grammar>-fields self)"]={\n")
-  (list-do rule (<grammar>-rules self) (println "  " rule))
-  (print " }"))
+(define-print-method <grammar>
+  (print-all -stream- "Grammar["(<grammar>-name self)":"(<grammar>-base self)(<grammar>-fields self)"]={\n")
+  (list-do rule (<grammar>-rules self)
+    (print-all -stream- "  "rule"\n"))
+  (print-all -stream- " }"))
 
 (define-function grammar-add-rule (self rule)
   (let* ((name  (car rule))
@@ -580,8 +581,8 @@
 
 (define-record <memo> () (state result position))
 
-(define-method do-print <memo> ()
-  (print "<memo:"self.state">"))
+(define-print-method <memo>
+  (print-all -stream- "<memo:"self.state">"))
 
 (define-function memo-set (self state result position)
   (with-instance-accessors self <memo>

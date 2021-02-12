@@ -60,7 +60,8 @@
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
 (define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
 
-(verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n"))
+(begin-for-syntax
+ (verbosity 1 (warn "oop/alignment-in-bytes is "oop/alignment-in-bytes", oop/align-padding is "oop/align-padding", oop/payload-mask is "oop/payload-mask", oop/tag-mask is "oop/tag-mask"\n")))
 
 (define-form oop/align (value)
   `(bitwise-and (+ ,value ,oop/align-padding)

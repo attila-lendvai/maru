@@ -12,7 +12,8 @@
     (set (<generic>-default self) default)
     self))
 
-(define-method do-print <generic> () (print "<multimethod:" (<generic>-name self) ">"))
+(define-print-method <generic>
+  (print-all -stream- "<multimethod:"self.name">"))
 
 (define-form define-generic (name . default)
   (or default (set default `(args (error "no method in generic "',name" corresponding to: "args", of types: " (map type-of args)))))

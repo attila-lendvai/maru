@@ -279,13 +279,6 @@
   (safety 2 (assert (and (<= value 255) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
   (box <long> (string-append string value)))
 
-(define-primitive-function symbol->string (symbol)
-  ;; FIXME isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
-  (if (string? symbol)
-      symbol
-    ;; TODO it's dangerous to return the uncopied name as a mutable string
-    (<symbol>-name symbol)))
-
 (define-primitive-function number->string ((num <long>) (radix <long> 10))
   (long->string* num radix))
 

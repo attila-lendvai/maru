@@ -140,8 +140,10 @@
          (error-if-storing)
          ($put-all stream "[instof:")
          (do-print stream (box <long> type) storing?)
-         ($put stream ?\] ))))))
+         ($put stream ?\] )))))
+  obj)
 
+;; TODO this smells like something that could be further simplified
 (define-function print (obj)
   (do-print *standard-output* obj false))
 
@@ -165,3 +167,15 @@
   (list-do arg -args-
     (print arg))
   (first -args-))
+
+(define-primitive-function (dump-all ()) _
+  (let ((stream (pop -args-)))
+    (list-do arg -args-
+      (do-print stream arg true))))
+
+;; NOTE there's a print-all macro in vm-early.l; being a form it needs
+;; to be defined very early, especially on high safety/debug level.
+(define-primitive-function (print-all ()) _
+  (let ((stream (pop -args-)))
+    (list-do arg -args-
+      (do-print stream arg false))))

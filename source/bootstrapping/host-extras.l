@@ -14,3 +14,12 @@
 
 ;; this got renamed
 (define number->string long->string)
+
+;; these are new. let's just drop the stream arg for the host.
+(define print-all (lambda args (apply print (cdr args))))
+(define dump-all  (lambda args (apply dump  (cdr args))))
+
+(define-form define-print-method (type . body)
+  `(define-method do-print ,type ()
+     (let ((-stream- ()))
+       ,@body)))

@@ -339,24 +339,26 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
-(load "source/env-min.l")
+(define-primitive-function string->symbol ((str <string>))
+  (array-binary-search *symbols*
+                       str
+                       (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
+                         (compare-strings str (<symbol>-name candidate)))
+                       (lambda (array index str)
+                         ;; TODO do we want to make a copy of str here? because str may be mutable...
+                         ;; TODO instantiate a read-only string as the name
+                         (gc/let* ((sym		(symbol str)))
+                           (debug (platform/print-diag "interning "str))
+                           (array-insert array index sym)
+                           sym))))
 
-(define-primitive-function (current-module ()) ()
-  *module*)
+(define-primitive-function symbol->string (symbol)
+  ;; FIXME? isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
+  (if (string? symbol)
+      symbol
+    (<symbol>-name symbol)))
 
-(define-primitive-function set-current-module ((module <module>))
-  (debug-print "set-current-module "module)
-  (set *module* module)
-  (capture-well-known-module-values)
-  module)
-
-(define-form with-current-module (module . body)
-  `(gc/let* ((__previous-module__ *module*)
-             __result__)
-     (set-current-module ,module)
-     (set __result__ (let () ,@body))
-     (set-current-module __previous-module__)
-     __result__))
+(require "source/env-min.l")
 
 ;; TODO this is ready to be moved into env-min.l, but then it redefines the host's defined?
 ;; and breaks something when it's loaded while not bootstrapping.
@@ -391,19 +393,6 @@
     (set (<variable>-value var) value)
     var))
 
-(define-primitive-function string->symbol ((str <string>))
-  (array-binary-search *symbols*
-                       str
-                       (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
-                         (compare-strings str (<symbol>-name candidate)))
-                       (lambda (array index str)
-                         ;; TODO do we want to make a copy of str here? because str may be mutable...
-                         ;; TODO instantiate a read-only string as the name?
-                         (gc/let* ((sym		(symbol str)))
-                           (debug (platform/print-diag "interning "str))
-                           (array-insert array index sym)
-                           sym))))
-
 (define-function maybe-object-in-variable (var type)
   (let ((tmp var))
     (and tmp
@@ -422,6 +411,27 @@
 (define-function global-variable? (var)
   (let ((env (<variable>-env var)))
     (= 0 (unbox <long> (<env>-level env)))))
+
+;;;
+;;; module
+;;; ----------------------------------------------------------------
+
+(define-primitive-function (current-module ()) ()
+  *module*)
+
+(define-primitive-function set-current-module ((module <module>))
+  (debug-print "set-current-module "module)
+  (set *module* module)
+  (capture-well-known-module-values)
+  module)
+
+(define-form with-current-module (module . body)
+  `(gc/let* ((__previous-module__ *module*)
+             __result__)
+     (set-current-module ,module)
+     (set __result__ (let () ,@body))
+     (set-current-module __previous-module__)
+     __result__))
 
 (load "source/evaluator/reader.l")
 (load "source/evaluator/printer.l")

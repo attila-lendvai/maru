@@ -27,33 +27,39 @@
 ;; 4: run a gc before every allocation
 (define *safety* 1)
 
-(define primitive/print print)
-(define primitive/dump  dump)
-
 (define error)
+
+(if evolving?
+    (eval '(let ()
+            (define *error-output*)
+            (define *standard-output*)
+            (define print-all (lambda args (error "dummy print-all reached")))
+            (define dump-all  (lambda args (error "dummy dump-all reached"))))))
+
+(define primitive/print		print)
+(define primitive/print-all	print-all)
+(define primitive/dump		dump)
+(define primitive/dump-all	dump-all)
 
 (define error/nested/2
   (lambda args
     (set error abort) ; let's give up in case of more recursive errors
-    (primitive/print "\nNESTED ERROR LEVEL 2: ")
-    (apply primitive/dump args)
-    (primitive/print "\n")
+    (apply primitive/dump-all (cons *error-output* (cons "\nNESTED ERROR LEVEL 2: " args)))
+    (primitive/print-all *error-output* "\n")
     (abort)))
 
 (define error/nested/1
   (lambda args
     (set error error/nested/2)
-    (primitive/print "\nNESTED ERROR LEVEL 1: ")
-    (apply primitive/print args)
-    (primitive/print "\n")
+    (apply primitive/print-all (cons *error-output* (cons "\nNESTED ERROR LEVEL 1: " args)))
+    (primitive/print-all *error-output* "\n")
     (abort)))
 
 (set error
   (lambda args
     (set error error/nested/1) ; in case a nested error happens while reporting
-    (primitive/print "\nerror: ")
-    (apply print args)
-    (primitive/print "\n")
+    (apply primitive/print-all (cons *error-output* (cons "\nerror: " args)))
+    (primitive/print-all *error-output* "\n")
     (abort)))
 
 (define list (lambda args args))
@@ -336,105 +342,5 @@
        self)))
 
 (require "source/selector.l")
-
-;;; print
-
-(define-selector do-print (self) (primitive/print "["(type-name-of self)" "(type-id-of self)"]"))
-(define-selector do-dump  (self) (primitive/dump self))
-
-(define print
-  (lambda args
-    (let ((l args))
-      (while (pair? l)
-        (do-print (pop l))))
-    (car args)))
-
-(define dump
-  (lambda args
-    (let ((l args))
-      (while (pair? l)
-        (do-dump (pop l)))
-      (car args))))
-
-(define println
-  (lambda args
-    (apply print args)
-    (primitive/print "\n")
-    (car args)))
-
-(define dumpln
-  (lambda args
-    (apply dump args)
-    (primitive/print "\n")
-    (car args)))
-
-(define-method do-print <undefined>		()	(primitive/print self))
-(define-method do-print <string>		()	(primitive/print self))
-(define-method do-print <symbol>		()	(primitive/print self))
-(define-method do-print <long>			()	(primitive/print self))
-(define-method do-print <array>			()	(primitive/print self))
-(define-method do-print <variable>		()	(primitive/print self))
-(define-method do-print <primitive-function>	()	(primitive/print self))
-
-(define-method do-dump  <undefined>		()	(primitive/dump self))
-(define-method do-dump  <string>		()	(primitive/dump self))
-(define-method do-dump  <symbol>		()	(primitive/dump self))
-(define-method do-dump  <long>			()	(primitive/dump self))
-(define-method do-dump  <array>			()	(primitive/dump self))
-
-(define-method do-print <fixed>		()	(print "<fixed "self.function">"))
-(define-method do-print <selector>	()	(print "<selector "self.name">"))
-(define-method do-print <expr>		()	(print "<expr "(or (when-at-expand feature/track-expr-names self.name) "?")" "self.parameters">"))
-(define-method do-print <env>		()	(print "<env Lv"self.level",Off"self.offset",#"(array-length self.bindings)">"))
-(define-method do-print <module>	()	(print "<module "(or (when-at-expand feature/debug-info self.name) "?") ">"))
-(define-method do-print <type>		()	(print "<"(<type>-name self)" "(<type>-id self)">"))
-
-(define-function %print-list (lst fn)
-  (print "(")
-  (let ((first-time?	true)
-        (cell		lst))
-    (while (pair? cell)
-      (if first-time?
-          (set first-time? ())
-        (print " "))
-      (fn (car cell))
-      (set cell (cdr cell)))
-    (when cell
-      (print " . " cell))
-    (print ")")))
-
-(define-method do-print <pair> ()
-  (%print-list self print))
-
-(define-method do-dump <pair> ()
-  (%print-list self dump))
-
-(define-method do-print <array> ()
-  (print "Array(")
-  (for (i 0 (array-length self))
-    (when (< 0 i) (print " "))
-    (print (array-at self i)))
-  (print ")"))
-
-(define-function dump-until (target arg)
-  (let ((found (= target arg)))
-    (if (pair? arg)
-        (let ()
-          (print "(")
-          (while arg
-            (if (pair? arg)
-                (if (dump-until target (car arg))
-                    (let ()
-                      (if (cdr arg) (print " ..."))
-                      (set found true)
-                      (set arg ())))
-              (let ()
-                (print ". ")
-                (dump-until target arg)))
-            (if (set arg (cdr arg))
-                (print " ")))
-          (print ")"))
-      (dump arg))
-    found))
-
+(require "source/printing.l")
 (require "source/generic.l")

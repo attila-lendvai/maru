@@ -1,10 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define *standard-input*)
-(define *standard-output*)
-(define *error-output*)
-(define *debug-output*)
-
 (require "source/platforms/libc/libc.l")
 
 (load "source/evaluator/vm-early.l")
@@ -66,34 +61,12 @@
     (error "set-working-directory: libc/chdir failed for "path)))
 
 (load "source/platforms/libc/streams.l")
-
-;; TODO eventually we could do something like this... note that this would access the current module!
-;; NOTE binding this into the interpreter's env is only useful/meaningful if its LIBC-STREAM type is also
-;; properly initialized in the interpreter's env. otherwise it would be there an object of an unknown type.
-;; TODO add compilation of symbols and drop the string->symbol call
-;; (define-symbol-form *standard-input*  (global-variable-value (string->symbol "*standard-input*")))
-;; (define-symbol-form *standard-output* (global-variable-value (string->symbol "*standard-output*")))
-;; (define-symbol-form *error-output*  (global-variable-value (string->symbol "*standard-error*")))
-
-(define-function initialize-streams ()
-  (gc/let* (tmp)
-    (with-forms ((doit ((libc-name our-name)
-                        `(let ()
-                           (set tmp (file-stream (box <target-vm-pointer> ,libc-name)))
-                           (set ,our-name tmp)
-                           ;; TODO add support for compiling symbols
-                           (set (global-variable-value (string->symbol ,(symbol->string our-name))) tmp)))))
-      (doit libc/stdin	*standard-input*)
-      (doit libc/stdout	*standard-output*)
-      (doit libc/stderr	*error-output*)
-      (set *debug-output* *error-output*))))
-
 (load "source/evaluator/vm-with-file-support.l")
 (load "source/evaluator/vm-late.l")
 
 (define-function main (argc argv)
   (initialize-vm)
-  (initialize-streams)
+  (initialize-streams libc/stdin libc/stdout libc/stderr)
 
   (process-command-line-arguments argc argv)
 

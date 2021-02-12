@@ -1,5 +1,24 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-form initialize-stream (target-name our-name)
+  (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
+  `(gc/let* (tmp)
+     (debug (platform/print-diag "initializing " ,(symbol->string our-name)))
+     (set tmp (box <target-vm-pointer> ,target-name))
+     (set tmp (file-stream tmp))
+     (set ,our-name tmp)
+     ;; the maru-user module was create earlier, let's set it there, too.
+     (set (global-variable-value *maru-user-module* ,(concat-symbol 'symbol/ our-name))
+          tmp)))
+
+(define-function initialize-streams (in-handle out-handle err-handle)
+  ;; NOTE a WITH-FORMS is tempting here, but the body of WITH-FORMS'
+  ;; are not executed in the syntax module.
+  (initialize-stream in-handle	*standard-input*)
+  (initialize-stream out-handle	*standard-output*)
+  (initialize-stream err-handle	*error-output*)
+  (initialize-stream err-handle	*debug-output*))
+
 (define-function repl-stream (stream)
   ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
   (safety 1 (assert (gc/valid-maru-value? stream)))
@@ -67,14 +86,18 @@
               ;; -v
               ((string= "-v" arg)
                (incr *verbosity*)
+               ;; KLUDGE propagate the value by hand into the evaluator
                (set tmp (box <long> *verbosity*))
-               (set (global-variable-value (string->symbol "*verbosity*")) tmp))
+               (set (global-variable-value *maru-module* symbol/*verbosity*) tmp)
+               (set (global-variable-value *maru-user-module* symbol/*verbosity*) tmp))
 
               ;; -O
               ((string= "-O" arg)
                (incr *optimised*)
+               ;; KLUDGE propagate the value by hand into the evaluator
                (set tmp (box <long> *optimised*))
-               (set (global-variable-value (string->symbol "*optimised*")) tmp))
+               (set (global-variable-value *maru-module* symbol/*optimised*) tmp)
+               (set (global-variable-value *maru-user-module* symbol/*optimised*) tmp))
 
               ;; -p
               ((string= "-p" arg)

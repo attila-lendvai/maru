@@ -36,6 +36,8 @@
   ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
   )
 
+;; we can't have a function in the target for print-all, because
+;; there's no support for &rest args yet in the compiler.
 (define-form print-all (stream . objs)
   `(let ()
      ,@(map (lambda (obj)
@@ -53,10 +55,6 @@
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
 ;;(define-form assert		prog ())
 (define-form assert		(test . args)	`(or ,test (error ,@(or args (list "kernel assertion failed")))))
-
-;; these are deliberately named the same as the binding in the evaluator, so that e.g. the verbosity macro works as expected also in the level-shifted code
-(define *verbosity*		0)
-(define *optimised*		0)
 
 ;;;
 ;;; override slot access with a specialized getter and setter
@@ -99,7 +97,7 @@
             names)))
 
 (define-forwards
-    *module* *maru-module* *symbols*
+    *module* *maru-module* *maru-user-module* *symbols*
 
     *expanders* *encoders* *evaluators* *applicators*
 
@@ -117,7 +115,7 @@
     abort %string->C-string
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
-    environment-define defined?
+    environment-define defined? global-variable-value set-global-variable-value
     )
 
 ;; cache some symbols into the symbol/foo global variables
@@ -134,7 +132,25 @@
 
 (define-symbol-cache
     true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
-    lambda let *globals* *expanders* *encoders* *evaluators* *applicators*)
+  lambda let *globals* *expanders* *encoders* *evaluators* *applicators*
+  *standard-input* *standard-output* *error-output* *debug-output* *verbosity* *optimised*)
+
+;; this installs symbol macros that get/set the value from/to the
+;; interpreter's global state, namely the maru module's global
+;; variables.
+(define-symbol-form *standard-input*  (global-variable-value *maru-module* symbol/*standard-input*))
+(define-symbol-form *standard-output* (global-variable-value *maru-module* symbol/*standard-output*))
+(define-symbol-form *error-output*    (global-variable-value *maru-module* symbol/*error-output*))
+(define-symbol-form *debug-output*    (global-variable-value *maru-module* symbol/*debug-output*))
+
+;; TODO this is dog slow, we cannot use it as-is to replace *verbosity*
+;; (define-symbol-form *verbosity*       (global-variable-value *maru-module* symbol/*verbosity*))
+;; (define-symbol-form *optimised*       (global-variable-value *maru-module* symbol/*optimised*))
+
+;; TODO this is fast, but this way *verbosity* in the evaluator and in the target is not in sync automatically.
+;; ideally, these variables could be in a super-module, and the codebase would't even have a global-variable?
+(define *verbosity* 0)
+(define *optimised* 0)
 
 ;;;
 ;;; error handling
@@ -172,8 +188,8 @@
 ;;
 (define-function error-prologue ()
   (incr *error-level*)
-  (unless *error-output*
-    (platform/print-diag "WARNING: error-prologue reached too early in init. We'll most probably crash before printing the actual error message."))
+  (unless (and *symbols* *error-output*)
+    (platform/print-diag "WARNING: error-prologue was reached too early in init. We'll most probably crash before printing the actual error message."))
   (cond
     ((= 2 *error-level*)
      (platform/print-diag "NESTED ERROR 1, attempting to print a limited backtrace")

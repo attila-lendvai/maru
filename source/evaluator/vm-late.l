@@ -29,9 +29,8 @@
   (debug-print "populate-module-with-maru-primitives for module "module)
   (let ((env (module-env module)))
     (gc/let* ((tmp))
-      ;; TODO this way *verbosity* in the evaluator and in the target is not in sync. see how *standard-output* is defined.
-      (set tmp (box <long> *verbosity*))	(environment-define env (string->symbol "*verbosity*")		tmp)
-      (set tmp (box <long> *optimised*))	(environment-define env (string->symbol "*optimised*")		tmp)
+      (set tmp (box <long> *verbosity*)) (environment-define env symbol/*verbosity* tmp)
+      (set tmp (box <long> *optimised*)) (environment-define env symbol/*optimised* tmp)
       ;; create an uninterned singleton symbol (i.e. a unique identity that cannot be recreated in any other way)
       (set +end+ (or +end+ (set tmp (symbol "+end+"))))
       ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
@@ -92,6 +91,10 @@
 
   (debug (platform/print-diag "gc roots registered"))
 
+  (set *symbols* (array 32))
+  (initialize-symbol-cache)
+  (debug (platform/print-diag "initialized *symbols*"))
+
   (safety 2
     (let ((str (string 16)))
       (string-append-all str "foo")
@@ -103,14 +106,13 @@
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (array 32)))
 
-  (set *symbols* (array 32))
-  (initialize-symbol-cache)
-  (debug (platform/print-diag "initialized *symbols*"))
-
   (set *maru-module* (module "maru"))
   (populate-module-with-maru-primitives *maru-module*)
   (debug (platform/print-diag "initialized *maru-module*"))
 
-  (set *module* (module "maru-user"))
+  (set *module* (set *maru-user-module* (module "maru-user")))
+  (environment-define (module-env *maru-user-module*)
+                      (string->symbol "*maru-module*")
+                      *maru-module*)
   (capture-well-known-module-values)
   (debug (platform/print-diag "finished module initialization")))
