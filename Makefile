@@ -16,7 +16,7 @@
 #  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
 # to force a full bootstrap cycle all the way down from the/a bottom stage:
-#  make PREVIOUS_STAGE_EXTRA_TARGETS=veryclean test-bootstrap || beep
+#  make test-bootstrap-recursively || beep
 #
 # the makefile parallelism is mostly only between the backends. don't use it
 # while bootstrapping all the way from a bottom stage, it's broken somewhere.
@@ -202,6 +202,11 @@ $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 eval: $(foreach backend,${BACKENDS},eval-$(backend))
 # NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
 
+force-eval0:
+	rm --force $(BUILD_x86)/eval0.s $(BITCODE_DIR)/eval0.ll
+
+eval0:      force-eval0 $(BUILD_x86)/eval0 $(BUILD_llvm)/eval0
+
 eval-x86: $(BUILD_x86)/eval1
 	cp $< $@
 	cp $< eval
@@ -210,10 +215,21 @@ eval-llvm: $(BUILD_llvm)/eval1
 	cp $< $@
 	cp $< eval
 
-# eval1 is the first version of us that gets built by our compiler animated by the previous stage.
-$(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
+# eval0 is the first version of us that gets built by the compiler of
+# the host. this binary may be incomplete and/or differ from eval1,
+# but it already contains e.g. all the primfn's or backtrace smartness
+# of our stage, and with that it helps development.
+#
+# to speed up the development cycle, it is not rebuilt automatically,
+# only when requested explicitly with a 'make eval0'.
+
+# TODO actually do this: wrap emit files below with
+# --eval "(set-working-directory \"$(SLAVE_DIR)\")"
+# --eval "(set-working-directory \"$(HOST_DIR)\")"
+# note that this will break 'make PLATFORM=linux eval0' unless we fix eval0's platform to libc.
+$(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval -O -v						\
+	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
@@ -221,7 +237,6 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
 		source/bootstrapping/host-extras.l				\
 		source/bootstrapping/early.l					\
-		--define feature/profiler 	$(PROFILER)			\
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
@@ -233,10 +248,9 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(call ensure-built,$(HOST_DIR)/eval) # we need to move the dependency here, mimicing the currently commented out version of eval2.ll rule below
-	$(TIME) $(HOST_DIR)/eval -O -v						\
+	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
@@ -256,11 +270,25 @@ $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-# eval2 is the second iteration of us that gets built by our compiler animated by our eval executable.
-# eval2 is just a test: eval2.s should be the exact same file as eval1.s
+# eval1 is the first version of us that gets built by our own compiler.
+# NOTE: use the LLVM eval0 here because it's faster than the x86 version.
+# TODO except that it's broken on PLATFORM=linux currently.
+HOST_EVAL0_x86=$(BUILD_x86)/eval0
+#HOST_EVAL0_x86=$(BUILD_llvm)/eval0
+#HOST_EVAL0_x86=$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
+$(BUILD_x86)/eval1.s: $(HOST_EVAL0_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-x86,$(HOST_EVAL0_x86),source/platforms/$(PLATFORM)/eval.l,$@)
+	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
+
+# eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
+# eval2 is just a test: its output should be the exact same files as eval1.*
 $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-x86,$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
+
+$(BITCODE_DIR)/eval1.ll: $(BUILD_llvm)/eval0 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call compile-llvm,$(BUILD_llvm)/eval0,source/platforms/$(PLATFORM)/eval.l,$@)
+	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-llvm,$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
@@ -384,8 +412,17 @@ $(BUILD_llvm)/%.o: source/evaluator/%.c
 run: $(TEST_EVAL)
 	rlwrap --no-warning $(TEST_EVAL) boot.l -
 
+run0: $(BUILD_x86)/eval0
+	rlwrap --no-warning $(BUILD_x86)/eval0 boot.l -
+
 run-bare: $(TEST_EVAL)
 	rlwrap --no-warning $(TEST_EVAL) -
+
+run-x86: $(BUILD_x86)/eval1
+	rlwrap --no-warning $(BUILD_x86)/eval1 boot.l -
+
+run-llvm: $(BUILD_llvm)/eval1
+	rlwrap --no-warning $(BUILD_llvm)/eval1 boot.l -
 
 test: test-evaluator test-bootstrap test-parser test-elf
 
