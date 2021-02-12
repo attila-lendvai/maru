@@ -1,5 +1,14 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; TODO FIXME file-stream returns an instance of a type that is not
+;; available at runtime in the interpreter, yet, we bind its value to
+;; *standard-output* & co... it's and extra complexity that this type
+;; id will have quite a gap in the type id's (4-5). without fixing
+;; this situation the streams will be an object of an unknown type in
+;; the evaluator, or even worse: a different type gets loaded and
+;; assigned the same type id. need to think more about the compilation
+;; of types, because the current setup is clearly inadequate.
+
 (define-form initialize-stream (target-name our-name)
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
   `(gc/let* (tmp)

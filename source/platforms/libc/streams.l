@@ -11,6 +11,7 @@
     (box <target-vm-pointer> it)))
 
 (define-primitive-function file-close ((stream <target-vm-pointer> _ nounbox))
+  ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
   (box <long> (libc/fclose (unbox <target-vm-pointer> stream))))
 
 (define-primitive-function file-read-character ((stream <target-vm-pointer>))

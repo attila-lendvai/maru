@@ -4,10 +4,10 @@
 
 Maru, the language, is implemented as an evaluator (aka an interpreter, a
 VM). But Maru is also self-hosting, which means that the
-implementation language of this evaluator is also Maru, although only
+implementation language of this evaluator is also Maru... although only
 a subset of the full language.
 
-The compiler compiles a list of named definitions (an *environment*) to the
+The compiler can compile a list of named definitions (an *environment*) to the
 target language; i.e. to the language of the foundational platform
 that was chosen to build the Maru VM on top of (e.g. x86 machine code,
 LLVM, libc, the Linux kernel, etc).
@@ -16,18 +16,29 @@ This subset of Maru is basically a list of the following toplevel
 definitions (see `compile-definition`):
 
  - `<long>`s
+
  - `<expr>`s; i.e. toplevel first-class functions (without variable
    capturing, the compiler does not support closures yet)
- - `<selector>`s; i.e. functions that dispatch on the type of their first parameter
+
+ - `<selector>`s; i.e. functions that dispatch on the type of their
+   first parameter (they are used for streams, but i'm considering to
+   maybe remove/replace them once full closures are supported by the
+   compiler.)
 
 Lambda's have a code body in `encode`ed form (see below), which can in
 turn contain the following elements (see `compile`):
 
  - `<long>` literals, compiled to word sized integers
+
  - `()`, i.e. nil, which is compiled to the integer zero
+
  - `<variable>` objects; i.e. resolved variable references
+
  - `<pair>`s; i.e. cons cells that can form a tree of lisp call forms
- - `<string>` literals
+
+ - `<string>` literals; they are compiled into full <string> objects,
+   but in the read-only segment instead of the heap
+
  - `<expr>`s; i.e. first class functions
 
 This seems rather limited at first sight, but keep in mind that the
@@ -76,3 +87,25 @@ basically a global=external=outside variable.
 
 This could come together with the introduction of nested local
 `define`s, too.
+
+## Compilation of types
+
+Maru is dinamically typed, and currently there's no static
+typechecking in its compilation. This will hopefully change.
+
+Unsurprisingly, types are represented in the target by their *type
+id*'s, i.e. by word sized integers. The `<undefined>` type doesn't
+necessarily need to be assigned the zero type id, but its single valid
+value is the zero word in the target, and `()`, aka `false` in the
+evaluator.
+
+TODO: Much needs to be worked out regarding the level-shifting of
+types. Currently, the very same `boot.l` needs to be loaded when we
+want to use our `eval.exe` that was used while compiling it -- at
+least regarding the types defined in the chaing of files that get
+loaded. Ideally, the compiler should emit enough this-and-that that
+the `eval.exe` recreates all the type related heap objects as part of
+its startup code. This could either be done by the usual way of having
+a separate exe and a heap image file, or by emitting objects into the
+static space, or having also a dynamic space that is relocated into
+the heap at startup.

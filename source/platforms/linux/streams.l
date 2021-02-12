@@ -26,6 +26,7 @@
       (box <target-vm-pointer> fd))))
 
 (define-primitive-function file-close ((fd <target-vm-pointer> _ nounbox))
+  ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
   (unless (= 0 (linux-syscall linux/close (unbox <target-vm-pointer> fd)))
     (error "file-close: close syscall returned with error")))
 

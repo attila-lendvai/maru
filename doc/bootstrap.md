@@ -51,23 +51,32 @@ The bootstrap process in general is the following:
  1) Stage `n` checks out and builds its parent/hosting stage under `build/` (typically stage
     `(n-1)` of the same language) to acquire an `eval` executable.
 
- 2) Using that executable and the compiler of the previous stage, it compiles a
-    version of itself that can already load and compile the codebase in stage `n`,
-    but the resulting executable may not be fully functional yet (in this phase the
-    `evolving?` variable is true). It's called `eval1` in the build process.
-    **Note** that this phase is not always necessary, depending on the nature of
-    the new features that are being bootstrapped, and in some stages it is not
-    done. It's needed when we introduce a new feature that the compiler itself
-    needs to be aware of (either because its implementation relies on this feature,
-    or e.g. in the case of the introduction of modules it needs to reach through
-    module boundaries at certain places).
+ 2) Using that executable and the compiler of the previous stage, it
+    compiles a version of itself that can already load and compile the
+    codebase in stage `n`, but the resulting executable may not be
+    fully functional yet (in this phase the `evolving?` variable is
+    true). It's called `eval0` in the build process.
 
- 3) Then it uses the resulting, potentially only semi-functional `eval1` executable to
+    **Note** that this phase is not always necessary, depending on the
+    nature of the new features that are being bootstrapped, and in
+    some earlier stages it is not done. It's useful to enjoy the
+    benefits of the new features of this stage, and it's necessary
+    when we introduce a new feature that the compiler itself needs to
+    be aware of (either because its implementation relies on or uses
+    this feature, or e.g. in the case of the introduction of modules
+    it needs to reach through module boundaries during the compilation
+    process).
+
+    **Note** that `eval0` is not automatically rebuilt when its source
+    files change to speed up development. You can rebuild it using
+    `make eval0`.
+
+ 3) Then it uses the resulting, potentially only semi-functional `eval0` executable to
     now compile itself using its own compiler, which will yield the final, fully
-    functional `eval2` executable.
+    functional `eval1` executable.
 
  4) Optionally, the `test-bootstrap` makefile target runs one more cycle to produce
-    `eval3`, and checks if the compiler's output is identical with that of the
+    `eval2`, and checks if the compiler's output is identical with that of the
     previous step.
 
 The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`

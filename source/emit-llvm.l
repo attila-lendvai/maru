@@ -1153,5 +1153,5 @@
                                    "")
                                  " }\n"))
     (emit INLINE (concat-strings "%\"<string>\" = type { %\"<header>\", %word, %ptr }\n"))
-    ;; KLUDGE
-    (emit INLINE "%struct._IO_FILE = type opaque\n")))
+    ;; we represent libc's FILE* with an opaque type
+    (emit INLINE "%m_libc-FILE = type opaque\n")))

@@ -119,6 +119,7 @@
     )
 
 ;; cache some symbols into the symbol/foo global variables
+;; TODO add compilation of symbols and drop this cache
 (define-form define-symbol-cache symbols
   `(let ()
      ,@(map (lambda (name)

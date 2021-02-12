@@ -4,42 +4,8 @@
 ;;;
 
 ;;;
-;;; Naming convention in this file:
+;;; types
 ;;;
-;;; vm     - Virtual Machine, i.e. a universe capable of executing code.
-;;;          It has its own set of laws that are accepted as axioms.
-;;;
-;;; host   - The Maru vm animating the bootstrap process.
-;;;
-;;; target - The target vm of the "level-shift" operation (e.g. x86 machines).
-;;;
-;;; kernel - It's the part of the code that runs in the target vm.
-;;;
-;;; slave  - The Maru vm that is being bootstrapped and that will
-;;;          spring to life when the result of the level-shift
-;;;          (the compilation) gets executed on the target.
-;;;          Its name comes from the idea that, having a dynamic compiler,
-;;;          the host could start up the slave vm under its full
-;;;          supervision.
-;;;
-;;; oop    - Ordinary Object Pointer, pointing to a lisp value.
-;;;
-;;; get, put
-;;;        - These are the kernel "accessors" for low-level Maru values.
-;;;
-;;; *foo* is global
-;;; +foo+ is a constant
-;;; -foo- comes from the implicit lexical scope
-;;; <foo> is a type
-;;;
-;;; size means bytes; if not, then it should be indicated.
-
-;;;
-;;; types and their kernel accessors (get, put, is)
-;;;
-;;; unsurprisingly, types are represented in the target as integers.
-;;; <undefined> doesn't necessarily need to be denoted by zero.
-;;; the primitive-functions encode/implement the behavior of the primitive types.
 ;;; ----------------------------------------------------------------
 
 ;;;
@@ -977,7 +943,8 @@
                             (lambda (name value)
                               (not (= name symbol/*globals*)))))
 
-    ;; overwrite these with empty arrays in the new module. TODO why? maybe clone the array instead?
+    ;; overwrite these with empty arrays in the new module.
+    ;; TODO why? maybe clone the array instead?
     (let ((doit (lambda (env name)
                   (gc/let* ((tmp (array 0)))
                     (set (<variable>-value (or (defined? name env)

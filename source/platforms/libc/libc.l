@@ -5,9 +5,9 @@
 ;;;
 ;;; The libc FFI
 ;;;
-(define-C-variable libc/stdin  stdin  (* "%struct._IO_FILE")) ; KLUDGE ideally we should grovel this type, but that would be more complex than this entire project
-(define-C-variable libc/stdout stdout (* "%struct._IO_FILE"))
-(define-C-variable libc/stderr stderr (* "%struct._IO_FILE"))
+(define-C-variable libc/stdin  stdin  (* "%m_libc-FILE")) ; an opaque type that we define in the prelude of the llvm backend
+(define-C-variable libc/stdout stdout (* "%m_libc-FILE"))
+(define-C-variable libc/stderr stderr (* "%m_libc-FILE"))
 
 (define-C-functions libc/
   (void abort ()) (void exit (int))

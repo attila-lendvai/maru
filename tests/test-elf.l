@@ -72,30 +72,30 @@ file-start
 	(.ascii	"ELF")
 	(.i8	1 1 1 0)			; ELFCLASS32, ELFDATA2LSB, version, ELFOSABI_NONE
 	(.i8	0 0 0 0 0 0 0 0)		; EI_ABIVERSION and padding
-	(.i16	2)				; type (ET_EXEC = 2)
-	(.i16	3)				; machine (EM_386 = 3)
-	(.i32	1)				; version
-	(.i32	entry-point)			; entry point
-	(.i32	(- section-headers file-start))	; phoff
-	(.i32	0)				; shoff
-	(.i32	0)				; flags
-	(.i16	elf-header-size)		; ehsize
-	(.i16	section-header-size)		; phentsize, of *one* section header, the rest are the same.
-	(.i16	1)				; phnum
-	(.i16	0)				; shentsize
-	(.i16	0)				; shnum
-	(.i16	0)				; shstrndx
+	(.i16	2)				; Type (ET_EXEC = 2)
+	(.i16	3)				; Machine (EM_386 = 3)
+	(.i32	1)				; Version
+	(.i32	entry-point)			; Entry point address
+	(.i32	(- program-headers file-start))	; phoff		Start of program headers
+	(.i32	0)				; shoff		Start of section headers
+	(.i32	0)				; Flags
+	(.i16	elf-header-size)		; ehsize	Size of this header
+	(.i16	program-header-size)		; phentsize	Size of program headers (of *one* section header, the rest are the same).
+	(.i16	1)				; phnum		Number of program headers
+	(.i16	0)				; shentsize	Size of section headers
+	(.i16	0)				; shnum		Number of section headers
+	(.i16	0)				; shstrndx	Section header string table index
 	(.def	elf-header-size (- $ file-start))
-section-headers
+program-headers
 	(.i32	1)				; type (1 = PT_LOAD)
 	(.i32	0)				; offset
-	(.i32	0x08048000)			; vaddr
-	(.i32	0)				; paddr
-	(.i32	file-size)			; filesz
-	(.i32	file-size)			; memsz
+	(.i32	0x08048000)			; vaddr		Virtual Addr
+	(.i32	0)				; paddr		Physical Addr
+	(.i32	file-size)			; filesz	Size in file (?)
+	(.i32	file-size)			; memsz		Size in memory (?)
 	(.i32	5)				; flags (PF_R + PF_X = 5)
 	(.i32	0x1000)				; alignment
-	(.def	section-header-size (- $ section-headers)) ; of *one* section header
+	(.def	program-header-size (- $ program-headers)) ; of *one* section header
 	;; (.align	0x1000)
 entry-point
 	(movlIR	4 _EAX) ; write
