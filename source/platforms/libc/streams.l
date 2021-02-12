@@ -30,7 +30,7 @@
 
 (define-record <libc-stream> <stream> (handle))
 
-(define-function file-stream (handle)
+(define-primitive-function file-stream ((handle <target-vm-pointer> _ nounbox))
   (assert (is <target-vm-pointer> handle))
   (make/opaque <libc-stream>
     (handle	(unbox <target-vm-pointer> handle))))

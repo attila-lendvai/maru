@@ -51,7 +51,7 @@
   (fd
    peeked-value))
 
-(define-function file-stream (fd)
+(define-primitive-function file-stream ((fd <target-vm-pointer> _ nounbox))
   (assert (is <target-vm-pointer> fd))
   (make/opaque <fd-stream>
     ;; TODO boxing...

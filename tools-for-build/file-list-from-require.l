@@ -7,12 +7,15 @@
     ;;(println "files: " *files*)
     ;;(println "Fake-loading: "path)
     (push *files* path)
-    (let ((forms (or (read path)
-                     (error "file not found or empty: "path))))
-      (list-do form forms
+    (let* ((file	(or (file-open path "r")
+                            (error "failed to open file "path)))
+           (stream	(file-stream file))
+           form)
+      (until (= +end+ (set form (read stream)))
         (when (and (pair? form)
                    (member? (first form) '(load require)))
-          (fake-require (second form)))))))
+          (fake-require (second form))))
+      (file-close file))))
 
 (while *command-line-arguments*
   (fake-require (pop *command-line-arguments*)))
