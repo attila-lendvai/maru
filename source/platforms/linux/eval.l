@@ -19,6 +19,12 @@
   (gc/allocate type (words-to-bytes slot-count)))
 
 (load "source/evaluator/eval.l")
+
+(define-primitive-function set-working-directory ((path <string>))
+  (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
+  (unless (= 0 (linux-syscall linux/chdir (string->C-string path)))
+    (error "set-working-directory: linux/chdir failed for "path)))
+
 (load "source/platforms/linux/streams.l")
 
 ;; TODO eventually we could do something like this... note that this would access the current module!

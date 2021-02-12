@@ -60,6 +60,11 @@
 ;;               (set size (* size 2))))))
 ;;       result)))
 
+(define-primitive-function set-working-directory ((path <string>))
+  (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
+  (unless (= 0 (libc/chdir (string->C-string path)))
+    (error "set-working-directory: libc/chdir failed for "path)))
+
 (load "source/platforms/libc/streams.l")
 
 ;; TODO eventually we could do something like this... note that this would access the current module!

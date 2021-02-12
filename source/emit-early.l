@@ -187,6 +187,7 @@
       (define-constant linux/write		4)
       (define-constant linux/open		5)
       (define-constant linux/close		6)
+      (define-constant linux/chdir		12)
       (define-constant linux/lseek		19)
       (define-constant linux/brk		45)
       (define-constant linux/fsync	        118)
@@ -200,6 +201,7 @@
       (define-constant linux/brk		12)
       (define-constant linux/exit		60)
       (define-constant linux/fsync		74)
+      (define-constant linux/chdir		80)
       ))))
 
 (switch-to-slave-module)
