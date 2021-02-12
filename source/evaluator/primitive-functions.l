@@ -419,3 +419,9 @@
 (when-at-expand feature/debug-output
   (define-primitive-function enable-debug-output	() (set *debug-output-enabled?* true))
   (define-primitive-function disable-debug-output	() (set *debug-output-enabled?* false)))
+
+(define-primitive-function set-working-directory ((path <string> _ nounbox))
+  (verbosity 1 (platform/print-diagnostics "change working directory: " (get/string path) "\n"))
+  (unless (= 0 (libc/chdir (get/string path)))
+    (error "set-working-directory: libc/chdir failed for "path))
+  path)
