@@ -509,6 +509,8 @@
   ())
 
 (define-method compile-call-to <expr> (op arg-locs -c-)
+  ;; NOTE the fact that a literal <expr> is found in a variable's
+  ;; value slot at compile time implies that it's a global definition.
   (if feature/redefinable-functions-in-target
       (let ()
         (comp op)

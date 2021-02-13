@@ -22,6 +22,8 @@
     (eval (list 'set name value))
     (set phased 1)))
 
+;; TODO clean up namespace issue, and only use .foo naming convention
+;; for stuff that doesn't actually emit anything.
 (define-function .base (addr)		(set $$ (set $ (eval addr))))
 (define-form	 .def (name expr)	(define-label name (eval expr)) ())
 (define-function .i8 bytes		(list-do byte bytes (_B () (eval byte))))
@@ -64,52 +66,55 @@
 ;; /usr/include/linux/elf.h
 ;; https://cirosantilli.com/elf-hello-world
 ;; man 8 ld-linux.so
+;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
 
-(assemble '(
-	(.base	0x08048000)			; with ASLR disabled, programs for x86 architecture are based at 0x8048000 by the linker: https://stackoverflow.com/questions/18296276/base-address-of-elf
+(assemble
+  '((.base	0x08048000) ; with ASLR disabled, programs for x86 architecture are based at 0x8048000 by the linker: https://stackoverflow.com/questions/18296276/base-address-of-elf
 file-start
-	(.i8	0x7f)				; ident
-	(.ascii	"ELF")
-	(.i8	1 1 1 0)			; ELFCLASS32, ELFDATA2LSB, version, ELFOSABI_NONE
-	(.i8	0 0 0 0 0 0 0 0)		; EI_ABIVERSION and padding
-	(.i16	2)				; Type (ET_EXEC = 2)
-	(.i16	3)				; Machine (EM_386 = 3)
-	(.i32	1)				; Version
-	(.i32	entry-point)			; Entry point address
-	(.i32	(- program-headers file-start))	; phoff		Start of program headers
-	(.i32	0)				; shoff		Start of section headers
-	(.i32	0)				; Flags
-	(.i16	elf-header-size)		; ehsize	Size of this header
-	(.i16	program-header-size)		; phentsize	Size of program headers (of *one* section header, the rest are the same).
-	(.i16	1)				; phnum		Number of program headers
-	(.i16	0)				; shentsize	Size of section headers
-	(.i16	0)				; shnum		Number of section headers
-	(.i16	0)				; shstrndx	Section header string table index
-	(.def	elf-header-size (- $ file-start))
+    (.i8	0x7f)			; ident
+    (.ascii	"ELF")
+    (.i8	1 1 1 0)		; ELFCLASS32, ELFDATA2LSB, version, ELFOSABI_NONE
+    (.i8	0 0 0 0 0 0 0 0)	; EI_ABIVERSION and padding
+    (.i16	2)			; Type (ET_EXEC = 2)
+    (.i16	3)			; Machine (EM_386 = 3)
+    (.i32	1)			; Version
+    (.i32	entry-point)		; Entry point address
+    (.i32	(- program-headers file-start))	; phoff		Start of program headers
+    (.i32	0)			; shoff		Start of section headers
+    (.i32	0)			; Flags
+    (.i16	elf-header-size)	; ehsize	Size of this header
+    (.i16	program-header-size)	; phentsize	Size of program headers (of *one* section header, the rest are the same).
+    (.i16	1)			; phnum		Number of program headers
+    (.i16	0)			; shentsize	Size of section headers
+    (.i16	0)			; shnum		Number of section headers
+    (.i16	0)			; shstrndx	Section header string table index
+    (.def	elf-header-size (- $ file-start))
 program-headers
-	(.i32	1)				; type (1 = PT_LOAD)
-	(.i32	0)				; offset
-	(.i32	0x08048000)			; vaddr		Virtual Addr
-	(.i32	0)				; paddr		Physical Addr
-	(.i32	file-size)			; filesz	Size in file (?)
-	(.i32	file-size)			; memsz		Size in memory (?)
-	(.i32	5)				; flags (PF_R + PF_X = 5)
-	(.i32	0x1000)				; alignment
-	(.def	program-header-size (- $ program-headers)) ; of *one* section header
-	;; (.align	0x1000)
+    ;; code segment
+    (.i32	1)			; type (1 = PT_LOAD)
+    (.i32	0)			; offset
+    (.i32	0x08048000)		; vaddr		Virtual Addr
+    (.i32	0)			; paddr		Physical Addr
+    (.i32	file-size)		; filesz	Size in file (?)
+    (.i32	file-size)		; memsz		Size in memory (?)
+    (.i32	5)			; flags (PF_R + PF_X = 5)
+    (.i32	0x1000)			; alignment
+    (.def	program-header-size (- $ program-headers)) ; of *one* section header
+    ;; (.align	0x1000)
 entry-point
-	(movlIR	4 _EAX) ; write
-	(movlIR	1 _EBX) ; fd, stdout
-	(movlIR	msg _ECX)
-	(movlIR	msglen _EDX)
-	(int	0x80)
-	(movlIR	1 _EAX) ; exit
-	(movlIR	0 _EBX) ; exit code
-	(int	0x80)
-msg	(.ascii	"Hello, world! From an elf binary!\n")
-	(.def	msglen (- $ msg))
-	;;(.def	code-size (- $ entry-point))
-	(.def	file-size (- $ file-start))))
+    (movlIR	4 _EAX)			; write
+    (movlIR	1 _EBX)			; fd, stdout
+    (movlIR	msg _ECX)
+    (movlIR	msglen _EDX)
+    (int	0x80)
+    (movlIR	1 _EAX)			; exit
+    (movlIR	0 _EBX)			; exit code
+    (int	0x80)			; linux syscall
+msg
+    (.ascii	"Hello, world! From an elf binary!\n")
+    (.def	msglen (- $ msg))
+    ;;(.def	code-size (- $ entry-point))
+    (.def	file-size (- $ file-start))))
 
 (print "writing buffer to ")
 

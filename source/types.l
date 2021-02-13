@@ -400,6 +400,7 @@
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
+;; TODO rename body to program-code
 (define-record		<expr>			() (parameters body env ctx
                                                      (when-at-expand feature/track-expr-names	name)
                                                      (when-at-expand feature/profiler		profiler-counter)))

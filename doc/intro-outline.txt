@@ -3,6 +3,23 @@
 * goals
 - smallest self-contained computing system that can reproduce itself
 - keep things simple
+** why
+https://www.facebook.com/onemore.freeman/posts/10226332358917904
+geek stuff:
+
+if you abandon the idea of integrating/linking computer algorithms together at the abstraction level of machine code (C linker), then what you gain is that all the complexity spelled out on the countless pages of the platform's ABI documentation -- using a messy, spoken language --, can be expressed formally in program code.
+
+such a "linker" would only have authority locally, on your own computer, and as such it becomes configurable, and can employ all the usual programming techniques like type systems and other forms of assertions on a much higher abstraction level than machine code and memory relocations.
+
+solving this problem on a higher level would automatically eliminate much of the complexity of the C abstraction level that is not at all inherent to the problem domain of integrating algorithms.
+
+this is an enormous accidental complexity that creeps into most software that intersects with the C toolchain in any way (i.e. practically all software).
+
+it is the consequence of the enormous mistake that we, the IT profession, have been making for the past several decades: organizing most of our compiler infrastructure around the faulty idea that you can retain and benefit from intellectual property if you only distribute compiled executables, because they are already lowered/distorted to the abstraction level of assembly -- an inherently lossy transformation --, that inhibits the efforts of prying eyes.
+
+much waste for very little gain. there'll always be countless children who will have enormous fun exploring/learning the magic of computing while disassembling and removing your copy protections... trust me, i know.
+
+the opensource era should finally weed out this monstrosity of accidental complexity.
 * du -sh source/ ~600k; minimal bootstrap: ~2000 LoC
 - gc
 - PEG parser

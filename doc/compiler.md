@@ -109,3 +109,9 @@ its startup code. This could either be done by the usual way of having
 a separate exe and a heap image file, or by emitting objects into the
 static space, or having also a dynamic space that is relocated into
 the heap at startup.
+
+## Knowledge base
+
+ - [stack red-zone](https://en.wikipedia.org/wiki/Red_zone_%28computing%29)
+ - [x86 position indepenedent code](https://www.technovelty.org/c/position-independent-code-and-x86-64-libraries.html)
+ - [GCC and Bare Metal Programming](https://cs107e.github.io/guides/gcc/)

@@ -584,7 +584,7 @@
       ;; it's a set form such as: (set (fn-name a b c) new-value). let's try to convert it to
       ;; (set-fn-name a b c new-value) if set-fn-name is defined.
       (awhen (setter-name-for fn-name env)
-        ;; TODO the value should be inserted as the first arg to not disrupt &rest parsing
+        ;; TODO? the value should be inserted as the first arg to not disrupt &rest parsing
         (gc/let* ((args (get/tail place))
                   (last (cons value ())))
           (set args (expand-all args env one-step?))
