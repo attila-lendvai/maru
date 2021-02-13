@@ -68,6 +68,10 @@
 ;; man 8 ld-linux.so
 ;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
 
+(define elf/PF_R	0x4)
+(define elf/PF_W	0x2)
+(define elf/PF_X	0x1)
+
 (assemble
   '((.base	0x08048000) ; with ASLR disabled, programs for x86 architecture are based at 0x8048000 by the linker: https://stackoverflow.com/questions/18296276/base-address-of-elf
 file-start
@@ -78,13 +82,13 @@ file-start
     (.i16	2)			; Type (ET_EXEC = 2)
     (.i16	3)			; Machine (EM_386 = 3)
     (.i32	1)			; Version
-    (.i32	entry-point)		; Entry point address
+    (.i32	code-segment-start)	; Entry point address
     (.i32	(- program-headers file-start))	; phoff		Start of program headers
     (.i32	0)			; shoff		Start of section headers
     (.i32	0)			; Flags
     (.i16	elf-header-size)	; ehsize	Size of this header
     (.i16	program-header-size)	; phentsize	Size of program headers (of *one* section header, the rest are the same).
-    (.i16	1)			; phnum		Number of program headers
+    (.i16	2)			; phnum		Number of program headers
     (.i16	0)			; shentsize	Size of section headers
     (.i16	0)			; shnum		Number of section headers
     (.i16	0)			; shstrndx	Section header string table index
@@ -92,16 +96,24 @@ file-start
 program-headers
     ;; code segment
     (.i32	1)			; type (1 = PT_LOAD)
-    (.i32	0)			; offset
+    (.i32	0)			; file offset
     (.i32	0x08048000)		; vaddr		Virtual Addr
     (.i32	0)			; paddr		Physical Addr
-    (.i32	file-size)		; filesz	Size in file (?)
-    (.i32	file-size)		; memsz		Size in memory (?)
-    (.i32	5)			; flags (PF_R + PF_X = 5)
+    (.i32	code-segment-size)	; filesz	Size in file (?)
+    (.i32	code-segment-size)	; memsz		Size in memory (?)
+    (.i32	(+ elf/PF_R elf/PF_X))	; flags (PF_R + PF_X = 5)
     (.i32	0x1000)			; alignment
     (.def	program-header-size (- $ program-headers)) ; of *one* section header
-    ;; (.align	0x1000)
-entry-point
+    ;; read only data segment
+    (.i32	1)			; type (1 = PT_LOAD)
+    (.i32	(- rodata-segment-start file-start))	; file offset
+    (.i32	rodata-segment-start)	; vaddr		Virtual Addr
+    (.i32	0)			; paddr		Physical Addr
+    (.i32	rodata-segment-size)	; filesz	Size in file (?)
+    (.i32	rodata-segment-size)	; memsz		Size in memory (?)
+    (.i32	elf/PF_R)		; flags (PF_R = 4)
+    (.i32	4)			; alignment
+code-segment-start
     (movlIR	4 _EAX)			; write
     (movlIR	1 _EBX)			; fd, stdout
     (movlIR	msg _ECX)
@@ -110,11 +122,14 @@ entry-point
     (movlIR	1 _EAX)			; exit
     (movlIR	0 _EBX)			; exit code
     (int	0x80)			; linux syscall
+    (.def	code-segment-size (- $ file-start))
+
+    ;; (.align 1234) ; to test that it still works with a random offset added
+rodata-segment-start
 msg
     (.ascii	"Hello, world! From an elf binary!\n")
     (.def	msglen (- $ msg))
-    ;;(.def	code-size (- $ entry-point))
-    (.def	file-size (- $ file-start))))
+    (.def	rodata-segment-size (- $ rodata-segment-start))))
 
 (print "writing buffer to ")
 
