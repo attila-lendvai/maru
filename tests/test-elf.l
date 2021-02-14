@@ -38,9 +38,12 @@
 
 (define-function movlIR (src dst)	(MOVLir src dst ()))
 (define-function movlRM (src dst)	(MOVLrm src dst 0 0 0 ()))
+(define-function movlMR (src dst)	(MOVLmr src 0 0 0 dst ()))
+(define-function movlRR (src dst)	(MOVLrr src dst ()))
 (define-function inclR (dst)		(INCLr dst ()))
 (define-function pushlI (src)		(PUSHLi src ()))
 (define-function addlIR (src dst)	(ADDLir src dst ()))
+(define-function addlRM (src dst)	(ADDLrm src dst 0 0 0 ()))
 (define-function sublIR (src dst)	(SUBLir src dst ()))
 (define-function int (n)		(_B () 0xCD) (_B () n))
 
@@ -88,7 +91,7 @@ file-start
     (.i32	0)			; Flags
     (.i16	elf-header-size)	; ehsize	Size of this header
     (.i16	program-header-size)	; phentsize	Size of program headers (of *one* section header, the rest are the same).
-    (.i16	2)			; phnum		Number of program headers
+    (.i16	3)			; phnum		Number of program headers
     (.i16	0)			; shentsize	Size of section headers
     (.i16	0)			; shnum		Number of section headers
     (.i16	0)			; shstrndx	Section header string table index
@@ -101,35 +104,54 @@ program-headers
     (.i32	0)			; paddr		Physical Addr
     (.i32	code-segment-size)	; filesz	Size in file (?)
     (.i32	code-segment-size)	; memsz		Size in memory (?)
-    (.i32	(+ elf/PF_R elf/PF_X))	; flags (PF_R + PF_X = 5)
+    (.i32	(+ elf/PF_R elf/PF_X))	; flags: read, execute
     (.i32	0x1000)			; alignment
     (.def	program-header-size (- $ program-headers)) ; of *one* section header
     ;; read only data segment
     (.i32	1)			; type (1 = PT_LOAD)
-    (.i32	(- rodata-segment-start file-start))	; file offset
-    (.i32	rodata-segment-start)	; vaddr		Virtual Addr
+    (.i32	(- ro-data-segment-start file-start))	; file offset
+    (.i32	ro-data-segment-start)	; vaddr		Virtual Addr
     (.i32	0)			; paddr		Physical Addr
-    (.i32	rodata-segment-size)	; filesz	Size in file (?)
-    (.i32	rodata-segment-size)	; memsz		Size in memory (?)
-    (.i32	elf/PF_R)		; flags (PF_R = 4)
+    (.i32	ro-data-segment-size)	; filesz	Size in file (?)
+    (.i32	ro-data-segment-size)	; memsz		Size in memory (?)
+    (.i32	elf/PF_R)		; flags: read
+    (.i32	4)			; alignment
+    ;; writable data segment
+    (.i32	1)			; type (1 = PT_LOAD)
+    (.i32	(- data-segment-start file-start))	; file offset
+    (.i32	data-segment-start)	; vaddr		Virtual Addr
+    (.i32	0)			; paddr		Physical Addr
+    (.i32	data-segment-size)	; filesz	Size in file (?)
+    (.i32	data-segment-size)	; memsz		Size in memory (?)
+    (.i32	(+ elf/PF_R elf/PF_W))	; flags: read, write
     (.i32	4)			; alignment
 code-segment-start
+    ;; print message
     (movlIR	4 _EAX)			; write
     (movlIR	1 _EBX)			; fd, stdout
     (movlIR	msg _ECX)
     (movlIR	msglen _EDX)
     (int	0x80)
+    ;; write into the data segment: var = var - 42
+    (movlIR	-42 _EAX)
+    (addlRM	_EAX var)
+    ;; exit
+    (movlMR	var _EBX)		; exit code, should be 0
     (movlIR	1 _EAX)			; exit
-    (movlIR	0 _EBX)			; exit code
     (int	0x80)			; linux syscall
     (.def	code-segment-size (- $ file-start))
 
     ;; (.align 1234) ; to test that it still works with a random offset added
-rodata-segment-start
+ro-data-segment-start
 msg
     (.ascii	"Hello, world! From an elf binary!\n")
     (.def	msglen (- $ msg))
-    (.def	rodata-segment-size (- $ rodata-segment-start))))
+    (.def	ro-data-segment-size (- $ ro-data-segment-start))
+
+data-segment-start
+var
+    (.i32	42)
+    (.def	data-segment-size (- $ data-segment-start))))
 
 (print "writing buffer to ")
 
