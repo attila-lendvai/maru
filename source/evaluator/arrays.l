@@ -107,7 +107,7 @@
       (else ;; (> len-a len-b)
        (- (byte-at buf-a len-b) 0)))))
 
-;; TODO how does this relate to the = primitive-function? maybe delme?
+;; TODO how does this relate to the '= primitive-function? maybe delme?
 (define-function string= (a b)
   (= 0 (compare-strings a b)))
 

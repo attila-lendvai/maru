@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO find the set of necessary primitives and install them as primitive-functions
+;; TODO find the set of necessary primitives and install them as <target-function>
 ;; and then use those primitives to implement here whatever else is needed.
 
 ;; this could be a visitor function using closures, but results in some 5-10% slowdown when used in find-local-variable

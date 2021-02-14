@@ -8,7 +8,7 @@
 (load "source/evaluator/primitive-functions.l")
 
 (define-function instantiate-primitive-function (module name imp fixed?)
-  ;; NOTE <primitive-function> is an opaque object, but it's ok to use
+  ;; NOTE <target-function> is an opaque object, but it's ok to use
   ;; <symbols>'s as their name because they are held as gc roots by
   ;; the *symbols* array.
   (gc/let* ((tmp (primitive-function imp name)))

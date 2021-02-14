@@ -79,10 +79,11 @@
          (do-print stream (<fixed>-function obj) storing?)
          ($put stream ?> ))
 
-        ((= type <primitive-function>)
+        ((= type <target-function>)
          (error-if-storing)
          ($put stream ?.)
-         ($put-all stream (<primitive-function>-name obj)))
+         ;; TODO handle name as optional
+         ($put-all stream (<target-function>-name obj)))
 
         ((= type <variable>)
          (error-if-storing)

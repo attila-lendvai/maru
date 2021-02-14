@@ -60,7 +60,7 @@
                                              (primitive/print-all -stream- self)))
                                         types)))))
   ;; by default redirect the printing of these types to the do-print primfn of the evaluator.
-  (redirect <undefined> <string> <symbol> <long> <array> <variable> <primitive-function>))
+  (redirect <undefined> <string> <symbol> <long> <array> <variable> <target-function>))
 
 (with-forms ((redirect (types `(let ()
                                  ,@(map (lambda (type)

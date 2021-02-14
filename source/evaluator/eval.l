@@ -222,7 +222,7 @@
     (function fn)))
 
 (define-function primitive-function (_imp name)
-  (make/opaque <primitive-function>
+  (make/opaque <target-function>
     (_imp		_imp)
     (name		name)
     (when-at-expand feature/profiler
@@ -522,13 +522,13 @@
         ((= type <expr>)
          (apply/expr fun arguments ctx))
 
-        ((= type <primitive-function>)
+        ((= type <target-function>)
          (if-at-expand (<= 3 *safety*)
-             (let ((result ((<primitive-function>-_imp fun) arguments ctx)))
+             (let ((result ((<target-function>-_imp fun) arguments ctx)))
                (or (gc/valid-maru-value? result)
-                   (error "<primitive-function> "fun" returned with something unboxed"))
+                   (error "<target-function> "fun" returned with something unboxed"))
                result)
-           ((<primitive-function>-_imp fun) arguments ctx)))
+           ((<target-function>-_imp fun) arguments ctx)))
 
         (else
          (aif (and *applicators*
@@ -974,8 +974,8 @@
           ((= callee-type <expr>)
            (incr-boxed (<expr>-profiler-counter callee)))
 
-          ((= callee-type <primitive-function>)
-           (incr (<primitive-function>-profiler-counter callee)))))))
+          ((= callee-type <target-function>)
+           (incr (<target-function>-profiler-counter callee)))))))
 
   (define-function profiler/take-sample (_)
     (incr profiler/sample-counter)
@@ -999,9 +999,9 @@
                     (< 0 (set counter (unbox <long> (<expr>-profiler-counter obj)))))
                (set name (<expr>-name obj)))
 
-              ((and (= type <primitive-function>)
-                    (< 0 (set counter (<primitive-function>-profiler-counter obj))))
-               (set name (<primitive-function>-name obj))))
+              ((and (= type <target-function>)
+                    (< 0 (set counter (<target-function>-profiler-counter obj))))
+               (set name (<target-function>-name obj))))
             (when counter
               (print-all *debug-output* (box <long> counter)"\t"(or name "n/a"))))
           (set obj (gc/next-object obj)))))))

@@ -352,5 +352,5 @@
 
 (level-shift-types
  <type> <record>
- <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <primitive-function>
+ <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <target-function>
  <variable> <env> <context> <module> <target-pointer> <symbol> <pair>)
