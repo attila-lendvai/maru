@@ -8,33 +8,52 @@
 (define-selector $at-end?)
 (define-selector $peek)
 (define-selector $next)
+(define-selector $put)
+(define-selector $put-all)
 
 ;;;----------------------------------------------------------------
 
-(define-record <string-stream> () (string size position))
+(define-record <string-stream> () (buffer position))
 
 (define-function string-stream (string)
   (make <string-stream>
-    (string	string)
-    (size	(string-length string))
+    (buffer	string)
     (position	0)))
 
 (define-method $at-end? <string-stream> ()
-  (= self.position self.size))
+  (>= self.position (string-length self.buffer)))
 
 (define-method $peek <string-stream> ()
   (let ((pos self.position))
-    (if (< pos self.size)
-	(string-at self.string pos)
+    (if (< pos (string-length self.buffer))
+	(string-at self.buffer pos)
       +end+)))
 
 (define-method $next <string-stream> ()
   (let ((pos self.position))
-    (if (< pos self.size)
-	(let ((value (string-at self.string pos)))
+    (if (< pos (string-length self.buffer))
+	(let ((value (string-at self.buffer pos)))
 	  (set self.position (+ pos 1))
 	  value)
       +end+)))
+
+(define-method $put <string-stream> (char)
+  (string-insert self.buffer self.position char)
+  (incr self.position)
+  char)
+
+(define-method $put-all <string-stream> (elements)
+  (typecase elements
+    (<string>		(string-insert-all self.buffer self.position elements)
+			(incr self.position (string-length elements)))
+    (else		(error "<string-stream> $put-all: unexpected elements: " elements)))
+  elements)
+
+(define-form with-output-to-string (args . body)
+  (let ((var (first args)))
+    `(let ((,var (string-stream "")))
+       ,@body
+       (<string-stream>-buffer ,var))))
 
 (unit-test "<string-stream>"
   (let ((s (string-stream "xhello"))

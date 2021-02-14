@@ -36,7 +36,6 @@
     (handle	(unbox <target-pointer> handle))))
 
 (define-method $at-end? <libc-stream> ()
-  ;; TODO make the FFI smarter to do this unboxing automatically. then we will be able to load this file as is into the interpreter
   (libc/feof self.handle))
 
 (define-method $peek <libc-stream> ()

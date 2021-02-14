@@ -148,13 +148,14 @@
 ;;; Operands
 ;;;
 
-(define-operand		GLOBAL		() (name)		"@"(llvm/escape-global-identifier (<GLOBAL>-name self)))
-(define-operand		LIBC-GLOBAL	() (name)		"@"(<LIBC-GLOBAL>-name self))
-(define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier (<LOCAL>-name self)))
-(define-operand		LITERAL		() (value)		(<LITERAL>-value self))
-(define-operand		CONSTANT	() (name value)		(<CONSTANT>-name self))
-(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string (<TEMP>-id self)))))
-(define-operand		LABEL		() (name)		(llvm/escape-local-identifier (<LABEL>-name self)))
+(define-operand		GLOBAL		() (name)		"@"(llvm/escape-global-identifier self.name))
+(define-operand		EXTERNAL    GLOBAL ()			"@"self.name)
+(define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier self.name))
+(define-operand		LITERAL		() (value)		self.value)
+;; TODO delete the value slot
+(define-operand		CONSTANT	() (name value)		self.name)
+(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string self.id))))
+(define-operand		LABEL		() (name)		(llvm/escape-local-identifier self.name))
 
 (define-form UNIQUE-LABEL ()
   `(LABEL (new-label-name -c-)))
@@ -164,6 +165,16 @@
 
 (define-function temp? (obj)
   (= <TEMP> (type-of obj)))
+
+(define-function closure-code-label (name)
+  ;; KLUDGE object "names" (i.e. addresses) should be tied together
+  ;; explicitly, not through giving them the "right" name
+  (GLOBAL (concat-string (symbol->string name) ".code")))
+
+(define-function closure-object-label (name)
+  (GLOBAL (if feature/redefinable-functions-in-target
+              (concat-string (symbol->string name) ".obj")
+            name)))
 
 ;;;
 ;;; Instructions
@@ -269,14 +280,18 @@
 (define-function emit-llvm-fn-type (return-type param-types vararg?)
   (let ((first? true))
     (print return-type " (")
-    (list-do param-type (if vararg?
-                            (concat-list param-types (list "..."))
-                          param-types)
-      (if first?
-          (set first? ())
-        (print ", "))
+    (list-do param-type param-types
+      (if first? (set first? false) (print ", "))
       (print param-type))
+    (when vararg?
+      (unless first? (print ", "))
+      (print "..."))
     (print ")")))
+
+(define-function emit-llvm-fn-type-for-expr (self)
+  ;; TODO optimize
+  (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters self))))
+    (emit-llvm-fn-type '%ptr param-types ())))
 
 (define-function emit-llvm-C-fn-type (ffn print-name?)
   (print (C-type->llvm-type (<C-function>-return-type ffn)) " ")
@@ -326,36 +341,9 @@
   ((pair)			(apply print $1)))
 
 (define-instruction DEFINE	()
-  ;; ((GLOBAL string)		(let ((length (+ 1 (string-length $2))))
-  ;;       			  (println $1".c = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))
-  ;;       			  (println $1"   = private unnamed_addr global %ptr bitcast([" length " x i8]* getelementptr([" length " x i8], [" length " x i8]* "$1".c) to %ptr)")))
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
-  ((CONSTANT array)		(let ((first? true))
-                                  ;; TODO this is fishy. i'm not sure this is the right way to emit <selector> dispatch tables...
-				  (print $1" = private unnamed_addr constant [" (array-length $2) " x %ptr] [")
-                                  (array-do el $2
-                                    (if first?
-                                        (set first? false)
-                                      (print ", "))
-                                    (print "%ptr ")
-                                    (if el
-                                        (cond
-                                          ((and (is <variable> el)
-                                                (is <expr> (<variable>-value el)))
-                                           (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters (<variable>-value el)))))
-                                             (print "bitcast (")
-                                             (emit-llvm-fn-type '%ptr param-types false)
-                                             (print "* "(GLOBAL (<variable>-name el))" to %ptr)")))
-                                          (else (error "don't know how to emit constant array element "el)))
-                                      (print "inttoptr(%word 0 to %ptr)")))
-                                  (println "]")))
-  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)"))
-  ((GLOBAL expr)		(let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2)))
-                                      (entry-label (GLOBAL (concat-string (symbol->string (<GLOBAL>-name $1)) ".body"))))
-                                  (print $1" = global %ptr bitcast (")
-                                  (emit-llvm-fn-type '%ptr param-types ())
-                                  (println "* "entry-label" to %ptr)"))))
+  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)")))
 
 (define-instruction DECLARE	()
   ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
@@ -373,6 +361,9 @@
 (define-instruction BITCAST	(t 1 t)
   ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
+(define-instruction GEP	(t 1 t)
+  ((_ _ _ _)			(println "	"$reg1" = getelementptr "$2", "$2"* "$1", i32 "$3", i32 "$4)))
+
 (define-instruction RET		(() 1 ())
   ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %ptr")
                                 (println "	ret %ptr "$reg1))
@@ -380,34 +371,35 @@
   ;;       			(println "	ret %ptr "$reg1))
   ((LOCAL)			(println "	ret %ptr "$1)))
 
-(define-instruction LOAD	(() 1 t)
+(define-instruction LOAD-VALUE	(() 1 t)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %ptr"))
   ((TEMP    _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL  _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
   ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
                                     (println "	"$reg1" = load %ptr, %ptr* "$1) ; this could be a call-next-method
-                                  (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters $2))))
-                                    (print "	"$reg1" = bitcast ")
-                                    (emit-llvm-fn-type '%ptr param-types ())
-                                    (println "* "$1" to %ptr"))))
+                                  (println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %ptr")))
+  ((CONSTANT  expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %ptr"))
   ((GLOBAL  C-function)		(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %ptr"))
   ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
                                   (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
 
+(define-instruction LOAD	(t 1 t)
+  ((LOCAL)			(println "	"$reg1" = load %ptr, %ptr* "$1)))
+
 (define-instruction STORE	(t 0 ())
-  ((LOCAL _)			(println "	store %ptr "$1", %ptr* "$2))
+  ((_ _)			(println "	store %ptr "$1", %ptr* "$2))
   ((LOCAL C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
 				  (println "	store "type" "$1", "type"* @"(<C-variable>-name $2)))))
 
 (define-instruction ADDR	(() 2 t)
   ((CONSTANT string)		(let* ((str (<CONSTANT>-value $1))
                                        (length (+ 1 (string-length str))))
-                                  (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "(<CONSTANT>-name $1)", %word 0, %word 0")))
+                                  (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "$1", %word 0, %word 0")))
   ((CONSTANT array)		(let* ((arr (<CONSTANT>-value $1))
                                        (length (array-length arr)))
-                                  (println "	"$reg1" = getelementptr [" length " x %ptr], [" length " x %ptr]* "(<CONSTANT>-name $1)", %word 0, %word 0")
+                                  (println "	"$reg1" = getelementptr [" length " x %ptr], [" length " x %ptr]* "$1", %word 0, %word 0")
                                   (println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
   ((_ _)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
 				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
@@ -420,7 +412,7 @@
                                                 (map (lambda _ '%ptr) $2) ; param types
                                                 ()))
   ((C-function _)		(emit-llvm-call $reg1
-                                                (LIBC-GLOBAL (<C-function>-name $1))
+                                                (EXTERNAL (<C-function>-name $1))
                                                 $2
                                                 (C-type->llvm-type (<C-function>-return-type $1))
                                                 (map C-type->llvm-type (<C-function>-parameter-types $1))
@@ -500,7 +492,10 @@
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
 				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
-				(println "	"$reg4" = load %ptr, %ptr* "$reg3)))
+				(println "	"$reg4" = load %ptr, %ptr* "$reg3))
+  ((LOCAL LITERAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
+				(println "	"$reg2" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$2)
+				(println "	"$reg4" = load %ptr, %ptr* "$reg2)))
 
 ;; args: baseptr, index, value
 (define-instruction STORE-I8	(t 6 t)
@@ -522,6 +517,12 @@
 ;;;
 ;;; Compiler
 ;;;
+
+(define-form comp (obj)
+  `(let ((__obj__ ,obj))
+     (emit COMMENT (list "COMPILE of "__obj__))
+     (compile __obj__ -c-)
+     (<compiler>-current-value -c-)))
 
 (define-form gen (instr-name . args)
   `(%gen -c- ,instr-name (list ,@args)))
@@ -566,11 +567,76 @@
       (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args))
       (apply emit-instruction (cons -c- (cons instr args))))))
 
-(define-form comp (obj)
-  `(let ((__obj__ ,obj))
-     (emit COMMENT (list "COMPILE of "__obj__))
-     (compile __obj__ -c-)
-     (<compiler>-current-value -c-)))
+;;;
+;;; Emitting objects
+;;;
+;;; if you want to grok this, then you better head over to the x86 backend...
+
+;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
+;; TODO optimize: these are doing a lot of repeated work with all the slave-value calls
+
+(define-function emit-object-header (type-id)
+  (print "%\"<header>\" { %word "
+         (slave-value (+ <header>-flags/used <header>-flags/opaque))
+         ", %word "type-id)
+  (when (slave-value feature/object-canary)
+    (print ", %word "(slave-value +canary-value+)))
+  (print "}"))
+
+(define-function emit-object/<long> (self -c-)
+  (cond
+    ((slave-value (is <immediate-type> <long>))
+     (eval-in-slave `(box <long> ,self)))
+    ((slave-value (and (is <boxed-type> <long>)
+                       (<boxed-type>-one-word? <long>)))
+     (emit-object-header (slave-value (<type>-slave-id <long>)))
+     ;; TODO the "receiving place" of this value needs to by typesafe
+     ;; emitting variable <long> representation requires a place to
+     ;; keep track of such session-wide config/cache that -c- cannot
+     ;; do currently, because it's recreated for each level.
+     (error "TODO emit-object/<long>"))
+    (else
+     (error "emit-object/<long>: unexpected slave representation for <long>"))))
+
+(define-function emit-object/C-string (self -c-)
+  (let ((const (CONSTANT (GLOBAL (unique-name "cstr")) self)))
+    (emit DEFINE const self)
+    const))
+
+(define-function emit-object/<string> (self -c-)
+  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+  (let ((elements	(emit-object/C-string self -c-))
+        (object-label	(GLOBAL (unique-name "ostr"))))
+    ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+    (print object-label" = private unnamed_addr constant %\"<string>\" { ")
+    (emit-object-header (slave-value (<type>-slave-id <string>)))
+    (print ", %word "
+           ;; FIXME this only works when <long> is an immediate
+           (eval-in-slave `(box <long> ,(string-length self)))
+           ", %ptr bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %ptr) }\n")
+    object-label))
+
+(define-function emit-object/<target-function> (expr name entry-label -c-)
+  (let ((object-label	(if name
+                            (closure-object-label name)
+                          (GLOBAL (unique-name "oclosure"))))
+        (name-obj	(when (slave-value feature/track-expr-names)
+                          (if name
+                              (emit-object/<string> (symbol->string name) -c-)
+                            "null")))
+        ;; TODO a counter in the read-only space?
+        (profiler-counter (when (slave-value feature/profiler)
+                            (emit-object/<long> 0 -c-))))
+    ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+    (print object-label" = private unnamed_addr constant %\"<target-function>\" { ")
+    (emit-object-header (slave-value (<type>-slave-id <string>)))
+    (print ", %ptr bitcast (")
+    (emit-llvm-fn-type-for-expr expr)
+    (print "* "entry-label" to %ptr)")
+    (and name-obj (print ", %\"<string>\"* "name-obj))
+    (and profiler-counter (print ", %word "profiler-counter))
+    (print " }\n")
+    (CONSTANT object-label expr)))
 
 ;;;
 ;;; Compiling lambdas
@@ -602,36 +668,27 @@
 (define-function emit/function-epilogue ()
   (println "}"))
 
-(define-function compile-expr (self name indirection-allowed? parent-comp)
-  (let* ((main?		(member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main)))
-         (indirect?	(and (not main?)
-                             indirection-allowed?
-                             feature/redefinable-functions-in-target))
-         (body		(<expr>-body self))
+(define-function emit-expr-code (self entry-point-label parent-comp)
+  (let* ((body		(<expr>-body self))
          (-c-		(llvm-compiler (+ 1 (<compiler>-level parent-comp))))
-         (entry-label	(if main?
-                            (LIBC-GLOBAL name)
-                          (GLOBAL (concat-string (symbol->string name)
-                                                 (if indirect? ".body" "")))))
          (parameters	(<expr>-parameters self))
          (init-param	(lambda (var)
                           (set (<variable>-value var)
                                (if +function-parameters-are-read-only+
                                    (LOCAL (<variable>-name var))
                                  (alloc-temp -c-)))))
-         (params	(map init-param parameters))
+         (param-locs	(map init-param parameters))
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
                              parameters)))
-    (emit COMMENT (list "compiling fn "name", body: " body))
-
+    (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self)))
     (list-do e body
       (comp e))
 
-    (emit/function-prologue entry-label param-decls)
+    (emit/function-prologue entry-point-label param-decls)
 
     (unless +function-parameters-are-read-only+
-      (free-temps params))
+      (free-temps param-locs))
 
     ;; all temps must be free-temp'ed properly at this point.
     (map (lambda (tmp)
@@ -642,7 +699,7 @@
     (unless +function-parameters-are-read-only+
       (map (lambda (local temp)
              (emit STORE local temp))
-           param-decls params))
+           param-decls param-locs))
 
     ;; make sure we finish off with a ret
     (unless (= <RET> (type-of (previous-instruction -c-)))
@@ -652,9 +709,15 @@
     ;; emit the body from the gen buffer
     (emit-gen-buffer -c-)
 
-    (emit/function-epilogue)
-    (when indirect?
-      (emit DEFINE (GLOBAL name) self))))
+    (emit/function-epilogue)))
+
+(define-function compile-expr (self name -c-)
+  (emit COMMENT (list "compiling fn "name", "self))
+  (let ((entry-point-label (if name
+                               (closure-code-label name)
+                             (GLOBAL (unique-name "code")))))
+    (emit-expr-code self entry-point-label -c-)
+    (emit-object/<target-function> self name entry-point-label -c-)))
 
 ;;;
 ;;; Compiling calls
@@ -678,23 +741,36 @@
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))))
 
+(define-function compile-call-to-object (arg-regs -c-)
+  ;; TODO assert the type to be <target-function>
+  ;; TODO assert nr of args = params
+  (gen BITCAST '%ptr "%\"<target-function>\"*")
+  (gen GEP (LOCAL '<target-function>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
+  (gen LOAD)
+  (gen CALLPTR arg-regs)
+  ())
+
+(define-function compile-call-to-global-function (op arg-regs -c-)
+  (if feature/redefinable-functions-in-target
+      (let ()
+        (comp op)
+        (compile-call-to-object arg-regs -c-))
+    (gen CALL (closure-code-label (<variable>-name op)) arg-regs))
+  ())
+
 (define-method compile-call-to <TEMP> (op arg-regs -c-)
   (comp op)
-  (gen CALLPTR arg-regs)
+  (compile-call-to-object arg-regs -c-)
   ())
 
 (define-method compile-call-to <pair> (op arg-regs -c-)
   (comp op)
-  (gen CALLPTR arg-regs)
+  (compile-call-to-object arg-regs -c-)
   ())
 
 (define-method compile-call-to <expr> (op arg-regs -c-)
-  (if feature/redefinable-functions-in-target
-      (let ()
-        (comp op)
-        (gen CALLPTR arg-regs))
-    (gen CALL (GLOBAL (<variable>-name op)) arg-regs))
-  (<expr>-n-required-parameters self))
+  (compile-call-to-global-function op arg-regs -c-)
+  (expr-n-required-parameters self))
 
 (define-method compile-call-to <C-function> (op arg-regs -c-)
   (let ((param-types self.parameter-types))
@@ -724,7 +800,7 @@
         (%ptr)                          ; all good
         (void
          (gen COMMENT (list "	void FFI call return value"))
-         (gen LOAD (LITERAL 0) 0))
+         (gen LOAD-VALUE (LITERAL 0) 0))
         (else
          (let ((bitsize	(llvm-type-bitsize return-type))
                (word-size	(target-value +word-size-in-bits+)))
@@ -739,57 +815,9 @@
       (list-length param-types))))
 
 (define-method compile-call-to (slave-value <selector>) (op arg-regs -c-)
-  (gen CALL (GLOBAL (eval-in-slave `(<selector>-name ,self))) arg-regs)
+  (compile-call-to-global-function op arg-regs -c-)
   ;; TODO extract and return n-params
   ())
-
-;;;
-;;; Compiling string literals
-;;;
-
-(assert (eval-in-slave '(is <immediate-type> <long>)) "emit-string-as-object only supports immediate <long> representation for now")
-
-(define-function compile-string-to-object (self -c-)
-  ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
-  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((elements	(unique-name "cstr"))
-        (object		(unique-name "str")))
-    (emit DEFINE (CONSTANT (GLOBAL elements) self) self)
-    ;; TODO use a string-output-stream to simplify this
-    (let ((buf ""))
-      (with-forms ((e (values `(let ()
-                                 ,@(map (lambda (value)
-                                          `(set buf (concat-string buf ,value)))
-                                        values)))))
-
-        ;; emit a constant <string> struct
-        (e "@"(llvm/escape-global-identifier object))
-        (e " = private unnamed_addr constant %\"<string>\" { %\"<header>\" { %ptr null, %word -1, %word ")
-        (e (number->string (slave-value (+ <header>-flags/used <header>-flags/opaque))))
-        (e ", %word ")
-        (e (number->string (eval-in-slave `(<type>-slave-id (type-of ,self)))))
-        (when (slave-value feature/object-canary)
-          (e ", %word "(number->string (slave-value +canary-value+))))
-        (e "}, %word ")
-        ;; FIXME this only works when <long> is an immediate
-        (e (number->string (eval-in-slave `(box <long> ,(string-length self)))))
-        (e ", %ptr bitcast ([" (number->string (+ 1 (string-length self))) " x i8]* @"(llvm/escape-global-identifier elements)" to %ptr) }\n")
-        (emit INLINE buf)
-
-        ;; gen a load of it
-        (set buf (string 16))
-        (let ((reg1 (new-reg-name "r" -c-))
-              (reg2 (new-reg-name "r" -c-)))
-          (e "\t%"reg1" = getelementptr %\"<string>\", %\"<string>\"* @"(llvm/escape-global-identifier object)", i32 0, i32 1\n")
-          (e "\t%"reg2" = bitcast %word* %"reg1" to %ptr\n")
-          (gen INLINE buf)
-          ;; KLUDGE
-          (set (<compiler>-current-value -c-) (LOCAL reg2)))))))
-
-(define-function compile-string-to-C-string (self -c-)
-  (let ((const (CONSTANT (GLOBAL (unique-name "str")) self)))
-    (emit DEFINE const self)
-    (gen ADDR const self)))
 
 ;;;
 ;;; Special Forms
@@ -817,15 +845,15 @@
 (define-function %compile/and-or (op expr -c-)
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
-    (gen LOAD (LITERAL (case op
-                         (and (target-value true))
-                         (or  (target-value false))))
+    (gen LOAD-VALUE (LITERAL (case op
+                               (and (target-value true))
+                               (or  (target-value false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
       (let ((value-reg (comp (first expr))))
         (gen STORE retval)
-        (gen LOAD (LITERAL 0) 0)
+        (gen LOAD-VALUE (LITERAL 0) 0)
         (gen EQ value-reg))
       (let ((lcont (UNIQUE-LABEL)))
         (case op
@@ -834,7 +862,7 @@
         (gen DEFLABEL lcont)))
     (gen BR lend)
     (gen DEFLABEL lend)
-    (gen LOAD retval ())
+    (gen LOAD-VALUE retval ())
     (free-temp retval)))
 
 (define-function compile/and (expr -c-)
@@ -863,13 +891,13 @@
       (if else-prg
           (list-do stmt else-prg
             (comp stmt))
-        (gen LOAD (LITERAL 0) 0))
+        (gen LOAD-VALUE (LITERAL 0) 0))
       (gen STORE retval))
     (gen BR lend)
 
     ;; end
     (gen DEFLABEL lend)
-    (gen LOAD retval ())
+    (gen LOAD-VALUE retval ())
     (free-temp retval)))
 
 (define-function compile/while (expr -c-)
@@ -911,10 +939,10 @@
        (error "compile/set failed for variable " (<variable>-name var) ", holding value " value)))))
 
 (define-function compile/lambda (form -c-)
-  (let ((name (unique-name "closure-"))
-        (expr (eval form)))
-    (compile-expr expr name false -c-)
-    (gen LOAD (GLOBAL name) expr)))
+  (let* ((expr	(eval form))
+         (label	(compile-expr expr () -c-)))
+    ;; NOTE compile-expr returns with a CONSTANT here
+    (gen LOAD-VALUE label expr)))
 
 (define-function compile/return (form -c-)
   (assert (<= (list-length form) 2))
@@ -937,8 +965,10 @@
 (define-function compile/C-string (expr -c-)
   ;; just an optimization to compile string literals into a C string
   ;; when they would be immediately converted anyway.
-  (assert (= (list-length expr) 2))
-  (compile-string-to-C-string (second expr) -c-))
+  (safety 1 (assert (= (list-length expr) 2)))
+  (let* ((str (second expr))
+         (const (emit-object/C-string str -c-)))
+    (gen ADDR const str)))
 
 ;;;
 ;;; linux syscalls
@@ -1078,40 +1108,38 @@
 
 (define-method compile <undefined> (-c-)
   (let ((false-value (target-value false)))
-    (gen LOAD (LITERAL false-value) false-value)))
+    (gen LOAD-VALUE (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
-  (gen LOAD (LITERAL self) self))
+  (gen LOAD-VALUE (LITERAL self) self))
 
 (define-method compile <variable> (-c-)
   (lexical-variable-or-die self -c-)
   (let ((value self.value))
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))
-      ((temp? value)		(gen LOAD value ()))
+      ((temp? value)		(gen LOAD-VALUE value ()))
       ((global-variable? self)	(let ((value-type (type-of value)))
                                   (cond
                                     ((= 'true self.name)
                                      (let ((true-value (target-value true)))
-                                       (gen LOAD (LITERAL true-value) true-value)))
+                                       (gen LOAD-VALUE (LITERAL true-value) true-value)))
                                     ((subtype? value-type <type>)
                                      ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                     (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
-                                    ((subtype? value-type <C-variable>)
-                                     (gen LOAD (GLOBAL (<C-variable>-name value)) value)
+                                     (gen LOAD-VALUE (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
+                                    ((is <C-variable> value)
+                                     (gen LOAD-VALUE (EXTERNAL (<C-variable>-name value)) value)
                                      (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%ptr))
                                     (else
-                                     (gen LOAD (GLOBAL self.name) value)))))
+                                     (gen LOAD-VALUE (GLOBAL self.name) value)))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
-  (compile-string-to-object self -c-))
-
-(define-method compile <array> (-c-)
-  (let ((const (CONSTANT (GLOBAL (unique-name "arr")) self)))
-    (emit DEFINE const self)
-    (gen ADDR const self)))
+  (set (<compiler>-current-value -c-)
+       (emit-object/<string> self -c-))
+  (gen GEP (LOCAL '<string>) 0 1) ; 1 means skip the header
+  (gen BITCAST "%word*" "%ptr"))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -1139,7 +1167,37 @@
 (define-method compile-definition <C-function>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <C-variable>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <long>		(name -c-)	(emit DEFINE (GLOBAL name) self))
-(define-method compile-definition <expr>		(name -c-)	(compile-expr self name true -c-))
+
+(define-method compile-definition <expr> (name -c-)
+  (let ((object-label (compile-expr self name -c-)))
+    (when (member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main))
+      ;; KLUDGE export special casing
+      (print (EXTERNAL name)" = external alias ")
+      (emit-llvm-fn-type-for-expr self)
+      (print ", ")
+      (emit-llvm-fn-type-for-expr self)
+      (print "* "(closure-code-label name)))
+    (when feature/redefinable-functions-in-target
+      ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
+      (println (GLOBAL name)" = global %ptr bitcast(%\"<target-function>\"* "
+               object-label" to %ptr)"))))
+
+;; kinda KLUDGE
+;; this is used when emitting the literal dispatch tables of <selectors>
+(define-method compile-definition <array> (name -c-)
+  (let ((compiled	(compile-array self -c-))
+        (array-label	(GLOBAL (unique-name "arr"))))
+    (let ((first? true))
+      (print array-label" = private unnamed_addr constant ["(array-length compiled)" x %ptr] [")
+      (array-do el compiled
+        (if first? (set first? false) (print ", "))
+        (print "%ptr ")
+        (if el
+            (print "bitcast (%\"<target-function>\"* "el" to %ptr)")
+          (print "null")))
+      (println "]"))
+    (print (GLOBAL name)" = global %ptr bitcast (["(array-length compiled)" x %ptr]* "
+           array-label" to %ptr)")))
 
 (define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet		(slave-value +target-triplet+))
@@ -1151,14 +1209,29 @@
     ;; our output is less specific, so allow the makefile, or whoever builds the
     ;; bitcode output to chose the proper target triplet.
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
-    (emit INLINE (concat-strings "%word = type i" (number->string word-size) "\n"))
+    (emit INLINE (list "%word = type i"word-size"\n"))
     (emit INLINE "%ptr = type i8*\n")
     ;; TODO this should be done by a general emitter
-    (emit INLINE (concat-strings "%\"<header>\" = type { %ptr, %word, %word, %word"
-                                 (if (slave-value feature/object-canary)
-                                     ", %word"
-                                   "")
-                                 " }\n"))
-    (emit INLINE (concat-strings "%\"<string>\" = type { %\"<header>\", %word, %ptr }\n"))
+    (emit INLINE (list "%\"<header>\" = type { %word, %word"
+                       (if (slave-value feature/object-canary)
+                           ", %word"
+                         "")
+                       " }\n"))
+    (cond
+      ((slave-value (is <immediate-type> <long>))
+       ())
+      ((slave-value (and (is <boxed-type> <long>)
+                         (<boxed-type>-one-word? <long>)))
+       (error "TODO LLVM emit-object/<string> only supports immediate <long> representation for now")
+       (emit INLINE "%\"<long>\" = type { %\"<header>\", %word }\n"))
+      (else
+       (error "LLVM emit-prelude: unexpected slave representation for <long>")))
+    (emit INLINE "%\"<string>\" = type { %\"<header>\", %word, %ptr }\n")
+    (emit INLINE (list "%\"<target-function>\" = type { %\"<header>\", %ptr "
+                       (if (slave-value feature/track-expr-names)
+                           ", %\"<string>\"* " "")
+                       (if (slave-value feature/profiler)
+                           ", %word" "")
+                       "}\n"))
     ;; we represent libc's FILE* with an opaque type
     (emit INLINE "%m_libc-FILE = type opaque\n")))

@@ -1,6 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/conversion.l")
+(require "source/streams.l")
 
 (define *tests* ())
 
@@ -127,6 +128,13 @@
 (define-test eval/string/concat ()
   (test-assert (= "alma.x\x00y.korte"
                   (concat-strings "alma." "x\x00y" ".korte"))))
+
+(define-test eval/string/output-stream ()
+  (test-assert (= "xfooy"
+                  (with-output-to-string (out)
+                    ($put out ?x)
+                    ($put-all out "foo")
+                    ($put out ?y)))))
 
 (define-test eval/string/bug/1 ()
   (let ((str (string)))
@@ -272,7 +280,7 @@
          (x-var		(first (first bindings))))
     ;;(dumpln x)
     (test-assert (= <fixed> (type-of fixed)))
-    (test-assert (= <primitive-function> (type-of let-prim)))
+    (test-assert (= <target-function> (type-of let-prim)))
     (test-assert (= 1 (list-length bindings)))
     (test-assert (= <variable> (type-of x-var)))
     (test-assert (not (global-variable? x-var)))))

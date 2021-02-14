@@ -26,10 +26,11 @@
   (let ((target-env		(slave-value *globals*))
         (methods		(eval-in-slave `(<selector>-methods ,self)))
         (target-methods		(array))
+        (dispatch-table-name	(concat-symbols name '-table))
         (parameters		())
         (index-min		())
         (index-max		0))
-    ;; the specialized methods
+    ;; build a trimmed methods array with the slave type id's as indexes
     (for (i 0 (array-length methods))
       (let ((impl-fn (array-at methods i)))
         (when impl-fn
@@ -46,11 +47,11 @@
                                    (<expr>-parameters impl-fn)))
               (assert (= (first parameters) 'self)))
             (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
-              (set (array-at target-methods (- slave-type-id index-min))
-                   (environment-define target-env impl-name impl-fn))
-              (compile-definition impl-fn impl-name -c-))))))
-    ;; the dispatch table
+              (set (array-at target-methods (- slave-type-id index-min)) impl-fn))))))
+    ;; define and emit the dispatch table
     (emit COMMENT (list "<selector> dispatch table for "name", from "index-min", to "index-max))
+    (environment-define target-env dispatch-table-name target-methods)
+    (compile-definition target-methods dispatch-table-name -c-)
     ;; the selector function
     (emit COMMENT (list "<selector> stub for "name))
     (let ((stub	(eval-in-target
@@ -61,11 +62,9 @@
                                      (<= type ,index-max))
                           ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
                           (error "selector '",(symbol->string name)" has no method for type " (box <long> type))))
-                      ;; we include the dispatch table as a literal
-                      ;; array here. it will be emitted with a
-                      ;; generated name into the read-only space.
-                      ((oop-at ,target-methods (- type ,index-min)) ,@parameters))))))
-      (compile-expr stub name () -c-))))
+                      ;; TODO eliminate the extra indirection from the global var to the dispatch array
+                      ((oop-at ,dispatch-table-name (- type ,index-min)) ,@parameters))))))
+      (compile-definition stub name -c-))))
 
 ;;;
 ;;; API visible in the target

@@ -26,3 +26,5 @@
 ;;       (string-append res c))
 ;;     (file-close file)
 ;;     res))
+
+42 ; evolving? must be non-empty for maru.8

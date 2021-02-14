@@ -30,7 +30,7 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(define-constant +global-label-prefix+
+(define-constant +external-label-prefix+
     (case (target-value +operating-system+)
       (darwin	"_")
       (else	"")))
@@ -106,12 +106,12 @@
 ;;;
 ;;; IA32 -- OPERANDS
 ;;;
-(define-operand LABEL () (name)		+maru-label-prefix+ (mangle-label (<LABEL>-name self)))		; a label that we generate
-(define-operand GLOBAL-LABEL LABEL ()	+global-label-prefix+ (<LABEL>-name self))			; a label in the global C namespace
+(define-operand LABEL () (name)		+maru-label-prefix+ (mangle-label self.name))		; a label that we generate
+(define-operand EXTERNAL-LABEL LABEL ()	+external-label-prefix+ self.name)			; a label in the global C namespace
 ;; global, literal, and temp pointers
-(define-operand GI32 () (name)		(<GI32>-name self))
-(define-operand LI32 () (value)		"$"(<LI32>-value self))
-(define-operand TI32 () (offset)	(<TI32>-offset self)"(%esp)")
+(define-operand GI32 () (name)		self.name)
+(define-operand LI32 () (value)		"$"self.value)
+(define-operand TI32 () (offset)	self.offset"(%esp)")
 
 (define-function UNIQUE-LABEL args
   (LABEL (unique-name (or (first args) "L"))))
@@ -133,8 +133,11 @@
 (define-emit    (ALIAS _ _)			(println "	.set "$1", "$2))
 (define-emit    (EXPORT LABEL)			(println "	.globl "$1))
 (define-emit    (ALIGN long)			(println "	.align " $1))
+;; TODO rename to WORD and PTR, bring closer to the llvm backend
 (define-emit    (LONG _)			(println "	.4byte	"$1))
+(define-emit    (PTR _)				(println "	.4byte	"$1))
 (define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
+;; TODO rename to DEFINE
 (define-emit    (DEFLABEL LABEL)		(println $1":"))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
@@ -322,7 +325,7 @@
                                                         (if (= 0 offset)
                                                             (println "	movl	%eax, %ecx")
                                                           (println "	leal	"(* 4 offset)"(%eax), %ecx"))
-                                                        (println "	movl	"$2", %eax") ; this also leaves it aas return value in %eax
+                                                        (println "	movl	"$2", %eax") ; this also leaves it as return value in %eax
                                                         (println "	movl	%eax, (%ecx)"))
                                                     (unless (= 0 offset)
                                                       (println "	leal	"(* 4 offset)"(%eax), %eax"))
@@ -347,6 +350,11 @@
     (param-offset		0)
     (arg-offset			0)
     (arg-limit			0)))
+
+(define-form comp (obj)
+  `(let ((__obj__ ,obj))
+     (emit COMMENT (list "COMPILE of "__obj__))
+     (compile __obj__ -c-)))
 
 ;; KLUDGE
 (define *compiler-factory* x86-compiler)
@@ -386,13 +394,81 @@
     (set c.arg-offset 0)))
 
 ;;;
-;;; Compiling lambdas
+;;; Emitting objects
 ;;;
 
-(define-form comp (obj)
-  `(let ((__obj__ ,obj))
-     (emit COMMENT (list "COMPILE of "__obj__))
-     (compile __obj__ -c-)))
+;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
+
+(define-function emit-object-header (type-id)
+  (emit RODATA)
+  (emit ALIGN 4)
+  ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
+  ;; (emit LONG -42)                   ; next
+  ;; (emit LONG -42)                   ; chunk size
+  (emit LONG (slave-value (+ <header>-flags/used <header>-flags/opaque))) ; flags
+  (emit LONG type-id)
+  (when (slave-value feature/object-canary)
+    (emit LONG (slave-value +canary-value+)))
+  ;; the gc chunk payload should follow from here, according to the type's object layout
+  )
+
+(define-function emit-object/<long> (self -c-)
+  (cond
+    ((slave-value (is <immediate-type> <long>))
+     (eval-in-slave `(box <long> ,self)))
+    ((slave-value (and (is <boxed-type> <long>)
+                       (<boxed-type>-one-word? <long>)))
+     (emit-object-header (slave-value (<type>-slave-id <long>)))
+     (let ((object-label (UNIQUE-LABEL "olong")))
+       (emit DEFLABEL object-label)
+       (emit LONG self)
+       object-label))
+    (else
+     (error "emit-object/<long>: unexpected slave representation for <long>"))))
+
+(define-function emit-object/C-string (self)
+  (let ((label (UNIQUE-LABEL "cstr")))
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (emit ASCIZ self)
+    label))
+
+(define-function emit-object/<string> (self -c-)
+  (assert (is <string> self))
+  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+  (let ((elements	(emit-object/C-string self))
+        (size		(emit-object/<long> (string-length self) -c-))
+        (object-label	(UNIQUE-LABEL "ostr")))
+    ;; TODO it should be something like: (target-value <string>)
+    (emit-object-header (slave-value (<type>-slave-id <string>)))
+    (emit DEFLABEL object-label)
+    (emit PTR size)
+    (emit PTR elements)
+    object-label))
+
+(define-function emit-object/<target-function> (name entry-label -c-)
+  (let ((object-label	(if name
+                            (LABEL (if feature/redefinable-functions-in-target
+                                       (concat-string (symbol->string name) "__obj")
+                                     name))
+                          (UNIQUE-LABEL "oclosure")))
+        (name		(when (slave-value feature/track-expr-names)
+                          (if name
+                              (emit-object/<string> (symbol->string name) -c-)
+                            (slave-value (<immediate-type>-tag-value <undefined>)))))
+        ;; TODO a counter in the read-only space?
+        (profiler-counter (when (slave-value feature/profiler)
+                            (emit-object/<long> 0 -c-))))
+    (emit-object-header (slave-value (<type>-slave-id <target-function>)))
+    (emit DEFLABEL object-label)
+    (emit PTR entry-label)
+    (and name (emit PTR name))
+    (and profiler-counter (emit PTR profiler-counter))
+    object-label))
+
+;;;
+;;; Compiling lambdas
+;;;
 
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
@@ -415,47 +491,45 @@
         (gen STORE temp)
         temp))))
 
-(define-function compile-expr (self name indirection-allowed? parent-comp)
-  (emit COMMENT (list "compiling fn "name", body: "(<expr>-body self)))
-  ;; KLUDGE __libc_csu_init & co.
-  (let* ((main?		(member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main)))
-         (indirect?	(and (not main?)
-                             indirection-allowed?
-                             feature/redefinable-functions-in-target))
-         (body (<expr>-body self))
-         (-c- (x86-compiler (+ 1 (<compiler>-level parent-comp))))
-         (entry-label (if main?
-                          (GLOBAL-LABEL name)
-                        (LABEL (concat-string (symbol->string name)
-                                              (if indirect? "_body" "")))))
-         (init-param (lambda (var)
-                       (set (<variable>-value var) (new-param -c-))))
-         (params (map init-param (<expr>-parameters self))))
+(define-function emit-expr-code (self entry-point-label parent-comp)
+  (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self)))
+  (let* ((body		(<expr>-body self))
+         (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
+         (init-param	(lambda (var)
+                          (set (<variable>-value var) (new-param -c-))))
+         (param-locs	(map init-param (<expr>-parameters self))))
     (list-do e body
       (and e (comp e)))
     ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
-    (let* ((arg-size (align +call-frame-alignmet+             (<x86-compiler>-arg-limit -c-) ))
+    (let* ((arg-size (align +call-frame-alignmet+             (<x86-compiler>-arg-limit -c-)))
            (tmp-size (align +call-frame-alignmet+ (+ arg-size (* (<compiler>-temp-limit -c-)
                                                                  (target-value +word-size-in-bytes+)))))
            (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ arg-size (<TI32>-offset tmp)))) (<compiler>-temps -c-))
-      (map (lambda (tmp) (set (<TI32>-offset tmp) (+ frm-size (<TI32>-offset tmp)))) params)
-      (emit TEXT)
-      (when main?
-        (emit EXPORT entry-label))
-      (emit DEFLABEL entry-label)
+      (map (lambda (el) (set (<TI32>-offset el) (+ arg-size (<TI32>-offset el)))) (<compiler>-temps -c-))
+      (map (lambda (el) (set (<TI32>-offset el) (+ frm-size (<TI32>-offset el)))) param-locs)
       (emit COMMENT (list "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size))
+      ;; emitting begins
+      (emit TEXT)
+      (emit DEFLABEL entry-point-label)
       (emit ENTER (- frm-size 8))
       (emit-gen-buffer -c-)
       (awhen (<x86-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
-      (emit LEAVE (- frm-size 8)))
-    (when indirect?
-      (let ((label (LABEL name)))
-        (emit DATA)
-        (emit EXPORT label)
-        (emit DEFLABEL label)
-        (emit LONG entry-label)))))
+      (emit LEAVE (- frm-size 8))))
+  entry-point-label)
+
+(define-function closure-code-label (name)
+  ;; KLUDGE object "names" (i.e. addresses) should be tied together
+  ;; explicitly, not through giving them the "right" name
+  (LABEL (concat-string (symbol->string name) "__code")))
+
+(define-function compile-expr (self name -c-)
+  (emit COMMENT (list "compiling fn "name", "self))
+  (let ((entry-point (if name
+                         (closure-code-label name)
+                       (UNIQUE-LABEL "code"))))
+    (emit-expr-code self entry-point -c-)
+    (emit-object/<target-function> name entry-point -c-)))
 
 ;;;
 ;;; Compiling calls
@@ -490,75 +564,45 @@
     (free-args -c- arg-locs)
     (free-temp op-tmp)))
 
-(define-method compile-call-to <TI32> (op arg-locs -c-)
-  (gen LOAD self)
+(define-function compile-call-to-object (arg-locs -c-)
+  ;; TODO assert the type to be <target-function>
+  ;; TODO assert nr of args = params
+  (gen LOAD-OOP (LI32 0)) ; TODO unreified way of reading the program-code slot
   (gen CALLPTR arg-locs)
   ())
 
+(define-function compile-call-to-global-function (op arg-locs -c-)
+  (if feature/redefinable-functions-in-target
+      (let ()
+        (comp op)
+        (compile-call-to-object arg-locs -c-))
+    (gen CALL (closure-code-label (<variable>-name op)) arg-locs))
+  ())
+
+(define-method compile-call-to <TI32> (op arg-locs -c-)
+  ;;(gen LOAD self)
+  (comp op)
+  (compile-call-to-object arg-locs -c-))
+
 (define-method compile-call-to <pair> (op arg-locs -c-)
   (comp op)
-  (gen CALLPTR arg-locs)
-  ())
+  (compile-call-to-object arg-locs -c-))
 
 (define-method compile-call-to <expr> (op arg-locs -c-)
   ;; NOTE the fact that a literal <expr> is found in a variable's
   ;; value slot at compile time implies that it's a global definition.
-  (if feature/redefinable-functions-in-target
-      (let ()
-        (comp op)
-        (gen CALLPTR arg-locs))
-    (gen CALL (LABEL (symbol->string (<variable>-name op))) arg-locs))
-  ;; TODO FIXME self.n-required-parameters should work
-  (<expr>-n-required-parameters self))
+  (compile-call-to-global-function op arg-locs -c-)
+  (expr-n-required-parameters self))
 
 (define-method compile-call-to <C-function> (op arg-locs -c-)
-  (gen CALL (GLOBAL-LABEL (<C-function>-name self)) arg-locs)
+  (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)
   (unless (<C-function>-vararg? self)
     (list-length (<C-function>-parameter-types self))))
 
 (define-method compile-call-to (slave-value <selector>) (op arg-locs -c-)
-  (gen CALL (LABEL (symbol->string (eval-in-slave `(<selector>-name ,self)))) arg-locs)
+  (compile-call-to-global-function op arg-locs -c-)
   ;; TODO extract and return n-params
   ())
-
-;;;
-;;; Compiling string literals
-;;;
-
-(define-function emit-string-as-C-string (self -c-)
-  (let ((label (UNIQUE-LABEL "cstr")))
-    (emit RODATA)
-    (emit DEFLABEL label)
-    (emit ASCIZ self)
-    label))
-
-(define-function emit-object-header (type-id)
-  (let ((object-label	(UNIQUE-LABEL "ostr")))
-    (emit RODATA)
-    (emit ALIGN 4)
-    ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
-    ;; (emit LONG -42)                   ; next
-    ;; (emit LONG -42)                   ; chunk size
-    (emit LONG (slave-value (+ <header>-flags/used <header>-flags/opaque))) ; flags
-    (emit LONG type-id)
-    (when (slave-value feature/object-canary)
-      (emit LONG (slave-value +canary-value+)))
-    ;; start of the gc chunk payload
-    (emit DEFLABEL object-label)
-    object-label))
-
-(assert (eval-in-slave '(is <immediate-type> <long>)) "emit-string-as-object only supports immediate <long> representation for now")
-
-(define-function emit-string-as-object (self -c-)
-  ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
-  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((elements-label	(emit-string-as-C-string self -c-))
-        (object-label	(emit-object-header (eval-in-slave `(<type>-slave-id (type-of ,self))))))
-    ;; start of the gc chunk payload; as per the slots of <string>
-    ;; FIXME this only works when <long> is an immediate
-    (emit LONG (eval-in-slave `(box <long> ,(string-length self))))
-    (emit LONG elements-label)
-    object-label))
 
 ;;;
 ;;; Special Forms
@@ -633,17 +677,13 @@
        (gen STORE value))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GI32 (GLOBAL-LABEL (<C-variable>-name value)))))
+       (gen STORE (GI32 (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
        (gen STORE (GI32 (LABEL (<variable>-name var))))))))
 
 (define-function compile/lambda (form -c-)
-  (let ((name (unique-name "closure-"))
-        (expr (eval form)))
-    (compile-expr expr name false -c-)
-    (gen LOAD (if feature/redefinable-functions-in-target
-                  (GI32 (LABEL name))
-                (LI32 (LABEL name))))))
+  (let ((expr (eval form)))
+    (gen LOAD (compile-expr expr () -c-))))
 
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
@@ -667,7 +707,7 @@
   ;; just an optimization to compile string literals into a C string
   ;; when they would be immediately converted anyway.
   (assert (= (list-length expr) 2))
-  (let ((label (emit-string-as-C-string (second expr) -c-)))
+  (let ((label (emit-object/C-string (second expr))))
     (gen LOAD label)))
 
 ;;;
@@ -786,10 +826,10 @@
          ((subtype? (type-of value) <type>)
           (gen LOAD (LI32 (eval-in-slave `(<type>-slave-id ,value)))))
          ((is <C-function> value) ; handles the situation when e.g. libc/strcmp is passed as a comparator fn for array-binary-search
-          (gen LOAD (LI32 (GLOBAL-LABEL (<C-function>-name value)))))
+          (gen LOAD (LI32 (EXTERNAL-LABEL (<C-function>-name value)))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD (GI32 (GLOBAL-LABEL (<C-variable>-name value)))))
+          (gen LOAD (GI32 (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not feature/redefinable-functions-in-target)
                (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
@@ -799,23 +839,8 @@
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
 (define-method compile <string> (-c-)
-  (let ((object-label (emit-string-as-object self -c-)))
+  (let ((object-label (emit-object/<string> self -c-)))
     (gen LOAD object-label)))
-
-;; this is used when emitting the literal dispatch tables of <selectors>
-(define-method compile <array> (-c-)
-  (let ((label (UNIQUE-LABEL "arr")))
-    (emit RODATA)
-    (emit DEFLABEL label)
-    (array-do el self
-      (cond
-        ((not el)
-         (emit LONG 0))
-        ((and (is <variable> el)
-              (is <expr> (<variable>-value el)))
-         (emit LONG (LABEL (<variable>-name el))))
-        (else (error "don't know how to emit constant array element "el))))
-    (gen LOAD label)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -850,18 +875,31 @@
   (emit DEFLABEL (LABEL name))
   (emit LONG self))
 
-;; (define-method compile-definition <string> (name -c-)
-;;   (let ((temp (UNIQUE-LABEL "str")))
-;;     (emit DATA)
-;;     (emit DEFLABEL temp)
-;;     (emit ASCIZ self)
-;;     (emit ALIGN 4)
-;;     (emit DEFLABEL (LABEL name))
-;;     (emit LONG temp)
-;;     ))
+;; kinda KLUDGE
+;; this is used when emitting the literal dispatch tables of <selectors>
+(define-method compile-definition <array> (name -c-)
+  (let ((compiled (compile-array self -c-))
+        (array-label (UNIQUE-LABEL "arr")))
+    (emit RODATA)
+    (emit DEFLABEL array-label)
+    (array-do el compiled
+      (emit PTR el))
+    (emit DATA)
+    (emit DEFLABEL (LABEL name))
+    (emit PTR array-label)))
 
-(define-method compile-definition <expr> (name parent-comp)
-  (compile-expr self name true parent-comp))
+(define-method compile-definition <expr> (name -c-)
+  (let ((object-label (compile-expr self name -c-)))
+    (when (member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main))
+      ;; KLUDGE export special casing
+      (let ((external-label (EXTERNAL-LABEL name)))
+        (emit ALIAS external-label (closure-code-label name))
+        (emit EXPORT external-label)))
+    (when feature/redefinable-functions-in-target
+      (let ((label (LABEL name)))
+        (emit DATA)
+        (emit DEFLABEL label)
+        (emit PTR object-label)))))
 
 (define-method emit-prelude <x86-compiler> ()
   (verbosity 1 (warn "\nCompiling to IA-32\n\n")))

@@ -82,8 +82,9 @@
         ((= type <target-function>)
          (error-if-storing)
          ($put stream ?.)
-         ;; TODO handle name as optional
-         ($put-all stream (<target-function>-name obj)))
+         ($put-all stream (if-at-expand feature/track-expr-names
+                              (<target-function>-name obj)
+                            "target-fn")))
 
         ((= type <variable>)
          (error-if-storing)

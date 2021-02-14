@@ -73,7 +73,7 @@
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
 
-(define-function string-insert-all (str idx insertion)
+(define-primitive-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))
   (string-do char insertion
     (string-insert str idx char)
     (incr idx))

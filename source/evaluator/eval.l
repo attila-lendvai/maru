@@ -224,7 +224,7 @@
 (define-function primitive-function (code name)
   (safety 2 (assert (and (is <target-pointer> code) (is <string> name))))
   (make <target-function>
-    (code		code)
+    (program-code	code)
     (name		name)
     (when-at-expand feature/profiler
       (profiler-counter	(box <long> 0)))))
@@ -524,7 +524,7 @@
          (apply/expr fun arguments ctx))
 
         ((= type <target-function>)
-         (let* ((code	(unbox <target-pointer> (<target-function>-code fun)))
+         (let* ((code	(unbox <target-pointer> (<target-function>-program-code fun)))
                 (result	(code arguments ctx)))
            (safety 3 (or (gc/valid-maru-value? result)
                          (error "<target-function> "fun" returned with something unboxed")))

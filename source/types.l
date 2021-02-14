@@ -400,13 +400,15 @@
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
 ;; TODO rename body to program-code
+;; TODO harmonize name with <target-function>, but how? <function> and <t/function>
 (define-record		<expr>			() (parameters body env ctx
                                                      (when-at-expand feature/track-expr-names	name)
                                                      (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<fixed>			() (function))
-(define-record		<target-function>	() (code name
-                                                     (when-at-expand feature/profiler profiler-counter)))
+(define-record		<target-function>	() (program-code
+                                                     (when-at-expand feature/track-expr-names	name)
+                                                     (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))

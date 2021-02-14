@@ -64,7 +64,7 @@
                (- alignment)))
 
 ;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
-(define-function <expr>-n-required-parameters (op)
+(define-function expr-n-required-parameters (op)
   (let ((params		(<expr>-parameters op))
         (n-params	()))
     (cond
@@ -77,8 +77,22 @@
        (when (symbol? params)          ; (lambda (arg1 . rest) ...)
          (set n-params ())))
       (else
-       (error "<expr>-n-required-parameters: error parsing <expr> " op ", parameters " params)))
+       (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
     n-params))
+
+;; this is kinda KLUDGEy
+(define emit-object/<long>) ; forward
+(define compile-expr) ; forward
+(define-function compile-array (self -c-)
+  (let ((compiled (array (array-length self))))
+    (for (i 0 (array-length self))
+      (let ((obj (array-at self i)))
+        (set (array-at compiled i)
+             (typecase obj
+               (<long>		(emit-object/<long> obj -c-))
+               (<expr>		(compile-expr obj () -c-))
+               (else (error "compile-array: don't know how to compile: "obj))))))
+    compiled))
 
 ;;;
 ;;; Operands
