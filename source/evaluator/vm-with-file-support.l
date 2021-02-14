@@ -13,7 +13,7 @@
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
   `(gc/let* (tmp)
      (debug (platform/print-diag "initializing " ,(symbol->string our-name)))
-     (set tmp (box <target-vm-pointer> ,target-name))
+     (set tmp (box <target-pointer> ,target-name))
      (set tmp (file-stream tmp))
      (set ,our-name tmp)
      ;; the maru-user module was create earlier, let's set it there, too.
@@ -29,11 +29,11 @@
   (initialize-stream err-handle	*debug-output*))
 
 (define-function repl-stream (stream)
-  ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
+  ;;(set (global-variable-value *input* <target-pointer>) stream)
   (safety 1 (assert (gc/valid-maru-value? stream)))
   (let ((stdin?	(= *standard-input* stream)))
     ;; (unless stdin?
-    ;;   (let ((libc-handle (unbox <target-vm-pointer> (<libc-stream>-handle stream))))
+    ;;   (let ((libc-handle (unbox <target-pointer> (<libc-stream>-handle stream))))
     ;;     (libc/fscanf libc-handle "#!%*[^\x0a\x0d]"))) ; drop the possible #!./eval first line of the file
     (gc/let* ((res ()))
       (while (let ()

@@ -224,7 +224,7 @@
  (define *primitive-function-type-accessors*
      '((<long>			(long?)				(unbox <long>))
        (<string>		(string?))
-       (<target-vm-pointer>	(is <target-vm-pointer>)	(unbox <target-vm-pointer>))
+       (<target-pointer>	(is <target-pointer>)		(unbox <target-pointer>))
        (<symbol>		(symbol?))
        (<pair>			(pair?))
        (<array>			(array?)))))
@@ -353,4 +353,4 @@
 (level-shift-types
  <type> <record>
  <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <primitive-function>
- <variable> <env> <context> <module> <target-vm-pointer> <symbol> <pair>)
+ <variable> <env> <context> <module> <target-pointer> <symbol> <pair>)

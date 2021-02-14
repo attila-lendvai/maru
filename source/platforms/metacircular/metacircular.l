@@ -61,14 +61,14 @@
 ;; (define-record <libc-stream> <stream> (handle))
 
 ;; (define-function libc-stream (libc-handle)
-;;   (safety 1 (assert (= <target-vm-pointer> (type-of libc-handle))))
+;;   (safety 1 (assert (= <target-pointer> (type-of libc-handle))))
 ;;   (make <libc-stream>
 ;;     (handle		libc-handle)))
 
 (load "source/evaluator/eval.l")
 
 (define-function repl-stream (stream)
-  ;;(set (global-variable-value *input* <target-vm-pointer>) stream)
+  ;;(set (global-variable-value *input* <target-pointer>) stream)
   (unless (= libc/stdin stream)
     (libc/fscanf stream "#!%*[^\x0a\x0d]")) ; drop the possible #!./eval first line of the file
   (gc/let* ((res ()))

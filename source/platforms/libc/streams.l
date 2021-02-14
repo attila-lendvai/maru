@@ -8,19 +8,19 @@
 
 (define-primitive-function file-open ((path <string>) (mode <string>))
   (awhen (libc/fopen (string->C-string path) (string->C-string mode))
-    (box <target-vm-pointer> it)))
+    (box <target-pointer> it)))
 
-(define-primitive-function file-close ((stream <target-vm-pointer> _ nounbox))
+(define-primitive-function file-close ((stream <target-pointer> _ nounbox))
   ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
-  (box <long> (libc/fclose (unbox <target-vm-pointer> stream))))
+  (box <long> (libc/fclose (unbox <target-pointer> stream))))
 
-(define-primitive-function file-read-character ((stream <target-vm-pointer>))
+(define-primitive-function file-read-character ((stream <target-pointer>))
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
         ()
       (box <long> c))))
 
-(define-primitive-function file-write-character ((char <long>) (stream <target-vm-pointer>))
+(define-primitive-function file-write-character ((char <long>) (stream <target-pointer>))
   (when (= libc/EOF (libc/fputc char stream))
     (error "file-write-character: libc/fputc returned an error")))
 
@@ -30,10 +30,10 @@
 
 (define-record <libc-stream> <stream> (handle))
 
-(define-primitive-function file-stream ((handle <target-vm-pointer> _ nounbox))
-  (assert (is <target-vm-pointer> handle))
+(define-primitive-function file-stream ((handle <target-pointer> _ nounbox))
+  (assert (is <target-pointer> handle))
   (make/opaque <libc-stream>
-    (handle	(unbox <target-vm-pointer> handle))))
+    (handle	(unbox <target-pointer> handle))))
 
 (define-method $at-end? <libc-stream> ()
   ;; TODO make the FFI smarter to do this unboxing automatically. then we will be able to load this file as is into the interpreter

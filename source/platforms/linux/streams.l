@@ -23,14 +23,15 @@
                            420          ; "rw-r--r--"
                            )))
     (when (<= 0 fd)
-      (box <target-vm-pointer> fd))))
+      ;; TODO use <target-word>
+      (box <target-pointer> fd))))
 
-(define-primitive-function file-close ((fd <target-vm-pointer> _ nounbox))
+(define-primitive-function file-close ((fd <target-pointer> _ nounbox))
   ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
-  (unless (= 0 (linux-syscall linux/close (unbox <target-vm-pointer> fd)))
+  (unless (= 0 (linux-syscall linux/close (unbox <target-pointer> fd)))
     (error "file-close: close syscall returned with error")))
 
-(define-primitive-function file-read-character ((fd <target-vm-pointer>))
+(define-primitive-function file-read-character ((fd <target-pointer>))
   (let ((char 0))
     (if (= 1 (linux-syscall linux/read fd (address-of char) 1))
         ;; TODO endianness, EAGAIN and stuff
@@ -38,7 +39,7 @@
       ;;(error "file-read-character: syscall returned with error")
       ())))
 
-(define-primitive-function file-write-character ((char <long>) (fd <target-vm-pointer>))
+(define-primitive-function file-write-character ((char <long>) (fd <target-pointer>))
   ;; TODO endianness
   (unless (= 1 (linux-syscall linux/write fd (address-of char) 1))
     (error "file-write-character: libc/fputc returned an error")))
@@ -51,11 +52,11 @@
   (fd
    peeked-value))
 
-(define-primitive-function file-stream ((fd <target-vm-pointer> _ nounbox))
-  (assert (is <target-vm-pointer> fd))
+(define-primitive-function file-stream ((fd <target-pointer> _ nounbox))
+  (assert (is <target-pointer> fd))
   (make/opaque <fd-stream>
     ;; TODO boxing...
-    (fd			(unbox <target-vm-pointer> fd))
+    (fd			(unbox <target-pointer> fd))
     (peeked-value	-1)))
 
 (define-function %ensure-peeked (stream)
