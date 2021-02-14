@@ -221,12 +221,13 @@
   (make <fixed>
     (function fn)))
 
-(define-function primitive-function (_imp name)
-  (make/opaque <target-function>
-    (_imp		_imp)
+(define-function primitive-function (code name)
+  (safety 2 (assert (and (is <target-pointer> code) (is <string> name))))
+  (make <target-function>
+    (code		code)
     (name		name)
     (when-at-expand feature/profiler
-      (profiler-counter	0))))
+      (profiler-counter	(box <long> 0)))))
 
 (define-primitive-function variable ((name <symbol>) value (env <env>) (index <long>))
   (make <variable>
@@ -523,12 +524,11 @@
          (apply/expr fun arguments ctx))
 
         ((= type <target-function>)
-         (if-at-expand (<= 3 *safety*)
-             (let ((result ((<target-function>-_imp fun) arguments ctx)))
-               (or (gc/valid-maru-value? result)
-                   (error "<target-function> "fun" returned with something unboxed"))
-               result)
-           ((<target-function>-_imp fun) arguments ctx)))
+         (let* ((code	(unbox <target-pointer> (<target-function>-code fun)))
+                (result	(code arguments ctx)))
+           (safety 3 (or (gc/valid-maru-value? result)
+                         (error "<target-function> "fun" returned with something unboxed")))
+           result))
 
         (else
          (aif (and *applicators*
@@ -975,7 +975,7 @@
            (incr-boxed (<expr>-profiler-counter callee)))
 
           ((= callee-type <target-function>)
-           (incr (<target-function>-profiler-counter callee)))))))
+           (incr-boxed (<target-function>-profiler-counter callee)))))))
 
   (define-function profiler/take-sample (_)
     (incr profiler/sample-counter)
@@ -1000,7 +1000,7 @@
                (set name (<expr>-name obj)))
 
               ((and (= type <target-function>)
-                    (< 0 (set counter (<target-function>-profiler-counter obj))))
+                    (< 0 (set counter (unbox <long> (<target-function>-profiler-counter obj)))))
                (set name (<target-function>-name obj))))
             (when counter
               (print-all *debug-output* (box <long> counter)"\t"(or name "n/a"))))

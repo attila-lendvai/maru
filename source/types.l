@@ -405,7 +405,8 @@
                                                      (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<fixed>			() (function))
-(define-record		<target-function>	() (_imp name (when-at-expand feature/profiler profiler-counter)))	; a "subr" in old lisp parlance
+(define-record		<target-function>	() (code name
+                                                     (when-at-expand feature/profiler profiler-counter)))
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))

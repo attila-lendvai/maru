@@ -11,7 +11,7 @@
   ;; NOTE <target-function> is an opaque object, but it's ok to use
   ;; <symbols>'s as their name because they are held as gc roots by
   ;; the *symbols* array.
-  (gc/let* ((tmp (primitive-function imp name)))
+  (gc/let* ((tmp (primitive-function (box <target-pointer> imp) name)))
     (when fixed?
       (set tmp (fixed tmp)))
     ;; NOTE string->symbol doesn't need gc/let* because *symbols* is a gc root
