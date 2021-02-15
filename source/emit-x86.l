@@ -305,9 +305,9 @@
 
 (define-emit    (LOAD-OOP LI32)			(let ((offset (<LI32>-value $1)))
                                                   (if (= 0 offset)
-                                                      (println "	movl	%eax, %ecx")
-                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")))
-						(println "	movl	(%ecx), %eax"))
+                                                      (println "	movl	(%eax), %eax")
+                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")
+                                                    (println "	movl	(%ecx), %eax"))))
 
 (define-emit    (STORE-OOP TI32 _)		(if-at-expand feature/strict-semantics-for-compiled-set
                                                     (let ()
