@@ -130,18 +130,12 @@
 ;;(define-emit    (SECTION string)		(println "	.section "$1))
 
 ;;(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
+(define-emit    (ALIAS _ _)			(println "	.set "$1", "$2))
 (define-emit    (EXPORT LABEL)			(println "	.globl "$1))
-(define-emit    (EXPORT GLOBAL-LABEL)		(println "	.globl "$1)) ; TODO add support for inheritance for multimethods, and delete the specializations on GLOBAL-LABEL
-
 (define-emit    (ALIGN long)			(println "	.align " $1))
-
-(define-emit    (LONG long)			(println "	.4byte	"$1))
-(define-emit    (LONG LABEL)			(println "	.4byte	"$1))
-
+(define-emit    (LONG _)			(println "	.4byte	"$1))
 (define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
-
 (define-emit    (DEFLABEL LABEL)		(println $1":"))
-(define-emit    (DEFLABEL GLOBAL-LABEL)		(println $1":"))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
 (define-emit    (ENTER long)			(println "	pushl	%ebp")
@@ -243,18 +237,16 @@
 						(println "	jne	"$1))
 
 (define-emit    (CALLPTR _)			(println "	call	*%eax"))
+;; TODO arg2 is arg-locs. what for? for the arity? delme?
 (define-emit    (CALL LABEL _)			(println "	call	"$1))
-(define-emit    (CALL GLOBAL-LABEL _)		(println "	call	"$1))
 
 (define-emit    (LOAD LI32)			(if (= 0 (<LI32>-value $1))
                                                     (println "	xorl	%eax, %eax")
                                                   (println "	movl	"$1", %eax")))
 (define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
-(define-emit    (LOAD GI32)			(println "	movl	"$1", %eax"))
-(define-emit    (LOAD TI32)			(println "	movl	"$1", %eax"))
+(define-emit    (LOAD _)			(println "	movl	"$1", %eax"))
 
-(define-emit    (STORE TI32)			(println "	movl	%eax, "$1))
-(define-emit    (STORE GI32)			(println "	movl	%eax, "$1))
+(define-emit    (STORE _)			(println "	movl	%eax, "$1))
 
 (define-emit    (ADDR GI32)			(println "	movl	$"$1", %eax"))
 (define-emit    (ADDR TI32)			(println "	leal	"$1", %eax"))
