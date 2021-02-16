@@ -338,7 +338,8 @@
     ((< 0 shift)
      (arithmethic-shift-left value shift))
     ((< shift 0)
-     (arithmethic-shift-right value (- shift)))))
+     (arithmethic-shift-right value (- shift)))
+    (else value)))
 
 (define-form bitwise-shift (value shift)
   (typecase shift
