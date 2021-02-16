@@ -2,6 +2,8 @@
 ;;;
 ;;; Common defs needed by all C based platforms.
 
+(require "source/platforms/platform-common.l")
+
 (define-form string->C-string (obj)
   ;; OPTIMIZATION: use a compiler special form to emit cstrings when
   ;; literals are immediately passed to string->C-string. ideally it

@@ -113,28 +113,13 @@
     print-backtrace capture-well-known-module-values populate-module-with-maru-primitives
     print println read encode expand eval string->symbol %accessor-typecheck
     abort %string->C-string
+
+    symbol/*standard-input* symbol/*standard-output* symbol/*error-output* symbol/*debug-output*
+
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
     environment-define defined? global-variable-value set-global-variable-value
     )
-
-;; cache some symbols into the symbol/foo global variables
-;; TODO add compilation of symbols and drop this cache
-(define-form define-symbol-cache symbols
-  `(let ()
-     ,@(map (lambda (name)
-              `(define ,(concat-symbol 'symbol/ name)))
-            symbols)
-     (define-function initialize-symbol-cache ()
-       ,@(map (lambda (name)
-                `(set ,(concat-symbol 'symbol/ name)
-                      (string->symbol ,(symbol->string name))))
-              symbols))))
-
-(define-symbol-cache
-    true define set quote quasiquote unquote unquote-splicing expand encode apply "." ; dot has a syntactic meaning
-  lambda let *globals* *expanders* *encoders* *evaluators* *applicators*
-  *standard-input* *standard-output* *error-output* *debug-output* *verbosity* *optimised*)
 
 ;; this installs symbol macros that get/set the value from/to the
 ;; interpreter's global state, namely the maru module's global
@@ -324,6 +309,9 @@
                      `((,effective-impl-name ,@arg-names))
                    body))))))))
 
+(define-function print-backtrace ()
+  (platform/print-diag "print-backtrace is not available in this build"))
+
 (define-primitive-function abort _
   (platform/print-diag "ABORTED")
   (print-backtrace)
@@ -339,18 +327,3 @@
 
 (define-function min (a b)
   (if (< a b) a b))
-
-;;;
-;;; copy the types here that should be visible to the target code
-;;; ----------------------------------------------------------------
-
-(define-form level-shift-types names
-  `(let ()
-     ,@(map (lambda (name)
-              `(define ,name (eval-in-slave ',name)))
-            names)))
-
-(level-shift-types
- <type> <record>
- <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <target-function>
- <variable> <env> <context> <module> <target-pointer> <symbol> <pair>)

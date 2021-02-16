@@ -1213,7 +1213,8 @@
     (emit INLINE "%ptr = type i8*\n")
     ;; TODO this should be done by a general emitter
     (emit INLINE (list "%\"<header>\" = type { %word, %word"
-                       (if (slave-value feature/object-canary)
+                       (if (and (slave-value (defined? 'feature/object-canary))
+                                (slave-value feature/object-canary))
                            ", %word"
                          "")
                        " }\n"))
