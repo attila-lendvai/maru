@@ -155,7 +155,9 @@
 (define-operand		CONSTANT	() (name value)		(<CONSTANT>-name self))
 (define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string (<TEMP>-id self)))))
 (define-operand		LABEL		() (name)		(llvm/escape-local-identifier (<LABEL>-name self)))
-(define-function	UNIQUE-LABEL	() ()			(LABEL (unique-name "L")))
+
+(define-form UNIQUE-LABEL ()
+  `(LABEL (new-label-name -c-)))
 
 (define-function local? (obj)
   (= <LOCAL> (type-of obj)))
@@ -237,7 +239,8 @@
 ;;; Compiler early
 ;;;
 (define-record <llvm-compiler> <compiler>
-  (reg-counter))
+  (reg-counter
+   label-counter))
 
 (define-function llvm-compiler (level)
   (make <llvm-compiler>
@@ -247,7 +250,8 @@
     (gen-buffer			(array))
     (current-value		())
 
-    (reg-counter		0)))
+    (reg-counter		0)
+    (label-counter		0)))
 
 ;; KLUDGE
 (define *compiler-factory* llvm-compiler)
@@ -524,6 +528,9 @@
 
 (define-function new-reg-name (base -c-)
   (concat-string base (number->string (incr (<llvm-compiler>-reg-counter -c-)))))
+
+(define-function new-label-name (-c-)
+  (concat-string "L" (number->string (incr (<llvm-compiler>-label-counter -c-)))))
 
 (define-function %gen (-c- factory args)
   (let ((instr (factory)))
