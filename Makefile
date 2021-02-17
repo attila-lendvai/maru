@@ -72,13 +72,11 @@ TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 # used when generating maru sources during the build process
 # in the order of speed
 #GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval1
-#GEN_EVAL	= $(BUILD_llvm)/eval1
-GEN_EVAL	= $(BUILD_x86)/eval1
-#GEN_EVAL	= $(BUILD_llvm)/eval1
+GEN_EVAL	= $(BUILD_llvm)/eval1
+#GEN_EVAL	= $(BUILD_x86)/eval1
 
 # used when executing tests
 TEST_EVAL	= $(GEN_EVAL)
-
 
 ##
 ## internal variables
@@ -137,6 +135,8 @@ BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
+EVAL0_DIR	= $(CURDIR)/$(BUILD)/eval0
+EVAL0		= eval0-llvm
 
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
@@ -167,9 +167,30 @@ endif
 
 all: eval
 
+eval: $(foreach backend,${BACKENDS},eval-$(backend))
+# NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
+
+# TODO $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
+eval-x86: $(BUILD_x86)/eval1
+	cp $< $@
+	cp $< eval
+
+eval-llvm: $(BUILD_llvm)/eval1
+	cp $< $@
+	cp $< eval
+
+eval0-x86: $(BUILD_x86)/eval0
+	cp $< $@
+	cp $< eval
+
+eval0-llvm: $(BUILD_llvm)/eval0
+	cp $< $@
+	cp $< eval
+
 clean:
-	rm -rf $(foreach plat,${PLATFORMS},$(foreach back,${BACKENDS},$(BUILD)/$(back)-$(plat) eval-$(back))) \
-		$(BUILD)/generated/ eval
+	rm -rf $(foreach plat,${PLATFORMS},$(foreach back,${BACKENDS},$(BUILD)/$(back)-$(plat) eval-$(back) eval0-$(back))) \
+		eval $(BUILD)/generated/
+	test -d $(EVAL0_DIR) && $(MAKE) --directory=$(EVAL0_DIR) clean
 	-git checkout --quiet $(BUILD)
 
 distclean: clean
@@ -199,35 +220,58 @@ $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 ###
 ### eval and bootstrapping
 ###
-eval: $(foreach backend,${BACKENDS},eval-$(backend))
-# NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
 
-force-eval0:
-	rm --force $(BUILD_x86)/eval0.s $(BITCODE_DIR)/eval0.ll
+$(HOST_DIR)/eval:
+	echo Building $@
+	@mkdir -p $(BUILD)
+# after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
+	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
+	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
+# a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
+	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
+	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval-$(PREVIOUS_STAGE_BACKEND)
 
-eval0:      force-eval0 $(BUILD_x86)/eval0 $(BUILD_llvm)/eval0
+update-eval0: $(EVAL0_DIR)
+	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../..
 
-eval-x86: $(BUILD_x86)/eval1
-	cp $< $@
-	cp $< eval
+# check out our latest commit into build/eval0/, and build the eval0 executable
+# there, in a clean tree.
+$(EVAL0_DIR):
+	git worktree add --detach --force $@
 
-eval-llvm: $(BUILD_llvm)/eval1
-	cp $< $@
-	cp $< eval
+# "forward" this target to the makefile in build/eval0
+# NOTE using TARGET_CPU=i686 would be faster, but i have trouble linking
+# -m32 executables on my nixos to test this properly.
+$(EVAL0_DIR)/$(EVAL0): $(EVAL0_DIR)
+	$(MAKE) --directory=$(EVAL0_DIR)		\
+		TARGET_CPU=$(TARGET_CPU)		\
+		TARGET_VENDOR=$(TARGET_VENDOR)		\
+		TARGET_OS=$(TARGET_OS)			\
+		PLATFORM=libc				\
+		$(EVAL0)
+
+# "forward" this target to the makefile, because this is typically used as EVAL0
+# $(EVAL0_DIR)/$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0: $(EVAL0_DIR)
+# # NOTE linux platform on llvm is broken currently, so we fix the platform to libc
+# 	$(MAKE) --directory=$(EVAL0_DIR)		\
+# 		TARGET_CPU=i686				\
+# 		TARGET_VENDOR=$(TARGET_VENDOR)		\
+# 		TARGET_OS=$(TARGET_OS)			\
+# 		PLATFORM=libc				\
+# 		$(BUILD)/llvm-libc/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
 
 # eval0 is the first version of us that gets built by the compiler of
 # the host. this binary may be incomplete and/or differ from eval1,
 # but it already contains e.g. all the primfn's or backtrace smartness
 # of our stage, and with that it helps development.
 #
-# to speed up the development cycle, it is not rebuilt automatically,
-# only when requested explicitly with a 'make eval0'.
+# to speed up the development cycle, the latest commit is checked out
+# into ./build/eval0/, and the eval0 executable is built there.
 
 # TODO actually do this: wrap emit files below with
 # --eval "(set-working-directory \"$(SLAVE_DIR)\")"
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
-# note that this will break 'make PLATFORM=linux eval0' unless we fix eval0's platform to libc.
-$(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval
+$(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
@@ -248,7 +292,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval
+$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
@@ -270,45 +314,32 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-# eval1 is the first version of us that gets built by our own compiler.
-# NOTE: use the LLVM eval0 here because it's faster than the x86 version.
-# TODO except that it's broken on PLATFORM=linux currently.
-HOST_EVAL0_x86=$(BUILD_x86)/eval0
-#HOST_EVAL0_x86=$(BUILD_llvm)/eval0
-#HOST_EVAL0_x86=$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
-$(BUILD_x86)/eval1.s: $(HOST_EVAL0_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(HOST_EVAL0_x86),source/platforms/$(PLATFORM)/eval.l,$@)
-	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
+# eval1 is the first version of us that gets built by our own compiler, from the latest sources.
+$(BUILD_x86)/eval1.s: $(EVAL0_DIR)/$(EVAL0) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	@mkdir -p $(BUILD_x86)
+	$(call compile-x86,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
+#	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
 
 # eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
 # eval2 is just a test: its output should be the exact same files as eval1.*
 $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-x86,$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
+	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval1.ll: $(BUILD_llvm)/eval0 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval0,source/platforms/$(PLATFORM)/eval.l,$@)
-	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
+$(BITCODE_DIR)/eval1.ll: $(EVAL0_DIR)/$(EVAL0) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
+	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
+#	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(call compile-llvm,$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
+	$(call compile-llvm,$(SLAVE_DIR),$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
-
-$(HOST_DIR)/eval:
-	echo Building $(BUILD)/$(PREVIOUS_STAGE)
-	@mkdir -p $(BUILD)
-# after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
-	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
-	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
-# a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
-	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
-	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval-$(PREVIOUS_STAGE_BACKEND)
 
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(1) $(PROFILER_ARG) -O -v						\
-	--define *host-directory* 	"$(SLAVE_DIR)"				\
+  $(TIME) $(2) $(PROFILER_ARG) -O -v						\
+	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
@@ -321,14 +352,14 @@ define compile-x86
 	--define target/vendor 			$(TARGET_VENDOR)		\
 	--define target/os 			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
-	$(2)									\
+	$(3)									\
 	source/emit-finish.l							\
-		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
+		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 
 define compile-llvm
-  $(TIME) $(1) $(PROFILER_ARG) -O -v						\
-	--define *host-directory* 	"$(SLAVE_DIR)"				\
+  $(TIME) $(2) $(PROFILER_ARG) -O -v						\
+	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
@@ -341,9 +372,9 @@ define compile-llvm
 	--define target/vendor 			$(TARGET_VENDOR)		\
 	--define target/os 			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
-	$(2)									\
+	$(3)									\
 	source/emit-finish.l							\
-		>$(3) || { $(BACKDATE_FILE) $(3); exit 42; }
+		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 
 # This "function" is useful when you need an eval executable, but you don't want to
@@ -424,7 +455,7 @@ run-x86: $(BUILD_x86)/eval1
 run-llvm: $(BUILD_llvm)/eval1
 	rlwrap --no-warning $(BUILD_llvm)/eval1 boot.l -
 
-test: test-evaluator test-bootstrap test-parser test-elf
+test: test-evaluator test-bootstrap test-parser test-elf test-modules
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 
@@ -454,16 +485,14 @@ test-compiler-llvm: $(BUILD_llvm)/compiler-test
 	$(BUILD_llvm)/compiler-test
 
 # TODO backend duplication
-$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(TEST_EVAL) tests/compiler-tests.l $(EMIT_FILES_x86)
+$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(EVAL0_DIR)/$(EVAL0) tests/compiler-tests.l $(EMIT_FILES_x86)
 	@mkdir -p $(BUILD_x86)
-#	$(call ensure-built,$(TEST_EVAL))
-	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
+	$(call compile-x86,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
-$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(TEST_EVAL) tests/compiler-tests.l $(EMIT_FILES_llvm)
+$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0_DIR)/$(EVAL0) tests/compiler-tests.l $(EMIT_FILES_llvm)
 	@mkdir -p $(BITCODE_DIR)
 	@mkdir -p $(BUILD_llvm)
-#	$(call ensure-built,$(TEST_EVAL))
-	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
+	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
@@ -471,6 +500,7 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 test-modules: $(TEST_EVAL) boot.l tests/module-tests.l
 	$(TEST_EVAL) boot.l tests/module-tests.l
 
+# NOTE test-elf needs the IA-32 eval-x86
 test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
 	./eval-x86 boot.l tests/test-elf.l
 	@chmod +x build/test-elf
