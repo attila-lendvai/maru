@@ -24,6 +24,10 @@
   (when (= libc/EOF (libc/fputc char stream))
     (error "file-write-character: libc/fputc returned an error")))
 
+;; (define-primitive-function file-flush ((stream <target-pointer>))
+;;   (unless (= 0 (libc/fflush stream))
+;;     (error "file-flush: libc/fflush returned an error")))
+
 ;;;
 ;;; <libc-stream>
 ;;;

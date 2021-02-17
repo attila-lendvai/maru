@@ -12,6 +12,9 @@
         (set (current-module) *slave-module*)))
   (switch-to-slave-module)
   ;; in the slave, set the global variable called 'host' to hold the host-module
+  ;; NOTE this toplevel form is encoded into the host. the previous
+  ;; switch-to-slave-module happens at runtime, it has no effect on the
+  ;; encode phase. therefore the use of eval-in-module below.
   (eval-in-module *slave-module* `(define *host-module* ,*host-module*)))
 
 ;; NOTE: we are in the slave module now, and the following forms will be read/interned into the slave.
@@ -29,7 +32,7 @@
 (define switch-to-host-module
     (lambda ()
       ;;(warn "--- switching to the host  module\n")
-      (set (current-module) *host-module*)))
+      (set-current-module *host-module*)))
 
 (define eval-in-host (lambda (form)
                        (eval-in-module *host-module* form)))
@@ -38,8 +41,8 @@
 
 ;; *slave-env* will be the direct parent of *target-env* (i.e. lookup is delegated to it).
 ;; you can think of *slave-env* as the syntax-module of the target: all macros,
-;; constants, and any meta-level stuff are defined and evaluated in that environment.
-;; *target-env* will be set up in emit-early.l.
+;; constants, and any meta-level stuff are evaluated in that environment.
+;; *target-env* will be set up later in emit-early.l.
 (define *slave-env* (eval-in-module *slave-module* '*globals*))
 
 (define-function eval-in-slave (form)

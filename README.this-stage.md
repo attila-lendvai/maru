@@ -37,6 +37,10 @@ some of these bugs, then I just opened a new stage.
    because of the previously missing/ignored concept of the *working
    directory*.
 
+ - The compiler can now emit full heap objects into the read-only
+   segment. The GC ignores them, and writing them results in a
+   `sigsegv`. See `emit-object/<string>` and friends.
+
 ## Stats
 
 This stage started out with:

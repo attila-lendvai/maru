@@ -174,10 +174,10 @@ var
 	(int	0x80)
 	;;(movlRM	_EAX 0)				; crash! for testing...
 	(RET	0)
-msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
+msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
-(println "calling it, printed output should follow")
+(println "calling it, output should follow")
 
 (call-IA-32-machine-code (<buffer>-elements code))
 
@@ -190,10 +190,10 @@ msg	(.ascii	"Test output from running the dynamically compiled asm code\n")
 	(movlIR	1 _EAX)				; exit
 	(movlIR	0 _EBX)				; status
 	(int	0x80)
-msg	(.ascii	"Now run ./a.out for a friendly greeting\n")
+msg	(.ascii	"*** Now run ./a.out for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 
-(println "calling it, printed output should follow")
+(println "calling it, output should follow")
 
 (call-IA-32-machine-code (<buffer>-elements code))
 

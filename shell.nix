@@ -7,6 +7,7 @@
 #pkgs.mkShell {
 #pkgs.stdenv.mkDerivation {
 #pkgsi686Linux.stdenv.mkDerivation {
+#pkgs.clangMultiStdenv.mkDerivation {
 pkgs.multiStdenv.mkDerivation {
   name = "maru";
 
@@ -19,6 +20,13 @@ pkgs.multiStdenv.mkDerivation {
       #libffi.dev
       gdb binutils
       llvm_11 clang_11
+      #clang
+      #clang_multi
+      #clang_multi.out
+      #pkgsi686Linux.libgcc.out
+      #pkgsi686Linux.clang.out
+      #gcc
+      #glibc_multi.out
 
       # keep this line if you use bash
       bashInteractive
@@ -31,7 +39,9 @@ pkgs.multiStdenv.mkDerivation {
   # NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgsi686Linux; [
   #   libgcc.out
   # ]);
-  # NIX_LDFLAGS_FOR_TARGET = "-L ${pkgsi686Linux.libgcc.out}/lib/ -L ${pkgsi686Linux.glibc.out}/lib/";
+  #NIX_LDFLAGS_FOR_TARGET = "-L ${pkgsi686Linux.libgcc.out}/lib/ -L ${pkgsi686Linux.glibc.out}/lib/";
+  #NIX_LDFLAGS_FOR_TARGET = "-L ${pkgs.clang_multi.out}/lib/";
+  #NIX_LDFLAGS = "-L ${pkgsi686Linux.clang.out}/lib/";
 
   buildCommand = ''
     make test-bootstrap

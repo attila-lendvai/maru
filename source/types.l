@@ -393,7 +393,11 @@
 (if-at-expand true
   (define-immediate	<long>			1 1)
   (define-boxed-word	<long>))				; provides a full-word integer, but bootstrap is about 25% slower
+(define-record		<fixed>			() (function))
 (define-boxed-word	<target-pointer>)			; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
+(define-record		<target-function>	() (program-code
+                                                     (when-at-expand feature/track-expr-names	name)
+                                                     (when-at-expand feature/profiler		profiler-counter)))
 ;;(define-boxed		<symbol>)				; a cstr is inline into the object's body
 (define-record		<symbol>		() (name))
 
@@ -405,10 +409,6 @@
                                                      (when-at-expand feature/track-expr-names	name)
                                                      (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
-(define-record		<fixed>			() (function))
-(define-record		<target-function>	() (program-code
-                                                     (when-at-expand feature/track-expr-names	name)
-                                                     (when-at-expand feature/profiler		profiler-counter)))
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
 (define-record		<context>		() (home env bindings callee pc))

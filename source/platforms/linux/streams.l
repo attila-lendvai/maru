@@ -9,6 +9,7 @@
 ;;; files
 ;;;
 
+;; TODO reaname these to file/open?
 (define-primitive-function file-open ((path <string>) (mode <string>))
   (let ((fd (linux-syscall linux/open (string->C-string path)
                            (cond
@@ -43,6 +44,10 @@
   ;; TODO endianness
   (unless (= 1 (linux-syscall linux/write fd (address-of char) 1))
     (error "file-write-character: libc/fputc returned an error")))
+
+;; (define-primitive-function file-flush ((fd <target-pointer>))
+;;   (unless (= 0 (linux-syscall linux/fsync fd))
+;;     (error "file-flush: linux/fsync returned an error")))
 
 ;;;
 ;;; <fd-stream>
