@@ -23,8 +23,8 @@
     `(let ()
        ,@forms)))
 
-(define *test-module-1* (create-module "test-module-1"))
-(define *test-module-2* (create-module "test-module-2"))
+(define *test-module-1* (module "test-module-1"))
+(define *test-module-2* (module "test-module-2"))
 
 (eval-in-module *test-module-1* `(define *test-module-2* ,*test-module-2*))
 (eval-in-module *test-module-2* `(define *test-module-1* ,*test-module-1*))
