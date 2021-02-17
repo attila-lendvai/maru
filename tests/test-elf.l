@@ -179,7 +179,11 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 
 (println "calling it, output should follow")
 
-(call-IA-32-machine-code (<buffer>-elements code))
+(define-function buffer->fn (buf)
+  (make <target-function>
+    (program-code	(<buffer>-elements buf))))
+
+(call-IA-32-machine-code (buffer->fn code))
 
 (assemble '(
 	(movlIR	4 _EAX)				; write
@@ -195,6 +199,6 @@ msg	(.ascii	"*** Now run ./a.out for a friendly greeting\n")
 
 (println "calling it, output should follow")
 
-(call-IA-32-machine-code (<buffer>-elements code))
+(call-IA-32-machine-code (buffer->fn code))
 
 (println "it shouldn't have returned!!!")
