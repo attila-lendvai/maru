@@ -64,7 +64,7 @@
        (else
         (error "C-type->llvm-type has failed for "type))))
     ((= '* type)
-     '%ptr)
+     '%oop)
     ((string? type)                     ; KLUDGE or is it?
      type)
     (else
@@ -75,7 +75,7 @@
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
   (case type
-    (%ptr	(target-value +word-size-in-bits+))
+    (%oop	(target-value +word-size-in-bits+))
     (void	0)
     (else
      (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
@@ -290,8 +290,8 @@
 
 (define-function emit-llvm-fn-type-for-expr (self)
   ;; TODO optimize
-  (let ((param-types (map (lambda _ '%ptr) (<expr>-parameters self))))
-    (emit-llvm-fn-type '%ptr param-types ())))
+  (let ((param-types (map (lambda _ '%oop) (<expr>-parameters self))))
+    (emit-llvm-fn-type '%oop param-types ())))
 
 (define-function emit-llvm-C-fn-type (ffn print-name?)
   (print (C-type->llvm-type (<C-function>-return-type ffn)) " ")
@@ -321,10 +321,10 @@
     (print " "name"(")
     (map (let ((first? true))
            (lambda (arg)
-             (let ((param-type (or (pop param-types) '%ptr)))
+             (let ((param-type (or (pop param-types) '%oop)))
                ;; TODO FIXME this ... situation is messy
                (when (= param-type '...)
-                 (set param-type '%ptr))
+                 (set param-type '%oop))
                (if first?
                    (set first? ())
                  (print ", "))
@@ -343,20 +343,20 @@
 (define-instruction DEFINE	()
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
-  ((GLOBAL long)		(println $1" = global %ptr inttoptr (%word "$2" to %ptr)")))
+  ((GLOBAL long)		(println $1" = global %oop inttoptr (%word "$2" to %oop)")))
 
 (define-instruction DECLARE	()
   ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
   ((C-variable)			(println "@"(<C-variable>-name $1)" = external global "(C-type->llvm-type (<C-variable>-type $1)))))
 
 (define-instruction ALLOCA	()
-  ((TEMP)			(println "	"$1" = alloca %ptr")))
+  ((TEMP)			(println "	"$1" = alloca %oop")))
 
 (define-instruction SEXT	(t 1 t)
   ((LOCAL _ _)			(println "	"$reg1" = sext "$2" "$1" to "$3)))
 
 (define-instruction INTTOPTR	(t 1 t)
-  ((LOCAL _)			(println "	"$reg1" = inttoptr "$2" "$1" to %ptr")))
+  ((LOCAL _)			(println "	"$reg1" = inttoptr "$2" "$1" to %oop")))
 
 (define-instruction BITCAST	(t 1 t)
   ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
@@ -365,31 +365,31 @@
   ((_ _ _ _)			(println "	"$reg1" = getelementptr "$2", "$2"* "$1", i32 "$3", i32 "$4)))
 
 (define-instruction RET		(() 1 ())
-  ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %ptr")
-                                (println "	ret %ptr "$reg1))
-  ;; ((TEMP)			(println "	"$reg1" = load %ptr, %ptr* "$1)
-  ;;       			(println "	ret %ptr "$reg1))
-  ((LOCAL)			(println "	ret %ptr "$1)))
+  ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %oop")
+                                (println "	ret %oop "$reg1))
+  ;; ((TEMP)			(println "	"$reg1" = load %oop, %oop* "$1)
+  ;;       			(println "	ret %oop "$reg1))
+  ((LOCAL)			(println "	ret %oop "$1)))
 
 (define-instruction LOAD-VALUE	(() 1 t)
-  ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %ptr"))
-  ((TEMP    _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
-  ((GLOBAL  _)			(println "	"$reg1" = load %ptr, %ptr* "$1))
+  ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
+  ((TEMP    _)			(println "	"$reg1" = load %oop, %oop* "$1))
+  ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
-                                    (println "	"$reg1" = load %ptr, %ptr* "$1) ; this could be a call-next-method
-                                  (println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %ptr")))
-  ((CONSTANT  expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %ptr"))
+                                    (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
+                                  (println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop")))
+  ((CONSTANT  expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop"))
   ((GLOBAL  C-function)		(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
-				(println "* @" (<C-function>-name $2) " to %ptr"))
+				(println "* @" (<C-function>-name $2) " to %oop"))
   ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
                                   (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
 
 (define-instruction LOAD	(t 1 t)
-  ((LOCAL)			(println "	"$reg1" = load %ptr, %ptr* "$1)))
+  ((LOCAL)			(println "	"$reg1" = load %oop, %oop* "$1)))
 
 (define-instruction STORE	(t 0 ())
-  ((_ _)			(println "	store %ptr "$1", %ptr* "$2))
+  ((_ _)			(println "	store %oop "$1", %oop* "$2))
   ((LOCAL C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
 				  (println "	store "type" "$1", "type"* @"(<C-variable>-name $2)))))
 
@@ -399,17 +399,17 @@
                                   (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "$1", %word 0, %word 0")))
   ((CONSTANT array)		(let* ((arr (<CONSTANT>-value $1))
                                        (length (array-length arr)))
-                                  (println "	"$reg1" = getelementptr [" length " x %ptr], [" length " x %ptr]* "$1", %word 0, %word 0")
-                                  (println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
-  ((_ _)			(println "	"$reg1" = getelementptr %ptr, %ptr* "$1", %word 0")
-				(println "	"$reg2" = bitcast %ptr* "$reg1" to %ptr")))
+                                  (println "	"$reg1" = getelementptr [" length " x %oop], [" length " x %oop]* "$1", %word 0, %word 0")
+                                  (println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
+  ((_ _)			(println "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0")
+				(println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
 
 (define-instruction CALL	(() 1 t)
   ((GLOBAL _)			(emit-llvm-call $reg1
                                                 $1
                                                 $2
-                                                '%ptr
-                                                (map (lambda _ '%ptr) $2) ; param types
+                                                '%oop
+                                                (map (lambda _ '%oop) $2) ; param types
                                                 ()))
   ((C-function _)		(emit-llvm-call $reg1
                                                 (EXTERNAL (<C-function>-name $1))
@@ -419,11 +419,11 @@
                                                 (<C-function>-vararg? $1))))
 
 (define-instruction CALLPTR	(t 2 t)
-  ((LOCAL _)			(let ((param-types (map (lambda _ '%ptr) $2)))
-                                  (print "	"$reg1" = bitcast %ptr "$1" to ")
-                                  (emit-llvm-fn-type '%ptr param-types ())
+  ((LOCAL _)			(let ((param-types (map (lambda _ '%oop) $2)))
+                                  (print "	"$reg1" = bitcast %oop "$1" to ")
+                                  (emit-llvm-fn-type '%oop param-types ())
                                   (println "*")
-                                  (emit-llvm-call $reg2 $reg1 $2 '%ptr param-types ()))))
+                                  (emit-llvm-call $reg2 $reg1 $2 '%oop param-types ()))))
 
 (define-instruction DEFLABEL	()
   ((LABEL)			(println $1":")))
@@ -432,27 +432,27 @@
   ((LABEL)			(println "	br label %"$1)))
 
 (define-instruction BRIF	(t 2 ())
-  ((LOCAL LABEL LABEL)		(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
+  ((LOCAL LABEL LABEL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = icmp ne %word "$reg1", 0")
 				(println "	br i1 "$reg2", label %"$2", label %"$3)))
 
 (define-instruction NEG		(t 3 t)
-  ((LOCAL)			(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
+  ((LOCAL)			(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = sub nsw %word 0, "$reg1)
-				(println "	"$reg3" = inttoptr %word "$reg2" to %ptr")))
+				(println "	"$reg3" = inttoptr %word "$reg2" to %oop")))
 
 (define-instruction LOGIC-NOT	(t 4 t)
-  ((LOCAL)			(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
+  ((LOCAL)			(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = icmp eq %word "$reg1", 0")
 				(println "	"$reg3" = zext i1 "$reg2" to %word")
-				(println "	"$reg4" = inttoptr %word "$reg3" to %ptr")))
+				(println "	"$reg4" = inttoptr %word "$reg3" to %oop")))
 
 (define-form define-cmp-instruction (instr-name llvm-comparator)
   `(define-instruction ,instr-name (t 4 t)
-    ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
+    ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = icmp " ,llvm-comparator " %word "$reg1", "$reg2)
-				(println "	"$reg4" = inttoptr i1 "$reg3" to %ptr"))))
+				(println "	"$reg4" = inttoptr i1 "$reg3" to %oop"))))
 
 (define-cmp-instruction LT "slt")
 (define-cmp-instruction LE "sle")
@@ -463,10 +463,10 @@
 
 (define-form define-arithmetic-instruction (instr-name llvm-op)
   `(define-instruction ,instr-name (t 4 t)
-    ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %ptr "$1" to %word")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
+    ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = " ,llvm-op " %word "$reg1", "$reg2)
-				(println "	"$reg4" = inttoptr %word "$reg3" to %ptr"))))
+				(println "	"$reg4" = inttoptr %word "$reg3" to %oop"))))
 
 (define-arithmetic-instruction ADD "add")
 (define-arithmetic-instruction SUB "sub")
@@ -482,37 +482,37 @@
 
 ;; args: baseptr, index
 (define-instruction LOAD-I8	(t 5 t)
-  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x i8]*")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
-				(println "	"$reg5" = inttoptr i8 "$reg4" to %ptr")))
+				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
 
 (define-instruction LOAD-OOP	(t 4 t)
-  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
-				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
-				(println "	"$reg4" = load %ptr, %ptr* "$reg3))
-  ((LOCAL LITERAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
-				(println "	"$reg2" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$2)
-				(println "	"$reg4" = load %ptr, %ptr* "$reg2)))
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$reg2)
+				(println "	"$reg4" = load %oop, %oop* "$reg3))
+  ((LOCAL LITERAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
+				(println "	"$reg2" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$2)
+				(println "	"$reg4" = load %oop, %oop* "$reg2)))
 
 ;; args: baseptr, index, value
 (define-instruction STORE-I8	(t 6 t)
-  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x i8]*")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
+  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
-				(println "	"$reg4" = ptrtoint %ptr "$3" to i8")
+				(println "	"$reg4" = ptrtoint %oop "$3" to i8")
 				(println "	store i8 "$reg4", i8* "$reg3)
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
-				(println "	"$reg6" = inttoptr %word "$reg5" to %ptr")))
+				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
 
 (define-instruction STORE-OOP	(t 4 t)
-  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %ptr "$1" to [0 x %ptr]*")
-				(println "	"$reg2" = ptrtoint %ptr "$2" to %word")
-				(println "	"$reg3" = getelementptr [0 x %ptr], [0 x %ptr]* "$reg1", %word 0, %word "$reg2)
-				(println "	store %ptr "$3", %ptr* "$reg3)
-				(println "	"$reg4" = bitcast %ptr "$3" to %ptr")))
+  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$reg2)
+				(println "	store %oop "$3", %oop* "$reg3)
+				(println "	"$reg4" = bitcast %oop "$3" to %oop")))
 
 ;;;
 ;;; Compiler
@@ -613,7 +613,7 @@
     (print ", %word "
            ;; FIXME this only works when <long> is an immediate
            (eval-in-slave `(box <long> ,(string-length self)))
-           ", %ptr bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %ptr) }\n")
+           ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
     object-label))
 
 (define-function emit-object/<target-function> (expr name entry-label -c-)
@@ -630,9 +630,9 @@
     ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
     (print object-label" = private unnamed_addr constant %\"<target-function>\" { ")
     (emit-object-header (slave-value (<type>-slave-id <string>)))
-    (print ", %ptr bitcast (")
+    (print ", %oop bitcast (")
     (emit-llvm-fn-type-for-expr expr)
-    (print "* "entry-label" to %ptr)")
+    (print "* "entry-label" to %oop)")
     (and name-obj (print ", %\"<string>\"* "name-obj))
     (and profiler-counter (print ", %word "profiler-counter))
     (print " }\n")
@@ -651,18 +651,18 @@
     (gen STORE temp)
     temp))
 
-(define-function emit/comma-separated-%ptrs (params)
+(define-function emit/comma-separated-%oops (params)
   (let ((first? true))
     (list-do param params
       (if first?
           (set first? ())
         (print ", "))
-      (print "%ptr ")
+      (print "%oop ")
       (print param))))
 
 (define-function emit/function-prologue (name params)
-  (print "define %ptr "name"(")
-  (emit/comma-separated-%ptrs params)
+  (print "define %oop "name"(")
+  (emit/comma-separated-%oops params)
   (println ") {"))
 
 (define-function emit/function-epilogue ()
@@ -744,7 +744,7 @@
 (define-function compile-call-to-object (arg-regs -c-)
   ;; TODO assert the type to be <target-function>
   ;; TODO assert nr of args = params
-  (gen BITCAST '%ptr "%\"<target-function>\"*")
+  (gen BITCAST '%oop "%\"<target-function>\"*")
   (gen GEP (LOCAL '<target-function>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
   (gen LOAD)
   (gen CALLPTR arg-regs)
@@ -786,18 +786,18 @@
         (set param-type (awhen (pop param-lst)
                           (C-type->llvm-type it)))
         (if (or (= ()    param-type) ; vararg calls have more args than params
-                (= '%ptr param-type))
+                (= '%oop param-type))
             (push new-arg-regs arg)
           (let ((cast-reg (LOCAL (new-reg-name "ffi-cast" -c-))))
             ;; TODO check for value range issues?
-            (gen INLINE (list "	"cast-reg" = ptrtoint %ptr "arg" to "param-type"\n"))
+            (gen INLINE (list "	"cast-reg" = ptrtoint %oop "arg" to "param-type"\n"))
             (push new-arg-regs cast-reg))))
       ;; gen the call itself
       (gen CALL self (list-reverse! new-arg-regs)))
     ;; convert return value
     (let ((return-type (C-type->llvm-type self.return-type)))
       (case return-type
-        (%ptr)                          ; all good
+        (%oop)                          ; all good
         (void
          (gen COMMENT (list "	void FFI call return value"))
          (gen LOAD-VALUE (LITERAL 0) 0))
@@ -931,7 +931,7 @@
       ((global-variable? var)
        (cond
          ((is <C-variable> value)
-          (gen BITCAST '%ptr (C-type->llvm-type (<C-variable>-type value)))
+          (gen BITCAST '%oop (C-type->llvm-type (<C-variable>-type value)))
           (gen STORE value))
          (else
           (gen STORE (GLOBAL (<variable>-name var))))))
@@ -981,7 +981,7 @@
 (define-instruction LINUX-SYSCALL (() 1 t)
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
-   (println "	"$reg1" = call %ptr asm sideeffect \"")
+   (println "	"$reg1" = call %oop asm sideeffect \"")
    (let ((arg-index	1)
          (clobbers	())
          mov syscall regs)
@@ -1020,7 +1020,7 @@
      (while clobbers
        (print ",~{"(pop clobbers)"}"))
      (print "\"\n	(")
-     (emit/comma-separated-%ptrs $1)
+     (emit/comma-separated-%oops $1)
      (println ")"))))
 
 (define-function compile/linux-syscall (expr -c-)
@@ -1129,7 +1129,7 @@
                                      (gen LOAD-VALUE (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
                                     ((is <C-variable> value)
                                      (gen LOAD-VALUE (EXTERNAL (<C-variable>-name value)) value)
-                                     (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%ptr))
+                                     (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%oop))
                                     (else
                                      (gen LOAD-VALUE (GLOBAL self.name) value)))))
       (else
@@ -1139,7 +1139,7 @@
   (set (<compiler>-current-value -c-)
        (emit-object/<string> self -c-))
   (gen GEP (LOCAL '<string>) 0 1) ; 1 means skip the header
-  (gen BITCAST "%word*" "%ptr"))
+  (gen BITCAST "%word*" "%oop"))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
@@ -1179,8 +1179,8 @@
       (print "* "(closure-code-label name)))
     (when feature/redefinable-functions-in-target
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
-      (println (GLOBAL name)" = global %ptr bitcast(%\"<target-function>\"* "
-               object-label" to %ptr)"))))
+      (println (GLOBAL name)" = global %oop bitcast(%\"<target-function>\"* "
+               object-label" to %oop)"))))
 
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
@@ -1188,16 +1188,16 @@
   (let ((compiled	(compile-array self -c-))
         (array-label	(GLOBAL (unique-name "arr"))))
     (let ((first? true))
-      (print array-label" = private unnamed_addr constant ["(array-length compiled)" x %ptr] [")
+      (print array-label" = private unnamed_addr constant ["(array-length compiled)" x %oop] [")
       (array-do el compiled
         (if first? (set first? false) (print ", "))
-        (print "%ptr ")
+        (print "%oop ")
         (if el
-            (print "bitcast (%\"<target-function>\"* "el" to %ptr)")
+            (print "bitcast (%\"<target-function>\"* "el" to %oop)")
           (print "null")))
       (println "]"))
-    (print (GLOBAL name)" = global %ptr bitcast (["(array-length compiled)" x %ptr]* "
-           array-label" to %ptr)")))
+    (print (GLOBAL name)" = global %oop bitcast (["(array-length compiled)" x %oop]* "
+           array-label" to %oop)")))
 
 (define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet		(slave-value +target-triplet+))
@@ -1210,7 +1210,7 @@
     ;; bitcode output to chose the proper target triplet.
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
     (emit INLINE (list "%word = type i"word-size"\n"))
-    (emit INLINE "%ptr = type i8*\n")
+    (emit INLINE "%oop = type i8*\n")
     ;; TODO this should be done by a general emitter
     (emit INLINE (list "%\"<header>\" = type { %word, %word"
                        (if (and (slave-value (defined? 'feature/object-canary))
@@ -1227,8 +1227,8 @@
        (emit INLINE "%\"<long>\" = type { %\"<header>\", %word }\n"))
       (else
        (error "LLVM emit-prelude: unexpected slave representation for <long>")))
-    (emit INLINE "%\"<string>\" = type { %\"<header>\", %word, %ptr }\n")
-    (emit INLINE (list "%\"<target-function>\" = type { %\"<header>\", %ptr "
+    (emit INLINE "%\"<string>\" = type { %\"<header>\", %word, %oop }\n")
+    (emit INLINE (list "%\"<target-function>\" = type { %\"<header>\", %oop "
                        (if (slave-value feature/track-expr-names)
                            ", %\"<string>\"* " "")
                        (if (slave-value feature/profiler)

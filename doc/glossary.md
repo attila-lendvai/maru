@@ -19,8 +19,15 @@
    having a dynamic compiler, the host could start up the slave VM
    under its full supervision.
 
- - *oop*: Ordinary Object Pointer, a pointer pointing to a valid maru
-    value (can be a boxed integer, or a record instance).
+ - *oop*: Ordinary Object Pointer, a managed pointer pointing to a
+    valid Maru value. Note that sometimes the pointee can be
+    packed/encoded right into the machine word (that is supposedly
+    pointing to a heap object, but not in this case). Such "pointers"
+    are marked by their least significant bits. We can do this because
+    pointers to machine words must be aligned, so the 3 least
+    significant zero bits of 32 bit pointers are zero, while 64 bit
+    pointers have 4 such bits. It makes sense to use those bits to
+    encode 8-16 types, like a small-integer, right into the pointer.
 
  - *oop-at*: pointer dereferencing primitive
 
