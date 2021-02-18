@@ -535,27 +535,33 @@
 ;;; Compiling calls
 ;;;
 
-(define-function compile-call (op args -c-)
+(define-function compile-call (op args raw? -c-)
+  (safety 2 (assert (or (pair? op) (variable? op))))
   ;; NOTE this implements a left-to-right evaluation order, including the operator.
   ;; i.e. moving this op-tmp means changing the evaluation order!
-  (let ((op-tmp	(when (pair? op)
-                  ;; we can spare a STORE/LOAD when we know that op
-                  ;; doesn't evaluate anything; i.e. we can reorder
-                  ;; its evaluation, which is a simple LOAD, to the
-                  ;; final, COMPILE-CALL-TO step.
-                  (compile/expr-into-temp-or-literal op -c-)))
+  (let ((op-tmp		(when (pair? op)
+                          ;; optimization:
+                          ;; we can spare a STORE/LOAD when we know that op
+                          ;; doesn't evaluate anything; i.e. we can delay
+                          ;; its evaluation, i.e. a simple LOAD, to the
+                          ;; final, COMPILE-CALL-TO step.
+                          (compile/expr-into-temp-or-literal op -c-)))
         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
         (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
     ;; set up the stack for the call
     (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
     (free-temps arg-tmps)
 
-    (let ((n-params	(compile-call-to (cond
-                                           (op-tmp		op-tmp)
-                                           ((variable? op)	(<variable>-value op))
-                                           (else		op))
-                                         op arg-locs -c-))
-          (arity	(list-length args)))
+    (let* ((op-value	(or op-tmp
+                            (and (variable? op)
+                                 (<variable>-value op))))
+           (n-params	(if raw?
+                            (let ()
+                              (gen LOAD op-value)
+                              (gen CALLPTR arg-locs)
+                              ())
+                          (compile-call-to op-value op arg-locs -c-)))
+           (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
@@ -580,13 +586,13 @@
   ())
 
 (define-method compile-call-to <TI32> (op arg-locs -c-)
-  ;;(gen LOAD self)
-  (comp op)
+  (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
 
-(define-method compile-call-to <pair> (op arg-locs -c-)
-  (comp op)
-  (compile-call-to-object arg-locs -c-))
+;; this case is handled early in compile-call
+;; (define-method compile-call-to <pair> (op arg-locs -c-)
+;;   (comp op)
+;;   (compile-call-to-object arg-locs -c-))
 
 (define-method compile-call-to <expr> (op arg-locs -c-)
   ;; NOTE the fact that a literal <expr> is found in a variable's
@@ -710,6 +716,9 @@
   (let ((label (emit-object/C-string (second expr))))
     (gen LOAD label)))
 
+(define-function compile/C-call (expr -c-)
+  (compile-call (second expr) (cddr expr) true -c-))
+
 ;;;
 ;;; linux syscalls
 ;;;
@@ -750,6 +759,7 @@
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
+  (cons (target-value C-call)		compile/C-call)
   ))
 
 ;;;
@@ -860,7 +870,7 @@
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))
       (else
-       (compile-call op args -c-)))))
+       (compile-call op args false -c-)))))
 
 ;;;
 ;;; COMPILE-DEFINITION

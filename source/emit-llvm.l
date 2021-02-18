@@ -723,18 +723,22 @@
 ;;; Compiling calls
 ;;;
 
-(define-function compile-call (op args -c-)
-  (assert op "compile-call: operator is nil")
+(define-function compile-call (op args raw? -c-)
+  (safety 2 (assert (or (pair? op) (variable? op))))
   (let ((arg-regs (map (lambda (arg)
                          (gen COMMENT (list "arg " arg))
                          (comp arg)
                          (<compiler>-current-value -c-))
                        args)))
 
-    (let ((n-params	(compile-call-to (if (variable? op)
-                                             (<variable>-value op)
-                                           op)
-                                         op arg-regs -c-))
+    (let* ((op-value	(if (variable? op)
+                            (<variable>-value op)
+                          op))
+           (n-params	(if raw?
+                            (let ()
+                              (comp op)
+                              (gen CALLPTR arg-regs))
+                          (compile-call-to op-value op arg-regs -c-)))
           (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
@@ -970,6 +974,9 @@
          (const (emit-object/C-string str -c-)))
     (gen ADDR const str)))
 
+(define-function compile/C-call (expr -c-)
+  (compile-call (second expr) (cddr expr) true -c-))
+
 ;;;
 ;;; linux syscalls
 ;;;
@@ -1044,6 +1051,7 @@
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
+  (cons (target-value C-call)		compile/C-call)
   ))
 
 ;;;
@@ -1158,7 +1166,7 @@
       ((set handler (cdr (assq op +special-forms+)))
        (handler self -c-))
       (else
-       (compile-call op args -c-)))))
+       (compile-call op args false -c-)))))
 
 ;;;
 ;;; COMPILE-DEFINITION
@@ -1177,7 +1185,7 @@
       (emit-llvm-fn-type-for-expr self)
       (print ", ")
       (emit-llvm-fn-type-for-expr self)
-      (print "* "(closure-code-label name)))
+      (println "* "(closure-code-label name)))
     (when feature/redefinable-functions-in-target
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
       (println (GLOBAL name)" = global %oop bitcast(%\"<target-function>\"* "

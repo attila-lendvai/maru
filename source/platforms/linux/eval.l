@@ -52,7 +52,7 @@
 ;; i386: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/i386/start.S;h=91035fa83fb7ee38a0ca5834ba1d215b4a7f78e8;hb=HEAD
 ;; x86_64: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/start.S;h=354d2e6ec78f0eaf9ab0f8ed665c2e5499388df0;hb=HEAD
 (define-function __libc_start_main (main argc argv init fini rtld_fini stack_end)
-  (linux-syscall linux/exit (main argc argv)))
+  (linux-syscall linux/exit (C-call main argc argv)))
 
 (define-function __libc_csu_init ())
 (define-function __libc_csu_fini ())

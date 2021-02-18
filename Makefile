@@ -247,7 +247,7 @@ $(EVAL0_DIR)/$(EVAL0): $(EVAL0_DIR)
 		TARGET_CPU=$(TARGET_CPU)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
-		PLATFORM=libc				\
+		PLATFORM=$(PLATFORM)			\
 		$(EVAL0)
 
 # "forward" this target to the makefile, because this is typically used as EVAL0
