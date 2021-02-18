@@ -305,7 +305,8 @@ bootstrapping issues.
 
 Ian published another Mercurial repo somewhere halfway in the commit history
 with only a couple of commits from around 2011. I assume that it was meant to hold
-the minimal/historical version of Maru that can already self-host. I started out
+the [minimal/historical version](https://www.piumarta.com/software/maru/)
+of Maru that can already self-host. I started out
 my work from this minimal repo (hence the divergence between the `piumarta` and
 the `maru.x` branches in this repo).
 

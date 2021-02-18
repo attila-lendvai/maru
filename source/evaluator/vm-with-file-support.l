@@ -23,6 +23,7 @@
 (define-function initialize-streams (in-handle out-handle err-handle)
   ;; NOTE a WITH-FORMS is tempting here, but the body of WITH-FORMS'
   ;; are not executed in the syntax module.
+  ;; TODO rename to *input*?
   (initialize-stream in-handle	*standard-input*)
   (initialize-stream out-handle	*standard-output*)
   (initialize-stream err-handle	*error-output*)

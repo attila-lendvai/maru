@@ -130,12 +130,13 @@
     (parent	parent)
     (level	(box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
     (offset	(box <long> offset))
-    (bindings	(array 0))))
+    (bindings	(array 0))
+    (stable	false))) ; using false here is fine because false = 0 = (), i.e. it's a valid Lisp object
 
 (define-function base-context (home env)
   (make <context>
-    (home	home)
-    (env	env)
+    (home	home)	; the context in which the currently applied <expr> was instantiated
+    (env	env)	; the env in which the currently applied <expr> was defined
     (bindings	(array 0))))
 
 ;; (define-function context (home caller env)
@@ -228,9 +229,12 @@
       (set env (<env>-parent env)))
     result))
 
+;; TODO use quicksearch?
 (define-function new-variable (env name)
   (safety 2 (assert (is <env> env)	"new-variable: env arg is not of type <env>: "env))
   (safety 2 (assert (symbol? name)	"new-variable: name arg is not of type <symbol>: "name))
+  ;; TODO delme?
+  (safety 4 (assert (not (find-local-variable env name)) "new-variable was about to shadow "name))
   (let ((offset (unbox <long> (<env>-offset env))))
     (gc/let* ((var (variable name () env offset)))
       (set (<env>-offset env) (box <long> (+ offset 1)))
@@ -241,9 +245,8 @@
   (let ((var (find-local-variable env name)))
     (if var
         (let ()
-          ;; TODO
-          ;;(error "environment-define: variable "it" is already defined in env "env)
-          ;;( "warning: environment-define: variable '"(unbox <symbol> (<variable>-name var))"' is already defined in this env.\n")
+          ;;(print-all *debug-output* "warning: environment-define: variable "var" is already defined in env "env"\n")
+          ;;(platform/print-diag-fmt "warning: environment-define: variable %s is already defined in this env\n" (string->C-string (symbol->string name)))
           )
       (set var (new-variable env name)))
     (set (<variable>-value var) value)
@@ -380,8 +383,8 @@
   (verbosity 3 (debug-print "  A  "fun" "arguments" "parent-ctx))
   (let ((env	(<expr>-env fun))
         (params	(<expr>-parameters fun)))
-    (gc/let* ((innter-ctx (context (<expr>-ctx fun) parent-ctx env)))
-      (let ((locals (<context>-bindings innter-ctx))
+    (gc/let* ((inner-context (context (<expr>-ctx fun) parent-ctx env)))
+      (let ((locals (<context>-bindings inner-context))
             (args   arguments))
         (while (pair? params)
           (or (pair? args) (error "too few arguments for "fun": "arguments))
@@ -398,9 +401,9 @@
       (let ((prg (<expr>-body fun))
             (result ()))
         (list-do exp prg
-          (set result (eval exp innter-ctx)))
+          (set result (eval exp inner-context)))
         (when (<env>-stable env)
-          (set (<context>-callee innter-ctx) ()))
+          (set (<context>-callee inner-context) ()))
         result))))
 
 (define-function apply (fun arguments ctx)
@@ -694,19 +697,21 @@
     ;; return value
     (cons head tail)))
 
-(define-function encode/symbol (exp env)
-  (debug-print "encode/symbol of '"exp"', in env "env)
-  (let ((var (or (defined? exp env)
-                 (error "encode/symbol: failed for "exp", current module "*module*", env "env))))
+(define-function encode/symbol (sym env)
+  (debug-print "encode/symbol of '"sym"', in env "env)
+  (let ((var (or (defined? sym env)
+                 (error "encode/symbol: failed for "sym", current module "*module*", env "env))))
     (if (global-variable? var)
         (let ((val (<variable>-value var)))
           (when (or (is <form> val) ; TODO ? how can <form>s show up here, after expand?
                     (is <fixed> val))
             (return val)))
-      (let ((venv (<variable>-env var)))
-        (unless (= (unbox <long> (<env>-level venv))
-                   (unbox <long> (<env>-level env)))
-          (set (<env>-stable venv) symbol/true))))
+      (let* ((var-env	(<variable>-env var))
+             (var-level	(unbox <long> (<env>-level var-env)))
+             (env-level	(unbox <long> (<env>-level env))))
+        (safety 1 (assert (<= var-level env-level)))
+        (when (< var-level env-level)
+          (set (<env>-stable var-env) symbol/true))))
     var))
 
 (define-primitive-function encode (exp (env <env> (<context>-env -ctx-)))

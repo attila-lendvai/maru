@@ -118,7 +118,7 @@
 (define-function %accessor-typecheck (expected-type-id object)
   (let ((type (type-of object)))
     (or (= type expected-type-id)
-        (fatal2 "kernel get/put type error: expected type id %ld, got %ld" expected-type-id type)))
+        (fatal2 "kernel accessor type error: expected type id %ld, got %ld" expected-type-id type)))
   object)
 
 ;; shorthands (and optimizations)

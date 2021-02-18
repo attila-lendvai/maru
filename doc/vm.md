@@ -21,3 +21,12 @@ should be passed and returned as boxed OOP's, except:
 
 `define-primitive-function` automatically unboxes `<long>` and
 `<target-vm-pointer>`, unless otherwise requested.
+
+### Value representations
+
+The *false* value on the Lisp side, i.e. the empty list, is
+represented as the 0 integer on the target side. The *false* symbol in
+the target namespace is bound to 0, while on the Lisp side it is bound
+to (). This allows us to have a *true* and *false* global binding in
+both worlds, and in the target *false* can be put in the slots of heap
+objects (because 0 = (), i.e. it's a valid Lisp object).

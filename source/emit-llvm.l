@@ -264,8 +264,7 @@
     (reg-counter		0)
     (label-counter		0)))
 
-;; KLUDGE
-(define *compiler-factory* llvm-compiler)
+(define compiler llvm-compiler)
 
 (define-function new-temp (-c-)
   (TEMP (new-temp-index -c-)))

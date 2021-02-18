@@ -411,8 +411,8 @@
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable))
-(define-record		<context>		() (home env bindings callee pc))
 (define-record		<module>		() (globals (when-at-expand feature/debug-info name)))		; globals is the <variable> that holds '*globals*
+(define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 
 ;; TODO why are some of these here, and some are primitive-functions? unify one way or another!

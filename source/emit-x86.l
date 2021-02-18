@@ -356,8 +356,7 @@
      (emit COMMENT (list "COMPILE of "__obj__))
      (compile __obj__ -c-)))
 
-;; KLUDGE
-(define *compiler-factory* x86-compiler)
+(define compiler x86-compiler)
 
 (define-function new-temp (-c-)
   (TI32 (* (new-temp-index -c-) (eval-at-expand (target-value +word-size-in-bytes+)))))
@@ -377,14 +376,14 @@
   (with-instance-accessors c <x86-compiler>
     (let* ((offset	c.param-offset)
            (temp	(TI32 offset)))
-      (incr c.param-offset 4)
+      (set c.param-offset (+ offset 4))
       temp)))
 
 (define-function new-arg (c)
   (with-instance-accessors c <x86-compiler>
-    (let* ((index	c.arg-offset)
-           (temp	(TI32 index)))
-      (incr c.arg-offset 4)
+    (let* ((offset	c.arg-offset)
+           (temp	(TI32 offset)))
+      (set c.arg-offset (+ offset 4))
       temp)))
 
 (define-function free-args (c args)
