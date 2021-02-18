@@ -145,11 +145,13 @@
 (define-form free-temp (temp)			`(%free-temp -c- ,temp))
 (define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
-(define-function lexical-variable-or-die (var -c-)
-  (unless (or (global-variable? var)
-              (= (<compiler>-level -c-)
-                 (<env>-level (<variable>-env var))))
-    (error "cannot access variable "var", closures are not supported yet.")))
+(define-function accessible-variable-or-die (var -c-)
+  (or (global-variable? var)
+      (let ((comp-level	(<compiler>-level -c-))
+            (var-level	(<env>-level (<variable>-env var))))
+        (assert (<= comp-level var-level) "err, what!? encountered a variable whose env is *below* the compiler's lambda nesting level!? it's "var)
+        (when (< var-level comp-level)
+          (error "cannot access variable "var", closures are not supported yet.")))))
 
 ;;;
 ;;; target env setup
