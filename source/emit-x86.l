@@ -721,7 +721,7 @@
   (let ((args	$1)
         (regs	+linux/syscall-registers/32+))
     (while args
-      (println "	movl	"(pop args)", "(pop regs))))
+      (println "	movl	"(pop args)", %"(pop regs))))
   (println "	int	$0x80"))
 
 ;; TODO add a <target-function> for this? or add a macro whose

@@ -180,8 +180,8 @@
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
 ;; KLUDGE move this somewhere into a 'linux' namespace
-(define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(%eax %ebx %ecx %edx %esi %edi %ebp))))
-(define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(%rax %rdi %rsi %rdx %r10 %r8 %r9))))
+(define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
+(define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(rax rdi rsi rdx r10 r8 r9))))
 (eval-in-slave
  '(let ()
    (define-constant linux/O_RDONLY		0)
