@@ -398,9 +398,8 @@
           (set args ()))
         (when args
           (error "too many arguments for "fun": "arguments)))
-      (let ((prg (<expr>-body fun))
-            (result ()))
-        (list-do exp prg
+      (gc/let* ((result ()))
+        (list-do exp (<expr>-body fun)
           (set result (eval exp inner-context)))
         (when (<env>-stable env)
           (set (<context>-callee inner-context) ()))
