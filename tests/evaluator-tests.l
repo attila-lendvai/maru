@@ -195,6 +195,13 @@
                            y))
                       40 2))))
 
+(define-symbol-form *symform* (another-form))
+(define-form another-form () 42)
+
+(define-test eval/expand/bug/3 ()
+  (test-assert (= 42 (expand '*symform*)))
+  (test-assert (equal '(set 42 43) (expand '(set *symform* 43)))))
+
 (define-form place-for-set-test (str i)
   `(accessor-for-set-test ,str ,i))
 
