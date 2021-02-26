@@ -69,7 +69,7 @@
 ;;;
 ;;; API visible in the target
 ;;;
-(switch-to-slave-module)
+(set *globals* *target-env*)
 
 (define-form define-C-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))

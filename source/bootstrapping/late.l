@@ -3,4 +3,4 @@
 (define-form host-value (form)
   `(eval-in-host ',form))
 
-(switch-to-host-module)
+(switch-to-host-env)
