@@ -544,7 +544,8 @@
                      (set converted (list3 symbol/set expanded-place value))
                      (if (and (not one-step?)
                               fn-name
-                              (setter-name-for fn-name env))
+                              (or (maybe-object-in-env env fn-name <form>)
+                                  (setter-name-for fn-name env)))
                          (expand converted env one-step?)
                        converted))))))))
 
