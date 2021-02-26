@@ -17,11 +17,22 @@
 
 ;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment (module-env *module*) 1 0)))
 (define-primitive-function (eval ()) _
-  (gc/let* ((env (if (cdr -args-) ; let's not tolerate being called with nil env
-                     (cadr -args-)
-                   (environment (module-env *module*) 1 0))))
-    ;; TODO resolve this naming anomaly somehow
-    (expand-encode-eval (car -args-) env)))
+  (let ((env (if (cdr -args-) ; let's not tolerate being called with nil env
+                 (cadr -args-)
+               (module-env *module*))))
+    (let* ((toplevel-env?	(= 0 (unbox <long> (<env>-level env))))
+           (prev-globals	(module-env *module*))
+           result)
+      (when toplevel-env?
+        (set (<variable>-value (<module>-globals *module*)) env)
+        (capture-well-known-module-values))
+      (set result (gc/let* ((child-env (environment env 1 0)))
+                    ;; TODO resolve this naming anomaly somehow
+                    (expand-encode-eval (car -args-) child-env)))
+      (when toplevel-env?
+        (set (<variable>-value (<module>-globals *module*)) prev-globals)
+        (capture-well-known-module-values))
+      result)))
 
 (define-primitive-function (eval-in-module ()) ((module <module>) form)
   (verbosity 2 (debug-print ";;; ? "module" "form))
