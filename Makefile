@@ -136,7 +136,11 @@ BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 EVAL0_DIR	= $(CURDIR)/$(BUILD)/eval0
-EVAL0		= eval0-llvm
+EVAL0_BINARY	= eval0-llvm
+# this way eval0 is built from the latest commit, checked out as a working dir in build/eval0
+EVAL0		= $(EVAL0_DIR)/$(EVAL0_BINARY)
+# this way eval0 is built each time
+#EVAL0		= $(BUILD_x86)/eval0
 
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
@@ -242,13 +246,13 @@ $(EVAL0_DIR):
 # "forward" this target to the makefile in build/eval0
 # NOTE using TARGET_CPU=i686 would be faster, but i have trouble linking
 # -m32 executables on my nixos to test this properly.
-$(EVAL0_DIR)/$(EVAL0): $(EVAL0_DIR)
+$(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
 		TARGET_CPU=$(TARGET_CPU)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
 		PLATFORM=$(PLATFORM)			\
-		$(EVAL0)
+		$(EVAL0_BINARY)
 
 # "forward" this target to the makefile, because this is typically used as EVAL0
 # $(EVAL0_DIR)/$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0: $(EVAL0_DIR)
@@ -315,9 +319,9 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
-$(BUILD_x86)/eval1.s: $(EVAL0_DIR)/$(EVAL0) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval1.s: $(EVAL0) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
-	$(call compile-x86,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
+	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
 
 # eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
@@ -326,9 +330,9 @@ $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstr
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval1.ll: $(EVAL0_DIR)/$(EVAL0) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval1.ll: $(EVAL0) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
+	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
