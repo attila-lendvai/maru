@@ -103,7 +103,11 @@
                (offset		(<env>-offset	obj)))
            (if (and level bindings offset)
                (let ()
-                 ($put-all stream "Env<Lv")
+                 ($put-all stream "Env<")
+                 (when-at-expand feature/debug-info
+                   (awhen (<env>-name obj)
+                     (do-print stream it storing?)))
+                 ($put-all stream " Lv")
                  (do-print stream level storing?)
                  ($put-all stream ",Off")
                  (do-print stream offset storing?)

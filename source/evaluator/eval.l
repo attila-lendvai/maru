@@ -825,7 +825,8 @@
             (env    (environment () 0 0))
             tmp)
     (when-at-expand feature/debug-info
-      (set (<module>-name module) (or module-name "")))
+      (set (<module>-name module) module-name)
+      (set (<env>-name env) module-name))
 
     (set (<module>-globals module)
          (environment-define env symbol/*globals* env))
