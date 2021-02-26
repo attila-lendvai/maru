@@ -829,14 +829,10 @@
       (set (<module>-name module) module-name)
       (set (<env>-name env) module-name))
 
-    (set (<module>-globals module)
-         (environment-define env symbol/*globals* env))
+    (set (<module>-globals module) env)
 
     (when *maru-module*
-      ;; *globals* is special in that it should point back to the module's env, therefore we skip that
-      (copy-module-bindings *maru-module* module
-                            (lambda (name value)
-                              (not (= name symbol/*globals*)))))
+      (copy-module-bindings *maru-module* module ()))
 
     ;; overwrite these with empty arrays in the new module.
     ;; TODO why? maybe clone the array instead?

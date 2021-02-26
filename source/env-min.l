@@ -16,7 +16,9 @@
      __result))
 
 (define-function module-env (module)
-  (<variable>-value (<module>-globals module)))
+  (let ((result (<module>-globals module)))
+    (assert (is <env> result) "module-env called while the module's globals slot is not an <env>; "module", "result)
+    result))
 
 ;; TODO this would reverse the order
 ;; (define-function copy-module-bindings (from to filter)

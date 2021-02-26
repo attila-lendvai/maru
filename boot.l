@@ -178,6 +178,9 @@
 
 (require "source/control-structures.l")
 
+(when-at-expand (not evolving?)
+  (define-symbol-form *globals* (<module>-globals (current-module))))
+
 ;; KLUDGE: the compiler cannot yet automatically keep track of gc
 ;; roots. to be able to share code between the evaluator and the
 ;; compiler, we register a few NOPs in the interpreter.

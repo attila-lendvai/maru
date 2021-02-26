@@ -19,18 +19,18 @@
 (define-primitive-function (eval ()) _
   (let ((env (if (cdr -args-) ; let's not tolerate being called with nil env
                  (cadr -args-)
-               (module-env *module*))))
+               (<module>-globals *module*))))
     (let* ((toplevel-env?	(= 0 (unbox <long> (<env>-level env))))
-           (prev-globals	(module-env *module*))
+           (prev-globals	(<module>-globals *module*))
            result)
       (when toplevel-env?
-        (set (<variable>-value (<module>-globals *module*)) env)
+        (set (<module>-globals *module*) env)
         (capture-well-known-module-values))
       (set result (gc/let* ((child-env (environment env 1 0)))
                     ;; TODO resolve this naming anomaly somehow
                     (expand-encode-eval (car -args-) child-env)))
       (when toplevel-env?
-        (set (<variable>-value (<module>-globals *module*)) prev-globals)
+        (set (<module>-globals *module*) prev-globals)
         (capture-well-known-module-values))
       result)))
 

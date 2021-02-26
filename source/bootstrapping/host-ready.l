@@ -43,7 +43,11 @@
 ;; you can think of *slave-env* as the syntax-module of the target: all macros,
 ;; constants, and any meta-level stuff are evaluated in that environment.
 ;; *target-env* will be set up later in emit-early.l.
-(define *slave-env* (eval-in-module *slave-module* '*globals*))
+;;(define *slave-env* (eval-in-module *slave-module* '*globals*))
+(define *slave-env* (let ((globals (eval-in-module *slave-module* '(oop-at (current-module) 0))))
+                      (when (is <variable> globals)
+                        (set globals (<variable>-value globals)))
+                      globals))
 
 (define-function eval-in-slave (form)
   ;; NOTE don't optimize this to (eval form *slave-env*) when (=

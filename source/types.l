@@ -412,7 +412,7 @@
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable
                                                      (when-at-expand feature/debug-info		name)))
-(define-record		<module>		() (globals (when-at-expand feature/debug-info name)))		; globals is the <variable> that holds '*globals*
+(define-record		<module>		() (globals (when-at-expand feature/debug-info name)))
 (define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 
