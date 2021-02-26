@@ -56,10 +56,10 @@
   (debug-print "capture-well-known-module-values from *module*, which is "*module*)
   ;; let's cache some values from *module* to speed up their access in tight loops
   (let ((env (module-env *module*)))
-    (set *expanders*	(defined? symbol/*expanders*	env))
-    (set *encoders*	(defined? symbol/*encoders*	env))
-    (set *evaluators*	(defined? symbol/*evaluators*	env))
-    (set *applicators*	(defined? symbol/*applicators*	env)))
+    (set *expanders-var*	(defined? symbol/*expanders*	env))
+    (set *encoders-var*		(defined? symbol/*encoders*	env))
+    (set *evaluators-var*	(defined? symbol/*evaluators*	env))
+    (set *applicators-var*	(defined? symbol/*applicators*	env)))
 
   (debug-print "capture-well-known-module-values is done"))
 

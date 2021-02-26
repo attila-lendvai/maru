@@ -99,7 +99,7 @@
 (define-forwards
     *module* *maru-module* *maru-user-module* *symbols*
 
-    *expanders* *encoders* *evaluators* *applicators*
+    *expanders-var* *encoders-var* *evaluators-var* *applicators-var*
 
     fixed-primitive-function/quote
     fixed-primitive-function/lambda

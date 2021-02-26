@@ -422,13 +422,13 @@
            result))
 
         (else
-         (aif (and *applicators*
-                   (set it (maybe-object-in-variable *applicators* <array>))
+         (aif (and *applicators-var*
+                   (set it (maybe-object-in-variable *applicators-var* <array>))
                    (array-at it type))
              (gc/let* ((args (cons fun arguments)))
                (apply it args ctx))
            (error "cannot apply: "fun", current module: "*module*", *applicators* is: "
-                  (and *applicators* (<variable>-value *applicators*)))))))))
+                  (and *applicators-var* (<variable>-value *applicators-var*)))))))))
 
 (define-primitive-function (apply ()) (fn args)
   (apply fn args -ctx-))
@@ -600,8 +600,8 @@
       ((symbol? exp)	(expand/symbol	exp env one-step?))
       (else
        ;; consult the *expanders* array to see if there's any custom expander for this type
-       (aif (and *expanders*
-                 (set it (maybe-object-in-variable *expanders* <array>))
+       (aif (and *expanders-var*
+                 (set it (maybe-object-in-variable *expanders-var* <array>))
                  (array-at it (type-of exp)))
            (gc/let* ((args (cons exp ())))
              ;; deliberate simplification: the next APPLY will record the callee and the args in the backtrace anyway
@@ -722,8 +722,8 @@
       ((pair? exp)	(encode/pair	exp env))
       ((symbol? exp)	(encode/symbol	exp env))
       (else
-       (aif (and *encoders*
-                 (set it (maybe-object-in-variable *encoders* <array>))
+       (aif (and *encoders-var*
+                 (set it (maybe-object-in-variable *encoders-var* <array>))
                  (array-at it (type-of exp)))
            (gc/let* ((args (list2 exp env)))
              ;; deliberate simplification: the next APPLY will record the callee and the args in the backtrace anyway
@@ -762,8 +762,8 @@
       (else
        (when-at-expand feature/backtrace
          (set (<call-frame>-callee-designator -call-frame-) exp))
-       (aif (and *evaluators*
-                 (set it (maybe-object-in-variable *evaluators* <array>))
+       (aif (and *evaluators-var*
+                 (set it (maybe-object-in-variable *evaluators-var* <array>))
                  (array-at it type))
 	   (gc/let* ((args (cons exp ())))
 	     (when-at-expand feature/backtrace
