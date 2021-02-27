@@ -81,7 +81,7 @@ TEST_EVAL	= $(GEN_EVAL)
 ##
 ## internal variables
 ##
-PREVIOUS_STAGE	= maru.8
+PREVIOUS_STAGE	= maru.9
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 

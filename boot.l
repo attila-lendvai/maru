@@ -29,13 +29,6 @@
 
 (define error)
 
-(if evolving?
-    (eval '(let ()
-            (define *error-output*)
-            (define *standard-output*)
-            (define print-all (lambda args (error "dummy print-all reached")))
-            (define dump-all  (lambda args (error "dummy dump-all reached"))))))
-
 (define primitive/print		print)
 (define primitive/print-all	print-all)
 (define primitive/dump		dump)
@@ -178,8 +171,7 @@
 
 (require "source/control-structures.l")
 
-(when-at-expand (not evolving?)
-  (define-symbol-form *globals* (<module>-globals (current-module))))
+(define-symbol-form *globals* (<module>-globals (current-module)))
 
 ;; KLUDGE: the compiler cannot yet automatically keep track of gc
 ;; roots. to be able to share code between the evaluator and the
