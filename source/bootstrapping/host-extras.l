@@ -11,3 +11,8 @@
 ;;;
 ;;; Temporary definitions that are needed to enable our host to bootstrap us.
 ;;;
+(define-function current-globals ()
+  (<module>-globals (current-module)))
+
+(define-function set-current-globals (value)
+  (set (<module>-globals (current-module)) value))

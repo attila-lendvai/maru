@@ -69,10 +69,13 @@
 
 (define primitive/load load)
 
-(set load (lambda (path)
-            (and (<= 1 *verbosity*) (warn "loading file: "path"\n"))
-            (set *load-history* (cons path *load-history*))
-            (primitive/load path)))
+;; NOTE using SET instead of DEFINE wouldn't introduce a new binding
+;; in *maru-user*, but overwrite the one holding the primitive in *maru*.
+(define load
+  (lambda (path)
+    (and (<= 1 *verbosity*) (warn "loading file: "path"\n"))
+    (set *load-history* (cons path *load-history*))
+    (primitive/load path)))
 
 (define require
   (lambda (path)
@@ -151,8 +154,6 @@
   ;; implementation of FORM.
   `(define ,name ,(form () (lambda _ replacement))))
 
-(define-symbol-form *module* (current-module))
-
 (define-form define-constant (name value-form)
   `(define ,name (form () (lambda _ ',(eval value-form)))))
 
@@ -171,7 +172,7 @@
 
 (require "source/control-structures.l")
 
-(define-symbol-form *globals* (<module>-globals (current-module)))
+(define-symbol-form *globals* (current-globals))
 
 ;; KLUDGE: the compiler cannot yet automatically keep track of gc
 ;; roots. to be able to share code between the evaluator and the

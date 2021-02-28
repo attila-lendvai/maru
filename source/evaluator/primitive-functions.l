@@ -15,30 +15,22 @@
           (set (<expr>-name tmp) (<variable>-name variable)))))
     value))
 
-;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment (module-env *module*) 1 0)))
+;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment *globals* 1 0)))
 (define-primitive-function (eval ()) _
   (let ((env (if (cdr -args-) ; let's not tolerate being called with nil env
                  (cadr -args-)
-               (<module>-globals *module*))))
+               *globals*)))
     (let* ((toplevel-env?	(= 0 (unbox <long> (<env>-level env))))
-           (prev-globals	(<module>-globals *module*))
+           (prev-globals	*globals*)
            result)
       (when toplevel-env?
-        (set (<module>-globals *module*) env)
-        (capture-well-known-module-values))
+        (set-current-globals env))
       (set result (gc/let* ((child-env (environment env 1 0)))
                     ;; TODO resolve this naming anomaly somehow
-                    (expand-encode-eval (car -args-) child-env)))
+                    (expand-encode-eval* (car -args-) child-env)))
       (when toplevel-env?
-        (set (<module>-globals *module*) prev-globals)
-        (capture-well-known-module-values))
+        (set-current-globals prev-globals))
       result)))
-
-(define-primitive-function (eval-in-module ()) ((module <module>) form)
-  (verbosity 2 (debug-print ";;; ? "module" "form))
-  (gc/let* ((env (environment (module-env module) 1 0))) ; errr, why not straight in the module's env?
-    (with-current-module module
-      (expand-encode-eval form env))))
 
 (define-primitive-function (lambda () fixed) ((env <env>) parameters . body)
   (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)

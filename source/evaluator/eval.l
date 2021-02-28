@@ -222,7 +222,7 @@
 ;; think this through: the host hands over to us <env>'s in e.g. <form>s
 ;; or as the module's env, and we need to access them, even while we load our own stuff
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
-(define-primitive-function defined? ((name <symbol>) (env <env> (module-env *module*)))
+(define-primitive-function defined? ((name <symbol>) (env <env> *globals*))
   (let ((result ()))
     (while (and env
                 (not (set result (find-local-variable env name))))
@@ -265,32 +265,26 @@
   (when (symbol? name)
     (maybe-object-in-variable (defined? name env) type)))
 
+;;;
+;;; globals
+;;; ----------------------------------------------------------------
+
+(define-primitive-function (current-globals ()) ()
+  *globals*)
+
+(define-primitive-function set-current-globals ((env <env>))
+  (debug-print "set-current-globals "env)
+  (set *globals* env)
+  (capture-well-known-globals)
+  env)
+
 ;; TODO move this also into env-min.l, but for that we need smart accessors in the
 ;; level-shifted code that automatically do the unboxing of slot values
 (define-function global-variable? (var)
   (let ((env (<variable>-env var)))
     (= 0 (unbox <long> (<env>-level env)))))
 
-;;;
-;;; module
 ;;; ----------------------------------------------------------------
-
-(define-primitive-function (current-module ()) ()
-  *module*)
-
-(define-primitive-function set-current-module ((module <module>))
-  (debug-print "set-current-module "module)
-  (set *module* module)
-  (capture-well-known-module-values)
-  module)
-
-(define-form with-current-module (module . body)
-  `(gc/let* ((__previous-module__ *module*)
-             __result__)
-     (set-current-module ,module)
-     (set __result__ (let () ,@body))
-     (set-current-module __previous-module__)
-     __result__))
 
 (load "source/evaluator/reader.l")
 (load "source/evaluator/printer.l")
@@ -427,7 +421,7 @@
                    (array-at it type))
              (gc/let* ((args (cons fun arguments)))
                (apply it args ctx))
-           (error "cannot apply: "fun", current module: "*module*", *applicators* is: "
+           (error "cannot apply: "fun", *globals*: "*globals*", *applicators* is: "
                   (and *applicators-var* (<variable>-value *applicators-var*)))))))))
 
 (define-primitive-function (apply ()) (fn args)
@@ -674,7 +668,7 @@
          ;; TODO ponder about this... it leads to a somewhat confusing behavior.
          ;; maybe DEFINE should define locally that sometimes happens to be *globals*?
          ;; what about this: (define foo (lambda (arg) (define nested 42)))
-         (let ((var (environment-define (module-env *module*) (first tail) ())))
+         (let ((var (environment-define *globals* (first tail) ())))
            (set tail (encode-all (cdr tail) env))
            (set tail (cons var tail)))))
 
@@ -700,7 +694,7 @@
 (define-function encode/symbol (sym env)
   (debug-print "encode/symbol of '"sym"', in env "env)
   (let ((var (or (defined? sym env)
-                 (error "encode/symbol: failed for "sym", current module "*module*", env "env))))
+                 (error "encode/symbol: failed for "sym", *globals* "*globals*", env "env))))
     (if (global-variable? var)
         (let ((val (<variable>-value var)))
           (when (or (is <form> val) ; TODO ? how can <form>s show up here, after expand?
@@ -799,55 +793,28 @@
       (else			(eval/with-call-frame type exp ctx)))))
 
 
-(define-function expand-encode-eval (form env)
+(define-function expand-encode-eval* (form env)
   (debug-print "expand-encode-eval for form "form)
-  (gc/let* ((x form)
-            (ctx (base-context () env)))
+  (gc/let* ((x form))
 					(verbosity 2 (debug-print ";;; ? "x))
     (set x (expand x env false))	(verbosity 2 (debug-print ";;; expd--> "x))
     (set x (encode x env))		(verbosity 2 (debug-print ";;; encd--> "x))
-    (set x (eval   x ctx))
+    (gc/let* ((ctx (base-context () env)))
+      (set x (eval   x ctx)))
 					(verbosity 2 (debug-print ";;; => "x))
     (debug-print "expand-encode-eval for form "form" is returning with "x)
     x))
 
+(define-function expand-encode-eval (form)
+  (gc/let* ((env (environment *globals* 1 0)))
+    (expand-encode-eval* form env)))
+
 (define-function expand-encode-eval-stream (stream)
   (gc/let* (form
-            res
-            env)
+            res)
     (until (= +end+ (set form (read stream)))
-      (set env (environment (module-env *module*) 1 0))
-      (set res (expand-encode-eval form env)))
+      (set res (expand-encode-eval form)))
     res))
-
-(define-primitive-function module ((module-name <string>))
-  (debug (platform/print-diag "module constructor"))
-  (gc/let* ((module (new <module>))
-            (env    (environment () 0 0))
-            tmp)
-    (when-at-expand feature/debug-info
-      (set (<module>-name module) module-name)
-      (set (<env>-name env) module-name))
-
-    (set (<module>-globals module) env)
-
-    (when *maru-module*
-      (copy-module-bindings *maru-module* module ()))
-
-    ;; overwrite these with empty arrays in the new module.
-    ;; TODO why? maybe clone the array instead?
-    (let ((doit (lambda (env name)
-                  (gc/let* ((tmp (array 0)))
-                    (set (<variable>-value (or (defined? name env)
-                                               (new-variable env name)))
-                         tmp)))))
-      (doit env symbol/*expanders*)
-      (doit env symbol/*encoders*)
-      (doit env symbol/*evaluators*)
-      (doit env symbol/*applicators*))
-
-    (debug (platform/print-diag-fmt "module constructor returning with %p"module))
-    module))
 
 (when-at-expand feature/profiler
   ;; these are coming from profiler.c

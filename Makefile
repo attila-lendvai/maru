@@ -469,7 +469,7 @@ run-x86: $(BUILD_x86)/eval1
 run-llvm: $(BUILD_llvm)/eval1
 	rlwrap --no-warning $(BUILD_llvm)/eval1 boot.l -
 
-test: test-evaluator test-bootstrap test-parser test-elf test-modules
+test: test-evaluator test-bootstrap test-parser test-elf
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 
@@ -510,9 +510,6 @@ $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0_DIR)/$(EVAL0) tests/c
 
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
-
-test-modules: $(TEST_EVAL) boot.l tests/module-tests.l
-	$(TEST_EVAL) boot.l tests/module-tests.l
 
 # NOTE test-elf needs the IA-32 eval-x86
 test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l

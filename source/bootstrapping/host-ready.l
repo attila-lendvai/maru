@@ -8,21 +8,17 @@
 ;; you can think of *slave-env* as the syntax-module of the target: all macros,
 ;; constants, and any meta-level stuff are evaluated in that environment.
 ;; *target-env* will be set up later in emit-early.l.
-(let* ((globals		(<module>-globals *maru-module*))
-       (slave-env	(environment (if (is <variable> globals)
-                                         (<variable>-value globals)
-                                       globals)
-                                     0 0)))
+(let ((slave-env (environment (if-at-expand (defined? '*maru-module*)
+                                  (<module>-globals *maru-module*)
+                                *maru*))))
+  (assert (= 0 (<env>-level slave-env)))
   ;; NOTE this can only come in once we have evolved; evolving?
-  ;; (when-at-expand feature/debug-info
-  ;;   (set (<env>-name slave-env) "slave"))
+  (when-at-expand feature/debug-info
+    (set (<env>-name slave-env) "slave"))
   (define *slave-env* slave-env)
   (environment-define *slave-env* 'switch-to-host-env
                       (lambda ()
-                        (let ((globals (<module>-globals (current-module))))
-                          (if (is <variable> globals)
-                              (set (<variable>-value globals) *host-env*)
-                            (set (<module>-globals (current-module)) *host-env*)))))
+                        (set *globals* *host-env*)))
   (set *globals* *slave-env*)
   ;; NOTE this toplevel form is encoded into the host env. the previous
   ;; switch-to-slave-env happens at runtime, i.e. it has no effect on the
@@ -44,6 +40,8 @@
 (define eval-in-host (lambda (form)
                        (eval form *host-env*)))
 
+(eval-in-host ((lambda args args) 'assert ((lambda args args) 'is '<target-function> load)))
+
 (switch-to-host-env)
 
 (assert (= *host-env* (eval '*host-env* *slave-env*)))
@@ -54,3 +52,7 @@
 
 (define-form slave-value (form)
   `(eval-in-slave ',form))
+
+(when-at-expand feature/debug-info
+  ;; maru-user is the host
+  (assert (= "maru-user" (<env>-name *globals*))))

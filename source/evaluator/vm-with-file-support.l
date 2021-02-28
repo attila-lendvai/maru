@@ -17,7 +17,7 @@
      (set tmp (file-stream tmp))
      (set ,our-name tmp)
      ;; the maru-user module was create earlier, let's set it there, too.
-     (set (global-variable-value *maru-user-module* ,(concat-symbol 'symbol/ our-name))
+     (set (global-variable-value *maru* ,(concat-symbol 'symbol/ our-name))
           tmp)))
 
 (define-function initialize-streams (in-handle out-handle err-handle)
@@ -30,7 +30,7 @@
   (initialize-stream err-handle	*debug-output*))
 
 (define-function repl-stream (stream)
-  ;;(set (global-variable-value *input* <target-pointer>) stream)
+  ;;(set (global-variable-value *maru* *input* <target-pointer>) stream)
   (safety 1 (assert (gc/valid-maru-value? stream)))
   (let ((stdin?	(= *standard-input* stream)))
     ;; (unless stdin?
@@ -44,11 +44,10 @@
                (and (not (= +end+ (set res (read stream))))
                     (not ($at-end? stream))))
         (unless (= +end+ res)
-          (gc/let* ((env (environment (module-env *module*) 1 0)))
-            (set res (expand-encode-eval res env))
-            (when stdin?
-              (do-print *standard-output* res false)
-              (platform/flush-streams)))))
+          (set res (expand-encode-eval res))
+          (when stdin?
+            (do-print *standard-output* res false)
+            (platform/flush-streams))))
       (when stdin?
         ($put-all *standard-output* "\nmorituri te salutant\n"))
       res)))
@@ -72,7 +71,7 @@
   (debug-print "start processing argv")
 
   ;; *command-line-arguments*
-  (let ((cla-var (environment-define (module-env *module*) (string->symbol "*command-line-arguments*") ())))
+  (let ((cla-var (environment-define *maru* (string->symbol "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
@@ -98,16 +97,14 @@
                (incr *verbosity*)
                ;; KLUDGE propagate the value by hand into the evaluator
                (set tmp (box <long> *verbosity*))
-               (set (global-variable-value *maru-module* symbol/*verbosity*) tmp)
-               (set (global-variable-value *maru-user-module* symbol/*verbosity*) tmp))
+               (set (global-variable-value *maru* symbol/*verbosity*) tmp))
 
               ;; -O
               ((string= "-O" arg)
                (incr *optimised*)
                ;; KLUDGE propagate the value by hand into the evaluator
                (set tmp (box <long> *optimised*))
-               (set (global-variable-value *maru-module* symbol/*optimised*) tmp)
-               (set (global-variable-value *maru-user-module* symbol/*optimised*) tmp))
+               (set (global-variable-value *maru* symbol/*optimised*) tmp))
 
               ;; -p
               ((string= "-p" arg)
@@ -131,7 +128,7 @@
                (pop-cla)
                (let ((sym (string->symbol arg)))
                  (gc/let* ((form (cons sym ())))
-                   (expand-encode-eval form (module-env *module*)))))
+                   (expand-encode-eval form))))
 
               ;; --define to define a variable
               ((string= "--define" arg)
@@ -147,7 +144,7 @@
                  (let ((i (string->long* value 10)))
                    (unless (= +end+ i)
                      (set value (box <long> i))))
-                 (environment-define (module-env *module*)
+                 (environment-define *globals*
                                      (string->symbol name)
                                      value)))
 

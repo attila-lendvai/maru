@@ -119,15 +119,6 @@
          (error-if-storing)
          ($put-all stream "Context<>"))
 
-        ((= type <module>)
-         (error-if-storing)
-         ($put-all stream "Module<")
-         (when-at-expand feature/debug-info
-           (do-print stream (or (<module>-name obj) "?") false)
-           ($put stream ?,))
-         (do-print stream (module-env obj) storing?)
-         ($put stream ?>))
-
         ((= type <type>)
          (error-if-storing)
          ($put-all stream "Type")

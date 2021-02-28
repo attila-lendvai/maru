@@ -15,7 +15,7 @@
  ;; TODO FIXME what about reinstating them when the exe starts up?
  <type> <record>
  <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <target-function>
- <variable> <env> <context> <module> <target-pointer> <symbol> <pair>)
+ <variable> <env> <context> <target-pointer> <symbol> <pair>)
 
 (define-form define-type-of ()
   (let ((conds-early	())
@@ -46,7 +46,7 @@
   (define-form is (type-name obj)
     (let ((type (eval type-name)))
       (cond
-        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in slave-module, regardless of our new definition of IS in the target module
+        ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in *slave-env*, regardless of our new definition of IS in the target module
          ;; TODO this ignores inheritance
          `(let ((__obj__ ,obj))
             (and (oop? __obj__)

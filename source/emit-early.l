@@ -262,9 +262,6 @@
 
 (set *globals* *target-env*)
 
-;; need to overwrite the one from boot.l with one that compiles
-(define-symbol-form *globals* (<module>-globals *module*))
-
 (safety 1
   (assert (not (= *globals* *slave-env*)))
   (assert (not (= *globals* (host-value *slave-env*))))
@@ -367,7 +364,7 @@
 ;; install stubs for the +special-operators+
 ;; (list-do name '()
 ;;   ;; they need to be <primitive-function>'s (why?)
-;;   (eval-in-module *target-module* `(define ,name error)))
+;;   (eval `(define ,name error) *target-env*))
 
 (set *globals* *host-env*)
 

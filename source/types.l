@@ -16,8 +16,10 @@
   ;; TODO use subtype? because this ignores inheritance
   `(= ,type (type-of ,obj)))
 
+(assert (not (= 'not-yet-bootstrapped type-of)))
+
 (define type-id-of type-of) ; we will replace type-of later
-(set type-of 'not-yet-bootstrapped)
+(define type-of 'not-yet-bootstrapped)
 
 (define %first-type-id		1) ; i.e. the first allocated type will be 1 (so that we can assert for non-zero type in the gc)
 (define %last-type-id		(- %first-type-id 1))
@@ -157,9 +159,12 @@
   (warn "<type> is bootstrapped: "	<type>		", id: "	(<type>-id <type>)"\n")
   (warn "<record> is bootstrapped: "	<record>	", id: "	(<type>-id <record>)"\n"))
 
+(assert (= 'not-yet-bootstrapped type-of))
+
 (define-function type-of (obj)
   (type-object-for-id (type-id-of obj)))
 
+(assert (not (= 'not-yet-bootstrapped type-of)))
 (assert (= (type-of <type>) <record>))
 (assert (= (type-of <record>) <record>))
 
@@ -412,7 +417,6 @@
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable
                                                      (when-at-expand feature/debug-info		name)))
-(define-record		<module>		() (globals (when-at-expand feature/debug-info name)))
 (define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 
