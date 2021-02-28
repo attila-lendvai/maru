@@ -152,7 +152,8 @@
   ;; NOTE unless we instantiate the FORM in the body of the macro
   ;; then in the bootstrap environment it will be bound to the target
   ;; implementation of FORM.
-  `(define ,name ,(form () (lambda _ replacement))))
+  (let ((replacement (eval replacement *env*)))
+    `(define ,name ,(form () (lambda _ replacement)))))
 
 (define-form define-constant (name value-form)
   `(define ,name (form () (lambda _ ',(eval value-form)))))
@@ -172,12 +173,12 @@
 
 (require "source/control-structures.l")
 
-(define-symbol-form *globals* (current-globals))
+(define-symbol-form *globals* '(current-globals))
 
 ;; KLUDGE: the compiler cannot yet automatically keep track of gc
 ;; roots. to be able to share code between the evaluator and the
 ;; compiler, we register a few NOPs in the interpreter.
-(define-symbol-form gc/let* let*)
+(define-symbol-form gc/let* 'let*)
 ;; NOTE do NOT try to mess here with box/unbox! it will screw you up
 ;; when in the compiler you want to box a literal and emit it into the
 ;; target...

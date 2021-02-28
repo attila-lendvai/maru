@@ -212,7 +212,7 @@
                            y))
                       40 2))))
 
-(define-symbol-form *symform* (another-form))
+(define-symbol-form *symform* '(another-form))
 (define-form another-form () 42)
 
 (define-test eval/expand/bug/3 ()
