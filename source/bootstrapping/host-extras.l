@@ -12,6 +12,14 @@
 ;;; Temporary definitions that are needed to enable our host to bootstrap us.
 ;;;
 
+;; changed the semantics
+(define-form define-symbol-form (name replacement)
+  ;; NOTE unless we instantiate the FORM in the body of the macro
+  ;; then in the bootstrap environment it will be bound to the target
+  ;; implementation of FORM.
+  (let ((replacement (eval replacement *env*)))
+    `(define ,name ,(form () (lambda _ replacement)))))
+
 ;; this got renamed
 (define number->string long->string)
 

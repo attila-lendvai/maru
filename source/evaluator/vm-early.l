@@ -124,14 +124,14 @@
 ;; this installs symbol macros that get/set the value from/to the
 ;; interpreter's global state, namely the maru module's global
 ;; variables.
-(define-symbol-form *standard-input*  (global-variable-value *maru-module* symbol/*standard-input*))
-(define-symbol-form *standard-output* (global-variable-value *maru-module* symbol/*standard-output*))
-(define-symbol-form *error-output*    (global-variable-value *maru-module* symbol/*error-output*))
-(define-symbol-form *debug-output*    (global-variable-value *maru-module* symbol/*debug-output*))
+(define-symbol-form *standard-input*  '(global-variable-value *maru-module* symbol/*standard-input*))
+(define-symbol-form *standard-output* '(global-variable-value *maru-module* symbol/*standard-output*))
+(define-symbol-form *error-output*    '(global-variable-value *maru-module* symbol/*error-output*))
+(define-symbol-form *debug-output*    '(global-variable-value *maru-module* symbol/*debug-output*))
 
 ;; TODO this is dog slow, we cannot use it as-is to replace *verbosity*
-;; (define-symbol-form *verbosity*       (global-variable-value *maru-module* symbol/*verbosity*))
-;; (define-symbol-form *optimised*       (global-variable-value *maru-module* symbol/*optimised*))
+;; (define-symbol-form *verbosity*       '(global-variable-value *maru-module* symbol/*verbosity*))
+;; (define-symbol-form *optimised*       '(global-variable-value *maru-module* symbol/*optimised*))
 
 ;; TODO this is fast, but this way *verbosity* in the evaluator and in the target is not in sync automatically.
 ;; ideally, these variables could be in a super-module, and the codebase would't even have a global-variable?

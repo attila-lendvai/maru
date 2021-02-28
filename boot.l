@@ -156,9 +156,10 @@
   ;; NOTE unless we instantiate the FORM in the body of the macro
   ;; then in the bootstrap environment it will be bound to the target
   ;; implementation of FORM.
-  `(define ,name ,(form () (lambda _ replacement))))
+  (let ((replacement (eval replacement *env*)))
+    `(define ,name ,(form () (lambda _ replacement)))))
 
-(define-symbol-form *module* (current-module))
+(define-symbol-form *module* '(current-module))
 
 (define-form define-constant (name value-form)
   `(define ,name (form () (lambda _ ',(eval value-form)))))
@@ -178,13 +179,10 @@
 
 (require "source/control-structures.l")
 
-(when-at-expand (not evolving?)
-  (define-symbol-form *globals* (<module>-globals (current-module))))
-
 ;; KLUDGE: the compiler cannot yet automatically keep track of gc
 ;; roots. to be able to share code between the evaluator and the
 ;; compiler, we register a few NOPs in the interpreter.
-(define-symbol-form gc/let* let*)
+(define-symbol-form gc/let* 'let*)
 ;; NOTE do NOT try to mess here with box/unbox! it will screw you up
 ;; when in the compiler you want to box a literal and emit it into the
 ;; target...
@@ -249,6 +247,9 @@
 (require "source/sequences-basic.l")
 
 (require "source/types.l")
+
+(when-at-expand (not evolving?)
+  (define-symbol-form *globals* (expand '(<module>-globals (current-module)))))
 
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible
 (define-function <pair>-source (x) ())
