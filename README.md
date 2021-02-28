@@ -4,9 +4,11 @@
 
 ## New abstraction: *module*
 
-This stage introduces the concept of *modules*. They will be built upon by the next stage to
-hermetically isolate the *host* and the *slave* universes in the bootstrap process. Modules
-can be thought of as isolated Maru universes that can peek into each other using the
+This stage introduces the concept of *modules*. (**NOTE:** this was
+unnecessary and got removed in `maru.10`) They will be built upon by
+the next stage to hermetically isolate the *host* and the *slave*
+universes in the bootstrap process. Modules can be thought of as
+isolated Maru universes that can peek into each other using the
 following new primitives:
 
 - `(eval-in-module form module)`
