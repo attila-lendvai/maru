@@ -4,9 +4,16 @@
 
 ## New abstraction: *module*
 
-This stage introduces the concept of *modules*. They will be built upon by the next stage to
-hermetically isolate the *host* and the *slave* universes in the bootstrap process. Modules
-can be thought of as isolated Maru universes that can peek into each other using the
+**NOTE:** this was unnecessary complexity and it got simplified
+away. First `maru.6` puts symbols back into a shared global namespace,
+and `maru.10` completely eliminates the module abstraction. Simple
+`environment` objects holding values named by global symbols (and
+possbily delegating to parent envs) are more than enough for us.
+
+This stage introduces the concept of *modules*. They will be built
+upon by the next stage to hermetically isolate the *host* and the
+*slave* universes in the bootstrap process. Modules can be thought of
+as isolated Maru universes that can peek into each other using the
 following new primitives:
 
 - `(eval-in-module form module)`
