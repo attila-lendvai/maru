@@ -125,12 +125,13 @@
                                       (not (cddr l)))
                                  (cadr l)
                                ;; in the bootstrap process we want to be able to directly reference the
-                               ;; cons primitive-function (as opposed to the 'cons symbol) so that our
+                               ;; cons primitive-function (as opposed to the 'CONS symbol) so that our
                                ;; expansion will not depend on the environment of the module that is using us.
                                ;; this is relevant in the bootstrap process when the *target-module* gets
-                               ;; filled with definitions and it redefines e.g. the cons evaluator
+                               ;; filled with definitions and it redefines e.g. the CONS evaluator
                                ;; primitive with the lowlevel implementation that is going to be
-                               ;; level-shifted. same applies to car below.
+                               ;; level-shifted and become the CONS primitive when bootstrapped.
+                               ;; same applies to CAR below.
                                (list qq-cons (qq-object obj) (qq-list (cdr l))))))
                        (list 'quote l))))
       (set qq-element (lambda (l)

@@ -17,7 +17,7 @@ pkgs.multiStdenv.mkDerivation {
       #lorri direnv
       gitFull diffutils
       gnumake
-      #libffi.dev
+      libffi.dev
       gdb binutils
       llvm_11 clang_11
       #clang

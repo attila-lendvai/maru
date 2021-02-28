@@ -152,10 +152,10 @@
 ;;     obj))
 
 (define-function context (home caller env)
-  (let ((obj (base-context home env)))
+  (let ((res (base-context home env)))
     (when caller
-      (set (<context>-callee caller) obj))
-    obj))
+      (set (<context>-callee caller) res))
+    res))
 
 ;;;
 ;;; more utils
@@ -767,6 +767,22 @@
 	     (apply it args ctx))
          exp)))))
 
+(define-function eval/variable (var ctx)
+  (if (global-variable? var)
+      (let ()
+        (debug-print "eval is reading global var "var)
+        (<variable>-value var))
+    (let ((delta (- (unbox <long> (<env>-level (<context>-env ctx)))
+		(unbox <long> (<env>-level (<variable>-env var))))))
+      (debug-print "eval is reading local var "var" with delta " (box <long> delta))
+      (while (< 0 delta)
+	(set ctx (<context>-home ctx))
+	(decr delta))
+      (let* ((index (unbox <long> (<variable>-index var)))
+             (value (array-at (<context>-bindings ctx) index)))
+        (debug-print "eval is reading local var from context "ctx" at index "(box <long> index)", holding value "value)
+	value))))
+
 (define-function eval (exp ctx)
   (verbosity 3 (debug-print "  E  "exp" "ctx))
   (let ((type (type-of exp)))
@@ -775,20 +791,7 @@
       ((= type <undefined>)	exp)
       ((= type <long>)		exp)
       ((= type <string>)	exp)
-      ((= type <variable>)	(if (global-variable? exp)
-				    (let ()
-                                      (debug-print "eval is reading global var "exp)
-                                      (<variable>-value exp))
-				  (let ((delta (- (unbox <long> (<env>-level (<context>-env ctx)))
-					      (unbox <long> (<env>-level (<variable>-env exp))))))
-				    (debug-print "eval is reading local var "exp" with delta " (box <long> delta))
-				    (while (< 0 delta)
-				      (set ctx (<context>-home ctx))
-				      (decr delta))
-                                    (let* ((index (unbox <long> (<variable>-index exp)))
-                                           (value (array-at (<context>-bindings ctx) index)))
-                                      (debug-print "eval is reading local var from context "ctx" at index "(box <long> index)", holding value "value)
-				      value))))
+      ((= type <variable>)	(eval/variable exp ctx))
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(eval/with-call-frame type exp ctx)))))
 

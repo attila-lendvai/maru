@@ -29,7 +29,7 @@
 BACKENDS		= x86 llvm
 PLATFORMS		= libc linux
 # use this backend of the previous stage when it needs to be built.
-PREVIOUS_STAGE_BACKEND	= llvm
+PREVIOUS_STAGE_BACKEND	= "-llvm"
 
 HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
@@ -82,6 +82,7 @@ TEST_EVAL	= $(GEN_EVAL)
 ## internal variables
 ##
 PREVIOUS_STAGE	= maru.9
+#PREVIOUS_STAGE	= maru.10.c99
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
@@ -243,7 +244,7 @@ $(HOST_DIR)/eval:
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
 # a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
 	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
-	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval-$(PREVIOUS_STAGE_BACKEND)
+	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval$(PREVIOUS_STAGE_BACKEND)
 
 update-eval0: $(EVAL0_DIR)
 	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../..

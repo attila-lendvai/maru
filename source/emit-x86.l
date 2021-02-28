@@ -396,8 +396,31 @@
 ;;; Emitting objects
 ;;;
 
-;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
+;; TODO these are dog-slow, we need to partial-eval the emitters.
+;; closures can be a poor man's phased compilation, but they need to
+;; be instantiated after the slave has been fully loaded.
 
+;; (define emit-object-header
+;;   (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
+;;         (canary-emitter	(if (slave-value feature/object-canary)
+;;                             (lambda () (emit LONG (slave-value +canary-value+)))
+;;                           (lambda ()))))
+;;     (lambda (type-id)
+;;       (emit RODATA)
+;;       (emit ALIGN 4)
+;;       ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
+;;       ;; (emit LONG -42)                   ; next
+;;       ;; (emit LONG -42)                   ; chunk size
+;;       (emit LONG flags)
+;;       (emit LONG type-id)
+;;       (canary-emitter))))
+
+;; (define emit-object/box-<long>
+;;   (let ((boxer (eval-in-slave `(expand '(box <long> val)))))
+;;     (eval `(lambda (val)
+;;              ,boxer))))
+
+;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
 (define-function emit-object-header (type-id)
   (emit RODATA)
   (emit ALIGN 4)

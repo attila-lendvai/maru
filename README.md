@@ -236,18 +236,6 @@ new features. Some that are worth mentioning:
     [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
     Part of this is already done and is used in the bootstrap process.
 
-  - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
-    definitions to generate bytecode assemblers. It requires either
-    the reimplementation of the tablegen parser/logic in Maru (doesn't
-    seem to be trivial), or writing C++ code (uhh!) to compile the
-    data to the Maru definitions implementing an assembler.
-
-  - Introduce a simplified language that drops some langauge features,
-    e.g. remove *forms* and the *expand* protocol. Make sure that this
-    language can bootstrap itself off of C99. Then reintroduce *forms*
-    and *expand* by using this simplified Maru as the implementation
-    language.
-
   - Compile to, and bootstrap on the bare metal of some interesting
     targets. It's already demonstrated by the Linux platform. Another
     one could be
@@ -260,12 +248,28 @@ new features. Some that are worth mentioning:
   - Simplify the types-are-objects part and its bootstrap, and maybe even
     make it optional?
 
+  - Weed out some of the added bloat/complexity (e.g. compile closures
+    instead of selectors, and use them to implement streams; write a
+    tree shaker; etc).
+
   - Merge the language and API that the compiler and the evaluator understands;
     i.e. make the level-shifted code (`eval.l` & co.) less different than code
     understood by the evaluator. This would mean that we can e.g. load/compile
     `source/buffer.l` both into the level-shifted code and into the evaluator.
     This is slowly happening, but it's nowhere near done, and I'm not even sure
     what done means here.
+
+  - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
+    definitions to generate bytecode assemblers. It requires either
+    the reimplementation of the tablegen parser/logic in Maru (doesn't
+    seem to be trivial), or writing C++ code (uhh!) to compile the
+    data to the Maru definitions implementing an assembler.
+
+  - Introduce a simplified language that drops some langauge features,
+    e.g. remove *forms* and the *expand* protocol. Make sure that this
+    language can bootstrap itself off of C99. Then reintroduce *forms*
+    and *expand* by using this simplified Maru as the implementation
+    language.
 
   - Understand and incorporate François René Rideau's model of
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),

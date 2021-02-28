@@ -1,7 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/conversion.l")
-
 (define-function array->string (arr)
   (let* ((ind 0)
          (lim (array-length arr))
