@@ -27,8 +27,8 @@ endif
 
 all : eval
 
-eval : $(BUILD)/eval2
-	cp $(BUILD)/eval2 eval
+eval : $(BUILD)/eval1
+	cp $(BUILD)/eval1 eval
 
 test-bootstrap : $(BUILD)/eval3 .force
 	diff $(BUILD)/eval2.s $(BUILD)/eval3.s
