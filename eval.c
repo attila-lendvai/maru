@@ -161,7 +161,7 @@ static oop symbols= nil, globals= nil, expanders= nil, encoders= nil, evaluators
 static oop s_set= nil, s_define= nil, s_let= nil, s_lambda= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil, s_main= nil;
 static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
 
-static int opt_b= 0, opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
+static int opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
 
 static oop traceStack= nil;
 static int traceDepth= 0;
@@ -3194,8 +3194,6 @@ int main(int argc, char **argv)
   f_let=    lookup(get(globals, Variable,value), s_let   );		GC_add_root(&f_let);
   f_define= lookup(get(globals, Variable,value), s_define);		GC_add_root(&f_define);
 
-  int repled= 0;
-
 #if !defined(LIB_GC)
 
   if (argc > 2 && !strcmp(argv[1], "-l")) {
@@ -3210,7 +3208,6 @@ int main(int argc, char **argv)
       fclose(stream);
       argc -= 2;
       argv += 2;
-      opt_b= 1;	// don't load boot.l
       GC_gcollect();
   }
 
@@ -3254,7 +3251,6 @@ int main(int argc, char **argv)
     oop argt= getTail(argl);
     wchar_t *arg= get(args, String,bits);
     if 	    (!wcscmp (arg, L"-v"))	{ ++opt_v; }
-    else if (!wcscmp (arg, L"-b"))	{ ++opt_b; }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
     else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
 #  if !defined(WIN32) && (!LIB_GC)
@@ -3267,24 +3263,15 @@ int main(int argc, char **argv)
 #  endif
     else
     {
-	if (!opt_b)
-	{
-	    replPath(L"boot.l");
-	    opt_b= 1;
-	}
-	else
-	{
-#          if !defined(WIN32) && (!LIB_GC)
-	    if (opt_p) profilingEnable();
-#	   endif
-	    set(arguments, Variable,value, argt);
-	    replPath(arg);
-	    repled= 1;
-#	   if !defined(WIN32) && (!LIB_GC)
-	    if (opt_p) profilingDisable(0);
-#	   endif
-	}
-	argt= get(arguments, Variable,value);
+#   if !defined(WIN32) && (!LIB_GC)
+      if (opt_p) profilingEnable();
+#   endif
+      set(arguments, Variable,value, argt);
+      replPath(arg);
+#   if !defined(WIN32) && (!LIB_GC)
+      if (opt_p) profilingDisable(0);
+#   endif
+      argt= get(arguments, Variable,value);
     }
     set(arguments, Variable,value, argt);		GC_UNPROTECT(argl);
   }
@@ -3299,12 +3286,6 @@ int main(int argc, char **argv)
   }
 
   set(output, Variable,value, newLong((long)stdout));
-
-  if (!repled) {
-    if (!opt_b) replPath(L"boot.l");
-    replFile(stdin, L"<stdin>");
-    printf("\nmorituri te salutant\n");
-  }
 
 #if !defined(WIN32) && (!LIB_GC)
   if (opt_p) profilingDisable(1);
