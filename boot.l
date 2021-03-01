@@ -982,12 +982,12 @@
 
 (define *load-path*)
 
-(and (= "-L" (car *arguments*))
+(and (= "-L" (car *command-line-arguments*))
      (let ()
-       (pop *arguments*)
-       (set *load-path* (pop *arguments*))))
+       (pop *command-line-arguments*)
+       (set *load-path* (pop *command-line-arguments*))))
 
-(define-form next-argument () '(pop *arguments*))
+(define-form next-argument () '(pop *command-line-arguments*))
 
 ;;; load/save
 

@@ -1659,7 +1659,7 @@
       (while (< 0 (set argc (- argc 1)))
 	(set tmp (new-<pair> () tmp))
 	(set_head tmp (new-<string> (oop-at argv argc))))
-      (set arguments (k_env_define (get <variable> value globals) (intern "*arguments*") tmp))))
+      (set arguments (k_env_define (get <variable> value globals) (intern "*command-line-arguments*") tmp))))
 
   (set f_set	(k_env_lookup (get <variable> value globals) s_set   ))		(gc_push_root (address-of f_set   ))
   (set f_quote	(k_env_lookup (get <variable> value globals) s_quote ))		(gc_push_root (address-of f_quote ))

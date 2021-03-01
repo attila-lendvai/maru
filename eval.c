@@ -3216,7 +3216,7 @@ int main(int argc, char **argv)
 	  tmp= newPair(nil, tmp);
 	  setHead(tmp, newString(mbs2wcs(argv[argc])));
       }
-      arguments= define(get(globals, Variable,value), intern(L"*arguments*"), tmp);
+      arguments= define(get(globals, Variable,value), intern(L"*command-line-arguments*"), tmp);
 
       tmp= nil;		GC_UNPROTECT(tmp);
   }
