@@ -2829,6 +2829,17 @@ static subr(save)
 
 #undef subr
 
+static oop expandEncodeEval(oop form) {
+    GC_PROTECT(form);
+    oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
+    form= expand(form, env);
+    form= encode(form, env);
+    oop ctx= newBaseContext(nil, nil, env);			GC_PROTECT(ctx);
+    form= eval  (form, ctx);					GC_UNPROTECT(ctx);  GC_UNPROTECT(env);
+    GC_UNPROTECT(form);
+    return form;
+}
+
 static void replFile(FILE *stream, wchar_t *path)
 {
   set(input, Variable,value, newLong((long)stream));
@@ -2845,11 +2856,7 @@ static void replFile(FILE *stream, wchar_t *path)
       dumpln(obj);
       fflush(stdout);
     }
-    oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
-    obj= expand(obj, env);
-    obj= encode(obj, env);
-    oop ctx= newBaseContext(nil, nil, env);			GC_PROTECT(ctx);
-    obj= eval  (obj, ctx);					GC_UNPROTECT(ctx);  GC_UNPROTECT(env);
+    obj = expandEncodeEval(obj);
     if ((stream == stdin) || (opt_v > 0)) {
       printf(" => ");
       fflush(stdout);
