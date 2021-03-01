@@ -3253,6 +3253,28 @@ int main(int argc, char **argv)
     if 	    (!wcscmp (arg, L"-v"))	{ ++opt_v; }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
     else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
+    else if (!wcscmp (arg, L"-")) {
+      replFile(stdin, L"<stdin>");
+      printf("\nmorituri te salutant\n");
+    }
+    else if (!wcscmp (arg, L"--define")) {
+      argl = argt; // skil --define
+      if (! is(Pair, argl) || ! is(Pair, getTail(argl))) {
+        fatal("--define requires two arguments");
+      }
+      oop name = getHead(argl);					GC_PROTECT(name);
+      name = intern(get(name, String,bits));
+      argl = getTail(argl);
+      oop value = getHead(argl);
+      argt = getTail(argl);
+
+      long valueInt = wcstol(get(value, String,bits), 0, 0);
+      if (valueInt != 0 && errno == 0) {
+        value = newLong(valueInt);
+      }
+
+      define(get(globals, Variable,value), name, value);	GC_UNPROTECT(name);
+    }
 #  if !defined(WIN32) && (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
 	opt_g= 0;
