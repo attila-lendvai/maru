@@ -162,7 +162,9 @@ static oop symbols= nil, globals= nil, expanders= nil, encoders= nil, evaluators
 static oop s_set= nil, s_define= nil, s_let= nil, s_lambda= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil, s_main= nil;
 static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
 
-static int opt_g= 0, opt_O= 0, opt_p= 0, opt_v= 0;
+static int opt_g= 0, opt_p= 0;
+static int verbosity= 0;
+static int optimize= 0;
 
 static oop traceStack= nil;
 static int traceDepth= 0;
@@ -1003,7 +1005,7 @@ static oop exlist(oop obj, oop env);
 
 static oop expand(oop expr, oop env)
 {
-  if (opt_v > 1) { printf("EXPAND ");  dumpln(expr); }
+  if (verbosity > 1) { printf("EXPAND ");  dumpln(expr); }
   if (is(Pair, expr)) {
     oop head= expand(getHead(expr), env);			GC_PROTECT(head);
     if (is(Symbol, head)) {
@@ -1013,7 +1015,7 @@ static oop expand(oop expr, oop env)
 	oop args= newPairFrom(env, getTail(expr), expr);	GC_PROTECT(args);
 	head= apply(get(val, Form,function), args, nil);	GC_UNPROTECT(args);
 	head= expand(head, env);				GC_UNPROTECT(head);
-	if (opt_v > 1) { printf("EXPAND => ");  dumpln(head); }
+	if (verbosity > 1) { printf("EXPAND => ");  dumpln(head); }
 	setSource(head, get(expr, Pair,source));
 	return head;
       }
@@ -1051,7 +1053,7 @@ static oop expand(oop expr, oop env)
       return args;
     }
   }
-  if (opt_v > 1) { printf("EXPAND => ");  dumpln(expr); }
+  if (verbosity > 1) { printf("EXPAND => ");  dumpln(expr); }
   return expr;
 }
 
@@ -1110,8 +1112,8 @@ static oop encode_let(oop expr, oop tail, oop env)
 
 static oop encode(oop expr, oop env)
 {
-  if (opt_O < 2) arrayAtPut(traceStack, traceDepth++, expr);
-  if (opt_v > 1) { printf("ENCODE ");  dumpln(expr); }
+  if (optimize < 2) arrayAtPut(traceStack, traceDepth++, expr);
+  if (verbosity > 1) { printf("ENCODE ");  dumpln(expr); }
   if (is(Pair, expr)) {
     oop head= encode(getHead(expr), env);			GC_PROTECT(head);
     oop tail= getTail(expr);					GC_PROTECT(tail);
@@ -1179,7 +1181,7 @@ static oop encode(oop expr, oop env)
       expr= apply(fn, args, nil);		GC_UNPROTECT(args);
     }
   }
-  if (opt_v > 1) { printf("ENCODE => ");  dumpln(expr); }
+  if (verbosity > 1) { printf("ENCODE => ");  dumpln(expr); }
   --traceDepth;
   return expr;
 }
@@ -1260,7 +1262,7 @@ static void fatal(char *reason, ...)
 
 static oop eval(oop obj, oop ctx)
 {
-  if (opt_v > 2) { printf("EVAL ");  dump(obj); printf(" IN ");  dumpln(ctx); }
+  if (verbosity > 2) { printf("EVAL ");  dump(obj); printf(" IN ");  dumpln(ctx); }
   switch (getType(obj)) {
     case Undefined:
     case Long:
@@ -1269,7 +1271,7 @@ static oop eval(oop obj, oop ctx)
       return obj;
     }
     case Pair: {
-      if (opt_O < 2) arrayAtPut(traceStack, traceDepth++, obj);
+      if (optimize < 2) arrayAtPut(traceStack, traceDepth++, obj);
       oop head= eval(getHead(obj), ctx);		GC_PROTECT(head);
       if (is(Fixed, head))
 	head= apply(get(head, Fixed,function), getTail(obj), ctx);
@@ -1317,7 +1319,7 @@ static oop ffcall(oop subr, oop arguments);
 
 static oop apply(oop fun, oop arguments, oop ctx)
 {
-  if (opt_v > 2) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(ctx); }
+  if (verbosity > 2) { printf("APPLY ");  dump(fun);  printf(" TO ");  dump(arguments);  printf(" IN ");  dumpln(ctx); }
   switch (getType(fun)) {
     case Expr: {
       if (opt_p) arrayAtPut(traceStack, traceDepth++, fun);
@@ -2600,24 +2602,6 @@ static subr(not)
   return (nil == obj) ? s_t : nil;
 }
 
-static subr(verbose)
-{
-  oop obj= car(args);
-  if (nil == obj) return newLong(opt_v);
-  if (!isLong(obj)) return nil;
-  opt_v= getLong(obj);
-  return obj;
-}
-
-static subr(optimised)
-{
-  oop obj= car(args);
-  if (nil == obj) return newLong(opt_O);
-  if (!isLong(obj)) return nil;
-  opt_O= getLong(obj);
-  return obj;
-}
-
 static subr(sin)
 {
   oop obj= getHead(args);
@@ -2862,19 +2846,19 @@ static void replFile(FILE *stream, wchar_t *path)
     oop obj= readForm(stream);
     if (obj == DONE) break;
     GC_PROTECT(obj);
-    if (opt_v) {
+    if (verbosity) {
       dumpln(obj);
       fflush(stdout);
     }
     obj = expandEncodeEval(obj);
-    if ((stream == stdin) || (opt_v > 0)) {
+    if ((stream == stdin) || (verbosity > 0)) {
       printf(" => ");
       fflush(stdout);
       dumpln(obj);
       fflush(stdout);
     }
     GC_UNPROTECT(obj);
-    if (opt_v) {
+    if (verbosity) {
 #if (!LIB_GC)
       GC_gcollect();
       printf("%ld collections, %ld objects, %ld bytes, %4.1f%% fragmentation\n",
@@ -3103,8 +3087,6 @@ static subr_ent_t subr_tab[] = {
     { " oop-at",		subr_oop_at },
     { " set-oop-at",		subr_set_oop_at },
     { " not",			subr_not },
-    { " verbose",		subr_verbose },
-    { " optimised",		subr_optimised },
     { " sin",			subr_sin },
     { " cos",			subr_cos },
     { " log",			subr_log },
@@ -3256,14 +3238,23 @@ int main(int argc, char **argv)
       }
   }
 
+  define(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
+  define(get(globals, Variable,value), intern(L"*optimize*"),  newLong(optimize));
+
   while (is(Pair, get(arguments, Variable,value))) {
     oop argl= get(arguments, Variable,value);		GC_PROTECT(argl);
     oop args= getHead(argl);
     oop argt= getTail(argl);
     wchar_t *arg= get(args, String,bits);
-    if 	    (!wcscmp (arg, L"-v"))	{ ++opt_v; }
+    if 	    (!wcscmp (arg, L"-v"))	{
+      ++verbosity;
+      define(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
+    }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
-    else if (!wcscmp (arg, L"-O"))	{ ++opt_O; }
+    else if (!wcscmp (arg, L"-O"))	{
+      ++optimize;
+      define(get(globals, Variable,value), intern(L"*optimize*"), newLong(optimize));
+    }
     else if (!wcscmp (arg, L"-")) {
       replFile(stdin, L"<stdin>");
       printf("\nmorituri te salutant\n");
@@ -3309,7 +3300,7 @@ int main(int argc, char **argv)
     set(arguments, Variable,value, argt);		GC_UNPROTECT(argl);
   }
 
-  if (opt_v) {
+  if (verbosity) {
 #if (!LIB_GC)
     GC_gcollect();
     printf("%ld collections, %ld objects, %ld bytes, %4.1f%% fragmentation\n",
