@@ -24,11 +24,11 @@ if [ ! -d ${SCRIPT_DIR}/build/quicklisp/local-projects/ ]; then
     #
     # get a recent enough ASDF
     #
-    cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
-    git clone git@common-lisp.net:asdf/asdf.git
-    cd asdf
-    git checkout 3.3.4.7
-    make
+    #cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
+    #git clone git@common-lisp.net:asdf/asdf.git
+    #cd asdf
+    #git checkout 3.3.4.7
+    #make
 
     #
     # get a recent slime/swank
@@ -39,7 +39,7 @@ if [ ! -d ${SCRIPT_DIR}/build/quicklisp/local-projects/ ]; then
     git checkout 15cf0609d30255405957bf0612fd6291fea438bc
 fi
 
-if [ ! -d ${SCRIPT_DIR}/build/quicklisp.lisp ]; then
+if [ ! -f ${SCRIPT_DIR}/build/quicklisp.lisp ]; then
     #
     # get quicklisp and load/install it under build/
     #
@@ -51,7 +51,7 @@ fi
 cd "${SCRIPT_DIR}"
 
 export CL_SOURCE_REGISTRY="(:source-registry (:directory \"${SCRIPT_DIR}\") (:tree \"${SCRIPT_DIR}/build/quicklisp/local-projects/\") :ignore-inherited-configuration)"
-export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (t (\"${SCRIPT_DIR}/build/fasls/\" :implementation \"root/\")) :ignore-inherited-configuration)"
+export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (t (\"${SCRIPT_DIR}/build/fasls/\" :implementation)) :ignore-inherited-configuration)"
 
 echo Building bootstrap executable using \'${LISP}\', CL_SOURCE_REGISTRY is \'${CL_SOURCE_REGISTRY}\', ASDF_OUTPUT_TRANSLATIONS is \'${ASDF_OUTPUT_TRANSLATIONS}\'
 
@@ -146,8 +146,6 @@ exit 0
                :description "Print this help and exit.")
          (flag :short-name "v" ;; :long-name ""
                :description "ignored, only for compatibility")
-         (flag :short-name "b" ;; :long-name ""
-               :description "Don't try to load boot.l")
          (flag :short-name "g" ;; :long-name ""
                :description "ignored, only for compatibility")
          (flag :short-name "O" ;; :long-name ""
@@ -167,13 +165,6 @@ exit 0
                   (not (clon:cmdline-p)))
           (clon:help)
           (clon:exit))
-        #+sbcl
-        (flet ((signal-handler (signal code scp)
-                 (declare (ignore signal code scp))
-                 (format *error-output* "~%SIGTERM/SIGINT was received, initiating shutdown~%")
-                 (uiop:quit)))
-          (sb-sys:enable-interrupt sb-unix:sigterm #'signal-handler)
-          (sb-sys:enable-interrupt sb-unix:sigint #'signal-handler))
         (awhen (clon:getopt :long-name "swank-port")
           (setf swank-port (parse-integer it :junk-allowed t))
           (unless swank-port
@@ -187,8 +178,7 @@ exit 0
         (install-debugger-hook)
         (maru.debug "Remainder arguments are ~S" (clon:remainder))
         (with-new-maru-state
-          (let ((load-boot? (not (clon:getopt :short-name "b")))
-                (repled nil))
+          (let ()
             (flet
                 ((build-maru-args-list ()
                    (let ((args (clon:remainder))
@@ -196,34 +186,27 @@ exit 0
                      (dolist (arg (reverse args))
                        (setf maru/args (maru/cons arg maru/args)))
                      (maru/define (global-namespace-of *eval-context*)
-                                  (maru/intern "*arguments*")
-                                  maru/args)))
-                 (maybe-load-boot ()
-                   (when load-boot?
-                     (maru.debug "Loading boot.l")
-                     (maru/repl #P"boot.l")
-                     (setf load-boot? nil))))
+                                  (maru/intern "*command-line-arguments*")
+                                  maru/args))))
               (loop
                 :with args-var = (build-maru-args-list)
                 :for cell = (maru/get-var args-var) :then (maru/cdr cell)
                 :until (maru/nil? cell)
                 :for arg = (maru/car cell)
-                :do (progn
-                      (maybe-load-boot)
-                      ;; NOTE the arg voodoo in eval.c is not mirrored perfectly here
-                      (maru/set-var args-var (maru/get-tail cell))
-                      (maru.debug "About to REPL file ~S" arg)
-                      (maru/repl (pathname arg))
-                      (setf repled t)))
-              (unless repled
-                (maybe-load-boot)
-                (maru.debug "Entering interactive REPL on *terminal-io*")
-                (maru/repl *terminal-io* :output-stream *terminal-io* :prompt ".")
-                (format t "morituri te salutant~%"))))))
+                :do (if (equal "-" arg)
+                        (progn
+                          (maru.debug "Entering interactive REPL on *terminal-io*")
+                          (maru/repl *terminal-io* :output-stream *terminal-io* :prompt ".")
+                          (format t "morituri te salutant~%"))
+                        (progn
+                          ;; NOTE the arg voodoo in eval.c is not mirrored perfectly here
+                          (maru/set-var args-var (maru/get-tail cell))
+                          (maru.debug "About to REPL file ~S" arg)
+                          (maru/repl (pathname arg)))))))))
     (abort ()
       :report "Exit the lisp vm."
       (uiop:die 42 "Game over."))))
 
 (setf uiop:*image-entry-point* 'toplevel)
 
-(uiop:dump-image "maru" :executable t)
+(uiop:dump-image "eval" :executable t)

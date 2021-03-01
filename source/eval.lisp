@@ -19,9 +19,6 @@
 
 (defparameter *current-file* nil)
 
-(defparameter *predefined-subr-names* (list))
-(defparameter *predefined-fixed-names* (list))
-
 (defmacro with-file-input ((var path) &body body)
   `(let ((*current-file* ,path))
      (with-open-file (,var *current-file*)
