@@ -5,7 +5,7 @@
 # ./build.sh
 # LISP=~/workspace/sbcl/run-sbcl.sh ./build.sh
 
-# this is not too tied to SBCL, but it won't work out of the box on anything else as is.
+# NOTE this is not too dependent on SBCL, but it won't work out of the box on anything else as is.
 
 SCRIPT_DIR=`dirname "$0"`
 SCRIPT_DIR=`readlink -f ${SCRIPT_DIR}`
@@ -18,7 +18,7 @@ fi
 
 # make quicklisp available below in the lisp code.
 # and get a fresh enough ASDF also.
-if [ ! -d build ]; then
+if [ ! -d ${SCRIPT_DIR}/build/quicklisp/local-projects/ ]; then
     mkdir -p ${SCRIPT_DIR}/build/quicklisp/local-projects/
 
     #
@@ -27,7 +27,7 @@ if [ ! -d build ]; then
     cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
     git clone git@common-lisp.net:asdf/asdf.git
     cd asdf
-    git checkout 3.3.4
+    git checkout 3.3.4.7
     make
 
     #
@@ -36,14 +36,16 @@ if [ ! -d build ]; then
     cd ${SCRIPT_DIR}/build/quicklisp/local-projects/
     git clone https://github.com/slime/slime.git
     cd slime
-    git checkout faa0c6a0b7c77f6a2db8d3244f24563106857944
+    git checkout 15cf0609d30255405957bf0612fd6291fea438bc
+fi
 
+if [ ! -d ${SCRIPT_DIR}/build/quicklisp.lisp ]; then
     #
     # get quicklisp and load/install it under build/
     #
     cd ${SCRIPT_DIR}/build/
     wget http://beta.quicklisp.org/quicklisp.lisp
-    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\" :dist-url \"http://beta.quicklisp.org/dist/quicklisp/2020-03-25/distinfo.txt\")" --quit
+    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\" :dist-url \"http://beta.quicklisp.org/dist/quicklisp/2021-02-28/distinfo.txt\")" --quit
 fi
 
 cd "${SCRIPT_DIR}"
