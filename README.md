@@ -16,5 +16,4 @@ now. I'd much rather work on `maru.10.common-lisp` instead.
 
 A most probably partial list of things that are still needed:
 
-- `[set-]current-module`
-- `expand` needs to recognize and treat things like `let` and `define` specially
+- fix `expand`, it needs to recognize and treat things like `let` and `define` specially
