@@ -2821,8 +2821,6 @@ static subr(save)
 
 #endif
 
-#undef subr
-
 static oop expandEncodeEval(oop form) {
     GC_PROTECT(form);
     oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
@@ -2887,6 +2885,15 @@ static void replPath(wchar_t *path)
   replFile(stream, path);
   fclose(stream);
 }
+
+static subr(load)
+{
+  oop arg= car(args);
+  replPath(get(arg, String,bits));
+  return nil;
+}
+
+#undef subr
 
 static void sigint(int signo)
 {
@@ -3093,6 +3100,7 @@ static subr_ent_t subr_tab[] = {
     { " address-of",		subr_address_of },
     { " times",			subr_times },
     { " set-working-directory",	subr_set_working_directory },
+    { " load",			subr_load },
 #if !defined(LIB_GC)
     { " save",			subr_save },
 #endif
