@@ -19,7 +19,7 @@
 (require "source/conversion.l")
 (require "source/unit-test.l")
 (require "source/parsing/parser.l")
-(require "source/parsing/peg-compiler.l")
+(require "source/parsing/peg-compile-forms.l")
 
 (progress "defining bootstrap parser")
 

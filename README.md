@@ -200,7 +200,7 @@ new features. Some that are worth mentioning:
     platform that compiles to a statically linked executable that runs
     directly on top of the Linux kernel,
     [using `syscall`s](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
-    i.e. without linking anything from `libc`, or `ld-linux.so`. From
+    i.e. without linking anything from `libc.so`, or `ld-linux.so`. From
     a practical perspective this is equivalent with running directly
     on the bare metal (i.e. all dynamically allocated memory is
     provided by our own GC, etc).
@@ -334,3 +334,7 @@ A list of projects that are worth mentioning in this context:
     inexpensive FPGA board, and simple enough for one person to understand it all.
 
   - [Seedling](https://github.com/nagydani/seedling/)
+
+  - [tort](https://github.com/kstephens/tort): Inspired by Ian
+    Piumarta's idst, maru and other small runtimes. Core is
+    approx. 5000 lines of C.

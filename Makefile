@@ -401,20 +401,24 @@ endef
 ###
 ### PEG parser
 ###
-$(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
+$(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/bootstrap-peg-parser.l source/parsing/parser.l source/parsing/peg-compile-forms.l
 	@mkdir -p $(BUILD)/generated
-#	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
+	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/bootstrap-peg-parser.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
 source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	cp $< $@
 
+# compile *.g PEG rules into maru parser implementations
+%.g.l: %.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
+	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+		|| { $(BACKDATE_FILE) $@; exit 42; }
+
 ###
 ### x86 assembler
 ###
-$(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
+$(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
 #	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
@@ -518,11 +522,6 @@ test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembl
 	@chmod +x build/test-elf
 	-readelf -el build/test-elf
 	./build/test-elf
-
-tests/parsing/%.g.l: tests/parsing/%.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l
-#	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
-		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l

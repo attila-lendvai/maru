@@ -795,7 +795,6 @@
       ((= type <symbol>)	(error "encountered a <symbol> in eval. this shouldn't happen!"))
       (else			(eval/with-call-frame type exp ctx)))))
 
-
 (define-function expand-encode-eval* (form env)
   (debug-print "expand-encode-eval for form "form)
   (gc/let* ((x form))
