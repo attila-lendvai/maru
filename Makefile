@@ -30,6 +30,9 @@ all : eval
 eval : $(BUILD)/eval1
 	cp $(BUILD)/eval1 eval
 
+run : eval
+	rlwrap ./eval boot.l -
+
 test-bootstrap : $(BUILD)/eval3 .force
 	diff $(BUILD)/eval2.s $(BUILD)/eval3.s
 

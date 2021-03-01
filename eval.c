@@ -1,4 +1,4 @@
-// last edited: 2012-10-05 09:11:14 by piumarta on emilia.local
+// -*- c-basic-offset: 2 -*-
 
 #define _DEFAULT_SOURCE 1
 

@@ -1,22 +1,20 @@
-# Maru (stage 3 from Ian Piumarta's latest public version)
+# Maru (stage 10; written in C)
 
 > **NOTE:** This readme focuses on the aspects of this stage that are relevant for bootstrapping the next stage.
 > The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
 
 This is the stripped down version of the *piumarta* branch to only contain the
-stuff that is needed to successfully self-host, to bootstrap its version of
-`eval.l`.
+`eval.c` code, and extended/modified to be able to bootstrap the `maru.10`
+branch.
 
-This stage is semantically equivalent with the head of the `maru.3` branch,
-which has arrived to this point on a different path: by starting out first
-from the minimal version of Maru, and then eventually getting the differences
-between the minimal and the latest backported into it.
+## Status
 
-If this stage supported *modules* then it should be suitable to bootstrap
-stage 4 in the `maru.4` branch.
+Requires complex enough work in C that I became uninterested for
+now. I'd much rather work on `maru.10.common-lisp` instead.
 
 ## TODO
 
-- Backport *modules* into this codebase and make it suitable to
-bootstrap `maru.4`. It is not a huge task, but large enough for me to
-rather work on more interesting stuff.
+A most probably partial list of things that are still needed:
+
+- `[set-]current-module`
+- `expand` needs to recognize and treat things like `let` and `define` specially
