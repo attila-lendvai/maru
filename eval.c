@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <wchar.h>
+#include <unistd.h>
 #include <locale.h>
 #include <math.h>
 #if defined(__MACH__)
@@ -496,24 +497,24 @@ static void endSource(void)
   currentLine= cdr(src);
 }
 
-static oop read(FILE *fp);
+static oop readForm(FILE *fp);
 
 static oop readList(FILE *fp, int delim)
 {
   oop head= nil, tail= head, obj= nil;
   GC_PROTECT(head);
   GC_PROTECT(obj);
-  obj= read(fp);
+  obj= readForm(fp);
   if (obj == DONE) goto eof;
   head= tail= newPairFrom(obj, nil, currentSource);
   for (;;) {
-    obj= read(fp);
+    obj= readForm(fp);
     if (obj == DONE) goto eof;
     if (obj == s_dot) {
-      obj= read(fp);
+      obj= readForm(fp);
       if (obj == DONE)		fatal("missing item after .");
       tail= set(tail, Pair,tail, obj);
-      obj= read(fp);
+      obj= readForm(fp);
       if (obj != DONE)		fatal("extra item after .");
       goto eof;
     }
@@ -606,7 +607,7 @@ static int readChar(wint_t c, FILE *fp)
   return c;
 }
 
-static oop read(FILE *fp)
+static oop readForm(FILE *fp)
 {
   for (;;) {
     wint_t c= getwc(fp);
@@ -658,7 +659,7 @@ static oop read(FILE *fp)
 	return newLong(readChar(getwc(fp), fp));
       }
       case '\'': {
-	oop obj= read(fp);
+	oop obj= readForm(fp);
 	if (obj == DONE)
 	  obj= s_quote;
 	else {
@@ -670,7 +671,7 @@ static oop read(FILE *fp)
 	return obj;
       }
       case '`': {
-	oop obj= read(fp);
+	oop obj= readForm(fp);
 	if (obj == DONE)
 	  obj= s_quasiquote;
 	else {
@@ -686,7 +687,7 @@ static oop read(FILE *fp)
 	c= getwc(fp);
 	if ('@' == c)	sym= s_unquote_splicing;
 	else		ungetwc(c, fp);
-	oop obj= read(fp);
+	oop obj= readForm(fp);
 	if (obj == DONE)
 	  obj= sym;
 	else {
@@ -1931,7 +1932,7 @@ static subr(read)
   oop   head= nil;
   if (nil == args) {
     beginSource(L"<stdin>");
-    oop obj= read(stdin);
+    oop obj= readForm(stdin);
     endSource();
     if (obj == DONE) obj= nil;
     return obj;
@@ -1947,7 +1948,7 @@ static subr(read)
       oop tail= head;
       oop obj= nil;						GC_PROTECT(obj);
       for (;;) {
-	  obj= read(stream);
+	  obj= readForm(stream);
 	  if (obj == DONE) break;
 	  tail= setTail(tail, newPairFrom(obj, nil, currentSource));
 	  if (stdin == stream) break;
@@ -1958,7 +1959,7 @@ static subr(read)
   }
   else if (isLong(arg)) {
       stream= (FILE *)getLong(arg);
-      if (stream) head= read(stream);
+      if (stream) head= readForm(stream);
       if (head == DONE) head= nil;
   }
   else {
@@ -2724,6 +2725,15 @@ static subr(times)
     return real;
 }
 
+static subr(set_working_directory)
+{
+  oop arg= car(args);
+  char *path= wcs2mbs(get(arg, String,bits));
+  if (chdir(path) != 0)
+    fatal("chdir failed for %s\n", path);
+  return arg;
+}
+
 typedef struct { char *name;  imp_t imp; } subr_ent_t;
 
 static subr_ent_t subr_tab[];
@@ -2849,7 +2859,7 @@ static void replFile(FILE *stream, wchar_t *path)
       printf(".");
       fflush(stdout);
     }
-    oop obj= read(stream);
+    oop obj= readForm(stream);
     if (obj == DONE) break;
     GC_PROTECT(obj);
     if (opt_v) {
@@ -3100,6 +3110,7 @@ static subr_ent_t subr_tab[] = {
     { " log",			subr_log },
     { " address-of",		subr_address_of },
     { " times",			subr_times },
+    { " set-working-directory",	subr_set_working_directory },
 #if !defined(LIB_GC)
     { " save",			subr_save },
 #endif
