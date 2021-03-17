@@ -396,57 +396,7 @@
 ;;; Emitting objects
 ;;;
 
-;; TODO these are dog-slow, we need to partial-eval the emitters.
-;; closures can be a poor man's phased compilation, but they need to
-;; be instantiated after the slave has been fully loaded.
-
-;; (define emit-object-header
-;;   (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-;;         (canary-emitter	(if (slave-value feature/object-canary)
-;;                             (lambda () (emit LONG (slave-value +canary-value+)))
-;;                           (lambda ()))))
-;;     (lambda (type-id)
-;;       (emit RODATA)
-;;       (emit ALIGN 4)
-;;       ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
-;;       ;; (emit LONG -42)                   ; next
-;;       ;; (emit LONG -42)                   ; chunk size
-;;       (emit LONG flags)
-;;       (emit LONG type-id)
-;;       (canary-emitter))))
-
-;; (define emit-object/box-<long>
-;;   (let ((boxer (eval-in-slave `(expand '(box <long> val)))))
-;;     (eval `(lambda (val)
-;;              ,boxer))))
-
 ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
-(define-function emit-object-header (type-id)
-  (emit RODATA)
-  (emit ALIGN 4)
-  ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
-  ;; (emit LONG -42)                   ; next
-  ;; (emit LONG -42)                   ; chunk size
-  (emit LONG (slave-value (+ <header>-flags/used <header>-flags/opaque))) ; flags
-  (emit LONG type-id)
-  (when (slave-value feature/object-canary)
-    (emit LONG (slave-value +canary-value+)))
-  ;; the gc chunk payload should follow from here, according to the type's object layout
-  )
-
-(define-function emit-object/<long> (self -c-)
-  (cond
-    ((slave-value (is <immediate-type> <long>))
-     (eval-in-slave `(box <long> ,self)))
-    ((slave-value (and (is <boxed-type> <long>)
-                       (<boxed-type>-one-word? <long>)))
-     (emit-object-header (slave-value (<type>-slave-id <long>)))
-     (let ((object-label (UNIQUE-LABEL "olong")))
-       (emit DEFLABEL object-label)
-       (emit LONG self)
-       object-label))
-    (else
-     (error "emit-object/<long>: unexpected slave representation for <long>"))))
 
 (define-function emit-object/C-string (self)
   (let ((label (UNIQUE-LABEL "cstr")))
@@ -455,38 +405,94 @@
     (emit ASCIZ self)
     label))
 
-(define-function emit-object/<string> (self -c-)
-  (assert (is <string> self))
-  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((elements	(emit-object/C-string self))
-        (size		(emit-object/<long> (string-length self) -c-))
-        (object-label	(UNIQUE-LABEL "ostr")))
-    ;; TODO it should be something like: (target-value <string>)
-    (emit-object-header (slave-value (<type>-slave-id <string>)))
-    (emit DEFLABEL object-label)
-    (emit PTR size)
-    (emit PTR elements)
-    object-label))
+;; these will be functions instantiated later. reason: to calculate
+;; some stuff and capture the result into closures. this is a poor
+;; man's staged computation to speed up object emission.
+(define emit-object/header)
+(define emit-object/<string>)
+(define emit-object/box-<long>)
+(define emit-object/<long>)
+(define emit-object/<target-function>)
 
-(define-function emit-object/<target-function> (name entry-label -c-)
-  (let ((object-label	(if name
-                            (LABEL (if feature/redefinable-functions-in-target
-                                       (concat-string (symbol->string name) "__obj")
-                                     name))
-                          (UNIQUE-LABEL "oclosure")))
-        (name		(when (slave-value feature/track-expr-names)
-                          (if name
-                              (emit-object/<string> (symbol->string name) -c-)
-                            (slave-value (<immediate-type>-tag-value <undefined>)))))
-        ;; TODO a counter in the read-only space?
-        (profiler-counter (when (slave-value feature/profiler)
-                            (emit-object/<long> 0 -c-))))
-    (emit-object-header (slave-value (<type>-slave-id <target-function>)))
-    (emit DEFLABEL object-label)
-    (emit PTR entry-label)
-    (and name (emit PTR name))
-    (and profiler-counter (emit PTR profiler-counter))
-    object-label))
+(define-function initialize-object-emitters ()
+  (set emit-object/header
+       (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
+             ;; TODO FIXME adding another level of let, or using let*
+             ;; results in confused bindings and/or closure capturing.
+             ;;(canary-value	(slave-value +canary-value+))
+             (canary-emitter	(if (slave-value feature/object-canary)
+                                    (lambda () (emit LONG (slave-value +canary-value+)))
+                                  (lambda ()))))
+         (lambda (type-id)
+           (emit RODATA)
+           (emit ALIGN 4)
+           ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
+           ;; (emit LONG -42)                   ; next
+           ;; (emit LONG -42)                   ; chunk size
+           (emit LONG flags)
+           (emit LONG type-id)
+           (canary-emitter))))
+
+  (set emit-object/box-<long>
+       (eval `(lambda (val)
+                ,(expand '(box <long> val) *slave-env*))))
+
+  (set emit-object/<long>
+       ;; TODO it should be something like: (target-value <string>). see others, too.
+       (let ((type-id (slave-value (<type>-slave-id <long>))))
+         (cond
+           ((slave-value (is <immediate-type> <long>))
+            (lambda (self -c-)
+              (emit-object/box-<long> self)))
+           ((slave-value (and (is <boxed-type> <long>)
+                              (<boxed-type>-one-word? <long>)))
+            (lambda (self -c-)
+              (emit-object/header type-id)
+              (let ((object-label (UNIQUE-LABEL "olong")))
+                (emit DEFLABEL object-label)
+                (emit LONG self)
+                object-label)))
+           (else
+            (error "emit-object/<long>: unexpected slave representation for <long>")))))
+
+  (set emit-object/<string>
+       (let ((type-id (slave-value (<type>-slave-id <string>))))
+         (lambda (self -c-)
+           (safety 1 (assert (is <string> self)))
+           ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+           (let ((elements	(emit-object/C-string self))
+                 (size		(emit-object/<long> (string-length self) -c-))
+                 (object-label	(UNIQUE-LABEL "ostr")))
+             (emit-object/header type-id)
+             (emit DEFLABEL object-label)
+             (emit PTR size)
+             (emit PTR elements)
+             object-label))))
+
+  (set emit-object/<target-function>
+       (let* ((type-id		(slave-value (<type>-slave-id <target-function>)))
+              (null-value	(slave-value (<immediate-type>-tag-value <undefined>)))
+              (name-factory	(when (slave-value feature/track-expr-names)
+                                  (lambda (name -c-)
+                                    (if name
+                                        (emit-object/<string> (symbol->string name) -c-)
+                                      null-value))))
+              (feature/profiler	(slave-value feature/profiler)))
+         (lambda (name entry-label -c-)
+           (let ((object-label	(if name
+                                    (LABEL (if feature/redefinable-functions-in-target
+                                               (concat-string (symbol->string name) "__obj")
+                                             name))
+                                  (UNIQUE-LABEL "oclosure"))))
+             (emit-object/header type-id)
+             (emit DEFLABEL object-label)
+             (emit PTR entry-label)
+             (when name-factory
+               (emit PTR (name-factory name -c-)))
+             (when feature/profiler
+               ;; TODO a counter in the read-only space?
+               (emit PTR (emit-object/<long> 0 -c-)))
+             object-label)))))
 
 ;;;
 ;;; Compiling lambdas
@@ -934,4 +940,5 @@
         (emit PTR object-label)))))
 
 (define-method emit-prelude <x86-compiler> ()
-  (verbosity 1 (warn "\nCompiling to IA-32\n\n")))
+  (verbosity 1 (warn "\nCompiling to IA-32\n\n"))
+  (initialize-object-emitters))

@@ -572,70 +572,93 @@
 ;;; if you want to grok this, then you better head over to the x86 backend...
 
 ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
-;; TODO optimize: these are doing a lot of repeated work with all the slave-value calls
-
-(define-function emit-object-header (type-id)
-  (print "%\"<header>\" { %word "
-         (slave-value (+ <header>-flags/used <header>-flags/opaque))
-         ", %word "type-id)
-  (when (slave-value feature/object-canary)
-    (print ", %word "(slave-value +canary-value+)))
-  (print "}"))
-
-(define-function emit-object/<long> (self -c-)
-  (cond
-    ((slave-value (is <immediate-type> <long>))
-     (eval-in-slave `(box <long> ,self)))
-    ((slave-value (and (is <boxed-type> <long>)
-                       (<boxed-type>-one-word? <long>)))
-     (emit-object-header (slave-value (<type>-slave-id <long>)))
-     ;; TODO the "receiving place" of this value needs to by typesafe
-     ;; emitting variable <long> representation requires a place to
-     ;; keep track of such session-wide config/cache that -c- cannot
-     ;; do currently, because it's recreated for each level.
-     (error "TODO emit-object/<long>"))
-    (else
-     (error "emit-object/<long>: unexpected slave representation for <long>"))))
 
 (define-function emit-object/C-string (self -c-)
   (let ((const (CONSTANT (GLOBAL (unique-name "cstr")) self)))
     (emit DEFINE const self)
     const))
 
-(define-function emit-object/<string> (self -c-)
-  ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-  (let ((elements	(emit-object/C-string self -c-))
-        (object-label	(GLOBAL (unique-name "ostr"))))
-    ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-    (print object-label" = private unnamed_addr constant %\"<string>\" { ")
-    (emit-object-header (slave-value (<type>-slave-id <string>)))
-    (print ", %word "
-           ;; FIXME this only works when <long> is an immediate
-           (eval-in-slave `(box <long> ,(string-length self)))
-           ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
-    object-label))
+;; these will be functions instantiated later. reason: to calculate
+;; some stuff and capture the result into closures. this is a poor
+;; man's staged computation to speed up object emission.
+(define emit-object/header)
+(define emit-object/<string>)
+(define emit-object/box-<long>)
+(define emit-object/<long>)
+(define emit-object/<target-function>)
 
-(define-function emit-object/<target-function> (expr name entry-label -c-)
-  (let ((object-label	(if name
-                            (closure-object-label name)
-                          (GLOBAL (unique-name "oclosure"))))
-        (name-obj	(when (slave-value feature/track-expr-names)
-                          (if name
-                              (emit-object/<string> (symbol->string name) -c-)
-                            "null")))
-        ;; TODO a counter in the read-only space?
-        (profiler-counter (when (slave-value feature/profiler)
-                            (emit-object/<long> 0 -c-))))
-    ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-    (print object-label" = private unnamed_addr constant %\"<target-function>\" { ")
-    (emit-object-header (slave-value (<type>-slave-id <string>)))
-    (print ", %oop bitcast (")
-    (emit-llvm-fn-type-for-expr expr)
-    (print "* "entry-label" to %oop)")
-    (and name-obj (print ", %\"<string>\"* "name-obj))
-    (and profiler-counter (print ", %word "profiler-counter))
-    (print " }\n")
-    (CONSTANT object-label expr)))
+(define-function initialize-object-emitters ()
+  (set emit-object/header
+       (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
+             ;; TODO FIXME adding another level of let, or using let*
+             ;; results in confused bindings and/or closure capturing.
+             ;;(canary-value	(slave-value +canary-value+))
+             (canary-emitter	(if (slave-value feature/object-canary)
+                                    (lambda () (print ", %word "(slave-value +canary-value+)))
+                                  (lambda ()))))
+         (lambda (type-id)
+           (print "%\"<header>\" { %word "flags", %word "type-id)
+           (canary-emitter)
+           (print "}"))))
+
+  (set emit-object/box-<long>
+       (eval `(lambda (val)
+                ,(expand '(box <long> val) *slave-env*))))
+
+  (set emit-object/<long>
+       (cond
+         ((slave-value (is <immediate-type> <long>))
+          (lambda (self -c-)
+            (emit-object/box-<long> self)))
+         ((slave-value (and (is <boxed-type> <long>)
+                            (<boxed-type>-one-word? <long>)))
+          (emit-object/header (slave-value (<type>-slave-id <long>)))
+          ;; TODO the "receiving place" of this value needs to be of the proper type
+          (error "TODO emit-object/<long>"))
+         (else
+          (error "emit-object/<long>: unexpected slave representation for <long>"))))
+
+  (set emit-object/<string>
+       (let ((type-id (slave-value (<type>-slave-id <string>))))
+         (lambda (self -c-)
+           ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+           (let ((elements	(emit-object/C-string self -c-))
+                 (object-label	(GLOBAL (unique-name "ostr"))))
+             ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+             (print object-label" = private unnamed_addr constant %\"<string>\" { ")
+             (emit-object/header type-id)
+             (print ", %word "
+                    ;; FIXME this only works when <long> is an immediate
+                    (emit-object/box-<long> (string-length self))
+                    ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
+             object-label))))
+
+  (set emit-object/<target-function>
+       (let ((type-id		(slave-value (<type>-slave-id <target-function>)))
+             (name-factory	(when (slave-value feature/track-expr-names)
+                                  (lambda (name -c-)
+                                    (if name
+                                        (emit-object/<string> (symbol->string name) -c-)
+                                      "null"))))
+             (feature/profiler	(slave-value feature/profiler)))
+         (lambda (expr name entry-label -c-)
+           (let ((object-label	(if name
+                                    (closure-object-label name)
+                                  (GLOBAL (unique-name "oclosure"))))
+                 (name-object	(when name-factory (name-factory name -c-))))
+             ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+             (print object-label" = private unnamed_addr constant %\"<target-function>\" { ")
+             (emit-object/header type-id)
+             (print ", %oop bitcast (")
+             (emit-llvm-fn-type-for-expr expr)
+             (print "* "entry-label" to %oop)")
+             (when name-object
+               (print ", %\"<string>\"* "name-object))
+             (when feature/profiler
+               (print ", %word ")
+               (emit-object/<long> 0 -c-))
+             (print " }\n")
+             (CONSTANT object-label expr))))))
 
 ;;;
 ;;; Compiling lambdas
@@ -1208,6 +1231,7 @@
            array-label" to %oop)")))
 
 (define-method emit-prelude <llvm-compiler> ()
+  (initialize-object-emitters)
   (let (;;(target-triplet		(slave-value +target-triplet+))
         (word-size		(target-value +word-size-in-bits+))
         (-c- self))
