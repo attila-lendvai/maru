@@ -332,7 +332,7 @@
                 arithmethic-shift-left arithmethic-shift-right
                 stack-pointer-on-entry
                 C-string                ; zero terminated C string
-                C-call ; calls the pointer in the first arg using the C calling convention on the rest of the args
+                ;;C-call ; calls the pointer in the first arg using the C calling convention on the rest of the args
                 ;; nothing should call these before their target version gets defined:
                 eval cons list car cdr form)
   (environment-define *globals* name (fixed (lambda args (eval-in-slave `(error ',name" encountered in interpreted code with args "',args))))))

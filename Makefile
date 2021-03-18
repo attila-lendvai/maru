@@ -54,14 +54,7 @@ CFLAGS_x86	+= $(CFLAGS)
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
 ifeq ($(PLATFORM),linux)
-# TODO deal with this on debian:
-# dpkg --search crt1.o
-# libc6-dev-i386: /usr/lib32/crt1.o
-# libc6-dev:amd64: /usr/lib/x86_64-linux-gnu/crt1.o
-  CFLAGS	+= -nostdlib -Wl,-Bstatic
-  # TODO this only works on nixos, using nix-shell and the shell.nix to fetch these files for us
-  CFLAGS_x86	+= -Wl,$(BUILD_x86)/crt1.o
-  CFLAGS_llvm	+= -Wl,$(BUILD_llvm)/crt1.o
+  CFLAGS	+= -nostdlib -nostartfiles -Wl,-Bstatic
 endif
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
