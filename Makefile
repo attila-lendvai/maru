@@ -14,6 +14,7 @@
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
 #  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
+#  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu PLATFORM=linux test-bootstrap-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
 # to force a full bootstrap cycle all the way down from the/a bottom stage:
 #  make test-bootstrap-recursively || beep
@@ -248,8 +249,8 @@ $(EVAL0_DIR):
 	git worktree add --detach --force $@
 
 # "forward" this target to the makefile in build/eval0
-# NOTE using TARGET_CPU=i686 would be faster, but i have trouble linking
-# -m32 executables on my nixos to test this properly.
+# NOTE: we fix TARGET_CPU to i686 (and platform to linux) because 32 LLVM is the fastest version of us.
+# TODO except that it propagates back, and maru.6 is broken on 32 bits LLVM
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
 		TARGET_CPU=$(TARGET_CPU)		\
@@ -257,16 +258,6 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 		TARGET_OS=$(TARGET_OS)			\
 		PLATFORM=$(PLATFORM)			\
 		$(EVAL0_BINARY)
-
-# "forward" this target to the makefile, because this is typically used as EVAL0
-# $(EVAL0_DIR)/$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0: $(EVAL0_DIR)
-# # NOTE linux platform on llvm is broken currently, so we fix the platform to libc
-# 	$(MAKE) --directory=$(EVAL0_DIR)		\
-# 		TARGET_CPU=i686				\
-# 		TARGET_VENDOR=$(TARGET_VENDOR)		\
-# 		TARGET_OS=$(TARGET_OS)			\
-# 		PLATFORM=libc				\
-# 		$(BUILD)/llvm-libc/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
 
 # eval0 is the first version of us that gets built by the compiler of
 # the host. this binary may be incomplete and/or differ from eval1,

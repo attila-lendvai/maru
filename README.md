@@ -329,6 +329,11 @@ that I know about and contain interesting code:
 
 A list of projects that are worth mentioning in this context:
 
+  - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
+    intelligence long-term project, with ambitious Artificial General
+    Intelligence goals. It contains interesting and relevant ideas, e.g. in
+    [refpersys-design.pdf](http://starynkevitch.net/Basile/refpersys-design.pdf).
+
   - [Project Oberon](http://www.projectoberon.com/): a project which encompasses CPU,
     language, operating system and user interface, and which can be run on a relatively
     inexpensive FPGA board, and simple enough for one person to understand it all.

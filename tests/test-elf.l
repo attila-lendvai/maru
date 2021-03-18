@@ -1,7 +1,19 @@
 (require "source/buffer.l")
 
+;; ELF stuff:
+;; stack, argc, argv, envs: https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; https://github.com/tonyg/pi-nothing/blob/4b2b59d42babd72cfd007cb71ed295dcdbf53d4a/nothingc/elf.rkt
 ;; https://interrupt.memfault.com/blog/gnu-binutils
+;; man elf
+;; /usr/include/linux/elf.h
+;; https://cirosantilli.com/elf-hello-world
+;; man 8 ld-linux.so
+;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
+
+;; memory layout, linux loader, malloc, brk:
+;; https://gist.github.com/CMCDragonkai/10ab53654b2aa6ce55c11cfc5b2432a4
+;; ASLR: https://sysctl-explorer.net/kernel/randomize_va_space/
+;; brk: https://gist.github.com/nikAizuddin/f4132721126257ec4345
 
 (define code (buffer 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
@@ -64,12 +76,6 @@
 	(else			(error "huh? "insn)))))
   (println "assembled "(buffer-length code)" bytes")
   )
-
-;; man elf
-;; /usr/include/linux/elf.h
-;; https://cirosantilli.com/elf-hello-world
-;; man 8 ld-linux.so
-;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
 
 (define elf/PF_R	0x4)
 (define elf/PF_W	0x2)

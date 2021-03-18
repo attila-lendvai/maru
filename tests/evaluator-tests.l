@@ -177,7 +177,7 @@
     (test-assert (= y 99))))
 
 ;; (define-test eval/let/bug/2 ()
-;;   ;; this is a bug also present in the piumarta branch
+;;   ;; this is a bug present in the piumarta branch
 ;;   ;; this should error...
 ;;   (encode '(let ((x 42)
 ;;                  (y (+ x 1))))))
