@@ -403,6 +403,19 @@
   ((_ _)			(println "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0")
 				(println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
 
+;; this crashes llvm: https://bugs.llvm.org/show_bug.cgi?id=49635
+;; (define-instruction SPONENTRY	(() 1 t)
+;;   (()				(println "	"$reg1" = i8* @llvm.sponentry()")))
+;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
+(define-instruction SPONENTRY	(() 4 t)
+  (()				(println "	"$reg1" = call i8* @llvm.frameaddress(i32 0)")
+				(println "	"$reg2" = bitcast %oop "$reg1" to [0 x %oop]*")
+				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg2", %word 0, %word 1")
+                                (println "	"$reg4" = bitcast %oop* "$reg3" to %oop")))
+
+;; (define-instruction FRAMEADDRESS	(() 1 t)
+;;   ((long)			(println "	"$reg1" = call i8* @llvm.frameaddress(i32 "$1")")))
+
 (define-instruction CALL	(() 1 t)
   ((GLOBAL _)			(emit-llvm-call $reg1
                                                 $1
@@ -1051,6 +1064,7 @@
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
   (cons (target-value C-call)		compile/C-call)
+  (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen SPONENTRY)))
   ))
 
 ;;;
@@ -1243,4 +1257,7 @@
                            ", %word" "")
                        "}\n"))
     ;; we represent libc's FILE* with an opaque type
-    (emit INLINE "%m_libc-FILE = type opaque\n")))
+    (emit INLINE "%m_libc-FILE = type opaque\n")
+    ;;(emit INLINE "declare i8* @llvm.sponentry()\n")
+    (emit INLINE "declare i8* @llvm.frameaddress(i32)\n")
+    ))

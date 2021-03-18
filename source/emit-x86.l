@@ -252,7 +252,7 @@
 (define-emit    (STORE _)			(println "	movl	%eax, "$1))
 
 (define-emit    (ADDR GI32)			(println "	movl	$"$1", %eax"))
-(define-emit    (ADDR TI32)			(println "	leal	"$1", %eax"))
+(define-emit    (ADDR _)			(println "	leal	"$1", %eax"))
 
 (define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
 						(println "	movl	%ecx, "$2))
@@ -759,6 +759,7 @@
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
   (cons (target-value C-call)		compile/C-call)
+  (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen ADDR "4(%ebp)")))
   ))
 
 ;;;
