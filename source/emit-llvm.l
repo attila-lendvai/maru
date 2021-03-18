@@ -986,9 +986,6 @@
          (const (emit-object/C-string str -c-)))
     (gen ADDR const str)))
 
-(define-function compile/C-call (expr -c-)
-  (compile-call (second expr) (cddr expr) true -c-))
-
 ;;;
 ;;; linux syscalls
 ;;;
@@ -1063,7 +1060,7 @@
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
-  (cons (target-value C-call)		compile/C-call)
+  ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call (second expr) (cddr expr) true -c-)))
   (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen SPONENTRY)))
   ))
 
@@ -1192,7 +1189,7 @@
 
 (define-method compile-definition <expr> (name -c-)
   (let ((object-label (compile-expr self name -c-)))
-    (when (member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main))
+    (when (member? name '(main _start))
       ;; KLUDGE export special casing
       (print (EXTERNAL name)" = external alias ")
       (emit-llvm-fn-type-for-expr self)

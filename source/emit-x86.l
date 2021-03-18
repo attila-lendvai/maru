@@ -715,9 +715,6 @@
   (let ((label (emit-object/C-string (second expr))))
     (gen LOAD label)))
 
-(define-function compile/C-call (expr -c-)
-  (compile-call (second expr) (cddr expr) true -c-))
-
 ;;;
 ;;; linux syscalls
 ;;;
@@ -758,7 +755,7 @@
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
-  (cons (target-value C-call)		compile/C-call)
+  ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call (second expr) (cddr expr) true -c-)))
   (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen ADDR "4(%ebp)")))
   ))
 
@@ -900,7 +897,7 @@
 
 (define-method compile-definition <expr> (name -c-)
   (let ((object-label (compile-expr self name -c-)))
-    (when (member? name '(main __libc_csu_init __libc_csu_fini __libc_start_main))
+    (when (member? name '(main _start))
       ;; KLUDGE export special casing
       (let ((external-label (EXTERNAL-LABEL name)))
         (emit ALIAS external-label (closure-code-label name))
