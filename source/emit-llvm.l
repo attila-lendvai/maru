@@ -1000,15 +1000,17 @@
    (println "	"$reg1" = call %oop asm sideeffect \"")
    (let ((arg-index	1)
          (clobbers	())
-         mov syscall regs)
+         mov syscall regs arg-location)
      (case (slave-value +architecture+)
        (IA-32
         (set mov	"	movl")
         (set syscall	"	int	$$0x80")
+        (set arg-location ",m") ; not enough registers on i386, pass args on the stack
         (set regs	+linux/syscall-registers/32+))
        (x86-64
         (set mov	"	movq")
         (set syscall	"	syscall")
+        (set arg-location ",r")
         (set regs	+linux/syscall-registers/64+)
         ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
         ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
@@ -1025,12 +1027,7 @@
      (println syscall"\", ")
      (print "	\"=A")
      (list-do _ $1
-       ;; TODO this should be (print ",r") to use rigsters, but then
-       ;; on 32 bits it fails because movl doesn't support the
-       ;; register combination (or something like that):
-       ;; error: invalid operand for instruction
-       ;;  movl    %rdx, %eax
-       (print ",r"))
+       (print arg-location))
      ;; list clobbered registers
      (while clobbers
        (print ",~{"(pop clobbers)"}"))
