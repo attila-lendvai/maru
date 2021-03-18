@@ -330,6 +330,7 @@
 ;; so that any accidental use of them will result in an early and useful error message.
 (list-do name '(return address-of byte-at set-byte-at
                 arithmethic-shift-left arithmethic-shift-right
+                stack-pointer-on-entry
                 C-string                ; zero terminated C string
                 C-call ; calls the pointer in the first arg using the C calling convention on the rest of the args
                 ;; nothing should call these before their target version gets defined:
