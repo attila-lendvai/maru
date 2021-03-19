@@ -30,7 +30,7 @@
 BACKENDS		= x86 llvm
 PLATFORMS		= libc linux
 # use this backend of the previous stage when it needs to be built.
-PREVIOUS_STAGE_BACKEND	= "-llvm"
+PREVIOUS_STAGE_BACKEND	= -llvm
 
 HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
@@ -131,7 +131,7 @@ BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 
-EVAL0_PHASE=1
+#EVAL0_PHASE=1
 ifdef EVAL0_PHASE
   # This way eval0 is built each time
   EVAL0_DIR	= $(SLAVE_DIR)
@@ -200,6 +200,7 @@ eval0-llvm: $(BUILD_llvm)/eval0
 clean:
 	rm -rf $(foreach plat,${PLATFORMS},$(foreach back,${BACKENDS},$(BUILD)/$(back)-$(plat) eval-$(back) eval0-$(back))) \
 		eval $(BUILD)/generated/
+# NOTE this is an endless loop when EVAL0_PHASE is enabled
 #	test -d $(EVAL0_DIR) && $(MAKE) --directory=$(EVAL0_DIR) clean
 	-git checkout --quiet $(BUILD)
 
@@ -252,14 +253,13 @@ $(EVAL0_DIR):
 	-find $@/$(BUILD) -type f -exec touch {} \;
 
 # "forward" this target to the makefile in build/eval0
-# NOTE: we fix TARGET_CPU to i686 (and platform to linux) because 32 LLVM is the fastest version of us.
-# TODO except that it propagates back, and maru.6 is broken on 32 bits LLVM
+# NOTE: we fix TARGET_CPU to i686 (and platform to linux) because 32 bit LLVM is the fastest version of us.
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
-		TARGET_CPU=$(TARGET_CPU)		\
+		TARGET_CPU=i686				\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
-		PLATFORM=$(PLATFORM)			\
+		PLATFORM=linux				\
 		$(EVAL0_BINARY)
 
 # eval0 is the first version of us that gets built by the compiler of
