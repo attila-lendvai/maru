@@ -129,11 +129,12 @@ BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 
-#EVAL0_PHASE=1
+EVAL0_PHASE=1
 ifdef EVAL0_PHASE
   # This way eval0 is built each time
   EVAL0_DIR	= $(SLAVE_DIR)
-  EVAL0		= $(BUILD_x86)/eval0
+  EVAL0_BINARY	= eval0-llvm
+  EVAL0		= $(BUILD_llvm)/eval0
 else
   # This way eval0 is built from the latest commit, checked out as a
   # working dir in build/eval0 and 'make update-eval0' must be used to
@@ -197,7 +198,7 @@ eval0-llvm: $(BUILD_llvm)/eval0
 clean:
 	rm -rf $(foreach plat,${PLATFORMS},$(foreach back,${BACKENDS},$(BUILD)/$(back)-$(plat) eval-$(back) eval0-$(back))) \
 		eval $(BUILD)/generated/
-	test -d $(EVAL0_DIR) && $(MAKE) --directory=$(EVAL0_DIR) clean
+#	test -d $(EVAL0_DIR) && $(MAKE) --directory=$(EVAL0_DIR) clean
 	-git checkout --quiet $(BUILD)
 
 distclean: clean
@@ -245,6 +246,8 @@ update-eval0: $(EVAL0_DIR)
 # there, in a clean tree.
 $(EVAL0_DIR):
 	git worktree add --detach --force $@
+# a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
+	-find $@/$(BUILD) -type f -exec touch {} \;
 
 # "forward" this target to the makefile in build/eval0
 # NOTE using TARGET_CPU=i686 would be faster, but i have trouble linking
@@ -322,8 +325,9 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
-$(BUILD_x86)/eval1.s: $(EVAL0) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval1.s: boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
+	$(call ensure-built,$(EVAL0))
 	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
 
@@ -333,8 +337,9 @@ $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstr
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval1.ll: $(EVAL0) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval1.ll: boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
+	$(call ensure-built,$(EVAL0))
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
