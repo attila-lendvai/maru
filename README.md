@@ -28,38 +28,7 @@ more detail.
 
 ## How
 
-Maru's architecture is described in Ian Piumarta's paper:
-[Open, extensible composition models](https://www.piumarta.com/freeco11/freeco11-piumarta-oecm.pdf).
-
-> it is a sketch of how Maru's generalised eval works,
-> which is entirely accurate in intent and approach,
-> if a little different in some implementation details (Ian Piumarta)
-
-### The Parts - an overview
-
-* `eval.c` (in branch `maru.0.c99`) contains a reader and
-[evaluator](https://en.wikipedia.org/wiki/Interpreter_(computing)) (interpreter) for an
-s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
-
-* `eval.l` (in branch `maru.1` and up) contains the same evaluator, written in
-(a subset of) this s-expression language that can be compiled to machine code.
-In other words, `eval.l` implementats a
-[metacircular evaluator](https://en.wikipedia.org/wiki/Meta-circular_evaluator)
-for the language it is written in.
-
-* `emit.l` contains a compiler from s-expressions to
-[IA-32](https://en.wikipedia.org/wiki/IA-32) (x86) assembly (and [LLVM](https://llvm.org/) IR),
-written in the s-expression language. This compiler can be thought of
-as a semantics-preserving "level shift" from s-expressions to machine code, letting
-the metacircular evaluator in `eval.l` escape from the "infinite metacircular regression"
-to a language grounded in hardware. A possible metaphor of this is a "target universe"
-implemented by some electric circuits (i.e. transistors wired to each other in a CPU)
-that provide you a set of axiomatic foundations to build upon while compiling the
-abstract to the concrete; while implementing your new universe (the Maru language in
-this case). More details are available in [the compiler's doc](doc/compiler.md).
-
-* `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by
-`emit.l`; it's written in the s-expression language.
+Maru's architecture is described in [doc/how.md](doc/how.md).
 
 ### Build instructions
 
@@ -70,7 +39,13 @@ make test-bootstrap-x86    # defaults to the libc platform
 make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 ```
 
-#### Linux
+#### Nix and NixOS
+
+My primary platform. There's a `default.nix` file in the repo, so you
+can run `nix-shell` to enter into the same environment that I use when
+I work on Maru.
+
+#### Debian, and derivatives
 
 ```
 sudo apt install make time rlwrap
@@ -93,8 +68,9 @@ sudo apt install gcc-multilib
 
 #### MacOS
 
-Please note that recent MacOS versions don't support 32 bit executables anymore,
-but Maru's LLVM backend is expected to work fine.
+Please note that recent MacOS versions don't support 32 bit
+executables anymore, but Maru's LLVM backend should work fine. I don't
+test it regularly, so things may not always work out of the box.
 
 1. Make sure XCode is installed. In a Terminal:
 
@@ -124,12 +100,12 @@ Patches are welcome for other platforms.
 
 ## Who
 
-Initially written by [Ian Piumarta](https://www.piumarta.com/software/maru/),
+Originally written by [Ian Piumarta](https://www.piumarta.com/software/maru/),
 at around 2011. Full commit history is available in the
 [`piumarta`](https://github.com/attila-lendvai/maru/tree/piumarta)
 branch.
 
-This repo and readme is maintained by [attila@lendvai.name](mailto:attila@lendvai.name).
+The current gardener is [attila@lendvai.name](mailto:attila@lendvai.name).
 
 ## Where
 
@@ -146,7 +122,7 @@ more self-contained, and more approachable** by people who set out to learn prog
 
 * We lose a lot of value by not capturing the history of the growth of a language, including
 the formal encoding of its build instructions. They are useful both for educational purposes,
-and also for practical reasons: to have a minimal *seed* that is very simple to
+and also for practical reasons: to have a minimal seed that is very simple to
 port to a new architecture, and then have a self-contained, formal bootstrap process that
 can automatically "grow" an entire computing system on top of that freshly laid, tiny foundation.
 
@@ -156,7 +132,7 @@ can automatically "grow" an entire computing system on top of that freshly laid,
 * Ian seems to have stopped working on Maru, but it's an interesting piece of code that
 deserves a repo and a maintainer.
 
-* This work is full of puzzles that are a whole lot of fun to resolve!
+* This work is full of puzzles that are a whole lot of fun to solve!
 
 ## Contribution
 
@@ -175,11 +151,11 @@ and/or that you are ready for some `git fetch` and `git rebase`.
 Backporting and bootstrapping the latest semantics from the `piumarta`
 branch is done: the `eval.l` in the latest branch of this repo should
 be semantically equivalent with the `eval.l` that resides in the
-`piumarta` branch, although we have arrived to this state on two
+`piumarta` branch, although, we have arrived to this state on two
 different paths:
 
   - Ian, while evolving Maru, kept his `eval.c` and `eval.l`
-    semantically in sync,
+    semantically in sync
 
   - while I have bootstrapped the new features: I started out from an
     earlier version of the `eval.l` + `eval.c` couple (the [minimal
@@ -194,20 +170,14 @@ different paths:
 There are several Maru stages/branches now, introducing non-trivial
 new features. Some that are worth mentioning:
 
-  - Introduction of *platforms*: they are the "holding environments"
-    where the implementation of `eval` can be brought alive. Notably,
-    besides the original `libc` platform, there is now a `linux`
-    platform that compiles to a statically linked executable that runs
-    directly on top of the Linux kernel,
-    [using `syscall`s](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
-    i.e. without linking anything from `libc.so`, or `ld-linux.so`. From
-    a practical perspective this is equivalent with running directly
-    on the bare metal (i.e. all dynamically allocated memory is
-    provided by our own GC, etc).
-
-    List of platforms: `libc`, `linux`, `metacircular` (only planned:
-    loading the evaluator's implementation into another instance of
-    the evaluator, as opposed to compiling it to machine code).
+  - Introduction of [*platforms*](platforms.md), and notably the
+    `linux` platform that compiles to a statically linked executable
+    that only uses Linux kernel
+    [`syscall`s](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
+    From a practical perspective this is almost equivalent with
+    running directly on the bare metal (i.e. all dynamically allocated
+    memory needs to be managed by our own GC, all IO behind our own
+    abstractions, etc).
 
   - The host and the slave are isolated while bootstrapping which makes it possible to
     do things like reordering types (changing their type id in the target),
@@ -225,12 +195,15 @@ new features. Some that are worth mentioning:
 ### Assorted TODO:
 
   - Finish the proof of concept in `tests/test-elf.l` to compile the
-    Linux plaform directly into an ELF binary.
+    Linux plaform directly into an ELF binary. This would reduce the
+    list of external dependencies to a single one (GNU Make).
 
   - Rewrite the build process in Maru; eliminate dependency on GNU Make.
 
-  - Replace the hand-written parser in `eval.l` with something generated by the
-    [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar) compiler.
+  - Replace the hand-written parser in `eval.l` with something
+    generated by a parser generator, maybe the
+    [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar)
+    compiler. More generally, make the parser extendable.
 
   - Implement modules and phase separation along with what is outlined in
     [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
@@ -241,7 +214,7 @@ new features. Some that are worth mentioning:
     one could be
     [pc-bios](https://github.com/cirosantilli/x86-bare-metal-examples),
     because it's easily testable using QEMU. Or port it on an ARM
-    board (like Raspberry Pi)? Or maybe even a C64 port?
+    board (like Raspberry Pi)? Or maybe even attempt a C64 port?
 
   - Revive all the goodies in the `piumarta` branch, but in a structured way.
 
@@ -249,7 +222,7 @@ new features. Some that are worth mentioning:
     make it optional?
 
   - Weed out some of the added bloat/complexity (e.g. compile closures
-    instead of selectors, and use them to implement streams; write a
+    instead of `<selector>`s, and use them to implement streams; write a
     tree shaker; etc).
 
   - Merge the language and API that the compiler and the evaluator understands;
@@ -257,7 +230,7 @@ new features. Some that are worth mentioning:
     understood by the evaluator. This would mean that we can e.g. load/compile
     `source/buffer.l` both into the level-shifted code and into the evaluator.
     This is slowly happening, but it's nowhere near done, and I'm not even sure
-    what done means here.
+    what being done means here.
 
   - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
     definitions to generate bytecode assemblers. It requires either
@@ -268,8 +241,7 @@ new features. Some that are worth mentioning:
   - Introduce a simplified language that drops some langauge features,
     e.g. remove *forms* and the *expand* protocol. Make sure that this
     language can bootstrap itself off of C99. Then reintroduce *forms*
-    and *expand* by using this simplified Maru as the implementation
-    language.
+    and *expand* by using this simplified Maru as the bootstrap host.
 
   - Understand and incorporate François René Rideau's model of
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),

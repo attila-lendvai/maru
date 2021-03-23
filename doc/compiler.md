@@ -8,7 +8,7 @@ implementation language of this evaluator is also Maru... although only
 a subset of the full language.
 
 The compiler can compile a list of named definitions (an *environment*) to the
-target language; i.e. to the language of the foundational platform
+target language; i.e. to the language of the foundational [platform](platforms.md)
 that was chosen to build the Maru VM on top of (e.g. x86 machine code,
 LLVM, libc, the Linux kernel, etc).
 

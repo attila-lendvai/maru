@@ -4,8 +4,8 @@
 
 The Maru Virtuam Machine (VM) is a machine that can execute Maru
 programs. It is implemented in terms of a set of axiomatic primitives
-provided by the *target* VM, aka the *platform* upon which the Maru
-VM's implementation is running.
+provided by the *target* VM, aka the [*platform*](platforms.md)
+on which the Maru VM's implementation is running.
 
 ## Implementation strategies
 
