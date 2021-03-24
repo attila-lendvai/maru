@@ -11,10 +11,9 @@
      ,@body))
 
 (define-form test-assert (condition . printing)
-  `(let ((__cond__ ,condition))
-     (unless __cond__
-       (println "\n\n\033[1;31m*** FAILURE\033[0m form: " ',condition " " ,@printing)
-       (println))))
+  `(unless ,condition
+     (println "\n\n\033[1;31m*** FAILURE\033[0m form: " ',condition " " ,@printing)
+     (println)))
 
 (define-form run-tests ()
   (let ((tests *tests*)
@@ -191,6 +190,17 @@
 ;;       (set x -1)
 ;;       (test-assert (= x -1)))
 ;;     (test-assert (= x 42))))
+
+(define-test eval/closures/bug/1 ()
+  ;; this bug is present in the piumarta branch, both in eval.c and eval.l
+  (let ((closure (let ((x 42))
+                   (lambda ()
+                     x))))
+    ;;(println (closure))
+    (test-assert (= 42 (closure)))
+    (let ((y -200))
+      ;;(println (closure))
+      (test-assert (= 42 (closure))))))
 
 (define-form eval/expand/bug/1/helper-form (val)
   `(zork ,val))
