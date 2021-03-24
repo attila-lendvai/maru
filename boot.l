@@ -157,7 +157,7 @@
     `(define ,name ,(form () (lambda _ replacement)))))
 
 (define-form define-constant (name value-form)
-  `(define ,name (form () (lambda _ ',(eval value-form)))))
+  `(define ,name (form () (lambda _ ',(eval value-form *env*)))))
 
 (define-form define-function (name args . body)
   `(define ,name (lambda ,args ,@body)))
@@ -256,10 +256,10 @@
   (or (is <string> x)
       (is <long> x)))
 
-(define-form define-expand (type args . body)   `(set (array-at *expanders*	,(<type>-id (eval type))) (lambda ,args ,@body)))
-(define-form define-encode (type args . body)   `(set (array-at *encoders*	,(<type>-id (eval type))) (lambda ,args ,@body)))
-(define-form define-eval   (type args . body)   `(set (array-at *evaluators*	,(<type>-id (eval type))) (lambda ,args ,@body)))
-(define-form define-apply  (type args . body)   `(set (array-at *applicators*	,(<type>-id (eval type))) (lambda ,args ,@body)))
+(define-form define-expand (type args . body)   `(set (array-at *expanders*	,(<type>-id (eval type *env*))) (lambda ,args ,@body)))
+(define-form define-encode (type args . body)   `(set (array-at *encoders*	,(<type>-id (eval type *env*))) (lambda ,args ,@body)))
+(define-form define-eval   (type args . body)   `(set (array-at *evaluators*	,(<type>-id (eval type *env*))) (lambda ,args ,@body)))
+(define-form define-apply  (type args . body)   `(set (array-at *applicators*	,(<type>-id (eval type *env*))) (lambda ,args ,@body)))
 
 ;;; local syntax
 
@@ -293,7 +293,7 @@
 
 (define-form with-instance-accessors (var-name type-name . body)
   (let ((accessors	())
-        (super		(eval type-name)))
+        (super		(eval type-name *env*)))
     (while (is <record> super)
       (list-do accessor (make-instance-accessors var-name
                                                  (<type>-name super)
@@ -305,7 +305,7 @@
 
 (define-form new (type-name . inits)
   (let* ((i -1)
-         (type (eval type-name))
+         (type (eval type-name *env*))
          (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
     ;; TODO singletons for types whose instances have no slots?
     (if inits

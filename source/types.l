@@ -250,7 +250,7 @@
 ;; the level-shifted code. see compile-begin for more details, or compiled peg parsers
 ;; that inhibit the expansion of slot-value while generating the maru code.
 (define-form slot-value (type-name slot-name object)
-  (let* ((type (eval type-name))
+  (let* ((type (eval type-name *env*))
          (slot-index (record/slot-index type slot-name)))
     `(oop-at
       ,(if feature/typecheck-slot-access
@@ -263,7 +263,7 @@
 ;; situations, at a later time, when the generated code is expanded, we may
 ;; encounter set-slot-value forms, so let's provide them, too.
 (define-form set-slot-value (type-name slot-name object value)
-  (let* ((type (eval type-name))
+  (let* ((type (eval type-name *env*))
          (slot-index (record/slot-index type slot-name)))
     `(set-oop-at
       ,(if feature/typecheck-slot-access

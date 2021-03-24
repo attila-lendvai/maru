@@ -72,7 +72,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-form slot-value (type-name slot-name object)
-  (let* ((type		(eval type-name))
+  (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
     `(oop-at ,(if feature/typecheck-slot-access
                   `(%accessor-typecheck ,type-name ,object)
@@ -80,7 +80,7 @@
              ,slot-index)))
 
 (define-form set-slot-value (type-name slot-name object value)
-  (let* ((type		(eval type-name))
+  (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
     `(set (oop-at ,(if feature/typecheck-slot-access
                        `(%accessor-typecheck ,type-name ,object)
