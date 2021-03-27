@@ -70,7 +70,9 @@
 
   (verbosity 1
     (gc/collect)
-    (libc/fprintf libc/stderr "%ld objects in %ld bytes, %ld bytes free\n" gc/objects-live gc/bytes-used gc/bytes-free))
+    (libc/fprintf libc/stderr
+                  (string->C-string "%ld objects in %ld bytes, %ld bytes free\n")
+                  gc/objects-live gc/bytes-used gc/bytes-free))
   (when-at-expand feature/profiler
     (profiler/disable))
   (platform/flush-streams)
