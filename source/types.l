@@ -401,26 +401,28 @@
     `(with-forms ,accessors
        ,@body)))
 
+;;; constructors
+
 (define-form new (type-name . inits)
   (let* ((i -1)
          (type (eval type-name *env*))
-         ;; NOTE (<type>-id type) is tempting here, but when we are
-         ;; being bootstrapped it needs the slave-id
-         (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
+         (allocate-form `(allocate ,(<type>-id type) ,(type/slot-count-of-instances type))))
     ;; TODO singletons for types whose instances have no slots?
     (if inits
-        `(gc/let* ((_self_ ,allocate-form))
+        `(let ((_self_ ,allocate-form))
            ;; TODO the usefulness of this is questionable... delme and rename make to new?
-           ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+           ,@(map (lambda (_init_)
+                    (list 'set-oop-at '_self_ (incr i) _init_))
+                  inits)
            _self_)
       allocate-form)))
 
 (define-form new* (type . inits)
   ;; this one doesn't need to know the type at expand-time
   (let ((i -1))
-    `(gc/let* ((_type_ ,type)
-               (_self_ (allocate (<type>-id _type_)
-                                 (type/slot-count-of-instances _type_))))
+    `(let* ((_type_ ,type)
+            (_self_ (allocate (<type>-id _type_)
+                              (type/slot-count-of-instances _type_))))
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 
@@ -434,7 +436,7 @@
               (%make-make-inits env prefix (cdr inits)))))))
 
 (define-form make (type . inits)
-  `(gc/let* ((self (new ,type)))
+  `(let ((self (new ,type)))
      (with-instance-accessors self ,type
        ,@(%make-make-inits *env* 'self. inits)
        self)))

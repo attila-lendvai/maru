@@ -1,8 +1,15 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;;;
-;;; types
-;;; ----------------------------------------------------------------
+;; NOTE this hides the one in source/types.l with a specialized
+;; version for the target code.
+
+(define-form make (type-name . inits)
+  (let ((type (eval type-name *env*)))
+    `(gc/let* ((self (allocate ,(<type>-slave-id type)
+                               ,(type/slot-count-of-instances type))))
+       (with-instance-accessors self ,type-name
+         ,@(%make-make-inits *env* 'self. inits)
+         self))))
 
 (define-form define-type-of ()
   (let ((conds-early	())

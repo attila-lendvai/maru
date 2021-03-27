@@ -9,10 +9,6 @@
 ;;; ----------------------------------------------------------------
 
 (load "source/evaluator/gc.l")
-
-(define-function allocate (type slot-count)
-  (gc/allocate type (words-to-bytes slot-count)))
-
 (load "source/evaluator/eval.l")
 
 ;; TODO possible #optimization: even in the current setup, libc.l can override number->string with its own.

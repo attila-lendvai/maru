@@ -176,14 +176,6 @@
 
 (define-symbol-form *globals* '(current-globals))
 
-;; KLUDGE: the compiler cannot yet automatically keep track of gc
-;; roots. to be able to share code between the evaluator and the
-;; compiler, we register a few NOPs in the interpreter.
-(define-symbol-form gc/let* 'let*)
-;; NOTE do NOT try to mess here with box/unbox! it will screw you up
-;; when in the compiler you want to box a literal and emit it into the
-;; target...
-
 (define-form assert (test . args)
   (unless args
     (set args (list "assertion failed: " `(quote ,test))))

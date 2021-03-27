@@ -48,20 +48,8 @@
          ,@(%make-make-inits *env* 'self. inits)
          self))))
 
-(define-primitive-function (allocate ()) (type (slot-count <long>))
-  ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
-  (allocate (cond
-              ((is <long> type)
-               ;; the requested type is directly given as an integer type-id
-               (unbox <long> type))
-              ((or (is <type> type)
-                   (is <record> type))
-               ;; KLUDGE we need to disable accessor typecheck here, because when it's a <record>, then it gets triggereed, because the target universe is unaware of inheritance
-               (unbox <long> (with-forms ((%accessor-typecheck ((type obj) obj)))
-                               (<type>-id type))))
-              (else
-               (error "allocate: illegal type specifier: "type)))
-            slot-count))
+(define-primitive-function allocate ((type <long>) (slot-count <long>))
+  (gc/allocate type (words-to-bytes slot-count)))
 
 (define-primitive-function allocate-data ((byte-size <long>))
   (gc/allocate-opaque <data> byte-size))
@@ -325,7 +313,7 @@
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
-        (gc/let* ((new-frame (new <call-frame>)))
+        (gc/let* ((new-frame (make <call-frame>)))
           (set (array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
       (with-instance-accessors frame <call-frame>

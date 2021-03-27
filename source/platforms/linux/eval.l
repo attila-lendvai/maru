@@ -9,10 +9,6 @@
 ;;; ----------------------------------------------------------------
 
 (load "source/evaluator/gc.l")
-
-(define-function allocate (type slot-count)
-  (gc/allocate type (words-to-bytes slot-count)))
-
 (load "source/evaluator/eval.l")
 
 (define-primitive-function set-working-directory ((path <string>))
