@@ -17,12 +17,12 @@
 
 ;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment *globals* 1 0)))
 (define-primitive-function (eval ()) _
-  (let ((env (if (cdr -args-) ; let's not tolerate being called with nil env
+  (let ((env (if (cdr -args-) ; let's fail early when called with nil env
                  (cadr -args-)
                *globals*)))
-    (let* ((toplevel-env?	(= 0 (unbox <long> (<env>-level env))))
-           (prev-globals	*globals*)
-           result)
+    (let ((toplevel-env?	(= 0 (unbox <long> (<env>-level env))))
+          (prev-globals	*globals*)
+          result)
       (when toplevel-env?
         (set-current-globals env))
       (set result (gc/let* ((child-env (environment env 1 0)))

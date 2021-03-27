@@ -29,6 +29,11 @@
     pointers have 4 such bits. It makes sense to use those bits to
     encode 8-16 types, like a small-integer, right into the pointer.
 
+ - *word*: the natural data size the target architecture; e.g. 64 bits
+    for `x86_64`. Must be equal to the size of a pointer.
+
+ - *long*: a signed integer of the size of a *word* in the target.
+
  - *oop-at*: pointer dereferencing primitive
 
  - *level shift*: aka compilation; a semantics-preserving "level

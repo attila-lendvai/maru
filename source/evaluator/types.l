@@ -31,7 +31,7 @@
 
 (when-at-expand feature/optimize-speed
   (define-form is (type-name obj)
-    (let ((type (eval type-name)))
+    (let ((type (eval type-name *env*)))
       (cond
         ((is <record> type) ; NOTE: IS in the form bodies will resolve to the one in *slave-env*, regardless of our new definition of IS in the target module
          ;; TODO this ignores inheritance

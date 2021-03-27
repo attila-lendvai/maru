@@ -379,19 +379,84 @@
   ;; TODO accessor regression: there used to be <peg>-result, now there's only a <parser>-result (inheritance)
   `(define-record ,name ,basis ,fields))
 
+;;; field accesors
+
+(define-function make-instance-accessors (var-name type-name slots)
+  (when (pair? slots)
+    (cons `(,(concat-symbols var-name '. (car slots))
+             ()
+             ((_)
+              `(slot-value ,type-name ,(car slots) ,var-name)))
+          (make-instance-accessors var-name type-name (cdr slots)))))
+
+(define-form with-instance-accessors (var-name type-name . body)
+  (let ((accessors	())
+        (super		(eval type-name *env*)))
+    (while (is <record> super)
+      (list-do accessor (make-instance-accessors var-name
+                                                 (<type>-name super)
+                                                 (<record>-direct-slots super))
+        (push accessors accessor))
+      (set super (<record>-super super)))
+    `(with-forms ,accessors
+       ,@body)))
+
+(define-form new (type-name . inits)
+  (let* ((i -1)
+         (type (eval type-name *env*))
+         ;; NOTE (<type>-id type) is tempting here, but when we are
+         ;; being bootstrapped it needs the slave-id
+         (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
+    ;; TODO singletons for types whose instances have no slots?
+    (if inits
+        `(gc/let* ((_self_ ,allocate-form))
+           ;; TODO the usefulness of this is questionable... delme and rename make to new?
+           ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+           _self_)
+      allocate-form)))
+
+(define-form new* (type . inits)
+  ;; this one doesn't need to know the type at expand-time
+  (let ((i -1))
+    `(gc/let* ((_type_ ,type)
+               (_self_ (allocate (<type>-id _type_)
+                                 (type/slot-count-of-instances _type_))))
+       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
+       _self_)))
+
+(define-function %make-make-inits (env prefix inits)
+  (when inits
+    (let ((entry (first inits)))
+      (when (= (first entry) 'when-at-expand) ; well, if we look at it as a DSL... or is it a KLUDGE?
+        (set entry (expand entry env)))
+      (when entry
+        (cons `(set ,(concat-symbol prefix (first entry)) ,(second entry))
+              (%make-make-inits env prefix (cdr inits)))))))
+
+(define-form make (type . inits)
+  `(gc/let* ((self (new ,type)))
+     (with-instance-accessors self ,type
+       ,@(%make-make-inits *env* 'self. inits)
+       self)))
+
 ;;; built-in types
 
-;; NOTE: the primitive-functions provided by the eval executable assume
+;; NOTE the primitive-functions provided by the eval executable assume
 ;; a certain memory layout for the built-in types.
 ;; what actually happens is encoded in the executable, and if you change any of these
 ;; then you need to bootstrap to reflect the changes in the next executable.
 ;; types are represented in the target as successive integers.
 
-;; TODO maybe: type objects should be serialized into the compiled binary and this
-;; should be wrapped in a big (eval-at-expand (if bootstrapping? ...)). this would also
-;; reflect the fact that editing these and bringing it out of sync with the
-;; level-shifted binary is not an option without grave consequences.
-;; such a setup would hopefully also simplify the bootstrapping dance above.
+;; NOTE these type definitions also encode the object layout in the
+;; target, which may or may not be a good idea. maybe there should be
+;; separate define-object-layout forms in the target code for that?
+
+;; TODO type objects and their accessors should be serialized into the
+;; compiled binary and this should be wrapped in a big (when-at-expand
+;; bootstrapping? ...). this would also reflect the fact that editing
+;; these and bringing it out of sync with the level-shifted binary is
+;; not an option without grave consequences. such a setup would
+;; hopefully also simplify the bootstrapping dance above.
 (define-type		<data>)					; some blob; used for stuff like the elements of <string> and <array>
 
 (define-immediate	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero

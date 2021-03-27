@@ -281,64 +281,6 @@
     `(let ()
        ,@(map-with expand body env))))
 
-;;; field accesors
-
-(define-function make-instance-accessors (var-name type-name slots)
-  (when (pair? slots)
-    (cons `(,(concat-symbols var-name '. (car slots))
-             ()
-             ((_)
-              `(slot-value ,type-name ,(car slots) ,var-name)))
-          (make-instance-accessors var-name type-name (cdr slots)))))
-
-(define-form with-instance-accessors (var-name type-name . body)
-  (let ((accessors	())
-        (super		(eval type-name *env*)))
-    (while (is <record> super)
-      (list-do accessor (make-instance-accessors var-name
-                                                 (<type>-name super)
-                                                 (<record>-direct-slots super))
-        (push accessors accessor))
-      (set super (<record>-super super)))
-    `(with-forms ,accessors
-       ,@body)))
-
-(define-form new (type-name . inits)
-  (let* ((i -1)
-         (type (eval type-name *env*))
-         (allocate-form `(allocate ,type-name ,(type/slot-count-of-instances type))))
-    ;; TODO singletons for types whose instances have no slots?
-    (if inits
-        `(gc/let* ((_self_ ,allocate-form))
-           ;; TODO the usefulness of this is questionable... delme and rename make to new?
-           ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
-           _self_)
-      allocate-form)))
-
-(define-form new* (type . inits)
-  ;; this one doesn't need to know the type at expand-time
-  (let ((i -1))
-    `(gc/let* ((_type_ ,type)
-               (_self_ (allocate (<type>-id _type_)
-                                 (type/slot-count-of-instances _type_))))
-       ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
-       _self_)))
-
-(define-function %make-make-inits (env prefix inits)
-  (when inits
-    (let ((entry (first inits)))
-      (when (= (first entry) 'when-at-expand) ; well, if we look at it as a DSL... or is it a KLUDGE?
-        (set entry (expand entry env)))
-      (when entry
-        (cons `(set ,(concat-symbol prefix (first entry)) ,(second entry))
-              (%make-make-inits env prefix (cdr inits)))))))
-
-(define-form make (type . inits)
-  `(gc/let* ((self (new ,type)))
-     (with-instance-accessors self ,type
-       ,@(%make-make-inits *env* 'self. inits)
-       self)))
-
 (require "source/selector.l")
 (require "source/printing.l")
 (require "source/generic.l")

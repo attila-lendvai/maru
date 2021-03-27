@@ -154,7 +154,7 @@ EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/asm-x86.l)
 
 EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l streams.l) \
- $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l) \
+ $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l)
 
 # for some optional C files, e.g. profiler.c
@@ -243,7 +243,7 @@ $(HOST_DIR)/eval:
 	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE_EXTRA_TARGETS) eval$(PREVIOUS_STAGE_BACKEND)
 
 update-eval0: $(EVAL0_DIR)
-	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../..
+	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../.. && make clean
 
 # check out our latest commit into build/eval0/, and build the eval0 executable
 # there, in a clean tree.

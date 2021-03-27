@@ -46,8 +46,8 @@
                    '(gc/valid-header-canary? (gc/header-of __obj__))
                  'true)))))
 
-;; TODO this assumes that the .text segment is loaded/mapped before
-;; the .data segment. it works on linux/elf, but probably requires
+;; TODO this assumes that the read-only data segment is loaded/mapped
+;; before the .data segment. it works on linux/elf, but may require
 ;; more care on other platforms.
 (define-form gc/read-only-object? (obj)
   `(< ,obj gc/memory-base))

@@ -52,6 +52,7 @@
   ;; allocates a lisp object with the given type. size is given as a count of the slots (pointers).
   (allocate (cond
               ((is <long> type)
+               ;; the requested type is directly given as an integer type-id
                (unbox <long> type))
               ((or (is <type> type)
                    (is <record> type))
