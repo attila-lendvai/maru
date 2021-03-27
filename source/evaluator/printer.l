@@ -112,7 +112,11 @@
                  ($put-all stream ",Off")
                  (do-print stream offset storing?)
                  ($put-all stream ",#")
-                 (do-print stream (box <long> (array-length bindings)) storing?))
+                 (do-print stream (box <long> (array-length bindings)) storing?)
+                 (awhen (<env>-parent obj)
+                   ($put-all stream ",parent: ")
+                   (do-print stream it storing?))
+                 ($put stream ?>))
              ($put-all stream "Env<?>"))))
 
         ((= type <context>)
