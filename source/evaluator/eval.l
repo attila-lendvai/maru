@@ -293,7 +293,7 @@
 ;;; backtrace
 ;;; ----------------------------------------------------------------
 
-(define-record <call-frame> () (callee-designator callee arguments))
+(define-record <call-frame> () (callee-designator callee arguments env))
 
 (define-form with-new-call-frame (args . body)
   (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
@@ -358,7 +358,8 @@
               (let ((args (<call-frame>-arguments call-frame)))
                 (cond
                   (expand-or-encode?
-                   (print-all out "\texpr: "args"\n"))
+                   (print-all out "\texpr: "args"\n")
+                   (print-all out "\tenv: "(<call-frame>-env call-frame)"\n"))
                   (else
                    (let ((arg-index 0))
                      (list-do arg args
@@ -589,6 +590,7 @@
 (define-primitive-function expand (exp (env <env> (<context>-env -ctx-)) (one-step? <long> false))
   (debug-print "expand, exp "exp", env "env)
   (with-new-call-frame (symbol/expand () exp)
+    (set (<call-frame>-env -call-frame-) env)
     ;; TODO use typecase
     (cond
       ((pair? exp)	(expand/pair	exp env one-step? -call-frame-))
@@ -711,6 +713,7 @@
 (define-primitive-function encode (exp (env <env> (<context>-env -ctx-)))
   (debug-print "encode of exp "exp", in env "env)
   (with-new-call-frame (symbol/encode () exp)
+    (set (<call-frame>-env -call-frame-) env)
     (debug-print "encode is dispatching on type "(box <long> (type-of exp)))
     ;; TODO use typecase
     (cond
