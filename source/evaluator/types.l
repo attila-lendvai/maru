@@ -4,19 +4,6 @@
 ;;; types
 ;;; ----------------------------------------------------------------
 
-(define-form level-shift-types names
-  `(let ()
-     ,@(map (lambda (name)
-              `(define ,name (eval-in-slave ',name)))
-            names)))
-
-(level-shift-types
- ;; make these types visible to the target code
- ;; TODO FIXME what about reinstating them when the exe starts up?
- <type> <record>
- <data> <undefined> <long> <array> <string> <expr> <form> <fixed> <target-function>
- <variable> <env> <context> <target-pointer> <symbol> <pair>)
-
 (define-form define-type-of ()
   (let ((conds-early	())
         (conds-late	()))
