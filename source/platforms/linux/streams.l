@@ -15,10 +15,10 @@
                            (cond
                              ((or (not mode)
                                   (string= mode "r"))
-                              (bitwise-or linux/O_RDONLY
-                                          linux/O_CREAT))
+                              linux/O_RDONLY)
                              ((string= mode "rw")
-                              linux/O_RDWR)
+                              (bitwise-or linux/O_RDWR
+                                          linux/O_CREAT))
                              (else
                               (error "file-open: unexpected mode "mode" while opening "path)))
                            420          ; "rw-r--r--"
