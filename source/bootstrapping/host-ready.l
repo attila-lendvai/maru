@@ -45,7 +45,11 @@
 (switch-to-host-env)
 
 (assert (= *host-env* (eval '*host-env* *slave-env*)))
+
 (assert (= (eval '*host-env* *host-env*) (eval '*host-env* *slave-env*)))
+
+(define-function switch-to-slave-env ()
+  (set *globals* *slave-env*))
 
 (define-function eval-in-slave (form)
   (eval form *slave-env*))

@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(set *globals* *slave-env*)
+(switch-to-slave-env)
 
 ;; these create only copies. we could/should add some form of
 ;; references to the same <variable> instances, but that kinda

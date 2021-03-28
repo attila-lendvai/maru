@@ -1,6 +1,10 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/platforms/libc/libc.l")
+(load (concat-strings "source/emit-" *compiler-backend* ".l"))
+
+(switch-to-target-env)
+
+(load "source/platforms/libc/libc.l")
 
 (load "source/evaluator/vm-early.l")
 

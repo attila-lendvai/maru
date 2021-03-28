@@ -20,7 +20,7 @@
 ;;;     go astray because "foo" will be emitted as a null terminated string of
 ;;;     ascii bytes (instead of a Maru object of type <string>).
 ;;;   - probaby more
-;;;   - see +special-operators+ and +special-forms+ for the list of specially
+;;;   - see +special-operators+ and *special-forms* for the list of specially
 ;;;     handled constructs
 ;;;
 ;;; Naming:
@@ -29,6 +29,8 @@
 ;;;   - -foo- is an implicit var in the lexenv
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
+
+(require "source/emit-early.l")
 
 (define-constant +external-label-prefix+
     (case (target-value +operating-system+)
@@ -745,34 +747,9 @@
     (gen LOAD label)))
 
 ;;;
-;;; linux syscalls
+;;; *special-forms*
 ;;;
-;;; TODO this should go into a separate file and only loaded as needed
-
-(eval-in-slave `(define linux-syscall (fixed (lambda args (print "linux-syscall encountered in interpreted code with args " args "\n") (abort)))))
-
-(define-emit    (LINUX-SYSCALL pair)
-  (let ((args	$1)
-        (regs	+linux/syscall-registers/32+))
-    (while args
-      (println "	movl	"(pop args)", %"(pop regs))))
-  (println "	int	$0x80"))
-
-;; TODO add a <target-function> for this? or add a macro whose
-;; expansion contains a literal x86 asm LINUX-SYSCALL instruction that
-;; is passed through all the way to emit?
-(define-function compile/linux-syscall (expr -c-)
-  (let ((args		(cdr expr))
-        (arg-locs	()))
-    (while args
-      (push arg-locs (compile/expr-into-temp-or-literal (pop args) -c-)))
-    (free-temps arg-locs)
-    (gen LINUX-SYSCALL (list-reverse! arg-locs))))
-
-;;;
-;;; +special-forms+
-;;;
-(define +special-forms+ (list
+(define *special-forms* (list
   (cons (target-value let)		compile/let)
   (cons (target-value and)		compile/and)
   (cons (target-value or)		compile/or)
@@ -782,7 +759,6 @@
   (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
-  (cons (target-value linux-syscall)	compile/linux-syscall)
   (cons (target-value C-string)		compile/C-string)
   ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call (second expr) (cddr expr) true -c-)))
   (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen ADDR "4(%ebp)")))
@@ -893,7 +869,7 @@
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
-      ((set handler (cdr (assq op +special-forms+)))
+      ((set handler (cdr (assq op *special-forms*)))
        (handler self -c-))
       (else
        (compile-call op args false -c-)))))
@@ -940,3 +916,5 @@
 (define-method emit-prelude <x86-compiler> ()
   (verbosity 1 (warn "\nCompiling to IA-32\n\n"))
   (initialize-object-emitters))
+
+(require "source/emit-late.l")

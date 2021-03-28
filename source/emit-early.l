@@ -220,7 +220,7 @@
       (define-constant linux/chdir		80)
       ))))
 
-(set *globals* *slave-env*)
+(switch-to-slave-env)
 
 ;; FIXME these would be too much trouble to define above because nested quasiquote doesn't work
 (define-form bytes-to-words (value)
@@ -256,11 +256,21 @@
 ;;; level-shifted to the target. let's mention *target-env* here for
 ;;; grep'ability.
 ;;;
-(define *target-env* (environment *globals*))
-(eval-in-host `(define *target-env* ,*target-env*))
 (define primitive/eval eval) ; we will need to reach back to this when starting the compiler
 
-(set *globals* *target-env*)
+(define *target-env* (environment *globals*))
+
+(when-at-expand feature/debug-info
+  (set (<env>-name *target-env*) "target"))
+
+(eval-in-host `(define *target-env* ,*target-env*))
+
+(define-function switch-to-target-env ()
+  (set *globals* *target-env*))
+
+(eval-in-host `(define switch-to-target-env ,switch-to-target-env))
+
+(switch-to-target-env)
 
 (safety 1
   (assert (not (= *globals* *slave-env*)))
@@ -367,7 +377,7 @@
 ;;   ;; they need to be <primitive-function>'s (why?)
 ;;   (eval `(define ,name error) *target-env*))
 
-(set *globals* *host-env*)
+(switch-to-host-env)
 
 ;; the *globals* of the slave-module is the env that holds the target's definitions
 (define-function eval-in-target (form)

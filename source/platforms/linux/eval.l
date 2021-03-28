@@ -1,6 +1,12 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/platforms/linux/linux.l")
+(load (concat-strings "source/emit-" *compiler-backend* ".l"))
+
+(load (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
+
+(switch-to-target-env)
+
+(load "source/platforms/linux/linux.l")
 
 (load "source/evaluator/vm-early.l")
 

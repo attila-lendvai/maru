@@ -69,7 +69,7 @@
 ;;;
 ;;; API visible in the target
 ;;;
-(set *globals* *target-env*)
+(switch-to-target-env)
 
 (define-form define-C-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
@@ -86,3 +86,5 @@
 (define-form define-C-variable (maru-name foreign-name type)
   (let ((fv (eval-in-host `(C-variable ,(symbol->string foreign-name) ',type))))
     `(define ,maru-name ,fv)))
+
+(switch-to-host-env)

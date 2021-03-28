@@ -14,7 +14,10 @@
       (until (= +end+ (set form (read stream)))
         (when (and (pair? form)
                    (member? (first form) '(load require)))
-          (fake-require (second form))))
+          (let ((path (second form)))
+            (when (pair? path)
+              (set path (eval path)))
+            (fake-require path))))
       (file-close file))))
 
 (while *command-line-arguments*

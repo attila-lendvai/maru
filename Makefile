@@ -218,15 +218,15 @@ define count-loc
 endef
 
 define collect-files
-  $(GEN_EVAL) boot.l tools-for-build/file-list-from-require.l $(1)
+  $(GEN_EVAL) --define *compiler-backend* $(1) boot.l tools-for-build/file-list-from-require.l $(2)
 endef
 
 $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 	@$(call ensure-built,$(GEN_EVAL))
 	@echo -e '\nBackend $(BLUE)$*$(RESET):\n'
-	@files=`$(call collect-files,boot.l $(EMIT_FILES_$*))`;				$(call count-loc,"Compiler LoC: ",$$files)
-	@files=`$(call collect-files,$(EVALUATOR_FILES))`;				$(call count-loc,"Evaluator LoC: ",$$files)
-	@files=`$(call collect-files,boot.l $(EMIT_FILES_$*) $(EVALUATOR_FILES))`;	$(call count-loc,"Alltogether LoC: ",$$files)
+	@files=`$(call collect-files,$*,boot.l "source/emit-$*.l")`;	$(call count-loc,"Compiler LoC: ",$$files)
+	@files=`$(call collect-files,$*,$(EVALUATOR_FILES))`;		$(call count-loc,"Evaluator LoC: ",$$files)
+	@files=`$(call collect-files,$*,boot.l $(EVALUATOR_FILES))`;	$(call count-loc,"Alltogether LoC: ",$$files)
 
 ###
 ### eval and bootstrapping
@@ -278,6 +278,10 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
+		--define *compiler-backend* 	"x86"				\
+		--define target/cpu 		$(TARGET_CPU_x86)		\
+		--define target/vendor 		$(TARGET_VENDOR)		\
+		--define target/os 		$(TARGET_OS)			\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -286,10 +290,6 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		--define target/cpu 		$(TARGET_CPU_x86)		\
-		--define target/vendor 		$(TARGET_VENDOR)		\
-		--define target/os 		$(TARGET_OS)			\
-		$(EMIT_FILES_x86)						\
 		source/platforms/$(PLATFORM)/eval.l				\
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
@@ -299,6 +299,9 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 	$(TIME) $(HOST_DIR)/eval -v						\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
+		--define *compiler-backend* 	"llvm"				\
+		--define target/cpu 		$(TARGET_CPU_llvm)		\
+		--define target/vendor 		$(TARGET_VENDOR)		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -308,10 +311,6 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		--define target/cpu 		$(TARGET_CPU_llvm)		\
-		--define target/vendor 		$(TARGET_VENDOR)		\
-		--define target/os 		$(TARGET_OS)			\
-		$(EMIT_FILES_llvm)						\
 		source/platforms/$(PLATFORM)/eval.l				\
 		source/emit-finish.l						\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
@@ -345,6 +344,10 @@ define compile-x86
   $(TIME) $(2) $(PROFILER_ARG) -O -v						\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
+	--define *compiler-backend* 	"x86"					\
+	--define target/cpu 		$(TARGET_CPU_x86)			\
+	--define target/vendor 		$(TARGET_VENDOR)			\
+	--define target/os 		$(TARGET_OS)				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
@@ -352,10 +355,6 @@ define compile-x86
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/cpu 			$(TARGET_CPU_x86)		\
-	--define target/vendor 			$(TARGET_VENDOR)		\
-	--define target/os 			$(TARGET_OS)			\
-	$(EMIT_FILES_x86)							\
 	$(3)									\
 	source/emit-finish.l							\
 		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
@@ -365,6 +364,10 @@ define compile-llvm
   $(TIME) $(2) $(PROFILER_ARG) -O -v						\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
+	--define *compiler-backend* 	llvm					\
+	--define target/cpu 		$(TARGET_CPU_llvm)			\
+	--define target/vendor 		$(TARGET_VENDOR)			\
+	--define target/os 		$(TARGET_OS)				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
@@ -372,10 +375,6 @@ define compile-llvm
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/cpu 			$(TARGET_CPU_llvm)		\
-	--define target/vendor 			$(TARGET_VENDOR)		\
-	--define target/os 			$(TARGET_OS)			\
-	$(EMIT_FILES_llvm)							\
 	$(3)									\
 	source/emit-finish.l							\
 		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
