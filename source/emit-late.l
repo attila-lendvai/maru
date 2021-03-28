@@ -79,7 +79,9 @@
   `(let ()
      ,@(map (lambda (entry)
               (let* ((foreign-name (second entry))
-                     (maru-name (concat-symbol maru-prefix foreign-name)))
+                     (maru-name (if maru-prefix
+                                    (concat-symbol maru-prefix foreign-name)
+                                  foreign-name)))
                 `(define-C-function ,maru-name ,@entry)))
             entries)))
 

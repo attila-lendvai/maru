@@ -6,6 +6,17 @@
 (define-constant fd/stdout 1)
 (define-constant fd/stderr 2)
 
+;; define some llvm intrinsics as FFI calls
+;; https://llvm.org/docs/LangRef.html#llvm-memcpy-intrinsic
+;; (define-C-functions ()
+;;   (void llvm.memcpy.p0i8.p0i8.i32 (* * int int))
+;;   )
+;; TODO turned off because this requires linking to something that defines memcpy. apparently llvm doesn't emit its own code for these.
+;; (if (= (host-value *compiler-backend*) "llvm")
+;;     (define-form copy-oops (from to wordcount)
+;;       ;; TODO add align: https://llvm.org/docs/LangRef.html#attr-align
+;;       `(llvm.memcpy.p0i8.p0i8.i32 ,to ,from (words-to-bytes ,wordcount) 1)))
+
 ;;;
 ;;; Platform API implementation when running on top of the Linux kernel.
 ;;;
