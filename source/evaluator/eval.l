@@ -200,9 +200,10 @@
 
 (define-primitive-function symbol->string (symbol)
   ;; FIXME? isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
-  (if (string? symbol)
-      symbol
-    (<symbol>-name symbol)))
+  (cond
+    ((string? symbol)		symbol)
+    ((symbol? symbol)		(<symbol>-name symbol))
+    (else (error "symbol->string: illegal value: "symbol))))
 
 (require "source/env-min.l")
 
