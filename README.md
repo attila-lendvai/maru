@@ -30,7 +30,7 @@ more detail.
 
 Maru's architecture is described in [doc/how.md](doc/how.md).
 
-### Build instructions
+#### Build instructions
 
 To test a bootstrap cycle using one or all of the backends:
 
@@ -173,7 +173,7 @@ new features. Some that are worth mentioning:
   - Introduction of [*platforms*](platforms.md), and notably the
     `linux` platform that compiles to a statically linked executable
     that only uses Linux kernel
-    [`syscall`s](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
+    [`syscalls`](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
     From a practical perspective this is almost equivalent with
     running directly on the bare metal (i.e. all dynamically allocated
     memory needs to be managed by our own GC, all IO behind our own
@@ -213,6 +213,7 @@ new features. Some that are worth mentioning:
     targets. It's already demonstrated by the Linux platform. Another
     one could be
     [pc-bios](https://github.com/cirosantilli/x86-bare-metal-examples),
+    or [EFI](https://kuroko-lang.github.io/),
     because it's easily testable using QEMU. Or port it on an ARM
     board (like Raspberry Pi)? Or maybe even attempt a C64 port?
 
@@ -299,7 +300,7 @@ that I know about and contain interesting code:
 
 #### Related projects
 
-A list of projects that are worth mentioning in this context:
+A list of projects that are relevant in this context:
 
   - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
     intelligence long-term project, with ambitious Artificial General
@@ -315,3 +316,9 @@ A list of projects that are worth mentioning in this context:
   - [tort](https://github.com/kstephens/tort): Inspired by Ian
     Piumarta's idst, maru and other small runtimes. Core is
     approx. 5000 lines of C.
+
+  - [kernel](http://web.cs.wpi.edu/~jshutt/kernel.html): "Kernel is a
+    conservative, Scheme-like dialect of Lisp in which **everything**
+    is a first-class object." (including special forms) You may want
+    to also see
+    [this blog](https://axisofeval.blogspot.com/search/label/kernel).
