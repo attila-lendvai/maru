@@ -3176,6 +3176,11 @@ int main(int argc, char **argv)
   globals= newEnv(nil, 0, 0);
   globals= define(globals, intern(L"*globals*"), globals);
 
+  {
+    oop s = intern(L"true");
+    define(get(globals, Variable,value), s, s);
+  }
+
   expanders=	define(get(globals, Variable,value), intern(L"*expanders*"),   nil);
   encoders=	define(get(globals, Variable,value), intern(L"*encoders*"),    nil);
   evaluators=	define(get(globals, Variable,value), intern(L"*evaluators*"),  nil);
@@ -3184,6 +3189,9 @@ int main(int argc, char **argv)
   traceStack=	newArray(32);					GC_add_root(&traceStack);
 
   backtrace=	define(get(globals, Variable,value), intern(L"*backtrace*"), nil);
+		define(get(globals, Variable,value), intern(L"*standard-output*"),	newString(L"dummy-*standard-output*"));
+		define(get(globals, Variable,value), intern(L"*error-output*"),		newString(L"dummy-*error-output*"));
+  // TODO
   input=	define(get(globals, Variable,value), intern(L"*input*"), nil);
   output=	define(get(globals, Variable,value), intern(L"*output*"), nil);
 
