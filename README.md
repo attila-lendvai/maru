@@ -14,9 +14,10 @@ in about 2000 LoC altogether.
 > platform would be a strong indicator of a deficiency within the platform
 > that should be addressed rather than disinherited. (Ian Piumarta)
 
-This repo is also a place for exploration in the land of bootstrapping
-and computing system development. My personal interest is in clearly
-and formally expressing that which is mostly treated as black magic:
+This repo is also a place for exploration in the land of
+[bootstrapping](http://bootstrappable.org/) and computing system
+development. My primary drive with Maru is to clearly
+and formally express that which is mostly treated as black magic:
 the bootstrapping of a language on top of other languages (which
 includes the previous developmental stage of the same language).
 
@@ -194,6 +195,10 @@ new features. Some that are worth mentioning:
 
 ### Assorted TODO:
 
+  - Make Maru Scheme compatible, either by forking it, or by some sort
+    of a compatibility layer that is loadable into vanilla Maru. Then
+    consider how that relates to [GNU Mes](https://www.gnu.org/software/mes/).
+
   - Finish the proof of concept in `tests/test-elf.l` to compile the
     Linux plaform directly into an ELF binary. This would reduce the
     list of external dependencies to a single one (GNU Make).
@@ -301,6 +306,14 @@ that I know about and contain interesting code:
 #### Related projects
 
 A list of projects that are relevant in this context:
+
+  - [bootstrappable.org](http://bootstrappable.org/): a community
+    around bootstrapping, and making/keeping projects
+    bootstrapable. It brings together many interesting projects:
+    [stage0](https://github.com/oriansj/stage0) (~500 byte self-hosting hex assembler),
+    [live-bootstrap](https://github.com/fosslinux/live-bootstrap/),
+    [GNU Mes](https://www.gnu.org/software/mes/) (Scheme + C, mutually self-hosting each other),
+    [m2-planet](https://github.com/oriansj/m2-planet) (a tiny C compiler).
 
   - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
     intelligence long-term project, with ambitious Artificial General
