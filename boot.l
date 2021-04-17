@@ -356,7 +356,7 @@
 		   (%make-accessor name (cdr fields) (+ 1 offset)))))
 
 (define %make-accessor
-  (if (> (optimised) 0)
+  (if (> *optimize* 0)
       %make-unsafe-accessor
     %make-safe-accessor))
 
@@ -992,9 +992,9 @@
 ;;; load/save
 
 (define-function pval (expr)
-  (and (> (verbose) 0) (println expr))
+  (and (> *verbosity* 0) (println expr))
   (let ((result (eval expr)))
-    (and (> (verbose) 1) (println "=> "result))
+    (and (> *verbosity* 1) (println "=> "result))
     result))
 
 (define-function find-and-read (name)

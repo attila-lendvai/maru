@@ -1002,11 +1002,10 @@ static void setSource(oop obj, oop src)
 }
 
 static oop exlist(oop obj, oop env);
+static oop expand(oop expr, oop env);
 
-static oop expand(oop expr, oop env)
+static oop expandPair(oop expr, oop env)
 {
-  if (verbosity > 1) { printf("EXPAND ");  dumpln(expr); }
-  if (is(Pair, expr)) {
     oop head= expand(getHead(expr), env);			GC_PROTECT(head);
     if (is(Symbol, head)) {
       oop val= findVariable(env, head);
@@ -1014,9 +1013,9 @@ static oop expand(oop expr, oop env)
       if (is(Form, val) && (nil != get(val, Form,function))) {
 	oop args= newPairFrom(env, getTail(expr), expr);	GC_PROTECT(args);
 	head= apply(get(val, Form,function), args, nil);	GC_UNPROTECT(args);
-	head= expand(head, env);				GC_UNPROTECT(head);
+	head= expand(head, env);
 	if (verbosity > 1) { printf("EXPAND => ");  dumpln(head); }
-	setSource(head, get(expr, Pair,source));
+	setSource(head, get(expr, Pair,source));		GC_UNPROTECT(head);
 	return head;
       }
     }
@@ -1032,7 +1031,15 @@ static oop expand(oop expr, oop env)
       head= intern(buffer_contents(&buf));
       tail= concat(getTail(getHead(tail)), getTail(tail));
     }
-    expr= newPairFrom(head, tail, expr);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+    GC_UNPROTECT(tail);  GC_UNPROTECT(head);
+    return newPairFrom(head, tail, expr);
+}
+
+static oop expand(oop expr, oop env)
+{
+  if (verbosity > 1) { printf("EXPAND ");  dumpln(expr); }
+  if (is(Pair, expr)) {
+    expr= expandPair(expr, env);
   }
   else if (is(Symbol, expr)) {
     oop val= findVariable(env, expr);
@@ -3178,6 +3185,11 @@ int main(int argc, char **argv)
   globals= newEnv(nil, 0, 0);
   globals= define(globals, intern(L"*globals*"), globals);
 
+  {
+    oop s = intern(L"true");
+    define(get(globals, Variable,value), s, s);
+  }
+
   expanders=	define(get(globals, Variable,value), intern(L"*expanders*"),   nil);
   encoders=	define(get(globals, Variable,value), intern(L"*encoders*"),    nil);
   evaluators=	define(get(globals, Variable,value), intern(L"*evaluators*"),  nil);
@@ -3186,6 +3198,9 @@ int main(int argc, char **argv)
   traceStack=	newArray(32);					GC_add_root(&traceStack);
 
   backtrace=	define(get(globals, Variable,value), intern(L"*backtrace*"), nil);
+		define(get(globals, Variable,value), intern(L"*standard-output*"),	newString(L"dummy-*standard-output*"));
+		define(get(globals, Variable,value), intern(L"*error-output*"),		newString(L"dummy-*error-output*"));
+  // TODO
   input=	define(get(globals, Variable,value), intern(L"*input*"), nil);
   output=	define(get(globals, Variable,value), intern(L"*output*"), nil);
 
