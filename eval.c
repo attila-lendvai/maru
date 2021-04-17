@@ -2038,6 +2038,12 @@ static subr(print)
   return nil;
 }
 
+static subr(print_all)
+{
+  args= getTail(args);		// drop/ignore stream
+  return subr_print(args, ctx);
+}
+
 static subr(dump)
 {
   while (is(Pair, args)) {
@@ -2045,6 +2051,12 @@ static subr(dump)
     args= getTail(args);
   }
   return nil;
+}
+
+static subr(dump_all)
+{
+  args= getTail(args);		// drop/ignore stream
+  return subr_dump(args, ctx);
 }
 
 static subr(format)
@@ -3024,7 +3036,9 @@ static subr_ent_t subr_tab[] = {
     { " type-of",		subr_type_of },
     { " warn",			subr_warn },
     { " print",			subr_print },
+    { " print-all",		subr_print_all },
     { " dump",			subr_dump },
+    { " dump-all",		subr_dump_all },
     { " format",		subr_format },
     { " form",			subr_form },
     { " fixed?",		subr_fixedP },
