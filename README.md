@@ -40,6 +40,9 @@ make test-bootstrap-x86    # defaults to the libc platform
 make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 ```
 
+<details>
+<summary>Platform specific instructions</summary>
+
 #### Nix and NixOS
 
 My primary platform. There's a `default.nix` file in the repo, so you
@@ -98,6 +101,7 @@ Currently Maru should work everywhere where there's a `libc`, and either the
 GNU toolchain, or LLVM is available.
 
 Patches are welcome for other platforms.
+</details>
 
 ## Who
 
@@ -193,7 +197,10 @@ new features. Some that are worth mentioning:
 
   - The addition of an LLVM backend.
 
-### Assorted TODO:
+### Future plans
+
+<details>
+<summary>Assorted TODO list</summary>
 
   - Make Maru Scheme compatible, either by forking it, or by some sort
     of a compatibility layer that is loadable into vanilla Maru. Then
@@ -224,6 +231,9 @@ new features. Some that are worth mentioning:
 
   - Revive all the goodies in the `piumarta` branch, but in a structured way.
 
+  - Investigate [Cranelift](https://github.com/bytecodealliance/wasmtime/tree/main/cranelift)
+    and consider adding it as a backend.
+
   - Simplify the types-are-objects part and its bootstrap, and maybe even
     make it optional?
 
@@ -253,6 +263,8 @@ new features. Some that are worth mentioning:
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),
     (see this [couple of page summary](https://github.com/fare/climbing), or
     see his [page on reflection](http://fare.tunes.org/reflection.html))
+
+</details>
 
 ### History and perspective
 
@@ -314,6 +326,13 @@ A list of projects that are relevant in this context:
     [live-bootstrap](https://github.com/fosslinux/live-bootstrap/),
     [GNU Mes](https://www.gnu.org/software/mes/) (Scheme + C, mutually self-hosting each other),
     [m2-planet](https://github.com/oriansj/m2-planet) (a tiny C compiler).
+
+  - [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/):
+    runnable code to accompany Ian Piumarta's paper called *PEG-based
+    tree rewriter provides front-, middle- and back-end stages in a
+    simple compiler*. Ian wrote this before Maru, and there are
+    several similarities between the two. See the [mailing list
+    thread](https://groups.google.com/g/maru-dev/c/0Cnq1RB-Ahk).
 
   - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
     intelligence long-term project, with ambitious Artificial General
