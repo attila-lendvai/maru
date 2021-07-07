@@ -23,6 +23,8 @@ SO = so
 SOCFLAGS = -shared -msse -msse2
 endif
 
+TEST_EVAL	= $(BUILD)/eval1
+
 .SUFFIXES :
 
 all : eval
@@ -68,5 +70,10 @@ stats : .force
 clean : .force
 	rm --force $(BUILD)/eval* $(BUILD)/mkosdefs osdefs.k eval
 	rm --dir --force $(BUILD) || true
+
+test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
+	$(TEST_EVAL) boot.l tests/evaluator-tests.l
+
+test: test-evaluator
 
 .force :
