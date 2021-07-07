@@ -319,6 +319,11 @@ that I know about and contain interesting code:
 
 A list of projects that are relevant in this context:
 
+  - [Kalyn](https://intuitiveexplanations.com/tech/kalyn): a subset of
+    Haskell semantics (mostly; not lazy), but with Lisp
+    syntax. Entirely (!)  self-hosting over x86-64 in 4-5 kLoC. The
+    project feels of high standard, including its documentation.
+
   - [bootstrappable.org](http://bootstrappable.org/): a community
     around bootstrapping, and making/keeping projects
     bootstrapable. It brings together many interesting projects:
