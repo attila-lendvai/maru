@@ -86,26 +86,30 @@ of the previous, `maru.1` stage.
 
 ### Repo layout
 
-The developmental stages of the language are kept in separate git branches. When a new stage is opened,
-this readme is replaced in the old branch to only document what's new/relevant for that specific stage
-(i.e. if you switch branches on github you'll see it right away).
+The developmental stages of the language are kept in separate git
+branches. When a new stage needs to be opened, the readme is replaced
+in the branch that became stale to only document what's new/relevant
+for that specific stage (i.e. if you switch branches on the GitHub
+website you'll see it displayed).
 
-Naming convention of the branches (no `master`):
+Naming convention of the branches (no `main` branch):
 
 `[language name].[bootstrap stage]`, e.g `maru.1`.
 
-Optionally, e.g. for stage zero in the bootstrap, it may also include the name of the
-parent language, from which this "bootstrap sprout" grows out:
+Optionally, and typically for the first stage, it may also include the
+name of the parent language, from which this "bootstrap sprout" grows
+out:
 
-`[language name].[bootstrap stage].[parent language]`, e.g. `maru.0.c99`, which holds
-the bootstrap implementation written in C.
+`[language name].[bootstrap stage].[parent language]`, e.g. `maru.1.c99`,
+which holds the bootstrap implementation written in C.
 
 During the build the previous stage is `git checkout`'ed locally under `./build/`,
 and its own build process is invoked in that directory. Note that this potentially
 becomes a recursive process until a stage is reached that can be built using some
 external dependency. This may happen by reaching an `eval.c` in the bottom stage/branch
-called `maru.0.c99` that can be built using a C compiler, or by reaching a higher level
-stage that has its build output checked into the git repo.
+called `maru.1.c99` that can be built using a C compiler, or by reaching a
+stage that has its build artifacts checked into the git repo (e.g. an `eval.s` or
+`eval.ll`).
 
 ### Bootstrap "shortcuts"
 
@@ -115,30 +119,27 @@ straight away producing an executable from the checked-in `eval2.ll` using `llc`
 (see `make eval-llvm`).
 
 Deleting these files (**note:** `make clean` retains them! see `make veryclean`),
-or touching the sources will force a normal bootstrap process using the previous stage(s).
-
-In the future, when Maru can produce binary executable files
-(see `make test-elf`) even those files could be checked in the git repo to provide
-optional "shortcuts" in the bootstrap process.
+or touching the sources will force a normal bootstrap process hosted by
+the previous stage.
 
 It's possible to skip these shortcuts and run the bootstrap procedure all the way from
-the/a bottom stage by `make PREVIOUS_STAGE_EXTRA_TARGETS=veryclean test-bootstrap`.
+the/a bottom stage by `make PREVIOUS_STAGE_EXTRA_TARGETS=veryclean veryclean test-bootstrap`.
 
 ## Bootstrap "leakage"
 
 In the bootstrap process most abstractions are present twice: the old
-versions in the host module, and the new versions loaded into in the
-slave module. At certain parts of the codebase these potentially
+versions in the host env, and the new versions loaded into in the
+slave env. At certain parts of the codebase these potentially
 incompatible definitions can mix:
 
   - The compiler is running in the host's environment, but compiles
     the definitions of the slave. Thus, it inherently needs to cross
     the host-slave boundary (ideally, always in a controlled and
-    explicit way, guarded by asserts).
+    explicit way, guarded by asserts that fail early and loud).
 
   - A lot of the `forms` (macros) of the slave must be
     executed/expanded while building up the set of definitions that
-    are meant to be level-shifted by the compiler to the target
+    will be level-shifted by the compiler to the target
     universe. These forms sometimes need to deal with the lexical
     environment (of type `<env>`) that is instantiated by the host.
     The object layout of these `<env>` objects will be that of which
@@ -147,26 +148,26 @@ incompatible definitions can mix:
     called `environment` in `eval.l`. When `eval.l` is compiled, it
     "captures" the object layout through the slot-index literals in
     the expansion of the accessor forms. Accessors expand to `oop-at`
-    forms with literal indexes, and these are directly compiled to
+    forms with literal indexes, and these are then directly compiled to
     machine instructions).
 
 A list of types and occasions where such leakage happens (meant to be
 exhaustive, but it's probably not yet):
 
-  - objects in the slave's source code: <pair>, <long>, <string>,
-    <symbol>, (), i.e. objects that are created by the host's reader
+  - objects in the slave's source code: `<pair>`, `<long>`, `<string>`,
+    `<symbol>`, `()`, i.e. objects that are created by the host's reader
     while parsing the slave's codebase into an object graph.
 
-  - <primitive-function>, <expr>, <env>, <fixed>: the source code of the slave gets
-    `encode`d by the host, therefore it may also contain objects of
-    these types besides the list above.
+  - `<primitive-function>`, `<expr>`, `<env>`, `<fixed>`: the source
+    code of the slave gets `encode`d by the host, therefore it may
+    also contain objects of these types besides the list above.
 
-  - <env>: whenever environments are passed to slave code, e.g. the
+  - `<env>`: whenever environments are passed to slave code, e.g. the
     forms defined in the slave will receive instances of the host's
-    <env> type.
+    `<env>` type.
 
-  - <type>, <record>: if we want to dispatch on the slave types while
+  - `<type>`, `<record>`: if we want to dispatch on the slave types while
     the host executable is bringing the slave to life, then the slave
     types need to integrate into that of the host's. What this means
     is that in the bootstrap process the slave does not create its own
-    <type> and <record> instances, but "borrows" them from the host.
+    `<type>` and `<record>` instances, but "borrows" them from the host.
