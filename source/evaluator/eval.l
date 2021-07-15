@@ -587,7 +587,7 @@
                        (lambda (item candidate)
                          (libc/strcmp item (get/symbol candidate)))
                        (lambda (array index item)
-                         (debug (libc/printf "interning %s into module {%p}\n" cstr module))
+                         (debug (libc/printf "interning %s\n" cstr))
                          (gc/let* ((sym (new-<symbol> item)))
                            (k/array-insert array index sym)
                            sym))))
