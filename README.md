@@ -15,7 +15,7 @@ in about 2000 LoC altogether.
 > that should be addressed rather than disinherited. (Ian Piumarta)
 
 This repo is also a place for exploration in the land of
-[bootstrapping](http://bootstrappable.org/) and computing system
+[bootstrapping](doc/bootstrap.md) and computing system
 development. My primary drive with Maru is to clearly
 and formally express that which is mostly treated as black magic:
 the bootstrapping of a language on top of other languages (which

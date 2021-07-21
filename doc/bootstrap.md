@@ -4,7 +4,7 @@
 
 A language evolves by the introduction of new features (optimizations, new primitives, etc).
 If you want to use such a novel language feature in its own implementation,
-then you need to *bootstrap* it:
+then you need to [*bootstrap*](http://bootstrappable.org/) it:
 
 1) First, implement the support for it in your compiler and/or eval, and produce
    an executable that can already compile and/or eval this new version of the language.
