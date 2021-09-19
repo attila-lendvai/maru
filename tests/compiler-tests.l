@@ -5,7 +5,16 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
+(load (concat-strings "source/emit-" *compiler-backend* ".l"))
+
+;; (load (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
+
+(switch-to-target-env)
+
+;; (load "source/platforms/linux/linux.l")
+
 (load "source/platforms/libc/libc.l")
+
 (load "source/evaluator/vm-early.l")
 
 ;; turn off some stuff that would bring in more dependencies
@@ -478,6 +487,7 @@
     (set-second-to-first 33 99)
   99)
 
+;;; TODO this file can either be libc or linux platform
 ;; this should error, explicitly noting that the lambda is capturing x, which is currently not supported.
 ;; the LLVM IR type system actually catches this bug, but the x86 backend silently miscompiles it currently
 ;; (define-test compile/closures/1
@@ -490,64 +500,64 @@
 ;;          b))
 ;;   (* 2 42))
 
-(begin-for-syntax
- (define-function string+length (str)
-   (let ((len (string-length str)))
-     (assert (< 0 len))
-     `((string->C-string ,str) ,len))))
+;; (begin-for-syntax
+;;  (define-function string+length (str)
+;;    (let ((len (string-length str)))
+;;      (assert (< 0 len))
+;;      `((string->C-string ,str) ,len))))
 
-(define-test compile/syscall/1
-    (let ()
-      ;; (eval-at-expand
-      ;;  `(linux-syscall linux/write 2 ,@(string+length "\n\t*** compile/syscall/1 is printing this to fd 2\n")))
-      (let ((fd (linux-syscall linux/open (C-string "/dev/null") linux/O_RDONLY)))
-        (<= 0 fd)))
-  true)
+;; (define-test compile/syscall/1
+;;     (let ()
+;;       ;; (eval-at-expand
+;;       ;;  `(linux-syscall linux/write 2 ,@(string+length "\n\t*** compile/syscall/1 is printing this to fd 2\n")))
+;;       (let ((fd (linux-syscall linux/open (C-string "/dev/null") linux/O_RDONLY)))
+;;         (<= 0 fd)))
+;;   true)
 
-(define-test compile/syscall/2
-    (let ((fd (linux-syscall linux/open
-                             (C-string "/tmp/_maru-test")
-                             (bitwise-or linux/O_RDWR
-                                         linux/O_CREAT)
-                             420 ; "rw-r--r--"
-                             )))
-      (or (= 4 (eval-at-expand
-                `(linux-syscall linux/write fd ,@(string+length "1234"))))
-          (failure "unexpected linux/write return code"))
-      (or (= 2 (linux-syscall linux/lseek fd 2 linux/SEEK_SET))
-          (failure "unexpected linux/lseek return code"))
-      (let ((buf 0))
-        (or (= 1 (linux-syscall linux/read fd (address-of buf) 1))
-            (failure "unexpected linux/read return code"))
-        (char-at (address-of buf) 0)))
-  ?3)
+;; (define-test compile/syscall/2
+;;     (let ((fd (linux-syscall linux/open
+;;                              (C-string "/tmp/_maru-test")
+;;                              (bitwise-or linux/O_RDWR
+;;                                          linux/O_CREAT)
+;;                              420 ; "rw-r--r--"
+;;                              )))
+;;       (or (= 4 (eval-at-expand
+;;                 `(linux-syscall linux/write fd ,@(string+length "1234"))))
+;;           (failure "unexpected linux/write return code"))
+;;       (or (= 2 (linux-syscall linux/lseek fd 2 linux/SEEK_SET))
+;;           (failure "unexpected linux/lseek return code"))
+;;       (let ((buf 0))
+;;         (or (= 1 (linux-syscall linux/read fd (address-of buf) 1))
+;;             (failure "unexpected linux/read return code"))
+;;         (char-at (address-of buf) 0)))
+;;   ?3)
 
-(define-test compile/syscall/3
-    (let ((fd (linux-syscall linux/open
-                             (C-string "/tmp/_maru-test")
-                             (bitwise-or linux/O_RDWR
-                                         linux/O_CREAT)
-                             420 ; "rw-r--r--"
-                             )))
-      (eval-at-expand
-       `(linux-syscall linux/write fd ,@(string+length "1234")))
-      (let ((char ?5))
-        (linux-syscall linux/write fd (address-of char) 1))
-      (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
-      (let ((buf 0)
-            (char 0)
-            (result 0))
-        (linux-syscall linux/read fd (address-of buf) 1)
-        (set char (char-at (address-of buf) 0))
-        ;; TODO FIXME on llvm 64 bits it fails when the char is not printed?! probably due to some optimization.
-        ;;(libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
-        (incr result (- char ?0))
-        (linux-syscall linux/lseek fd 4 linux/SEEK_SET)
-        (linux-syscall linux/read fd (address-of buf) 1)
-        (set char (char-at (address-of buf) 0))
-        ;;(libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
-        (incr result (- char ?0))))
-  (+ 3 5))
+;; (define-test compile/syscall/3
+;;     (let ((fd (linux-syscall linux/open
+;;                              (C-string "/tmp/_maru-test")
+;;                              (bitwise-or linux/O_RDWR
+;;                                          linux/O_CREAT)
+;;                              420 ; "rw-r--r--"
+;;                              )))
+;;       (eval-at-expand
+;;        `(linux-syscall linux/write fd ,@(string+length "1234")))
+;;       (let ((char ?5))
+;;         (linux-syscall linux/write fd (address-of char) 1))
+;;       (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
+;;       (let ((buf 0)
+;;             (char 0)
+;;             (result 0))
+;;         (linux-syscall linux/read fd (address-of buf) 1)
+;;         (set char (char-at (address-of buf) 0))
+;;         ;; TODO FIXME on llvm 64 bits it fails when the char is not printed?! probably due to some optimization.
+;;         ;;(libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
+;;         (incr result (- char ?0))
+;;         (linux-syscall linux/lseek fd 4 linux/SEEK_SET)
+;;         (linux-syscall linux/read fd (address-of buf) 1)
+;;         (set char (char-at (address-of buf) 0))
+;;         ;;(libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
+;;         (incr result (- char ?0))))
+;;   (+ 3 5))
 
 (define-function main (argc argv)
   (platform/print-diag "Printing test command line args:\n")

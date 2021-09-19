@@ -493,14 +493,14 @@ test-compiler-llvm: $(BUILD_llvm)/compiler-test
 	$(BUILD_llvm)/compiler-test
 
 # TODO backend duplication
-$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(EVAL0_DIR)/$(EVAL0) tests/compiler-tests.l $(EMIT_FILES_x86)
+$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(EVAL0) tests/compiler-tests.l $(EMIT_FILES_x86)
 	@mkdir -p $(BUILD_x86)
-	$(call compile-x86,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
+	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
-$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0_DIR)/$(EVAL0) tests/compiler-tests.l $(EMIT_FILES_llvm)
+$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0) tests/compiler-tests.l $(EMIT_FILES_llvm)
 	@mkdir -p $(BITCODE_DIR)
 	@mkdir -p $(BUILD_llvm)
-	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0_DIR)/$(EVAL0),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
+	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
