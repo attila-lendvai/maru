@@ -302,6 +302,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		--define *compiler-backend* 	"llvm"				\
 		--define target/cpu 		$(TARGET_CPU_llvm)		\
 		--define target/vendor 		$(TARGET_VENDOR)		\
+		--define target/os 		$(TARGET_OS)			\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
