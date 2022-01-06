@@ -254,6 +254,10 @@ new features. Some that are worth mentioning:
     seem to be trivial), or writing C++ code (uhh!) to compile the
     data to the Maru definitions implementing an assembler.
 
+  - Maybe add [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/)
+    to the repo as a branch. It seems to be an earlier iteration of
+    the same idea.
+
   - Introduce a simplified language that drops some langauge features,
     e.g. remove *forms* and the *expand* protocol. Make sure that this
     language can bootstrap itself off of C99. Then reintroduce *forms*
@@ -324,6 +328,9 @@ A list of projects that are relevant in this context:
     syntax. Entirely (!)  self-hosting over x86-64 in 4-5 kLoC. The
     project feels of high standard, including its documentation.
 
+  - [nanohs](https://github.com/bkomuves/nanohs): a tiny self-hosting
+    subset of Haskell.
+
   - [bootstrappable.org](http://bootstrappable.org/): a community
     around bootstrapping, and making/keeping projects
     bootstrapable. It brings together many interesting projects:
@@ -338,6 +345,10 @@ A list of projects that are relevant in this context:
     simple compiler*. Ian wrote this before Maru, and there are
     several similarities between the two. See the [mailing list
     thread](https://groups.google.com/g/maru-dev/c/0Cnq1RB-Ahk).
+
+  - [blynn's Haskell compiler](https://github.com/blynn/compiler):
+    bootstrap a Haskell compiler incrementally from C, with extensive
+    documentation..
 
   - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
     intelligence long-term project, with ambitious Artificial General
