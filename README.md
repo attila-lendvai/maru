@@ -293,7 +293,7 @@ The `piumarta` branch of this git repo is a conversion of Ian Piumarta's Mercuri
 repo that was once available at
 [http://piumarta.com/hg/maru/](http://piumarta.com/hg/maru/).
 To the best of my knowledge
-this is the latest publically available state of Ian's work. This repo was full of
+this is the latest publicly available state of Ian's work. This repo was full of
 assorted code, probably driving the VPRI demos.
 
 The `piumarta` branch will be left stale (modulo small fixes and cleanups).
@@ -323,13 +323,14 @@ that I know about and contain interesting code:
 
 A list of projects that are relevant in this context:
 
-  - [Kalyn](https://intuitiveexplanations.com/tech/kalyn): a subset of
-    Haskell semantics (mostly; not lazy), but with Lisp
-    syntax. Entirely (!)  self-hosting over x86-64 in 4-5 kLoC. The
-    project feels of high standard, including its documentation.
-
-  - [nanohs](https://github.com/bkomuves/nanohs): a tiny self-hosting
-    subset of Haskell.
+  - [Seedling](https://github.com/nagydani/seedling/): a ladder of
+    languages, with a minimalistic core language at the bottom called
+    *Seed* (it's a Forth like). Seed can self-host in less than 1k
+    LoC. The higher level languages above Seed are (going to be)
+    extensions of it, and are implemented on top of Seed. Porting to a
+    new architecture will be trivial. And an interesting tidbit: the
+    initial bootstrap was done not by using another programming
+    language/compiler, but by pen and paper!
 
   - [bootstrappable.org](http://bootstrappable.org/): a community
     around bootstrapping, and making/keeping projects
@@ -338,6 +339,14 @@ A list of projects that are relevant in this context:
     [live-bootstrap](https://github.com/fosslinux/live-bootstrap/),
     [GNU Mes](https://www.gnu.org/software/mes/) (Scheme + C, mutually self-hosting each other),
     [m2-planet](https://github.com/oriansj/m2-planet) (a tiny C compiler).
+
+  - [Kalyn](https://intuitiveexplanations.com/tech/kalyn): a subset of
+    Haskell semantics (mostly; not lazy), but with Lisp
+    syntax. Entirely (!)  self-hosting over x86-64 in 4-5 kLoC. The
+    project feels of high standard, including its documentation.
+
+  - [nanohs](https://github.com/bkomuves/nanohs): a tiny self-hosting
+    subset of Haskell.
 
   - [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/):
     runnable code to accompany Ian Piumarta's paper called *PEG-based
@@ -359,8 +368,6 @@ A list of projects that are relevant in this context:
     language, operating system and user interface, and which can be run on a relatively
     inexpensive FPGA board, and simple enough for one person to understand it all.
 
-  - [Seedling](https://github.com/nagydani/seedling/)
-
   - [tort](https://github.com/kstephens/tort): Inspired by Ian
     Piumarta's idst, maru and other small runtimes. Core is
     approx. 5000 lines of C.
@@ -370,3 +377,7 @@ A list of projects that are relevant in this context:
     is a first-class object." (including special forms) You may want
     to also see
     [this blog](https://axisofeval.blogspot.com/search/label/kernel).
+
+  - [Compiling a Lisp: Overture](https://bernsteinbear.com/blog/compiling-a-lisp-0/):
+    Educational article series about constructing a simple Lisp compiler,
+    implemented in C.
