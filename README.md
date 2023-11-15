@@ -323,6 +323,19 @@ that I know about and contain interesting code:
 
 A list of projects that are relevant in this context:
 
+  - [sectorlisp](https://justine.lol/sectorlisp2/)
+    ([github](https://github.com/jart/sectorlisp)): LISP with GC in
+    436 bytes. It doesn't have a compiler, i.e. it cannot
+    self-host. It only has a C implementation, an x86 assembly
+    impementation (in the form of a boot sector), and John McCarthy's
+    Lisp in Lisp evaluator. It would be an interesting project to add
+    a compiler to it and see how the end result compares to Maru. Or
+    to start growing a language as demonstrated in this repo, but
+    starting out from sectorlisp. Note that sectorlisp is not
+    equivalent to the first stage of Maru (the `maru.1` git branches),
+    because that can already self-host, i.e. it can bootstrap itself
+    off of the C implementation.
+
   - [Seedling](https://github.com/nagydani/seedling/): a ladder of
     languages, with a minimalistic core language at the bottom called
     *Seed* (it's a Forth like). Seed can self-host in less than 1k
