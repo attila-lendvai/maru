@@ -15,7 +15,7 @@ s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
 
 * `eval.l` (in branch `maru.1` and up) contains the same evaluator, written in
 (a subset of) this s-expression language that can be compiled to machine code.
-In other words, `eval.l` implementats a
+In other words, `eval.l` implements a
 [metacircular evaluator](https://en.wikipedia.org/wiki/Meta-circular_evaluator)
 for the language it is written in.
 
@@ -28,7 +28,7 @@ to a language grounded in hardware. A possible metaphor of this is a "target uni
 implemented by some electric circuits (i.e. transistors wired to each other in a CPU)
 that provide you a set of axiomatic foundations to build upon while compiling the
 abstract to the concrete; while implementing your new universe (the Maru language in
-this case). More details are available in [the compiler's doc](doc/compiler.md).
+this case). More details are available in [the compiler's doc](compiler.md).
 
 * `boot.l` contains some basic data structures, algorithms, and paradigms that are needed by
 `emit.l`; it's written in the s-expression language.
