@@ -125,17 +125,16 @@ Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru
 and Maru is part of this exploration. The foundations should get **smaller, simpler,
 more self-contained, and more approachable** by people who set out to learn programming.
 
-* We lose a lot of value by not capturing the history of the growth of a language, including
+* I'm fascinated by bootstrapping issues.
+We lose a lot of value by not capturing the history of the growth of a language, including
 the formal encoding of its build instructions. They are useful both for educational purposes,
 and also for practical reasons: to have a minimal seed that is very simple to
 port to a new architecture, and then have a self-contained, formal bootstrap process that
 can automatically "grow" an entire computing system on top of that freshly laid, tiny foundation.
 
-* Maru is very small: in about 1700 lines of code in the `maru.1` branch it can self-host
-(plus around 2300 LoC of throwaway C code for the initial step).
-
-* Ian seems to have stopped working on Maru, but it's an interesting piece of code that
-deserves a repo and a maintainer.
+* Ian seems to have abandoned Maru, and his published archive couldn't
+be run as-is. But it's an interesting piece of code that deserves a
+repo and a maintainer to keep bitrot at bay.
 
 * This work is full of puzzles that are a whole lot of fun to solve!
 
@@ -162,13 +161,18 @@ different paths:
   - Ian, while evolving Maru, kept his `eval.c` and `eval.l`
     semantically in sync
 
-  - while I have bootstrapped the new features: I started out from an
-    earlier version of the `eval.l` + `eval.c` couple (the [minimal
-    ones](https://www.piumarta.com/software/maru/) published on Ian's
-    website). Then I bootstrapped the later stages of `eval.l` using
-    an earlier stage of itself. I only used the C code as the initial
-    stepping stone in the bootstrap process, and then I left it
-    behind.
+  - in contrast, I have bootstrapped the new features: I started out
+    from a minimal version of the `eval.l` + `eval.c` couple (the
+    [original version](https://www.piumarta.com/software/maru/)
+    published on Ian's website). Then I bootstrapped the features of
+    the later stages of `eval.l` using an earlier stage of itself. I
+    only use the 2300 LoC of throwaway C code as the initial stepping
+    stone in the bootstrap process, but once the first step is made
+    the C code is left behind.
+
+There is one major bug left that I failed to fix while I was actively
+hacking on Maru. It's discussed in
+https://github.com/attila-lendvai/maru/issues/8.
 
 ### Notable new features
 
@@ -226,7 +230,7 @@ new features. Some that are worth mentioning:
     one could be
     [pc-bios](https://github.com/cirosantilli/x86-bare-metal-examples),
     or [EFI](https://kuroko-lang.github.io/),
-    because it's easily testable using QEMU. Or port it on an ARM
+    because it's easily testable using QEMU. Or port it to an ARM
     board (like Raspberry Pi)? Or maybe even attempt a C64 port?
 
   - Revive all the goodies in the `piumarta` branch, but in a structured way.
@@ -249,14 +253,15 @@ new features. Some that are worth mentioning:
     what being done means here.
 
   - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
-    definitions to generate bytecode assemblers. It requires either
-    the reimplementation of the tablegen parser/logic in Maru (doesn't
-    seem to be trivial), or writing C++ code (uhh!) to compile the
-    data to the Maru definitions implementing an assembler.
+    definitions to generate machine code assemblers for various CPU
+    architectures. It requires either the reimplementation of the
+    tablegen parser/logic in Maru (doesn't seem to be trivial), or
+    writing C++ code (uhh!) to compile the data to something that is
+    easy to work with in Maru.
 
   - Maybe add [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/)
-    to the repo as a branch. It seems to be an earlier iteration of
-    the same idea.
+    to the repo as a branch, and use it as a bootstrap stage. It seems to
+    be an earlier, or different iteration of the same idea.
 
   - Introduce a simplified language that drops some langauge features,
     e.g. remove *forms* and the *expand* protocol. Make sure that this
