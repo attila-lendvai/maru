@@ -5,5 +5,5 @@
 
 The `piumarta` branch of this git repo is a conversion of Ian Piumarta's mercurial
 repo that was once available at http://piumarta.com/hg/maru/. To the best of my knowledge
-this is latest publically available state of Ian's work. This branch will be kept as is,
+this is the latest publically available state of Ian's work. This branch will be kept as is,
 except for small fixes and cleanups that I'll do while exploring it.
