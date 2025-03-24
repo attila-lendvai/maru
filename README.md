@@ -328,6 +328,14 @@ that I know about and contain interesting code:
 
 A list of projects that are relevant in this context:
 
+  - Robert van Engelen's
+    [tinylisp](https://github.com/Robert-van-Engelen/tinylisp) (99
+    lines of C with with GC and a REPL), his
+    [paper](https://github.com/Robert-van-Engelen/tinylisp/blob/main/tinylisp.pdf),
+    and its [big brother](https://github.com/Robert-van-Engelen/lisp),
+    which is 1k LoC of heavily commented C. No compiler, they are not
+    self-hosting.
+
   - [sectorlisp](https://justine.lol/sectorlisp2/)
     ([github](https://github.com/jart/sectorlisp)): LISP with GC in
     436 bytes. It doesn't have a compiler, i.e. it cannot
