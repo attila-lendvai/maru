@@ -235,17 +235,20 @@ new features. Some that are worth mentioning:
 
   - Revive all the goodies in the `piumarta` branch, but in a structured way.
 
-  - Investigate [Cranelift](https://github.com/bytecodealliance/wasmtime/tree/main/cranelift)
-    and consider adding it as a backend.
+  - Investigate [Cranelift](https://cranelift.dev/),
+    [QBE](https://c9x.me/compile/),
+    [libfirm](https://github.com/libfirm/libfirm),
+    [Tilde](https://yasserarg.com/tb),
+    and consider adding them as backends.
 
-  - Simplify the types-are-objects part and its bootstrap, and maybe even
-    make it optional?
+  - Simplify the types-are-objects (as opposed to integers) part and
+    its bootstrap, and maybe even make it optional?
 
   - Weed out some of the added bloat/complexity (e.g. compile closures
     instead of `<selector>`s, and use them to implement streams; write a
     tree shaker; etc).
 
-  - Merge the language and API that the compiler and the evaluator understands;
+  - Fully merge the language and API that the compiler and the evaluator understands;
     i.e. make the level-shifted code (`eval.l` & co.) less different than code
     understood by the evaluator. This would mean that we can e.g. load/compile
     `source/buffer.l` both into the level-shifted code and into the evaluator.
@@ -254,10 +257,11 @@ new features. Some that are worth mentioning:
 
   - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
     definitions to generate machine code assemblers for various CPU
-    architectures. It requires either the reimplementation of the
-    tablegen parser/logic in Maru (doesn't seem to be trivial), or
-    writing C++ code (uhh!) to compile the data to something that is
-    easy to work with in Maru.
+    architectures. It requires either:
+    - the reimplementation of the tablegen parser/logic in Maru
+      (doesn't seem to be trivial),
+    - or using `source/assembler/run-llvm-tblgen.sh` to generate a
+      json file from LLVM's tablegen data.
 
   - Maybe add [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/)
     to the repo as a branch, and use it as a bootstrap stage. It seems to
@@ -319,6 +323,9 @@ There are some other copies/versions of Maru. Here are the ones
 that I know about and contain interesting code:
 
 - [github.com/melvinzhang/maru](https://github.com/melvinzhang/maru)
+
+- [https://github.com/kstephens/maru](https://github.com/kstephens/maru)
+  seems to have 3 versions captured: 1.0, 2.1, 2.4
 
 - [below-the-top](https://github.com/jbulow/below-the-top) is some kind of
   generic sexp tokenizer and evaluator written in Common Lisp that can be
@@ -407,3 +414,15 @@ A list of projects that are relevant in this context:
   - [Compiling a Lisp: Overture](https://bernsteinbear.com/blog/compiling-a-lisp-0/):
     Educational article series about constructing a simple Lisp compiler,
     implemented in C.
+
+  - [D. F. Hendry's MINT3](https://www.researchgate.net/publication/344519055_M_I_N_T_Machine_Independent_Organic_Software_Tools_Third_Edition):
+    Supposedly something interesting from the past, but I haven't researched
+    it myself yet.
+
+  - Meta II (1954) - a compiler compiler, or a language to write compilers in.
+    See this [tutorial](https://www.bayfronttechnologies.com/mc_tutorial.html).
+    > META II is not intended as a standard language which everyone will use to
+    > write compilers. Rather, it is an example of a simple working language which
+    > can give one a good start in designing a compiler-writing compiler suited
+    > to his own needs. Indeed, the META II compiler is written in its own
+    > language, thus lending itself to modification.”
