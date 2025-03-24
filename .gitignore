@@ -6,5 +6,6 @@ eval-x86
 etc
 source/parsing/peg.g.l
 source/assembler/asm-x86.l
+source/assembler/X86
 *.g.l
 playground

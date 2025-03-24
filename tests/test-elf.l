@@ -10,6 +10,10 @@
 ;; man 8 ld-linux.so
 ;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
 
+;; lots of docs on writing a kernel module to add a new binary format
+;; https://www.muppetlabs.com/~breadbox/txt/mopb.html
+;; https://www.muppetlabs.com/~breadbox/txt/mopb-app.html
+
 ;; memory layout, linux loader, malloc, brk:
 ;; https://gist.github.com/CMCDragonkai/10ab53654b2aa6ce55c11cfc5b2432a4
 ;; ASLR: https://sysctl-explorer.net/kernel/randomize_va_space/
@@ -200,7 +204,7 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(movlIR	1 _EAX)				; exit
 	(movlIR	0 _EBX)				; status
 	(int	0x80)
-msg	(.ascii	"*** Now run ./a.out for a friendly greeting\n")
+msg	(.ascii	"*** You may run ./a.out now for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 
 (println "calling it, output should follow")
