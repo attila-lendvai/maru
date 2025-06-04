@@ -72,9 +72,15 @@ sudo apt install gcc-multilib
 
 #### MacOS
 
-Please note that recent MacOS versions don't support 32 bit
-executables anymore, but Maru's LLVM backend should work fine. I don't
-test it regularly, so things may not always work out of the box.
+Please note that x86 MacOS dropped support for 32 bit executables, so
+the current x86 backend won't work there. The even newer Mac's
+nowadays have ARM CPU's, and there's no ARM backend for Maru. There
+are no fundamental reasons why the LLVM backend shouldn't work on
+MacOS, but I don't own a Mac.
+
+PR's are welcome for fixes, setting up CI, or adjusting this readme.
+
+The following instructions used to work at around 2018:
 
 1. Make sure XCode is installed. In a Terminal:
 
