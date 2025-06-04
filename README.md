@@ -432,3 +432,10 @@ A list of projects that are relevant in this context:
     > can give one a good start in designing a compiler-writing compiler suited
     > to his own needs. Indeed, the META II compiler is written in its own
     > language, thus lending itself to modification.”
+
+  - [mu](https://github.com/akkartik/mu): I haven't played with this
+    yet, but it seems to be a very self-contained and low-level
+    language/VM whose compiler can target the bare Linux kernel, or
+    the bare machine (x86). The readme has a collection of links to
+    docs on low-level stuff. Mu could be another stepping stone to
+    bootstrap Maru.
