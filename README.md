@@ -282,6 +282,8 @@ new features. Some that are worth mentioning:
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),
     (see this [couple of page summary](https://github.com/fare/climbing), or
     see his [page on reflection](http://fare.tunes.org/reflection.html))
+    
+  - Maybe rename *long* to *word* throughout the project.
 
 </details>
 

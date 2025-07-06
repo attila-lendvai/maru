@@ -135,11 +135,11 @@
 (define-emit    (ALIAS _ _)			(println "	.set "$1", "$2))
 (define-emit    (EXPORT LABEL)			(println "	.globl "$1))
 (define-emit    (ALIGN long)			(println "	.align " $1))
-;; TODO rename to WORD and PTR, bring closer to the llvm backend
+;; TODO rename to WORD? bring closer to the llvm backend
 (define-emit    (LONG _)			(println "	.4byte	"$1))
 (define-emit    (PTR _)				(println "	.4byte	"$1))
 (define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
-;; TODO rename to DEFINE
+;; TODO rename to DEFINE? that would be less unique
 (define-emit    (DEFLABEL LABEL)		(println $1":"))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
@@ -421,6 +421,7 @@
        (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
              ;; TODO FIXME adding another level of let, or using let*
              ;; results in confused bindings and/or closure capturing.
+             ;; TODO undo the inlining once eval/closures/bug/1 is fixed
              ;;(canary-value	(slave-value +canary-value+))
              (canary-emitter	(if (slave-value feature/object-canary)
                                     (lambda () (emit LONG (slave-value +canary-value+)))
