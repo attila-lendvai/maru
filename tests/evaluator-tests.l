@@ -193,21 +193,21 @@
 
 (define-test eval/closures/bug/1 ()
   ;; this bug is present in the piumarta branch, both in eval.c and eval.l
-  (let ((closure (let ((a 1)
-                       (b 2)
-                       (c 3)
+  (let ((closure (let ((a 11)
+                       (b 22)
+                       (c 33)
                        (x 42))
                    (lambda ()
                      (list a b c x)))))
     ;;(println (closure))
-    (test-assert (equal (list 1 2 3 42) (closure)))
+    (test-assert (equal (list 11 22 33 42) (closure)))
     (let ((y -1)
           (z))
       ;; (println (closure)) currently print '(-1 () 3 42)
       ;; i.e. the places captured by the closure are overwritten by
       ;; the second LET.
       )
-    (test-assert (equal (list 1 2 3 42) (closure)))))
+    (test-assert (equal (list 11 22 33 42) (closure)))))
 
 (define-form eval/expand/bug/1/helper-form (val)
   `(zork ,val))

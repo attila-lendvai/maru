@@ -154,8 +154,9 @@
           (set nfree (+ nfree (<header>-size ptr)))
           (set (<header>-flags ptr) 0)
           (set (<header>-type ptr) 0)))
-      (and (= gc/memory-base (set ptr (<header>-next ptr)))
-           (set ptr 0)))
+      (when (= gc/memory-base
+               (set ptr (<header>-next ptr)))
+        (set ptr 0)))
     (set gc/objects-live nobjs)
     (set gc/bytes-used nused)
     (set gc/bytes-free nfree)
@@ -221,13 +222,15 @@
           (gc/debug (platform/print-diag-fmt "alloc? %ld %p %p [%p] %ld >= %ld %ld" (<header>-flags chunk) chunk (<header>-next chunk) first (<header>-size chunk) requested-size (<= requested-size (<header>-size chunk))))
           (when (= 0 (<header>-flags chunk)) ;; i.e. free chunk
             (let ((chunk-size (<header>-size chunk)))
-              (while (and (= 0 (<header>-flags (<header>-next chunk)))
+              (while (and (= 0 (<header>-flags (<header>-next chunk))) ; free
+                          ;; TODO can this ever be false?
                           (= (<header>-next chunk) (+ chunk (+ size-of-<header> chunk-size))))
                 ;; merge all consecutive free chunks
                 (let ((next (<header>-next chunk)))
                   (set (<header>-next chunk) (<header>-next next))
                   (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ size-of-<header> (<header>-size next)))))
-                  (and (= next gc/memory-last) (set gc/memory-last chunk))))
+                  (when (= next gc/memory-last)
+                    (set gc/memory-last chunk))))
               ;; TODO ? total-size includes the header while chunk-size is only the size of the payload space
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk

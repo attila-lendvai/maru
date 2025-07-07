@@ -487,9 +487,12 @@
     (set-second-to-first 33 99)
   99)
 
-;;; TODO this file can either be libc or linux platform
-;; this should error, explicitly noting that the lambda is capturing x, which is currently not supported.
-;; the LLVM IR type system actually catches this bug, but the x86 backend silently miscompiles it currently
+;; this should error, explicitly noting that the lambda is capturing
+;; cariables, which is currently not supported. (the LLVM IR type
+;; system actually catched this bug when we used to miscompiled it.)
+;; but the current compiler explicitly errors with the following:
+;; "error: err, what!?  encountered a variable whose env is *below*
+;; the compiler's lambda nesting level!? it's b.2+3"
 ;; (define-test compile/closures/1
 ;;     (let ((a 40)
 ;;           (b 0))
@@ -506,6 +509,7 @@
 ;;      (assert (< 0 len))
 ;;      `((string->C-string ,str) ,len))))
 
+;;; TODO are we compiled for libc or linux platform? or both?
 ;; (define-test compile/syscall/1
 ;;     (let ()
 ;;       ;; (eval-at-expand

@@ -156,8 +156,8 @@
 (assert (= (type-object-for-id (<type>-id <record>)) <record>))
 
 (verbosity 2
-  (warn "<type> is bootstrapped: "	<type>		", id: "	(<type>-id <type>)"\n")
-  (warn "<record> is bootstrapped: "	<record>	", id: "	(<type>-id <record>)"\n"))
+  (warn "<type> is instantiated: "	<type>		", id: "	(<type>-id <type>)"\n")
+  (warn "<record> is instantiated: "	<record>	", id: "	(<type>-id <record>)"\n"))
 
 (assert (= 'not-yet-bootstrapped type-of))
 
@@ -293,7 +293,7 @@
          ,@(%make-record-accessors <type> false)
          ,@(%make-record-accessors <record> false)))
 
-(verbosity 2 (warn "type bootstrap finished\n"))
+(verbosity 2 (warn "type registry is alive\n"))
 
 ;;; at this point the type registry is bootstrapped, containing two types: <type> and <record>
 

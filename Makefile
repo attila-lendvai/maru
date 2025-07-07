@@ -51,6 +51,8 @@ else ifeq ($(HOST_OS),Darwin)
 endif
 
 CFLAGS		+= -O3
+# if you want to use the perf tool to profile the binary
+#CFLAGS		+= -O3 -g -fno-omit-frame-pointer -fno-inline
 CFLAGS_x86	+= $(CFLAGS)
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
@@ -118,7 +120,6 @@ RESET		= $(shell tput sgr0)
 BACKDATE_FILE	= touch -t 200012312359
 
 LLC		= llc$(LLVM_VERSION)
-LLVM_OPT	= opt$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
 DIFF		= diff --unified --ignore-all-space
 STRIP		= strip

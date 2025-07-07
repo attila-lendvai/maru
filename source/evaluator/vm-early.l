@@ -270,7 +270,7 @@
                                  (let ()
                                    (set ,arg-name (get/head __args))
                                    ,@(when type-checker
-                                       ;; TODO this emits quite some duplicity
+                                       ;; TODO this emits quite some redundancy
                                        `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string prim-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
                                    ,@(when (and unbox?
                                                 unboxer)

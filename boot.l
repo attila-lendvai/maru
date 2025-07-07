@@ -25,6 +25,9 @@
 ;; 2: non-trivial runtime costs
 ;; 3: catch my bug no matter what!
 ;; 4: run a gc before every allocation
+;; NOTE re `make SAFETY=2 target`: defining *safety* from the Makefile
+;; is not obvious... are we interested in the host or the slave value?
+;; or both?
 (define *safety* 1)
 
 (define error)
