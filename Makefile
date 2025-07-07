@@ -61,7 +61,7 @@ GREEN		= $(shell tput setaf 2)
 BLUE		= $(shell tput setaf 4)
 RESET		= $(shell tput sgr0)
 
-LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
+LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS) -relocation-model=pic
 LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
 CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
 DIFF		= diff --unified --ignore-all-space
