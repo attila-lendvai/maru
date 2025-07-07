@@ -1254,4 +1254,8 @@
     (emit INLINE "%m_libc-FILE = type opaque\n")
     ;;(emit INLINE "declare i8* @llvm.sponentry()\n")
     (emit INLINE "declare i8* @llvm.frameaddress(i32)\n")
+    ;; TODO KLUDGE introduce a cleaner mechanism to emit platform
+    ;; specific literal code (in this case for memset).
+    (when (defined? '*llvm-platform-specific-prelude*)
+      (emit INLINE (eval '*llvm-platform-specific-prelude*)))
     ))

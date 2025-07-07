@@ -54,7 +54,9 @@ CFLAGS_x86	+= $(CFLAGS)
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
 ifeq ($(PLATFORM),linux)
-  CFLAGS	+= -nostdlib -nostartfiles -Wl,-Bstatic
+# NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
+# https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
+  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic
 endif
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)

@@ -2,6 +2,35 @@
 
 (require "source/platforms/linux/linux.l")
 
+;; https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
+
+;; let's declare a memset function because clang -O can emit
+;; references to it (and memcpy and memmove) even with `clang
+;; -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic`.
+(eval-in-host
+ '(define *llvm-platform-specific-prelude*
+   "
+define weak dso_local ptr @memset(ptr %dst, i32 %val, %word %len) {
+entry:
+  %end = getelementptr i8, ptr %dst, %word %len
+  %val8 = trunc i32 %val to i8
+  br label %loop
+
+loop:
+  %cur = phi ptr [ %dst, %entry ], [ %next, %store ]
+  %done = icmp eq ptr %cur, %end
+  br i1 %done, label %exit, label %store
+
+store:
+  store i8 %val8, ptr %cur
+  %next = getelementptr i8, ptr %cur, %word 1
+  br label %loop
+
+exit:
+  ret ptr %dst
+}
+"))
+
 (load "source/evaluator/vm-early.l")
 
 ;;;
