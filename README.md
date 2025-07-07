@@ -6,9 +6,9 @@
 ## Assorted smaller changes
  - `define-structure` -> `define-record`
  - `define-type`
- - `--call` and `--define` command line arguments (until we finally grow a read-from-string to be able to implement --eval)
+ - `--call` and `--define` command line arguments (until we finally grow a `read-from-string` to be able to implement --eval)
  - `times-do`
- - make test-compiler-[llvn,x86] test-interpreter
+ - make test-compiler-[llvm,x86] test-interpreter
 
 ## LLVM backend
 
