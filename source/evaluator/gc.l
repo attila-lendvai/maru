@@ -191,9 +191,10 @@
                        (gc/mark-and-trace (oop-at obj index))))))))))
 
 (define-function gc/collect ()
+  (set gc/collection-count (+ gc/collection-count 1))
   (gc/debug
-    (or (bitwise-and 1023 (set gc/collection-count (+ gc/collection-count 1)))
-        (platform/print-diag-fmt "%ld collections" gc/collection-count)))
+   (or (bitwise-and 1023 gc/collection-count)
+       (platform/print-diag-fmt "%ld collections" gc/collection-count)))
   (gc/debug (platform/print-diag-fmt "about to mark %ld gc roots stored at %p" gc/root-count gc/roots))
   (gc/mark-and-trace gc/roots) ; even though it's an opaque, we still need to mark the vector itself
   (for (i 0 gc/root-count)

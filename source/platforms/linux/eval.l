@@ -79,7 +79,9 @@ exit:
         (print-all *error-output*
                    (box <long> gc/objects-live)" objects in "
                    (box <long> gc/bytes-used)" bytes, "
-                   (box <long> gc/bytes-free)" bytes free\n")))
+                   (box <long> gc/bytes-free)" bytes free, "
+                   (box <long> gc/collection-count)" GC runs\n"
+                   )))
     (when-at-expand feature/profiler
       (profiler/disable))
     (platform/flush-streams)
