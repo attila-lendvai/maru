@@ -1192,7 +1192,7 @@
     ;; bitcode output to chose the proper target triplet.
     ;;(emit INLINE (concat-strings "target triple = \"" target-triplet "\"\n"))
     (emit INLINE (list "%word = type i"word-size"\n"))
-    (emit INLINE "%oop = type i8*\n")
+    (emit INLINE "%oop = type ptr\n")
     ;; TODO this should be done by a general emitter
     (emit INLINE (list "%\"<header>\" = type { %word, %word"
                        (if (and (slave-value (defined? 'feature/object-canary))
