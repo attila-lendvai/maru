@@ -32,6 +32,7 @@
    ;;
    ;; the rest is only for convenience
    ;;
+   "perf"
    "bash-completion"
    "gawk"
    "sed"
