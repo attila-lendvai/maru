@@ -87,7 +87,7 @@
 ;;; The GC's state
 ;;;
 (define gc/minimum-growth-unit	(* 50 1024))
-(define gc/allocations-until-gc	32768)
+(define gc/allocations-until-gc	131072)
 
 (define gc/objects-live         0)
 (define gc/bytes-used           0)
