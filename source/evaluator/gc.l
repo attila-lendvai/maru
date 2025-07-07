@@ -87,7 +87,7 @@
 ;;; The GC's state
 ;;;
 (define gc/minimum-growth-unit	(* 50 1024))
-(define gc/frequency            32768)
+(define gc/allocations-until-gc	32768)
 
 (define gc/objects-live         0)
 (define gc/bytes-used           0)
@@ -108,7 +108,7 @@
     (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
-    (gc/debug (platform/print-diag-fmt "heap growth %p size %ld %ld/%ld" ptr size gc/alloc-count gc/frequency))
+    (gc/debug (platform/print-diag-fmt "heap growth %p size %ld %ld/%ld" ptr size gc/alloc-count gc/allocations-until-gc))
     (assert (aligned-to-oop? ptr) "gc/acquire-new-heap-space: aligned-to-oop? has failed for ptr "ptr)
     ptr))
 
@@ -209,7 +209,7 @@
   (gc/debug (platform/print-diag-fmt "gc/allocate type %ld %ld" type requested-size))
   (safety 2 (assert type "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
-  (and (= gc/alloc-count gc/frequency)
+  (and (= gc/alloc-count gc/allocations-until-gc)
        (gc/collect))
   (let* ((first (<header>-next gc/memory-last))
          (chunk first)
