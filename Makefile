@@ -258,7 +258,7 @@ $(EVAL0_DIR):
 # NOTE: we fix TARGET_CPU to i686 (and platform to linux) because 32 bit LLVM is the fastest version of us.
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
-		TARGET_CPU=i686				\
+		TARGET_CPU=$(TARGET_CPU)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
 		PLATFORM=linux				\
