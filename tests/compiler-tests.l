@@ -71,21 +71,19 @@
 
 (define-function sum-of-three (x y z) (+ (+ x y) z))
 
-;; TODO this doesn't even compile
-;; (define-function compile/bug/push-root/helper/1 (x)
-;;   (let ((x x))
-;;     (set x 99))
-;;   x)
+(define-function compile/bug/push-root/helper/1 (x)
+  (let ((x x))
+    (set x 99))
+  x)
 
-;; (define-function compile/bug/push-root/helper/2 (x)
-;;   (set x 99)
-;;   (let ((x x))
-;;     (return x)))
+(define-function compile/bug/push-root/helper/2 (x)
+  (let ((x (* 2 x)))
+    (return x)))
 
-;; (define-test compile/bug/push-root
-;;     (+ (compile/bug/push-root/helper/1 40)
-;;        (compile/bug/push-root/helper/2 2))
-;;   42)
+(define-test compile/bug/push-root
+    (+ (compile/bug/push-root/helper/1 2)
+       (compile/bug/push-root/helper/2 20))
+  42)
 
 (define printf 10)
 (define word 10)
@@ -311,52 +309,52 @@
     (bitwise-not -1)
   0)
 
-;; (define-test compile/bitwise-shift-left/1
-;;     (bitwise-shift 0x0f 4)
-;;   0xf0)
+(define-test compile/bitwise-shift-left/1
+    (bitwise-shift 0x0f 4)
+  0xf0)
 
-;; (define-test compile/bitwise-shift-left/2
-;;     (bitwise-shift 0xffffff0 1000)
-;;   0)
+(define-test compile/bitwise-shift-left/2
+    (bitwise-shift 0xffffff0 1000)
+  0)
 
-;; (define-test compile/bitwise-shift-right/1
-;;     (bitwise-shift 0x0f -2)
-;;   0x3)
+(define-test compile/bitwise-shift-right/1
+    (bitwise-shift 0x0f -2)
+  0x3)
 
-;; (define-test compile/bitwise-shift-right/2
-;;     (bitwise-shift -8 -1)
-;;   -4)
+(define-test compile/bitwise-shift-right/2
+    (bitwise-shift -8 -1)
+  -4)
 
-;; (define-test compile/bitwise-shift-right/3
-;;     (bitwise-shift 0xffffff0 -1000)
-;;   0)
+(define-test compile/bitwise-shift-right/3
+    (bitwise-shift 0xffffff0 -1000)
+  0)
 
-;; (define-test compile/bitwise-shift/literal/1
-;;     (bitwise-shift 0x0f 4)
-;;   0xf0)
+(define-test compile/bitwise-shift/literal/1
+    (bitwise-shift 0x0f 4)
+  0xf0)
 
-;; (define-test compile/bitwise-shift/literal/2
-;;     (bitwise-shift 0xf0 -4)
-;;   0x0f)
+(define-test compile/bitwise-shift/literal/2
+    (bitwise-shift 0xf0 -4)
+  0x0f)
 
-;; (define-test compile/bitwise-shift/literal/3
-;;     (bitwise-shift 0x42 0)
-;;   0x42)
+(define-test compile/bitwise-shift/literal/3
+    (bitwise-shift 0x42 0)
+  0x42)
 
-;; (define-test compile/bitwise-shift/local/1
-;;     (let ((shift (+ 2 2)))
-;;       (bitwise-shift 0x0f shift))
-;;   0xf0)
+(define-test compile/bitwise-shift/local/1
+    (let ((shift (+ 2 2)))
+      (bitwise-shift 0x0f shift))
+  0xf0)
 
-;; (define-test compile/bitwise-shift/local/2
-;;     (let ((shift (- 0 4)))
-;;       (bitwise-shift 0xf0 shift))
-;;   0x0f)
+(define-test compile/bitwise-shift/local/2
+    (let ((shift (- 0 4)))
+      (bitwise-shift 0xf0 shift))
+  0x0f)
 
-;; (define-test compile/bitwise-shift/local/3
-;;     (let ((shift 0))
-;;       (bitwise-shift 0x42 shift))
-;;   0x42)
+(define-test compile/bitwise-shift/local/3
+    (let ((shift 0))
+      (bitwise-shift 0x42 shift))
+  0x42)
 
 (define-test compile/char-at/1
     (char-at (C-string "alma") 2)
