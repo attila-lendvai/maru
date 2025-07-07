@@ -369,7 +369,8 @@
                   ((< 0 shift)
                    `(arithmethic-shift-left ,value ,shift))
                   ((< shift 0)
-                   `(arithmethic-shift-right ,value ,(- shift)))))
+                   `(arithmethic-shift-right ,value ,(- shift)))
+                  (else value)))
     (else	`(%bitwise-shift ,value ,shift))))
 
 ;; install stubs for the +special-operators+
