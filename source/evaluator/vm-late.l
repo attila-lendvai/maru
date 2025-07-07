@@ -93,7 +93,7 @@
 
   (gc/initialize)
 
-  (safety 4 (set gc/frequency 1))
+  (safety 4 (set gc/allocations-until-gc 1))
   (debug (platform/print-diag "gc initialized"))
 
   (gc/push-root (address-of *globals*))
