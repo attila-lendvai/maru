@@ -340,13 +340,15 @@
       (case prop
         (raw-slot-access	(set raw-slot-access? true))
         (else			(error "define-record: unexpected property "prop))))
+    ;; so that it's already available at expand time...
     (eval `(define ,name ,record-type))
+    ;; ...and at runtime.
     `(let ((type-obj ,record-type))
        (define ,name type-obj)
        ,@(%make-record-accessors record-type raw-slot-access?)
        type-obj)))
 
-;;; immediate type
+;;; immediate type (i.e. a word with some tag bits)
 
 (define-record <immediate-type> <type> (tag-value tag-width))
 
@@ -359,7 +361,7 @@
 (define-form define-immediate (name tag-value tag-width)
   `(define ,name ,(new-<immediate-type> name (eval tag-value) (eval tag-width))))
 
-;;; boxed type
+;;; boxed type (i.e. a full object with a header)
 
 (define-record <boxed-type> <type> (one-word?))
 

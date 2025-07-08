@@ -7,6 +7,9 @@
 ;;;
 ;;; API visible in the target
 ;;;
+
+;; NOTE C-string is a compiler special form
+
 (define-form define-C-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
     `(define ,maru-name ,ff)))
@@ -26,7 +29,7 @@
     `(define ,maru-name ,fv)))
 
 (define-form string->C-string (obj)
-  ;; OPTIMIZATION: use a compiler special form to emit cstrings when
+  ;; OPTIMIZATION: use the C-string compiler special form to emit cstrings when
   ;; literals are immediately passed to string->C-string. ideally it
   ;; should be done by some compiler macro like facility.
   (if (is <string> obj)

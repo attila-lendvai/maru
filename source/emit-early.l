@@ -22,6 +22,7 @@
 ;;;
 ;;; FFI
 ;;;
+;; TODO these should be in the c based platform file, but that is loaded into the target...
 (define-record <C-function> ()
   (name
    return-type

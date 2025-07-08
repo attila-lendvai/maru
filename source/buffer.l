@@ -2,7 +2,7 @@
 ;;;
 ;;; A simple memory buffer with dynamic reallocation
 
-;; TODO this should be merged with source/evaluator/buffer.l
+;; TODO this should be merged with source/evaluator/arrays.l
 
 (define-record <buffer> () (size elements capacity))
 

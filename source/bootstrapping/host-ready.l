@@ -40,6 +40,7 @@
 (define eval-in-host (lambda (form)
                        (eval form *host-env*)))
 
+;; a convoluted way to build (assert (is <target-function> load)) without LIST
 (eval-in-host ((lambda args args) 'assert ((lambda args args) 'is '<target-function> load)))
 
 (switch-to-host-env)

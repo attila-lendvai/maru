@@ -133,7 +133,7 @@
 ;; (define-symbol-form *verbosity*       '(global-variable-value *maru* symbol/*verbosity*))
 ;; (define-symbol-form *optimised*       '(global-variable-value *maru* symbol/*optimised*))
 
-;; TODO this is fast, but this way *verbosity* in the evaluator and in the target is not in sync automatically.
+;; TODO this is fast, but this way *verbosity* in the vm and in the target is not in sync automatically.
 ;; ideally, these variables could be in a super-module, and the codebase would't even have a global-variable?
 (define *verbosity* 0)
 (define *optimised* 0)
@@ -151,6 +151,8 @@
 ;;
 ;; FATAL is a low-level facility, it directly uses the libc's printf
 ;; (i.e. it cannot print maru objects, but works early in the init).
+;; when PLATFORM=linux then it silently ignores the formatting control
+;; characters.
 ;;
 (define-function fatal-prologue ()
   (incr *error-level*)
