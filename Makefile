@@ -35,6 +35,7 @@ PREVIOUS_STAGE_BACKEND	= -llvm
 HOST_OS		= $(shell uname -s)
 TARGET_CPU	?= $(shell uname -m)
 PLATFORM	?= libc
+VERBOSITY	?= -v #-v -v
 
 ifeq ($(HOST_OS),Linux)
 #  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
@@ -278,7 +279,7 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval -v						\
+	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		--define *compiler-backend* 	"x86"				\
@@ -299,7 +300,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(TIME) $(HOST_DIR)/eval -v						\
+	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		--define *compiler-backend* 	"llvm"				\
@@ -345,7 +346,7 @@ $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bo
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(2) $(PROFILER_ARG) -O -v						\
+  $(TIME) $(2) $(PROFILER_ARG) -O $(VERBOSITY)					\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	--define *compiler-backend* 	"x86"					\
@@ -365,7 +366,7 @@ define compile-x86
 endef
 
 define compile-llvm
-  $(TIME) $(2) $(PROFILER_ARG) -O -v						\
+  $(TIME) $(2) $(PROFILER_ARG) -O $(VERBOSITY)					\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	--define *compiler-backend* 	llvm					\
