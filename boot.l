@@ -21,6 +21,7 @@
 ;; This variable is controls the amount of safety features. It's mostly queried at expand time,
 ;; and its value at bootstrapping also controls the amount of checks compiled into the eval executable.
 ;; See also the (define-form safety ...).
+;; 0: asserts disabled
 ;; 1: add some checks that are cheap
 ;; 2: non-trivial runtime costs
 ;; 3: catch my bug no matter what!
@@ -180,9 +181,10 @@
 (define-symbol-form *globals* '(current-globals))
 
 (define-form assert (test . args)
-  (unless args
-    (set args (list "assertion failed: " `(quote ,test))))
-  `(or ,test (error ,@args)))
+  (when (< 0 *safety*)
+    (unless args
+      (set args (list "assertion failed: " `(quote ,test))))
+    `(or ,test (error ,@args))))
 
 (define-form verbosity (level . body)
   `(when (<= ,level *verbosity*)
