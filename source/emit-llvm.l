@@ -807,6 +807,11 @@
     (gen CALL (closure-code-label (<variable>-name op)) arg-regs))
   ())
 
+(define-method compile-call-to <target-function> (op arg-regs -c-)
+  (comp op)
+  (compile-call-to-object arg-regs -c-)
+  ())
+
 (define-method compile-call-to <TEMP> (op arg-regs -c-)
   (comp op)
   (compile-call-to-object arg-regs -c-)

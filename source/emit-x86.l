@@ -619,6 +619,10 @@
     (gen CALL (closure-code-label (<variable>-name op)) arg-locs))
   ())
 
+(define-method compile-call-to <target-function> (op arg-locs -c-)
+  (comp op)
+  (compile-call-to-object arg-locs -c-))
+
 (define-method compile-call-to <TI32> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
