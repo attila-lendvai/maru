@@ -65,21 +65,4 @@
 (load "source/evaluator/vm-late.l")
 
 (define-function main (argc argv)
-  (initialize-vm)
-  (initialize-streams libc/stdin libc/stdout libc/stderr)
-
-  (process-command-line-arguments argc argv)
-
-  (debug-print "main is on the way out")
-
-  (verbosity 1
-    (gc/collect)
-    (libc/fprintf libc/stderr
-                  (string->C-string "%ld objects in %ld bytes, %ld bytes free, %ld GC runs\n")
-                  gc/objects-live gc/bytes-used gc/bytes-free gc/collection-count))
-  (when-at-expand feature/profiler
-    (profiler/disable))
-  (platform/flush-streams)
-
-  (debug-print "main is returning normally")
-  0)
+  (main/common argc argv libc/stdin libc/stdout libc/stderr))

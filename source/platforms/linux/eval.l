@@ -65,26 +65,5 @@ exit:
   (let ((argc (oop-at (stack-pointer-on-entry) 0))
         (argv (+ (stack-pointer-on-entry)
                  (words-to-bytes 1))))
-
-    (initialize-vm)
-    (initialize-streams linux/stdin linux/stdout linux/stderr)
-
-    (process-command-line-arguments argc argv)
-
-    (debug-print "main is on the way out")
-
-    (verbosity 1
-      (gc/collect)
-      (let ((out *error-output*))
-        (print-all *error-output*
-                   (box <long> gc/objects-live)" objects in "
-                   (box <long> gc/bytes-used)" bytes, "
-                   (box <long> gc/bytes-free)" bytes free, "
-                   (box <long> gc/collection-count)" GC runs\n"
-                   )))
-    (when-at-expand feature/profiler
-      (profiler/disable))
-    (platform/flush-streams)
-
-    (debug-print "main is returning normally")
-    (linux-syscall linux/exit 0)))
+    (linux-syscall linux/exit
+     (main/common argc argv linux/stdin linux/stdout linux/stderr))))

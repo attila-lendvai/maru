@@ -127,3 +127,30 @@
   (set *globals* (set *maru-user* (environment *maru* 0 0)))   (when-at-expand feature/debug-info (set (<env>-name *maru-user*) "maru-user"))
   (capture-well-known-globals)
   (debug (platform/print-diag "initialize-vm is done")))
+
+(define-function gc/print-statistics ()
+  (print-all *error-output*
+             "Heap: "
+             (box <long> gc/objects-live)" objects in "
+             (box <long> gc/bytes-used)" bytes, "
+             (box <long> gc/bytes-free)" bytes free, "
+             (box <long> gc/collection-count)" GC runs\n"
+             ))
+
+(define-function main/common (argc argv stdin stdout stderr)
+  (initialize-vm)
+  (initialize-streams stdin stdout stderr)
+
+  (process-command-line-arguments argc argv)
+
+  (debug-print "main is on the way out")
+
+  (verbosity 1
+    (gc/collect)
+    (gc/print-statistics))
+  (when-at-expand feature/profiler
+    (profiler/disable))
+  (platform/flush-streams)
+
+  (debug-print "main is returning normally")
+  0)
