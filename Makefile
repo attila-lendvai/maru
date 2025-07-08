@@ -51,8 +51,10 @@ else ifeq ($(HOST_OS),Darwin)
 endif
 
 CFLAGS		+= -O3
-CFLAGS_x86	+= $(CFLAGS)
-CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
+# if you want to use the perf tool to profile the binary
+#CFLAGS		+= -O3 -g -fno-omit-frame-pointer -fno-inline
+CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie
+CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments -fPIC -Wl,-pie
 
 ifeq ($(PLATFORM),linux)
 # NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
