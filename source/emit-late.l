@@ -65,28 +65,3 @@
                       ;; TODO eliminate the extra indirection from the global var to the dispatch array
                       ((oop-at ,dispatch-table-name (- type ,index-min)) ,@parameters))))))
       (compile-definition stub name -c-))))
-
-;;;
-;;; API visible in the target
-;;;
-(switch-to-target-env)
-
-(define-form define-C-function (maru-name return-type foreign-name parameter-types)
-  (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
-    `(define ,maru-name ,ff)))
-
-(define-form define-C-functions (maru-prefix . entries)
-  `(let ()
-     ,@(map (lambda (entry)
-              (let* ((foreign-name (second entry))
-                     (maru-name (if maru-prefix
-                                    (concat-symbol maru-prefix foreign-name)
-                                  foreign-name)))
-                `(define-C-function ,maru-name ,@entry)))
-            entries)))
-
-(define-form define-C-variable (maru-name foreign-name type)
-  (let ((fv (eval-in-host `(C-variable ,(symbol->string foreign-name) ',type))))
-    `(define ,maru-name ,fv)))
-
-(switch-to-host-env)
