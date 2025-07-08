@@ -2,8 +2,10 @@
 
 (require "source/conversion.l")
 
-;; NOTE for debugging only, because this breaks the output due to multiline string literals escaping the line-comment syntax
-(define *compiler-verbose* '())
+;; FIXME only works at 1 and below. comments need to be escaped:
+;; there's only single-line comment syntax in llvm and gas. escape
+;; newlines and the comment syntax chars.
+(define *compiler-verbosity* 0)
 
 (define-constant +maru-label-prefix+ "m_")
 

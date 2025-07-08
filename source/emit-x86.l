@@ -124,7 +124,7 @@
 ;;;
 ;;; IA32 -- INSTRUCTIONS
 ;;;
-(define-emit    (COMMENT pair)			(when *compiler-verbose* (print "## ") (apply println $1)))
+(define-emit    (COMMENT pair)			(when (<= 1 *compiler-verbosity*) (print "# ") (apply println $1)))
 
 (define-emit    (TEXT)				(println "	.text"))
 (define-emit    (DATA)				(println "	.data"))
@@ -355,7 +355,8 @@
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
-     (emit COMMENT (list "COMPILE of "__obj__))
+     (when (<= 2 *compiler-verbosity*)
+       (emit COMMENT (list "COMPILE of "__obj__)))
      (compile __obj__ -c-)))
 
 (define compiler x86-compiler)
@@ -523,7 +524,8 @@
         temp))))
 
 (define-function emit-expr-code (self entry-point-label parent-comp)
-  (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self)))
+  (when (<= 3 *compiler-verbosity*)
+    (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self))))
   (let* ((body		(<expr>-body self))
          (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (init-param	(lambda (var)
@@ -538,7 +540,8 @@
            (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
       (map (lambda (el) (set (<TI32>-offset el) (+ arg-size (<TI32>-offset el)))) (<compiler>-temps -c-))
       (map (lambda (el) (set (<TI32>-offset el) (+ frm-size (<TI32>-offset el)))) param-locs)
-      (emit COMMENT (list "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size))
+      (when (<= 2 *compiler-verbosity*)
+        (emit COMMENT (list "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size)))
       ;; emitting begins
       (emit TEXT)
       (emit DEFLABEL entry-point-label)
@@ -865,7 +868,8 @@
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
-    (emit COMMENT (list "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
+    (when (<= 2 *compiler-verbosity*)
+      (emit COMMENT (list "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args)))
     ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))

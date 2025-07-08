@@ -197,7 +197,9 @@
 
 (define-function %emit (-c- factory args)
   (let* ((instr (factory)))
-    (and *compiler-verbose* (println "; EMIT of "instr", args: " args)) ; TODO move this into emit-instruction?
+    (when (<= 3 *compiler-verbosity*)
+      ;; TODO move this into emit-instruction?
+      (println "; EMIT of "instr", args: " args))
     (apply emit-instruction (cons -c- (cons instr args)))))
 
 (define-function %emit-form/mm-params (index types)
@@ -334,8 +336,8 @@
     (println ")")))
 
 (define-instruction COMMENT	()
-  ;;((string)			(when *compiler-verbose* (print "; ") (println $1)))
-  ((pair)			(when *compiler-verbose* (print "; ") (apply println $1))))
+  ;;((string)			(when (<= 1 *compiler-verbosity*) (print "; ") (println $1)))
+  ((pair)			(when (<= 1 *compiler-verbosity*) (print "; ") (apply println $1))))
 
 (define-instruction INLINE	()
   ((string)			(print $1))
@@ -534,7 +536,8 @@
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
-     (emit COMMENT (list "COMPILE of "__obj__))
+     (when (<= 2 *compiler-verbosity*)
+       (emit COMMENT (list "COMPILE of "__obj__)))
      (compile __obj__ -c-)
      (<compiler>-current-value -c-)))
 
@@ -551,7 +554,8 @@
   (let ((instr (factory)))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
-    (emit COMMENT (list "GEN of "instr", args: " args))
+    (when (<= 2 *compiler-verbosity*)
+      (emit COMMENT (list "GEN of "instr", args: " args)))
     ;; instantiate the regs
     (set (<instruction>-regs instr)
          (let ((temps ()))
@@ -578,7 +582,8 @@
   (array-do entry (<compiler>-gen-buffer -c-)
     (let* ((instr (first entry))
            (args (rest entry)))
-      (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args))
+      (when (<= 2 *compiler-verbosity*)
+        (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args)))
       (apply emit-instruction (cons -c- (cons instr args))))))
 
 ;;;
@@ -718,7 +723,8 @@
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
                              parameters)))
-    (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self)))
+    (when (<= 3 *compiler-verbosity*)
+      (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self))))
     (list-do e body
       (comp e))
 
@@ -763,7 +769,8 @@
 (define-function compile-call (op args raw? -c-)
   (safety 2 (assert (or (pair? op) (variable? op))))
   (let ((arg-regs (map (lambda (arg)
-                         (gen COMMENT (list "arg " arg))
+                         (when (<= 2 *compiler-verbosity*)
+                           (gen COMMENT (list "arg " arg)))
                          (comp arg)
                          (<compiler>-current-value -c-))
                        args)))
@@ -815,7 +822,8 @@
 
 (define-method compile-call-to <C-function> (op arg-regs -c-)
   (let ((param-types self.parameter-types))
-    (gen COMMENT (list "	casting FFI args"))
+    (when (<= 2 *compiler-verbosity*)
+      (gen COMMENT (list "	casting FFI args")))
     ;; for FFI calls we need to cast the non-pointer llvm args
     ;; using ptrtoint to the specific llvm type.
     (let ((param-type	())
@@ -840,7 +848,8 @@
       (case return-type
         (%oop)                          ; all good
         (void
-         (gen COMMENT (list "	void FFI call return value"))
+         (when (<= 2 *compiler-verbosity*)
+           (gen COMMENT (list "	void FFI call return value")))
          (gen LOAD-VALUE (LITERAL 0) 0))
         (else
          (let ((bitsize	(llvm-type-bitsize return-type))
