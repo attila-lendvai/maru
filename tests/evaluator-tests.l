@@ -150,6 +150,17 @@
     (array-insert x 5 43)
     (test-assert (equal (array->list x) '(1 2 42 3 4 43)))))
 
+(define-test eval/array/access ()
+  (let ((x (list->array '(1 2 3 4))))
+    (= 3 (array-at x 2))
+    (set (array-at x 1) 42)
+    (test-assert (equal (array->list x) '(1 42 3 4)))
+    (set (array-at x 5) 99)
+    (test-assert (equal (array->list x) '(1 42 3 4 () 99)))
+    ;; access beyond size is valid and returns ()
+    (test-assert (equal () (array-at x 1000)))
+    ))
+
 (define-function eval/let/1/helper (env)
   (let ((env env))
     (set env 42))
