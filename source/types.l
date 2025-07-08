@@ -109,17 +109,18 @@
         ;; and keep an additional host-id->slave-id map.
         (let ((slave-id	(allocate-type-id/slave))
               (host-id	(<type>-id type)))
+          (verbosity 3 (warn "register-type: "type", slave-id: "slave-id", host-id: "host-id"\n"))
           (set (array-at %type-id-map/host->slave host-id) slave-id)
           (set (array-at %types slave-id) type)
           (eval-in-host `(register-type ',type))))
 
-      (define-function type-object-for-id (type-id)
-        (or (array-at %types (let ((slave-id (array-at %type-id-map/host->slave type-id)))
+      (define-function type-object-for-id (host-id)
+        (or (array-at %types (let ((slave-id (array-at %type-id-map/host->slave host-id)))
                                ;; we could make this smarter and only do the remap when there's an entry...
                                ;; but do we want to? wouldn't that hide some nasty bugs?
-                               (assert slave-id "type-object-for-id: no host->slave mapping exists for host type-id: " type-id)
+                               (assert slave-id "type-object-for-id: no host->slave mapping exists for host type-id: "host-id", type: "(array-at %types host-id))
                                slave-id))
-            (error "type-object-for-id has failed for type id "type-id", known types are: "%types))))
+            (error "type-object-for-id has failed for type id "host-id", known types are: "%types))))
 ;;;
 ;;; we are not being bootstrapped, therefore we need to instantiate <type> and <record> ourselves
 ;;;
@@ -307,6 +308,7 @@
   (assert (subtype? type <type>))
   (let ((id (allocate-type-id))
         (result (allocate (<type>-id type) (type/slot-count-of-instances type))))
+    (verbosity 3 (warn "new <type> instance: " name ", id: " id"\n"))
     (set (<type>-name	result) name)
     (set (<type>-id	result) id)
     (register-type result)
