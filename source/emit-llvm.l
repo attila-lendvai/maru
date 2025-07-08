@@ -623,7 +623,7 @@
 
   (set emit-object/box-<long>
        (eval `(lambda (val)
-                ,(expand '(box <long> val) *slave-env*))))
+                (print ,(expand '(box <long> val) *slave-env*)))))
 
   (set emit-object/<long>
        (cond
@@ -632,9 +632,11 @@
             (emit-object/box-<long> self)))
          ((slave-value (and (is <boxed-type> <long>)
                             (<boxed-type>-one-word? <long>)))
-          (emit-object/header (slave-value (<type>-slave-id <long>)))
           ;; TODO the "receiving place" of this value needs to be of the proper type
-          (error "TODO emit-object/<long>"))
+          (error "TODO emit-object/<long> for boxed type")
+          ;; (lambda (self -c-)
+          ;;   (emit-object/header (slave-value (<type>-slave-id <long>))))
+          )
          (else
           (error "emit-object/<long>: unexpected slave representation for <long>"))))
 
@@ -647,10 +649,9 @@
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<string>\" { ")
              (emit-object/header type-id)
-             (print ", %word "
-                    ;; FIXME this only works when <long> is an immediate
-                    (emit-object/box-<long> (string-length self))
-                    ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
+             (print ", %word ")
+             (emit-object/box-<long> (string-length self))
+             (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
              object-label))))
 
   (set emit-object/<target-function>

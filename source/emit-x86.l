@@ -439,7 +439,7 @@
 
   (set emit-object/box-<long>
        (eval `(lambda (val)
-                ,(expand '(box <long> val) *slave-env*))))
+                (print ,(expand '(box <long> val) *slave-env*)))))
 
   (set emit-object/<long>
        ;; TODO it should be something like: (target-value <string>). see others, too.
