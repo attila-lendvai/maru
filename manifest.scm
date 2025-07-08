@@ -17,27 +17,39 @@
 ;; ld: cannot find -lgcc_s: No such file or directory
 ;; ld: cannot find crtendS.o: No such file or directory
 
-(specifications->manifest
- '("coreutils"
-   "diffutils"
-   "clang-toolchain"
-   "glibc"
-   ;; "libffi"
-   "make"
-   "time"
-   "ncurses" ; for clear, reset, tput (used by the Makefile)
-   "git"
-   "findutils" ; find is used in the Makefile
+(use-modules (gnu packages llvm))
 
-   ;;
-   ;; the rest is only for convenience
-   ;;
-   "perf"
-   "bash-completion"
-   "gawk"
-   "sed"
-   "git:gui"
-   "man-pages"
-   "less"
-   "gdb"
-   ))
+(manifest
+ (append
+  (list
+   ;; pick specific versions
+   (package->manifest-entry
+    clang-toolchain-20
+    ))
+
+  ;; get the latest from the channels you have pulled
+  (manifest-entries
+   (specifications->manifest
+    '("coreutils"
+      "diffutils"
+      ;;"clang-toolchain"
+      "glibc"
+      ;; "libffi"
+      "make"
+      "time"
+      "ncurses"        ; for clear, reset, tput (used by the Makefile)
+      "git"
+      "findutils"                       ; find is used in the Makefile
+
+      ;;
+      ;; the rest is only for convenience
+      ;;
+      "perf"
+      "bash-completion"
+      "gawk"
+      "sed"
+      "git:gui"
+      "man-pages"
+      "less"
+      "gdb"
+      )))))
