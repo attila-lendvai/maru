@@ -64,7 +64,7 @@
 
        (define-function ,zeroed-name (obj)
          (if (gc/read-only-object? obj)
-             (safety 3 (or (and (is <string> obj) (not (,getter-name obj (,length-name obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
+             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
            (let ((size (,length-name obj)))
              (,setter-name obj size 0)
              (set (slot-value ,type-name size obj) (box <long> size))))
