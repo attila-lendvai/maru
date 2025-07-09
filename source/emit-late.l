@@ -2,6 +2,12 @@
 
 (define-function compile-env (env -c-)
   (verbosity 1 (warn "begin compiling\n"))
+  (emit-comment
+   0 "feature/profiler="(slave-value feature/profiler)", "
+   "feature/track-expr-names="(slave-value feature/track-expr-names)", "
+   "feature/object-canary="(slave-value feature/object-canary)", "
+   "feature/strict-semantics-for-compiled-set="feature/strict-semantics-for-compiled-set", "
+   "feature/redefinable-functions-in-target="feature/redefinable-functions-in-target)
   (emit-prelude -c-)
   ;; NOTE this array-do will not pick up any new definitions added to
   ;; the env after the iterations has begun (see e.g. the
