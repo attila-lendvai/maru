@@ -57,7 +57,7 @@
 
 (define-primitive-function (set () fixed) ((var <variable>) value-form)
   (debug-print "SET "var" = "value-form" IN "-ctx-)
-  (let ((value (eval value-form -ctx-)))
+  (gc/let* ((value (eval value-form -ctx-)))
     (if (global-variable? var)
         (set (<variable>-value var) value)
       (let ((delta (- (unbox <long> (<env>-level (<context>-env -ctx-)))

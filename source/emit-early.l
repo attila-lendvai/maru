@@ -263,7 +263,7 @@
 (define *target-env* (environment *globals*))
 
 (when-at-expand feature/debug-info
-  (set (<env>-name *target-env*) "target"))
+  (eval-in-host `(set (<env>-name ,*target-env*) "target")))
 
 (eval-in-host `(define *target-env* ,*target-env*))
 
