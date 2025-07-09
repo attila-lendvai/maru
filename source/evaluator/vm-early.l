@@ -54,7 +54,7 @@
   (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
     `(oop-at ,(if feature/typecheck-slot-access
-                  `(%accessor-typecheck ,type-name ,object)
+                  `(%accessor-typecheck ,(<type>-slave-id type) ,object)
                 object)
              ,slot-index)))
 
@@ -62,7 +62,7 @@
   (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
     `(set (oop-at ,(if feature/typecheck-slot-access
-                       `(%accessor-typecheck ,type-name ,object)
+                       `(%accessor-typecheck ,(<type>-slave-id type) ,object)
                      object)
                   ,slot-index)
           ,value)))

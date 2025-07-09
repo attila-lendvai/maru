@@ -179,6 +179,16 @@
     obj))
 
 (require "source/conversion-min.l")
+
+;; NOTE this is not exactly the same as the one in the VM: it lacks the slot-name
+;; parameter, because the compiler cannot emit symbol literals yet.
+(define-function %accessor-typecheck (expected-type-id object)
+  (let ((type (type-of object)))
+    (or (= type expected-type-id)
+        (fatal "kernel accessor type error: expected type id "
+               expected-type-id", got "type"\n")))
+  object)
+
 (require "source/sequences-min.l")
 
 ;;;

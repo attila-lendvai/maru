@@ -80,12 +80,12 @@
       ((is <boxed-type> type)
        (if (<boxed-type>-one-word? type)
            `(oop-at ,(if feature/typecheck-slot-access
-                         `(%accessor-typecheck ,type-name ,obj)
+                         `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
                        obj)
                     0)
          ;; then we just return its address, the payload is right there inlined
          (if feature/typecheck-slot-access
-             `(%accessor-typecheck ,type-name ,obj)
+             `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
            obj)))
 
       ((is <immediate-type> type)
@@ -106,14 +106,6 @@
  `(let ()
     (define box		,box)
     (define unbox	,unbox)))
-
-;; NOTE this is not exactly the same as the one in the user-land, it lacks the slot-name
-;; parameter (because the compiler cannot deal with symbol literals yet).
-(define-function %accessor-typecheck (expected-type-id object)
-  (let ((type (type-of object)))
-    (or (= type expected-type-id)
-        (fatal "kernel accessor type error: expected type id " expected-type-id ", got " type)))
-  object)
 
 ;; shorthands (and optimizations)
 (if-at-expand feature/optimize-space
