@@ -365,7 +365,7 @@ define compile-x86
 	source/bootstrapping/late.l						\
 	$(3)									\
 	source/emit-finish.l							\
-		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 
 define compile-llvm
@@ -385,7 +385,7 @@ define compile-llvm
 	source/bootstrapping/late.l						\
 	$(3)									\
 	source/emit-finish.l							\
-		>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 
 # This "function" is useful when you need an eval executable, but you don't want to
