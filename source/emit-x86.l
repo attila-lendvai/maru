@@ -137,6 +137,7 @@
 ;;(define-emit    (SECTION string)		(println "	.section "$1))
 
 ;;(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
+(define-emit    (TYPE _ _)			(println "	.type "$1", "$2))
 (define-emit    (ALIAS _ _)			(println "	.set "$1", "$2))
 (define-emit    (EXPORT LABEL)			(println "	.globl "$1))
 (define-emit    (ALIGN long)			(println "	.align " $1))
@@ -929,12 +930,15 @@
     (emit PTR array-label)))
 
 (define-method compile-definition <expr> (name -c-)
-  (let ((object-label (compile-expr self name -c-)))
-    (when (member? name '(main _start))
-      ;; KLUDGE export special casing
-      (let ((external-label (EXTERNAL-LABEL name)))
-        (emit ALIAS external-label (closure-code-label name))
-        (emit EXPORT external-label)))
+  (assert name)
+  (let ((object-label (compile-expr self name -c-))
+        (code-label   (closure-code-label name)))
+    (if (member? name '(main _start)) ; KLUDGE special case the entry points
+        (let ((external-label (EXTERNAL-LABEL name)))
+          (emit ALIAS external-label code-label)
+          (emit EXPORT external-label))
+      (emit EXPORT code-label))
+    (emit TYPE code-label "@function")
     (when feature/redefinable-functions-in-target
       (let ((label (LABEL name)))
         (emit DATA)
