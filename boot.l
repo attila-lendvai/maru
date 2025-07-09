@@ -12,11 +12,12 @@
     (eval '(define evolving? ())))
 
 (if bootstrapping?
-    (let ()
-      (warn "boot.l speaking with *verbosity* " *verbosity* "; we're bootstrapping")
-      (if evolving?
-          (warn "; we're evolving"))
-      (warn "\n")))
+    (and (<= 1 *verbosity*)
+         (warn "boot.l speaking with *verbosity* " *verbosity* "; we're bootstrapping")
+         (let ()
+           (if evolving?
+               (warn "; we're evolving"))
+           (warn "\n"))))
 
 ;; This variable is controls the amount of safety features. It's mostly queried at expand time,
 ;; and its value at bootstrapping also controls the amount of checks compiled into the eval executable.

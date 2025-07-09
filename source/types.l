@@ -109,7 +109,7 @@
         ;; and keep an additional host-id->slave-id map.
         (let ((slave-id	(allocate-type-id/slave))
               (host-id	(<type>-id type)))
-          (verbosity 3 (warn "register-type: "type", slave-id: "slave-id", host-id: "host-id"\n"))
+          (verbosity 3 (warn "register-type: "type", "host-id" -> "slave-id"\n"))
           (set (array-at %type-id-map/host->slave host-id) slave-id)
           (set (array-at %types slave-id) type)
           (eval-in-host `(register-type ',type))))
@@ -518,5 +518,8 @@
                   (<type>-slave-id type))
              (assert (= (type-of instance) type)))
            entry))
-  ;; (print %type-id-map/host->slave "\n" %types "\n")
-  )
+  (verbosity 2
+    (warn "host->slave type mapping:\n")
+    (types-do type
+      (let ((id (<type>-id type)))
+        (warn "  "type": " id " -> "(array-at %type-id-map/host->slave id)"\n")))))
