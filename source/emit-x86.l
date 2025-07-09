@@ -73,6 +73,11 @@
                 (%define-emit-param-name index))
           (%define-emit-params (+ index 1) (cdr types)))))
 
+;; this is faster than (emit COMMENT ...) by skipping the evaluation early
+(define-form emit-comment (level . args)
+  `(when (<= ,level *compiler-verbosity*)
+     (emit COMMENT (list ,@args))))
+
 (define-form define-emit (op-args . body)
   (let* ((op-name (car op-args))
          (type-name (symbol->type-name op-name)))
@@ -127,7 +132,7 @@
 (define-emit    (COMMENT pair)			(when (<= 1 *compiler-verbosity*) (print "# ") (apply println $1)))
 
 (define-emit    (TEXT)				(println "	.text"))
-(define-emit    (DATA)				(println "	.data"))
+(define-emit    (DATA)				(println "	.section .data"))
 (define-emit    (RODATA)			(println "	.section .rodata"))
 ;;(define-emit    (SECTION string)		(println "	.section "$1))
 
@@ -355,8 +360,7 @@
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
-     (when (<= 2 *compiler-verbosity*)
-       (emit COMMENT (list "COMPILE of "__obj__)))
+     (emit-comment 2 "COMPILE of "__obj__)
      (compile __obj__ -c-)))
 
 (define compiler x86-compiler)
@@ -413,7 +417,7 @@
 ;; man's staged computation to speed up object emission.
 (define emit-object/header)
 (define emit-object/<string>)
-(define emit-object/box-<long>)
+(define box-<long>)
 (define emit-object/<long>)
 (define emit-object/<target-function>)
 
@@ -427,19 +431,31 @@
              (canary-emitter	(if (slave-value feature/object-canary)
                                     (lambda () (emit LONG (slave-value +canary-value+)))
                                   (lambda ()))))
-         (lambda (type-id)
-           (emit RODATA)
+         (lambda (type type-id)
+           (emit-comment 1 "object header")
+           ;; NOTE cannot use RODATA because the header and the object
+           ;; payload must be consequtive, but the payload values must
+           ;; be relocatable.
+           (emit DATA)
            (emit ALIGN 4)
-           ;; the gc header. we don't even emit the fields that shouldn't be read by anyone.
-           ;; (emit LONG -42)                   ; next
-           ;; (emit LONG -42)                   ; chunk size
-           (emit LONG flags)
-           (emit LONG type-id)
-           (canary-emitter))))
 
-  (set emit-object/box-<long>
+           ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
+           ;; but this here is the emission of read-only literals. the
+           ;; GC should never walk these objects, therefore we can
+           ;; skip emitting the first two words of the header.
+
+           ; next         ; not emitted
+           ; chunk size   ; not emitted
+           (emit LONG flags)
+           (emit-comment 2 "type: "type)
+           (emit LONG type-id)
+           (canary-emitter)
+           ; the object pointer points here
+           )))
+
+  (set box-<long>
        (eval `(lambda (val)
-                (print ,(expand '(box <long> val) *slave-env*)))))
+                ,(expand '(box <long> val) *slave-env*))))
 
   (set emit-object/<long>
        ;; TODO it should be something like: (target-value <string>). see others, too.
@@ -447,11 +463,12 @@
          (cond
            ((slave-value (is <immediate-type> <long>))
             (lambda (self -c-)
-              (emit-object/box-<long> self)))
+              ;; instead of a label (a pointer) we return with an immediate tagged mword
+              (box-<long> self)))
            ((slave-value (and (is <boxed-type> <long>)
                               (<boxed-type>-one-word? <long>)))
             (lambda (self -c-)
-              (emit-object/header type-id)
+              (emit-object/header <long> type-id)
               (let ((object-label (UNIQUE-LABEL "olong")))
                 (emit DEFLABEL object-label)
                 (emit LONG self)
@@ -467,7 +484,7 @@
            (let ((elements	(emit-object/C-string self))
                  (size		(emit-object/<long> (string-length self) -c-))
                  (object-label	(UNIQUE-LABEL "ostr")))
-             (emit-object/header type-id)
+             (emit-object/header <string> type-id)
              (emit DEFLABEL object-label)
              (emit PTR size)
              (emit PTR elements)
@@ -487,14 +504,17 @@
                                     (LABEL (if feature/redefinable-functions-in-target
                                                (concat-string (symbol->string name) "__obj")
                                              name))
-                                  (UNIQUE-LABEL "oclosure"))))
-             (emit-object/header type-id)
+                                  (UNIQUE-LABEL "oclosure")))
+                 (name		(when name-factory
+                                  ;; NOTE this must happen first due
+                                  ;; to the order of emission.
+                                  (name-factory name -c-))))
+             (emit-object/header <target-function> type-id)
              (emit DEFLABEL object-label)
              (emit PTR entry-label)
-             (when name-factory
-               (emit PTR (name-factory name -c-)))
+             (when name
+               (emit PTR name))
              (when feature/profiler
-               ;; TODO a counter in the read-only space?
                (emit PTR (emit-object/<long> 0 -c-)))
              object-label)))))
 
@@ -525,7 +545,7 @@
 
 (define-function emit-expr-code (self entry-point-label parent-comp)
   (when (<= 3 *compiler-verbosity*)
-    (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self))))
+    (emit-comment 1 "emitting <expr> "self", code: "(<expr>-body self)))
   (let* ((body		(<expr>-body self))
          (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (init-param	(lambda (var)
@@ -541,7 +561,7 @@
       (map (lambda (el) (set (<TI32>-offset el) (+ arg-size (<TI32>-offset el)))) (<compiler>-temps -c-))
       (map (lambda (el) (set (<TI32>-offset el) (+ frm-size (<TI32>-offset el)))) param-locs)
       (when (<= 2 *compiler-verbosity*)
-        (emit COMMENT (list "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size)))
+        (emit-comment 1 "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size))
       ;; emitting begins
       (emit TEXT)
       (emit DEFLABEL entry-point-label)
@@ -558,7 +578,7 @@
   (LABEL (concat-string (symbol->string name) "__code")))
 
 (define-function compile-expr (self name -c-)
-  (emit COMMENT (list "compiling fn "name", "self))
+  (emit-comment 1 "compiling fn "name", "self)
   (let ((entry-point (if name
                          (closure-code-label name)
                        (UNIQUE-LABEL "code"))))
@@ -873,7 +893,7 @@
          (arity		(list-length args))
          (handler	()))
     (when (<= 2 *compiler-verbosity*)
-      (emit COMMENT (list "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args)))
+      (emit-comment 1 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
     ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))
@@ -901,11 +921,10 @@
 (define-method compile-definition <array> (name -c-)
   (let ((compiled (compile-array self -c-))
         (array-label (UNIQUE-LABEL "arr")))
-    (emit RODATA)
+    (emit DATA)
     (emit DEFLABEL array-label)
     (array-do el compiled
       (emit PTR el))
-    (emit DATA)
     (emit DEFLABEL (LABEL name))
     (emit PTR array-label)))
 

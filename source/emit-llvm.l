@@ -250,6 +250,11 @@
            i))
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
+;; this is faster than (emit COMMENT ...) by skipping the evaluation early
+(define-form emit-comment (level . args)
+  `(when (<= ,level *compiler-verbosity*)
+     (emit COMMENT (list ,@args))))
+
 ;;;
 ;;; Compiler early
 ;;;
@@ -536,8 +541,7 @@
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
-     (when (<= 2 *compiler-verbosity*)
-       (emit COMMENT (list "COMPILE of "__obj__)))
+     (emit-comment 2 "COMPILE of "__obj__)
      (compile __obj__ -c-)
      (<compiler>-current-value -c-)))
 
@@ -554,8 +558,7 @@
   (let ((instr (factory)))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
-    (when (<= 2 *compiler-verbosity*)
-      (emit COMMENT (list "GEN of "instr", args: " args)))
+    (emit-comment 2 "GEN of "instr", args: " args)
     ;; instantiate the regs
     (set (<instruction>-regs instr)
          (let ((temps ()))
@@ -582,8 +585,7 @@
   (array-do entry (<compiler>-gen-buffer -c-)
     (let* ((instr (first entry))
            (args (rest entry)))
-      (when (<= 2 *compiler-verbosity*)
-        (emit COMMENT (list "EMIT-INSTRUCTION of "instr", args: "args)))
+      (emit-comment 2 "EMIT-INSTRUCTION of "instr", args: "args)
       (apply emit-instruction (cons -c- (cons instr args))))))
 
 ;;;
@@ -603,7 +605,7 @@
 ;; man's staged computation to speed up object emission.
 (define emit-object/header)
 (define emit-object/<string>)
-(define emit-object/box-<long>)
+(define box-<long>)
 (define emit-object/<long>)
 (define emit-object/<target-function>)
 
@@ -621,15 +623,15 @@
            (canary-emitter)
            (print "}"))))
 
-  (set emit-object/box-<long>
+  (set box-<long>
        (eval `(lambda (val)
-                (print ,(expand '(box <long> val) *slave-env*)))))
+                ,(expand '(box <long> val) *slave-env*))))
 
   (set emit-object/<long>
        (cond
          ((slave-value (is <immediate-type> <long>))
           (lambda (self -c-)
-            (emit-object/box-<long> self)))
+            (box-<long> self)))
          ((slave-value (and (is <boxed-type> <long>)
                             (<boxed-type>-one-word? <long>)))
           ;; TODO the "receiving place" of this value needs to be of the proper type
@@ -649,8 +651,7 @@
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<string>\" { ")
              (emit-object/header type-id)
-             (print ", %word ")
-             (emit-object/box-<long> (string-length self))
+             (print ", %word "(box-<long> (string-length self)))
              (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
              object-label))))
 
@@ -724,8 +725,7 @@
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
                              parameters)))
-    (when (<= 3 *compiler-verbosity*)
-      (emit COMMENT (list "emitting <expr> "self", code: "(<expr>-body self))))
+    (emit-comment 3 "emitting <expr> "self", code: "(<expr>-body self))
     (list-do e body
       (comp e))
 
@@ -756,7 +756,7 @@
     (emit/function-epilogue)))
 
 (define-function compile-expr (self name -c-)
-  (emit COMMENT (list "compiling fn "name", "self))
+  (emit-comment 1 "compiling fn "name", "self)
   (let ((entry-point-label (if name
                                (closure-code-label name)
                              (GLOBAL (unique-name "code")))))
@@ -1158,7 +1158,7 @@
 ;;;
 ;;; COMPILE-DEFINITION
 ;;;
-(define-method compile-definition <type>		(name -c-)	(emit COMMENT (list "type "name))) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
+(define-method compile-definition <type>		(name -c-)	(emit-comment 1 "type "name)) ; we don't need (target-value <type>) here because <type> is "reused" by the slave from the host
 (define-method compile-definition <undefined>		(name -c-)	(compile-definition 0 name -c-))
 (define-method compile-definition <C-function>		(name -c-)	(emit DECLARE self))
 (define-method compile-definition <C-variable>		(name -c-)	(emit DECLARE self))

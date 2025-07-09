@@ -152,9 +152,8 @@
   (or (global-variable? var)
       (let ((comp-level	(<compiler>-level -c-))
             (var-level	(<env>-level (<variable>-env var))))
-        (assert (<= comp-level var-level) "err, what!? encountered a variable whose env is *below* the compiler's lambda nesting level!? it's "var)
         (when (< var-level comp-level)
-          (error "cannot access variable "var", closures are not supported yet.")))))
+          (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
 
 ;;;
 ;;; target env setup
