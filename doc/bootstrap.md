@@ -1,36 +1,51 @@
 # Maru's bootstrap process
 
+## Meta
+
+This document explains the bootstrap process, both conceptually and the specifics of this implementation.
+
+Don't forget to consult the [glossary](glossary.md).
+
 ## Overview
 
 A language evolves by the introduction of new features (optimizations, new primitives, etc).
 If you want to use such a novel language feature in its own implementation,
 then you need to [*bootstrap*](http://bootstrappable.org/) it:
 
-1) First, implement the support for it in your compiler and/or eval, and produce
-   an executable that can already compile and/or eval this new version of the language.
+1) First, implement the support for the new feature only assuming the
+   axioms of your **host** VM. Then produce an executable that can
+   already compile and/or eval this new version of the language.
 
-2) After that, you can start using this feature, and now you may even rewrite the
-   implementation of this very feature, and use/assume this feature in its own
-   implementation.
+2) After that, you can start using this feature, and now you may even
+   rewrite the implementation of this very feature itself, and
+   use/assume this feature in its own implementation.
 
-It's a confusing enough process, therefore it makes sense to fork the codebase at
-the point between 1) and 2). Strictly speaking, it would be enough to git checkout
-and build a specific prior commit to provide an executable to execute the bootstrap
-process, but it's better to have separate branches.
+It's a confusing enough process, therefore it makes sense to fork the
+codebase of 1) and 2) into git branches. Strictly speaking, it would
+be enough to git checkout and build a specific prior commit to provide
+an executable to host the bootstrap process, but it's better to have
+separate branches.
 
 Once it's working fine, the old branch becomes irrelevant/stale, except for:
 
-  - Didactic purposes: to make it easier to understand how a self-hosted language grows.
+  - Didactic purposes: to make it easier to understand how a
+    self-hosted language grows.
 
-  - Aesthetics: cherry-picking or backporting changes wouldn't be possible without
-    having separate branches.
+  - Aesthetics: cherry-picking or backporting changes wouldn't be
+    possible without having separate branches.
 
-  - "Oh God, we have lost all the executables!" -- bootstrap again all the way up
-    from a C implementation.
+  - "Oh God, we have lost all the executables!" -- bootstrap again all
+    the way up from the first C implementation.
     
-  - Sometimes the implementation of the new feature simply requires two parallel,
-    wildly diverging instances of the codebase, until the new feature is fully
-    implemented/debugged/bootstrapped.
+  - Tricky issues sometimes require modifying both branches in
+    parallel: cherry-picking or backporting some commits, or
+    developing specific fixes or debug helpers for working out the
+    bootstrap.
+
+  - Sometimes the world changes (e.g. the C compiler becomes more
+    restrictive, or 32 bit x86 support becomes extinct). To retain
+    bootstrappability throughout the entire evolution of the language
+    we need to do some facelifting on the old codebase.
 
   - Secure computing requires, above all, trusing your compiler.
     [Reproducible builds](https://en.wikipedia.org/wiki/Reproducible_builds),
@@ -46,49 +61,82 @@ Once it's working fine, the old branch becomes irrelevant/stale, except for:
 
 ## The bootstrap process
 
+A Maru implementation consists of two separate, but not completely
+independent artifacts:
+
+ - A binary file that can be executed on the target. This binary
+   already defines a few well-known objects and some primitive
+   functions implemented by the binary.
+
+ - And the .l source code files that can be loaded by this binary to
+   further extend the VM with definitions.
+
+There are 3 main namespaces/players in the bootstrap process:
+
+ - The host: a Maru VM animating the process.
+
+ - The slave: basically the latest version of the codebase loaded into
+   a separate environment in the host VM. This means that most
+   definitons get duplacted, and a few (and hopefully well controlled)
+   ties are created between the host and the slave. Uncontrolled
+   leakage between the host and the slave can lead to the most
+   mind boggling puzzles (read: bugs).
+
+ - The target: this is an env in the host. The definitions defined
+   into it will be level-shifted into the target architecture to
+   implement the bootstrapped VM binary.
+
 The bootstrap process in general is the following:
 
- 1) Stage `n` checks out and builds its parent/hosting stage under `build/` (typically stage
-    `(n-1)` of the same language) to acquire an `eval` executable.
+ - Actors, overview:
+   - eval0: The makefile checkes out our latest commit as a worktree
+     into `build/`, builds it there, and leaves it alone until a `make
+     veryclean`, `make update-eval0`, `make eval0`, or similar
+     intervention happens. Corollary: the bootstrap is only fully
+     tested once eval0 has been rebuilt, because only that will cross
+     the stage n-1 to stage n gap.
+   - eval1: latest source compiled by eval0 (the `evolving` variable
+     is `true` in this phase)
+   - eval2: latest source compiled by itself (by eval1)
+   - eval3: latest source compiled by itself, once agains (by
+     eval2). This is done to verify that eval2 and eval3 are bit by
+     bit equivalent.
 
- 2) Using that executable and the compiler of the previous stage, it
-    compiles a version of itself that can already load and compile the
-    codebase in stage `n`, but the resulting executable may not be
-    fully functional yet (in this phase the `evolving?` variable is
-    true). It's called `eval0` in the build process.
+ 1) Stage `n` checks out and builds its parent/hosting stage under
+    `build/` (typically stage `(n-1)` of the same language) to acquire
+    an `eval` executable. Let's call this *eval0*.
 
-    **Note** that this phase is not always necessary, depending on the
-    nature of the new features that are being bootstrapped, and in
-    some earlier stages it is not done. It's useful to enjoy the
-    benefits of the new features of this stage, and it's necessary
-    when we introduce a new feature that the compiler itself needs to
-    be aware of (either because its implementation relies on or uses
-    this feature, or e.g. in the case of the introduction of modules
-    it needs to reach through module boundaries during the compilation
-    process).
+ 2) Using the compiler of *eval0* (i.e. the previous stage), the
+    current stage is compiled. Let's call the result *eval1*. It can
+    already load and compile itself, i.e. the vanilla codebase in
+    stage `n`, but the resulting executable may not be fully
+    functional yet. The discrepancies are typically in the categories
+    of performance and safety checks. In this phase the `evolving?`
+    variable is true, signifying that the host and the slave are not
+    the same version.
 
-    **Note** that `eval0` is not automatically rebuilt when its source
-    files change to speed up development. You can rebuild it using
-    `make eval0`.
+    **Note** that compiling *eval1* is not always necessary, depending
+    on the nature of the new features that are being
+    bootstrapped. It's useful to immediately enjoy the benefits of the
+    new features of this stage, and it's necessary when we introduce a
+    new feature that the compiler itself needs to be aware of (either
+    because its implementation relies on it or uses this feature, or
+    e.g. in the case of the introduction of modules it needs to reach
+    across module boundaries during the compilation process).
 
- 3) Then it uses the resulting, potentially only semi-functional `eval0` executable to
-    now compile itself using its own compiler, which will yield the final, fully
-    functional `eval1` executable.
+ 3) Then it uses the resulting, potentially only semi-functional
+    `eval1` executable to now compile itself using its own compiler,
+    which will yield the final, fully functional `eval2` executable.
 
- 4) Optionally, the `test-bootstrap` makefile target runs one more cycle to produce
-    `eval2`, and checks if the compiler's output is identical with that of the
-    previous step.
-
-The `boot.l` and `emit.l` files are kept in the same branch with the `eval.l`
-whose semantics they are assuming, i.e. the `eval1` executable of the `maru.2`
-stage is built by the `eval` executable, the `boot.l`, and the `emit.l` files
-of the previous, `maru.1` stage.
+ 4) Optionally, the `test-bootstrap` makefile target runs one more
+    cycle to produce `eval3`, and checks if the compiler's output is
+    identical with that of the previous step.
 
 ### Repo layout
 
 The developmental stages of the language are kept in separate git
 branches. When a new stage needs to be opened, the readme is replaced
-in the branch that became stale to only document what's new/relevant
+in the branch that is becaming stale to only document what's new/relevant
 for that specific stage (i.e. if you switch branches on the GitHub
 website you'll see it displayed).
 
@@ -97,26 +145,33 @@ Naming convention of the branches (no `main` branch):
 `[language name].[bootstrap stage]`, e.g `maru.1`.
 
 Optionally, and typically for the first stage, it may also include the
-name of the parent language, from which this "bootstrap sprout" grows
+name of the hosting language, from which this "bootstrap sprout" grows
 out:
 
-`[language name].[bootstrap stage].[parent language]`, e.g. `maru.1.c99`,
+`[language name].[bootstrap stage].[hosting language]`, e.g. `maru.1.c99`,
 which holds the bootstrap implementation written in C.
 
-During the build the previous stage is `git checkout`'ed locally under `./build/`,
-and its own build process is invoked in that directory. Note that this potentially
-becomes a recursive process until a stage is reached that can be built using some
-external dependency. This may happen by reaching an `eval.c` in the bottom stage/branch
-called `maru.1.c99` that can be built using a C compiler, or by reaching a
-stage that has its build artifacts checked into the git repo (e.g. an `eval.s` or
+During the build the previous stage is `git checkout`'ed locally under
+`./build/`, and its own build process is invoked in that
+directory. Note that this may potentially become a recursive process
+until a stage is reached that can be built by itself. This may happen
+by reaching an `eval.c` in the bottom stage/branch called `maru.1.c99`
+that can be built using a C compiler, or by reaching a stage that has
+its build artifacts checked into the git repo (e.g. an `eval.s` or
 `eval.ll`).
+
+Potentially something like a `maru.5.common-lisp` can also be
+developed to serve as another "entry point" to the bootstrap (there's
+an experiment for that). In that case `maru.6` should yield the same
+binary output regardless of which parent is being used in the
+bootstrap chain.
 
 ### Bootstrap "shortcuts"
 
 Starting with `maru.5`, the LLVM IR output (`eval2.ll`) is committed into the repo under
-`build/`. This effectively short-circuits the recursive bootstrap process by
-straight away producing an executable from the checked-in `eval2.ll` using `llc`
-(see `make eval-llvm`).
+`build/`. This effectively short-circuits the recursing bootstrap chain by
+straight away producing an executable from the checked-in `eval2.ll`
+(an LLVM IR file, see `make eval-llvm`).
 
 Deleting these files (**note:** `make clean` retains them! see `make veryclean`),
 or touching the sources will force a normal bootstrap process hosted by

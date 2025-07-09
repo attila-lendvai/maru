@@ -4,8 +4,8 @@
 
 Maru, the language, is implemented as an evaluator (aka an interpreter, a
 VM). But Maru is also self-hosting, which means that the
-implementation language of this evaluator is also Maru... although only
-a subset of the full language.
+implementation language of this evaluator is also Maru... (although only
+a subset of the full language).
 
 The compiler can compile a list of named definitions (an *environment*) to the
 target language; i.e. to the language of the foundational [platform](platforms.md)
@@ -13,7 +13,8 @@ that was chosen to build the Maru VM on top of (e.g. x86 machine code,
 LLVM, libc, the Linux kernel, etc).
 
 This subset of Maru is basically a list of the following toplevel
-definitions (see `compile-definition`):
+definitions collected into the target environment and then
+level-shifted to the target (see `compile-definition`):
 
  - `<long>`s
 
@@ -30,7 +31,8 @@ turn contain the following elements (see `compile`):
 
  - `<long>` literals, compiled to word sized integers
 
- - `()`, i.e. nil, which is compiled to the integer zero
+ - `()`, i.e. nil, which is compiled to the <undefined> value in the
+   target, which is normally the integer zero.
 
  - `<variable>` objects; i.e. resolved variable references
 
