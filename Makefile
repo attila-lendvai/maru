@@ -62,6 +62,9 @@ ifeq ($(PLATFORM),linux)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic
 endif
 
+# setarch --addr-no-randomize improves debuggability of lowlevel issues
+EVAL_WRAPPER	= setarch --addr-no-randomize $(TIME)
+
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
@@ -355,7 +358,7 @@ $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bo
 # a "function" to compile a maru .l file with a compiler backend
 # TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
 define compile-x86
-  $(TIME) $(2) $(PROFILER_ARG) -O $(VERBOSITY)					\
+  $(EVAL_WRAPPER) $(2) $(PROFILER_ARG) -O $(VERBOSITY)				\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
@@ -375,7 +378,7 @@ define compile-x86
 endef
 
 define compile-llvm
-  $(TIME) $(2) $(PROFILER_ARG) -O $(VERBOSITY)					\
+  $(EVAL_WRAPPER) $(2) $(PROFILER_ARG) -O $(VERBOSITY)				\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	source/bootstrapping/prepare.l						\
