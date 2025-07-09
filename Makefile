@@ -55,12 +55,14 @@ endif
 # include -g and the rest. -O3 may remain.
 CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
 CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie
-CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments -fPIC -Wl,-pie
+CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
 ifeq ($(PLATFORM),linux)
 # NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
 # https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
-  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic
+# -Ttext=0x08048000,-no-pie is needed to produce an ELF without a dynamic linker
+# reference (clang -m32 inserts to a dangling /gnu/store reference)
+  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
 
 # setarch --addr-no-randomize improves debuggability of lowlevel issues
