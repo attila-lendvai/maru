@@ -19,22 +19,9 @@
 (define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
 (define-constant feature/backtrace		(or true feature/profiler (< 0 *safety*)))
 (define-constant feature/object-canary		(or () (<= 3 *safety*)))
-(define-constant feature/debug-output		(or () (<= 3 *safety*)))
 ;; TODO set up proper framework for optimization control, merge with *optimised*
 (define-constant feature/optimize-space		true)
 (define-constant feature/optimize-speed		(and (not feature/optimize-space) (<= *safety* 2)))
-
-(define-form debug		prog ())
-(define-form debug/identities	prog ())
-(define-form gc/debug		prog ())
-
-(when-at-expand feature/debug-output
-  (define *debug-output-enabled?* false)
-
-  (define-form debug		prog	`(when *debug-output-enabled?* ,@prog))
-  ;;(define-form debug/identities	prog	`(when *debug-output-enabled?* ,@prog))
-  ;;(define-form gc/debug		prog	`(when *debug-output-enabled?* ,@prog))
-  )
 
 ;; we can't have a function in the target for print-all, because
 ;; there's no support for &rest args yet in the compiler.
@@ -43,14 +30,6 @@
      ,@(map (lambda (obj)
               `(do-print ,stream ,obj false))
             objs)))
-
-(define-form debug-print objs
-  `(debug
-    ;; only after streams are initialized. use platform/print-diag for debug output prior to that point.
-    (when *debug-output*
-      (print-all *debug-output* ,@objs)
-      ;; TODO? use $put
-      (do-print *debug-output* "\n" false))))
 
 ;; TODO use print-to-string eventually to generate the default assertion message, or add support for list literals in the compiler
 ;;(define-form assert		prog ())
@@ -112,7 +91,7 @@
     ;; and finally, these are the names of our own functions. we need to resolve some circular references this way.
     print-backtrace capture-well-known-globals
     print println read encode expand eval string->symbol %accessor-typecheck
-    abort %string->C-string
+    abort %string->C-string long->string/emit
 
     symbol/*standard-input* symbol/*standard-output* symbol/*error-output* symbol/*debug-output*
 
@@ -146,49 +125,28 @@
 (when-at-expand feature/backtrace
   (define *call-stack*		0))
 
-(define *error-level* 0)
-
-;;
-;; FATAL is a low-level facility, it directly uses the libc's printf
-;; (i.e. it cannot print maru objects, but works early in the init).
-;; when PLATFORM=linux then it silently ignores the formatting control
-;; characters.
-;;
-(define-function fatal-prologue ()
-  (incr *error-level*)
-  (platform/print-diag "\nERROR: "))
-
-(define-function fatal-epilogue ()
-  (platform/print-diag) ; newline
-  (abort))
-
-;; NOTE: FATAL needs to be a form so that platform/print-diag expands
-;; to a C-string compiler special form; i.e. no advanced facility is
-;; called while early in the init.
-(define-form fatal  (fmt)           `(let () (fatal-prologue) (platform/print-diag ,fmt)                 (fatal-epilogue)))
-(define-form fatal1 (fmt arg)       `(let () (fatal-prologue) (platform/print-diag-fmt ,fmt ,arg)        (fatal-epilogue)))
-(define-form fatal2 (fmt arg1 arg2) `(let () (fatal-prologue) (platform/print-diag-fmt ,fmt ,arg1 ,arg2) (fatal-epilogue)))
-
 ;;
 ;; ERROR (and ASSERT!) goes through the maru printing facility
 ;; (i.e. it must not get called with an unboxed .asciz, nor before
 ;; streams and the VM is properly initialized).
 ;;
+(define *error-level* 0)
+
 (define-function error-prologue ()
   (incr *error-level*)
   (unless (and *symbols* *error-output*)
-    (platform/print-diag "WARNING: error-prologue was reached too early in init. We'll most probably crash before printing the actual error message."))
+    (platform/diag-print "WARNING: error-prologue was reached too early in init. We'll most probably crash before printing the actual error message.\n"))
   (cond
     ((= 2 *error-level*)
-     (platform/print-diag "NESTED ERROR 1, attempting to print a limited backtrace")
+     (platform/diag-print "NESTED ERROR 1, attempting to print a limited backtrace\n")
      (abort))
     ((< 2 *error-level*)
-     (platform/print-diag "NESTED ERROR 2, giving up...")
+     (platform/diag-print "NESTED ERROR 2, giving up...\n")
      (platform/halt)))
-  (platform/print-diag "\nERROR: "))
+  (platform/diag-print "\nERROR: "))
 
 (define-function error-epilogue ()
-  (platform/print-diag) ; newline
+  (platform/diag-print "\n")
   (abort))
 
 (define-function %error (arg)
@@ -312,10 +270,11 @@
                    body))))))))
 
 (define-function print-backtrace ()
-  (platform/print-diag "print-backtrace is not available in this build"))
+  (platform/diag-print "print-backtrace is not available in this build\n"))
 
 (define-primitive-function abort _
-  (platform/print-diag "ABORTED")
+  (when (<= 3 *error-level*)
+    (fatal "ABORTING at error level " *error-level*))
   (print-backtrace)
   (platform/flush-streams)
   (platform/halt))

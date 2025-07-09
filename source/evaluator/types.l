@@ -28,11 +28,11 @@
          ;; strictly speaking, this should be OOP?, but that would add an extra non-nil check
          ((aligned-to-oop? ptr)
 	  (let ((header (gc/header-of ptr)))
-            (safety 3 (or (gc/valid-header-canary? header) (fatal1 "type-of: encountered an untagged pointer: %p" ptr)))
-            (safety 2 (or (gc/live-chunk? header) (fatal1 "type-of: attempt to access dead object: %p" ptr)))
+            (safety 3 (or (gc/valid-header-canary? header) (fatal "type-of: encountered an untagged pointer: " (pointer ptr))))
+            (safety 2 (or (gc/live-chunk? header) (fatal "type-of: attempt to access dead object: " (pointer ptr))))
             (<header>-type header)))
          ,@conds-late
-         (else (fatal1 "type-of: encountered something unidentifiable: {%p}" ptr))))))
+         (else (fatal "type-of: encountered something unidentifiable: " (pointer ptr)))))))
 
 (define-type-of)
 
@@ -112,7 +112,7 @@
 (define-function %accessor-typecheck (expected-type-id object)
   (let ((type (type-of object)))
     (or (= type expected-type-id)
-        (fatal2 "kernel accessor type error: expected type id %ld, got %ld" expected-type-id type)))
+        (fatal "kernel accessor type error: expected type id " expected-type-id ", got " type)))
   object)
 
 ;; shorthands (and optimizations)

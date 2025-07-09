@@ -69,34 +69,20 @@
      (assert (< 0 len))
      `((string->C-string ,str) ,len))))
 
-(define-form platform/print strs
-  (let ((forms ()))
-    (list-do str strs
-      (push forms (if (is <string> str)
-                      `(linux-syscall linux/write fd/stdout ,@(string+length str))
-                    `(let ((x ,str))
-                       (linux-syscall linux/write fd/stdout (string->C-string x) (C-string-length x))))))
-    `(let ()
-       ,@(list-reverse! forms)
-       (linux-syscall linux/write fd/stderr ,@(string+length "\n")))))
+(define-form platform/diag-print (str)
+  (if (is <string> str)
+      `(linux-syscall linux/write fd/stderr ,@(string+length str))
+    `(let ((cstr (string->C-string ,str)))
+       (linux-syscall linux/write fd/stderr cstr (C-string-length cstr)))))
 
-(define-form platform/print-diag* strs
-  (let ((forms ()))
-    (list-do str strs
-      (push forms (if (is <string> str)
-                      `(linux-syscall linux/write fd/stderr ,@(string+length str))
-                    `(let ((x ,str))
-                       (linux-syscall linux/write fd/stderr (string->C-string x) (C-string-length x))))))
-    `(let ()
-       ,@(list-reverse! forms))))
+(define-function platform/diag-print-char (char)
+  ;; TODO endianness?
+  (linux-syscall linux/write fd/stderr (address-of char) 1)
+  char)
 
-(define-form platform/print-diag-fmt* (format . args)
-  ;; this just prints the format string, unprocessed
-  ;; TODO implement formatting within maru, and forget libc's printf
-  (if (is <string> format)
-      `(linux-syscall linux/write fd/stderr ,@(string+length format))
-    `(let ((x ,format))
-       (linux-syscall linux/write fd/stderr (string->C-string x) (C-string-length x)))))
+;; TODO delme
+(define-form platform/print-diag-fmt (format . args)
+  ())
 
 (define-form platform/halt args
   `(linux-syscall linux/exit ,@(or args '(-1))))

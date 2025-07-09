@@ -194,7 +194,7 @@
                          ;; TODO do we want to make a copy of str here? because str may be mutable...
                          ;; TODO instantiate a read-only string as the name
                          (gc/let* ((sym		(symbol str)))
-                           (debug (platform/print-diag "interning "str))
+                           (debug (platform/format "interning " (string str) "\n"))
                            (array-insert array index sym)
                            sym))))
 
@@ -287,7 +287,7 @@
 
 (define-form with-new-call-frame (args . body)
   (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
-                             (fatal1 "infinite recursion guard triggered at call depth %ld" *call-stack-index*))))
+                             (fatal "infinite recursion guard triggered at call depth "*call-stack-index*))))
     `(let ((__result__ ,(if feature/backtrace
                             `(let ((-call-frame- (%new-call-frame ,@args)))
                                ,call-depth-check
@@ -309,8 +309,8 @@
 
 (when-at-expand feature/backtrace
   (define-function %new-call-frame (callee-designator callee args)
-    (safety 3 (unless (gc/valid-maru-value? callee-designator)	(fatal1 "new-call-frame: encountered an untagged callee-designator: %p" callee-designator)))
-    (safety 3 (unless (gc/valid-maru-value? callee)		(fatal1 "new-call-frame: encountered an untagged callee %p" callee)))
+    (safety 3 (unless (gc/valid-maru-value? callee-designator)	(fatal "new-call-frame: encountered an untagged callee-designator")))
+    (safety 3 (unless (gc/valid-maru-value? callee)		(fatal "new-call-frame: encountered an untagged callee")))
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))

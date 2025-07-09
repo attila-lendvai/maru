@@ -58,7 +58,7 @@
 (define-function set-global-variable-value (env name value)
   (safety 3 (assert (= 0 (unbox <long> (<env>-level env)))) "set-global-variable-value called with non-toplevel env "env)
   ;;(safety 3 (or (symbol? name) (fatal "set-global-variable-value called with a non-symbol name")))
-  (debug (platform/print-diag "set-global-variable-value for " (symbol->string name)))
+  (debug (platform/format "set-global-variable-value for " (string (symbol->string name)) "\n"))
   (aif (defined? name env)
       (set (<variable>-value it) value)
     (environment-define env name value)

@@ -1,32 +1,44 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO is this useless in this form if the caller needs to gc/let* the return value?
-;; TODO or is this number->string? how shall we call word-sized integers in the target? long? or is <long> the wrong name on the interpreter side?
 ;; TODO clarify boxed/unboxed for the arg and return value; entire file
+
+;; KLUDGE implement closure compilation and delme
+(define %long->string/buffer)
+
+(define-function digit->string (digit emitter)
+  (emitter (if (<= digit 9)
+               (+ ?0 digit)
+             (+ ?a (- digit 10)))))
+
+(define-function long->string/positive (num radix emitter)
+  (if (< num radix)
+      (digit->string num emitter)
+    (let ((next	(/ num radix)))
+      (long->string/positive next radix emitter)
+      (digit->string (- num (* next radix)) emitter)))
+  num)
+
+(define-function long->string/emit (num radix emitter)
+  (safety 1 (assert (and (< 0 radix) (<= radix 35))))
+  (if (<= 0 num)
+      (long->string/positive num radix emitter)
+    (emitter ?-)
+    (long->string/positive (- num) radix emitter))
+  num)
+
+;; TODO the GC/LET* makes it useless for the evaluator.
+;; a temp solution could be to simply expand to a let* in the evaluator?
 (define-function long->string* (num radix)
   (safety 1 (assert (and (< 0 radix) (<= radix 35))))
-  (let ((negative?	false))
-    (gc/let* ((result (string 10)))
-      (when (< num 0)
-        (set negative? true)
-        (set num (- num)))
-      (if (= 0 num)
-          (string-append result ?0)
-        (while (< 0 num)
-          (let* ((next	(/ num radix))
-                 (digit	(- num (* next radix)))
-                 (char	(if (<= digit 9)
-                            (+ ?0 digit)
-                          (+ ?a (- digit 10)))))
-            (string-insert result 0 char)
-            (set num next)))
-        ;; or alternatively, we can append, and then reverse in one go
-        ;;(string-reverse! result)
-        )
-      (when negative?
-        (string-insert result 0 ?-))
-      result)))
+  (gc/let* ((result (string 10)))
+    (set %long->string/buffer result)   ; KLUDGE
+    (long->string/emit num radix
+                       (lambda (char)
+                         ;; TODO (string-append result char)
+                         (string-append %long->string/buffer char)))
+    result))
 
+;; TODO or is this number->string? how shall we call word-sized integers in the target? long? or is <long> the wrong name on the interpreter side?
 (define-function long->string (num)
   (long->string* num 10))
 

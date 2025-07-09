@@ -75,7 +75,7 @@
   (debug-print "capture-well-known-globals is done"))
 
 (define-function initialize-vm ()
-  (debug (platform/print-diag "initialize-vm is alive"))
+  (debug (platform/diag-print "initialize-vm is alive\n"))
 
   (safety 2
     (or (= 42 (unbox <long> (box <long> 42)))		(fatal "box-unbox of <long> is broken"))
@@ -94,26 +94,26 @@
   (gc/initialize)
 
   (safety 4 (set gc/allocations-until-gc 1))
-  (debug (platform/print-diag "gc initialized"))
+  (debug (platform/diag-print "gc initialized\n"))
 
   (gc/push-root (address-of *globals*))
   (gc/push-root (address-of *symbols*))
   (gc/push-root (address-of *maru*))
 
-  (debug (platform/print-diag "gc roots registered"))
+  (debug (platform/diag-print "gc roots registered\n"))
 
   (set *symbols* (array 32))
   (initialize-symbol-cache)
-  (debug (platform/print-diag "initialized *symbols*"))
+  (debug (platform/diag-print "initialized *symbols*\n"))
 
   (safety 2
     (let ((str (string 16)))
       (string-append-all str "foo")
       (string-append-all str "bar")
-      (or (string= str "foobar") (fatal1 "string-append-all broken: '%s'" (string->C-string str)))))
+      (or (string= str "foobar") (fatal "string-append-all is broken"))))
 
   (when-at-expand feature/backtrace
-    (debug (platform/print-diag "initializing *call-stack*"))
+    (debug (platform/diag-print "initializing *call-stack*\n"))
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (array 32)))
 
@@ -122,11 +122,11 @@
   (environment-define *maru*
                       (string->symbol "*maru*")
                       *maru*)
-  (debug (platform/print-diag "initialized *maru*"))
+  (debug (platform/diag-print "initialized *maru*\n"))
 
   (set *globals* (set *maru-user* (environment *maru* 0 0)))   (when-at-expand feature/debug-info (set (<env>-name *maru-user*) "maru-user"))
   (capture-well-known-globals)
-  (debug (platform/print-diag "initialize-vm is done")))
+  (debug (platform/diag-print "initialize-vm is done\n")))
 
 (define-function gc/print-statistics ()
   (print-all *error-output*

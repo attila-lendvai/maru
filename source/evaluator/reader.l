@@ -35,7 +35,7 @@
     ((and (<= ?0 c) (<= c ?9))  (- c ?0))
     ((and (<= ?a c) (<= c ?z))  (- c (- ?a 10)))
     ((and (<= ?A c) (<= c ?Z))  (- c (- ?A 10)))
-    (else                       (fatal1 "illegal digit in character escape: %c" c))))
+    (else                       (fatal "illegal digit in character escape: "c))))
 
 (define-function read/char (c stream)
   (if (= ?\\ c)
@@ -84,7 +84,7 @@
                 x))
 
              ((or (is_alpha c) (is_digit10 c))
-              (fatal1 "illegal character escape: \\%c" c))
+              (fatal "illegal character escape: \\" c))
 
              (else c)))))
     c))
@@ -151,13 +151,13 @@
         ((= symbol/. elt)
          (put/tail tail (read-toplevel stream))
          (unless (= delim ($next stream))
-           (fatal1 "missing closing '%c' delimiter after ." delim))
+           (fatal "missing closing delimiter "delim" after ."))
          (get/tail head))
         ((and (= +end-of-list+ elt)
               (= delim ($next stream)))
          (get/tail head))
         (else
-         (fatal1 "missing closing '%c' delimiter while reading list" delim))))))
+         (fatal "missing closing delimiter "delim" while reading list"))))))
 
 (define-function read/quote (prefix stream)
   (gc/let* ((qobj (read-toplevel stream)))
@@ -196,7 +196,7 @@
                                     (!= +end+ c))))
         ((= ?\" c)      (return (read/string-literal stream)))
         ((= c +end+)    (return +end+))
-        (else           (fatal1 "illegal character: %c" c))))))
+        (else           (fatal "illegal character: "c))))))
 
 (define-function read-toplevel (stream)
   (let ((c ($peek stream)))

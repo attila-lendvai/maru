@@ -35,7 +35,7 @@ exit:
 (switch-to-target-env)
 
 (load "source/platforms/linux/linux.l")
-
+(load "source/debug-min.l")
 (load "source/evaluator/vm-early.l")
 
 ;;;

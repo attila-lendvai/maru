@@ -18,14 +18,14 @@
          (unbox <long> (slot-value ,type-name size obj)))
 
        (define-function ,getter-name (obj idx)
-         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string getter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
+         (safety 2 (unless (and (is ,type-name obj) (<= 0 idx)) (fatal (string ,(symbol->string getter-name)) ": called with object of type" (type-of obj) ", index " idx)))
          (let ((elements (slot-value ,type-name elements obj))
                (size     (,length-name obj)))
            (and (< idx size)
                 (,accessor elements idx))))
 
        (define-function ,setter-name (obj idx val)
-         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string setter-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
+         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal (string ,(symbol->string setter-name)) ": called with object of type " (type-of obj) ", index " idx)))
          (let* ((elements	(slot-value ,type-name elements obj))
                 (size		(,length-name obj))
                 (capacity	(if elements
@@ -50,7 +50,7 @@
          (,setter-name obj (,length-name obj) val))
 
        (define-function ,insert-name (obj idx value)
-         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal2 ,(concat-string (symbol->string insert-name) ": called with object of type %ld, and index %ld") (type-of obj) idx)))
+         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal (string ,(symbol->string insert-name)) ": called with object of type " (type-of obj) ", index " idx)))
          (let ((size (,length-name obj)))
            (when (< idx size)
              ;; TODO how about insering far out into the new territory?
@@ -64,7 +64,7 @@
 
        (define-function ,zeroed-name (obj)
          (if (gc/read-only-object? obj)
-             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal1 ,(concat-string (symbol->string zeroed-name) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated: %p") obj)))
+             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated")))
            (let ((size (,length-name obj)))
              (,setter-name obj size 0)
              (set (slot-value ,type-name size obj) (box <long> size))))

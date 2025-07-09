@@ -12,7 +12,7 @@
 (define-form initialize-stream (target-name our-name)
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
   `(gc/let* (tmp)
-     (debug (platform/print-diag "initializing " ,(symbol->string our-name)))
+     (debug (platform/format "initializing " (string ,(symbol->string our-name)) "\n"))
      (set tmp (box <target-pointer> ,target-name))
      (set tmp (file-stream tmp))
      (set ,our-name tmp)
@@ -112,8 +112,8 @@
                    (let ((usecs 1000))
                      (install_profiler_handler profiler/take-sample)
                      (set_profiler_interval usecs)
-                     (platform/print-diag-fmt "profiling at every %ld uSec(s)" usecs))
-                 (platform/print-diag "WARNING: this build has no profiler, ignoring -p")))
+                     (platform/format "profiling at every "usecs" uSec(s)"))
+                 (platform/diag-print "WARNING: this build has no profiler, ignoring -p\n")))
 
               ;; -
               ((string= "-" arg)
