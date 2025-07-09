@@ -1,4 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
+;;;
+;;; This file is loaded when the host VM is ready, basically right
+;;; after it has loaded its own boot.l
 
 (set-working-directory *slave-directory*)
 

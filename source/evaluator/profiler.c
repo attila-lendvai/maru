@@ -23,5 +23,5 @@ extern void install_profiler_handler(void (*handler)(int))
 extern void set_profiler_interval(int microseconds) // 0 for disable
 {
     struct itimerval itv = { { 0, microseconds }, { 0, microseconds } };
-    setitimer(ITIMER_VIRTUAL, &itv, 0);
+    setitimer(ITIMER_VIRTUAL, &itv, NULL);
 }

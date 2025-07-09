@@ -41,9 +41,9 @@
       ())))
 
 (define-primitive-function file-write-character ((char <long>) (fd <target-pointer>))
-  ;; TODO endianness
+  ;; TODO endianness? think this through...
   (unless (= 1 (linux-syscall linux/write fd (address-of char) 1))
-    (error "file-write-character: libc/fputc returned an error")))
+    (error "file-write-character: syscall returned an error")))
 
 ;; (define-primitive-function file-flush ((fd <target-pointer>))
 ;;   (unless (= 0 (linux-syscall linux/fsync fd))

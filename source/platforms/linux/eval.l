@@ -62,6 +62,8 @@ exit:
 ;; x86_64: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/start.S;h=354d2e6ec78f0eaf9ab0f8ed665c2e5499388df0;hb=HEAD
 ;; argc and argv position on the stack: https://briancallahan.net/blog/20200808.html
 (define-function _start ()
+  (debug (platform/diag-print "_start is alive\n"))
+
   (let ((argc (oop-at (stack-pointer-on-entry) 0))
         (argv (+ (stack-pointer-on-entry)
                  (words-to-bytes 1))))

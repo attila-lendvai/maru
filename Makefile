@@ -51,9 +51,9 @@ else ifeq ($(HOST_OS),Darwin)
   TIME		= time
 endif
 
-CFLAGS		+= -O3
-# if you want to use the perf tool to profile the binary
-#CFLAGS		+= -O3 -g -fno-omit-frame-pointer -fno-inline
+# if you want to use the perf tool to profile the binary then also
+# include -g and the rest. -O3 may remain.
+CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
 CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments -fPIC -Wl,-pie
 

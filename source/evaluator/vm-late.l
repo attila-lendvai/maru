@@ -21,6 +21,7 @@
 
 (define-form %instantiate-primitive-functions (env)
   `(let ()
+     (debug (platform/diag-print "%instantiate-primitive-functions\n"))
      ,@(map (lambda (entry)
               (let* (((name fixed?)	entry)
                      (impl-name		(concat-symbol name '/evaluator-stub)))
@@ -37,7 +38,8 @@
     ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
     (environment-define env (string->symbol "+end+") +end+))
 
-  ;; make sure the symbol true evaluates to itself
+  ;; make sure the symbol true evaluates to itself: by convention our
+  ;; true value will be the symbol 'true.
   (environment-define env symbol/true symbol/true)
 
   (environment-define env (string->symbol "*maru*") *maru*)
@@ -45,7 +47,7 @@
   (%instantiate-primitive-functions env)
 
   (with-forms ((var-value ((name) `(<variable>-value (defined? ,name env)))))
-    (set fixed-primitive-function/quote	(var-value symbol/quote))
+    (set fixed-primitive-function/quote		(var-value symbol/quote))
     (set fixed-primitive-function/lambda	(var-value symbol/lambda))
     (set fixed-primitive-function/let		(var-value symbol/let))
     (set fixed-primitive-function/define	(var-value symbol/define))

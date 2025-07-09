@@ -1,5 +1,15 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; 2025-07 status
+;; llvm
+;; *** FAILURE form: (equal (list 11 22 33 42) (closure))
+;; x86
+;; *** FAILURE form: (equal (list 11 22 33 42) (closure))
+;; *** FAILURE form: (< 0 (bitwise-shift 268435455 4))
+;; *** FAILURE form: (= -5 (/ -1000 20 10))
+;; *** FAILURE form: (= -5 (/ 1000 -20 10))
+
+
 (require "source/conversion.l")
 (require "source/streams.l")
 
@@ -42,12 +52,18 @@
 (define-test eval/arithmetic// ()
   (test-assert (= 1   (/ 1)))
   (test-assert (= 100 (/ 1000 10)))
-  (test-assert (= 5   (/ 1000 20 10))))
+  (test-assert (= 5   (/ 1000 20 10)))
+  ;; FIXME division is unsigned in the x86 backend
+  (test-assert (= -5  (/ -1000 20 10)))
+  (test-assert (= -5  (/ 1000 -20 10)))
+  )
 
 (define-test eval/arithmetic/* ()
   (test-assert (= 1   (*)))
   (test-assert (= 42  (* 42)))
-  (test-assert (= 24  (* 1 2 3 4))))
+  (test-assert (= 24  (* 1 2 3 4)))
+  (test-assert (= -24  (* 1 -2 3 4)))
+  )
 
 (define-test eval/arithmetic/shift ()
   (test-assert (= 0xffffff	(bitwise-shift 0xffffff0 -4)))
@@ -57,10 +73,11 @@
   (test-assert (= 0		(bitwise-shift 0xffffff0 10000)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
   (test-assert (= -1		(bitwise-shift -1 -100)))
-  ;; shifting a positive number into the sign bit
-  ;; FIXME
+  ;; on 32 bit: shifting a positive number into the sign bit
   (test-assert (< 0		(bitwise-shift 0xfffffff 4)))
-  (test-assert (< 0		(bitwise-shift 0xfffffff 68))))
+  ;; on 64 bit platforms a 65 bit shift should zero the place
+  (test-assert (= 0		(bitwise-shift 0xfffffff 65)))
+  )
 
 (define-test eval/equality/string ()
   (test-assert (=  "alma" "alma"))

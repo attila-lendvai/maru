@@ -70,7 +70,7 @@
 
 (define-form platform/halt args
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
-  `(libc/exit ,@(or args '(-1))))
+  `(libc/exit ,@(or args '(-42))))
 
 (define-form platform/acquire-memory (size)
   `(libc/malloc ,size))

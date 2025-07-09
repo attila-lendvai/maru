@@ -170,8 +170,15 @@
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (platform/print-diag-fmt "mark and trace %p (%p) flags %ld size %ld type %ld" obj header flags (<header>-size header) (<header>-type header)))
-         (safety 3 (or (gc/valid-header-canary? header)		(fatal "gc/mark-and-trace: encountered an untagged pointer: " (pointer obj))))
-         (safety 1 (or (bitwise-and <header>-flags/used flags)	(fatal "gc/mark-and-trace: attempt to mark dead object: " (pointer header))))
+         (safety 3
+           (or (gc/valid-header-canary? header)
+               (fatal "gc/mark-and-trace: encountered an untagged pointer: " (pointer obj))))
+         ;; this is typically triggered on (<= 4 *safety*) when a
+         ;; gc/let* is missing somewhere, thus an object is not
+         ;; recorded as a gc root, and it gets collected.
+         (safety 1
+           (or (bitwise-and <header>-flags/used flags)
+               (fatal "gc/mark-and-trace: reached a dead object: " (pointer header))))
          (or (bitwise-and flags <header>-flags/mark)
              (let ()
                (set (<header>-flags header) (bitwise-or flags <header>-flags/mark))
@@ -303,11 +310,9 @@
                 vars)))
         (make-unprotectors
          (lambda (vars)
-           (let ((result ()))
-             (while (pair? vars)
-               (set result (cons `(gc/pop-root (address-of ,(car vars))) result))
-               (set vars (cdr vars)))
-             result))))
+           (list-reverse
+            (map (lambda (v) `(gc/pop-root (address-of ,v)))
+                 vars)))))
     (assert (pair? vars) "the proper syntax is (gc/protect (var1 var2 ...) ...)")
     `(let ()
        ,@(make-protectors vars)

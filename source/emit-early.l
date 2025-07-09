@@ -183,7 +183,9 @@
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
-;; KLUDGE move this somewhere into a 'linux' namespace
+;; KLUDGE move this somewhere into a 'linux' namespace,
+;; or at least under source/platforms/linux/
+;; TODO these should be groveled automatically
 (define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
 (define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(rax rdi rsi rdx r10 r8 r9))))
 (eval-in-slave
@@ -200,6 +202,7 @@
    (define-constant linux/stderr		2)
    (cond
      ((= +architecture+ 'IA-32)
+      ;; less $(guix build linux-libre-headers)/include/asm/unistd_32.h
       (define-constant linux/exit		1)
       (define-constant linux/read		3)
       (define-constant linux/write		4)
@@ -211,15 +214,16 @@
       (define-constant linux/fsync	        118)
       )
      ((= +architecture+ 'x86-64)
+      ;; less $(guix build linux-libre-headers)/include/asm/unistd_64.h
+      (define-constant linux/exit		60)
       (define-constant linux/read		0)
       (define-constant linux/write		1)
       (define-constant linux/open		2)
       (define-constant linux/close		3)
+      (define-constant linux/chdir		80)
       (define-constant linux/lseek		8)
       (define-constant linux/brk		12)
-      (define-constant linux/exit		60)
       (define-constant linux/fsync		74)
-      (define-constant linux/chdir		80)
       ))))
 
 (switch-to-slave-env)
@@ -254,9 +258,8 @@
   `(eval-in-slave '(let () ,@forms)))
 
 ;;;
-;;; create an empty env to hold the definitions that will be
-;;; level-shifted to the target. let's mention *target-env* here for
-;;; grep'ability.
+;;; create an empty env (stored in *target-env*) to hold the
+;;; definitions that will be level-shifted to the target.
 ;;;
 (define primitive/eval eval) ; we will need to reach back to this when starting the compiler
 

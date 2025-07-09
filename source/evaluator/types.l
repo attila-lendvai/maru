@@ -11,6 +11,7 @@
          ,@(%make-make-inits *env* 'self. inits)
          self))))
 
+;; TODO this should be done cleaner/nicer than a single-use macro
 (define-form define-type-of ()
   (let ((conds-early	())
         (conds-late	()))
@@ -25,7 +26,8 @@
     `(define-function type-of (ptr)
        (cond
          ,@conds-early
-         ;; strictly speaking, this should be OOP?, but that would add an extra non-nil check
+         ;; strictly speaking, this should be a full OOP? call, but
+         ;; that would include an unnecessary nil check
          ((aligned-to-oop? ptr)
 	  (let ((header (gc/header-of ptr)))
             (safety 3 (or (gc/valid-header-canary? header) (fatal "type-of: encountered an untagged pointer: " (pointer ptr))))

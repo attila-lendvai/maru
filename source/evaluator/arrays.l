@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO this is only slightly different from what is in source/arrays.l.
+;; TODO this is only slightly different from what is in source/buffer.l.
 ;; maybe try to merge them by eliminating the differences between the level-shifted code and normal maru code.
 ;; TODO this has no proper bounds checking. decide whether it's really a good idea to just return nil when index is out of range
 (define-form define-vector-accessors (type-name basename elements-are-pointers? accessor copier mover element-size-in-bytes)

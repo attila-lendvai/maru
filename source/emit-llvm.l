@@ -2,8 +2,10 @@
 ;;;
 ;;; This is a compiler that emits LLVM IR text.
 ;;;
-;;; Status: it should successfully compile eval.l into eval.s,
-;;; that in turn can be compiled by the gcc toolchain into an executable eval binary.
+;;; Status: should work in all combinations of 32/64 bits, and
+;;; libc/linux platforms. Must note though that clang -m32 is rather
+;;; problematic nowadays, so producing a working binary using the libc
+;;; platform is not going to be trivial.
 ;;;
 
 ;;; It can compile a subset of Maru.
@@ -370,6 +372,7 @@
   ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
 (define-instruction GEP	(t 1 t)
+  ;; args: ptr type index1 index2
   ((_ _ _ _)			(println "	"$reg1" = getelementptr "$2", "$2"* "$1", i32 "$3", i32 "$4)))
 
 (define-instruction RET		(() 1 ())
@@ -386,8 +389,9 @@
   ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
                                   (println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop")))
-  ((CONSTANT  expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop"))
-  ((GLOBAL  C-function)		(print "	"$reg1" = bitcast ")
+  ;; closures
+  ((CONSTANT expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop"))
+  ((GLOBAL   C-function)	(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %oop"))
   ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
@@ -414,7 +418,7 @@
 
 ;; this crashes llvm: https://bugs.llvm.org/show_bug.cgi?id=49635
 ;; (define-instruction SPONENTRY	(() 1 t)
-;;   (()				(println "	"$reg1" = i8* @llvm.sponentry()")))
+;;   (()				(println "	"$reg1" = call i8* @llvm.sponentry()")))
 ;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
 (define-instruction SPONENTRY	(() 4 t)
   (()				(println "	"$reg1" = call i8* @llvm.frameaddress(i32 0)")
@@ -508,7 +512,7 @@
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
-
+;; args: baseptr, index
 (define-instruction LOAD-OOP	(t 4 t)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")

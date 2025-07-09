@@ -85,7 +85,7 @@
   ())
 
 (define-form platform/halt args
-  `(linux-syscall linux/exit ,@(or args '(-1))))
+  `(linux-syscall linux/exit ,@(or args '(-42))))
 
 (define *initial-break* 0)
 (define *current-break* 0)

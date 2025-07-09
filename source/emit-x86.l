@@ -187,9 +187,9 @@
                                                    (println "	xorl	%edx, %edx"))
                                                   ;; TODO emit shifts when possible
                                                   (else
-                                                   (println "	movl	$0, %edx")
-						   (println "	movl	"$1", %ecx")
-						   (println "	divl	%ecx"))))
+                                                   (println "	xorl	%edx, %edx") ; the upper side of 64 bit operand
+						   (println "	movl	"$1", %ecx") ; divisor
+						   (println "	divl	%ecx"))))    ; divl is unsigned division
 
 (define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
 (define-emit    (AND LI32)			(unless (= -1 (<LI32>-value $1))

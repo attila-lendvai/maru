@@ -1,7 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
 ;;; This file contains any temporary extra definitions that are needed
-;;; in the host module while evolving from the previous stage.
+;;; in the host env while evolving from the previous stage (i.e. when
+;;; eval0 is hosting the bootstrap).
 ;;;
 
 ;; Mark the fact that we are evolving from the previous stage.
