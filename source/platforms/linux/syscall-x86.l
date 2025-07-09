@@ -1,7 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(eval-in-target '(define linux-syscall (fixed (lambda args (print "linux-syscall encountered in interpreted code with args " args "\n") (abort)))))
-
 (define-emit    (LINUX-SYSCALL pair)
   (let ((args	$1)
         (regs	+linux/syscall-registers/32+))

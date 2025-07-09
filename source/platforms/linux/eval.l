@@ -30,6 +30,15 @@ exit:
 
 (load (concat-strings "source/emit-" *compiler-backend* ".l"))
 
+;; this is a placeholder object in the target on which we can register
+;; a special-form. theoretically this could be any objcect, but we
+;; leave a recognizable trace should something go off track somewhere.
+(eval-in-target
+ '(define linux-syscall
+   (fixed (lambda args
+            (print "linux-syscall encountered in interpreted code with args " args "\n")
+            (abort)))))
+
 (load (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
 
 (switch-to-target-env)

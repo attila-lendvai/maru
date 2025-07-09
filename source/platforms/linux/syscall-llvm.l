@@ -1,7 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(eval-in-target '(define linux-syscall (fixed (lambda args (print "linux-syscall encountered in interpreted code with args " args "\n") (abort)))))
-
 ;;; https://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/
 ;;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 
