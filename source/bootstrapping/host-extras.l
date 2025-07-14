@@ -18,4 +18,7 @@
 (define-function set-current-globals (value)
   (set (<module>-globals (current-module)) value))
 
-(set feature/profiler false)
+;; Make sure that the profiler is not compiled in when evolving. This
+;; may only be necessary for maru.9 -> maru.10 because the profiler
+;; seems to be broken in maru.9.
+(define-constant feature/profiler false)

@@ -200,7 +200,9 @@
 ;;; configuration
 
 (unless (defined? 'feature/profiler)
-  (define-constant feature/profiler		false))
+  ;; careful: due to the semantics of DEFINE it must be hidden behind an eval... hrm, is that maybe a FIXME?
+  (eval '(define feature/profiler false)))
+
 (define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))

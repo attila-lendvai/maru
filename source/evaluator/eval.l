@@ -844,17 +844,19 @@
            (incr-boxed (<target-function>-profiler-counter callee)))))))
 
   (define-function profiler/take-sample (_)
+    (debug-print "profiler is taking a sample")
     (incr profiler/sample-counter)
     (if-at-expand feature/profiler/cumulative
         (for (i 0 *call-stack-index*)
           (profiler/take-sample-at-frame (array-at *call-stack* i)))
       (awhen (current-call-frame)
-        (profiler/take-sample-at-frame it))))
+        (profiler/take-sample-at-frame it)))
+    (debug-print "profiler is done taking a sample"))
 
   (define-function profiler/disable ()
     (set_profiler_interval 0)
     (when (< 0 profiler/sample-counter)
-      (print-all *debug-output* "Profiler took "(box <long> profiler/sample-counter)" samples:")
+      (print-all *debug-output* "Profiler took "(box <long> profiler/sample-counter)" samples:\n")
       (let ((obj (gc/first-object)))
         (while obj
           (let ((type (type-of obj))
@@ -869,5 +871,5 @@
                     (< 0 (set counter (unbox <long> (<target-function>-profiler-counter obj)))))
                (set name (<target-function>-name obj))))
             (when counter
-              (print-all *debug-output* (box <long> counter)"\t"(or name "n/a"))))
+              (print-all *debug-output* (box <long> counter)"\t"(or name "?")"\n")))
           (set obj (gc/next-object obj)))))))

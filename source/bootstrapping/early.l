@@ -11,3 +11,6 @@
 (define *debug-output*    (eval-in-host '*debug-output*))
 (define *verbosity*       (eval-in-host '*verbosity*))
 (define *optimised*       (eval-in-host '*optimised*))
+
+;; TODO this should be done for all the needed features
+(define feature/profiler (eval-in-host 'feature/profiler))

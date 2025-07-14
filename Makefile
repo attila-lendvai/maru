@@ -170,14 +170,20 @@ EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l
 EVAL_OBJ_x86	=
 EVAL_OBJ_llvm	=
 
-ifdef PROFILER
-  PROFILER	= true
-  EVAL_OBJ_x86	+= $(BUILD_x86)/profiler.o
-  EVAL_OBJ_llvm	+= $(BUILD_llvm)/profiler.o
-  PROFILER_ARG	= -p
+PROFILER ?= false
+
+ifneq ($(filter yes on true 1,$(PROFILER)),)
+  PROFILER_MARU		:= true
+  EVAL_OBJ_x86		+= $(BUILD_x86)/profiler.o
+  EVAL_OBJ_llvm		+= $(BUILD_llvm)/profiler.o
+  PROFILER_ARG		= -p
 else
-  PROFILER	= false
-  PROFILER_ARG	=
+  ifneq ($(filter no off false 0,$(PROFILER)),)
+    PROFILER_MARU	:= false
+    PROFILER_ARG	=
+  else
+    $(error "Unexpected value for PROFILER: '$(PROFILER)'.")
+  endif
 endif
 
 .SUFFIXES:					# disable all built-in rules
@@ -291,7 +297,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/cpu 		$(TARGET_CPU_x86)		\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
-		--define feature/profiler	$(PROFILER)			\
+		--define feature/profiler	$(PROFILER_MARU)		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -313,7 +319,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		--define target/cpu 		$(TARGET_CPU_llvm)		\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
-		--define feature/profiler	$(PROFILER)			\
+		--define feature/profiler	$(PROFILER_MARU)		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -359,7 +365,7 @@ define compile-x86
 	--define target/cpu 		$(TARGET_CPU_x86)			\
 	--define target/vendor 		$(TARGET_VENDOR)			\
 	--define target/os 		$(TARGET_OS)				\
-	--define feature/profiler	$(PROFILER)				\
+	--define feature/profiler	$(PROFILER_MARU)			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
@@ -379,7 +385,7 @@ define compile-llvm
 	--define target/cpu 		$(TARGET_CPU_llvm)			\
 	--define target/vendor 		$(TARGET_VENDOR)			\
 	--define target/os 		$(TARGET_OS)				\
-	--define feature/profiler	$(PROFILER)				\
+	--define feature/profiler	$(PROFILER_MARU)			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\

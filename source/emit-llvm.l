@@ -677,12 +677,13 @@
                                     (if name
                                         (emit-object/<string> (symbol->string name) -c-)
                                       "null"))))
-             (feature/profiler	(slave-value feature/profiler)))
+             (profiler?		(slave-value feature/profiler)))
          (lambda (expr name entry-label -c-)
            (let ((object-label	(if name
                                     (closure-object-label name)
                                   (GLOBAL (unique-name "oclosure"))))
-                 (name-object	(when name-factory (name-factory name -c-))))
+                 (name-object	(when name-factory (name-factory name -c-)))
+                 (counter	(when profiler? (emit-object/<long> 0 -c-))))
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
              (emit-object/header type-id)
@@ -691,7 +692,7 @@
              (print "* "entry-label" to %oop)")
              (when name-object
                (print ", %\"<string-h>\"* "name-object))
-             (when feature/profiler
+             (when counter
                (print ", %oop ")
                (emit/header->payload/in-constants name-object))
              (print " }}\n")

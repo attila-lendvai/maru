@@ -13,6 +13,7 @@
 extern void install_profiler_handler(void (*handler)(int))
 {
     struct sigaction sa;
+    // fprintf(stderr, "install_profiler_handler called for 0x%p\n", handler);
     sa.sa_handler = handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;

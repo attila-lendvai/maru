@@ -110,9 +110,10 @@
               ((string= "-p" arg)
                (if-at-expand feature/profiler
                    (let ((usecs 1000))
-                     (install_profiler_handler profiler/take-sample)
+                     (install_profiler_handler
+                      (<target-function>-program-code profiler/take-sample))
                      (set_profiler_interval usecs)
-                     (platform/format "profiling at every "usecs" uSec(s)"))
+                     (platform/format "enabled profiling at every "usecs" uSec(s)"))
                  (platform/diag-print "WARNING: this build has no profiler, ignoring -p\n")))
 
               ;; -

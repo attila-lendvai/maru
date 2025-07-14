@@ -499,7 +499,7 @@
                                     (if name
                                         (emit-object/<string> (symbol->string name) -c-)
                                       null-value))))
-              (feature/profiler	(slave-value feature/profiler)))
+              (profiler?	(slave-value feature/profiler)))
          (lambda (name entry-label -c-)
            (let ((object-label	(if name
                                     (LABEL (if feature/redefinable-functions-in-target
@@ -509,14 +509,16 @@
                  (name		(when name-factory
                                   ;; NOTE this must happen first due
                                   ;; to the order of emission.
-                                  (name-factory name -c-))))
+                                  (name-factory name -c-)))
+                 (counter	(when profiler?
+                                  (emit-object/<long> 0 -c-))))
              (emit-object/header <target-function> type-id)
              (emit DEFLABEL object-label)
              (emit PTR entry-label)
              (when name
                (emit PTR name))
-             (when feature/profiler
-               (emit PTR (emit-object/<long> 0 -c-)))
+             (when counter
+               (emit PTR counter))
              object-label)))))
 
 ;;;
