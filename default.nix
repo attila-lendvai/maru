@@ -1,3 +1,8 @@
+# This is a config file for Nix, the package manager to enter an
+# environment with all the required dependencies. It's several years
+# old, and probably bitrotten. I'm using Guix nowadays (see
+# manifest.scm).
+
 { pkgs            ? import <nixpkgs> {},
   pkgsx86_64Linux ? import <nixpkgs> { system = "x86_64-linux"; },
   pkgsi686Linux   ? import <nixpkgs> { system = "i686-linux"; }

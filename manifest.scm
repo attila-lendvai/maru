@@ -2,8 +2,11 @@
 ;;
 ;; Usage:
 ;;
-;; guix shell --pure
+;; guix shell
 ;; guix shell --pure -- make test
+;; # if you want to protect the packages from guix gc:
+;; guix package --manifest=manifest.scm --profile=.guix-profile
+;; guix shell --profile=.guix-profile
 
 ;; TODO -m32 does not work as of 2025-06:
 ;; cc -O3 -m32 -o build/x86-libc/i386-linux-gnu/eval1  build/x86-libc/i386-linux-gnu/eval1.s
@@ -18,16 +21,17 @@
 ;; ld: cannot find crtendS.o: No such file or directory
 
 (use-modules (gnu packages llvm))
+(use-modules (gnu packages commencement))
 
 (manifest
  (append
-  (list
-   ;; pick specific versions
-   (package->manifest-entry
-    clang-toolchain-20
-    ))
+   ;; you can pick specific version-classes here
+  (map package->manifest-entry
+       (list clang-toolchain-20
+             ;; gcc-toolchain
+             ))
 
-  ;; get the latest from the channels you have pulled
+  ;; get the latest from the channels you have `guix pull`ed
   (manifest-entries
    (specifications->manifest
     '("coreutils"
