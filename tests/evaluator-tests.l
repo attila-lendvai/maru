@@ -264,6 +264,12 @@
   (test-assert (= 42 (expand '*symform*)))
   (test-assert (equal '(set 42 43) (expand '(set *symform* 43)))))
 
+(define-constant a-global-constant 42)
+
+(define-test eval/expand/symbol-macro-and-let ()
+  (let ((a-global-constant 43))
+    (test-assert (= 42 a-global-constant))))
+
 (define-form place-for-set-test (str i)
   `(accessor-for-set-test ,str ,i))
 
