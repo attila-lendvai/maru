@@ -141,9 +141,15 @@
                  (pop-cla)
                  (pop-cla)
                  ;; convert to long when possible
-                 (let ((i (string->long* value 10)))
-                   (unless (= +end+ i)
-                     (set value (box <long> i))))
+                 (cond
+                   ((string= value "true")
+                    (set value symbol/true))
+                   ((string= value "false")
+                    (set value ()))
+                   (else
+                    (let ((i (string->long* value 10)))
+                      (unless (= +end+ i)
+                        (set value (box <long> i))))))
                  (environment-define *globals*
                                      (string->symbol name)
                                      value)))
