@@ -10,5 +10,5 @@ identical with the `eval.l` in the *piumarta* branch.
  - introduction of tagged immediate types
  - revive the PEG parser bootstrap
  - revive the *command-line-arguments* global
- - implement <string> and <array> similarly
- - introcude the evolving? variable
+ - implement `<string>` and `<array>` similarly
+ - introcude the `evolving?` variable
