@@ -17,3 +17,5 @@
 
 (define-function set-current-globals (value)
   (set (<module>-globals (current-module)) value))
+
+(set feature/profiler false)

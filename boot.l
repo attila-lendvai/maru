@@ -199,9 +199,8 @@
 
 ;;; configuration
 
-;; this may or may not be defined by the makefile, so let's hide the reading of the var feature/profiler behind an eval
-(define-constant feature/profiler		(when (defined? 'feature/profiler)
-                                                  (eval '(not (= feature/profiler 0)))))
+(unless (defined? 'feature/profiler)
+  (define-constant feature/profiler		false))
 (define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
 (define-constant feature/debug-info		true)
 (define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))

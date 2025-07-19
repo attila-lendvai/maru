@@ -171,12 +171,12 @@ EVAL_OBJ_x86	=
 EVAL_OBJ_llvm	=
 
 ifdef PROFILER
-  PROFILER	= 1
+  PROFILER	= true
   EVAL_OBJ_x86	+= $(BUILD_x86)/profiler.o
   EVAL_OBJ_llvm	+= $(BUILD_llvm)/profiler.o
   PROFILER_ARG	= -p
 else
-  PROFILER	= 0
+  PROFILER	= false
   PROFILER_ARG	=
 endif
 
@@ -291,6 +291,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/cpu 		$(TARGET_CPU_x86)		\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
+		--define feature/profiler	$(PROFILER)			\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -312,12 +313,12 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		--define target/cpu 		$(TARGET_CPU_llvm)		\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
+		--define feature/profiler	$(PROFILER)			\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
 		source/bootstrapping/host-extras.l				\
 		source/bootstrapping/early.l					\
-		--define feature/profiler  	$(PROFILER)			\
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
@@ -326,7 +327,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
-$(BUILD_x86)/eval1.s: boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
 	$(call ensure-built,$(EVAL0))
 	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
@@ -334,17 +335,17 @@ $(BUILD_x86)/eval1.s: boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUA
 
 # eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
 # eval2 is just a test: its output should be the exact same files as eval1.*
-$(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval1.ll: boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(EVAL0))
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
-$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-llvm,$(SLAVE_DIR),$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
@@ -358,11 +359,11 @@ define compile-x86
 	--define target/cpu 		$(TARGET_CPU_x86)			\
 	--define target/vendor 		$(TARGET_VENDOR)			\
 	--define target/os 		$(TARGET_OS)				\
+	--define feature/profiler	$(PROFILER)				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
 	source/bootstrapping/early.l						\
-	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
 	$(3)									\
@@ -378,11 +379,11 @@ define compile-llvm
 	--define target/cpu 		$(TARGET_CPU_llvm)			\
 	--define target/vendor 		$(TARGET_VENDOR)			\
 	--define target/os 		$(TARGET_OS)				\
+	--define feature/profiler	$(PROFILER)				\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
 	source/bootstrapping/early.l						\
-	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
 	$(3)									\
@@ -434,7 +435,7 @@ $(BUILD_x86)/%: $(BUILD_x86)/%.s
 	$(CC) $(CFLAGS_x86) -o $@ $(EVAL_OBJ_x86) $<
 	@-$(STRIP) $@ -o $@.stripped
 
-$(BUILD_x86)/%.o: source/evaluator/%.c
+$(BUILD_x86)/%.o: source/platforms/$(PLATFORM)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_x86) -c -o $@ $<
 
@@ -450,7 +451,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 #	$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
 #	@-$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
 
-$(BUILD_llvm)/%.o: source/evaluator/%.c
+$(BUILD_llvm)/%.o: source/platforms/$(PLATFORM)/%.c
 	@mkdir -p $(@D)
 	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -c -o $@ $<
 
