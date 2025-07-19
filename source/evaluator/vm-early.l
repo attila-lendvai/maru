@@ -160,6 +160,13 @@
             args)
      (error-epilogue)))
 
+(define-form warn args
+  `(let ()
+     (platform/diag-print "\nWARNING: ")
+     ,@(map (lambda (arg)
+              `(%error ,arg))
+            args)))
+
 ;;;
 ;;; primitive-function infrasrtucture
 ;;; ----------------------------------------------------------------
