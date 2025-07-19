@@ -501,6 +501,9 @@
                          (set var-init-prog	(expand-all (get/tail entry) env one-step?)))
                      (set var-name	entry)
                      (set var-init-prog	(cons () ())))
+                   (when (maybe-form-in-env/symbol env var-name)
+                     ;; TODO add infra for compiler warnings
+                     (warn "LET binding for '"var-name"' while it also has a binding for a symbol form\n"))
                    (gc/let* ((new-entry (cons var-name var-init-prog)))
                      (set new-bindings/last (if new-bindings
                                                 (put/tail new-bindings/last (cons new-entry ()))
