@@ -87,18 +87,18 @@
          (error "llvm-type-bitsize: unexpected type "type))
        (cdr entry)))))
 
-(define-function %llvm-escape (prefix str char-needs-wrapping? legal-char? . with-zero)
+(define-function %llvm-escape (prefix str char-needs-quoting? ordinary-char? . with-zero)
   (with-forms ((putnext ((c) `(string-append mangled ,c))))
     (let* ((mangled (string))
-           (wrap-result? ())
+           (quote-result? ())
            (digit-for (lambda (c)
                         (if (< c 10)
                             (+ c ?0)
                           (+ c (- ?A 10)))))
            (write-char (lambda (c)
-                         (when (char-needs-wrapping? c)
-                           (set wrap-result? true))
-                         (if (legal-char? c)
+                         (when (char-needs-quoting? c)
+                           (set quote-result? true))
+                         (if (ordinary-char? c)
                              (putnext c)
                            (putnext ?\\)
                            (putnext (digit-for (bitwise-shift c -4)))
@@ -110,20 +110,21 @@
         (write-char c))
       (when with-zero
         (write-char ?\x00))
-      (when wrap-result?
+      (when quote-result?
         (putnext ?\")
         (string-insert mangled 0 ?\"))
       mangled)))
+
+(define-function llvm/ordinary-char? (c)
+  (and (<= 32 c) (<= c 127)
+       (not (= ?\" c))
+       (not (= ?\\ c))))
 
 (define-function llvm/escape-string (str . with-zero)
   (%llvm-escape ()
                 str
                 (lambda _ true)           ; always wrap it in double quotes
-                ;; TODO this felxibility may be unnecessary; duplicate code below
-                (lambda (c)
-                  (and (<= 32 c) (<= c 127)
-                       (not (= ?\" c))
-                       (not (= ?\\ c))))
+                llvm/ordinary-char?
                 with-zero))
 
 (define-function llvm/escape-identifier (prefix name)
@@ -137,10 +138,7 @@
                            (and (<= ?A c) (<= c ?Z))
                            (and (<= ?0 c) (<= c ?9))
                            (member? c '(?- ?$ ?. ?_)))))
-                (lambda (c)
-                  (and (<= 32 c) (<= c 127)
-                       (not (= ?\" c))
-                       (not (= ?\\ c))))))
+                llvm/ordinary-char?))
 
 (define-function llvm/escape-local-identifier (name)
   (llvm/escape-identifier () name))
