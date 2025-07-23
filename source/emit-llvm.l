@@ -389,9 +389,9 @@
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
-                                  (println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop")))
+                                  (println "	"$reg1" = bitcast %\"<target-function-h>\"* "$1" to %oop")))
   ;; closures
-  ((CONSTANT expr)		(println "	"$reg1" = bitcast %\"<target-function>\"* "$1" to %oop"))
+  ((CONSTANT expr)		(println "	"$reg1" = bitcast %\"<target-function-h>\"* "$1" to %oop"))
   ((GLOBAL   C-function)	(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %oop"))
@@ -651,7 +651,7 @@
            (let ((elements	(emit-object/C-string self -c-))
                  (object-label	(GLOBAL (unique-name "ostr"))))
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-             (print object-label" = private unnamed_addr constant %\"<string>\" { ")
+             (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
              (emit-object/header type-id)
              (print ", %word "(box-<long> (string-length self)))
              (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
@@ -671,13 +671,13 @@
                                   (GLOBAL (unique-name "oclosure"))))
                  (name-object	(when name-factory (name-factory name -c-))))
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-             (print object-label" = private unnamed_addr constant %\"<target-function>\" { ")
+             (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
              (emit-object/header type-id)
              (print ", %oop bitcast (")
              (emit-llvm-fn-type-for-expr expr)
              (print "* "entry-label" to %oop)")
              (when name-object
-               (print ", %\"<string>\"* "name-object))
+               (print ", %\"<string-h>\"* "name-object))
              (when feature/profiler
                (print ", %word ")
                (emit-object/<long> 0 -c-))
@@ -795,8 +795,8 @@
 (define-function compile-call-to-object (arg-regs -c-)
   ;; TODO assert the type to be <target-function>
   ;; TODO assert nr of args = params
-  (gen BITCAST '%oop "%\"<target-function>\"*")
-  (gen GEP (LOCAL '<target-function>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
+  (gen BITCAST '%oop "%\"<target-function-h>\"*")
+  (gen GEP (LOCAL '<target-function-h>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
   (gen LOAD-OOP (LITERAL 0))
   (gen CALLPTR arg-regs)
   ())
@@ -1136,7 +1136,7 @@
 (define-method compile <string> (-c-)
   (set (<compiler>-current-value -c-)
        (emit-object/<string> self -c-))
-  (gen GEP (LOCAL '<string>) 0 1) ; 1 means skip the header
+  (gen GEP (LOCAL '<string-h>) 0 1) ; 1 means skip the header
   (gen BITCAST "%word*" "%oop"))
 
 (define-method compile <pair> (-c-)
@@ -1177,7 +1177,7 @@
       (println "* "(closure-code-label name)))
     (when feature/redefinable-functions-in-target
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
-      (println (GLOBAL name)" = global %oop bitcast(%\"<target-function>\"* "
+      (println (GLOBAL name)" = global %oop bitcast(%\"<target-function-h>\"* "
                object-label" to %oop)"))))
 
 ;; kinda KLUDGE
@@ -1191,7 +1191,7 @@
         (if first? (set first? false) (print ", "))
         (print "%oop ")
         (if el
-            (print "bitcast (%\"<target-function>\"* "el" to %oop)")
+            (print "bitcast (%\"<target-function-h>\"* "el" to %oop)")
           (print "null")))
       (println "]"))
     (print (GLOBAL name)" = global %oop bitcast (["(array-length compiled)" x %oop]* "
@@ -1226,10 +1226,10 @@
        (emit INLINE "%\"<long>\" = type { %\"<header>\", %word }\n"))
       (else
        (error "LLVM emit-prelude: unexpected slave representation for <long>")))
-    (emit INLINE "%\"<string>\" = type { %\"<header>\", %word, %oop }\n")
-    (emit INLINE (list "%\"<target-function>\" = type { %\"<header>\", %oop "
+    (emit INLINE "%\"<string-h>\" = type { %\"<header>\", %word, %oop }\n")
+    (emit INLINE (list "%\"<target-function-h>\" = type { %\"<header>\", %oop "
                        (if (slave-value feature/track-expr-names)
-                           ", %\"<string>\"* " "")
+                           ", %\"<string-h>\"* " "")
                        (if (slave-value feature/profiler)
                            ", %word" "")
                        "}\n"))
