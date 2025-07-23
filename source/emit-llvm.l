@@ -382,7 +382,8 @@
   ;;       			(println "	ret %oop "$reg1))
   ((LOCAL)			(println "	ret %oop "$1)))
 
-(define-instruction LOAD-VALUE	(() 1 t)
+(define-instruction LOAD	(() 1 t)
+  ;; args: ptr type (for method dispatch)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
   ((TEMP    _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
@@ -396,9 +397,6 @@
 				(println "* @" (<C-function>-name $2) " to %oop"))
   ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
                                   (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
-
-(define-instruction LOAD	(t 1 t)
-  ((LOCAL)			(println "	"$reg1" = load %oop, %oop* "$1)))
 
 (define-instruction STORE	(t 0 ())
   ((_ _)			(println "	store %oop "$1", %oop* "$2))
@@ -799,7 +797,7 @@
   ;; TODO assert nr of args = params
   (gen BITCAST '%oop "%\"<target-function>\"*")
   (gen GEP (LOCAL '<target-function>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
-  (gen LOAD)
+  (gen LOAD-OOP (LITERAL 0))
   (gen CALLPTR arg-regs)
   ())
 
@@ -860,7 +858,7 @@
         (void
          (when (<= 2 *compiler-verbosity*)
            (gen COMMENT (list "	void FFI call return value")))
-         (gen LOAD-VALUE (LITERAL 0) 0))
+         (gen LOAD (LITERAL 0) 0))
         (else
          (let ((bitsize	(llvm-type-bitsize return-type))
                (word-size	(target-value +word-size-in-bits+)))
@@ -905,15 +903,15 @@
 (define-function %compile/and-or (op expr -c-)
   (let ((lend	(UNIQUE-LABEL))
         (retval	(alloc-temp -c-)))
-    (gen LOAD-VALUE (LITERAL (case op
-                               (and (target-value true))
-                               (or  (target-value false))))
+    (gen LOAD (LITERAL (case op
+                         (and (target-value true))
+                         (or  (target-value false))))
          0) ; just for the type dispatch
     (gen STORE retval)
     (while (set expr (rest expr))
       (let ((value-reg (comp (first expr))))
         (gen STORE retval)
-        (gen LOAD-VALUE (LITERAL 0) 0)
+        (gen LOAD (LITERAL (target-value false)) 0)
         (gen EQ value-reg))
       (let ((lcont (UNIQUE-LABEL)))
         (case op
@@ -922,7 +920,7 @@
         (gen DEFLABEL lcont)))
     (gen BR lend)
     (gen DEFLABEL lend)
-    (gen LOAD-VALUE retval ())
+    (gen LOAD retval ())
     (free-temp retval)))
 
 (define-function compile/and (expr -c-)
@@ -951,13 +949,13 @@
       (if else-prg
           (list-do stmt else-prg
             (comp stmt))
-        (gen LOAD-VALUE (LITERAL 0) 0))
+        (gen LOAD (LITERAL (target-value false)) 0))
       (gen STORE retval))
     (gen BR lend)
 
     ;; end
     (gen DEFLABEL lend)
-    (gen LOAD-VALUE retval ())
+    (gen LOAD retval ())
     (free-temp retval)))
 
 (define-function compile/while (expr -c-)
@@ -1002,7 +1000,7 @@
   (let* ((expr	(eval form))
          (label	(compile-expr expr () -c-)))
     ;; NOTE compile-expr returns with a CONSTANT here
-    (gen LOAD-VALUE label expr)))
+    (gen LOAD label expr)))
 
 (define-function compile/return (form -c-)
   (assert (<= (list-length form) 2))
@@ -1108,30 +1106,30 @@
 
 (define-method compile <undefined> (-c-)
   (let ((false-value (target-value false)))
-    (gen LOAD-VALUE (LITERAL false-value) false-value)))
+    (gen LOAD (LITERAL false-value) false-value)))
 
 (define-method compile <long> (-c-)
-  (gen LOAD-VALUE (LITERAL self) self))
+  (gen LOAD (LITERAL self) self))
 
 (define-method compile <variable> (-c-)
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
       ((local? value)		(set (<compiler>-current-value -c-) value))
-      ((temp? value)		(gen LOAD-VALUE value ()))
+      ((temp? value)		(gen LOAD value ()))
       ((global-variable? self)	(let ((value-type (type-of value)))
                                   (cond
                                     ((= 'true self.name)
                                      (let ((true-value (target-value true)))
-                                       (gen LOAD-VALUE (LITERAL true-value) true-value)))
+                                       (gen LOAD (LITERAL true-value) true-value)))
                                     ((subtype? value-type <type>)
                                      ;; generics don't support inheritance yet, so let's short-circuit all <type>'s here into a LITERAL
-                                     (gen LOAD-VALUE (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
+                                     (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
                                     ((is <C-variable> value)
-                                     (gen LOAD-VALUE (EXTERNAL (<C-variable>-name value)) value)
+                                     (gen LOAD (EXTERNAL (<C-variable>-name value)) value)
                                      (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%oop))
                                     (else
-                                     (gen LOAD-VALUE (GLOBAL self.name) value)))))
+                                     (gen LOAD (GLOBAL self.name) value)))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
