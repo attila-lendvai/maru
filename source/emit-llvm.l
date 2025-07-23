@@ -651,8 +651,8 @@
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
              (emit-object/header type-id)
-             (print ", %word "(box-<long> (string-length self)))
-             (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }\n")
+             (print ", %\"<string>\" { %word "(box-<long> (string-length self)))
+             (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }}\n")
              object-label))))
 
   (set emit-object/<target-function>
@@ -671,7 +671,7 @@
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
              (emit-object/header type-id)
-             (print ", %oop bitcast (")
+             (print ", %\"<target-function>\" { %oop bitcast (")
              (emit-llvm-fn-type-for-expr expr)
              (print "* "entry-label" to %oop)")
              (when name-object
@@ -679,7 +679,7 @@
              (when feature/profiler
                (print ", %word ")
                (emit-object/<long> 0 -c-))
-             (print " }\n")
+             (print " }}\n")
              (CONSTANT object-label expr))))))
 
 ;;;
@@ -1224,13 +1224,18 @@
        (emit INLINE "%\"<long>\" = type { %\"<header>\", %word }\n"))
       (else
        (error "LLVM emit-prelude: unexpected slave representation for <long>")))
-    (emit INLINE "%\"<string-h>\" = type { %\"<header>\", %word, %oop }\n")
-    (emit INLINE (list "%\"<target-function-h>\" = type { %\"<header>\", %oop "
-                       (if (slave-value feature/track-expr-names)
-                           ", %\"<string-h>\"* " "")
-                       (if (slave-value feature/profiler)
-                           ", %word" "")
-                       "}\n"))
+    (emit INLINE
+          (list
+           "%\"<string>\" = type { %word, %oop }\n"
+           "%\"<string-h>\" = type { %\"<header>\", %\"<string>\" }\n"))
+    (emit INLINE
+          (list "%\"<target-function>\" = type { %oop "
+                (if (slave-value feature/track-expr-names)
+                    ", %\"<string-h>\"* " "")
+                (if (slave-value feature/profiler)
+                    ", %word" "")
+                "}\n"
+                "%\"<target-function-h>\" = type { %\"<header>\", %\"<target-function>\"}\n"))
     ;; we represent libc's FILE* with an opaque type
     (emit INLINE "%m_libc-FILE = type opaque\n")
     ;;(emit INLINE "declare i8* @llvm.sponentry()\n")
