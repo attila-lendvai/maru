@@ -107,7 +107,11 @@
       (else ;; (> len-a len-b)
        (- (byte-at buf-a len-b) 0)))))
 
-;; TODO how does this relate to the '= primitive-function? maybe delme?
+;; we need this because in the target `=` is compiled to a dumb
+;; non-dispatching integer comparison. if we want to share the
+;; codebase between the kernel and the vm, then we probably need to
+;; retain a separate string=. alternatively, we could smarten up the
+;; way `=` is compiled, but that would slow down every comparison.
 (define-function string= (a b)
   (= 0 (compare-strings a b)))
 

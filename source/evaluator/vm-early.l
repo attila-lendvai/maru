@@ -187,6 +187,7 @@
 (define-function %too-many-arguments (name args)
   (error name": too many arguments: "args))
 
+;; TODO this is convoluted and needs better documentation
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
   ;; ARGS: may be _ to skip arg parsing

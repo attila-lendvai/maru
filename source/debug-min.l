@@ -18,6 +18,7 @@
   `(debug
     ;; only works after streams and printing are initialized. prior to
     ;; that we must use the platform primitives directly.
+    ;; TODO add some trick to switch to the smart printer when it becomes available in the init process
     (when *debug-output*
       (print-all *debug-output* ,@objs)
       ;; TODO? use $put
@@ -61,14 +62,17 @@
                  `(long->string/emit ,form 10 platform/diag-print-char))))
             forms)))
 
+(define-function fatal-prologue ()
+  (platform/flush-streams)
+  (platform/diag-print "\nFATAL: "))
+
 ;; TODO consider somehow replacing the lame early FATAL with a proper
 ;; ERROR later in the init
 (define-form fatal forms
   ;; format (fatal form1 (string form2) (pointer form3) (long form4) ...)
   ;; but it defaults to long, and recognizes string literals.
   `(let ()
-     (platform/flush-streams)
-     (platform/diag-print "\nFATAL: ")
+     (fatal-prologue)
      (platform/format ,@forms)
      (platform/diag-print "\n")
      (platform/halt)))

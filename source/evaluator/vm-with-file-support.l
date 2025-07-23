@@ -39,6 +39,7 @@
     (gc/let* ((res ()))
       (while (let ()
                (when stdin?
+                 ;; ($put *standard-output* "maru> ") ;; TODO fix the compiler for this
                  ($put *standard-output* ?.)
                  (platform/flush-streams))
                (and (not (= +end+ (set res (read stream))))
@@ -47,6 +48,7 @@
           (set res (expand-encode-eval res))
           (when stdin?
             (do-print *standard-output* res false)
+            ($put *standard-output* ?\n)
             (platform/flush-streams))))
       (when stdin?
         ($put-all *standard-output* "\nmorituri te salutant\n"))

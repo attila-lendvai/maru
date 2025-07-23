@@ -195,7 +195,6 @@ all: eval
 eval: $(foreach backend,${BACKENDS},eval-$(backend))
 # NOTE this way ./eval will be the last one in BACKENDS that actually got built, which is llvm as things are
 
-# TODO $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 eval-x86: $(BUILD_x86)/eval1
 	cp $< $@
 	cp $< eval
@@ -464,6 +463,8 @@ $(BUILD_llvm)/%.o: source/platforms/$(PLATFORM)/%.c
 ###
 ### Tests
 ###
+repl: run
+
 run: $(TEST_EVAL)
 	rlwrap --no-warning $(TEST_EVAL) boot.l -
 
@@ -522,8 +523,11 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
 # NOTE test-elf needs the IA-32 eval-x86
-test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
-	./eval-x86 boot.l tests/test-elf.l
+# make TARGET_CPU=i686 PLATFORM=linux test-elf
+# but that will sigsegv currently without `ulimit -s unlimited`,
+# because the mark-and-sweep in the GC is not tailcall for now.
+test-elf: eval-llvm tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
+	./eval-llvm boot.l tests/test-elf.l
 	@chmod +x build/test-elf
 	-readelf -el build/test-elf
 	./build/test-elf

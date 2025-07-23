@@ -207,6 +207,10 @@ new features. Some that are worth mentioning:
 
   - The addition of an LLVM backend.
 
+### Notable features
+
+  - It has a profiler.
+
 ### Future plans
 
 <details>

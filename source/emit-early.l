@@ -261,8 +261,12 @@
 ;;; create an empty env (stored in *target-env*) to hold the
 ;;; definitions that will be level-shifted to the target.
 ;;;
-(define primitive/eval eval) ; we will need to reach back to this when starting the compiler
+(define primitive/eval eval) ; we will need to call the host's eval when starting the compiler
 
+;; *target-env* will hold the definitions that need to be
+;; level-shifted (compiled). *slave-env* (*globals* here) will be the
+;; parent of *target-env*, therefore all <form>'s that are defined in
+;; *slave-env* are available "in" the *target-env*.
 (define *target-env* (environment *globals*))
 
 (when-at-expand feature/debug-info

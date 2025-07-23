@@ -775,7 +775,7 @@
   (emit-comment 1 "compiling fn "name", "self)
   (let ((entry-point-label (if name
                                (closure-code-label name)
-                             (GLOBAL (unique-name "code")))))
+                             (GLOBAL (unique-name "fn")))))
     (emit-expr-code self entry-point-label -c-)
     (emit-object/<target-function> self name entry-point-label -c-)))
 
@@ -1242,7 +1242,10 @@
        (error "LLVM emit-prelude: unexpected slave representation for <long>")))
     (emit INLINE
           (list
-           "%\"<string>\" = type { %word, %oop }\n"
+           ;; TODO this should be type { %oop, ptr }, but that will
+           ;; involve shitloads of casting. also, it's only a %word when
+           ;; <long> is a tagged immediate.
+           "%\"<string>\" = type { %word, ptr }\n"
            "%\"<string-h>\" = type { %\"<header>\", %\"<string>\" }\n"))
     (emit INLINE
           (list "%\"<target-function>\" = type { %oop "

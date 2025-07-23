@@ -42,14 +42,15 @@
       (let ((head (function (car alist) (car blist) a)))
         (cons head (map2-with function (cdr alist) (cdr blist) a)))))
 
-(define-function map* (function . lists)
+(define-function map* (fn . lists)
+  ;; Map fn to every first elements, then same with seconds, thirds, etc.
   (if (pair? (car lists))
-      (let ((head (apply function (map car lists))))
-        (cons head (apply map* (cons function (map cdr lists)))))))
+      (let ((head (apply fn (map car lists))))
+        (cons head (apply map* (cons fn (map cdr lists)))))))
 
-(define-function foldr (op value list)
+(define-function foldr (fn value list)
   (if (pair? list)
-      (op (car list) (foldr op value (cdr list)))
+      (fn (car list) (foldr fn value (cdr list)))
     value))
 
 (define-function zip lists
