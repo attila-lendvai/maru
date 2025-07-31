@@ -340,6 +340,17 @@
          args)
     (println ")")))
 
+;; Re parens and sans parens versions: it reflects LLVM's dual
+;; grammar: instructions vs constants. The design is a compromise
+;; between expression-like constants and instruction-like runtime
+;; code. It's baked into the LLVM grammar and won't ever change, so we
+;; have to deal with it ourselves.
+(define-function emit/header->payload (input)
+  (print "getelementptr %\"<header>\", %\"<header>\"* "input", i32 1"))
+
+(define-function emit/header->payload/in-constants (input)
+  (print "getelementptr (%\"<header>\", %\"<header>\"* "input", i32 1)"))
+
 (define-instruction COMMENT	()
   ;;((string)			(when (<= 1 *compiler-verbosity*) (print "; ") (println $1)))
   ((pair)			(when (<= 1 *compiler-verbosity*) (print "; ") (apply println $1))))
@@ -387,9 +398,13 @@
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
-                                  (println "	"$reg1" = bitcast %\"<target-function-h>\"* "$1" to %oop")))
+                                  (print "	"$reg1" = ")
+                                  (emit/header->payload $1)
+                                  (println)))
   ;; closures
-  ((CONSTANT expr)		(println "	"$reg1" = bitcast %\"<target-function-h>\"* "$1" to %oop"))
+  ((CONSTANT expr)		(print "	"$reg1" = ")
+				(emit/header->payload $1)
+				(println))
   ((GLOBAL   C-function)	(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %oop"))
@@ -652,7 +667,7 @@
              (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
              (emit-object/header type-id)
              (print ", %\"<string>\" { %word "(box-<long> (string-length self)))
-             (print ", %oop bitcast (["(+ 1 (string-length self))" x i8]* "elements" to %oop) }}\n")
+             (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "elements" to ptr) }}\n")
              object-label))))
 
   (set emit-object/<target-function>
@@ -677,8 +692,8 @@
              (when name-object
                (print ", %\"<string-h>\"* "name-object))
              (when feature/profiler
-               (print ", %word ")
-               (emit-object/<long> 0 -c-))
+               (print ", %oop ")
+               (emit/header->payload/in-constants name-object))
              (print " }}\n")
              (CONSTANT object-label expr))))))
 
@@ -790,14 +805,14 @@
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))))
 
-(define-function compile-call-to-object (arg-regs -c-)
-  ;; TODO assert the type to be <target-function>
-  ;; TODO assert nr of args = params
-  (gen BITCAST '%oop "%\"<target-function-h>\"*")
-  (gen GEP (LOCAL '<target-function-h>) 0 1) ; TODO use (record/slot-index <target-function> 'program-code)
-  (gen LOAD-OOP (LITERAL 0))
-  (gen CALLPTR arg-regs)
-  ())
+(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
+  (define-function compile-call-to-object (arg-regs -c-)
+    ;; TODO assert the type to be <target-function>
+    ;; TODO assert nr of args = params
+    (gen BITCAST '%oop "%\"<target-function>\"*")
+    (gen LOAD-OOP (LITERAL program-code-offset))
+    (gen CALLPTR arg-regs)
+    ()))
 
 (define-function compile-call-to-global-function (op arg-regs -c-)
   (if feature/redefinable-functions-in-target
@@ -1175,8 +1190,8 @@
       (println "* "(closure-code-label name)))
     (when feature/redefinable-functions-in-target
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
-      (println (GLOBAL name)" = global %oop bitcast(%\"<target-function-h>\"* "
-               object-label" to %oop)"))))
+      (println (GLOBAL name)" = global %oop ")
+      (emit/header->payload object-label))))
 
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
@@ -1189,7 +1204,7 @@
         (if first? (set first? false) (print ", "))
         (print "%oop ")
         (if el
-            (print "bitcast (%\"<target-function-h>\"* "el" to %oop)")
+            (emit/header->payload/in-constants el)
           (print "null")))
       (println "]"))
     (print (GLOBAL name)" = global %oop bitcast (["(array-length compiled)" x %oop]* "
@@ -1231,9 +1246,9 @@
     (emit INLINE
           (list "%\"<target-function>\" = type { %oop "
                 (if (slave-value feature/track-expr-names)
-                    ", %\"<string-h>\"* " "")
+                    ", %oop" "")
                 (if (slave-value feature/profiler)
-                    ", %word" "")
+                    ", %oop" "")
                 "}\n"
                 "%\"<target-function-h>\" = type { %\"<header>\", %\"<target-function>\"}\n"))
     ;; we represent libc's FILE* with an opaque type
