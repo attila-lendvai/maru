@@ -19,6 +19,9 @@
                              ((string= mode "rw")
                               (bitwise-or linux/O_RDWR
                                           linux/O_CREAT))
+                             ((string= mode "w")
+                              (bitwise-or linux/O_WRONLY
+                                          linux/O_CREAT))
                              (else
                               (error "file-open: unexpected mode "mode" while opening "path)))
                            420          ; "rw-r--r--"
