@@ -275,6 +275,7 @@
 (eval-in-host `(define *target-env* ,*target-env*))
 
 (define-function switch-to-target-env ()
+  (verbosity 2 (warn "---> target env\n"))
   (set *globals* *target-env*))
 
 (eval-in-host `(define switch-to-target-env ,switch-to-target-env))

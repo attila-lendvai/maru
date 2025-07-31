@@ -21,6 +21,7 @@
   (define *slave-env* slave-env)
   (environment-define *slave-env* 'switch-to-host-env
                       (lambda ()
+                        (verbosity 2 (warn "---> host env\n"))
                         (set *globals* *host-env*)))
   (set *globals* *slave-env*)
   ;; NOTE this toplevel form is encoded into the host env. the previous
@@ -53,6 +54,7 @@
 (assert (= (eval '*host-env* *host-env*) (eval '*host-env* *slave-env*)))
 
 (define-function switch-to-slave-env ()
+  (verbosity 2 (warn "---> slave env\n"))
   (set *globals* *slave-env*))
 
 (define-function eval-in-slave (form)
