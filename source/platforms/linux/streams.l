@@ -30,10 +30,10 @@
       ;; TODO use <target-word>
       (box <target-pointer> fd))))
 
-(define-primitive-function file-close ((fd <target-pointer> _ nounbox))
-  ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
-  (unless (= 0 (linux-syscall linux/close (unbox <target-pointer> fd)))
-    (error "file-close: close syscall returned with error")))
+(define-primitive-function file-close ((fd <target-pointer>))
+  ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
+  (when (= 0 (linux-syscall linux/close fd))
+    symbol/true))
 
 (define-primitive-function file-read-character ((fd <target-pointer>))
   (let ((char 0))
@@ -45,8 +45,8 @@
 
 (define-primitive-function file-write-character ((char <long>) (fd <target-pointer>))
   ;; TODO endianness? think this through...
-  (unless (= 1 (linux-syscall linux/write fd (address-of char) 1))
-    (error "file-write-character: syscall returned an error")))
+  (when (= 1 (linux-syscall linux/write fd (address-of char) 1))
+    symbol/true))
 
 ;; (define-primitive-function file-flush ((fd <target-pointer>))
 ;;   (unless (= 0 (linux-syscall linux/fsync fd))
@@ -114,3 +114,5 @@
     (else
      (error "<fd-stream> $put-all: unexpected elements: " elements)))
   elements)
+
+(require "source/streams-min-late.l")

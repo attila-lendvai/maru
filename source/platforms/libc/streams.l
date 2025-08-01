@@ -10,9 +10,10 @@
   (awhen (libc/fopen (string->C-string path) (string->C-string mode))
     (box <target-pointer> it)))
 
-(define-primitive-function file-close ((stream <target-pointer> _ nounbox))
-  ;; NOTE it is NOUNBOX because a lot of kernel code calls file-close
-  (box <long> (libc/fclose (unbox <target-pointer> stream))))
+(define-primitive-function file-close ((handle <target-pointer> _ nounbox))
+  ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
+  (when (= 0 (libc/fclose (unbox <target-pointer> handle)))
+    symbol/true))
 
 (define-primitive-function file-read-character ((stream <target-pointer>))
   (let ((c (libc/fgetc stream)))
@@ -21,8 +22,8 @@
       (box <long> c))))
 
 (define-primitive-function file-write-character ((char <long>) (stream <target-pointer>))
-  (when (= libc/EOF (libc/fputc char stream))
-    (error "file-write-character: libc/fputc returned an error")))
+  (when (not (= libc/EOF (libc/fputc char stream)))
+    symbol/true))
 
 ;; (define-primitive-function file-flush ((stream <target-pointer>))
 ;;   (unless (= 0 (libc/fflush stream))
@@ -68,3 +69,5 @@
                           (error "<libc-stream> $put-all: libc/fputs returned with error")))
     (else		(error "<libc-stream> $put-all: unexpected elements: " elements)))
   elements)
+
+(require "source/streams-min-late.l")

@@ -705,10 +705,10 @@
     (<parser>-result p)))
 
 (define-function parse-file (grammar rule path)
-  (let* ((handle  (or (file-open path "r") (error "cannot open: "path)))
+  (let* ((handle  (file-open-or-die path "r"))
 	 (stream  (input-stream handle path))
 	 (result  (parse-stream grammar rule stream)))
-    (file-close handle)
+    (file-close-or-die handle)
     result))
 
 (define-function parse-string (grammar rule str)

@@ -2,6 +2,8 @@
 ;;;
 ;;; A simple memory buffer with dynamic reallocation
 
+(require "source/streams-min-late.l")
+
 ;; TODO this should be merged with source/evaluator/arrays.l
 
 (define-record <buffer> () (size elements capacity))
@@ -87,10 +89,9 @@
 
 (define-function buffer-save (self path)
   (with-instance-accessors self <buffer>
-    (let ((f (or (file-open path "w")
-                 (error "cannot open for writing: "path)))
+    (let ((f (file-open-or-die path "w"))
           (elements self.elements))
       (for (i 0 self.size)
         ;; TODO file-write-byte?
-        (file-write-character (byte-at elements i) f))
-      (file-close f))))
+        (file-write-character-or-die (byte-at elements i) f))
+      (file-close-or-die f))))

@@ -4,12 +4,8 @@
 
 (require "source/unit-test.l")
 (require "source/files.l")
-
-(define-selector $at-end?)
-(define-selector $peek)
-(define-selector $next)
-(define-selector $put)
-(define-selector $put-all)
+(require "source/streams-min.l")
+(require "source/streams-min-late.l")
 
 ;;;----------------------------------------------------------------
 
@@ -146,9 +142,8 @@
     res))
 
 (define-function contents-of-file-named (name)
-  (input-stream-up-to (input-stream (or (file-open name "r")
-					(error "no such file: "name))
-				    name)
+  (input-stream-up-to (input-stream (file-open-or-die name "r")
+                                    name)
                       +end+))
 
 ;; (unit-test "<input-stream>"
