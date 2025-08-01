@@ -424,6 +424,8 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 $(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
+# KLUDGE, gc/mark-and-sweep is not tailcall for now, so we need more stack space
+	ulimit -s unlimited
 #	$(call ensure-built,$(GEN_EVAL))
 	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
@@ -522,11 +524,15 @@ $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0) tests/compiler-tests
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
-# NOTE test-elf needs the IA-32 eval-x86
+# make PLATFORM=linux test-elf-x86
+test-elf-x86: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
+	./eval-x86 boot.l tests/test-elf.l
+	@chmod +x build/test-elf
+	-readelf -el build/test-elf
+	./build/test-elf
+
 # make TARGET_CPU=i686 PLATFORM=linux test-elf
-# but that will sigsegv currently without `ulimit -s unlimited`,
-# because the mark-and-sweep in the GC is not tailcall for now.
-test-elf: eval-llvm tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
+test-elf-llvm: eval-llvm tests/test-elf.l source/assembler/asm-common.l source/assembler/asm-x86.l
 	./eval-llvm boot.l tests/test-elf.l
 	@chmod +x build/test-elf
 	-readelf -el build/test-elf
