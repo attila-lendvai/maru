@@ -38,8 +38,9 @@ turn contain the following elements (see `compile`):
 
  - `<pair>`s; i.e. cons cells that can form a tree of lisp call forms
 
- - `<string>` literals; they are compiled into full <string> objects,
-   but in the read-only segment instead of the heap
+ - `<string>` literals; they are compiled into full <string> objects
+   (i.e. with a gc header prior to the OOP), but in the read-only
+   segment instead of the heap
 
  - `<expr>`s; i.e. first class functions
 
@@ -53,6 +54,22 @@ C toolchain is required for a full cycle of bootstrap even on x86. With the addi
 of an IA-32 assembler that directly outputs machine code this requirement
 can be eliminated; i.e. there's no inherent external dependency on the C
 infrastructure in the codebase.
+
+## Peculiarities of the compiler
+
+i.e. peculiarities of the subset of Maru that the compiler can
+level-shift to machine code; you can also read it as a TODO list:
+
+ - `=` is simple integer equality, i.e. it's very different from the
+   `=` in the VM that does e.g. string comparison
+
+ - for now lambda's cannot capture anything (fails with an explicit
+   error)
+
+ - special-operators can only take two arguments; i.e. arithmetics,
+   comparators, etc (and the error message is obscure)
+
+ - more, TODO
 
 ## Compile-time phases: `expand` and `encode`
 

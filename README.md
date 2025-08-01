@@ -23,9 +23,12 @@ includes the previous developmental stage of the same language).
 
 ## Meta
 
-This document aims to present an overview of Maru. There are various
-documents in the [`doc/`](doc/) directory that discuss some topics in
-more detail.
+This document aims to present an overview of Maru at its latest
+developmental stage. There are various documents in the [`doc/`](doc/)
+directory that discuss some topics in further detail.
+
+In the earlier developmental stages (i.e. in the other git branches)
+this file contains notes about that specific stage.
 
 ## How
 

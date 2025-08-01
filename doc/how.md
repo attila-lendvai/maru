@@ -10,10 +10,11 @@ Maru's architecture is described in Ian Piumarta's paper:
 ### The Parts - an overview
 
 * `eval.c` (in branch `maru.0.c99`) contains a reader and
-[evaluator](https://en.wikipedia.org/wiki/Interpreter_(computing)) (interpreter) for an
-s-expression language, written in C ([C99](https://en.wikipedia.org/wiki/C99)).
+[evaluator](https://en.wikipedia.org/wiki/Interpreter_(computing))
+(interpreter) for an s-expression language, written in C (more
+specifically in [C99](https://en.wikipedia.org/wiki/C99)).
 
-* `eval.l` (in branch `maru.1` and up) contains the same evaluator, written in
+* `eval.l` (in branches `maru.1` and up) contains the same evaluator, written in
 (a subset of) this s-expression language that can be compiled to machine code.
 In other words, `eval.l` implements a
 [metacircular evaluator](https://en.wikipedia.org/wiki/Meta-circular_evaluator)
