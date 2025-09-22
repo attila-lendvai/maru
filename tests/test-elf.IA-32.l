@@ -19,19 +19,19 @@
 ;; ASLR: https://sysctl-explorer.net/kernel/randomize_va_space/
 ;; brk: https://gist.github.com/nikAizuddin/f4132721126257ec4345
 
-(define code (buffer 4096))	;; binary
+(define asm-buffer (buffer 4096))	;; binary
 (define phased 1)		;; non-nil if something changed this pass
 ;;(define $% 0)			;; file offset
 (define $$ 0)			;; last .base address
 (define $ 0)			;; current address
 
-(define-function _B  (out value)	(buffer-append code value) (incr $))
+(define-function _B  (out value)	(buffer-append asm-buffer value) (incr $))
 (define-function _W  (out value)	(_B out (bitwise-and 0xff value))   (_B out (bitwise-and 0xff   (bitwise-shift value -8))))
 (define-function _L  (out value)	(_W out (bitwise-and 0xffff value)) (_W out (bitwise-and 0xffff (bitwise-shift value -16))))
 (define-function _D1 (out value)	(_B out value))
 (define-function _D4 (out value)	(_L out value))
 
-(require "source/assembler/asm-x86.l")
+(require "source/assembler/assembler.IA-32.l")
 
 (define-function define-label (name value)
   (unless (= (eval name) value)
@@ -52,6 +52,9 @@
                                             (times-do (- bytes remainder)
                                               (_B () 0)))))
 
+;; Define simplified variants that pass () as buffer for each
+;; generated instruction emitter, and writes directly into our global
+;; variable (asm-buffer) in the _B function above.
 (define-function movlIR (src dst)	(MOVLir src dst ()))
 (define-function movlRM (src dst)	(MOVLrm src dst 0 0 0 ()))
 (define-function movlMR (src dst)	(MOVLmr src 0 0 0 dst ()))
@@ -71,14 +74,14 @@
   (set phased 1)
   (while phased
     (set phased ())
-    (buffer-reset code)
-    (set $$ (set $ (address-of (<buffer>-elements code))))
+    (buffer-reset asm-buffer)
+    (set $$ (set $ (address-of (<buffer>-elements asm-buffer))))
     (list-do insn program
       (cond
 	((symbol? insn)		(define-label insn $))
 	((pair? insn)		(eval insn))
 	(else			(error "huh? "insn)))))
-  (println "assembled "(buffer-length code)" bytes")
+  (println "assembled "(buffer-length asm-buffer)" bytes")
   )
 
 (define elf/PF_R	0x4)
@@ -165,7 +168,7 @@ var
 
 (print "writing buffer to ")
 
-(buffer-save code (println "./build/test-elf"))
+(buffer-save asm-buffer (println "./build/test-elf"))
 
 ;; for details on int 0x80 and syscall see:
 ;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
@@ -174,7 +177,7 @@ var
 ;; TODO the next two doesn't print anything for me, even though the asm looks good in gdb
 ;; when i uncomment the crashing line to enter gdb.
 
-;; TODO this started to sigsegv for me. due to stricter ASLR on a new kernel?
+;; NOTE stricter ASLR on newer kernels will make this sigsegv, unless disabled
 
 (assemble '(
 	(movlIR	4 _EAX)				; write
@@ -189,11 +192,11 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 
 (println "calling it, output should follow")
 
-(define-function buffer->fn (buf)
+(define-function buffer->function (buf)
   (make <target-function>
     (program-code	(<buffer>-elements buf))))
 
-(call-IA-32-machine-code (buffer->fn code))
+(call-IA-32-machine-code (buffer->function asm-buffer))
 
 (assemble '(
 	(movlIR	4 _EAX)				; write
@@ -209,6 +212,6 @@ msg	(.ascii	"*** You may run ./a.out now for a friendly greeting\n")
 
 (println "calling it, output should follow")
 
-(call-IA-32-machine-code (buffer->fn code))
+(call-IA-32-machine-code (buffer->function asm-buffer))
 
 (println "it shouldn't have returned!!!")
