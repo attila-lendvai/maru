@@ -21,6 +21,10 @@
 # the makefile parallelism is mostly only between the backends. don't use it
 # while bootstrapping all the way from a bottom stage, it's broken somewhere.
 
+# The tee redirect stuff needs something better than Dash (which is
+# the default in Ubuntu in the CI).
+# SHELL := $(shell command -v bash)
+
 ##
 ## configuration
 ##
@@ -41,7 +45,8 @@ ifeq ($(HOST_OS),Linux)
   LLVM_VERSION	=
   TARGET_VENDOR	?= linux
   TARGET_OS	?= gnu
-  TIME		= time --format='\n$(GREEN)user time: %U$(RESET)\n'
+  # `command time` forces bash to use the external time command
+  TIME		= command time --format='\n$(GREEN)user time: %U$(RESET)\n'
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
   TARGET_VENDOR	?= apple
@@ -64,8 +69,9 @@ ifeq ($(PLATFORM),linux)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
 
-# setarch --addr-no-randomize improves debuggability of lowlevel issues
-EVAL_WRAPPER	= setarch --addr-no-randomize $(TIME)
+# setarch --addr-no-randomize improves debuggability of lowlevel
+# issues (but it's problematic in containers/CI).
+EVAL_WRAPPER	:= $(shell setarch --addr-no-randomize true 2>/dev/null && echo "setarch --addr-no-randomize $(TIME)")
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
@@ -376,8 +382,9 @@ define compile-x86
 	$(EMIT_FILES_x86)							\
 	$(3)									\
 	source/emit-finish.l							\
-	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
+#	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 
 define compile-llvm
   $(EVAL_WRAPPER) $(2) $(PROFILER_ARG) -O $(VERBOSITY)				\
@@ -396,8 +403,9 @@ define compile-llvm
 	$(EMIT_FILES_llvm)							\
 	$(3)									\
 	source/emit-finish.l							\
-	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
+#	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 
 # This "function" is useful when you need an eval executable, but you don't want to
 # have it rebuilt each time when you are working on e.g. the compiler.
