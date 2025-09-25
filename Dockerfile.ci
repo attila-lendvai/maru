@@ -1,0 +1,22 @@
+FROM docker.io/ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bash \
+        build-essential \
+        make \
+        llvm \
+        clang \
+        gcc-multilib \
+        libc6-dev-i386 \
+        git \
+        time \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure bash is the default shell
+# SHELL ["/bin/bash", "-c"]
+
+WORKDIR /workspace

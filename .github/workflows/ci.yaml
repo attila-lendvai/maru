@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - maru.10
+  pull_request:
+    branches:
+      - maru.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/attila-lendvai/maru-ci:latest
+      options: --init
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Calm down Git
+      run: git config --global --add safe.directory /__w/maru/maru
+
+    - name: make PLATFORM=libc test-bootstrap
+      run: make PLATFORM=libc test-bootstrap || true
+
+    - name: make PLATFORM=linux test-bootstrap
+      run: make PLATFORM=linux test-bootstrap
+
+    - name: make test-evaluator
+      run: make test-evaluator
+
+    - name: make test-parser
+      run: make test-parser
+
+    - name: make PROFILER=1 test-bootstrap-llvm
+      run: make PROFILER=1 test-bootstrap-llvm
+
+    - name: make PLATFORM=linux test-elf-llvm
+      run: make PLATFORM=linux test-elf-llvm
