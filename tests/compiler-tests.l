@@ -11,18 +11,21 @@
 
 (switch-to-target-env)
 
+;;(define gc/let* let*)
+
 ;; (load "source/platforms/linux/linux.l")
 
 (load "source/platforms/libc/libc.l")
 
+;;(load "source/debug-min.l")
 (load "source/evaluator/vm-early.l")
 
 ;; turn off some stuff that would bring in more dependencies
 (define-form assert (test . args) ())
 (define-function error-prologue ()
-  (platform/print-diag "\nERROR: "))
+  (platform/diag-print "\nERROR: "))
 (define-function %error (arg)
-  (platform/print-diag "%error reached"))
+  (platform/diag-print "%error reached"))
 
 (load "source/evaluator/gc.l")
 (load "source/evaluator/types.l")
@@ -44,7 +47,7 @@
   (push *tests* name)
   (let ((name-as-string (symbol->string name)))
     `(define-function ,name ()
-       (platform/print-diag* ,(concat-strings name-as-string ", "))
+       (platform/diag-print ,(concat-strings name-as-string ", "))
        (let ((expected ,expected-value)
              (actual ,form))
          (if (not (= actual expected))
@@ -562,9 +565,9 @@
 ;;   (+ 3 5))
 
 (define-function main (argc argv)
-  (platform/print-diag "Printing test command line args:\n")
+  (platform/diag-print "Printing test command line args:\n")
   (for (i 0 argc)
-    (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
+       (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
 
   (let ((idx argc))
     (while (< 0 (set idx (- idx 1)))
