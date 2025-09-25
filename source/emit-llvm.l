@@ -49,12 +49,14 @@
         '((int			i32)
           (long			i32)
           (unsigned-long	i32)
-          (size_t		i32)))
+          (size_t		i32)
+          (off_t		i32)))
        (64
         '((int			i32)
           (long			i64)
           (unsigned-long	i64)
-          (size_t		i64)))
+          (size_t		i64)
+          (off_t		i64)))
        (else
         (error "unexpected word size in +word-size-in-bits+: "(target-value +word-size-in-bits+))))))
 

@@ -101,9 +101,10 @@
            (result	*current-break*))
        (assert (= ,size (- new-break *current-break*)))
        (set *current-break* new-break)
-       ;; KLUDGE make test-elf generates machine code and wants to call it...
+       ;; KLUDGE we make all allocated memory executable.
+       ;; `make test-elf` generates machine code and wants to call it...
        (linux-syscall linux/mprotect *initial-break*
                       (- *current-break* *initial-break*)
-                      (+ (+ linux/PROT_READ linux/PROT_WRITE)
+                      ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
                           linux/PROT_EXEC))
        result)))

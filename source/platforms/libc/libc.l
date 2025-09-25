@@ -18,9 +18,15 @@
   (size_t fwrite (* size_t size_t *)) (size_t fread (* size_t size_t *))
   (int chdir (*)) ;(* getcwd (* size_t))
   (size_t strlen (*)) (* strcpy (* *)) (* strncpy (* * size_t)) (int strcmp (* *)) (int strncmp (* * size_t)) (* strdup (*)) (unsigned-long strtoul (* * int)) (long strtol (* * int))
+  (int mprotect (* size_t int))
+  (* mmap (* size_t int int int off_t))
+  (long sysconf (int))
   )
 
-(define-constant libc/EOF -1)
+(define-constant libc/EOF			-1)
+(define-constant libc/MAP_FAILED		-1)
+(define-constant libc/MAP_PRIVATE		2)
+(define-constant libc/MAP_ANONYMOUS		0x20)
 
 ;;;
 ;;; Platform API implementation when running under libc.
@@ -74,3 +80,35 @@
 
 (define-form platform/acquire-memory (size)
   `(libc/malloc ,size))
+
+;; (define-form platform/acquire-memory (size)
+;;   ;; KLUDGE we should call: size_t pagesize = sysconf(_SC_PAGESIZE)
+;;   `(let* ((size/rounded (/ (+ ,size (- 0x1000 1)) ; round to page size
+;;                            0x1000))
+;;           (buf (libc/malloc size/rounded)))
+;;      (when (= 0 buf)
+;;        (platform/diag-print "malloc returned with NULL")
+;;        (platform/halt))
+;;      ;; KLUDGE we make all allocated memory executable.
+;;      ;; `make test-elf` generates machine code and wants to call it...
+;;      (unless (= 0 (libc/mprotect buf size/rounded
+;;                                  ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
+;;                                      linux/PROT_EXEC)))
+;;        (platform/diag-print "mprotect returned with non-zero")
+;;        (platform/halt))
+;;      buf))
+
+;; (define-form platform/acquire-memory (size)
+;;   ;; KLUDGE we should call: size_t pagesize = sysconf(_SC_PAGESIZE)
+;;   ;; KLUDGE we make all allocated memory executable.
+;;   ;; `make test-elf` generates machine code and wants to call it...
+;;   `(let ((buf (libc/mmap 0 (/ (+ ,size (- 0x1000 1)) ; round to page size
+;;                               0x1000)
+;;                          ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
+;;                              linux/PROT_EXEC)
+;;                          ,(+ libc/MAP_PRIVATE libc/MAP_ANONYMOUS)
+;;                          -1 0)))
+;;      (when (= buf libc/MAP_FAILED)
+;;        (platform/diag-print "mmap returned with MAP_FAILED")
+;;        (platform/halt))
+;;      buf))
