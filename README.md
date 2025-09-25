@@ -206,7 +206,7 @@ new features. Some that are worth mentioning:
     implementing `car` in `eval.l` is now called `car`). This paves the way for
     metacircularity: to be able to "bring alive" the evaluator by loading it
     verbatim into another instance of itself (as opposed to compiling it to
-    machine code and giving it to a CPU to bring it alive).
+    machine code and giving it to a CPU to animate it).
 
   - The addition of an LLVM backend.
 

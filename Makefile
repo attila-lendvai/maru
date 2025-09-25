@@ -490,7 +490,7 @@ run-x86: $(BUILD_x86)/eval1
 run-llvm: $(BUILD_llvm)/eval1
 	rlwrap --no-warning $(BUILD_llvm)/eval1 boot.l -
 
-test: test-evaluator test-bootstrap test-parser test-elf
+test: test-evaluator test-bootstrap test-parser test-elf-llvm
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 
