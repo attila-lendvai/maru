@@ -59,7 +59,7 @@ endif
 # if you want to use the perf tool to profile the binary then also
 # include -g and the rest. -O3 may remain.
 CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
-CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie
+CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie,--build-id=none
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
 ifeq ($(PLATFORM),linux)
