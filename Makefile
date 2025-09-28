@@ -59,7 +59,18 @@ endif
 # if you want to use the perf tool to profile the binary then also
 # include -g and the rest. -O3 may remain.
 CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
-CFLAGS_x86	+= $(CFLAGS) -Wl,-T,tools-for-build/linker-script.ld,-no-pie,--build-id=none
+
+# Some hardened kernels need a linker script that makes the .text
+# section writable, so that relocation of non-PIC code can happen (our
+# generated assembly is not PIC as of this writing). This hapened on
+# Guix, but it's typically not the case in containers, like in the
+# CI. But this linker script can derail the setup of the stack (or
+# something like that, ask an LLM), which then leads to a sigsegv at
+# 0x0 very early at start.  CFLAGS_x86 += $(CFLAGS)
+# -Wl,-T,tools-for-build/linker-script.ld
+CFLAGS_x86	+= $(CFLAGS) -fPIE -Wl,-pie
+CFLAGS_x86	+= $(CFLAGS) -Wl,--build-id=none
+
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
 ifeq ($(PLATFORM),linux)
