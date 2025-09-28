@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - maru.10
+      - staging
   pull_request:
     branches:
       - maru.10
@@ -16,28 +17,21 @@ jobs:
       options: --init
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Calm down Git
+        run: git config --global --add safe.directory /__w/maru/maru
 
-    - name: Calm down Git
-      run: git config --global --add safe.directory /__w/maru/maru
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    - name: make PLATFORM=libc test-bootstrap
-      run: make PLATFORM=libc test-bootstrap || true
+      - run:  make PLATFORM=libc  test-bootstrap
+      - run:  make PLATFORM=linux test-bootstrap
 
-    - name: make PLATFORM=linux test-bootstrap
-      run: make PLATFORM=linux test-bootstrap
+      - run:  make PROFILER=1 PLATFORM=libc  test-bootstrap
 
-    - name: make test-evaluator
-      run: make test-evaluator
+      - run:  make test-evaluator
+      - run:  make test-parser
 
-    - name: make test-parser
-      run: make test-parser
-
-    - name: make PROFILER=1 test-bootstrap-llvm
-      run: make PROFILER=1 test-bootstrap-llvm
-
-    - name: make PLATFORM=linux test-elf-llvm
-      run: make PLATFORM=linux test-elf-llvm
+      - run:  make PLATFORM=linux test-elf-llvm
+      - run:  make PLATFORM=linux test-elf-x86
