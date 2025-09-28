@@ -189,7 +189,7 @@ code-segment-start
 
 ro-data-segment-start
 msg
-    (.ascii	"Hello, world! From an elf binary!\n")
+    (.ascii	"Hello, world! From an ELF64 binary!\n")
     (.def	msglen (- $ msg))
     (.def	ro-data-segment-size (- $ ro-data-segment-start))
 
@@ -198,9 +198,9 @@ exit-code
     (.i64	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(print "writing test-elf buffer to ")
+(print "writing elf buffer to ")
 
-(buffer-save asm-buffer (println "./build/test-elf"))
+(buffer-save asm-buffer (println "./build/test-elf.x86-64"))
 
 (assemble '(
 	(movqIR	1 _RAX)				; write (syscall #1)
@@ -214,7 +214,7 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 
 (print "writing runtime buffer to ")
 
-(buffer-save asm-buffer (println "./build/runtime-buffer"))
+(buffer-save asm-buffer (println "./build/runtime-buffer.x86-64"))
 
 (println "calling memory buffer, output should follow")
 
@@ -233,7 +233,7 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(movqIR	60 _RAX)			; exit
 	(movqIR	0 _RDI)				; status
 	(syscall)
-msg	(.ascii	"*** You may run ./build/test-elf now for a friendly greeting\n")
+msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 
 (println "calling it, output should follow")

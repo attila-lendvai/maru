@@ -157,7 +157,7 @@ code-segment-start
     ;; (.align 1234) ; to test that it still works with a random offset added
 ro-data-segment-start
 msg
-    (.ascii	"Hello, world! From an elf binary!\n")
+    (.ascii	"Hello, world! From an ELF32 binary!\n")
     (.def	msglen (- $ msg))
     (.def	ro-data-segment-size (- $ ro-data-segment-start))
 
@@ -166,9 +166,9 @@ var
     (.i32	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(print "writing buffer to ")
+(print "writing elf buffer to ")
 
-(buffer-save asm-buffer (println "./build/test-elf"))
+(buffer-save asm-buffer (println "./build/test-elf.IA-32"))
 
 ;; for details on int 0x80 and syscall see:
 ;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
@@ -190,7 +190,11 @@ var
 msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
-(println "calling it, output should follow")
+(print "writing runtime buffer to ")
+
+(buffer-save asm-buffer (println "./build/runtime-buffer.IA-32"))
+
+(println "calling memory buffer, output should follow")
 
 (define-function buffer->function (buf)
   (make <target-function>
@@ -207,7 +211,7 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(movlIR	1 _EAX)				; exit
 	(movlIR	0 _EBX)				; status
 	(int	0x80)
-msg	(.ascii	"*** You may run ./a.out now for a friendly greeting\n")
+msg	(.ascii	"*** You may run ./build/test-elf.IA-32 now for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 
 (println "calling it, output should follow")

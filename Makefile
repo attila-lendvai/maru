@@ -553,9 +553,9 @@ test-elf-x86: eval-x86 tests/test-elf.IA-32.l source/assembler/assembler.IA-32.l
 # make PLATFORM=linux test-elf-llvm
 test-elf-llvm: eval-llvm tests/test-elf.x86-64.l source/assembler/assembler.IA-32.l
 	./eval-llvm boot.l tests/test-elf.x86-64.l
-	@chmod +x build/test-elf
-	-readelf -el build/test-elf
-	./build/test-elf
+	@chmod +x build/test-elf.x86-64
+	-readelf -el build/test-elf.x86-64
+	./build/test-elf.x86-64
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l
