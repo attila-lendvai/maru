@@ -40,19 +40,28 @@ TARGET_CPU	?= $(shell uname -m)
 PLATFORM	?= libc
 VERBOSITY	?= -v #-v -v
 
+# see https://stackoverflow.com/a/20983251/14464
+RED		= $(shell tput setaf 1)
+GREEN		= $(shell tput setaf 2)
+BLUE		= $(shell tput setaf 4)
+RESET		= $(shell tput sgr0)
+
 ifeq ($(HOST_OS),Linux)
 #  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
   LLVM_VERSION	=
   TARGET_VENDOR	?= linux
   TARGET_OS	?= gnu
   # `command time` forces bash to use the external time command
-  TIME		= command time --format='\n$(GREEN)user time: %U$(RESET)\n'
+  # setarch --addr-no-randomize improves debuggability of lowlevel
+  # issues (but it's problematic in containers/CI).
+  TIME		= time --format="\n$(GREEN)user time: %U$(RESET)\n"
+  EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
   TARGET_VENDOR	?= apple
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
-  TIME		= time
+  EVAL_WRAPPER	:= time
 endif
 
 CFLAGS		+= -O3
@@ -68,10 +77,6 @@ ifeq ($(PLATFORM),linux)
 # reference (clang -m32 inserts to a dangling /gnu/store reference)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
-
-# setarch --addr-no-randomize improves debuggability of lowlevel
-# issues (but it's problematic in containers/CI).
-EVAL_WRAPPER	:= $(shell setarch --addr-no-randomize true 2>/dev/null && echo "setarch --addr-no-randomize $(TIME)")
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
@@ -120,12 +125,6 @@ else ifeq ($(TARGET_CPU_llvm),i686)
 else
   $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
-
-# see https://stackoverflow.com/a/20983251/14464
-RED		= $(shell tput setaf 1)
-GREEN		= $(shell tput setaf 2)
-BLUE		= $(shell tput setaf 4)
-RESET		= $(shell tput sgr0)
 
 BACKDATE_FILE	= touch -t 200012312359
 
@@ -299,7 +298,7 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
+	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
@@ -320,7 +319,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
+	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		source/bootstrapping/prepare.l					\
@@ -419,7 +418,7 @@ endef
 $(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/gen-peg.l source/parsing/parser.l source/parsing/peg-compiler.l
 	@mkdir -p $(BUILD)/generated
 #	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/gen-peg.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
@@ -432,7 +431,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 $(BUILD)/generated/asm-x86.l: $(GEN_EVAL) source/assembler/gen-asm-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compiler.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
 #	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-asm-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
@@ -539,7 +538,7 @@ test-elf: eval-x86 tests/test-elf.l source/assembler/asm-common.l source/assembl
 
 tests/parsing/%.g.l: tests/parsing/%.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l
 #	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
