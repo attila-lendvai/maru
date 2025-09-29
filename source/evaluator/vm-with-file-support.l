@@ -31,30 +31,30 @@
   (initialize-stream err-handle	*error-output*)
   (initialize-stream err-handle	*debug-output*))
 
-(define-function repl-stream (stream)
-  ;;(set (global-variable-value *maru* *input* <target-pointer>) stream)
-  (safety 1 (assert (gc/valid-maru-value? stream)))
-  (let ((stdin?	(= *standard-input* stream)))
-    ;; (unless stdin?
-    ;;   (let ((libc-handle (unbox <target-pointer> (<libc-stream>-handle stream))))
-    ;;     (libc/fscanf libc-handle "#!%*[^\x0a\x0d]"))) ; drop the possible #!./eval first line of the file
-    (gc/let* ((res ()))
-      (while (let ()
-               (when stdin?
-                 ;; ($put *standard-output* "maru> ") ;; TODO fix the compiler for this
-                 ($put *standard-output* ?.)
-                 (platform/flush-streams))
-               (and (not (= +end+ (set res (read stream))))
-                    (not ($at-end? stream))))
-        (unless (= +end+ res)
-          (set res (expand-encode-eval res))
-          (when stdin?
-            (do-print *standard-output* res false)
-            ($put *standard-output* ?\n)
-            (platform/flush-streams))))
-      (when stdin?
-        ($put-all *standard-output* "\nmorituri te salutant\n"))
-      res)))
+(define-primitive-function repl-stream ((input _ *standard-input*)
+                                        (output _ *standard-output*)
+                                        (interactive? _ true))
+  (safety 1 (assert (gc/valid-maru-value? input) (gc/valid-maru-value? output)))
+  ;; This won't work as-is now that we have a linux platform where
+  ;; there's no fscanf and the streams are not of type <libc-stream>...
+  ;; (unless interactive?
+  ;;   (let ((libc-handle (unbox <target-pointer> (<libc-stream>-handle input))))
+  ;;     (libc/fscanf libc-handle "#!%*[^\x0a\x0d]"))) ; drop the possible #!./eval first line of the file
+  (gc/let* (res)
+    (while (let ()
+             (when interactive?
+               ($put-all output "maru> ")
+               (platform/flush-streams))
+             (not (= +end+ (set res (read input)))))
+      (unless (= +end+ res)
+        (set res (expand-encode-eval res))
+        (when interactive?
+          (do-print output res false)
+          ($put output ?\n)             ; newline
+          (platform/flush-streams))))
+    (when interactive?
+      ($put-all output "\nmorituri te salutant\n"))
+    res))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
@@ -125,7 +125,7 @@
 
               ;; -
               ((string= "-" arg)
-               (repl-stream *standard-input*))
+               (repl-stream *standard-input* *standard-output* true))
 
               ;; --call to call a function
               ((string= "--call" arg)
@@ -166,4 +166,4 @@
               (else
                (verbosity 1 (print-all *debug-output* "loading file: "arg"\t(as a CLA)\n"))
                (with-input-from-file (stream arg)
-                 (repl-stream stream))))))))))
+                 (repl-stream stream *standard-output* false))))))))))
