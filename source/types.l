@@ -363,7 +363,18 @@
 
 ;;; boxed type (i.e. a full object with a header)
 
-(define-record <boxed-type> <type> (one-word?))
+(define-record <boxed-type> <type>
+  ;; NOTE: it's possible to allocate heap objects of any length
+  ;; regardless of what the types says. so, it's possible to allocate
+  ;; a large opaque object, put <symbol> as its type, and memcpy a
+  ;; cstring into the payload.
+
+  ;; TODO this ONE-WORD? thing is silly. either rename to
+  ;; SINGLE-WORD?, or come up with some alternative that generalizes
+  ;; better. how could (box <some-boxed-type> payload) work for not a
+  ;; single word payload, but something longer that needs to be
+  ;; memcpy'd into the object's body?
+  (one-word?))
 
 (define-function new-<boxed-type> (name one-word?)
   (let ((type (new-type-instance name <boxed-type>)))

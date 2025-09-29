@@ -622,7 +622,6 @@
 ;; man's staged computation to speed up object emission.
 (define emit-object/header)
 (define emit-object/<string>)
-(define box-<long>)
 (define emit-object/<long>)
 (define emit-object/<target-function>)
 
@@ -640,36 +639,40 @@
            (canary-emitter)
            (print "}"))))
 
-  (set box-<long>
-       (eval `(lambda (val)
-                ,(expand '(box <long> val) *slave-env*))))
-
   (set emit-object/<long>
        (cond
          ((slave-value (is <immediate-type> <long>))
           (lambda (self -c-)
-            (box-<long> self)))
+            (eval-in-slave `(box <long> ,self))))
          ((slave-value (and (is <boxed-type> <long>)
                             (<boxed-type>-one-word? <long>)))
-          ;; TODO the "receiving place" of this value needs to be of the proper type
-          (error "TODO emit-object/<long> for boxed type")
-          ;; (lambda (self -c-)
-          ;;   (emit-object/header (slave-value (<type>-slave-id <long>))))
-          )
+          (let ((type-id (slave-value (<type>-slave-id <long>))))
+            (lambda (self -c-)
+              (let ((object-label	(GLOBAL (unique-name "olong"))))
+                ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+                (print object-label" = private unnamed_addr constant %\"<long-h>\" { ")
+                (emit-object/header type-id)
+                (print ", %\"<long>\" { %word "self" }}\n")
+                object-label))))
          (else
           (error "emit-object/<long>: unexpected slave representation for <long>"))))
 
   (set emit-object/<string>
-       (let ((type-id (slave-value (<type>-slave-id <string>))))
+       (let ((type-id (slave-value (<type>-slave-id <string>)))
+             (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
+                                       "%word" "%oop")))
          (lambda (self -c-)
            ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
            (let ((elements	(emit-object/C-string self -c-))
-                 (object-label	(GLOBAL (unique-name "ostr"))))
+                 (object-label	(GLOBAL (unique-name "ostr")))
+                 (size		(emit-object/<long> (string-length self) -c-)))
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
              (emit-object/header type-id)
-             (print ", %\"<string>\" { %word "(box-<long> (string-length self)))
-             (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "elements" to ptr) }}\n")
+             ;; FIXME this assumes that <long> is a tagged immediate
+             (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
+             (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
+                    elements" to ptr) }}\n")
              object-label))))
 
   (set emit-object/<target-function>
@@ -1238,17 +1241,18 @@
        ())
       ((slave-value (and (is <boxed-type> <long>)
                          (<boxed-type>-one-word? <long>)))
-       (error "TODO LLVM emit-object/<string> only supports immediate <long> representation for now")
-       (emit INLINE "%\"<long>\" = type { %\"<header>\", %word }\n"))
+       (emit INLINE
+             (list "%\"<long>\" = type { %word }\n"
+                   "%\"<long-h>\" = type { %\"<header>\", %\"<long>\" }\n")))
       (else
-       (error "LLVM emit-prelude: unexpected slave representation for <long>")))
+       (error "LLVM emit-prelude: unexpected representation for <long>")))
     (emit INLINE
-          (list
-           ;; TODO this should be type { %oop, ptr }, but that will
-           ;; involve shitloads of casting. also, it's only a %word when
-           ;; <long> is a tagged immediate.
-           "%\"<string>\" = type { %word, ptr }\n"
-           "%\"<string-h>\" = type { %\"<header>\", %\"<string>\" }\n"))
+          (list "%\"<string>\" = type { "
+                (if (slave-value (is <immediate-type> <long>))
+                    "%word"
+                  "%oop")
+                ", ptr }\n"
+                "%\"<string-h>\" = type { %\"<header>\", %\"<string>\" }\n"))
     (emit INLINE
           (list "%\"<target-function>\" = type { %oop "
                 (if (slave-value feature/track-expr-names)

@@ -58,7 +58,7 @@
         (else
          `(= ,type-name (type-of ,obj)))))))
 
-(define-function %allocate-boxed (type-id payload)
+(define-function %allocate-boxed-word (type-id payload)
   (let ((obj (gc/allocate-opaque type-id (words-to-bytes 1))))
     (set (oop-at obj 0) payload)
     obj))
@@ -68,7 +68,7 @@
     (cond
       ((is <boxed-type> type)
        (assert (<boxed-type>-one-word? (eval type-name)) "cannot know how to allocate a boxed type that is not one-word?")
-       `(%allocate-boxed ,type-name ,payload))
+       `(%allocate-boxed-word ,type-name ,payload))
       ((is <immediate-type> type)
        ;; TODO error when overflow
        `(bitwise-or (bitwise-shift ,payload ,(<immediate-type>-tag-width type))

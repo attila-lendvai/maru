@@ -418,7 +418,6 @@
 ;; man's staged computation to speed up object emission.
 (define emit-object/header)
 (define emit-object/<string>)
-(define box-<long>)
 (define emit-object/<long>)
 (define emit-object/<target-function>)
 
@@ -454,28 +453,24 @@
            ; the object pointer points here
            )))
 
-  (set box-<long>
-       (eval `(lambda (val)
-                ,(expand '(box <long> val) *slave-env*))))
-
   (set emit-object/<long>
        ;; TODO it should be something like: (target-value <string>). see others, too.
-       (let ((type-id (slave-value (<type>-slave-id <long>))))
-         (cond
-           ((slave-value (is <immediate-type> <long>))
-            (lambda (self -c-)
-              ;; instead of a label (a pointer) we return with an immediate tagged mword
-              (box-<long> self)))
-           ((slave-value (and (is <boxed-type> <long>)
-                              (<boxed-type>-one-word? <long>)))
+       (cond
+         ((slave-value (is <immediate-type> <long>))
+          (lambda (self -c-)
+            ;; instead of a label (a pointer) we return with an immediate tagged mword
+            (eval-in-slave `(box <long> ,self))))
+         ((slave-value (and (is <boxed-type> <long>)
+                            (<boxed-type>-one-word? <long>)))
+          (let ((type-id (slave-value (<type>-slave-id <long>))))
             (lambda (self -c-)
               (emit-object/header <long> type-id)
               (let ((object-label (UNIQUE-LABEL "olong")))
                 (emit DEFLABEL object-label)
                 (emit LONG self)
-                object-label)))
-           (else
-            (error "emit-object/<long>: unexpected slave representation for <long>")))))
+                object-label))))
+         (else
+          (error "emit-object/<long>: unexpected slave representation for <long>"))))
 
   (set emit-object/<string>
        (let ((type-id (slave-value (<type>-slave-id <string>))))
