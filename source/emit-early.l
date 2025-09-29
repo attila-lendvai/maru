@@ -12,6 +12,7 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
+;; TODO shouldn't these be in the slave? or maybe even in the target (it's a form, i.e. not emitted)
 (define-constant feature/redefinable-functions-in-target ()) ; costs about 20-30% time increase in the bootstrap process
 (define-constant feature/strict-semantics-for-compiled-set true) ; compiled set-oop-at & co. also returns the value that was just set
 
@@ -272,7 +273,8 @@
 ;; level-shifted (compiled). *slave-env* (*globals* here) will be the
 ;; parent of *target-env*, therefore all <form>'s that are defined in
 ;; *slave-env* are available "in" the *target-env*.
-(define *target-env* (environment *globals*))
+(assert (= *slave-env* *globals*))
+(define *target-env* (environment *slave-env*))
 
 (when-at-expand feature/debug-info
   (eval-in-host `(set (<env>-name ,*target-env*) "target")))

@@ -27,7 +27,7 @@
                            420          ; "rw-r--r--"
                            )))
     (when (<= 0 fd)
-      ;; TODO use <target-word>
+      ;; TODO use <target-word> for boxing and unboxing
       (box <target-pointer> fd))))
 
 (define-primitive-function file-close ((fd <target-pointer>))
@@ -74,7 +74,7 @@
              (rc	(linux-syscall linux/read fd (address-of char) 1)))
         (set (<fd-stream>-peeked-value stream)
              (if (= 1 rc)
-                 char
+                 char ; FIXME needs to be boxed, no?
                -1)))))
 
 (define-method $at-end? <fd-stream> ()

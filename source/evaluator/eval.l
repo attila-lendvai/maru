@@ -424,7 +424,7 @@
                    (array-at it type))
              (gc/let* ((args (cons fun arguments)))
                (apply it args ctx))
-           (error "cannot apply: "fun", *globals*: "*globals*", *applicators* is: "
+           (error "cannot apply: "fun" of type: "(box <long> type)", *globals*: "*globals*", *applicators* is: "
                   (and *applicators-var* (<variable>-value *applicators-var*)))))))))
 
 (define-primitive-function (apply ()) (fn args)
@@ -660,6 +660,8 @@
       ((= head fixed-primitive-function/lambda)
        (let ((args (first tail)))
          (unless (is <env> args)
+           ;; We're crossing a closure boundary, so increase level by
+           ;; 1, and restart at offset 0.
            (gc/let* ((inner-env (environment env 1 0)))
              (while (pair? args)
                (environment-define inner-env (get/head args) ())

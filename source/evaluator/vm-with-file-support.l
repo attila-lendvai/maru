@@ -21,9 +21,11 @@
           tmp)))
 
 (define-function initialize-streams (in-handle out-handle err-handle)
-  ;; NOTE a WITH-FORMS is tempting here, but the body of WITH-FORMS'
-  ;; are not executed in the syntax module.
+  ;; NOTE: a WITH-FORMS is tempting here, but the body of WITH-FORMS'
+  ;; is not executed in the right env. years later: not sure what that
+  ;; means, but a WITH-FORMS indeed seems to lead to a backtrace.
   ;; TODO rename to *input*?
+  ;; TODO do we need a *debug-input*?
   (initialize-stream in-handle	*standard-input*)
   (initialize-stream out-handle	*standard-output*)
   (initialize-stream err-handle	*error-output*)
@@ -96,14 +98,18 @@
               ;; -v
               ((string= "-v" arg)
                (incr *verbosity*)
-               ;; KLUDGE propagate the value by hand into the evaluator
+               ;; KLUDGE propagate the value from the target up into
+               ;; the evaluator by hand. ideally this should be done
+               ;; automatically.
                (set tmp (box <long> *verbosity*))
                (set (global-variable-value *maru* symbol/*verbosity*) tmp))
 
               ;; -O
               ((string= "-O" arg)
                (incr *optimised*)
-               ;; KLUDGE propagate the value by hand into the evaluator
+               ;; KLUDGE propagate the value from the target up into
+               ;; the evaluator by hand. ideally this should be done
+               ;; automatically.
                (set tmp (box <long> *optimised*))
                (set (global-variable-value *maru* symbol/*optimised*) tmp))
 

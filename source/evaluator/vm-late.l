@@ -29,7 +29,9 @@
             *primitive-function-registry*)))
 
 (define-function populate-env-with-maru-primitives (env)
-  (debug-print "populate-env-with-maru-primitives for env "env)
+  (debug (platform/diag-print "populate-env-with-maru-primitives"))
+  ;; TODO why did this ever work this early?! or it never worked?
+  ;; (debug-print "populate-env-with-maru-primitives for env "env)
   (gc/let* ((tmp))
     (set tmp (box <long> *verbosity*)) (environment-define env symbol/*verbosity* tmp)
     (set tmp (box <long> *optimised*)) (environment-define env symbol/*optimised* tmp)

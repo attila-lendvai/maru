@@ -90,6 +90,7 @@
 (define *initial-break* 0)
 (define *current-break* 0)
 
+;; TODO how come this cannot be a define-function? investigate and then fix or explain
 (define-form platform/acquire-memory (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
   ;; TODO this really should be a function, but we don't yet have ERROR and ASSERT at this point

@@ -11,7 +11,9 @@
     (box <target-pointer> it)))
 
 (define-primitive-function file-close ((handle <target-pointer> _ nounbox))
-  ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
+  ;; NOUNBOX because it is called from many places from inside the
+  ;; target, i.e. they all would need to box it, because the auto
+  ;; unboxing is only added to the /EVALUATOR-STUB.
   (when (= 0 (libc/fclose (unbox <target-pointer> handle)))
     symbol/true))
 
@@ -36,7 +38,6 @@
 (define-record <libc-stream> <stream> (handle))
 
 (define-primitive-function file-stream ((handle <target-pointer> _ nounbox))
-  (assert (is <target-pointer> handle))
   (make/opaque <libc-stream>
     (handle	(unbox <target-pointer> handle))))
 
@@ -56,11 +57,13 @@
         +end+
       result)))
 
-(define-method $put <libc-stream> (u/char)
-  (let ((result (libc/fputc u/char self.handle)))
+(define-method $put <libc-stream> (char)
+  ;; can't add an (assert (is <long> char)) because this is lowered
+  ;; into the target domain where the values are not boxed/tagged.
+  (let ((result (libc/fputc char self.handle)))
     (when (= result libc/EOF)
       (error "<libc-stream> $put: fputc returned with error"))
-    u/char))
+    char))
 
 ;; TODO implemenet inheritance on compiled selectors
 (define-method $put-all <libc-stream> (elements)

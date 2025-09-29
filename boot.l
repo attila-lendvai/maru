@@ -273,8 +273,8 @@
       (let* ((name    (first  binding))
              (fun     (second binding))
              (var     (third  binding))
-             ;; if we take the value of form now, then our expansion will not depend on the
-             ;; value of form in the current module. this is useful when bootstrapping.
+             ;; if we read/encode the value of FORM now, then our expansion will not depend on the
+             ;; value of FORM in the current module. this is useful when bootstrapping.
              (exp     (list form (make-with-form fun) (make-with-form var))))
         (environment-define env name (eval exp *env*))))
     `(let ()
