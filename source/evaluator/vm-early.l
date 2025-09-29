@@ -218,6 +218,8 @@
                  (unbox?	true)
                  default-value
                  default-value?)
+            (when (= '_ type)
+              (set type ()))
             (when (pair? entry)
               (set default-value (pop entry))
               (if (= '_ default-value)
