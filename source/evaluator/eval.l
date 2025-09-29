@@ -653,6 +653,10 @@
                    (set new-bindings/last (if new-bindings
                                               (put/tail new-bindings/last (cons new-entry ()))
                                             (set new-bindings (cons new-entry ())))))))
+             ;; in reverse, copy the offset to the inner-env now,
+             ;; because the init forms of our bindings may have
+             ;; defined new bindings. this fixes eval/closures/bug/1.
+             (set (<env>-offset inner-env) (<env>-offset env))
              (set tail (encode-all (cdr tail) inner-env)) ; encode the body
              (set tail (cons new-bindings tail))
              (set tail (cons inner-env tail))))))
