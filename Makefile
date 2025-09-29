@@ -41,19 +41,28 @@ TARGET_CPU	?= $(shell uname -m)
 PLATFORM	?= libc
 VERBOSITY	?= -v #-v -v
 
+# see https://stackoverflow.com/a/20983251/14464
+RED		= $(shell tput setaf 1)
+GREEN		= $(shell tput setaf 2)
+BLUE		= $(shell tput setaf 4)
+RESET		= $(shell tput sgr0)
+
 ifeq ($(HOST_OS),Linux)
 #  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
   LLVM_VERSION	=
   TARGET_VENDOR	?= linux
   TARGET_OS	?= gnu
   # `command time` forces bash to use the external time command
-  TIME		= command time --format='\n$(GREEN)user time: %U$(RESET)\n'
+  # setarch --addr-no-randomize improves debuggability of lowlevel
+  # issues (but it's problematic in containers/CI).
+  TIME		= time --format="\n$(GREEN)user time: %U$(RESET)\n"
+  EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
   TARGET_VENDOR	?= apple
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
-  TIME		= time
+  EVAL_WRAPPER	:= time
 endif
 
 # if you want to use the perf tool to profile the binary then also
@@ -80,10 +89,6 @@ ifeq ($(PLATFORM),linux)
 # reference (clang -m32 inserts to a dangling /gnu/store reference)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
-
-# setarch --addr-no-randomize improves debuggability of lowlevel
-# issues (but it's problematic in containers/CI).
-EVAL_WRAPPER	:= $(shell setarch --addr-no-randomize true 2>/dev/null && echo "setarch --addr-no-randomize $(TIME)")
 
 TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 
@@ -133,12 +138,6 @@ else ifeq ($(TARGET_CPU_llvm),i686)
 else
   $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
-
-# see https://stackoverflow.com/a/20983251/14464
-RED		= $(shell tput setaf 1)
-GREEN		= $(shell tput setaf 2)
-BLUE		= $(shell tput setaf 4)
-RESET		= $(shell tput sgr0)
 
 BACKDATE_FILE	= touch -t 200012312359
 
@@ -306,7 +305,7 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
+	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		--define *compiler-backend* 	"x86"				\
@@ -328,7 +327,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	$(TIME) $(HOST_DIR)/eval $(VERBOSITY)					\
+	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		--define *compiler-backend* 	"llvm"				\
@@ -426,7 +425,7 @@ endef
 ###
 $(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/bootstrap-peg-parser.l source/parsing/parser.l source/parsing/peg-compile-forms.l
 	@mkdir -p $(BUILD)/generated
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/bootstrap-peg-parser.l >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/bootstrap-peg-parser.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
@@ -435,7 +434,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 
 # compile *.g PEG rules into maru parser implementations
 %.g.l: %.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
-	$(TIME) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 ###
@@ -446,7 +445,7 @@ $(BUILD)/generated/assembler.IA-32.l: $(GEN_EVAL) source/assembler/gen-IA-32.l s
 # KLUDGE, gc/mark-and-sweep is not tailcall for now, so we need more stack space
 	ulimit -s unlimited
 #	$(call ensure-built,$(GEN_EVAL))
-	$(TIME) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-IA-32.l >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-IA-32.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
