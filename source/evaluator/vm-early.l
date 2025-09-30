@@ -187,12 +187,22 @@
 (define-function %too-many-arguments (name args)
   (error name": too many arguments: "args))
 
+;; defines a function that will be exposed to the VM. as such, it
+;; needs to do some conversion for the values that are crossing the
+;; boundary between the VM and the target domain.
 ;; TODO this is convoluted and needs better documentation
 (define-form define-primitive-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
   ;; ARGS: may be _ to skip arg parsing
   ;;       otherwise a list of entries like:
   ;;         (arg-name (or arg-type null) (or default-value _) . (properties: nounbox))
+  ;;
+  ;; it generates two functions: NAME and NAME/EVALUATOR-STUB. the
+  ;; latter does some extra to deal with the crossing of the boundary
+  ;; between the VM and the target domains.
+  ;;
+  ;; the function in the target domain does not do any magic, it's
+  ;; really just a plain ,@body.
   (set name-and-props (ensure-list name-and-props))
   (let ((prim-name	(pop name-and-props))
         impl-name
@@ -266,7 +276,7 @@
              (impl (when (and body
                               effective-impl-name)
                      `((define-function ,effective-impl-name ,arg-names
-                         ;; TODO (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
+                         ;; TODO add these: (safety 1 (assert (is <env> env) "environment-define: env is not of type <env>: "env))
                          ,@body)))))
         `(let ()
            ,@impl

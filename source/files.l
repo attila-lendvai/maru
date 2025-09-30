@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; TODO delme?
+
 ;; (define *load-path* ())
 
 ;; (when (= "-L" (car *command-line-arguments*))
@@ -17,9 +19,9 @@
 ;;       (p (at string i) f))
 ;;     (close f)))
 
+;; there's another impl in streams.l
 ;; (define-function contents-of-file-named (path)
-;;   (let ((file	(or (file-open-or-die path "r")
-;;                     (error "cannot open for reading: "path)))
+;;   (let ((file	(file-open-or-die path "r"))
 ;;         (res	(string))
 ;;         c)
 ;;     (while (set c (file-read-character file))

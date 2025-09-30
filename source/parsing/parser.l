@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; Stream parsing.
+
 (require "source/unit-test.l")
 (require "source/sequences.l")
 (require "source/conversion.l")

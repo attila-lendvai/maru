@@ -267,6 +267,10 @@
     `(lambda (*env* ,@(car args-and-body))
        ,@(cdr args-and-body))))
 
+;; (with-forms
+;;     ((fun1 ((arg1 arg2) . body))
+;;      (var1 (() ((var-name) . body))))
+;;   body)
 (define-form with-forms (bindings . body)
   (let ((env (environment *env*)))
     (list-do binding bindings

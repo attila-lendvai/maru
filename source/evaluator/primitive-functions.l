@@ -2,6 +2,8 @@
 
 (require "source/conversion-min.l")
 
+;; NOTE: not all of them are in this file.
+
 (define-primitive-function (define () fixed) ((variable <variable>) value-form)
   (let ((value (eval value-form -ctx-)))
     (set (<variable>-value variable) value)

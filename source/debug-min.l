@@ -33,9 +33,9 @@
 ;;    - or it must evaluate to a target <long> (i.e. untagged) (?)
 ;;
 
-;; NOTE: FATAL needs to be a form so that the platform primitive expands
-;; to a C-string compiler special form; i.e. no advanced facility is
-;; called while we are early in the init.
+;; NOTE: FATAL needs to be a form so that the platform primitive
+;; expands to a C-string compiler special form; i.e. it works without
+;; any advanced facility, e.g. while we are early in the init.
 
 (define-form platform/format forms
   ;; full syntax: (platform/format "literal" (string form2) (pointer

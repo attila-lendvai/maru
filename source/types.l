@@ -404,6 +404,9 @@
               `(slot-value ,type-name ,(car slots) ,var-name)))
           (make-instance-accessors var-name type-name (cdr slots)))))
 
+;; Bind symbol macros for each slot on VAR-NAME.SLOT-NAME.  TODO is
+;; this really what we want? instead of e.g. binding the slot names as
+;; local variables?
 (define-form with-instance-accessors (var-name type-name . body)
   (let ((accessors	())
         (super		(eval type-name *env*)))

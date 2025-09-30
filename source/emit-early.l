@@ -260,6 +260,8 @@
       (assert (is <env> ,*slave-env*))
       (assert (is <expr> ,eval-in-slave)))))
 
+;; TODO what about this? if it's retained, then audit the code for
+;; every usage of EVAL-IN-SLAVE...
 (define-form begin-for-syntax forms
   `(eval-in-slave '(let () ,@forms)))
 

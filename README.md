@@ -1,3 +1,5 @@
+[![CI](https://github.com/attila-lendvai/maru/actions/workflows/ci.yaml/badge.svg)](https://github.com/attila-lendvai/maru/actions/workflows/ci.yaml)
+
 # Maru
 
 ## What
@@ -149,39 +151,39 @@ repo and a maintainer to keep bitrot at bay.
 
 ## Contribution
 
-You are very welcome to contribute, but beware that until further notice
-**this repo will receive forced pushes** (i.e.
-**`git push -f`** rewriting git history (except the `piumarta` branch)). This will stop
-eventually when I settle with
-a build setup that nicely facilitates bootstrapping multiple, parallel paths of
-language development. Please make sure that you open a branch for your work,
-and/or that you are ready for some `git fetch` and `git rebase`.
+You are very welcome to contribute, but beware that short of any
+contributors **this repo receives forced pushes** every now and then
+(i.e.  **`git push -f`** rewriting git history (except the `piumarta`
+branch)). This will stop eventually when contributors show up, or I
+settle down with a build setup that nicely facilitates bootstrapping
+multiple, parallel paths of language development. Please make sure
+that you open a git branch for your work, and/or that you are ready
+for some `git fetch` and `git rebase`.
 
 ## Status
 
 ### Maru's status
 
-Backporting and bootstrapping the latest semantics from the `piumarta`
-branch is done: the `eval.l` in the latest branch of this repo should
-be semantically equivalent with the `eval.l` that resides in the
-`piumarta` branch, although, we have arrived to this state on two
-different paths:
+Backporting the latest semantics from the `piumarta` branch on top of
+the minimal version is done: the `eval.l` in the head of the `maru.3`
+branch should be semantically equivalent to the `eval.l` that resides
+in the `piumarta` branch, although, we have arrived to this state on
+two different paths:
 
   - Ian, while evolving Maru, kept his `eval.c` and `eval.l`
     semantically in sync
 
   - in contrast, I have bootstrapped the new features: I started out
-    from a minimal version of the `eval.l` + `eval.c` couple (the
+    from the minimal version of the `eval.l` + `eval.c` couple (the
     [original version](https://www.piumarta.com/software/maru/)
     published on Ian's website). Then I bootstrapped the features of
-    the later stages of `eval.l` using an earlier stage of itself. I
-    only use the 2300 LoC of throwaway C code as the initial stepping
-    stone in the bootstrap process, but once the first step is made
-    the C code is left behind.
+    the later versions of `eval.l` using an earlier version of
+    itself. This bootstrapping chain is formally implemented in the
+    build system. I only use the 2300 LoC of throwaway C code as the
+    initial stepping stone in the bootstrap process, but once the
+    first step is made the C code is left behind for good.
 
-There is one major bug left that I failed to fix while I was actively
-hacking on Maru. It's discussed in
-https://github.com/attila-lendvai/maru/issues/8.
+After that I started to further evolve Maru's implementation.
 
 ### Notable new features
 
@@ -193,9 +195,11 @@ new features. Some that are worth mentioning:
     that only uses Linux kernel
     [`syscalls`](https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux);
     From a practical perspective this is almost equivalent with
-    running directly on the bare metal (i.e. all dynamically allocated
-    memory needs to be managed by our own GC, all IO behind our own
-    abstractions, etc).
+    running directly on the bare metal, minus dealing with the
+    hardware drivers (i.e. all dynamically allocated memory needs to
+    be managed by our own GC, all IO behind our own abstractions,
+    etc). Other platforms: *libc* (functional), and *metacircular*
+    (only planned).
 
   - The host and the slave are isolated while bootstrapping which makes it possible to
     do things like reordering types (changing their type id in the target),
@@ -221,7 +225,8 @@ new features. Some that are worth mentioning:
 
   - Make Maru Scheme compatible, either by forking it, or by some sort
     of a compatibility layer that is loadable into vanilla Maru. Then
-    consider how that relates to [GNU Mes](https://www.gnu.org/software/mes/).
+    consider how that relates to [GNU Mes](https://www.gnu.org/software/mes/)
+    and the [bootstrappable.org](http://bootstrappable.org/) community.
 
   - Finish the proof of concept in `tests/test-elf.l` to compile the
     Linux plaform directly into an ELF binary. This would reduce the
