@@ -267,7 +267,6 @@
 ;;; create an empty env (stored in *target-env*) to hold the
 ;;; definitions that will be level-shifted to the target.
 ;;;
-(define primitive/eval eval) ; we will need to call the host's eval when starting the compiler
 
 ;; *target-env* will hold the definitions that need to be
 ;; level-shifted (compiled). *slave-env* (*globals* here) will be the
