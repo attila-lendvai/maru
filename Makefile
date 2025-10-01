@@ -118,9 +118,11 @@ TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
 TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
 ifeq ($(TARGET_CPU_llvm),x86_64)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/64bit-le
+  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 else ifeq ($(TARGET_CPU_llvm),i686)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/32bit-le
+  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
+else ifeq ($(TARGET_CPU_llvm),aarch64)
+  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 else
   $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
@@ -135,6 +137,7 @@ endif
 ifeq ($(TARGET_CPU_llvm),x86_64)
 else ifeq ($(TARGET_CPU_llvm),i686)
   CFLAGS_llvm	+= -m32
+else ifeq ($(TARGET_CPU_llvm),aarch64)
 else
   $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
