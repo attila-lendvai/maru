@@ -170,6 +170,10 @@
      (set arch		'IA-32)
      (set word-size	32))
 
+    (("aarch64")
+     (set arch		'aarch64)
+     (set word-size	64))
+
     (else
      (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
 

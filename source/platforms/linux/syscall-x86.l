@@ -2,7 +2,7 @@
 
 (define-emit    (LINUX-SYSCALL pair)
   (let ((args	$1)
-        (regs	+linux/syscall-registers/32+))
+        (regs	+linux/syscall/argument-registers/IA-32+))
     (while args
       (println "	movl	"(pop args)", %"(pop regs))))
   (println "	int	$0x80"))

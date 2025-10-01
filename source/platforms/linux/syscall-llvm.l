@@ -6,37 +6,40 @@
 (define-instruction LINUX-SYSCALL (() 1 t)
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
-   (println "	"$reg1" = call %oop asm sideeffect \"")
-   (let ((arg-index	1)
-         (clobbers	())
-         mov syscall regs arg-location)
+   (print "	"$reg1" = call %oop asm sideeffect \"") ; sideffect means: never optimize away
+   (let (syscall regs output clobbers)
      (case (slave-value +architecture+)
        (IA-32
-        (set mov	"	movl")
-        (set syscall	"	int	$$0x80")
-        (set arg-location ",m") ; not enough registers on i386, pass args on the stack
-        (set regs	+linux/syscall-registers/IA-32+))
-       (x86-64
-        (set mov	"	movq")
-        (set syscall	"	syscall")
-        (set arg-location ",r")
-        (set regs	+linux/syscall-registers/x86_64+)
+        ;; at most 6 args passed in regs. the rest should be spilled
+        ;; to the stack, but we don't support that.
+        (set syscall	"int	$$0x80")
+        (set regs	+linux/syscall/argument-registers/IA-32+)
         ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
         ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
-        ;; "The kernel destroys registers %rcx and %r11."
-        (set clobbers '("rcx" "r11")))
+        ;; On IA-32 "A" means the edx:eax pair used together to
+        ;; represent a 64-bit quantity. (i don't think we need that?)
+        ;;(set output "A")
+        (set output	"{eax}")
+        (set clobbers	+linux/syscall/clobbered-registers/IA-32+))
+       (x86-64
+        (set syscall	"syscall")
+        (set regs	+linux/syscall/argument-registers/x86_64+)
+        (set output	"{rax}")
+        (set clobbers	+linux/syscall/clobbered-registers/x86_64+))
+       (aarch64
+        (set syscall	"svc #0")
+        (set regs	+linux/syscall/argument-registers/aarch64+)
+        (set output	"{x0}")
+        (set clobbers	+linux/syscall/clobbered-registers/aarch64+))
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
-     (list-do _ $1
-       (let ((reg (pop regs)))
-         (push clobbers reg)
-         (println mov"	$"arg-index", %"reg)
-         (incr arg-index)))
+
      (println syscall"\", ")
-     (print "	\"=A")
-     (list-do _ $1
-       (print arg-location))
-     ;; list clobbered registers
+     (print "	\"="output)
+     (map (lambda (_ reg)
+            (assert reg)   ; this will fail for more args than regs.
+            (print ", {"reg"}"))
+          $1 regs)
      (while clobbers
        (print ",~{"(pop clobbers)"}"))
      ;; ~{memory} indicates that the assembly writes to arbitrary undeclared memory
