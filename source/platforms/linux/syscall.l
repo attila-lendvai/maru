@@ -1,8 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 ;; TODO these should be groveled automatically
-(define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
-(define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(rax rdi rsi rdx r10 r8 r9))))
+(define-constant +linux/syscall-registers/IA-32+   `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
+(define-constant +linux/syscall-registers/x86_64+  `(quote ,(map symbol->string '(rax rdi rsi rdx r10 r8 r9))))
 
 (eval-in-slave
  '(let ()

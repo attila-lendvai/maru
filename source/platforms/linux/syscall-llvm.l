@@ -15,17 +15,16 @@
         (set mov	"	movl")
         (set syscall	"	int	$$0x80")
         (set arg-location ",m") ; not enough registers on i386, pass args on the stack
-        (set regs	+linux/syscall-registers/32+))
+        (set regs	+linux/syscall-registers/IA-32+))
        (x86-64
         (set mov	"	movq")
         (set syscall	"	syscall")
         (set arg-location ",r")
-        (set regs	+linux/syscall-registers/64+)
+        (set regs	+linux/syscall-registers/x86_64+)
         ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
         ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
         ;; "The kernel destroys registers %rcx and %r11."
-        (push clobbers "rcx")
-        (push clobbers "r11"))
+        (set clobbers '("rcx" "r11")))
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
      (list-do _ $1
