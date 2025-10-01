@@ -5,6 +5,11 @@
 ;; let's declare a memset function because clang -O can emit
 ;; references to it (and memcpy and memmove) even with `clang
 ;; -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic`.
+
+;; So even if your handwritten code never mentions strlen, LLVM might:
+;;   - Recognize a simple string length loop in IR.
+;;   - Emit a call to strlen (libc function) during lowering to
+;;     AArch64 assembly/object code.
 (define *llvm-platform-specific-prelude*
   "
 define weak dso_local ptr @memset(ptr %dst, i32 %val, %word %len) {
@@ -25,6 +30,23 @@ store:
 
 exit:
   ret ptr %dst
+}
+
+define weak dso_local i64 @strlen(ptr %0) {
+  br label %2
+
+2:                                                ; preds = %2, %1
+  %3 = phi ptr [ %0, %1 ], [ %6, %2 ]
+  %4 = load i8, ptr %3
+  %5 = icmp eq i8 %4, 0
+  %6 = getelementptr i8, ptr %3, i64 1
+  br i1 %5, label %7, label %2
+
+7:                                                ; preds = %2
+  %8 = ptrtoint ptr %3 to i64
+  %9 = ptrtoint ptr %0 to i64
+  %10 = sub i64 %8, %9
+  ret i64 %10
 }
 ")
 
