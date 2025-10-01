@@ -1,0 +1,42 @@
+FROM docker.io/debian:unstable
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        clang-21 \
+        bash \
+        build-essential \
+        libffi-dev \
+        make \
+        llvm \
+        gdb \
+        git \
+        time \
+        ca-certificates \
+        less \
+        bash-completion \
+        nano \
+    # Conditional packages for x86
+    && if [ "$TARGETARCH" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 linux-headers-amd64; \
+    fi \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure bash is the default shell
+# SHELL ["/bin/bash", "-c"]
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100
+
+# Enable bash-completion for root
+RUN echo 'if [ -f /usr/share/bash-completion/bash_completion ]; then' >> /root/.bashrc \
+ && echo '  . /usr/share/bash-completion/bash_completion' >> /root/.bashrc \
+ && echo 'fi' >> /root/.bashrc >> /root/.bashrc
+
+# This is needed to avoid a git warning:
+# fatal: detected dubious ownership in repository at '/workspace'
+RUN git config --global --add safe.directory /workspace
+
+WORKDIR /workspace

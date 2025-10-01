@@ -9,11 +9,14 @@ RUN apt-get update && \
         make \
         llvm \
         clang \
-        gcc-multilib \
-        libc6-dev-i386 \
+        libffi-dev \
         git \
         time \
         ca-certificates \
+    # Conditional packages for x86
+    && if [ "$TARGETARCH" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure bash is the default shell
