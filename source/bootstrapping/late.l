@@ -3,6 +3,10 @@
 (define-form host-value (form)
   `(eval-in-host ',form))
 
+(define-form slave-repl ()
+  '(eval-in-slave
+    '(repl-stream)))
+
 (switch-to-host-env)
 
 (when-at-expand feature/debug-info

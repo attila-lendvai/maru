@@ -15,3 +15,7 @@
 (eval-in-host
  `(when-at-expand feature/debug-info
     (assert (= "slave" (<env>-name ,*globals*)))))
+
+(define-function repl-stream _
+  ;; just a stub
+  )
