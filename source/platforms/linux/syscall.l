@@ -1,0 +1,50 @@
+;;; -*- mode: lisp; coding: us-ascii -*-
+
+;; TODO these should be groveled automatically
+(define-constant +linux/syscall-registers/32+ `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
+(define-constant +linux/syscall-registers/64+ `(quote ,(map symbol->string '(rax rdi rsi rdx r10 r8 r9))))
+
+(eval-in-slave
+ '(let ()
+   (define-constant linux/O_RDONLY		0)
+   (define-constant linux/O_WRONLY		1)
+   (define-constant linux/O_RDWR		2)
+   (define-constant linux/O_CREAT		64)
+   (define-constant linux/PROT_READ		1)
+   (define-constant linux/PROT_WRITE		2)
+   (define-constant linux/PROT_EXEC		4)
+   (define-constant linux/SEEK_SET		0)
+   (define-constant linux/SEEK_CUR		1)
+   (define-constant linux/SEEK_END		2)
+   (define-constant linux/stdin			0)
+   (define-constant linux/stdout		1)
+   (define-constant linux/stderr		2)
+   (cond
+     ((= +architecture+ 'IA-32)
+      ;; less $(guix build linux-libre-headers)/include/asm/unistd_32.h
+      (define-constant linux/exit		1)
+      (define-constant linux/read		3)
+      (define-constant linux/write		4)
+      (define-constant linux/open		5)
+      (define-constant linux/close		6)
+      (define-constant linux/chdir		12)
+      (define-constant linux/lseek		19)
+      (define-constant linux/brk		45)
+      (define-constant linux/fsync		118)
+      (define-constant linux/mprotect		125)
+      )
+     ((= +architecture+ 'x86-64)
+      ;; less $(guix build linux-libre-headers)/include/asm/unistd_64.h
+      (define-constant linux/exit		60)
+      (define-constant linux/read		0)
+      (define-constant linux/write		1)
+      (define-constant linux/open		2)
+      (define-constant linux/close		3)
+      (define-constant linux/chdir		80)
+      (define-constant linux/lseek		8)
+      (define-constant linux/brk		12)
+      (define-constant linux/fsync		74)
+      (define-constant linux/mprotect		10)
+      ))))
+
+(load (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
