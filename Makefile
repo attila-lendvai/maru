@@ -78,8 +78,7 @@ ifeq ($(PLATFORM),linux)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
 
-TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
-
+TARGET_x86	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
@@ -104,17 +103,11 @@ MAKEFLAGS	+= --warn-undefined-variables --output-sync
 TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
 TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
-ifeq ($(TARGET_CPU_llvm),x86_64)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/64bit-le
-else ifeq ($(TARGET_CPU_llvm),i686)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/32bit-le
-else
-  $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
-endif
-
 ifeq ($(TARGET_CPU_x86),x86_64)
-else ifeq ($(TARGET_CPU_x86),i386)
+else ifeq ($(TARGET_CPU_x86),i686)
   CFLAGS_x86	+= -m32
+# KLUDGE will be dropped when make is replaced
+else ifeq ($(TARGET_CPU_x86),arm64)
 else
   $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
 endif
@@ -122,6 +115,8 @@ endif
 ifeq ($(TARGET_CPU_llvm),x86_64)
 else ifeq ($(TARGET_CPU_llvm),i686)
   CFLAGS_llvm	+= -m32
+else ifeq ($(TARGET_CPU_llvm),aarch64)
+else ifeq ($(TARGET_CPU_llvm),arm64)
 else
   $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
@@ -141,6 +136,7 @@ BUILD		= build
 
 BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
+BITCODE_DIR	= $(BUILD_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 
@@ -276,14 +272,14 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 		$(EVAL0_BINARY)
 
 # "forward" this target to the makefile, because this is typically used as EVAL0
-# $(EVAL0_DIR)/$(BUILD)/llvm-$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0: $(EVAL0_DIR)
+# $(EVAL0_DIR)/$(BUILD)/$(PLATFORM)/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0: $(EVAL0_DIR)
 # # NOTE linux platform on llvm is broken currently, so we fix the platform to libc
 # 	$(MAKE) --directory=$(EVAL0_DIR)		\
 # 		TARGET_CPU=i686				\
 # 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 # 		TARGET_OS=$(TARGET_OS)			\
 # 		PLATFORM=libc				\
-# 		$(BUILD)/llvm-libc/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
+# 		$(BUILD)/libc/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval0
 
 # eval0 is the first version of us that gets built by the compiler of
 # the host. this binary may be incomplete and/or differ from eval1,
@@ -456,7 +452,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 # generate different code. is it better or worse than clang's output?
 	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
-	objdump --disassemble $@ >$@.dis.s
+	objdump --disassemble $@ >$@.ll.s
 	@-$(STRIP) $@ -o $@.stripped
 #	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -S -o $@.clang.s $<
 #	$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
