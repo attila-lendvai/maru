@@ -1,7 +1,14 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (define-function compile-env (env -c-)
-  (verbosity 1 (warn "begin compiling\n"))
+  (verbosity 1
+    (warn "begin compiling\n\n")
+    (map (lambda (sym)
+           (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
+         '(+operating-system+ +architecture+ +little-endian?+
+           +word-size-in-bits+
+           oop/alignment-in-bytes oop/align-padding
+           oop/payload-mask oop/tag-mask)))
   (emit-comment
    0 "feature/profiler="(slave-value feature/profiler)", "
    "feature/track-expr-names="(slave-value feature/track-expr-names)", "
