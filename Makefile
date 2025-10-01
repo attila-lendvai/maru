@@ -91,8 +91,7 @@ CFLAGS_x86	+= $(CFLAGS) -fPIE
 
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
 
-TARGET_x86	= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
-
+TARGET_x86	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
@@ -118,19 +117,11 @@ MAKEFLAGS	+= --warn-undefined-variables --output-sync
 TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
 TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
 
-ifeq ($(TARGET_CPU_llvm),x86_64)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
-else ifeq ($(TARGET_CPU_llvm),i686)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
-else ifeq ($(TARGET_CPU_llvm),aarch64)
-  BITCODE_DIR		= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
-else
-  $(error "Couldn't extract the target's word size from TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
-endif
-
 ifeq ($(TARGET_CPU_x86),x86_64)
 else ifeq ($(TARGET_CPU_x86),i686)
   CFLAGS_x86	+= -m32
+# KLUDGE will be dropped when make is replaced
+else ifeq ($(TARGET_CPU_x86),arm64)
 else
   $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
 endif
@@ -139,6 +130,7 @@ ifeq ($(TARGET_CPU_llvm),x86_64)
 else ifeq ($(TARGET_CPU_llvm),i686)
   CFLAGS_llvm	+= -m32
 else ifeq ($(TARGET_CPU_llvm),aarch64)
+else ifeq ($(TARGET_CPU_llvm),arm64)
 else
   $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
 endif
@@ -162,6 +154,7 @@ BUILD		= build
 
 BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
 BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
+BITCODE_DIR	= $(BUILD_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 
@@ -476,7 +469,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
 	@$(call print_file_size,$@)
-	objdump --disassemble $@ >$@.dis.s
+	objdump --disassemble $@ >$@.ll.s
 	@-$(STRIP) $@ -o $@.stripped
 #	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -S -o $@.clang.s $<
 #	$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
