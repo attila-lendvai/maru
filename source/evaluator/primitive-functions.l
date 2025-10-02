@@ -189,7 +189,7 @@
                                 (unbox <long> rhs))
                              symbol/true))
       (<string>		(and (string? rhs)
-                             (= 0 (compare-strings lhs rhs))
+                             (= 0 (string-compare lhs rhs))
                              symbol/true))
       (else		(and (= lhs rhs)
                              symbol/true)))))
@@ -263,6 +263,8 @@
 
 (define-primitive-function (string-length ()) ((arg <string>))
   (<string>-size arg))
+
+(define-primitive-function (string-compare ()) ((s1 <string>) (s2 <string>)))
 
 (define-primitive-function (array-at ()) ((array <array>) (index <long>))
   (array-at array index))

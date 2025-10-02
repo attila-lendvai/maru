@@ -85,8 +85,8 @@
 ;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 
-(define-function compare-strings (str-a str-b)
-  (safety 2 (or (and (is <string> str-a) (is <string> str-b)) (fatal "compare-strings: called with non-string")))
+(define-function string-compare (str-a str-b)
+  (safety 2 (or (and (is <string> str-a) (is <string> str-b)) (fatal "string-compare: called with non-string")))
   (let* ((len-a	(string-length str-a))
          (len-b	(string-length str-b))
          (buf-a	(<string>-elements str-a))
@@ -113,7 +113,7 @@
 ;; retain a separate string=. alternatively, we could smarten up the
 ;; way `=` is compiled, but that would slow down every comparison.
 (define-function string= (a b)
-  (= 0 (compare-strings a b)))
+  (= 0 (string-compare a b)))
 
 ;; NOTE there's a variant of this in sequences.l, but it's not trivial to merge them.
 (define-function array-binary-search (array item comparator inserter)

@@ -200,7 +200,7 @@
   (array-binary-search *symbols*
                        str
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
-                         (compare-strings str (<symbol>-name candidate)))
+                         (string-compare str (<symbol>-name candidate)))
                        (lambda (array index str)
                          ;; TODO do we want to make a copy of str here? because str may be mutable...
                          ;; TODO instantiate a read-only string as the name
