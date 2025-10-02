@@ -292,7 +292,7 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 		TARGET_CPU=$(TARGET_CPU)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
-		PLATFORM=linux				\
+		PLATFORM=$(PLATFORM)			\
 		$(EVAL0_BINARY)
 
 # eval0 is the first version of us that gets built by the compiler of
