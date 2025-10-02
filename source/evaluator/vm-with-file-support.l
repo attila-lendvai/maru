@@ -104,6 +104,11 @@
                (set tmp (box <long> *verbosity*))
                (set (global-variable-value *maru* symbol/*verbosity*) tmp))
 
+              ((string= "-d" arg)
+               (if-at-expand feature/debug-output
+                   (set *debug-output-enabled?* true)
+                 (platform/diag-print "WARNING: FEATURE/DEBUG-OUTPUT was not enabled while compiling this build, ignoring -d\n")))
+
               ;; -O
               ((string= "-O" arg)
                (incr *optimised*)
