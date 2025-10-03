@@ -237,6 +237,7 @@
 #define   _Or_B(     OP,R                   ,B  )  (         _Or       (OP,R)                            ,_B(B))
 #define   _Or_W(     OP,R                   ,W  )  (         _Or       (OP,R)                            ,_W(W))
 #define   _Or_L(     OP,R                   ,L  )  (         _Or       (OP,R)                            ,_L(L))
+#define   _Or_Q(     OP,R                   ,Q  )  (         _Or       (OP,R)                            ,_Q(Q))
 #define   _O_Mrm(    OP  ,MO,R,M                )  (         _O        (OP  ),_Mrm(MO,R,M            )         )
 #define  _OO_Mrm(    OP  ,MO,R,M                )  (        _OO        (OP  ),_Mrm(MO,R,M            )         )
 #define   _O_Mrm_B(  OP  ,MO,R,M            ,B  )  (         _O        (OP  ),_Mrm(MO,R,M            ) ,_B(B))
@@ -1143,6 +1144,8 @@
 #define	ADDQir(I,R)		(_REX(1,0,0,R),	ADDLir(I,_r8(R)))
 #define	ADDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ADDLmr(D,_r8(B),_r8(I),S,_r8(R)))
 #define	ADDQrr(S,D)		(_REX(1,S,0,D),	ADDLrr(_r8(S),_r8(D)))
+#define	ADDQim(N,D,B,I,S)	(_REX(1,0,I,B), ADDLim(N,D,_r8(B),_r8(I),S))
+#define	ADDQrm(R,D,B,I,S)	(_REX(1,R,I,B), ADDLrm(_r8(R),D,_r8(B),_r8(I),S))
 
 #define CALLQr(R)		(_REX(0,R,0,0),	CALLr(_r8(R)))
 #define CALLQm(D,B,I,S)		(_REX(0,0,I,B),	CALLm(D,_r8(B),_r8(I),S))
@@ -1174,7 +1177,7 @@
 				 _L(((unsigned long)(I))>>32) )
 
 #define	MOVQim(N,D,B,I,S)	(_REX(1,0,I,B), MOVLim(N,D,_r8(B),_r8(I),S))
-#define	MOVQir(I,R)		(_REX(1,0,0,R), _O_Mrm_L(0xc7,_b11,_b000,_rN(_r8(R)),I))
+#define	MOVQir(I,R)		(_REX(1,0,0,R), _Or_Q(0xb8,_rN(_r8(R)),I))
 
 #define	MOVQrm(R,D,B,I,S)	(_REX(1,R,I,B), MOVLrm(_r8(R),D,_r8(B),_r8(I),S))
 #define	MOVQmr(D,B,I,S,R)	(_REX(1,R,I,B), MOVLmr(D,_r8(B),_r8(I),S,_r8(R)))
@@ -1201,3 +1204,5 @@
 #define TESTQrr(S,D)		(_REX(1,S,0,D), TESTLrr(_r8(S),_r8(D)))
 
 #define XORQrr(S,D)		(_REX(1,S,0,D), XORLrr(_r8(S),_r8(D)))
+
+#define SYSCALL()		(_W(0x050f))
