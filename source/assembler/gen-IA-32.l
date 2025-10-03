@@ -1,15 +1,9 @@
 ;;; -*- mode: fundamental; coding: us-ascii; tab-width: 8 -*-
 
-;;; Based on the Previous NEXT emulator:
-;;;   https://github.com/cebix/macemu/blob/master/BasiliskII/src/uae_cpu/compiler/codegen_x86.h
-;;;   https://unix.superglobalmegacorp.com/
-;;;   https://unix.superglobalmegacorp.com/previous/newsrc/src/cpu/jit/codegen_x86.h.html
-;;;   http://previous.unixdude.net/
-;;;   https://github.com/probonopd/previous/blob/master/src/cpu/jit/codegen_x86.h
-;;;
 ;;; Run-time assembler for IA-32 and AMD64
 ;;;
 ;;; This file is derived from CCG.
+;;;   https://pages.lip6.fr/vvm/projects_realizations/ccg/
 ;;;
 ;;; Copyright 1999, 2000, 2001, 2002, 2003 Ian Piumarta
 ;;;
@@ -31,6 +25,13 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+;; Further links:
+;;   https://github.com/cebix/macemu/blob/master/BasiliskII/src/uae_cpu/compiler/codegen_x86.h
+;;   https://unix.superglobalmegacorp.com/
+;;   https://unix.superglobalmegacorp.com/previous/newsrc/src/cpu/jit/codegen_x86.h.html
+;;   http://previous.unixdude.net/
+;;   https://github.com/probonopd/previous/blob/master/src/cpu/jit/codegen_x86.h
 
 (println
  ";;;
@@ -162,12 +163,21 @@
 
 /*** ASSEMBLER ***/
 
-#define _M(M)           (((M)>3) ? ASMFAIL("internal error: mod = " #M) : (M))
-#define _r(R)           (((R)>7) ? ASMFAIL("internal error: reg = " #R) : (R))
-#define _m(M)           (((M)>7) ? ASMFAIL("internal error: r/m = " #M) : (M))
-#define _s(S)           (((S)>3) ? ASMFAIL("internal error: memory scale = " #S) : (S))
-#define _i(I)           (((I)>7) ? ASMFAIL("internal error: memory index = " #I) : (I))
-#define _b(B)           (((B)>7) ? ASMFAIL("internal error: memory base = "  #B) : (B))
+/* #if (_ASM_SAFETY==0)
+# define _M(M)		(M)
+# define _r(R)		(R)
+# define _m(M)		(M)
+# define _s(S)		(S)
+# define _i(I)		(I)
+# define _b(B)		(B)
+#else */
+# define _M(M)		(((M)>3) ? ASMFAIL("internal error: mod = " #M) : (M))
+# define _r(R)		(((R)>7) ? ASMFAIL("internal error: reg = " #R) : (R))
+# define _m(M)		(((M)>7) ? ASMFAIL("internal error: r/m = " #M) : (M))
+# define _s(S)		(((S)>3) ? ASMFAIL("internal error: memory scale = " #S) : (S))
+# define _i(I)		(((I)>7) ? ASMFAIL("internal error: memory index = " #I) : (I))
+# define _b(B)		(((B)>7) ? ASMFAIL("internal error: memory base = "  #B) : (B))
+/* #endif */
 
 #define _Mrm(Md,R,M)  _B((_M(Md)<<6)|(_r(R)<<3)|_m(M))
 #define _SIB(Sc,I, B) _B((_s(Sc)<<6)|(_i(I)<<3)|_b(B))
@@ -364,15 +374,46 @@
 #define BTSLrm(RS,MD,MB,MI,MS)          _OO_r_X         (0x0fab              ,_r4(RS)           ,MD,MB,MI,MS            )
 
 
-#define CALLm(MD,MB,MI,MS)              ((_r0P(MB) && _r0P(MI)) ? _O_D4 (0xe8              ,(MD)                   ) : \
-                                          ((            _r0P(MI)) ? _O_Mrm(0xff,_b11,_b010,_r4    (MB)               ) : \
-                                                                    _O_r_X(0xff,     _b010   ,(MD),MB,MI,MS)         ))
+#define CALLr(RD)			_O_Mrm		(0xff		,_b11,_b010  ,_r4(RD))
+
+#define CALLm(MD,MB,MI,MS)		((_r0P(MB) && _r0P(MI)) ? _O_D4 (0xe8			,MD		) : \
+								  _O_r_X(0xff,     _b010	,MD,MB,MI,MS)	)
 
 #define CBW()                           _O              (0x98                                                           )
 #define CLC()                           _O              (0xf8                                                           )
 #define CLTD()                          _O              (0x99                                                           )
 #define CMC()                           _O              (0xf5                                                           )
 
+#define CMOVCCLirr(CC, RS, RD)		_OO_Mrm		(0x0f40|(CC)	,_b11,_r4(RD),_r4(RS)				)
+
+#define CMOVOLrr(RS, RD)		CMOVCCLirr(0x0,RS,RD)
+#define CMOVNOLrr(RS, RD)		CMOVCCLirr(0x1,RS,RD)
+#define CMOVBLrr(RS, RD)		CMOVCCLirr(0x2,RS,RD)
+#define CMOVNAELrr(RS, RD)		CMOVCCLirr(0x2,RS,RD)
+#define CMOVNBLrr(RS, RD)		CMOVCCLirr(0x3,RS,RD)
+#define CMOVAELrr(RS, RD)		CMOVCCLirr(0x3,RS,RD)
+#define CMOVELrr(RS, RD)		CMOVCCLirr(0x4,RS,RD)
+#define CMOVZLrr(RS, RD)		CMOVCCLirr(0x4,RS,RD)
+#define CMOVNELrr(RS, RD)		CMOVCCLirr(0x5,RS,RD)
+#define CMOVNZLrr(RS, RD)		CMOVCCLirr(0x5,RS,RD)
+#define CMOVBELrr(RS, RD)		CMOVCCLirr(0x6,RS,RD)
+#define CMOVNALrr(RS, RD)		CMOVCCLirr(0x6,RS,RD)
+#define CMOVNBELrr(RS, RD)		CMOVCCLirr(0x7,RS,RD)
+#define CMOVALrr(RS, RD)		CMOVCCLirr(0x7,RS,RD)
+#define CMOVSLrr(RS, RD)		CMOVCCLirr(0x8,RS,RD)
+#define CMOVNSLrr(RS, RD)		CMOVCCLirr(0x9,RS,RD)
+#define CMOVPLrr(RS, RD)		CMOVCCLirr(0xa,RS,RD)
+#define CMOVPELrr(RS, RD)		CMOVCCLirr(0xa,RS,RD)
+#define CMOVNPLrr(RS, RD)		CMOVCCLirr(0xb,RS,RD)
+#define CMOVPOLrr(RS, RD)		CMOVCCLirr(0xb,RS,RD)
+#define CMOVLLrr(RS, RD)		CMOVCCLirr(0xc,RS,RD)
+#define CMOVNGELrr(RS, RD)		CMOVCCLirr(0xc,RS,RD)
+#define CMOVNLLrr(RS, RD)		CMOVCCLirr(0xd,RS,RD)
+#define CMOVGELrr(RS, RD)		CMOVCCLirr(0xd,RS,RD)
+#define CMOVLELrr(RS, RD)		CMOVCCLirr(0xe,RS,RD)
+#define CMOVNGLrr(RS, RD)		CMOVCCLirr(0xe,RS,RD)
+#define CMOVNLELrr(RS, RD)		CMOVCCLirr(0xf,RS,RD)
+#define CMOVGLrr(RS, RD)		CMOVCCLirr(0xf,RS,RD)
 
 #define CMPBrr(RS, RD)                  _O_Mrm          (0x38           ,_b11,_r1(RS),_r1(RD)                           )
 #define CMPBmr(MD, MB, MI, MS, RD)      _O_r_X          (0x3a                ,_r1(RD)           ,MD,MB,MI,MS            )
@@ -465,7 +506,7 @@
 #define INVLPGm(MD, MB, MI, MS)         _OO_r_X         (0x0f01              ,_b111             ,MD,MB,MI,MS            )
 
 
-#define JCCSim(CC,D,B,I,S)              ((_r0P(B) && _r0P(I)) ? _O_D1   (0x70|(CC)              ,(D)                    ) : \
+#define JCCSim(CC,D,B,I,S)		((_r0P(B) && _r0P(I)) ? _O_D1	(0x70|(CC)		,D		) : \
                                                                 ASMFAIL("illegal mode in conditional jump"))
 
 #define JOSm(D,B,I,S)                   JCCSim(0x0,D,B,I,S)
@@ -497,7 +538,7 @@
 #define JNLESm(D,B,I,S)                 JCCSim(0xf,D,B,I,S)
 #define JGSm(D,B,I,S)                   JCCSim(0xf,D,B,I,S)
 
-#define JCCim(CC,D,B,I,S)               ((_r0P(B) && _r0P(I)) ? _OO_D4  (0x0f80|(CC)            ,(D)                    ) : \
+#define JCCim(CC,D,B,I,S)		((_r0P(B) && _r0P(I)) ? _OO_D4	(0x0f80|(CC)		,D		) : \
                                                                 ASMFAIL("illegal mode in conditional jump"))
 
 #define JOm(D,B,I,S)                    JCCim(0x0,D,B,I,S)
@@ -529,14 +570,13 @@
 #define JNLEm(D,B,I,S)                  JCCim(0xf,D,B,I,S)
 #define JGm(D,B,I,S)                    JCCim(0xf,D,B,I,S)
 
-
-#define JMPSm(D,B,I,S)                  ((_r0P(B) && _r0P(I)) ? _O_D1   (0xeb                   ,(D)                    ) : \
+#define JMPSm(D,B,I,S)			((_r0P(B) && _r0P(I)) ? _O_D1	(0xeb			,D		) : \
                                                                 ASMFAIL("illegal mode in short jump"))
 
-#define JMPm(D,B,I,S)                   ((_r0P(B) && _r0P(I)) ? _O_D4   (0xe9                   ,(D)                    ) : \
-                                                   ((_r0P(I)) ? _O_Mrm  (0xff   ,_b11,_b100,_r4(B)                      ) : \
-                                                                _O_r_X  (0xff        ,_b100     ,(D),B,I,S              ) ))
+#define JMPm(D,B,I,S)			((_r0P(B) && _r0P(I)) ? _O_D4	(0xe9			,D		) : \
+							        _O_r_X	(0xff	     ,_b100	,D,B,I,S	) )
 
+#define JMPr(R)				_O_Mrm		(0xff	,_b11,_b100,_r4(R))
 
 #define LAHF()                           _O              (0x9f                                                           )
 #define LEALmr(MD, MB, MI, MS, RD)      _O_r_X          (0x8d                ,_r4(RD)           ,MD,MB,MI,MS            )
@@ -580,8 +620,11 @@
 #define MOVLir(IM,  R)                  _Or_L           (0xb8,_r4(R)                                            ,IM     )
 #define MOVLim(IM, MD, MB, MI, MS)      _O_X_L          (0xc7                                   ,MD,MB,MI,MS    ,IM     )
 
-#define MOVSBLrr(RS,RD)                 _OO_Mrm         (0x0fbe         ,_b11,_r1(RS),_r4(RD)                           )
+#define MOVSBLrr(RS,RD)			_OO_Mrm		(0x0fbe		,_b11,_r4(RD),_r1(RS)				)
 #define MOVSBLmr(MD,MB,MI,MS,RD)        _OO_r_X         (0x0fbe              ,_r4(RD)           ,MD,MB,MI,MS            )
+
+#define MOVZBLmr(MD, MB, MI, MS, RD)	_OO_r_X		(0x0fb6		     ,_r4(RD)           ,MD,MB,MI,MS		)
+#define MOVZBLrr(RS,RD)			_OO_Mrm		(0x0fb6		,_b11,_r4(RD),_r1(RS)				)
 
 #define MULBrr(RS,RD)           ( _rAL (RD) +   _O_Mrm  (0xf6           ,_b11,_b100  ,_r1(RS)                           ) )
 #define MULBmr(MD,MB,MI,MS,RD)  ( _rAL (RD) +   _O_r_X  (0xf6                ,_b100             ,MD,MB,MI,MS            ) )
@@ -981,3 +1024,9 @@
 #define SALLim  SHLLim
 #define SALLrr  SHLLrr
 #define SALLrm  SHLLrm
+/*** unqualified/implicitly-sized instructions ***/
+
+
+#define BSWAPr(R)			BSWAPLr(R)
+#define PUSHr(R)			((_r4P(R) ? PUSHLr(R) : _r2P(R) ? PUSHWr(R) : ASMFAIL("illegal register size")))
+#define POPr(R)				((_r4P(R) ? POPLr(R) : _r2P(R) ? POPWr(R) : ASMFAIL("illegal register size")))
