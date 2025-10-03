@@ -54,9 +54,11 @@
   string        = "\"" (!"\"".)*@$:s "\""_ ( "#"name )* -> s ;
   primary       = number | name | string | "("_ expressions:e ")"_ -> e ;
   arglist       = expression?:e _ (","_ expression)*:f -> `(,@e ,@f) ;
-  suffix        = primary:a     ( "("                           _ arglist:b     ")"_            -> (cons a b):a )*              -> a ;
-  prefix        = suffix ;
-  mulop         = prefix:a      ( ("*"|"/"|"%")@$$:o            _ mulop:b                       -> (list o		a b):a    )*      -> a ;
+  typename      = name+:ids -> `(type ,@ids) ;
+  cast          = "("_ typename:_ ")"_ prefix:e -> e ;
+  bang          = "!"_ prefix:e -> `(= 0 ,e) ;
+  suffix        = primary:a ( "(" _ arglist:b ")"_ -> (cons a b):a )* -> a ;
+  prefix        = cast | bang | suffix ;  mulop         = prefix:a ( ("*"|"/"|"%")@$$:o _ mulop:b -> (list o a b):a )* -> a ;
   addop         = mulop:a       ( ("+"|"-")@$$:o                _ addop:b                       -> (list o		a b):a    )*      -> a ;
   shiftl        = addop:a       ( "<<"@$$:o                     _ shiftl:b                      -> (list 'bitwise-shift	a b):a    )*      -> a ;
   shiftr        = shiftl:a      ( ">>"@$$:o                     _ shiftr:b                      -> (list 'bitwise-shift	a (- b)):a    )*      -> a ;
