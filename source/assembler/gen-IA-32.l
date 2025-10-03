@@ -1037,3 +1037,167 @@
 #define BSWAPr(R)			BSWAPLr(R)
 #define PUSHr(R)			((_r4P(R) ? PUSHLr(R) : _r2P(R) ? PUSHWr(R) : ASMFAIL("illegal register size")))
 #define POPr(R)				((_r4P(R) ? POPLr(R) : _r2P(R) ? POPWr(R) : ASMFAIL("illegal register size")))
+
+/***
+
+          x86_64 follows
+
+***/
+
+#define _SIL		0x14
+#define _DIL		0x15
+#define _SPL		0x16
+#define _BPL		0x17
+
+#define _R8B		0x18
+#define _R9B		0x19
+#define _R10B		0x1a
+#define _R11B		0x1b
+#define _R12B		0x1c
+#define _R13B		0x1d
+#define _R14B		0x1e
+#define _R15B		0x1f
+
+#define _R8W		0x28
+#define _R9W		0x29
+#define _R10W		0x2a
+#define _R11W		0x2b
+#define _R12W		0x2c
+#define _R13W		0x2d
+#define _R14W		0x2e
+#define _R15W		0x2f
+
+#define _R8D		0x48
+#define _R9D		0x49
+#define _R10D		0x4a
+#define _R11D		0x4b
+#define _R12D		0x4c
+#define _R13D		0x4d
+#define _R14D		0x4e
+#define _R15D		0x4f
+
+#define _RAX		0x80
+#define _RCX		0x81
+#define _RDX		0x82
+#define _RBX		0x83
+#define _RSP		0x84
+#define _RBP		0x85
+#define _RSI		0x86
+#define _RDI		0x87
+#define _R8		0x88
+#define _R9		0x89
+#define _R10		0x8A
+#define _R11		0x8B
+#define _R12		0x8C
+#define _R13		0x8D
+#define _R14		0x8E
+#define _R15		0x8F
+
+// indexed addressing can use r12 (REX.X + _ESP) as an index register
+
+#define _r_X(R,D,B,I,S)				\
+    (_r0P(I)					\
+     ? (_r0P(B)					\
+	?     _r_D(R,D)				\
+	: (_ESP==(B)				\
+	   ? _r_DBIS(R,D,_ESP,_ESP,1)		\
+	   : _r_DB  (R,D,   B       )))		\
+     :						\
+     ((_r0P(B)					\
+       ?     _r_0DIS(R,D,        I,S)		\
+       :     _r_DBIS(R,D,   B,   I,S))))
+
+// tests for 64-bit register extension bit and size
+
+#define _rXP(R)	(((R) & 0xF) >= 8)
+
+#define _r8P(R)	(_rS(R)==8)
+
+// after verifying size, 64-bit register is renamed to the corresponding 32-bit register
+
+#define _r8(R)	( _r0P(R)						\
+		  ? 0							\
+		  : ( _r8P(R)						\
+		      ? 0x40 + _rN(R)					\
+		      : ASMFAIL("64-bit register required")) )
+
+// prefix to convert 32-bit instruction into the corresponding 64-bit instruction
+//
+// can be omitted if none of
+//	W = override when long-mode default is still 32-bit
+//	R = source register operand is r8..r15
+//	X = index register operand is r8..r15
+//	B = base or destination register operand is r8..r15
+// are true
+
+#define _REX(W,R,X,B)							\
+    ((void)( (!((W)|_rXP(R)|_rXP(X)|_rXP(B)))				\
+	     ? 0							\
+	     : _B(0x40 + ((W) << 3) +					\
+		  (_rXP(R) << 2) + (_rXP(X) << 1) + (_rXP(B) << 0)) ) )
+
+/* +++ fully-qualified intrinsic instructions - STILL VERY INCOMPLETE */
+
+// most quad instructions are just long instructions with a prefix
+
+#define	ADDQir(I,R)		(_REX(1,0,0,R),	ADDLir(I,_r8(R)))
+#define	ADDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ADDLmr(D,_r8(B),_r8(I),S,_r8(R)))
+#define	ADDQrr(S,D)		(_REX(1,S,0,D),	ADDLrr(_r8(S),_r8(D)))
+
+#define CALLQr(R)		(_REX(0,R,0,0),	CALLr(_r8(R)))
+#define CALLQm(D,B,I,S)		(_REX(0,0,I,B),	CALLm(D,_r8(B),_r8(I),S))
+
+#define CMOVCCQirr(CC,S,D)	(_REX(1,S,0,D),	CMOVCCLirr(CC,_r8(S),_r8(D)))
+
+#define CMOVEQrr(S,D)				CMOVCCQirr(0x4,S,D)
+#define CMOVZQrr(S,D)				CMOVCCQirr(0x4,S,D)
+
+#define	CMPQir(I,R)		(_REX(1,0,0,R),	CMPLir(I,_r8(R)))
+#define	CMPQim(N,D,B,I,S)	(_REX(1,0,I,B), CMPLim(N,D,_r8(B),_r8(I),S))
+#define	CMPQrr(S,D)		(_REX(1,S,0,D),	CMPLrr(_r8(S),_r8(D)))
+#define	CMPQrm(R,D,B,I,S)	(_REX(1,R,I,B), CMPLrm(_r8(R),D,_r8(B),_r8(I),S))
+#define	CMPQmr(D,B,I,S,R)	(_REX(1,R,I,B), CMPLmr(D,_r8(B),_r8(I),S,_r8(R)))
+
+#define INCQr(R)		(_REX(1,0,0,R), _O_Mrm(0xff,_b11,_b000,_r8(R)))
+
+#define JMPQr(R)		(_REX(0,R,0,0),	JMPr(_r8(R)))
+#define JMPQm(D,B,I,S)		(_REX(0,0,I,B),	JMPm(D,_r8(B),_r8(I),S))
+
+#define LEAQmr(D,B,I,S,R)	(_REX(1,R,I,B),	LEALmr(D,_r8(B),_r8(I),S,_r8(R)))
+
+#define LEAVEQ()				LEAVE()
+
+// REX prefix on MOVLir generates MOVABS, so MOVQir uses a different
+// instruction encoding to imply 32-bit source and 64-bit desintation
+
+#define	MOVABSQir(I,R)		(_REX(1,0,0,R), MOVLir((unsigned long)(I),_r8(R)),	\
+				 _L(((unsigned long)(I))>>32) )
+
+#define	MOVQim(N,D,B,I,S)	(_REX(1,0,I,B), MOVLim(N,D,_r8(B),_r8(I),S))
+#define	MOVQir(I,R)		(_REX(1,0,0,R), _O_Mrm_L(0xc7,_b11,_b000,_rN(_r8(R)),I))
+
+#define	MOVQrm(R,D,B,I,S)	(_REX(1,R,I,B), MOVLrm(_r8(R),D,_r8(B),_r8(I),S))
+#define	MOVQmr(D,B,I,S,R)	(_REX(1,R,I,B), MOVLmr(D,_r8(B),_r8(I),S,_r8(R)))
+#define	MOVQrr(S,D)		(_REX(1,S,0,D), MOVLrr(_r8(S),_r8(D)))
+
+#define MOVSBQrr(S,D)		(_REX(1,S,0,D), MOVSBLrr((S),_r8(D)))
+#define MOVSBQmr(D,B,I,S,R)	(_REX(1,S,0,D), MOVSBLmr(D,_r8(B),_r8(I),S,_r8(R)))
+
+#define MOVZBQrr(S,D)		(_REX(1,S,0,D), MOVZBLrr((S),_r8(D)))
+#define MOVZBQmr(D,B,I,S,R)	(_REX(1,S,0,D), MOVZBLmr(D,_r8(B),_r8(I),S,_r8(R)))
+
+#define NEGQr(R)		(_REX(0,0,0,R), NEGLr(_r8(R)))
+
+#define POPQr(R)		(_REX(0,0,0,R), POPLr(_r8(R)))
+#define PUSHQr(R)		(_REX(0,0,0,R), PUSHLr(_r8(R)))
+
+#define RETQ()					RET()
+
+#define	SUBQim(N,D,B,I,S)	(_REX(1,0,I,B), SUBLim(N,D,_r8(B),_r8(I),S))
+#define	SUBQir(I,R)		(_REX(1,0,0,R), SUBLir(I,_r8(R)))
+#define	SUBQmr(D,B,I,S,R)	(_REX(1,R,I,B), SUBLmr(D,_r8(B),_r8(I),S,_r8(R)))
+#define	SUBQrr(S,D)		(_REX(1,S,0,D),	SUBLrr(_r8(S),_r8(D)))
+
+#define TESTQrr(S,D)		(_REX(1,S,0,D), TESTLrr(_r8(S),_r8(D)))
+
+#define XORQrr(S,D)		(_REX(1,S,0,D), XORLrr(_r8(S),_r8(D)))
