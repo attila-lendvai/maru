@@ -34,18 +34,18 @@
 (define $$ 0)			;; last .base address
 (define $ 0)			;; current address
 
-(define-function _B  (out value)	(buffer-append asm-buffer value) (incr $))
-(define-function _W  (out value)	(_B out (bitwise-and 0xff value))   (_B out (bitwise-and 0xff   (bitwise-shift value -8))))
-(define-function _L  (out value)	(_W out (bitwise-and 0xffff value)) (_W out (bitwise-and 0xffff (bitwise-shift value -16))))
-(define-function _Q  (out value)
-  (_L out (bitwise-and 0xffffffff value))
-  (_L out (bitwise-and 0xffffffff (bitwise-shift value -32))))
+(define-function _B  (value)	(buffer-append asm-buffer value) (incr $))
+(define-function _W  (value)	(_B (bitwise-and 0xff value))   (_B (bitwise-and 0xff   (bitwise-shift value -8))))
+(define-function _L  (value)	(_W (bitwise-and 0xffff value)) (_W (bitwise-and 0xffff (bitwise-shift value -16))))
+(define-function _Q  (value)
+  (_L (bitwise-and 0xffffffff value))
+  (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
 
-(define-function _D1 (out value)	(_B () value))
-(define-function _D4 (out value)	(_L out value))
-(define-function _D4 (out value)	(_Q out value))
+;; TODO these should encode RIP relative addresses
+(define-function _D1 (value)	(_B value))
+(define-function _D4 (value)	(_L value))
 
-(require "source/assembler/assembler.x86-64.l")
+(require "source/assembler/assembler.x86.l")
 
 (define-function define-label (name value)
   (unless (= (eval name) value)
@@ -55,30 +55,16 @@
 ;; address helpers
 (define-function .base (addr)		(set $$ (set $ (eval addr))))
 (define-form	 .def (name expr)	(define-label name (eval expr)) ())
-(define-function .i8 bytes		(list-do byte bytes (_B () (eval byte))))
-(define-function .i16 halfs		(list-do half halfs (_W () (eval half))))
-(define-function .i32 longs		(list-do long longs (_L () (eval long))))
-(define-function .i64 quads		(list-do quad quads (_Q () (eval quad))))
-(define-function .ascii strings		(list-do string strings (string-do char string (_B () char))))
-(define-function .asciiz strings	(apply .ascii strings) (_B () 0))
+(define-function .i8 bytes		(list-do byte bytes (_B (eval byte))))
+(define-function .i16 halfs		(list-do half halfs (_W (eval half))))
+(define-function .i32 longs		(list-do long longs (_L (eval long))))
+(define-function .i64 quads		(list-do quad quads (_Q (eval quad))))
+(define-function .ascii strings		(list-do string strings (string-do char string (_B char))))
+(define-function .asciiz strings	(apply .ascii strings) (_B 0))
 (define-function .align (bytes)		(let ((remainder (bitwise-and $ (- bytes 1))))
                                           (when (< 0 remainder)
                                             (times-do (- bytes remainder)
-                                              (_B () 0)))))
-
-;; 64-bit instruction wrappers — assume you'll provide implementations
-(define-function movqIR (src dst)	(MOVQir src dst ()))
-;;(define-function movqRM (src dst)	(MOVQrm src dst 0 0 0 ()))
-(define-function movqMR (src dst)	(MOVQmr src 0 0 0 dst ()))
-;;(define-function movqRR (src dst)	(MOVQrr src dst ()))
-;;(define-function incqR (dst)		(INCQr dst ()))
-;;(define-function pushqI (src)		(PUSHQi src ()))
-;;(define-function addqIR (src dst)	(ADDQir src dst ()))
-;;(define-function addqRM (src dst)	(ADDQrm src dst 0 0 0 ()))
-;;(define-function subqIR (src dst)	(SUBQir src dst ()))
-;; raw syscall emitter (2 bytes 0x0f 0x05)
-(define-function syscall ()		(_B () 0x0f) (_B () 0x05))
-(define-function nop ()			(NOP ()))
+                                              (_B 0)))))
 
 (define-function assemble (program)
   (list-do insn program
@@ -160,29 +146,25 @@ program-headers
 code-segment-start
     ;; print message (syscall write)
     ;; rax = syscall number (1), rdi = fd, rsi = buf, rdx = count
-    (movqIR	1 _RAX)			; write (syscall #1)
-    (movqIR	1 _RDI)			; fd, stdout
-    (movqIR	msg _RSI)
-    (movqIR	msglen _RDX)
-    (syscall)
+    (MOVQir	1 _RAX)			; write (syscall #1)
+    (MOVQir	1 _RDI)			; fd, stdout
+    (MOVQir	msg _RSI)
+    (MOVQir	msglen _RDX)
+    (SYSCALL)
 
     ;; write into the data segment: var = var - 42
-    ;; TODO fix addqrm
-    (movqIR	-42 _RAX)
-    (movqIR	exit-code _RBX)
-    ;;TODO broken (addqRM	_RAX _RBX)
-    (nop)
-    (.i8 0x48) ; add rax,[rbx]
-    (.i8 0x01)
-    (.i8 0x03)
-    (nop)
+    (XORQrr	_RAX _RAX)
+    (MOVQir	exit-code _RBX)
+    (ADDQim	-42 0 _RBX _RAX 1)
+    ;; (NOP)
+    ;; (MOVQir -42 _RAX)
+    ;; (ADDQrm _RAX exit-code 0 0 0)
 
     ;; exit: rax = 60, rdi = status
-    ;;TODO broken (movqMR	exit-code _RDI)		; exit code into rdi
-    (movqIR	exit-code _RDI)		; exit code into rdi
-    (movqMR	_RDI _RDI)
-    (movqIR	60 _RAX)		; exit syscall (60)
-    (syscall)
+    (MOVQir	exit-code _RDI)		; exit code into rdi
+    (MOVQmr	0 _RDI 0 0 _RDI)
+    (MOVQir	60 _RAX)		; exit syscall (60)
+    (SYSCALL)
 
     (.align elf/page-size)		; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned
     (.def	code-segment-size (- $ file-start))
@@ -203,12 +185,12 @@ exit-code
 (buffer-save asm-buffer (println "./build/test-elf.x86-64"))
 
 (assemble '(
-	(movqIR	1 _RAX)				; write (syscall #1)
-	(movqIR	2 _RDI)				; stderr (fd 2)
-	(movqIR	msg _RSI)			; buffer
-	(movqIR	msglen _RDX)			; strlen(buffer)
-	(syscall)
-	(RET	0)
+	(MOVQir	1 _RAX)				; write (syscall #1)
+	(MOVQir	2 _RDI)				; stderr (fd 2)
+	(MOVQir	msg _RSI)			; buffer
+	(MOVQir	msglen _RDX)			; strlen(buffer)
+	(SYSCALL)
+	(RET)
 msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
@@ -225,14 +207,14 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 (call-x86-64-machine-code (buffer->function asm-buffer))
 
 (assemble '(
-	(movqIR	1 _RAX)				; write
-	(movqIR	1 _RDI)				; stdout
-	(movqIR	msg _RSI)			; buffer
-	(movqIR	msglen _RDX)			; strlen(buffer)
-	(syscall)
-	(movqIR	60 _RAX)			; exit
-	(movqIR	0 _RDI)				; status
-	(syscall)
+	(MOVQir	1 _RAX)				; write
+	(MOVQir	1 _RDI)				; stdout
+	(MOVQir	msg _RSI)			; buffer
+	(MOVQir	msglen _RDX)			; strlen(buffer)
+	(SYSCALL)
+	(MOVQir	60 _RAX)			; exit
+	(MOVQir	0 _RDI)				; status
+	(SYSCALL)
 msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 

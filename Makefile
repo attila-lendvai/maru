@@ -179,7 +179,7 @@ endif
 EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
-GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/assembler.IA-32.l)
+GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/assembler.x86.l)
 
 EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l streams.l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l primitive-functions.l arrays.l vm-early.l vm-late.l types.l) \
@@ -443,16 +443,16 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-$(BUILD)/generated/assembler.IA-32.l: $(GEN_EVAL) source/assembler/gen-IA-32.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
+$(BUILD)/generated/assembler.x86.l: $(GEN_EVAL) source/assembler/gen-x86.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
 # KLUDGE, gc/mark-and-sweep is not tailcall for now, so we need more stack space
 	ulimit -s unlimited
 #	$(call ensure-built,$(GEN_EVAL))
-	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-IA-32.l >$@ \
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-x86.l >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
 
-source/assembler/assembler.IA-32.l: $(BUILD)/generated/assembler.IA-32.l
+source/assembler/assembler.x86.l: $(BUILD)/generated/assembler.x86.l
 	cp $< $@
 
 ###
@@ -546,14 +546,14 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
 # make PLATFORM=linux test-elf-x86
-test-elf-x86: eval-x86 tests/test-elf.IA-32.l source/assembler/assembler.IA-32.l
+test-elf-x86: eval-x86 tests/test-elf.IA-32.l source/assembler/assembler.x86.l
 	./eval-x86 boot.l tests/test-elf.IA-32.l
 	@chmod +x build/test-elf.IA-32
 	-readelf -el build/test-elf.IA-32
 	./build/test-elf.IA-32
 
 # make PLATFORM=linux test-elf-llvm
-test-elf-llvm: eval-llvm tests/test-elf.x86-64.l source/assembler/assembler.IA-32.l
+test-elf-llvm: eval-llvm tests/test-elf.x86-64.l source/assembler/assembler.x86.l
 	./eval-llvm boot.l tests/test-elf.x86-64.l
 	@chmod +x build/test-elf.x86-64
 	-readelf -el build/test-elf.x86-64
