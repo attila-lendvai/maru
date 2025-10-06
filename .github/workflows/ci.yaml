@@ -33,5 +33,7 @@ jobs:
       - run:  make test-evaluator
       - run:  make test-parser
 
-      - run:  make PLATFORM=linux test-elf-llvm
-      - run:  make PLATFORM=linux test-elf-x86
+      - run:  make PLATFORM=libc  test-elf
+      - run:  make PLATFORM=linux test-elf
+
+      - run:  make PLATFORM=linux test-jit

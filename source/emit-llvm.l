@@ -631,9 +631,13 @@
 (define-function initialize-object-emitters ()
   (set emit-object/header
        (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-             ;; TODO FIXME adding another level of let, or using let*
-             ;; results in confused bindings and/or closure capturing.
-             ;;(canary-value	(slave-value +canary-value+))
+             ;; TODO FIXME if this let is a let*, and the canary-value
+             ;; binding is also uncommented, then it results in
+             ;; confused bindings and/or closure capturing that
+             ;; crashes while compiling (ERROR: cannot apply: 13 of
+             ;; type: 7). i couldn't yet extract a reproducer.
+
+             ;;(canary-value (slave-value +canary-value+))
              (canary-emitter	(if (slave-value feature/object-canary)
                                     (lambda () (print ", %word "(slave-value +canary-value+)))
                                   (lambda ()))))
