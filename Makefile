@@ -561,5 +561,9 @@ test-elf.x86-64: eval-llvm tests/test-elf.x86-64.l source/assembler/x86.l
 # make PLATFORM=linux test-elf
 test-elf: test-elf.x86-64
 
+# make PLATFORM=linux test-jit
+test-jit: eval-llvm tests/jit.l source/assembler/x86.l
+	./eval-llvm boot.l tests/jit.l
+
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l
