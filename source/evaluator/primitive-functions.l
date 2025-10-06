@@ -329,17 +329,17 @@
   (define-primitive-function call-IA-32-machine-code (fn)
     (debug-print "call-IA-32-machine-code will call "fn)
     (assert (is <target-function> fn) "call-IA-32-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
-    (fn)
-    (debug-print "call-IA-32-machine-code got back the control from "fn)
-    ()))
+    (let ((result (box <long> (fn))))
+      (debug-print "call-IA-32-machine-code got back the control from "fn)
+      result)))
 
 (when-at-expand (= +architecture+ 'x86-64)
   (define-primitive-function call-x86-64-machine-code (fn)
     (debug-print "call-x86-64-machine-code will call "fn)
     (assert (is <target-function> fn) "call-x86-64-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
-    (fn)
-    (debug-print "call-x86-64-machine-code got back the control from "fn)
-    ()))
+    (let ((result (box <long> (fn))))
+      (debug-print "call-x86-64-machine-code got back the control from "fn)
+      result)))
 
 (when-at-expand feature/debug-output
   (define-primitive-function enable-debug-output	() (set *debug-output-enabled?* true))
