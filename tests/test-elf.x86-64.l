@@ -45,7 +45,7 @@
 (define-function _D1 (value)	(_B value))
 (define-function _D4 (value)	(_L value))
 
-(require "source/assembler/assembler.x86.l")
+(require "source/assembler/x86.l")
 
 (define-function define-label (name value)
   (unless (= (eval name) value)
