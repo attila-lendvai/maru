@@ -33,24 +33,6 @@
 (define-function sublIR (src dst)	(SUBLir src dst))
 (define-function int (n)		(_B 0xCD) (_B n))
 
-(define-function assemble (program)
-  (list-do insn program
-    (cond
-      ((symbol? insn)		(eval (list 'define insn 0)))
-      ((= '.def (car insn))	(eval (list 'define (cadr insn) 0)))))
-  (set phased 1)
-  (while phased
-    (set phased ())
-    (buffer-reset asm-buffer)
-    (set $$ (set $ (address-of (<buffer>-elements asm-buffer))))
-    (list-do insn program
-      (cond
-	((symbol? insn)		(define-label insn $))
-	((pair? insn)		(eval insn))
-	(else			(error "huh? "insn)))))
-  (println "assembled "(buffer-length asm-buffer)" bytes")
-  )
-
 (define elf/PF_R	0x4)
 (define elf/PF_W	0x2)
 (define elf/PF_X	0x1)
@@ -133,9 +115,9 @@ var
     (.i32	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(print "writing elf buffer to ")
-
-(buffer-save asm-buffer (println "./build/test-elf.IA-32"))
+(let ((filename "./build/test-elf.IA-32"))
+  (println "writing elf buffer to "filename)
+  (save-assembler-buffer *assembler* filename))
 
 ;; for details on int 0x80 and syscall see:
 ;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
@@ -157,17 +139,13 @@ var
 msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
-(print "writing runtime buffer to ")
-
-(buffer-save asm-buffer (println "./build/runtime-buffer.IA-32"))
+(let ((filename "./build/runtime-buffer.IA-32"))
+  (println "writing runtime buffer to "filename)
+  (save-assembler-buffer *assembler* filename))
 
 (println "calling memory buffer, output should follow")
 
-(define-function buffer->function (buf)
-  (make <target-function>
-    (program-code	(<buffer>-elements buf))))
-
-(call-IA-32-machine-code (buffer->function asm-buffer))
+(call-IA-32-machine-code (assembler->function *assembler*))
 
 (assemble '(
 	(movlIR	4 _EAX)				; write
@@ -183,6 +161,6 @@ msg	(.ascii	"*** You may run ./build/test-elf.IA-32 now for a friendly greeting\
 
 (println "calling it, output should follow")
 
-(call-IA-32-machine-code (buffer->function asm-buffer))
+(call-IA-32-machine-code (assembler->function *assembler*))
 
-(println "it shouldn't have returned!!!")
+(println "BUG: it shouldn't have returned!!!")

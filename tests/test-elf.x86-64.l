@@ -125,9 +125,9 @@ exit-code
     (.i64	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(print "writing elf buffer to ")
-
-(buffer-save asm-buffer (println "./build/test-elf.x86-64"))
+(let ((filename "./build/test-elf.x86-64"))
+  (println "writing elf buffer to "filename)
+  (save-assembler-buffer *assembler* filename))
 
 (assemble '(
 	(MOVQir	1 _RAX)				; write (syscall #1)
@@ -139,17 +139,13 @@ exit-code
 msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
-(print "writing runtime buffer to ")
-
-(buffer-save asm-buffer (println "./build/runtime-buffer.x86-64"))
+(let ((filename "./build/runtime-buffer.x86-64"))
+  (println "writing runtime buffer to "filename)
+  (save-assembler-buffer *assembler* filename))
 
 (println "calling memory buffer, output should follow")
 
-(define-function buffer->function (buf)
-  (make <target-function>
-    (program-code	(<buffer>-elements buf))))
-
-(call-x86-64-machine-code (buffer->function asm-buffer))
+(call-x86-64-machine-code (assembler->function *assembler*))
 
 (assemble '(
 	(MOVQir	1 _RAX)				; write
@@ -165,6 +161,6 @@ msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting
 
 (println "calling it, output should follow")
 
-(call-x86-64-machine-code (buffer->function asm-buffer))
+(call-x86-64-machine-code (assembler->function *assembler*))
 
-(println "it shouldn't have returned!!!")
+(println "BUG: it shouldn't have returned!!!")
