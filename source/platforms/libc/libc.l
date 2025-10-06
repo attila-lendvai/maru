@@ -27,6 +27,10 @@
 (define-constant libc/MAP_FAILED		-1)
 (define-constant libc/MAP_PRIVATE		2)
 (define-constant libc/MAP_ANONYMOUS		0x20)
+(define-constant libc/PROT_READ			1)
+(define-constant libc/PROT_WRITE		2)
+(define-constant libc/PROT_EXEC			4)
+(define-constant libc/_SC_PAGESIZE		30)
 
 ;;;
 ;;; Platform API implementation when running under libc.
@@ -78,36 +82,48 @@
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   `(libc/exit ,@(or args '(-42))))
 
+;; (define-form platform/acquire-memory (size)
+;;   `(libc/malloc ,size))
+
+;; malloc doesn't return page-aligned memory, so we round down the
+;; returned address, and round up the end address. this should work,
+;; but using mmap would probably be the right way.
 (define-form platform/acquire-memory (size)
-  `(libc/malloc ,size))
+  `(let* ((page-size	(libc/sysconf libc/_SC_PAGESIZE))
+          (buf		(libc/malloc size))
+          ;; the page-size-alined boundaries encompassing the returned block
+          (addr-start	(align-address-down buf page-size))
+          (addr-size	(- (align-address-up (+ buf size) page-size)
+                           addr-start)))
+     (when (= 0 buf)
+       (platform/diag-print "malloc returned with NULL")
+       (platform/halt))
+     ;; KLUDGE we make all allocated memory executable.
+     ;; `make test-elf` generates machine code and wants to call it...
+     (unless (= 0 (libc/mprotect addr-start addr-size
+                                 ,(+ (+ libc/PROT_READ libc/PROT_WRITE)
+                                     libc/PROT_EXEC)))
+       (platform/format "mprotect failed")
+       ;;(platform/format "mprotect returned with "(long libc/errno))
+       (platform/halt))
+     buf))
+
+;; TODO this is subtly broken: bootstrap goes quite far ahead, but
+;; then it misbehaves (endless loop, or unable to apply undefined).
+;; ideally the API should be extended to be able to allocate/extend a
+;; continuous block of memory that the GC may take advantage of. for
+;; that we would need to receive the current range.
 
 ;; (define-form platform/acquire-memory (size)
-;;   ;; KLUDGE we should call: size_t pagesize = sysconf(_SC_PAGESIZE)
-;;   `(let* ((size/rounded (/ (+ ,size (- 0x1000 1)) ; round to page size
-;;                            0x1000))
-;;           (buf (libc/malloc size/rounded)))
-;;      (when (= 0 buf)
-;;        (platform/diag-print "malloc returned with NULL")
-;;        (platform/halt))
-;;      ;; KLUDGE we make all allocated memory executable.
-;;      ;; `make test-elf` generates machine code and wants to call it...
-;;      (unless (= 0 (libc/mprotect buf size/rounded
-;;                                  ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
-;;                                      linux/PROT_EXEC)))
-;;        (platform/diag-print "mprotect returned with non-zero")
-;;        (platform/halt))
-;;      buf))
-
-;; (define-form platform/acquire-memory (size)
-;;   ;; KLUDGE we should call: size_t pagesize = sysconf(_SC_PAGESIZE)
 ;;   ;; KLUDGE we make all allocated memory executable.
 ;;   ;; `make test-elf` generates machine code and wants to call it...
-;;   `(let ((buf (libc/mmap 0 (/ (+ ,size (- 0x1000 1)) ; round to page size
-;;                               0x1000)
-;;                          ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
-;;                              linux/PROT_EXEC)
-;;                          ,(+ libc/MAP_PRIVATE libc/MAP_ANONYMOUS)
-;;                          -1 0)))
+;;   `(let* ((page-size (libc/sysconf libc/_SC_PAGESIZE))
+;;           (buf (libc/mmap 0 (align-address-up ,size page-size)
+;;                           ,(+ (+ libc/PROT_READ libc/PROT_WRITE)
+;;                               libc/PROT_EXEC)
+;;                           ,(+ libc/MAP_PRIVATE libc/MAP_ANONYMOUS)
+;;                           -1 0)))
+;;      ;;(platform/format "mmap returned with "(pointer buf)"\n")
 ;;      (when (= buf libc/MAP_FAILED)
 ;;        (platform/diag-print "mmap returned with MAP_FAILED")
 ;;        (platform/halt))
