@@ -10,34 +10,8 @@
 ;; *** FAILURE form: (= -5 (/ 1000 -20 10))
 
 
-(require "source/conversion.l")
-(require "source/streams.l")
+(require "tests/infra.l")
 
-(define *tests* ())
-
-(define-form define-test (name args . body)
-  (push *tests* name)
-  `(define-function ,name ,args
-     ,@body))
-
-(define-form test-assert (condition . printing)
-  `(unless ,condition
-     (println "\n\n\033[1;31m*** FAILURE\033[0m form: " ',condition " " ,@printing)
-     (println)))
-
-(define-form run-tests ()
-  (let ((tests *tests*)
-        (test)
-        (forms ()))
-    (while (set test (first tests))
-      (push forms `(,test))
-      (set tests (rest tests)))
-    `(let ()
-       ,@forms)))
-
-;;;
-;;; Tests
-;;;
 (define-test eval/arithmetic/- ()
   (test-assert (= -42 (- 42)))
   (test-assert (= 0   (- 2 2)))
@@ -405,14 +379,5 @@
     ;; this should signal a proper error that no method was found, not die in some other way
     ;; (a-record-selector2 x)
     ))
-
-(define-function run-tests ()
-  (println "\nAbout to run the interpreter tests.")
-  (let ((tests *tests*)
-        (test))
-    (while (set test (pop tests))
-      (print test ", ")
-      (eval `(,test)))
-    (println "\nFinished running the interpreter tests.")))
 
 (run-tests)
