@@ -22,3 +22,9 @@
 ;; may only be necessary for maru.9 -> maru.10 because the profiler
 ;; seems to be broken in maru.9.
 (define-constant feature/profiler false)
+
+(define-function print-list (lst . etc)
+  (let ((separator (or (pop etc) " "))
+        (stream    (or (pop etc) *standard-output*)))
+    ;; PUNT: we ignore the supplied separator
+    (%print-list stream lst false)))

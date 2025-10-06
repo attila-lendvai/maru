@@ -32,27 +32,32 @@
 
 (define-function println args
   (apply print-all (cons *standard-output* args))
-  (print-all *standard-output* "\n")
+  (do-print "\n" *standard-output*)
   (car args))
 
 (define-function dumpln args
   (apply dump-all (cons *standard-output* args))
-  (print-all *standard-output* "\n")
+  (do-print "\n" *standard-output*)
   (car args))
 
-(define-function %print-list (stream lst storing?)
+(define-function %print-list (stream lst separator storing?)
   (primitive/print-all stream "(")
   (let ((first-time?	true)
         (cell		lst))
     (while (pair? cell)
       (if first-time?
-          (set first-time? ())
-        (primitive/print-all stream " "))
+          (set first-time? false)
+        (primitive/print-all stream separator))
       ((if storing? do-dump do-print) (car cell) stream)
       (set cell (cdr cell)))
     (when cell
       (print-all stream " . " cell))
     (primitive/print-all stream ")")))
+
+(define-function print-list (lst . etc)
+  (let ((separator (or (pop etc) " "))
+        (stream    (or (pop etc) *standard-output*)))
+    (%print-list stream lst separator false)))
 
 (with-forms ((redirect (types `(let ()
                                  ,@(map (lambda (type)
@@ -75,10 +80,10 @@
 (define-print-method <expr>	(print-all -stream- "<expr "(or (when-at-expand feature/track-expr-names self.name) "?")" "self.parameters">"))
 (define-print-method <env>	(print-all -stream- "<env "(or (when-at-expand feature/debug-info self.name) "?")" Lv"self.level",Off"self.offset",#"(array-length self.bindings)">"))
 (define-print-method <type>	(print-all -stream- "<"(<type>-name self)" "(<type>-id self)">"))
-(define-print-method <pair>	(%print-list -stream- self false))
+(define-print-method <pair>	(%print-list -stream- self " " false))
 
 (define-method do-dump <pair> (stream)
-  (%print-list stream self true))
+  (%print-list stream self " " true))
 
 (define-print-method <array>
   (primitive/print-all -stream- "Array(")
