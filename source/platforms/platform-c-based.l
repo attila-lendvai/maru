@@ -24,8 +24,9 @@
                 `(define-C-function ,maru-name ,@entry)))
             entries)))
 
-(define-form define-C-variable (maru-name foreign-name type)
-  (let ((fv (eval-in-host `(C-variable ,(symbol->string foreign-name) ',type))))
+(define-form define-C-variable (maru-name foreign-name type . attributes)
+  (let ((fv (eval-in-host `(C-variable ,(symbol->string foreign-name)
+                                       ',type ,@attributes))))
     `(define ,maru-name ,fv)))
 
 (define-form string->C-string (obj)

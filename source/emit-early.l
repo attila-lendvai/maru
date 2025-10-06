@@ -49,12 +49,15 @@
 
 (define-record <C-variable> ()
   (name
-   type))
+   type
+   attributes ; for stuff like thread_local for llvm
+   ))
 
-(define-function C-variable (foreign-name type)
+(define-function C-variable (foreign-name type . attributes)
   (make <C-variable>
     (name	foreign-name)
-    (type	type)))
+    (type	type)
+    (attributes	attributes)))
 
 ;;;
 ;;; Utils

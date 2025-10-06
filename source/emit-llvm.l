@@ -368,7 +368,10 @@
 
 (define-instruction DECLARE	()
   ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
-  ((C-variable)			(println "@"(<C-variable>-name $1)" = external global "(C-type->llvm-type (<C-variable>-type $1)))))
+  ((C-variable)			(print "@"(<C-variable>-name $1)" = external ")
+                                (awhen (<C-variable>-attributes $1)
+                                  (print-list it " "))
+                                (println " global "(C-type->llvm-type (<C-variable>-type $1)))))
 
 (define-instruction ALLOCA	()
   ((TEMP)			(println "	"$1" = alloca %oop")))
