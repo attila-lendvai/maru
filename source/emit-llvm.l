@@ -791,6 +791,30 @@
 ;;; Compiling calls
 ;;;
 
+(define-function gen-C-type->llvm-type (c-type -c-)
+  (if (and (pair? c-type)
+           (= '* (first c-type)))
+      (let ()
+        ;; all good
+        )
+      (let ((llvm-type (C-type->llvm-type c-type)))
+        (case llvm-type
+          (%oop)                        ; all good
+          (void
+           (when (<= 2 *compiler-verbosity*)
+             (gen COMMENT (list "	void FFI value")))
+           (gen LOAD (LITERAL 0) 0))
+          (else
+           (let ((bitsize	(llvm-type-bitsize llvm-type))
+                 (word-size	(target-value +word-size-in-bits+)))
+             (cond
+               ((< bitsize word-size)
+                (gen SEXT llvm-type '%word))
+
+               ((> bitsize word-size)
+                (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " c-type))))
+           (gen INTTOPTR '%word))))))
+
 (define-function compile-call (op args raw? -c-)
   (safety 2 (assert (or (pair? op) (variable? op))))
   (let ((arg-regs (map (lambda (arg)
@@ -874,23 +898,7 @@
       ;; gen the call itself
       (gen CALL self (list-reverse! new-arg-regs)))
     ;; convert return value
-    (let ((return-type (C-type->llvm-type self.return-type)))
-      (case return-type
-        (%oop)                          ; all good
-        (void
-         (when (<= 2 *compiler-verbosity*)
-           (gen COMMENT (list "	void FFI call return value")))
-         (gen LOAD (LITERAL 0) 0))
-        (else
-         (let ((bitsize	(llvm-type-bitsize return-type))
-               (word-size	(target-value +word-size-in-bits+)))
-           (cond
-             ((< bitsize word-size)
-	      (gen SEXT return-type '%word))
-
-             ((> bitsize word-size)
-	      (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " return-type))))
-         (gen INTTOPTR '%word))))
+    (gen-C-type->llvm-type self.return-type -c-)
     (unless (<C-function>-vararg? self)
       (list-length param-types))))
 
@@ -1149,7 +1157,7 @@
                                      (gen LOAD (LITERAL (eval-in-slave `(<type>-slave-id ,value))) 0))
                                     ((is <C-variable> value)
                                      (gen LOAD (EXTERNAL (<C-variable>-name value)) value)
-                                     (gen BITCAST (C-type->llvm-type (<C-variable>-type value)) '%oop))
+                                     (gen-C-type->llvm-type (<C-variable>-type value) -c-))
                                     (else
                                      (gen LOAD (GLOBAL self.name) value)))))
       (else
