@@ -5,9 +5,16 @@ on:
     branches:
       - maru.10
       - staging
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+
   pull_request:
     branches:
       - maru.10
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
 
 jobs:
   build:

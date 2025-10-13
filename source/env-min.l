@@ -48,6 +48,7 @@
     (and (= name (<variable>-name -variable-))
          -variable-)))
 
+;; TODO why is "global" in its name? rename...
 (define-function global-variable-value (env name)
   (safety 3 (assert (= 0 (unbox <long> (<env>-level env)))) "variable-value called with non-toplevel env "env)
   (aif (defined? name env)

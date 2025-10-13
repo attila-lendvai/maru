@@ -1,4 +1,4 @@
-# Maru's VM, aka the runtime
+# Maru's VM
 
 ## Overview
 
@@ -8,10 +8,57 @@ interpreter.
 
 It is implemented in terms of a set of axiomatic primitives provided
 by the *target* domain, aka the [*platform*](platforms.md) upon which
-the Maru VM's implementation is running. Think of something like the
-Linux kernel running on x86_64, or libc on an aarch64 machine.
+the Maru VM's implementation is running. A platform is something like
+the Linux kernel running on x86_64 hardware, or libc on an aarch64
+machine.
 
-The code running in the target domain is also called the *kernel*.
+The codebase that is running in the target domain is also called the
+*kernel*.
+
+### Eval pipeline
+
+There are 3 phases in which a sexp turns into a value:
+
+  1) `expand` is a macroexpand: it looks up and runs any
+  user-specified macros. Macros are functions/transformers that can
+  return any sexp to be placed instead of their invocation forms. Not
+  many surprises here relative to other lisps.
+
+  2) `encode` is a phase where the sexp is transformed into an
+  internal data structure that can be easily evaluated (it's just a
+  thinly annotated sexp). This process is mostly about instantiating
+  `<env>` and `<variable>` objects, and allocating unique indices for
+  the variables to be used for addressing the bindings arrays at eval
+  time. At read-time all unquoted forms are expanded and encoded.
+
+  3) `eval` runs an encoded form to yield a value at run-time.
+
+`apply` is their cousine that can execute the code captured into a
+lambda/closure.
+
+### Data structures
+
+TODO, WARNING: this may be inaccurate, limited by my current understanding.
+
+ - `<env>` is a key-value store that holds `<variable>` objects as
+   values; it's the current lexical scope. `*globals*` is a variable
+   that holds the toplevel lexical scope.
+
+   - `parent`: no surprises here, variable lookup is delegated upwards.
+   - `level`: this is **not** the level in the parent chain. `level`
+     is incremented when crossing lambda boundaries. It is needed for
+     the implementation of closures capturing variables from their
+     lexical environment.
+
+ - `<context>` is a where the variable values are held at evaluation
+   time.
+
+   - `bindings` is an array that holds the values. It's indexed
+     according to the variable allocation in the `<env>`s that are
+     calculated at `encode` time.
+
+Closures capture the `<context>` where they are instantiated and this
+is how they share variables with other closures.
 
 ## Implementation strategies
 

@@ -1,6 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; This is a compiler that emits IA-32 text, aka x86 assembly, using the gcc toolchain.
+;;; This is a compiler that emits IA-32 text, aka x86 assembly, that
+;;; needs to be fed to the gcc toolchain.
 ;;;
 ;;; Status: it should successfully compile eval.l into eval.s,
 ;;; that in turn can be compiled by the gcc toolchain into an executable eval binary.
@@ -14,11 +15,8 @@
 ;;; Limitations and peculiarities:
 ;;;   - no closures
 ;;;   - no variable number of args for functions
-;;;   - only supports the following literals: Long, String (no lists, quoted literals, etc)
-;;;   - string literals are compiled into .asciz, which means that they
-;;;     are *not* tagged Maru objects on the heap; i.e. (t/print "foo") will
-;;;     go astray because "foo" will be emitted as a null terminated string of
-;;;     ascii bytes (instead of a Maru object of type <string>).
+;;;   - some literal objects are emitted as valid objects that can participate
+;;;     in the heap; see emit-object/<string> and co. for an up-to-date list.
 ;;;   - probaby more
 ;;;   - see +special-operators+ and *special-forms* for the list of specially
 ;;;     handled constructs

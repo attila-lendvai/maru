@@ -7,6 +7,8 @@
 ;; https://cirosantilli.com/elf-hello-world
 ;; man 8 ld-linux.so
 ;; https://en.wikipedia.org/wiki/Executable_and_Linkable_Format
+;; embedding user data into elf: https://www.matheusmoreira.com/articles/self-contained-lone-lisp-applications
+
 
 ;; lots of docs on writing a kernel module to add a new binary format
 ;; https://www.muppetlabs.com/~breadbox/txt/mopb.html
