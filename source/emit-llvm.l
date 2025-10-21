@@ -1186,8 +1186,10 @@
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
-      ((set handler (cdr (assq op *special-forms*)))
-       (handler self -c-))
+      ((is <fixed> op)
+       (let ((handler (cdr (assq op *special-forms*))))
+         (or handler (error "No handler for fixed form: " self))
+         (handler self -c-)))
       (else
        (compile-call op args false -c-)))))
 
