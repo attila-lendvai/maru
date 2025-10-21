@@ -788,7 +788,18 @@
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value C-string)		compile/C-string)
   ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call-form (second expr) (cddr expr) true -c-)))
-  (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen ADDR "4(%ebp)")))
+  (cons (target-value stack-pointer-on-entry)
+        (lambda (expr -c-)
+          ;; the function prologue we also employ is like this:
+          ;;
+          ;; pushl	%ebp
+          ;; movl	%esp, %ebp
+          ;; subl	$36, %esp
+          ;; ...
+          ;;
+          ;; so, the 4(%ebp) is to undo the pushl %ebp, so that we
+          ;; regain the %rsp value at the entry point to the function.
+          (gen ADDR "4(%ebp)")))
   ))
 
 ;;;

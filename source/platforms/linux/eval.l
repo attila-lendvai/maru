@@ -100,8 +100,26 @@ exit:
 (define-function _start ()
   (debug (platform/diag-print "_start is alive\n"))
 
-  (let ((argc (oop-at (stack-pointer-on-entry) 0))
-        (argv (+ (stack-pointer-on-entry)
-                 (words-to-bytes 1))))
+  ;; Stack layout, High memory
+  ;; +---------------------+
+  ;; | NULL                |
+  ;; +---------------------+
+  ;; | ...                 |
+  ;; +---------------------+
+  ;; | envp pointers       |
+  ;; +---------------------+
+  ;; | NULL                |
+  ;; +---------------------+
+  ;; | ... (argc times)    |
+  ;; +---------------------+
+  ;; | argv[0]             |
+  ;; +---------------------+
+  ;; | argc (int)          | <-- stack pointer points to argc
+  ;; +---------------------+
+  ;; Lower memory
+
+  (let* ((sp (stack-pointer-on-entry))
+         (argc (oop-at sp 0))
+         (argv (+ sp (words-to-bytes 1))))
     (linux-syscall linux/exit
      (main/common argc argv linux/stdin linux/stdout linux/stderr))))
