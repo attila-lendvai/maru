@@ -27,41 +27,41 @@
 ;; NOTE copy means it may not overlap. move means they may overlap.
 
 ;; TODO these two are exported into the evaluator to provide the same api in interpreted code. how shall this be?
-(define-form copy-oops (from to wordcount)
-  `(for (i 0 ,wordcount)
-     (set (oop-at ,to   i)
-          (oop-at ,from i))))
+(define-function copy-oops (from to wordcount)
+  (for (i 0 wordcount)
+    (set (oop-at to   i)
+         (oop-at from i))))
 
-(define-form copy-bytes (from to count)
-  `(for (i 0 ,count)
-     (set (byte-at ,to   i)
-          (byte-at ,from i))))
+(define-function copy-bytes (from to count)
+  (for (i 0 count)
+    (set (byte-at to   i)
+         (byte-at from i))))
 
-(define-form platform/move-oops (from to wordcount)
-  `(cond
-     ((< ,to ,from)
-      (for (i 0 ,wordcount)
-        (set (oop-at ,to   i)
-             (oop-at ,from i))))
-     ((< ,from ,to)
-      (for (i (- ,wordcount 1) -1 -1)
-        (set (oop-at ,to   i)
-             (oop-at ,from i))))))
+(define-function platform/move-oops (from to wordcount)
+  (cond
+    ((< to from)
+     (for (i 0 wordcount)
+       (set (oop-at to   i)
+            (oop-at from i))))
+    ((< from to)
+     (for (i (- wordcount 1) -1 -1)
+       (set (oop-at to   i)
+            (oop-at from i))))))
 
-(define-form platform/move-bytes (from to count)
-  `(cond
-     ((< ,to ,from)
-      (for (i 0 ,count)
-        (set (byte-at ,to   i)
-             (byte-at ,from i))))
-     ((< ,from ,to)
-      (for (i (- ,count 1) -1 -1)
-        (set (byte-at ,to   i)
-             (byte-at ,from i))))))
+(define-function platform/move-bytes (from to count)
+  (cond
+    ((< to from)
+     (for (i 0 count)
+       (set (byte-at to   i)
+            (byte-at from i))))
+    ((< from to)
+     (for (i (- count 1) -1 -1)
+       (set (byte-at to   i)
+            (byte-at from i))))))
 
-(define-form platform/clear-bytes (from count)
-  `(for (i 0 ,count)
-     (set (byte-at ,from i) 0)))
+(define-function platform/clear-bytes (from count)
+  (for (i 0 count)
+    (set (byte-at from i) 0)))
 
 (begin-for-syntax
  (define-function string+length (str)
@@ -84,28 +84,29 @@
 (define-form platform/print-diag-fmt (format . args)
   ())
 
+;; needs to be a form; the compiler doesn't yet support . rest args
 (define-form platform/halt args
   `(linux-syscall linux/exit ,@(or args '(-42))))
 
 (define *initial-break* 0)
 (define *current-break* 0)
 
-;; TODO how come this cannot be a define-function? investigate and then fix or explain
-(define-form platform/acquire-memory (size)
+(define-function platform/acquire-memory (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
   ;; TODO this really should be a function, but we don't yet have ERROR and ASSERT at this point
-  `(let ()
-     (unless *initial-break*
-       (set *current-break* (set *initial-break* (linux-syscall linux/brk 0)))
-       (assert (< 0 *current-break*)))
-     (let ((new-break	(linux-syscall linux/brk (+ *current-break* ,size)))
-           (result	*current-break*))
-       (assert (= ,size (- new-break *current-break*)))
-       (set *current-break* new-break)
-       ;; KLUDGE we make all allocated memory executable.
-       ;; `make test-elf` generates machine code and wants to call it...
-       (linux-syscall linux/mprotect *initial-break*
-                      (- *current-break* *initial-break*)
-                      ,(+ (+ linux/PROT_READ linux/PROT_WRITE)
-                          linux/PROT_EXEC))
-       result)))
+  (unless *initial-break*
+    (set *current-break* (set *initial-break* (linux-syscall linux/brk 0)))
+    ;; TODO assert contains a quoted form that the compiler cannot yet emit
+    ;;(assert (< 0 *current-break*))
+    )
+  (let ((new-break	(linux-syscall linux/brk (+ *current-break* size)))
+        (result	*current-break*))
+    ;;(assert (= size (- new-break *current-break*)))
+    (set *current-break* new-break)
+    ;; KLUDGE we make all allocated memory executable.
+    ;; `make test-elf` generates machine code and wants to call it...
+    (linux-syscall linux/mprotect *initial-break*
+                   (- *current-break* *initial-break*)
+                   (+ (+ linux/PROT_READ linux/PROT_WRITE)
+                      linux/PROT_EXEC))
+    result))
