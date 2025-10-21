@@ -96,7 +96,7 @@
   ;; TODO this really should be a function, but we don't yet have ERROR and ASSERT at this point
   (unless *initial-break*
     (set *current-break* (set *initial-break* (linux-syscall linux/brk 0)))
-    ;; TODO assert contains a quoted form that the compiler cannot yet emit
+    ;; TODO too early, ASSERT and ERROR is not functional at this point
     ;;(assert (< 0 *current-break*))
     )
   (let ((new-break	(linux-syscall linux/brk (+ *current-break* size)))

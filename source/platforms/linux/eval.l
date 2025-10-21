@@ -65,9 +65,10 @@ define weak dso_local i64 @strlen(ptr %0) {
 
 (switch-to-target-env)
 
+(load "source/evaluator/vm-early.l")
 (load "source/platforms/linux/linux.l")
 (load "source/debug-min.l")
-(load "source/evaluator/vm-early.l")
+(load "source/evaluator/vm.l")
 
 ;;;
 ;;; garbage collector

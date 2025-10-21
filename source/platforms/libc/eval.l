@@ -4,9 +4,10 @@
 
 (switch-to-target-env)
 
+(load "source/evaluator/vm-early.l")
 (load "source/platforms/libc/libc.l")
 (load "source/debug-min.l")
-(load "source/evaluator/vm-early.l")
+(load "source/evaluator/vm.l")
 
 ;;;
 ;;; garbage collector
