@@ -819,7 +819,8 @@
                 (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " c-type))))
            (gen INTTOPTR '%word))))))
 
-(define-function compile-call (op args raw? -c-)
+(define-function compile-call-form (op args raw? -c-)
+  (emit-comment 2 "compile-call: "op", args: "args", raw?: "raw?)
   (safety 2 (assert (or (pair? op) (variable? op))))
   (let ((arg-regs (map (lambda (arg)
                          (when (<= 2 *compiler-verbosity*)
@@ -1073,7 +1074,7 @@
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value C-string)		compile/C-string)
-  ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call (second expr) (cddr expr) true -c-)))
+  ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call-form (second expr) (cddr expr) true -c-)))
   (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen SPONENTRY)))
   ))
 
@@ -1191,7 +1192,7 @@
          (or handler (error "No handler for fixed form: " self))
          (handler self -c-)))
       (else
-       (compile-call op args false -c-)))))
+       (compile-call-form op args false -c-)))))
 
 ;;;
 ;;; COMPILE-DEFINITION
