@@ -26,7 +26,7 @@
            (name-blacklist	'()))
       (unless (or (member? (type-of value) type-blacklist)
                   (member? name name-blacklist))
-        (emit COMMENT (list "defn " name))
+        (emit-comment 1 "defn "name)
         (verbosity 1 (warn name ", "))
         (compile-definition value name -c-))))
   (verbosity 1 (warn "\n"))
@@ -48,7 +48,7 @@
       (let ((impl-fn (array-at methods i)))
         (when impl-fn
           (let ((slave-type-id (eval-in-slave `(<type>-slave-id ,(type-object-for-id i)))))
-            (emit COMMENT (list "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn)))
+            (emit-comment 1 "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn))
             (or index-min (set index-min slave-type-id))
             (set index-max slave-type-id)
             ;; NOTE this takes the parameter signature of the first method
@@ -62,11 +62,11 @@
             (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
               (set (array-at target-methods (- slave-type-id index-min)) impl-fn))))))
     ;; define and emit the dispatch table
-    (emit COMMENT (list "<selector> dispatch table for "name", from "index-min", to "index-max))
+    (emit-comment 1 "<selector> dispatch table for "name", from "index-min", to "index-max)
     (environment-define target-env dispatch-table-name target-methods)
     (compile-definition target-methods dispatch-table-name -c-)
     ;; the selector function
-    (emit COMMENT (list "<selector> stub for "name))
+    (emit-comment 1 "<selector> stub for "name)
     (let ((stub	(eval-in-target
                  `(,lambda ,parameters
                     (let ((type (type-of self)))

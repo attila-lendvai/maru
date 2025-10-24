@@ -127,7 +127,7 @@
 ;;;
 ;;; IA32 -- INSTRUCTIONS
 ;;;
-(define-emit    (COMMENT pair)			(when (<= 1 *compiler-verbosity*) (print "# ") (apply println $1)))
+(define-emit    (COMMENT pair)			(print "# ") (apply println $1))
 
 (define-emit    (TEXT)				(println "	.text"))
 (define-emit    (DATA)				(println "	.section .data"))

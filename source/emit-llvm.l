@@ -354,8 +354,8 @@
   (print "getelementptr (%\"<header>\", %\"<header>\"* "input", i32 1)"))
 
 (define-instruction COMMENT	()
-  ;;((string)			(when (<= 1 *compiler-verbosity*) (print "; ") (println $1)))
-  ((pair)			(when (<= 1 *compiler-verbosity*) (print "; ") (apply println $1))))
+  ;;((string)			(print "; ") (println $1))
+  ((pair)			(print "; ") (apply println $1)))
 
 (define-instruction INLINE	()
   ((string)			(print $1))
