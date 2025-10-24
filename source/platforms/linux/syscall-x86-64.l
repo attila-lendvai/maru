@@ -1,0 +1,11 @@
+;;; -*- mode: lisp; coding: us-ascii -*-
+
+(require "source/platforms/linux/syscall-x86.l")
+
+;; redefine the 32 bit version
+(define-emit    (LINUX-SYSCALL pair)
+  (let ((args $1)
+        (regs +linux/syscall/argument-registers/x86_64+))
+    (while args
+      (println "	mov	"(pop args)", %"(pop regs)))
+    (println "	syscall")))

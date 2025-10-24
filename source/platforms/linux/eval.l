@@ -54,6 +54,13 @@ exit:
 }
 ")
 
+(require "source/emit-early.l")
+
+;; KLUDGE, i guess
+(when (and (equal "x86" *compiler-backend*)
+           (= 64 (slave-value +word-size-in-bits+)))
+  (set *compiler-backend* "x86-64"))
+
 (load (concat-strings "source/emit-" *compiler-backend* ".l"))
 
 ;; this is a placeholder object in the target on which we can register

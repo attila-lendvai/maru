@@ -90,7 +90,7 @@ ifeq ($(PLATFORM),linux)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
 
-TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
+TARGET_x86	= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
@@ -128,7 +128,7 @@ else
 endif
 
 ifeq ($(TARGET_CPU_x86),x86_64)
-else ifeq ($(TARGET_CPU_x86),i386)
+else ifeq ($(TARGET_CPU_x86),i686)
   CFLAGS_x86	+= -m32
 else
   $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
@@ -176,7 +176,7 @@ else
   EVAL0		= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l  emit-late.l)
+EMIT_FILES_x86	= $(addprefix source/,emit-early.l emit-x86.l emit-x86-64.l emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
