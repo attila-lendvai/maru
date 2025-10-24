@@ -52,6 +52,7 @@
 (define-primitive-function allocate ((type <long>) (slot-count <long>))
   (gc/allocate type (words-to-bytes slot-count)))
 
+;; TODO rename to allocate-opaque-data or something else
 (define-primitive-function allocate-data ((byte-size <long>))
   (gc/allocate-opaque <data> byte-size))
 

@@ -434,6 +434,7 @@
 
 ;; TODO this crashes llvm: https://bugs.llvm.org/show_bug.cgi?id=49635
 ;; reported as: https://github.com/llvm/llvm-project/issues/164427
+;; NOTE it's only supported on arm: https://llvm.org/docs/LangRef.html#id419
 ;; (define-instruction SPONENTRY	(() 1 t)
 ;;   (()				(println "	"$reg1" = call ptr @llvm.sponentry()")))
 ;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)

@@ -365,7 +365,8 @@
 (define compiler x86-compiler)
 
 (define-function new-temp (-c-)
-  (TI32 (* (new-temp-index -c-) (eval-at-expand (target-value +word-size-in-bytes+)))))
+  (TI32 (* (new-temp-index -c-) (eval-at-expand
+                                 (target-value +word-size-in-bytes+)))))
 
 (define-function %free-temp (-c- obj)
   (when (is <TI32> obj)
@@ -378,6 +379,7 @@
   (array-do entry (<compiler>-gen-buffer -c-)
     (apply emit-instruction entry)))
 
+;; parameters are what functions have
 (define-function new-param (c)
   (with-instance-accessors c <x86-compiler>
     (let* ((offset	c.param-offset)
@@ -385,6 +387,7 @@
       (set c.param-offset (+ offset 4))
       temp)))
 
+;; arguments are what we pass to functions when we call them
 (define-function new-arg (c)
   (with-instance-accessors c <x86-compiler>
     (let* ((offset	c.arg-offset)
@@ -540,8 +543,9 @@
         temp))))
 
 (define-function emit-expr-code (self entry-point-label parent-comp)
-  (when (<= 3 *compiler-verbosity*)
-    (emit-comment 1 "emitting <expr> "self", code: "(<expr>-body self)))
+  ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
+  (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
+  (emit-comment 3 ", code: "(<expr>-body self))
   (let* ((body		(<expr>-body self))
          (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (init-param	(lambda (var)
@@ -902,8 +906,7 @@
          (args		(rest self))
          (arity		(list-length args))
          (handler	()))
-    (when (<= 2 *compiler-verbosity*)
-      (emit-comment 1 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
+    (emit-comment 2 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args)
     ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
     (cond
       ((set handler (second (assq op-value (array-at +special-operators+ arity))))

@@ -95,8 +95,8 @@ TARGET_x86	= i386-$(TARGET_VENDOR)-$(TARGET_OS)
 TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 #TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
-# used when generating maru sources during the build process
-# in the order of speed
+# Used when generating maru sources during the build process.
+# In the order of speed:
 #GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval1
 GEN_EVAL	= $(BUILD_llvm)/eval1
 #GEN_EVAL	= $(BUILD_x86)/eval1

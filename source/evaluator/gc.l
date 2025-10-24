@@ -295,6 +295,7 @@
   (set (oop-at gc/roots gc/root-count) ()))
 
 (define-function gc/initialize ()
+  (debug (platform/diag-print "gc/initialize is speaking\n"))
   (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
     (set gc/memory-base ptr)
     (set gc/memory-last ptr))
