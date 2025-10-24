@@ -382,9 +382,9 @@
 ;; parameters are what functions have
 (define-function new-param (c)
   (with-instance-accessors c <x86-compiler>
-    (let* ((offset	c.param-offset)
-           (temp	(TI32 offset)))
-      (set c.param-offset (+ offset 4))
+    (let ((temp	(TI32 c.param-offset)))
+      (incr c.param-offset (eval-at-expand
+                            (target-value +word-size-in-bytes+)))
       temp)))
 
 ;; arguments are what we pass to functions when we call them
@@ -392,7 +392,8 @@
   (with-instance-accessors c <x86-compiler>
     (let* ((offset	c.arg-offset)
            (temp	(TI32 offset)))
-      (set c.arg-offset (+ offset 4))
+      (set c.arg-offset (+ offset (eval-at-expand
+                                   (target-value +word-size-in-bytes+))))
       temp)))
 
 (define-function free-args (c args)
@@ -548,28 +549,50 @@
   (emit-comment 3 ", code: "(<expr>-body self))
   (let* ((body		(<expr>-body self))
          (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
-         (init-param	(lambda (var)
-                          (set (<variable>-value var) (new-param -c-))))
-         (param-locs	(map init-param (<expr>-parameters self))))
-    (list-do e body
-      (and e (comp e)))
-    ;; TODO investigate: probably only the frm-size needs to be aligned (on darwin)
-    (let* ((arg-size (align +call-frame-alignmet+             (<x86-compiler>-arg-limit -c-)))
-           (tmp-size (align +call-frame-alignmet+ (+ arg-size (* (<compiler>-temp-limit -c-)
-                                                                 (target-value +word-size-in-bytes+)))))
-           (frm-size (align +call-frame-alignmet+ (+ tmp-size 8))))
-      (map (lambda (el) (set (<TI32>-offset el) (+ arg-size (<TI32>-offset el)))) (<compiler>-temps -c-))
-      (map (lambda (el) (set (<TI32>-offset el) (+ frm-size (<TI32>-offset el)))) param-locs)
-      (when (<= 2 *compiler-verbosity*)
-        (emit-comment 1 "frame "arg-size" "(<compiler>-temp-limit -c-)" "tmp-size" "frm-size))
-      ;; emitting begins
+         (param-locs
+           (map (lambda (var)
+                  ;; KLUDGE this writes some internal
+                  ;; compiler state (this param's
+                  ;; location on the stack) into the
+                  ;; source code.
+                  (set (<variable>-value var) (new-param -c-)))
+                (<expr>-parameters self))))
+    ;; Compile the fn body first into the gen buffer (COMP is a form,
+    ;; we cannot map it).
+    (list-do el body
+      (comp el))
+    ;; Calculate the frame and emit the entire fn
+    (let* ((word-size	(eval-at-expand
+                         (target-value +word-size-in-bytes+)))
+           (arg-size	(<x86-compiler>-arg-limit -c-))
+           (temp-size	(* (<compiler>-temp-limit -c-) word-size))
+           (frame-size	(align +call-frame-alignmet+
+                               ;; 2 words: pushed ebp, and the return address (?)
+                               (+ arg-size temp-size (* 2 word-size))))
+           (frame-body-size (- frame-size (* 2 word-size))))
+      ;; Now that we know the frame size, fix up the offsets of the
+      ;; temps allocated on the stack.
+      (map (lambda (el)
+             (incr (<TI32>-offset el) arg-size))
+           (<compiler>-temps -c-))
+      ;; Params could also be accessed through %ebp, but for that we
+      ;; would need another operand class. Let's just offset them by
+      ;; the frame size and use %esp through simple TI32.
+      (map (lambda (el)
+             (incr (<TI32>-offset el) frame-size))
+           param-locs)
+      ;; actual emitting begins
       (emit TEXT)
       (emit DEFLABEL entry-point-label)
-      (emit ENTER (- frm-size 8))
-      (emit-gen-buffer -c-)
+      (emit-comment 1 "params: "(list-length param-locs)
+                    ", frame-size: "frame-size"("(/ frame-size word-size)
+                    "), arg-size: " arg-size  "("(/ arg-size word-size)
+                    "), temp-size: "temp-size "("(/ temp-size word-size)")")
+      (emit ENTER frame-body-size)
+      (emit-gen-buffer -c-) ; emit the body
       (awhen (<x86-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
-      (emit LEAVE (- frm-size 8))))
+      (emit LEAVE frame-body-size)))
   entry-point-label)
 
 (define-function closure-code-label (name)
