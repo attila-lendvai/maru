@@ -67,7 +67,17 @@ endif
 
 # if you want to use the perf tool to profile the binary then also
 # include -g and the rest. -O3 may remain.
-CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
+CFLAGS		+= -O3
+#CFLAGS		+= -g -fno-omit-frame-pointer -fno-inline
+#CFLAGS		+= -Wl,--build-id=none
+
+ifeq ($(PLATFORM),linux)
+# NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
+# https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
+# -Wl,-no-pie is needed to produce an ELF without a dynamic linker
+# reference (clang -m32 inserts to a dangling /gnu/store reference on Guix)
+  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-no-pie
+endif
 
 # Some hardened kernels need a linker script that makes the .text
 # section writable, so that relocation of non-PIC code can happen (our
@@ -77,18 +87,9 @@ CFLAGS		+= -O3 #-g -fno-omit-frame-pointer -fno-inline
 # something like that, ask an LLM), which then leads to a sigsegv at
 # 0x0 very early at start.  CFLAGS_x86 += $(CFLAGS)
 # -Wl,-T,tools-for-build/linker-script.ld
-CFLAGS_x86	+= $(CFLAGS) -fPIE -Wl,-pie
-CFLAGS_x86	+= $(CFLAGS) -Wl,--build-id=none
+CFLAGS_x86	+= $(CFLAGS) -fPIE
 
 CFLAGS_llvm	+= $(CFLAGS) -Qunused-arguments
-
-ifeq ($(PLATFORM),linux)
-# NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
-# https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
-# -Ttext=0x08048000,-no-pie is needed to produce an ELF without a dynamic linker
-# reference (clang -m32 inserts to a dangling /gnu/store reference)
-  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
-endif
 
 TARGET_x86	= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
 
