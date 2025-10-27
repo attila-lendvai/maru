@@ -84,6 +84,7 @@
   (debug (platform/diag-print "initialize-vm is alive\n"))
 
   (safety 2
+    (debug (platform/diag-print "running basic type and box/unbox checks\n"))
     (or (= 42 (unbox <long> (box <long> 42)))		(fatal "box-unbox of <long> is broken"))
     (when-at-expand (eval-in-slave '(is <immediate-type> <long>))
       (or (= 85 (box <long> 42))			(fatal "box of <long> is broken"))

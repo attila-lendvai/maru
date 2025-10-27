@@ -577,6 +577,7 @@
   (concat-string "L" (number->string (incr (<llvm-compiler>-label-counter -c-)))))
 
 (define-function %gen (-c- factory args)
+  ;; TODO it feels wasteful/unnecessary to allocate an instr instance here...
   (let ((instr (factory)))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))

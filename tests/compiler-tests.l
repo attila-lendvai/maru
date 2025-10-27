@@ -5,30 +5,41 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
+;;; TODO this is kind of a mess. currently it REQUIRE's way more than
+;;; it should need.
+
 (load (concat-strings "source/emit-" *compiler-backend* ".l"))
 
-;; (load (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
+;; (require (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
 
 (switch-to-target-env)
 
-;;(define gc/let* let*)
+;; disable unconditionally
+;;(define-form debug		prog ())
 
-;; (load "source/platforms/linux/linux.l")
-
-(load "source/platforms/libc/libc.l")
-
-;;(load "source/debug-min.l")
-(load "source/evaluator/vm-early.l")
+(require "source/platforms/libc/libc.l")
 
 ;; turn off some stuff that would bring in more dependencies
-(define-form assert (test . args) ())
-(define-function error-prologue ()
-  (platform/diag-print "\nERROR: "))
-(define-function %error (arg)
-  (platform/diag-print "%error reached"))
+;; (define-form assert (test . args) ())
+;; (define-function error-prologue ()
+;;   (platform/diag-print "\nERROR: "))
+;; (define-function %error (arg)
+;;   (platform/diag-print "%error reached"))
+;; (define-form fatal forms
+;;   `(let ()
+;;      (platform/diag-print "FATAL happened")
+;;      (platform/halt)))
 
-(load "source/evaluator/gc.l")
-(load "source/evaluator/types.l")
+;;(define gc/let* let*)
+
+;; (require "source/platforms/linux/linux.l")
+
+;;(require "source/evaluator/vm-early.l")
+
+;;(require "source/debug-min.l")
+
+;;(require "source/evaluator/gc.l")
+;;(require "source/evaluator/types.l")
 
 (define-form assert (test . args)
   `(or ,test (failure ,@(or args (list "an assert failed")))))

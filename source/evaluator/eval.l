@@ -198,6 +198,7 @@
 ;;; ----------------------------------------------------------------
 
 (define-primitive-function string->symbol ((str <string>))
+  ;; aka intern
   (array-binary-search *symbols*
                        str
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
