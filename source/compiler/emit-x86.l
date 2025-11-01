@@ -44,47 +44,6 @@
 (unless (= 32 (target-value +word-size-in-bits+))
   (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))
 
-;;; DEFINE-INSTRUCTION
-
-(define-form define-instruction (name)
-  (let ((type-name (symbol->type-name name)))
-    `(let ()
-       (define-type ,type-name)
-       (define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
-       (define ,name (new ,type-name)))))
-
-;;; DEFINE-EMIT
-
-(define-form emit args
-  `(emit-instruction ,@args))
-
-(define-generic emit-instruction)
-
-(define-function %define-emit-param-name (index)
-  (string->symbol (concat-string "$" (number->string index))))
-
-(define-function %define-emit-params (index types)
-  (when (pair? types)
-    (cons (list (awhen (and (not (= (first types) '_))
-                              (first types))
-                  (symbol->type-name it))
-                (%define-emit-param-name index))
-          (%define-emit-params (+ index 1) (cdr types)))))
-
-;; this is faster than (emit COMMENT ...) by skipping the evaluation early
-(define-form emit-comment (level . args)
-  `(when (<= ,level *compiler-verbosity*)
-     (emit COMMENT (list ,@args))))
-
-(define-form define-emit (op-args . body)
-  (let* ((op-name (car op-args))
-         (type-name (symbol->type-name op-name)))
-    `(let ()
-       ,@(unless (defined? op-name)
-           `((define-instruction ,op-name)))
-       (define-multimethod emit-instruction ((,type-name __op__) ,@(%define-emit-params 1 (cdr op-args)))
-         ,@body))))
-
 (define-function mangle-label (name)
   (with-forms ((putnext ((c) `(string-append mangled ,c))))
     (let* ((plain   (symbol->string name))
@@ -127,215 +86,255 @@
 ;;;
 ;;; IA32 -- INSTRUCTIONS
 ;;;
-(define-emit    (COMMENT pair)			(print "# ") (apply println $1))
+(define-instruction COMMENT	()
+  ((pair)			(print "# ") (apply println $1)))
 
-(define-emit    (TEXT)				(println "	.text"))
-(define-emit    (DATA)				(println "	.section .data"))
-(define-emit    (RODATA)			(println "	.section .rodata"))
-;;(define-emit    (SECTION string)		(println "	.section "$1))
+(define-instruction TEXT	()
+  (()				(println "	.text")))
 
-;;(define-emit    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
-(define-emit    (TYPE _ _)			(println "	.type "$1", "$2))
-(define-emit    (ALIAS _ _)			(println "	.set "$1", "$2))
-(define-emit    (EXPORT LABEL)			(println "	.globl "$1))
-(define-emit    (ALIGN long)			(println "	.align " $1))
-;; TODO rename to WORD? bring closer to the llvm backend
-(define-emit    (LONG _)			(println "	.4byte	"$1))
-(define-emit    (PTR _)				(println "	.4byte	"$1))
-(define-emit    (ASCIZ string)			(print   "	.asciz ") (dumpln $1))
+(define-instruction DATA	()
+  (()				(println "	.section .data")))
+
+(define-instruction RODATA	()
+  (()				(println "	.section .rodata")))
+
+;;(define-instruction    (SECTION string)		(println "	.section "$1))
+;;(define-instruction    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
+
+(define-instruction TYPE	()
+  ((_ _)			(println "	.type "$1", "$2)))
+
+(define-instruction ALIAS	()
+  ((_ _)			(println "	.set "$1", "$2)))
+
+(define-instruction EXPORT	()
+  ((LABEL)			(println "	.globl "$1)))
+
+(define-instruction ALIGN	()
+  ((long)			(println "	.align " $1)))
+
+(define-instruction ASCIZ	()
+  ((string)			(print   "	.asciz ") (dumpln $1)))
+
 ;; TODO rename to DEFINE? that would be less unique
-(define-emit    (DEFLABEL LABEL)		(println $1":"))
+(define-instruction DEFLABEL	()
+  ((LABEL)			(println $1":")))
+
+;; TODO rename to WORD? bring closer to the llvm backend
+(define-instruction LONG	()
+  ((_)				(println "	.4byte	"$1)))
+
+(define-instruction PTR		()
+  ((_)				(println "	.4byte	"$1)))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
-(define-emit    (ENTER long)			(println "	pushl	%ebp")
-						(println "	movl	%esp, %ebp")
-						(unless (= 0 $1)
-                                                  (println "	subl	$"$1", %esp")))
+(define-instruction ENTER	()
+  ((long)			(println "	pushl	%ebp")
+				(println "	movl	%esp, %ebp")
+				(unless (= 0 $1)
+				  (println "	subl	$"$1", %esp"))))
 
-(define-emit    (LEAVE long)			(println "	leave")
-						(println "	ret"))
+(define-instruction LEAVE	()
+  ((long)			(println "	leave")
+				(println "	ret")))
 
-(define-emit    (NEG)				(println "	negl	%eax"))
+(define-instruction NEG		()
+  (()				(println "	negl	%eax")))
 
-(define-emit    (ADD TI32)			(println "	addl	"$1", %eax"))
+(define-instruction ADD		()
+  ((TI32)			(println "	addl	"$1", %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	addl	"$1", %eax"))))
 
-(define-emit    (ADD LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	addl	"$1", %eax")))
+(define-instruction SUB		()
+  ((TI32)			(println "	subl	"$1", %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	subl	"$1", %eax"))))
 
-(define-emit    (SUB TI32)			(println "	subl	"$1", %eax"))
+(define-instruction MUL		()
+  ((TI32)			(println "	mull	"$1))
+  ((LI32)			(cond
+				  ((= (<LI32>-value $1) 1)) ; nothing to do
+				  ;; TODO emit shifts when possible
+				  (else
+				   (println "	movl	"$1", %ecx")
+				   (println "	mull	%ecx")))))
 
-(define-emit    (SUB LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	subl	"$1", %eax")))
+;; divl is unsigned division
+(define-instruction DIV		()
+  ((TI32)			(println "	xorl	%edx, %edx")
+				(println "	divl	"$1))
+  ((LI32)			(cond
+                                  ((= (<LI32>-value $1) 1)
+                                   ;; remainder is zero, %eax is unchanged
+                                   (println "	xorl	%edx, %edx"))
+                                  ;; TODO emit shifts when possible
+                                  (else
+                                   (println "	xorl	%edx, %edx") ; the upper side of 64 bit operand
+                                   (println "	movl	"$1", %ecx") ; divisor
+                                   (println "	divl	%ecx")))))
 
-(define-emit    (MUL TI32)			(println "	mull	"$1))
+(define-instruction AND		()
+  ((TI32)			(println "	andl	"$1", %eax"))
+  ((LI32)			(unless (= -1 (<LI32>-value $1))
+				  (println "	andl	"$1", %eax"))))
 
-(define-emit    (MUL LI32)			(cond
-                                                  ((= (<LI32>-value $1) 1)) ; nothing to do
-                                                  ;; TODO emit shifts when possible
-						  (else
-                                                   (println "	movl	"$1", %ecx")
-						   (println "	mull	%ecx"))))
+(define-instruction OR		()
+  ((TI32)			(println "	orl	"$1", %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	orl	"$1", %eax"))))
 
-(define-emit    (DIV TI32)			(println "	xorl	%edx, %edx")
-						(println "	divl	"$1))
+(define-instruction XOR		()
+  ((TI32)			(println "	xorl	"$1", %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	xorl	"$1", %eax"))))
 
-(define-emit    (DIV LI32)			(cond
-                                                  ((= (<LI32>-value $1) 1)
-                                                   ;; remainder is zero, %eax is unchanged
-                                                   (println "	xorl	%edx, %edx"))
-                                                  ;; TODO emit shifts when possible
-                                                  (else
-                                                   (println "	xorl	%edx, %edx") ; the upper side of 64 bit operand
-						   (println "	movl	"$1", %ecx") ; divisor
-						   (println "	divl	%ecx"))))    ; divl is unsigned division
+(define-instruction BITWISE-NOT	()
+  (()				(println "	notl	%eax")))
 
-(define-emit    (AND TI32)			(println "	andl	"$1", %eax"))
-(define-emit    (AND LI32)			(unless (= -1 (<LI32>-value $1))
-                                                  (println "	andl	"$1", %eax")))
-(define-emit    (OR  TI32)			(println "	orl	"$1", %eax"))
-(define-emit    (OR  LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	orl	"$1", %eax")))
-(define-emit    (XOR TI32)			(println "	xorl	"$1", %eax"))
-(define-emit    (XOR LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	xorl	"$1", %eax")))
-(define-emit    (BITWISE-NOT)			(println "	notl	%eax"))
+(define-instruction LOGIC-NOT	()
+  (()				(println "	cmpl	$0, %eax")
+				(println "	sete	%al")
+				(println "	movzbl	%al, %eax")))
 
-(define-emit    (LOGIC-NOT)			(println "	cmpl	$0, %eax")
-						(println "	sete	%al")
-						(println "	movzbl	%al, %eax"))
+(define-form define-instruction/comparator (maru-name x86-name)
+  `(define-instruction ,maru-name ()
+     ((TI32)
+      (println "	cmpl	"$1", %eax")
+      (println "	" ,x86-name "	%al")
+      (println "	movzbl	%al, %eax"))
+     ((LI32)
+      (println "	cmpl	"$1", %eax")
+      (println "	" ,x86-name "	%al")
+      (println "	movzbl	%al, %eax"))))
 
-(define-form define-emit/comparator (maru-name x86-name)
-  (unless (defined? maru-name)
-    ;; TODO KLUDGE we need to do this early, otherwise the expanded define-emit's would define it twice in their own expand-time
-    (eval `(define-instruction ,maru-name)))
-  `(let ()
-     (define-emit (,maru-name TI32)
-       (println "	cmpl	"$1", %eax")
-       (println "	" ,x86-name "	%al")
-       (println "	movzbl	%al, %eax"))
-     (define-emit (,maru-name LI32)
-       (println "	cmpl	"$1", %eax")
-       (println "	" ,x86-name "	%al")
-       (println "	movzbl	%al, %eax"))))
+(define-instruction/comparator LT "setl")
+(define-instruction/comparator LE "setle")
+(define-instruction/comparator EQ "sete")
+(define-instruction/comparator GE "setge")
+(define-instruction/comparator GT "setg")
+;;(define-instruction/comparator NE "setne")
 
-(define-emit/comparator LT "setl")
-(define-emit/comparator LE "setle")
-(define-emit/comparator EQ "sete")
-(define-emit/comparator GE "setge")
-(define-emit/comparator GT "setg")
-;;(define-emit/comparator NE "setne")
+(define-instruction ASL		()
+  ((TI32)			(println "	movl	"$1", %ecx")
+				(println "	sall	%cl, %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	shll	"$1", %eax"))))
 
-(define-emit    (ASL TI32)			(println "	movl	"$1", %ecx")
-						(println "	sall	%cl, %eax"))
+(define-instruction ASR		()
+  ((TI32)			(println "	movl	"$1", %ecx")
+				(println "	sarl	%cl, %eax"))
+  ((LI32)			(unless (= 0 (<LI32>-value $1))
+				  (println "	sarl	"$1", %eax"))))
 
-(define-emit    (ASL LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	shll	"$1", %eax")))
+(define-instruction BR		()
+  ((LABEL)			(println "	jmp	"$1)))
 
-(define-emit    (ASR TI32)			(println "	movl	"$1", %ecx")
-						(println "	sarl	%cl, %eax"))
+(define-instruction BF		()
+  ((LABEL)			(println "	cmpl	$0, %eax")
+				(println "	je	"$1)))
 
-(define-emit    (ASR LI32)			(unless (= 0 (<LI32>-value $1))
-                                                  (println "	sarl	"$1", %eax")))
+(define-instruction BT		()
+  ((LABEL)			(println "	cmpl	$0, %eax")
+				(println "	jne	"$1)))
 
-(define-emit    (BR LABEL)			(println "	jmp	"$1))
+(define-instruction CALLPTR	()
+  ((_)				(println "	call	*%eax")))
 
-(define-emit    (BF LABEL)			(println "	cmpl	$0, %eax")
-						(println "	je	"$1))
-
-(define-emit    (BT LABEL)			(println "	cmpl	$0, %eax")
-						(println "	jne	"$1))
-
-(define-emit    (CALLPTR _)			(println "	call	*%eax"))
 ;; TODO arg2 is arg-locs. what for? for the arity? delme?
-(define-emit    (CALL LABEL _)			(println "	call	"$1))
+(define-instruction CALL	()
+  ((LABEL _)			(println "	call	"$1)))
 
-(define-emit    (LOAD LI32)			(if (= 0 (<LI32>-value $1))
-                                                    (println "	xorl	%eax, %eax")
-                                                  (println "	movl	"$1", %eax")))
-(define-emit    (LOAD LABEL)			(println "	movl	$"$1", %eax"))
-(define-emit    (LOAD _)			(println "	movl	"$1", %eax"))
+(define-instruction LOAD	()
+  ((LI32)			(if (= 0 (<LI32>-value $1))
+				    (println "	xorl	%eax, %eax")
+				  (println "	movl	"$1", %eax")))
+  ((LABEL)			(println "	movl	$"$1", %eax"))
+  ((_)				(println "	movl	"$1", %eax")))
 
-(define-emit    (STORE _)			(println "	movl	%eax, "$1))
+(define-instruction STORE	()
+  ((_)				(println "	movl	%eax, "$1)))
 
-(define-emit    (ADDR GI32)			(println "	movl	$"$1", %eax"))
-(define-emit    (ADDR _)			(println "	leal	"$1", %eax"))
+(define-instruction ADDR	()
+  ((GI32)			(println "	movl	$"$1", %eax"))
+  ((_)				(println "	leal	"$1", %eax")))
 
-(define-emit    (MOVE TI32 TI32)		(println "	movl	"$1", %ecx")
-						(println "	movl	%ecx, "$2))
-
-(define-emit    (MOVE LI32 TI32)		(println "	movl	"$1", "$2))
+(define-instruction MOVE	()
+  ((TI32 TI32)			(println "	movl	"$1", %ecx")
+				(println "	movl	%ecx, "$2))
+  ((LI32 TI32)			(println "	movl	"$1", "$2)))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
-(define-emit    (LOAD-I8 TI32)			(println "	movl	"$1", %ecx")
-						(println "	leal	(%eax, %ecx), %ecx")
-						(println "	xorl	%eax, %eax")
-						(println "	movb	(%ecx), %al"))
+(define-instruction LOAD-I8	()
+  ((TI32)			(println "	movl	"$1", %ecx")
+				(println "	leal	(%eax, %ecx), %ecx")
+				(println "	xorl	%eax, %eax")
+				(println "	movb	(%ecx), %al"))
+  ((LI32)			(let ((offset (<LI32>-value $1)))
+				  (if (= 0 offset)
+				      (println "	movl	%eax, %ecx")
+				    (println "	leal	"offset"(%eax), %ecx")))
+				(println "	xorl	%eax, %eax")
+				(println "	movb	(%ecx), %al")))
 
-(define-emit    (LOAD-I8 LI32)			(let ((offset (<LI32>-value $1)))
-                                                  (if (= 0 offset)
-                                                      (println "	movl	%eax, %ecx")
-                                                    (println "	leal	"offset"(%eax), %ecx")))
-						(println "	xorl	%eax, %eax")
-						(println "	movb	(%ecx), %al"))
+(define-instruction STORE-I8	()
+  ((TI32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+                                    ;; NOTE this works out just fine for a TI32, too, because we are little-endian.
+                                    (let ()
+                                      (println "	movl	"$1", %ecx")
+                                      (println "	leal	(%eax, %ecx), %ecx")
+                                      (println "	xor	%eax, %eax")
+                                      (println "	movb	"$2", %al")
+                                      (println "	movb	%al, (%ecx)"))
+                                  (println "	movl	"$1", %ecx")
+                                  (println "	leal	(%eax, %ecx), %eax")
+                                  (println "	movb	"$2", (%eax)")))
+  ((LI32 _)			(let ((offset (<LI32>-value $1)))
+                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                      (let ()
+                                        (if (= 0 offset)
+                                            (println "	movl	%eax, %ecx")
+                                          (println "	leal	"offset"(%eax), %ecx"))
+                                        (println "	xor	%eax, %eax")
+                                        (println "	movb	"$2", %al") ; this also leaves it as return value in %eax
+                                        (println "	movb	%al, (%ecx)"))
+                                    (unless (= 0 offset)
+                                      (println "	leal	"offset"(%eax), %eax"))
+                                    (println "	movb	"$2", (%eax)")))))
 
-(define-emit    (STORE-I8 TI32 _)		(if-at-expand feature/strict-semantics-for-compiled-set
-						    ;; NOTE this works out just fine for a TI32, too, because we are little-endian.
-                                                    (let ()
-                                                      (println "	movl	"$1", %ecx")
-						      (println "	leal	(%eax, %ecx), %ecx")
-                                                      (println "	xor	%eax, %eax")
-                                                      (println "	movb	"$2", %al")
-						      (println "	movb	%al, (%ecx)"))
-                                                  (println "	movl	"$1", %ecx")
-						  (println "	leal	(%eax, %ecx), %eax")
-						  (println "	movb	"$2", (%eax)")))
+(define-instruction LOAD-OOP	()
+  ((TI32)			(println "	movl	"$1", %ecx")
+                                (println "	leal	(%eax, %ecx, 4), %ecx")
+                                (println "	movl	(%ecx), %eax"))
+  ((LI32)			(let ((offset (<LI32>-value $1)))
+                                  (if (= 0 offset)
+                                      (println "	movl	(%eax), %eax")
+                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")
+                                    (println "	movl	(%ecx), %eax")))))
 
-(define-emit    (STORE-I8 LI32 _)		(let ((offset (<LI32>-value $1)))
-                                                  (if-at-expand feature/strict-semantics-for-compiled-set
-                                                      (let ()
-                                                        (if (= 0 offset)
-                                                            (println "	movl	%eax, %ecx")
-                                                          (println "	leal	"offset"(%eax), %ecx"))
-                                                        (println "	xor	%eax, %eax")
-                                                        (println "	movb	"$2", %al") ; this also leaves it as return value in %eax
-						        (println "	movb	%al, (%ecx)"))
-                                                    (unless (= 0 offset)
-                                                      (println "	leal	"offset"(%eax), %eax"))
-                                                    (println "	movb	"$2", (%eax)"))))
-
-(define-emit    (LOAD-OOP TI32)			(println "	movl	"$1", %ecx")
-						(println "	leal	(%eax, %ecx, 4), %ecx")
-						(println "	movl	(%ecx), %eax"))
-
-(define-emit    (LOAD-OOP LI32)			(let ((offset (<LI32>-value $1)))
-                                                  (if (= 0 offset)
-                                                      (println "	movl	(%eax), %eax")
-                                                    (println "	leal	"(* 4 offset)"(%eax), %ecx")
-                                                    (println "	movl	(%ecx), %eax"))))
-
-(define-emit    (STORE-OOP TI32 _)		(if-at-expand feature/strict-semantics-for-compiled-set
-                                                    (let ()
-                                                      (println "	movl	"$1", %ecx")
-						      (println "	leal	(%eax, %ecx, 4), %ecx")
-                                                      (println "	movl	"$2", %eax")
-						      (println "	movl	%eax, (%ecx)"))
-                                                  (println "	movl	"$1", %ecx")
-						  (println "	leal	(%eax, %ecx, 4), %eax")
-                                                  (println "	movl	"$2", (%eax)")))
-
-(define-emit    (STORE-OOP LI32 _)		(let ((offset (<LI32>-value $1)))
-                                                  (if-at-expand feature/strict-semantics-for-compiled-set
-                                                      (let ()
-                                                        (if (= 0 offset)
-                                                            (println "	movl	%eax, %ecx")
-                                                          (println "	leal	"(* 4 offset)"(%eax), %ecx"))
-                                                        (println "	movl	"$2", %eax") ; this also leaves it as return value in %eax
-                                                        (println "	movl	%eax, (%ecx)"))
-                                                    (unless (= 0 offset)
-                                                      (println "	leal	"(* 4 offset)"(%eax), %eax"))
-                                                    (println "	movl	"$2", (%eax)"))))
+(define-instruction STORE-OOP	()
+  ((TI32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+                                    (let ()
+                                      (println "	movl	"$1", %ecx")
+                                      (println "	leal	(%eax, %ecx, 4), %ecx")
+                                      (println "	movl	"$2", %eax")
+                                      (println "	movl	%eax, (%ecx)"))
+                                  (println "	movl	"$1", %ecx")
+                                  (println "	leal	(%eax, %ecx, 4), %eax")
+                                  (println "	movl	"$2", (%eax)")))
+  ((LI32 _)			(let ((offset (<LI32>-value $1)))
+                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                      (let ()
+                                        (if (= 0 offset)
+                                            (println "	movl	%eax, %ecx")
+                                          (println "	leal	"(* 4 offset)"(%eax), %ecx"))
+                                        (println "	movl	"$2", %eax") ; this also leaves it as return value in %eax
+                                        (println "	movl	%eax, (%ecx)"))
+                                    (unless (= 0 offset)
+                                      (println "	leal	"(* 4 offset)"(%eax), %eax"))
+                                    (println "	movl	"$2", (%eax)")))))
 
 ;;;
 ;;; Compiler Infrastructure
@@ -357,11 +356,6 @@
     (arg-offset			0)
     (arg-limit			0)))
 
-(define-form comp (obj)
-  `(let ((__obj__ ,obj))
-     (emit-comment 2 "COMPILE of "__obj__)
-     (compile __obj__ -c-)))
-
 (define compiler x86-compiler)
 
 (define-function new-temp (-c-)
@@ -372,12 +366,13 @@
   (when (is <TI32> obj)
     (push (<compiler>-temps -c-) obj)))
 
-(define-form gen args
-  `(array-append (<compiler>-gen-buffer -c-) (list ,@args)))
-
-(define-function emit-gen-buffer (-c-)
-  (array-do entry (<compiler>-gen-buffer -c-)
-    (apply emit-instruction entry)))
+(define-function %gen (-c- factory args)
+  ;; TODO it feels wasteful/unnecessary to allocate an instr instance here...
+  (let ((instr (factory)))
+    (emit-comment 2 "GEN of "instr", args: " args)
+    ;; save into the gen buffer
+    (array-append (<compiler>-gen-buffer -c-) (cons instr args))
+    ()))
 
 ;; parameters are what functions have
 (define-function new-param (c)
@@ -408,7 +403,7 @@
 
 ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
 
-(define-function emit-object/C-string (self)
+(define-function emit-object/C-string (self -c-)
   (let ((label (UNIQUE-LABEL "cstr")))
     (emit RODATA)
     (emit DEFLABEL label)
@@ -430,10 +425,9 @@
              ;; results in confused bindings and/or closure capturing.
              ;; TODO undo the inlining once eval/closures/bug/1 is fixed
              ;;(canary-value	(slave-value +canary-value+))
-             (canary-emitter	(if (slave-value feature/object-canary)
-                                    (lambda () (emit LONG (slave-value +canary-value+)))
-                                  (lambda ()))))
-         (lambda (type type-id)
+             (canary-emitter	(when (slave-value feature/object-canary)
+                                  (lambda (-c-) (emit LONG (slave-value +canary-value+))))))
+         (lambda (type type-id -c-)
            (emit-comment 1 "object header")
            ;; NOTE cannot use RODATA because the header and the object
            ;; payload must be consequtive, but the payload values must
@@ -451,7 +445,8 @@
            (emit LONG flags)
            (emit-comment 2 "type: "type)
            (emit LONG type-id)
-           (canary-emitter)
+           (when canary-emitter
+             (canary-emitter -c-))
            ; the object pointer points here
            )))
 
@@ -466,7 +461,7 @@
                             (<boxed-type>-one-word? <long>)))
           (let ((type-id (slave-value (<type>-slave-id <long>))))
             (lambda (self -c-)
-              (emit-object/header <long> type-id)
+              (emit-object/header <long> type-id -c-)
               (let ((object-label (UNIQUE-LABEL "olong")))
                 (emit DEFLABEL object-label)
                 (emit LONG self)
@@ -479,10 +474,10 @@
          (lambda (self -c-)
            (safety 1 (assert (is <string> self)))
            ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-           (let ((elements	(emit-object/C-string self))
+           (let ((elements	(emit-object/C-string self -c-))
                  (size		(emit-object/<long> (string-length self) -c-))
                  (object-label	(UNIQUE-LABEL "ostr")))
-             (emit-object/header <string> type-id)
+             (emit-object/header <string> type-id -c-)
              (emit DEFLABEL object-label)
              (emit PTR size)
              (emit PTR elements)
@@ -510,7 +505,7 @@
                                   (name-factory name -c-)))
                  (counter	(when profiler?
                                   (emit-object/<long> 0 -c-))))
-             (emit-object/header type type-id)
+             (emit-object/header type type-id -c-)
              (emit DEFLABEL object-label)
              (emit PTR entry-label)
              (when name
@@ -546,8 +541,6 @@
 
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
-  (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
-  (emit-comment 3 ", code: "(<expr>-body self))
   (let* ((body		(<expr>-body self))
          (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
          (param-locs
@@ -558,6 +551,8 @@
                   ;; source code.
                   (set (<variable>-value var) (new-param -c-)))
                 (<expr>-parameters self))))
+    (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
+    (emit-comment 3 ", code: "(<expr>-body self))
     ;; Compile the fn body first into the gen buffer (COMP is a form,
     ;; we cannot map it).
     (list-do el body
@@ -799,7 +794,7 @@
   ;; just an optimization to compile string literals into a C string
   ;; when they would be immediately converted anyway.
   (assert (= (list-length expr) 2))
-  (let ((label (emit-object/C-string (second expr))))
+  (let ((label (emit-object/C-string (second expr) -c-)))
     (gen LOAD label)))
 
 ;;;

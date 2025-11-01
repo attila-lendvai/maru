@@ -159,4 +159,103 @@
         (when (< var-level comp-level)
           (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
 
+;;;
+;;; Instructions
+;;;
+
+(define-record <instruction> ()
+  ;; TODO some of these slots are the same for all instances; they should reside on the type
+  (regs
+   has-input?
+   n-regs
+   produces-output?
+   ))
+
+(define-generic emit-instruction)
+
+(define-form emit (instr-name . args)
+  `(%emit -c- ,instr-name (list ,@args)))
+
+(define-function %emit (-c- factory args)
+  (let* ((instr (factory)))
+    (when (<= 3 *compiler-verbosity*)
+      ;; TODO move this into emit-instruction?
+      (println "; EMIT of "instr", args: " args))
+    (apply emit-instruction (cons -c- (cons instr args)))))
+
+(define-function %emit-form/mm-params (index types)
+  (when (pair? types)
+    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
+      (cons (list (awhen (and (not (= (first types) '_))
+                              (first types))
+                    (symbol->type-name it))
+                  param-name)
+            (%emit-form/mm-params (+ index 1) (cdr types))))))
+
+(define-function %emit-form/reg-accessor (index)
+  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
+        (body `(array-at __regs__ ,index)))
+    (list var-name () `((_) ',body))))
+
+(define-function %emit-form/reg-accessors (index)
+  (when (<= 0 index)
+    (cons (%emit-form/reg-accessor index)
+          (%emit-form/reg-accessors (- index 1)))))
+
+(define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
+  (when (pair? emit-forms)
+    (let* ((emit-form (first emit-forms))
+           (args (first emit-form))
+           (body (rest emit-form)))
+      ;; TODO what about dispatching on -c-?
+      ;; (cons `(define-multimethod emit-instruction ((<llvm-compiler> -c-) (,type-name self) ,@(%emit-form/mm-params 1 args))
+      (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
+               ;;(println "; emitting " self)
+               (let ((__regs__ (<instruction>-regs self)))
+                 (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
+                   ,@body)))
+            (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
+
+;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
+(define-form define-instruction (instr-name reg-spec . emit-forms)
+  (let ((has-input?		(first reg-spec))
+        (n-regs			(or (second reg-spec) 0))
+        (produces-output?	(third reg-spec))
+        (type-name		(symbol->type-name instr-name)))
+    `(let ()
+       (define-record ,type-name <instruction> ())
+       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
+       (define-function ,instr-name ()
+         (make ,type-name
+           (has-input?		,has-input?)
+           (n-regs		',n-regs)
+           (produces-output?	,produces-output?)))
+       ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
+
+;; this is faster than (emit COMMENT ...) by skipping the evaluation early
+(define-form emit-comment (level . args)
+  `(when (<= ,level *compiler-verbosity*)
+     (emit COMMENT (list ,@args))))
+
+;;;
+;;; Compiler
+;;;
+
+(define-form comp (obj)
+  `(let ((__obj__ ,obj))
+     (emit-comment 2 "COMPILE of "__obj__)
+     (compile __obj__ -c-)
+     (<compiler>-current-value -c-)))
+
+(define-form gen (instr-name . args)
+  `(%gen -c- ,instr-name (list ,@args)))
+
+(define-function emit-gen-buffer (-c-)
+  (array-do entry (<compiler>-gen-buffer -c-)
+    (let* ((instr (first entry))
+           (args (rest entry)))
+      ;; TODO commented out due to load order headache...
+      ;; (emit-comment 2 "EMIT-INSTRUCTION of "instr", args: "args)
+      (apply emit-instruction (cons -c- (cons instr args))))))
+
 (load "source/compiler/target.l")
