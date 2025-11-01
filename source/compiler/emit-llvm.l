@@ -29,7 +29,7 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(require "source/emit-early.l")
+(require "source/compiler/emit-early.l")
 
 ;; Shall we map function params directly to LLVM IR function params?
 ;; NOTE: They are read-only in LLVM IR, and as of now eval.l violates this assumption.
@@ -866,7 +866,7 @@
     (gen CALL (closure-code-label (<variable>-name op)) arg-regs))
   ())
 
-(define-method compile-call-to <target-function> (op arg-regs -c-)
+(define-method compile-call-to (slave-value <target-function>) (op arg-regs -c-)
   (comp op)
   (compile-call-to-object arg-regs -c-)
   ())
@@ -1295,4 +1295,4 @@
       (emit INLINE (eval '*llvm-platform-specific-prelude*)))
     ))
 
-(require "source/emit-late.l")
+(require "source/compiler/emit-late.l")

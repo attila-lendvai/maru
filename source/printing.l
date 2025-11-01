@@ -65,7 +65,8 @@
                                              (primitive/print-all -stream- self)))
                                         types)))))
   ;; by default redirect the printing of these types to the do-print primfn of the evaluator.
-  (redirect <undefined> <string> <symbol> <long> <array> <variable> <target-function>))
+  ;; TODO i removed  <target-function> from here; what are the negative consequences?
+  (redirect <undefined> <string> <symbol> <long> <array> <variable>))
 
 (with-forms ((redirect (types `(let ()
                                  ,@(map (lambda (type)

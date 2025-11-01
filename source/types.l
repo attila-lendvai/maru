@@ -484,16 +484,12 @@
   (define-immediate	<long>			1 1)
   (define-boxed-word	<long>))				; provides a full-word integer, but bootstrap is about 25% slower
 (define-record		<fixed>			() (function))
-(define-boxed-word	<target-pointer>)			; a pointer into the level-shifted realm, boxed, so that it can be stored in the maru heap
-(define-record		<target-function>	() (program-code
-                                                     (when-at-expand feature/track-expr-names	name)
-                                                     (when-at-expand feature/profiler		profiler-counter)))
 ;;(define-boxed		<symbol>)				; a cstr is inline into the object's body
 (define-record		<symbol>		() (name))
 
 (define-record		<array>			() (size elements))
 (define-record		<string>		() (size elements))
-;; TODO rename body to program-code
+;; TODO rename body to program-code, or maybe machine-code is better
 ;; TODO harmonize name with <target-function>, but how? <function> and <t/function>
 (define-record		<expr>			() (parameters body env ctx
                                                      (when-at-expand feature/track-expr-names	name)

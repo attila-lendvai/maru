@@ -16,8 +16,7 @@
   (buffer-save (<assembler>-buffer a) filename))
 
 (define-function assembler->function (a)
-  (make <target-function>
-    (program-code (<buffer>-elements (<assembler>-buffer a)))))
+  (pointer->target-function (<buffer>-elements (<assembler>-buffer a))))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 

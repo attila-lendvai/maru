@@ -325,6 +325,10 @@
       (error "string->integer: failed for "str))
     (box <long> res)))
 
+(define-primitive-function pointer->target-function (ptr)
+  (make <target-function>
+    (program-code ptr)))
+
 (when-at-expand (= +architecture+ 'IA-32)
   (define-primitive-function call-IA-32-machine-code (fn)
     (debug-print "call-IA-32-machine-code will call "fn)

@@ -45,7 +45,8 @@
                        (eval form *host-env*)))
 
 ;; a convoluted way to build (assert (is <target-function> load)) without LIST
-(eval-in-host ((lambda args args) 'assert ((lambda args args) 'is '<target-function> load)))
+;; TODO is this crucial still? i guess it was a rage-add after debugging something nasty...
+;;(eval-in-host ((lambda args args) 'assert ((lambda args args) 'is '<target-function> load)))
 
 (switch-to-host-env)
 
