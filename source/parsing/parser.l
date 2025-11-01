@@ -9,11 +9,13 @@
 
 (define-selector $size)
 
-(<selector>-add-method $size <string> string-length)
+;; (define-method $size <string> () (string-length self))
+(selector/add-method $size <string> string-length)
 
 (define-selector $at)
 
-(<selector>-add-method $at <string> string-at)
+;; (define-method $at <string> (i) (string-at self i))
+(selector/add-method $at <string> string-at)
 
 ;;;----------------------------------------------------------------
 
