@@ -364,7 +364,10 @@
 (define-instruction DEFINE	()
   ((CONSTANT string)		(let ((length (+ 1 (string-length $2))))
 				  (println $1" = private unnamed_addr constant [" length " x i8] c" (llvm/escape-string $2 true))))
-  ((GLOBAL long)		(println $1" = global %oop inttoptr (%word "$2" to %oop)")))
+  ((GLOBAL long)		(print $1" = global %oop ")
+                                (if (= 0 $2)
+                                    (println "null")
+                                  (println "inttoptr (%word "$2" to %oop)"))))
 
 (define-instruction DECLARE	()
   ((C-function)			(print "declare ") (emit-llvm-C-fn-type $1 true) (println))
