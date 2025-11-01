@@ -11,7 +11,7 @@
 
 (require-cgrov "source/platforms/posix/posix")
 
-(define-C-functions lower/posix/
+(define-C-functions posix/
   ;;(* getcwd (* size_t))
   ;; (int chdir (*)) we handle chdir in a libc wrapper; too precious to skip there
   (* fdopen (int *))
@@ -30,7 +30,7 @@
 (define-form platform/acquire-memory (in-size)
   `(let* ((size		,in-size)
           (buf		(libc/malloc size))
-          (page-size	(lower/posix/sysconf posix/_SC_PAGESIZE))
+          (page-size	(posix/sysconf posix/_SC_PAGESIZE))
           ;; the page-size-alined boundaries encompassing the returned block
           (addr-start	(align-address-down buf page-size))
           (addr-size	(- (align-address-up (+ buf size) page-size)
@@ -40,9 +40,9 @@
        (platform/halt))
      ;; KLUDGE we make all allocated memory executable.
      ;; `make test-elf` generates machine code and wants to call it...
-     (unless (= 0 (lower/posix/mprotect addr-start addr-size
-                                        ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
-                                            posix/PROT_EXEC)))
+     (unless (= 0 (posix/mprotect addr-start addr-size
+                                  ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
+                                      posix/PROT_EXEC)))
        (platform/diag-print "mprotect failed")
        ;;(platform/diag-print "mprotect returned with "(long libc/errno))
        (platform/halt))
@@ -57,7 +57,7 @@
 ;; (define-form platform/acquire-memory (size)
 ;;   ;; KLUDGE we make all allocated memory executable.
 ;;   ;; `make test-elf` generates machine code and wants to call it...
-;;   `(let* ((page-size (lower/posix/sysconf posix/_SC_PAGESIZE))
+;;   `(let* ((page-size (posix/sysconf posix/_SC_PAGESIZE))
 ;;           (buf (posix/mmap 0 (align-address-up ,size page-size)
 ;;                           ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
 ;;                               posix/PROT_EXEC)
