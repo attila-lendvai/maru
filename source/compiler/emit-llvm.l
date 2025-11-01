@@ -245,11 +245,10 @@
        (define-record ,type-name <instruction> ())
        ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
        (define-function ,instr-name ()
-         (let ((i (new ,type-name)))
-           (set (<instruction>-has-input? i)		',has-input?)
-           (set (<instruction>-n-regs i)		',n-regs)
-           (set (<instruction>-produces-output? i)	',produces-output?)
-           i))
+         (make ,type-name
+           (has-input?		,has-input?)
+           (n-regs		',n-regs)
+           (produces-output?	,produces-output?)))
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
 ;; this is faster than (emit COMMENT ...) by skipping the evaluation early
@@ -379,27 +378,27 @@
 (define-instruction ALLOCA	()
   ((TEMP)			(println "	"$1" = alloca %oop")))
 
-(define-instruction SEXT	(t 1 t)
+(define-instruction SEXT	(true 1 true)
   ((LOCAL _ _)			(println "	"$reg1" = sext "$2" "$1" to "$3)))
 
-(define-instruction INTTOPTR	(t 1 t)
+(define-instruction INTTOPTR	(true 1 true)
   ((LOCAL _)			(println "	"$reg1" = inttoptr "$2" "$1" to %oop")))
 
-(define-instruction BITCAST	(t 1 t)
+(define-instruction BITCAST	(true 1 true)
   ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
-(define-instruction GEP	(t 1 t)
+(define-instruction GEP		(true 1 true)
   ;; args: ptr type index1 index2
   ((_ _ _ _)			(println "	"$reg1" = getelementptr "$2", "$2"* "$1", i32 "$3", i32 "$4)))
 
-(define-instruction RET		(() 1 ())
+(define-instruction RET		(false 1 false)
   ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %oop")
                                 (println "	ret %oop "$reg1))
   ;; ((TEMP)			(println "	"$reg1" = load %oop, %oop* "$1)
   ;;       			(println "	ret %oop "$reg1))
   ((LOCAL)			(println "	ret %oop "$1)))
 
-(define-instruction LOAD	(() 1 t)
+(define-instruction LOAD	(false 1 true)
   ;; args: ptr type (for method dispatch)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
   ((TEMP    _)			(println "	"$reg1" = load %oop, %oop* "$1))
@@ -419,12 +418,12 @@
   ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
                                   (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
 
-(define-instruction STORE	(t 0 ())
+(define-instruction STORE	(true 0 false)
   ((_ _)			(println "	store %oop "$1", %oop* "$2))
   ((LOCAL C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
 				  (println "	store "type" "$1", "type"* @"(<C-variable>-name $2)))))
 
-(define-instruction ADDR	(() 2 t)
+(define-instruction ADDR	(false 2 true)
   ((CONSTANT string)		(let* ((str (<CONSTANT>-value $1))
                                        (length (+ 1 (string-length str))))
                                   (println "	"$reg2" = getelementptr [" length " x i8], [" length " x i8]* "$1", %word 0, %word 0")))
@@ -438,19 +437,19 @@
 ;; TODO this crashes llvm: https://bugs.llvm.org/show_bug.cgi?id=49635
 ;; reported as: https://github.com/llvm/llvm-project/issues/164427
 ;; NOTE it's only supported on arm: https://llvm.org/docs/LangRef.html#id419
-;; (define-instruction SPONENTRY	(() 1 t)
+;; (define-instruction SPONENTRY	(false 1 true)
 ;;   (()				(println "	"$reg1" = call ptr @llvm.sponentry()")))
 ;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
-(define-instruction SPONENTRY	(() 4 t)
+(define-instruction SPONENTRY	(false 4 true)
   (()				(println "	"$reg1" = call ptr @llvm.frameaddress(i32 0)")
 				(println "	"$reg2" = bitcast %oop "$reg1" to [0 x %oop]*")
 				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg2", %word 0, %word 1")
                                 (println "	"$reg4" = bitcast %oop* "$reg3" to %oop")))
 
-;; (define-instruction FRAMEADDRESS	(() 1 t)
+;; (define-instruction FRAMEADDRESS	(false 1 true)
 ;;   ((long)			(println "	"$reg1" = call ptr @llvm.frameaddress(i32 "$1")")))
 
-(define-instruction CALL	(() 1 t)
+(define-instruction CALL	(false 1 true)
   ((GLOBAL _)			(emit-llvm-call $reg1
                                                 $1
                                                 $2
@@ -464,7 +463,7 @@
                                                 (map C-type->llvm-type (<C-function>-parameter-types $1))
                                                 (<C-function>-vararg? $1))))
 
-(define-instruction CALLPTR	(t 2 t)
+(define-instruction CALLPTR	(true 2 true)
   ((LOCAL _)			(let ((param-types (map (lambda _ '%oop) $2)))
                                   (print "	"$reg1" = bitcast %oop "$1" to ")
                                   (emit-llvm-fn-type '%oop param-types ())
@@ -477,24 +476,24 @@
 (define-instruction BR		()
   ((LABEL)			(println "	br label %"$1)))
 
-(define-instruction BRIF	(t 2 ())
+(define-instruction BRIF	(true 2 false)
   ((LOCAL LABEL LABEL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = icmp ne %word "$reg1", 0")
 				(println "	br i1 "$reg2", label %"$2", label %"$3)))
 
-(define-instruction NEG		(t 3 t)
+(define-instruction NEG		(true 3 true)
   ((LOCAL)			(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = sub nsw %word 0, "$reg1)
 				(println "	"$reg3" = inttoptr %word "$reg2" to %oop")))
 
-(define-instruction LOGIC-NOT	(t 4 t)
+(define-instruction LOGIC-NOT	(true 4 true)
   ((LOCAL)			(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = icmp eq %word "$reg1", 0")
 				(println "	"$reg3" = zext i1 "$reg2" to %word")
 				(println "	"$reg4" = inttoptr %word "$reg3" to %oop")))
 
 (define-form define-cmp-instruction (instr-name llvm-comparator)
-  `(define-instruction ,instr-name (t 4 t)
+  `(define-instruction ,instr-name (true 4 true)
     ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = icmp " ,llvm-comparator " %word "$reg1", "$reg2)
@@ -508,7 +507,7 @@
 ;;(define-cmp-instruction NE "ne")
 
 (define-form define-arithmetic-instruction (instr-name llvm-op)
-  `(define-instruction ,instr-name (t 4 t)
+  `(define-instruction ,instr-name (true 4 true)
     ((LOCAL LOCAL)		(println "	"$reg1" = ptrtoint %oop "$1" to %word")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = " ,llvm-op " %word "$reg1", "$reg2)
@@ -527,14 +526,14 @@
 (define-arithmetic-instruction ASR "ashr")
 
 ;; args: baseptr, index
-(define-instruction LOAD-I8	(t 5 t)
+(define-instruction LOAD-I8	(true 5 true)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
 ;; args: baseptr, index
-(define-instruction LOAD-OOP	(t 4 t)
+(define-instruction LOAD-OOP	(true 4 true)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$reg2)
@@ -544,7 +543,7 @@
 				(println "	"$reg4" = load %oop, %oop* "$reg2)))
 
 ;; args: baseptr, index, value
-(define-instruction STORE-I8	(t 6 t)
+(define-instruction STORE-I8	(true 6 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
@@ -553,7 +552,7 @@
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
 				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
 
-(define-instruction STORE-OOP	(t 4 t)
+(define-instruction STORE-OOP	(true 4 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$reg2)

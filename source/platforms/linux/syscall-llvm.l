@@ -3,7 +3,7 @@
 ;;; https://blog.packagecloud.io/eng/2016/04/05/the-definitive-guide-to-linux-system-calls/
 ;;; https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux
 
-(define-instruction LINUX-SYSCALL (() 1 t)
+(define-instruction LINUX-SYSCALL (false 1 true)
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
    (print "	"$reg1" = call %oop asm sideeffect \"") ; sideffect means: never optimize away
