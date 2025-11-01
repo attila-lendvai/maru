@@ -55,7 +55,7 @@ ifeq ($(HOST_OS),Linux)
   # `command time` forces bash to use the external time command
   # setarch --addr-no-randomize improves debuggability of lowlevel
   # issues (but it's problematic in containers/CI).
-  TIME		= time --format="\n$(GREEN)user time: %U$(RESET)\n"
+  TIME		= time --format="\n$(GREEN)user time: %U$(RESET)"
   EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
@@ -144,6 +144,11 @@ else
 endif
 
 BACKDATE_FILE	= touch -t 200012312359
+# This should be something that prints the file size, but otherwise
+# fails gracefully when something is not available.
+define print_file_size
+  { echo && echo -n "$(1): $(GREEN)" && stat -c%s $(1) | numfmt --grouping && echo "$(RESET)" || true; }
+endef
 
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
@@ -393,7 +398,7 @@ define compile-x86
 	source/bootstrapping/late.l						\
 	$(3)									\
 	source/emit-finish.l							\
-	>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 
@@ -414,7 +419,7 @@ define compile-llvm
 	source/bootstrapping/late.l						\
 	$(3)									\
 	source/emit-finish.l							\
-	>$(4) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 
@@ -461,6 +466,7 @@ $(BUILD)/generated/x86-instructions.l: $(GEN_EVAL) source/assembler/gen-x86-inst
 $(BUILD_x86)/%: $(BUILD_x86)/%.s
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_x86) -o $@ $(EVAL_OBJ_x86) $<
+	@$(call print_file_size,$@)
 	@-$(STRIP) $@ -o $@.stripped
 
 $(BUILD_x86)/%.o: source/platforms/$(PLATFORM)/%.c
@@ -473,6 +479,7 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 # generate different code. is it better or worse than clang's output?
 	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
+	@$(call print_file_size,$@)
 	objdump --disassemble $@ >$@.dis.s
 	@-$(STRIP) $@ -o $@.stripped
 #	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -S -o $@.clang.s $<
