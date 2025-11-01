@@ -11,11 +11,6 @@
 (load "source/evaluator/gc.l")
 (load "source/evaluator/eval.l")
 
-(define-vm-function set-working-directory ((path <string>))
-  (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
-  (unless (= 0 (linux-syscall linux/SYS_chdir (string->C-string path)))
-    (error "set-working-directory: linux/SYS_chdir failed for "path)))
-
 (load "source/platforms/linux/streams.l")
 (load "source/platforms/linux/vm-functions.l")
 (load "source/evaluator/vm-with-file-support.l")

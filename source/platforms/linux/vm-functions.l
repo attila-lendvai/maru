@@ -1,5 +1,36 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-function spawn-program (path argv envp)
+  ;; (debug (platform/diag-print "spawn-program is about to spawn '"(string path)"'\n"))
+  (let ((pid (linux-syscall linux/SYS_clone linux/SIGCHLD 0)))
+    (if (= 0 pid)
+        (let ((rc (linux-syscall linux/SYS_execve path argv envp)))
+          ;; (platform/diag-print "execve error: "(long rc)"\n")
+          (linux-syscall linux/SYS_exit 127))
+      ;; (debug (platform/diag-print "child spawned\n"))
+      pid)))
+
+(define-function run-program (path argv envp)
+  (let ((child-pid (spawn-program path argv envp))
+        (status 0))
+    (linux-syscall linux/SYS_wait4 child-pid (address-of status) 0 0)
+    (let ((termsig (bitwise-and status 0x7f))
+          (rc (bitwise-and (bitwise-shift status -8) 0xff)))
+      (if (= 0 termsig)
+          rc
+        (+ 128 termsig)))))
+
+(define-vm-function (spawn-program ()) ((path <string>))
+  (box <long> (spawn-program (string->C-string path) 0 0)))
+
+(define-vm-function (run-program ()) ((path <string>))
+  (box <long> (run-program (string->C-string path) 0 0)))
+
+(define-vm-function set-working-directory ((path <string>))
+  (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
+  (unless (= 0 (linux-syscall linux/SYS_chdir (string->C-string path)))
+    (error "set-working-directory: chdir syscall failed for: "path)))
+
 ;;
 ;; !!!
 ;;

@@ -382,3 +382,10 @@
 (when-at-expand (feature debug-output)
   (define-vm-function enable-debug-output	() (set *debug-output-enabled?* true))
   (define-vm-function disable-debug-output	() (set *debug-output-enabled?* false)))
+
+;; FIXME: why do i need the HOST-VALUE here?! WHEN-AT-EXPAND should be
+;; evaluating in the slave env, where the unwrapped DEFINED? should
+;; just work. instead i get: form encountered in interpreted code with
+;; args ((oop-at.0+29 obj.2+0 0) 1)
+;; (when-at-expand (host-value (defined? 'platform/spawn-program *target-env*))
+;;   )
