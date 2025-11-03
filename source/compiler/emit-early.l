@@ -177,7 +177,7 @@
   `(%emit -c- ,instr-name (list ,@args)))
 
 (define-function %emit (-c- factory args)
-  (let* ((instr (factory)))
+  (let* ((instr (factory ())))
     (when (<= 3 *compiler-verbosity*)
       ;; TODO move this into emit-instruction?
       (println "; EMIT of "instr", args: " args))
@@ -221,15 +221,23 @@
   (let ((has-input?		(first reg-spec))
         (n-regs			(or (second reg-spec) 0))
         (produces-output?	(third reg-spec))
-        (type-name		(symbol->type-name instr-name)))
+        (type-name		(symbol->type-name instr-name))
+        (singleton-name		(concat-symbol instr-name '-instance)))
     `(let ()
        (define-record ,type-name <instruction> ())
        ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
-       (define-function ,instr-name ()
-         (make ,type-name
-           (has-input?		,has-input?)
-           (n-regs		',n-regs)
-           (produces-output?	,produces-output?)))
+       (define ,singleton-name (make ,type-name
+                                 (has-input?		,has-input?)
+                                 (n-regs		',n-regs)
+                                 (produces-output?	,produces-output?)))
+       (define-function ,instr-name (regs)
+         (if regs
+             (make ,type-name
+               (regs			regs)
+               (has-input?		,has-input?)
+               (n-regs			',n-regs)
+               (produces-output?	,produces-output?))
+           ,singleton-name))
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
 ;; this is faster than (emit COMMENT ...) by skipping the evaluation early

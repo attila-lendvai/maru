@@ -404,7 +404,7 @@
 (define-function %gen (-c- factory args)
   ;; TODO it feels wasteful/unnecessary to allocate an instr instance here...
   ;; at least until we start storing something in the instances
-  (let ((instr (factory)))
+  (let ((instr (factory ())))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
     (emit-comment 2 "GEN of "instr", args: " args)

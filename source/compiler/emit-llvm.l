@@ -494,17 +494,14 @@
   (concat-string "L" (number->string (incr (<llvm-compiler>-label-counter -c-)))))
 
 (define-function %gen (-c- factory args)
-  ;; TODO it feels wasteful/unnecessary to allocate an instr instance here...
-  (let ((instr (factory)))
+  (let* ((instr-proto (factory ()))
+         (instr (factory (let ((temps ()))
+                           (times-do (<instruction>-n-regs instr-proto)
+                             (push temps (LOCAL (new-reg-name "r" -c-))))
+                           (list->array temps)))))
     (when (<instruction>-has-input? instr)
       (push args (<compiler>-current-value -c-)))
     (emit-comment 2 "GEN of "instr", args: " args)
-    ;; instantiate the regs
-    (set (<instruction>-regs instr)
-         (let ((temps ()))
-           (times-do (<instruction>-n-regs instr)
-             (push temps (LOCAL (new-reg-name "r" -c-))))
-           (list->array temps)))
     ;; update current-value
     (when (<instruction>-produces-output? instr)
       (assert (> (<instruction>-n-regs instr) 0))
