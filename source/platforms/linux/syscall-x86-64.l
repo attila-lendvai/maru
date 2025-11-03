@@ -3,7 +3,7 @@
 (require "source/platforms/linux/syscall-x86.l")
 
 ;; redefine the 32 bit version
-(define-instruction LINUX-SYSCALL ()
+(define-instruction LINUX-SYSCALL (false 0 true)
   ((pair)
    (let ((args $1)
          (regs +linux/syscall/argument-registers/x86_64+))

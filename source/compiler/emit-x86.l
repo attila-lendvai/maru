@@ -58,39 +58,39 @@
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
 (define-instruction ENTER	()
-  ((long)			(println "	pushl	%ebp")
-				(println "	movl	%esp, %ebp")
+  ((long)			(println "	push	%ebp")
+				(println "	mov	%esp, %ebp")
 				(unless (= 0 $1)
-				  (println "	subl	$"$1", %esp"))))
+				  (println "	sub	$"$1", %esp"))))
 
-(define-instruction NEG		()
-  (()				(println "	negl	%eax")))
+(define-instruction NEG		(true 1 true)
+  ((GR32)			(println "	negl	"$1)))
 
-(define-instruction BITWISE-NOT	()
-  (()				(println "	notl	%eax")))
+(define-instruction BITWISE-NOT	(true 1 true)
+  ((GR32)			(println "	notl	"$1)))
 
-(define-instruction LOGIC-NOT	()
-  (()				(println "	cmpl	$0, %eax")
+(define-instruction LOGIC-NOT	(true 0 true)
+  ((GR32)			(println "	test	"$1", "$1)
 				(println "	sete	%al")
-				(println "	movzbl	%al, %eax")))
+				(println "	movzbl	%al, "$1)))
 
-(define-instruction BF		()
-  ((LABEL)			(println "	cmpl	$0, %eax")
-				(println "	je	"$1)))
+(define-instruction BF		(true 0 false)
+  ((GR32 LABEL)			(println "	test	"$1", "$1)
+				(println "	je	"$2)))
 
-(define-instruction BT		()
-  ((LABEL)			(println "	cmpl	$0, %eax")
-				(println "	jne	"$1)))
+(define-instruction BT		(true 0 false)
+  ((GR32 LABEL)			(println "	test	"$1", "$1)
+				(println "	jne	"$2)))
 
-(define-instruction CALLPTR	()
-  ((_)				(println "	call	*%eax")))
+(define-instruction CALLPTR	(true 0 false)
+  ((GR32 _)			(println "	call	*"$1)))
 
-(define-instruction LOAD	()
+(define-instruction LOAD	(false 0 true)
   ((LI32)			(if (= 0 (<LI32>-value $1))
-				    (println "	xorl	%eax, %eax")
-				  (println "	movl	"$1", %eax")))
-  ((LABEL)			(println "	movl	$"$1", %eax"))
-  ((_)				(println "	movl	"$1", %eax")))
+				    (println "	xor	%eax, %eax")
+				  (println "	mov	"$1", %eax")))
+  ((LABEL)			(println "	mov	$"$1", %eax"))
+  ((_)				(println "	mov	"$1", %eax")))
 
 ;;;
 ;;; Compiler Infrastructure

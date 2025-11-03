@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define-instruction LINUX-SYSCALL ()
+(define-instruction LINUX-SYSCALL (false 0 true)
   ((pair)
    (let ((args $1)
          (regs +linux/syscall/argument-registers/IA-32+))
