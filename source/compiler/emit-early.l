@@ -1,6 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/conversion.l")
+(require "source/compiler/c-ffi.l")
 
 ;; FIXME only works at 1 and below. comments need to be escaped:
 ;; there's only single-line comment syntax in llvm and gas. escape
@@ -19,45 +20,6 @@
 (define-selector compile)
 (define-selector compile-definition)
 (define-selector compile-call-to)
-
-;;;
-;;; FFI
-;;;
-;; TODO these should be in the c based platform file, but that is loaded into the target...
-(define-record <C-function> ()
-  (name
-   return-type
-   parameter-types
-   n-params
-   vararg?))
-
-(define-print-method <C-function>
-  (print-all -stream- "<<C-function> "self.return-type", "self.name", "self.parameter-types", "self.vararg?">"))
-
-(define-function C-function (return-type foreign-name parameter-types)
-  (let* ((rev-types (list-reverse parameter-types))
-         (vararg? (= '... (first rev-types))))
-    (when vararg?
-      (pop rev-types))
-    (set parameter-types (list-reverse! rev-types))
-    (make <C-function>
-      (name		foreign-name)
-      (return-type	return-type)
-      (parameter-types	parameter-types)
-      (n-params		(list-length parameter-types))
-      (vararg?		vararg?))))
-
-(define-record <C-variable> ()
-  (name
-   type
-   attributes ; for stuff like thread_local for llvm
-   ))
-
-(define-function C-variable (foreign-name type . attributes)
-  (make <C-variable>
-    (name	foreign-name)
-    (type	type)
-    (attributes	attributes)))
 
 ;;;
 ;;; Utils
