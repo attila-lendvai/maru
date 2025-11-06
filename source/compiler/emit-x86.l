@@ -68,16 +68,16 @@
   (compile-env env (x86-32-compiler 1)))
 
 (define-function new-temp (-c-)
-  (TI32 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (TEMP32 (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <TI32> obj)
+  (when (is <TEMP32> obj)
     (push (<compiler>-temps -c-) obj)))
 
 ;; parameters are what functions have
 (define-function new-param (c)
   (with-instance-accessors c <x86-32-compiler>
-    (let ((temp	(TI32 c.param-offset)))
+    (let ((temp	(TEMP32 c.param-offset)))
       (incr c.param-offset +word-size-in-bytes+)
       temp)))
 
@@ -85,7 +85,7 @@
 (define-function new-arg (c)
   (with-instance-accessors c <x86-32-compiler>
     (let* ((offset	c.arg-offset)
-           (temp	(TI32 offset)))
+           (temp	(TEMP32 offset)))
       (set c.arg-offset (+ offset +word-size-in-bytes+))
       temp)))
 
@@ -141,7 +141,7 @@
            (<compiler>-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
-      ;; the frame size and use %esp through simple TI32.
+      ;; the frame size and use %esp through simple TEMP32.
       (map (lambda (el)
              (incr (<TEMP>-offset el) frame-size))
            param-locs)
@@ -229,7 +229,7 @@
   (comp op)
   (compile-call-to-object arg-locs -c-))
 
-(define-method compile-call-to <TI32> (op arg-locs -c-)
+(define-method compile-call-to <TEMP32> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
 
@@ -264,13 +264,13 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (typecase value
-      (<TI32>
+      (<TEMP32>
        (gen STORE value))
       (<C-variable>
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GI32 (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE (GLOBAL32 (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GI32 (LABEL (<variable>-name var))))))))
+       (gen STORE (GLOBAL32 (LABEL (<variable>-name var))))))))
 
 (define-function compile/lambda (form -c-)
   (let ((expr (eval form)))
@@ -282,8 +282,8 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (gen ADDR (GI32 (LABEL (<variable>-name var)))))
-        ((is <TI32> val)
+         (gen ADDR (GLOBAL32 (LABEL (<variable>-name var)))))
+        ((is <TEMP32> val)
          (gen ADDR val))
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
@@ -352,7 +352,7 @@
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
-      ((or (is <TI32> value)
+      ((or (is <TEMP32> value)
            (is <LI32> value))
        (gen LOAD value))
       ((global-variable? self)
@@ -365,12 +365,12 @@
           (gen LOAD (LI32 (EXTERNAL-LABEL (<C-function>-name value)))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD (GI32 (EXTERNAL-LABEL (<C-variable>-name value)))))
+          (gen LOAD (GLOBAL32 (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not feature/redefinable-functions-in-target)
                (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
          (else
-          (gen LOAD (GI32 (LABEL self.name))))))
+          (gen LOAD (GLOBAL32 (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 

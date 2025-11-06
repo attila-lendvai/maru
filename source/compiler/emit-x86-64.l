@@ -42,7 +42,7 @@
                                   (println "	sub	$"$1", %rsp"))))
 
 (define-instruction SEXT	()
-  ((GR32 GR64)			(println "	movslq	"$1", "$2)))
+  ((R32 R64)			(println "	movslq	"$1", "$2)))
 
 (define-instruction/emit-forms LOAD 0
   ((LABEL)			(println "	lea	"$1"(%rip), %rax")))
@@ -74,10 +74,10 @@
   (compile-env env (x86-64-compiler 1)))
 
 (define-function new-temp (-c-)
-  (TI64 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (TEMP64 (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <TI64> obj)
+  (when (is <TEMP64> obj)
     (push (<compiler>-temps -c-) obj)))
 
 ;; (define-function new-param (c)
@@ -86,10 +86,10 @@
 ;;       (if reg
 ;;           (let ()
 ;;             (assert (string? reg))
-;;             (GR64 reg))
+;;             (R64 reg))
 ;;         (let ((offset	c.param-offset))
 ;;           (set c.param-offset (+ offset +word-size-in-bytes+))
-;;           (TI64 offset))))))
+;;           (TEMP64 offset))))))
 
 (define-function new-arg (c)
   (with-instance-accessors c <x86-64-compiler>
@@ -97,10 +97,10 @@
       (if reg
           (let ()
             (assert (string? reg))
-            (GR64 reg))
+            (R64 reg))
         (let ((offset	c.arg-offset))
           (set c.arg-offset (+ offset +word-size-in-bytes+))
-          (TI64 offset))))))
+          (TEMP64 offset))))))
 
 (define-function free-args (c args)
   (with-instance-accessors c <x86-64-compiler>
@@ -131,11 +131,11 @@
 ;;   (emit-comment 1 "spilling "(list-length (<expr>-parameters expr))" params to the stack")
 ;;   (map (lambda (var)
 ;;          (let ((loc (<variable>-value var)))
-;;            (unless (is <TI64> loc)
+;;            (unless (is <TEMP64> loc)
 ;;              (let ((reg (<variable>-value var))
 ;;                    (temp (pop (<x86-64-compiler>-param-spill-locs -c-))))
 ;;                (assert temp)
-;;                (assert (is <GR64> reg))
+;;                (assert (is <R64> reg))
 ;;                (set (<variable>-value var) temp)
 ;;                (gen MOVE reg temp)))))
 ;;        (<expr>-parameters expr)))
@@ -154,18 +154,18 @@
                         (let ((spill-loc (new-temp -c-)))
                           ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
                           (set (<variable>-value var) spill-loc)
-                          (GR64 it))
+                          (R64 it))
                       (let ((offset (<x86-compiler>-param-offset -c-)))
                         (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
                         ;; this extends the stack frame size as needed
-                        (TI64 offset))))
+                        (TEMP64 offset))))
                   (<expr>-parameters self)))))
     (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
     (emit-comment 3 ", code: "(<expr>-body self))
     ;; Unconditionally spill the params to the stack.
     (emit-comment 1 "spilling "(list-length param-locs)" params to the stack")
     (map (lambda (param-loc var)
-           (when (is <GR64> param-loc)
+           (when (is <R64> param-loc)
              (let ((spilled-loc (<variable>-value var)))
                (gen MOVE param-loc spilled-loc))))
          param-locs (<expr>-parameters self))
@@ -192,9 +192,9 @@
            (<compiler>-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
-      ;; the frame size and use %esp through simple TI64.
+      ;; the frame size and use %esp through simple TEMP64.
       (map (lambda (loc)
-             (when (is <TI64> loc) ; the first few loc's are in registers
+             (when (is <TEMP64> loc) ; the first few loc's are in registers
                (incr (<TEMP>-offset loc) frame-size)))
            param-locs)
       ;; actual emitting begins
@@ -282,11 +282,11 @@
   (comp op)
   (compile-call-to-object arg-locs -c-))
 
-(define-method compile-call-to <TI64> (op arg-locs -c-)
+(define-method compile-call-to <TEMP64> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
 
-(define-method compile-call-to <GR64> (op arg-locs -c-)
+(define-method compile-call-to <R64> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
 
@@ -306,7 +306,7 @@
   (case (<C-function>-return-type self)
     ;; TODO introduce a proper infrastructure for this
     (int
-     (gen SEXT (GR32 "%eax") (GR64 "%rax")))
+     (gen SEXT (R32 "%eax") (R64 "%rax")))
     (short
      (error "TODO sign-extend a short to 64 bits")))
   (unless (<C-function>-vararg? self)
@@ -326,14 +326,14 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (cond
-      ((or (is <TI64> value)
-           (is <GR64> value))
+      ((or (is <TEMP64> value)
+           (is <R64> value))
        (gen STORE value))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GI64 (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE (GLOBAL64 (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GI64 (LABEL (<variable>-name var))))))))
+       (gen STORE (GLOBAL64 (LABEL (<variable>-name var))))))))
 
 (define-function compile/lambda (form -c-)
   (let ((expr (eval form)))
@@ -345,10 +345,10 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (gen ADDR (GI64 (LABEL (<variable>-name var)))))
-        ((is <TI64> val)
+         (gen ADDR (GLOBAL64 (LABEL (<variable>-name var)))))
+        ((is <TEMP64> val)
          (gen ADDR val))
-        ;; ((is <GR64> val)
+        ;; ((is <R64> val)
         ;;  (maybe-spill-params -c-)
         ;;  (gen ADDR (<variable>-value var)))
         (else
@@ -418,9 +418,9 @@
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
-      ((or (is <GR64> value)
+      ((or (is <R64> value)
            (is <LI64> value)
-           (is <TI64> value))
+           (is <TEMP64> value))
        (gen LOAD value))
       ((global-variable? self)
        (cond
@@ -432,12 +432,12 @@
           (gen LOAD (EXTERNAL-LABEL (<C-function>-name value))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD (GI64 (EXTERNAL-LABEL (<C-variable>-name value)))))
+          (gen LOAD (GLOBAL64 (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not feature/redefinable-functions-in-target)
                (is <expr> value))
           (gen LOAD (LABEL self.name)))
          (else
-          (gen LOAD (GI64 (LABEL self.name))))))
+          (gen LOAD (GLOBAL64 (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 

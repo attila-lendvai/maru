@@ -59,20 +59,20 @@
   (LABEL (unique-name (or (first args) "L"))))
 
 ;; Naming convention: global, literal, temp, general register
-(define-operand GR ()		(name)		self.name)
+(define-operand REGISTER ()	(name)		self.name)
 (define-operand LITERAL ()	(value)		"$"self.value)
 (define-operand GLOBAL-CELL ()	(name)		self.name)
 (define-operand TEMP ()		(offset))
 
-(define-operand GI32 GLOBAL-CELL)
+(define-operand GLOBAL32 GLOBAL-CELL)
 (define-operand LI32 LITERAL)
-(define-operand GR32 GR)
-(define-operand TI32 TEMP	()	self.offset"(%esp)")
+(define-operand R32 REGISTER)
+(define-operand TEMP32 TEMP	()	self.offset"(%esp)")
 
-(define-operand GI64 GLOBAL-CELL)
+(define-operand GLOBAL64 GLOBAL-CELL)
 (define-operand LI64 LITERAL)
-(define-operand GR64 GR ())
-(define-operand TI64 TEMP	()	self.offset"(%rsp)")
+(define-operand R64 REGISTER ())
+(define-operand TEMP64 TEMP	()	self.offset"(%rsp)")
 
 ;;;
 ;;; INSTRUCTIONS
@@ -128,11 +128,11 @@
   ((LABEL)			(println "	jmp	"$1)))
 
 (define-instruction BF		(true 0 false)
-  ((GR LABEL)			(println "	test	"$1", "$1)
+  ((REGISTER LABEL)		(println "	test	"$1", "$1)
 				(println "	je	"$2)))
 
 (define-instruction BT		(true 0 false)
-  ((GR LABEL)			(println "	test	"$1", "$1)
+  ((REGISTER LABEL)		(println "	test	"$1", "$1)
 				(println "	jne	"$2)))
 
 ;; TODO arg2 is arg-locs. what for? for the arity? delme?
@@ -140,35 +140,35 @@
   ((LABEL _)			(println "	call	"$1)))
 
 (define-instruction CALLPTR	(true 0 false)
-  ((GR _)			(println "	call	*"$1)))
+  ((REGISTER _)			(println "	call	*"$1)))
 
 (define-instruction ADD		(true 0 true)
-  ((GR32 TI32)			(println "	add	"$2","$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 TEMP32)			(println "	add	"$2","$1))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	add	"$2","$1)))
-  ((GR64 TI64)			(println "	add	"$2","$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 TEMP64)			(println "	add	"$2","$1))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	add	"$2","$1))))
 
 (define-instruction SUB		(true 0 true)
-  ((GR32 TI32)			(println "	sub	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 TEMP32)			(println "	sub	"$2", "$1))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sub	"$2", "$1)))
-  ((GR64 TI64)			(println "	sub	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 TEMP64)			(println "	sub	"$2", "$1))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sub	"$2", "$1))))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
 ;; into the instruction. same applies to div.
 (define-instruction MUL		()
-  ((TI32)			(println "	mull	"$1))
+  ((TEMP32)			(println "	mull	"$1))
   ((LI32)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
                                   (else
                                    (println "	mov	"$1", %ecx")
                                    (println "	mul	%ecx"))))
-  ((TI64)			(println "	mulq	"$1))
+  ((TEMP64)			(println "	mulq	"$1))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
@@ -178,7 +178,7 @@
 
 ;; the x86 div instruction is unsigned division
 (define-instruction DIV		()
-  ((TI32)			(println "	xor	%edx, %edx")
+  ((TEMP32)			(println "	xor	%edx, %edx")
                                 (println "	divl	"$1))
   ((LI32)			(cond
                                   ((= 1 (<LITERAL>-value $1))
@@ -189,7 +189,7 @@
                                    (println "	xor	%edx, %edx") ; the upper side of 64 bit operand
                                    (println "	mov	"$1", %ecx") ; divisor
                                    (println "	div	%ecx"))))
-  ((TI64)			(println "	xor	%rdx, %rdx")
+  ((TEMP64)			(println "	xor	%rdx, %rdx")
                                 (println "	divq	"$1))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))
@@ -202,105 +202,105 @@
                                    (println "	div	%rcx")))))
 
 (define-instruction AND		(true 0 true)
-  ((GR32 TI32)			(println "	and	"$2", "$1))
-  ((GR32 LI32)			(unless (= -1 (<LITERAL>-value $2))
+  ((R32 TEMP32)			(println "	and	"$2", "$1))
+  ((R32 LI32)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1)))
-  ((GR64 TI64)			(println "	and	"$2", "$1))
-  ((GR64 LI64)			(unless (= -1 (<LITERAL>-value $2))
+  ((R64 TEMP64)			(println "	and	"$2", "$1))
+  ((R64 LI64)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1))))
 
 (define-instruction OR		(true 0 true)
-  ((GR32 TI32)			(println "	or	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 TEMP32)			(println "	or	"$2", "$1))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1)))
-  ((GR64 TI64)			(println "	or	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 TEMP64)			(println "	or	"$2", "$1))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1))))
 
 ;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
-  ((GR32 TI32)			(println "	xor	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 TEMP32)			(println "	xor	"$2", "$1))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1)))
-  ((GR64 TI64)			(println "	xor	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 TEMP64)			(println "	xor	"$2", "$1))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1))))
 
 (define-instruction BITWISE-NOT	(true 0 true)
-  ((GR)				(println "	not	"$1)))
+  ((REGISTER)			(println "	not	"$1)))
 
 (define-instruction LOGIC-NOT	(true 0 true)
-  ((GR)				(println "	test	"$1", "$1)
+  ((REGISTER)			(println "	test	"$1", "$1)
 				(println "	sete	%al")
 				(println "	movzb	%al, "$1)))
 
 (define-instruction NEG		(true 0 true)
-  ((GR)				(println "	neg	"$1)))
+  ((REGISTER)			(println "	neg	"$1)))
 
 ;; TODO should use reg1 and allocate a reg instead of directly using
 ;; ecx. same applies to asr.
 (define-instruction ASL		(true 0 true)
-  ((GR32 TI32)			(println "	mov	"$2", %ecx")
+  ((R32 TEMP32)			(println "	mov	"$2", %ecx")
 				(println "	sal	%cl, "$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	shl	"$2", "$1)))
-  ((GR64 TI64)			(println "	mov	"$2", %rcx")
+  ((R64 TEMP64)			(println "	mov	"$2", %rcx")
 		                (println "	sal	%cl, "$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	shl	"$2", "$1))))
 
 (define-instruction ASR		(true 0 true)
-  ((GR32 TI32)			(println "	mov	"$2", %ecx")
+  ((R32 TEMP32)			(println "	mov	"$2", %ecx")
 				(println "	sar	%cl, "$1))
-  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
+  ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sar	"$2", "$1)))
-  ((GR64 TI64)			(println "	mov	"$2", %rcx")
+  ((R64 TEMP64)			(println "	mov	"$2", %rcx")
 		                (println "	sar	%cl, "$1))
-  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
+  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sar	"$2", "$1))))
 
 (define-instruction ADDR	(false 0 true)
-  ((GI32)			(println "	mov	$"$1", %eax"))
-  ((TI32)			(println "	lea	"$1", %eax"))
-  ((GI64)			(println "	lea	"$1"(%rip), %rax"))
-  ((TI64)			(println "	lea	"$1", %rax")))
+  ((GLOBAL32)			(println "	mov	$"$1", %eax"))
+  ((TEMP32)			(println "	lea	"$1", %eax"))
+  ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax"))
+  ((TEMP64)			(println "	lea	"$1", %rax")))
 
 (define-instruction MOVE	(false 0 false)
-  ((TI32 TI32)			(println "	mov	"$1", %ecx")
+  ((TEMP32 TEMP32)			(println "	mov	"$1", %ecx")
 				(println "	mov	%ecx, "$2))
-  ((LI32 TI32)			(println "	movl	"$1", "$2))
-  ((TI64 TI64)			(println "	mov	"$1", %rcx")
+  ((LI32 TEMP32)			(println "	movl	"$1", "$2))
+  ((TEMP64 TEMP64)			(println "	mov	"$1", %rcx")
                                 (println "	mov	%rcx, "$2))
-  ((GR64 _)			(println "	movq	"$1", "$2))
-  ((_ GR64)			(println "	movq	"$1", "$2)))
+  ((R64 _)			(println "	movq	"$1", "$2))
+  ((_ R64)			(println "	movq	"$1", "$2)))
 
 (define-instruction LOAD	(false 0 true)
   ((LI32)			(if (= 0 (<LITERAL>-value $1))
 				    (println "	xor	%eax, %eax")
 				  (println "	mov	"$1", %eax")))
-  ((GI32)			(println "	mov	"$1", %eax"))
-  ((TI32)			(println "	mov	"$1", %eax"))
+  ((GLOBAL32)			(println "	mov	"$1", %eax"))
+  ((TEMP32)			(println "	mov	"$1", %eax"))
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
-  ((TI64)			(println "	mov	"$1", %rax"))
-  ((GR64)			(println "	mov	"$1", %rax"))
-  ((GI64)			(println "	lea	"$1"(%rip), %rax")
+  ((TEMP64)			(println "	mov	"$1", %rax"))
+  ((R64)			(println "	mov	"$1", %rax"))
+  ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax")
 				(println "	mov	(%rax), %rax")))
 
 (define-instruction STORE	(true 0 false)
-  ((GR32 TI32)			(println "	mov	"$1", "$2))
-  ((GR32 GI32)			(println "	mov	"$1", "$2))
-  ((GR64 GI64)			(println "	lea	"$2"(%rip), %rbx")
+  ((R32 TEMP32)			(println "	mov	"$1", "$2))
+  ((R32 GLOBAL32)		(println "	mov	"$1", "$2))
+  ((R64 GLOBAL64)		(println "	lea	"$2"(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
-  ((GR64 GR64)			(println "	mov	"$1", ("$2")"))
-  ((GR64 TI64)			(println "	mov	"$1", "$2)))
+  ((R64 R64)			(println "	mov	"$1", ("$2")"))
+  ((R64 TEMP64)			(println "	mov	"$1", "$2)))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
 (define-instruction LOAD-I8	(false 0 true)
-  ((TI32)			(println "	mov	"$1", %ecx")
+  ((TEMP32)			(println "	mov	"$1", %ecx")
 				(println "	lea	(%eax, %ecx), %ecx")
 				(println "	xor	%eax, %eax")
 				(println "	movb	(%ecx), %al"))
@@ -310,7 +310,7 @@
 				    (println "	lea	"offset"(%eax), %ecx")))
 				(println "	xor	%eax, %eax")
 				(println "	movb	(%ecx), %al"))
-  ((TI64)			(println "	mov	"$1", %rcx")
+  ((TEMP64)			(println "	mov	"$1", %rcx")
                                 (println "	lea	(%rax, %rcx), %rcx")
                                 (println "	xor	%rax, %rax")
                                 (println "	mov	(%rcx), %al"))
@@ -322,8 +322,8 @@
                                 (println "	mov	(%rcx), %al")))
 
 (define-instruction STORE-I8	(false 0 true)
-  ((TI32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
-                                    ;; NOTE this works out just fine for a TI32, too, because we are little-endian.
+  ((TEMP32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+                                    ;; NOTE this works out just fine for a TEMP32, too, because we are little-endian.
                                     (let ()
                                       (println "	mov	"$1", %ecx")
                                       (println "	lea	(%eax, %ecx), %ecx")
@@ -345,8 +345,8 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"offset"(%eax), %eax"))
                                     (println "	movb	"$2", (%eax)"))))
-  ((TI64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
-				    ;; NOTE this works out just fine for a TI64, too, because we are little-endian.
+  ((TEMP64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+				    ;; NOTE this works out just fine for a TEMP64, too, because we are little-endian.
                                     (let ()
                                       (println "	mov	"$1", %rcx")
                                       (println "	lea	(%rax, %rcx), %rcx")
@@ -371,7 +371,7 @@
                                     (println "	movb	"$2", (%rax)")))))
 
 (define-instruction LOAD-OOP	(false 0 true)
-  ((TI32)			(println "	mov	"$1", %ecx")
+  ((TEMP32)			(println "	mov	"$1", %ecx")
                                 (println "	lea	(%eax, %ecx, 4), %ecx")
                                 (println "	mov	(%ecx), %eax"))
   ((LI32)			(let ((offset (<LITERAL>-value $1)))
@@ -379,7 +379,7 @@
                                       (println "	mov	(%eax), %eax")
                                     (println "	lea	"(* 4 offset)"(%eax), %ecx")
                                     (println "	mov	(%ecx), %eax"))))
-  ((TI64)			(println "	mov	"$1", %rcx")
+  ((TEMP64)			(println "	mov	"$1", %rcx")
 				(println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rcx")
 				(println "	mov	(%rcx), %rax"))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
@@ -389,7 +389,7 @@
                                     (println "	mov	(%rcx), %rax")))))
 
 (define-instruction STORE-OOP	(false 0 true)
-  ((TI32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
                                     (let ()
                                       (println "	mov	"$1", %ecx")
                                       (println "	lea	(%eax, %ecx, 4), %ecx")
@@ -409,7 +409,7 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"(* 4 offset)"(%eax), %eax"))
                                     (println "	mov	"$2", (%eax)"))))
-  ((TI64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
                                     (let ()
                                       (println "	mov	"$1", %rcx")
                                       (println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rcx")
@@ -432,21 +432,21 @@
 
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
-     ((GR32 TI32)
+     ((R32 TEMP32)
       (println "	cmp	"$2", "$1)
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, %eax"))
-     ((GR32 LI32)
+     ((R32 LI32)
       (if (= 0 (<LITERAL>-value $2))
           (println "	test	"$1", "$1)
         (println "	cmp	"$2", "$1))
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, %eax"))
-     ((GR64 TI64)
+     ((R64 TEMP64)
       (println "	cmp	"$2", "$1)
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, "$1))
-     ((GR64 LI64)
+     ((R64 LI64)
       (if (= 0 (<LITERAL>-value $2))
           (println "	test	"$1", "$1)
         (println "	cmp	"$2", "$1))
@@ -504,8 +504,8 @@
       ;; KLUDGE
       (set (<compiler>-current-value -c-)
            (if (= 4 +word-size-in-bytes+)
-               (GR32 "%eax")
-             (GR64 "%rax"))))
+               (R32 "%eax")
+             (R64 "%rax"))))
     ;; save into the gen buffer
     (array-append (<compiler>-gen-buffer -c-) (cons instr args))
     ()))
