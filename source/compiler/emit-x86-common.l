@@ -43,15 +43,20 @@
   (LABEL (unique-name (or (first args) "L"))))
 
 ;; Naming convention: global, literal, temp, general register
-(define-operand GI32 () (name)		self.name)
-(define-operand LI32 () (value)		"$"self.value)
-(define-operand TI32 () (offset)	self.offset"(%esp)")
-(define-operand GR32 () (name)		self.name)
+(define-operand GR ()		(name)		self.name)
+(define-operand LITERAL ()	(value)		"$"self.value)
+(define-operand GLOBAL-CELL ()	(name)		self.name)
+(define-operand TEMP ()		(offset))
 
-(define-operand GI64 () (name)		self.name)
-(define-operand LI64 () (value)		"$"self.value)
-(define-operand TI64 () (offset)	self.offset"(%rsp)")
-(define-operand GR64 () (name)		self.name)
+(define-operand GI32 GLOBAL-CELL)
+(define-operand LI32 LITERAL)
+(define-operand GR32 GR)
+(define-operand TI32 TEMP	()	self.offset"(%esp)")
+
+(define-operand GI64 GLOBAL-CELL)
+(define-operand LI64 LITERAL)
+(define-operand GR64 GR ())
+(define-operand TI64 TEMP	()	self.offset"(%rsp)")
 
 ;;;
 ;;; INSTRUCTIONS
@@ -100,24 +105,35 @@
 (define-instruction BR		()
   ((LABEL)			(println "	jmp	"$1)))
 
+(define-instruction BF		(true 0 false)
+  ((GR LABEL)			(println "	test	"$1", "$1)
+				(println "	je	"$2)))
+
+(define-instruction BT		(true 0 false)
+  ((GR LABEL)			(println "	test	"$1", "$1)
+				(println "	jne	"$2)))
+
 ;; TODO arg2 is arg-locs. what for? for the arity? delme?
 (define-instruction CALL	(false 0 true)
   ((LABEL _)			(println "	call	"$1)))
 
+(define-instruction CALLPTR	(true 0 false)
+  ((GR _)			(println "	call	*"$1)))
+
 (define-instruction ADD		(true 0 true)
   ((GR32 TI32)			(println "	add	"$2","$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	add	"$2","$1)))
   ((GR64 TI64)			(println "	add	"$2","$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	add	"$2","$1))))
 
 (define-instruction SUB		(true 0 true)
   ((GR32 TI32)			(println "	sub	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sub	"$2", "$1)))
   ((GR64 TI64)			(println "	sub	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sub	"$2", "$1))))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
@@ -125,14 +141,14 @@
 (define-instruction MUL		()
   ((TI32)			(println "	mull	"$1))
   ((LI32)			(cond
-                                  ((= (<LI32>-value $1) 1)) ; nothing to do
+                                  ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
                                   (else
                                    (println "	mov	"$1", %ecx")
                                    (println "	mul	%ecx"))))
   ((TI64)			(println "	mulq	"$1))
   ((LI64)			(cond
-                                  ((= (<LI64>-value $1) 1)) ; nothing to do
+                                  ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
                                   (else
                                    (println "	mov	"$1", %rcx")
@@ -143,7 +159,7 @@
   ((TI32)			(println "	xor	%edx, %edx")
                                 (println "	divl	"$1))
   ((LI32)			(cond
-                                  ((= (<LI32>-value $1) 1)
+                                  ((= 1 (<LITERAL>-value $1))
                                    ;; remainder is zero, %eax is unchanged
                                    (println "	xor	%edx, %edx"))
                                   ;; TODO emit shifts when possible
@@ -154,7 +170,7 @@
   ((TI64)			(println "	xor	%rdx, %rdx")
                                 (println "	divq	"$1))
   ((LI64)			(cond
-                                  ((= (<LI64>-value $1) 1)
+                                  ((= 1 (<LITERAL>-value $1))
                                    ;; remainder is zero, %rax is unchanged
                                    (println "	xor	%rdx, %rdx"))
                                   ;; TODO emit shifts when possible
@@ -165,48 +181,60 @@
 
 (define-instruction AND		(true 0 true)
   ((GR32 TI32)			(println "	and	"$2", "$1))
-  ((GR32 LI32)			(unless (= -1 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1)))
   ((GR64 TI64)			(println "	and	"$2", "$1))
-  ((GR64 LI64)			(unless (= -1 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1))))
 
 (define-instruction OR		(true 0 true)
   ((GR32 TI32)			(println "	or	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1)))
   ((GR64 TI64)			(println "	or	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1))))
 
+;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
   ((GR32 TI32)			(println "	xor	"$2", "$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1)))
   ((GR64 TI64)			(println "	xor	"$2", "$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1))))
+
+(define-instruction BITWISE-NOT	(true 0 true)
+  ((GR)				(println "	not	"$1)))
+
+(define-instruction LOGIC-NOT	(true 0 true)
+  ((GR)				(println "	test	"$1", "$1)
+				(println "	sete	%al")
+				(println "	movzb	%al, "$1)))
+
+(define-instruction NEG		(true 0 true)
+  ((GR)				(println "	neg	"$1)))
 
 ;; TODO should use reg1 and allocate a reg instead of directly using
 ;; ecx. same applies to asr.
 (define-instruction ASL		(true 0 true)
   ((GR32 TI32)			(println "	mov	"$2", %ecx")
 				(println "	sal	%cl, "$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	shl	"$2", "$1)))
   ((GR64 TI64)			(println "	mov	"$2", %rcx")
 		                (println "	sal	%cl, "$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	shl	"$2", "$1))))
 
 (define-instruction ASR		(true 0 true)
   ((GR32 TI32)			(println "	mov	"$2", %ecx")
 				(println "	sar	%cl, "$1))
-  ((GR32 LI32)			(unless (= 0 (<LI32>-value $2))
+  ((GR32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sar	"$2", "$1)))
   ((GR64 TI64)			(println "	mov	"$2", %rcx")
 		                (println "	sar	%cl, "$1))
-  ((GR64 LI64)			(unless (= 0 (<LI64>-value $2))
+  ((GR64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sar	"$2", "$1))))
 
 (define-instruction ADDR	(false 0 true)
@@ -240,7 +268,7 @@
 				(println "	lea	(%eax, %ecx), %ecx")
 				(println "	xor	%eax, %eax")
 				(println "	movb	(%ecx), %al"))
-  ((LI32)			(let ((offset (<LI32>-value $1)))
+  ((LI32)			(let ((offset (<LITERAL>-value $1)))
 				  (if (= 0 offset)
 				      (println "	movl	%eax, %ecx")
 				    (println "	lea	"offset"(%eax), %ecx")))
@@ -250,7 +278,7 @@
                                 (println "	lea	(%rax, %rcx), %rcx")
                                 (println "	xor	%rax, %rax")
                                 (println "	mov	(%rcx), %al"))
-  ((LI64)			(let ((offset (<LI64>-value $1)))
+  ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	%rax, %rcx")
                                     (println "	lea	"offset"(%rax), %rcx")))
@@ -269,7 +297,7 @@
                                   (println "	mov	"$1", %ecx")
                                   (println "	lea	(%eax, %ecx), %eax")
                                   (println "	movb	"$2", (%eax)")))
-  ((LI32 _)			(let ((offset (<LI32>-value $1)))
+  ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand feature/strict-semantics-for-compiled-set
                                       (let ()
                                         (if (= 0 offset)
@@ -293,7 +321,7 @@
                                   (println "	lea	"$1"(%rip), %rcx")
                                   (println "	lea	(%rax, %rcx), %rax")
                                   (println "	movb	"$2", (%rax)")))
-  ((LI64 _)			(let ((offset (<LI64>-value $1)))
+  ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand feature/strict-semantics-for-compiled-set
                                       (let ()
                                         (if (= 0 offset)
@@ -310,7 +338,7 @@
   ((TI32)			(println "	mov	"$1", %ecx")
                                 (println "	lea	(%eax, %ecx, 4), %ecx")
                                 (println "	mov	(%ecx), %eax"))
-  ((LI32)			(let ((offset (<LI32>-value $1)))
+  ((LI32)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	(%eax), %eax")
                                     (println "	lea	"(* 4 offset)"(%eax), %ecx")
@@ -318,7 +346,7 @@
   ((TI64)			(println "	mov	"$1", %rcx")
 				(println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rcx")
 				(println "	mov	(%rcx), %rax"))
-  ((LI64)			(let ((offset (<LI64>-value $1)))
+  ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	(%rax), %rax")
                                     (println "	lea	"(* +word-size-in-bytes+ offset)"(%rax), %rcx")
@@ -334,7 +362,7 @@
                                   (println "	mov	"$1", %ecx")
                                   (println "	lea	(%eax, %ecx, 4), %eax")
                                   (println "	mov	"$2", (%eax)")))
-  ((LI32 _)			(let ((offset (<LI32>-value $1)))
+  ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand feature/strict-semantics-for-compiled-set
                                       (let ()
                                         (if (= 0 offset)
@@ -354,7 +382,7 @@
                                   (println "	mov	"$1", %rcx")
                                   (println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rax")
                                   (println "	mov	"$2", (%rax)")))
-  ((LI64 _)			(let ((offset (<LI64>-value $1)))
+  ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand feature/strict-semantics-for-compiled-set
                                       (let ()
                                         (if (= 0 offset)
@@ -373,7 +401,7 @@
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, %eax"))
      ((GR32 LI32)
-      (if (= 0 (<LI32>-value $2))
+      (if (= 0 (<LITERAL>-value $2))
           (println "	test	"$1", "$1)
         (println "	cmp	"$2", "$1))
       (println "	" ,x86-name "	%al")
@@ -383,7 +411,7 @@
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, "$1))
      ((GR64 LI64)
-      (if (= 0 (<LI64>-value $2))
+      (if (= 0 (<LITERAL>-value $2))
           (println "	test	"$1", "$1)
         (println "	cmp	"$2", "$1))
       (println "	" ,x86-name "	%al")
@@ -396,6 +424,34 @@
 (define-instruction/comparator GT "setg")
 ;;(define-instruction/comparator NE "setne")
 
+;; a vector of assoc lists indexed by operator arity
+(define +special-operators+
+    (let ((table
+           `(;; nullary
+             ()
+             ;; unary
+             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
+             ;; binary
+             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
+              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
+              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
+              (char-at		,LOAD-I8)
+              (byte-at		,LOAD-I8)
+              (oop-at		,LOAD-OOP))
+             ;; ternary
+             ((set-char-at	,STORE-I8)
+              (set-byte-at	,STORE-I8)
+              (set-oop-at	,STORE-OOP)))))
+      (list->array
+       (map (lambda (arity-line)
+              (map (lambda (entry)
+                     (let* ((op-name (car entry))
+                            (op (eval-in-target op-name)))
+                       (assert op "operator not found while building +special-operators+: "op)
+                       (cons op (cdr entry))))
+                   arity-line))
+            table))))
 
 ;;;
 ;;; Compiler Infrastructure

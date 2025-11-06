@@ -39,14 +39,7 @@
   (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))
 
 ;;;
-;;; IA32 -- OPERANDS
-;;;
-
-(define-function temp?		(obj)	(= <TI32> (type-of obj)))
-(define-function literal?	(obj)	(= <LI32> (type-of obj)))
-
-;;;
-;;; IA32 -- INSTRUCTIONS
+;;; IA-32 -- INSTRUCTIONS
 ;;;
 
 (define-instruction CELL	()
@@ -62,30 +55,9 @@
 				(unless (= 0 $1)
 				  (println "	sub	$"$1", %esp"))))
 
-(define-instruction NEG		(true 1 true)
-  ((GR32)			(println "	negl	"$1)))
-
-(define-instruction BITWISE-NOT	(true 1 true)
-  ((GR32)			(println "	notl	"$1)))
-
-(define-instruction LOGIC-NOT	(true 0 true)
-  ((GR32)			(println "	test	"$1", "$1)
-				(println "	sete	%al")
-				(println "	movzbl	%al, "$1)))
-
-(define-instruction BF		(true 0 false)
-  ((GR32 LABEL)			(println "	test	"$1", "$1)
-				(println "	je	"$2)))
-
-(define-instruction BT		(true 0 false)
-  ((GR32 LABEL)			(println "	test	"$1", "$1)
-				(println "	jne	"$2)))
-
-(define-instruction CALLPTR	(true 0 false)
-  ((GR32 _)			(println "	call	*"$1)))
-
+;; TODO cannot merge 32 and 64 bit versions because of the LABEL
 (define-instruction LOAD	(false 0 true)
-  ((LI32)			(if (= 0 (<LI32>-value $1))
+  ((LI32)			(if (= 0 (<LITERAL>-value $1))
 				    (println "	xor	%eax, %eax")
 				  (println "	mov	"$1", %eax")))
   ((LABEL)			(println "	mov	$"$1", %eax"))
@@ -294,13 +266,13 @@
       ;; Now that we know the frame size, fix up the offsets of the
       ;; temps allocated on the stack.
       (map (lambda (el)
-             (incr (<TI32>-offset el) arg-size))
+             (incr (<TEMP>-offset el) arg-size))
            (<compiler>-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
       ;; the frame size and use %esp through simple TI32.
       (map (lambda (el)
-             (incr (<TI32>-offset el) frame-size))
+             (incr (<TEMP>-offset el) frame-size))
            param-locs)
       ;; actual emitting begins
       (emit TEXT)
@@ -480,10 +452,10 @@
          (value	(<variable>-value var)))
     (accessible-variable-or-die var -c-)
     (comp (third expr))
-    (cond
-      ((temp? value)
+    (typecase value
+      (<TI32>
        (gen STORE value))
-      ((is <C-variable> value)
+      (<C-variable>
        ;; TODO dispatch on the type of the C-variable
        (gen STORE (GI32 (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
@@ -506,7 +478,7 @@
       (cond
         ((global-variable? var)
          (gen ADDR (GI32 (LABEL (<variable>-name var)))))
-        ((temp? val)
+        ((is <TI32> val)
          (gen ADDR val))
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
@@ -575,35 +547,6 @@
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
-;; a vector of assoc lists indexed by operator arity
-(define +special-operators+
-    (let ((table
-           `(;; nullary
-             ()
-             ;; unary
-             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
-             ;; binary
-             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
-              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
-              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
-              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
-              (char-at		,LOAD-I8)
-              (byte-at		,LOAD-I8)
-              (oop-at		,LOAD-OOP))
-             ;; ternary
-             ((set-char-at	,STORE-I8)
-              (set-byte-at	,STORE-I8)
-              (set-oop-at	,STORE-OOP)))))
-      (list->array
-       (map (lambda (arity-line)
-              (map (lambda (entry)
-                     (let* ((op-name (car entry))
-                            (op (eval-in-target op-name)))
-                       (assert op "operator not found while building +special-operators+: "op)
-                       (cons op (cdr entry))))
-                   arity-line))
-            table))))
-
 (define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (target-value false))))
 (define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
 
@@ -611,8 +554,8 @@
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
-      ((or (temp? value)
-           (literal? value))
+      ((or (is <TI32> value)
+           (is <LI32> value))
        (gen LOAD value))
       ((global-variable? self)
        (cond

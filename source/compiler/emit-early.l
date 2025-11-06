@@ -74,16 +74,19 @@
     (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
           (define-operand/make-setters type-name (cdr fields)))))
 
-(define-form define-operand (name super direct-slots . printing)
-  (let* ((type-name	(symbol->type-name name))
-         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super)) ,direct-slots)))
+(define-form define-operand (name super . rest)
+  (let* ((direct-slots	(pop rest))
+         (type-name	(symbol->type-name name))
+         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super))
+                                 ,direct-slots)))
          (effective-slots (<record>-effective-slots type)))
     (assert (is <record> type))
     (eval `(define-function ,name ,effective-slots
              (let ((self (new ,type-name)))
                ,@(define-operand/make-setters type-name effective-slots)
                self)))
-    `(define-print-method ,type-name (print-all -stream- ,@printing))))
+    (when rest
+      `(define-print-method ,type-name (print-all -stream- ,@rest)))))
 
 ;;; compiler infrastructure
 ;;;

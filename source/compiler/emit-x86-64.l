@@ -58,30 +58,9 @@
 (define-instruction SEXT	()
   ((GR32 GR64)			(println "	movslq	"$1", "$2)))
 
-(define-instruction NEG		(true 0 true)
-  ((GR64)			(println "	neg	"$1)))
-
-(define-instruction BITWISE-NOT	(true 0 true)
-  ((GR64)			(println "	not	"$1)))
-
-(define-instruction LOGIC-NOT	(true 0 true)
-  ((GR64)			(println "	test	"$1", "$1)
-                                (println "	sete	%al")
-                                (println "	movzb	%al, "$1)))
-
-(define-instruction BF		(true 0 false)
-  ((GR64 LABEL)			(println "	test	"$1", "$1)
-		                (println "	je	"$2)))
-
-(define-instruction BT		(true 0 false)
-  ((GR64 LABEL)			(println "	test	"$1", "$1)
-		                (println "	jne	"$2)))
-
-(define-instruction CALLPTR	(true 0 false)
-  ((GR64 _)			(println "	call	*"$1)))
-
+;; TODO cannot merge 32 and 64 bit versions because of the LABEL
 (define-instruction LOAD	(false 0 true)
-  ((LI64)			(if (= 0 (<LI64>-value $1))
+  ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
   ((TI64)			(println "	mov	"$1", %rax"))
@@ -346,14 +325,14 @@
       ;; Now that we know the frame size, fix up the offsets of the
       ;; temps allocated on the stack.
       (map (lambda (el)
-             (incr (<TI64>-offset el) arg-size))
+             (incr (<TEMP>-offset el) arg-size))
            (<compiler>-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
       ;; the frame size and use %esp through simple TI64.
       (map (lambda (loc)
              (when (is <TI64> loc) ; the first few loc's are in registers
-               (incr (<TI64>-offset loc) frame-size)))
+               (incr (<TEMP>-offset loc) frame-size)))
            param-locs)
       ;; actual emitting begins
       (emit TEXT)
@@ -641,35 +620,6 @@
     (gen op tmp1 tmp2)))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
-
-;; a vector of assoc lists indexed by operator arity
-(define +special-operators+
-    (let ((table
-           `(;; nullary
-             ()
-             ;; unary
-             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
-             ;; binary
-             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
-              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
-              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
-              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
-              (char-at		,LOAD-I8)
-              (byte-at		,LOAD-I8)
-              (oop-at		,LOAD-OOP))
-             ;; ternary
-             ((set-char-at	,STORE-I8)
-              (set-byte-at	,STORE-I8)
-              (set-oop-at	,STORE-OOP)))))
-      (list->array
-       (map (lambda (arity-line)
-              (map (lambda (entry)
-                     (let* ((op-name (car entry))
-                            (op (eval-in-target op-name)))
-                       (assert op "operator not found while building +special-operators+: "op)
-                       (cons op (cdr entry))))
-                   arity-line))
-            table))))
 
 (define-method compile <undefined>  (-c-)  (gen LOAD (LI64 (target-value false))))
 (define-method compile <long>       (-c-)  (gen LOAD (LI64 self)))
