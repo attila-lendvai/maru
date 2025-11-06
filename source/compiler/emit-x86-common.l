@@ -5,6 +5,14 @@
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
 
+;; TODO introduce abstraction for ABIs...
+(define-constant +call-frame-alignmet+
+    (case (target-value +word-size-in-bits+)
+      (32 (case (target-value +operating-system+)
+            (darwin	16)
+            (else	+word-size-in-bytes+)))
+      (64 16)))
+
 (define-constant +external-label-prefix+
     (case (target-value +operating-system+)
       (darwin	"_")
@@ -32,6 +40,14 @@
            (putnext (digit-for (bitwise-shift c -4)))
            (putnext (digit-for (bitwise-and c 0xf))))))
       mangled)))
+
+(define-record <x86-compiler> <compiler>
+  (param-offset
+   arg-offset
+   arg-limit
+   asm-cell-type
+   fn-epilogue-label
+   ))
 
 ;;;
 ;;; OPERANDS
@@ -97,6 +113,12 @@
 ;; TODO rename to DEFINE? that would be less unique
 (define-instruction DEFLABEL	()
   ((LABEL)			(println $1":")))
+
+(define-instruction CELL	()
+  ((_)				(println "	"(<x86-compiler>-asm-cell-type -c-)"	"$1)))
+
+(define-instruction PTR		()
+  ((_)				(println "	"(<x86-compiler>-asm-cell-type -c-)"	"$1)))
 
 (define-instruction LEAVE	()
   ((long)			(println "	leave")
@@ -251,6 +273,20 @@
                                 (println "	mov	%rcx, "$2))
   ((GR64 _)			(println "	movq	"$1", "$2))
   ((_ GR64)			(println "	movq	"$1", "$2)))
+
+(define-instruction LOAD	(false 0 true)
+  ((LI32)			(if (= 0 (<LITERAL>-value $1))
+				    (println "	xor	%eax, %eax")
+				  (println "	mov	"$1", %eax")))
+  ((GI32)			(println "	mov	"$1", %eax"))
+  ((TI32)			(println "	mov	"$1", %eax"))
+  ((LI64)			(if (= 0 (<LITERAL>-value $1))
+                                    (println "	xor	%rax, %rax")
+                                  (println "	mov	"$1", %rax")))
+  ((TI64)			(println "	mov	"$1", %rax"))
+  ((GR64)			(println "	mov	"$1", %rax"))
+  ((GI64)			(println "	lea	"$1"(%rip), %rax")
+				(println "	mov	(%rax), %rax")))
 
 (define-instruction STORE	(true 0 false)
   ((GR32 TI32)			(println "	mov	"$1", "$2))
@@ -504,3 +540,82 @@
   (let ((temp (alloc-temp -c-)))
     (gen STORE temp)
     temp))
+
+;;;
+;;; Special Forms
+;;;
+
+(define-function compile/let-binding (binding comp)
+  ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
+  ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
+  ;; TODO cleanup! expand now brings let bindings to a normal form (to ease encode's job). think this through...
+  (unless (pair? binding)
+    (set binding (list binding ())))
+  (unless (cdr binding)
+    (set binding (list (car binding) ())))
+  (let ((var (car binding))
+        (tmp (compile/prog-into-temp (cdr binding) comp)))
+    (assert (= (type-of var) <variable>) "compile/let-binding: encountered a non-variable: " var)
+    (set (<variable>-value var) tmp)))
+
+(define-function compile/let (expr -c-)
+  (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
+    (list-do stmt (cdddr expr)
+      (comp stmt))
+    (free-temps temps)))
+
+(define-function compile/and (expr -c-)
+  (let ((done (UNIQUE-LABEL)))
+    (set expr (cdr expr))
+    (while expr
+      (comp (car expr))
+      (when (set expr (cdr expr))
+        (gen BF done)))
+    (gen DEFLABEL done)))
+
+(define-function compile/or (expr -c-)
+  (let ((done (UNIQUE-LABEL)))
+    (set expr (cdr expr))
+    (while expr
+      (comp (car expr))
+      (when (set expr (cdr expr))
+        (gen BT done)))
+    (gen DEFLABEL done)))
+
+(define-function compile/if (expr -c-)
+  (let ((l/false (UNIQUE-LABEL))
+        (l/end (UNIQUE-LABEL)))
+    (comp (second expr))
+    (gen BF l/false)
+    (comp (third expr))
+    (gen BR l/end)
+    (gen DEFLABEL l/false)
+    (list-do stmt (cdddr expr)
+      (comp stmt))
+    (gen DEFLABEL l/end)))
+
+(define-function compile/while (expr -c-)
+  (let ((l/body	(UNIQUE-LABEL))
+        (l/cond	(UNIQUE-LABEL)))
+    (gen BR l/cond)
+    (gen DEFLABEL l/body)
+    (list-do stmt (cddr expr)
+      (and stmt (comp stmt)))
+    (gen DEFLABEL l/cond)
+    (comp (second expr))
+    (gen BT l/body)))
+
+(define-function compile/return (expr -c-)
+  (list-do stmt (cdr expr)
+    (comp stmt))
+  (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
+              (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
+
+(define-function compile/C-string (expr -c-)
+  ;; just an optimization to compile string literals into a C string
+  ;; when they would be immediately converted anyway.
+  (assert (= (list-length expr) 2))
+  (let ((label (emit-object/C-string (second expr) -c-)))
+    (gen LOAD label)))
+
+(require "source/compiler/emit-x86-objects.l")

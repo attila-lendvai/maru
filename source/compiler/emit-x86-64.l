@@ -30,23 +30,9 @@
 
 (require "source/compiler/emit-x86-common.l")
 
-(define-constant +call-frame-alignmet+
-  ;; TODO? on IA-32 this is simply (/ (target-value +word-size-in-bits+) 8)
-  16)
-
-(unless (= 64 (target-value +word-size-in-bits+))
-  (error "The x86 compiler backend doesn't support target word size "(target-value +word-size-in-bits+)))
-
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
-
-;; TODO rename to WORD? bring closer to the llvm backend
-(define-instruction CELL	()
-  ((_)				(println "	.8byte	"$1)))
-
-(define-instruction PTR		()
-  ((_)				(println "	.8byte	"$1)))
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
 (define-instruction ENTER	()
@@ -58,30 +44,16 @@
 (define-instruction SEXT	()
   ((GR32 GR64)			(println "	movslq	"$1", "$2)))
 
-;; TODO cannot merge 32 and 64 bit versions because of the LABEL
-(define-instruction LOAD	(false 0 true)
-  ((LI64)			(if (= 0 (<LITERAL>-value $1))
-                                    (println "	xor	%rax, %rax")
-                                  (println "	mov	"$1", %rax")))
-  ((TI64)			(println "	mov	"$1", %rax"))
-  ((GR64)			(println "	mov	"$1", %rax"))
-  ((LABEL)			(println "	lea	"$1"(%rip), %rax"))
-  ((GI64)			(println "	lea	"$1"(%rip), %rax")
-				(println "	mov	(%rax), %rax")))
+(define-instruction/emit-forms LOAD 0
+  ((LABEL)			(println "	lea	"$1"(%rip), %rax")))
 
 ;;;
 ;;; Compiler Infrastructure
 ;;;
 (define-constant +param-registers+ ''("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
 
-(define-record <x86-64-compiler> <compiler>
-  (param-offset
-   ;; params-spilled? ; did we already copy our args to the stack?
-   ;; params-must-be-spilled
-   arg-registers
-   arg-offset ; only the args that spilled to the stack
-   arg-limit
-   fn-epilogue-label))
+(define-record <x86-64-compiler> <x86-compiler>
+  (arg-registers))
 
 (define-function x86-64-compiler (level)
   (make <x86-64-compiler>
@@ -91,10 +63,12 @@
     (gen-buffer			(array))
 
     (param-offset		0)
-    ;; (params-must-be-spilled	false)
-    (arg-registers		+param-registers+)
     (arg-offset			0)
-    (arg-limit			0)))
+    (arg-limit			0)
+    (asm-cell-type		".8byte")
+
+    (arg-registers		+param-registers+)
+    ))
 
 (define-function run-compiler (env)
   (compile-env env (x86-64-compiler 1)))
@@ -134,117 +108,6 @@
       (set c.arg-limit c.arg-offset))
     (set c.arg-offset 0)
     (set c.arg-registers +param-registers+)))
-
-;;;
-;;; Emitting objects
-;;;
-
-;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
-
-;; these will be functions instantiated later. reason: to calculate
-;; some stuff and capture the result into closures. this is a poor
-;; man's staged computation to speed up object emission.
-(define emit-object/header)
-(define emit-object/<string>)
-(define emit-object/<long>)
-(define emit-object/<target-function>)
-
-(define-function initialize-object-emitters ()
-  (set emit-object/header
-       (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-             ;; TODO FIXME adding another level of let, or using let*
-             ;; results in confused bindings and/or closure capturing.
-             ;; TODO undo the inlining once eval/closures/bug/1 is fixed
-             ;;(canary-value	(slave-value +canary-value+))
-             (canary-emitter	(when (slave-value feature/object-canary)
-                                  (lambda (-c-)
-                                    (emit CELL (slave-value +canary-value+))))))
-         (lambda (type type-id -c-)
-           (emit-comment 1 "object header")
-           ;; NOTE cannot use RODATA because the header and the object
-           ;; payload must be consequtive, but the payload values must
-           ;; be relocatable.
-           (emit DATA)
-           (emit ALIGN +word-size-in-bytes+)
-
-           ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
-           ;; but this here is the emission of read-only literals. the
-           ;; GC should never walk these objects, therefore we can
-           ;; skip emitting the first two words of the header.
-
-           ; next         ; not emitted
-           ; chunk size   ; not emitted
-           (emit CELL flags)
-           (emit-comment 2 "type: "type)
-           (emit CELL type-id)
-           (when canary-emitter
-             (canary-emitter -c-))
-           ; the object pointer points here
-           )))
-
-  (set emit-object/<long>
-       ;; TODO it should be something like: (target-value <string>). see others, too.
-       (cond
-         ((slave-value (is <immediate-type> <long>))
-          (lambda (self -c-)
-            ;; instead of a label (a pointer) we return with an immediate tagged mword
-            (eval-in-slave `(box <long> ,self))))
-         ((slave-value (and (is <boxed-type> <long>)
-                            (<boxed-type>-one-word? <long>)))
-          (let ((type-id (slave-value (<type>-slave-id <long>))))
-            (lambda (self -c-)
-              (emit-object/header <long> type-id -c-)
-              (let ((object-label (UNIQUE-LABEL "olong")))
-                (emit DEFLABEL object-label)
-                (emit CELL self)
-                object-label))))
-         (else
-          (error "emit-object/<long>: unexpected slave representation for <long>"))))
-
-  (set emit-object/<string>
-       (let ((type-id (slave-value (<type>-slave-id <string>))))
-         (lambda (self -c-)
-           (safety 1 (assert (is <string> self)))
-           ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-           (let ((elements	(emit-object/C-string self -c-))
-                 (size		(emit-object/<long> (string-length self) -c-))
-                 (object-label	(UNIQUE-LABEL "ostr")))
-             (emit-object/header <string> type-id -c-)
-             (emit DEFLABEL object-label)
-             (emit PTR size)
-             (emit PTR elements)
-             object-label))))
-
-  (set emit-object/<target-function>
-       (let* ((type		(slave-value <target-function>))
-              (type-id		(slave-value (<type>-slave-id <target-function>)))
-              (null-value	(slave-value (<immediate-type>-tag-value <undefined>)))
-              (name-factory	(when (slave-value feature/track-expr-names)
-                                  (lambda (name -c-)
-                                    (if name
-                                        (emit-object/<string> (symbol->string name) -c-)
-                                      null-value))))
-              (profiler?	(slave-value feature/profiler)))
-         (lambda (name entry-label -c-)
-           (let ((object-label	(if name
-                                    (LABEL (if feature/redefinable-functions-in-target
-                                               (concat-string (symbol->string name) "__obj")
-                                             name))
-                                  (UNIQUE-LABEL "oclosure")))
-                 (name		(when name-factory
-                                  ;; NOTE this must happen first due
-                                  ;; to the order of emission.
-                                  (name-factory name -c-)))
-                 (counter	(when profiler?
-                                  (emit-object/<long> 0 -c-))))
-             (emit-object/header type type-id -c-)
-             (emit DEFLABEL object-label)
-             (emit PTR entry-label)
-             (when name
-               (emit PTR name))
-             (when counter
-               (emit PTR counter))
-             object-label)))))
 
 ;;;
 ;;; Compiling lambdas
@@ -292,8 +155,8 @@
                           ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
                           (set (<variable>-value var) spill-loc)
                           (GR64 it))
-                      (let ((offset (<x86-64-compiler>-param-offset -c-)))
-                        (incr (<x86-64-compiler>-param-offset -c-) +word-size-in-bytes+)
+                      (let ((offset (<x86-compiler>-param-offset -c-)))
+                        (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
                         ;; this extends the stack frame size as needed
                         (TI64 offset))))
                   (<expr>-parameters self)))))
@@ -313,7 +176,7 @@
       (comp el))
 
     ;; Calculate the frame and emit the entire fn
-    (let* ((arg-size	(<x86-64-compiler>-arg-limit -c-))
+    (let* ((arg-size	(<x86-compiler>-arg-limit -c-))
            (temp-size	(+ arg-size
                            (* (<compiler>-temp-limit -c-)
                               +word-size-in-bytes+)))
@@ -343,7 +206,7 @@
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
       (emit-gen-buffer -c-)
-      (awhen (<x86-64-compiler>-fn-epilogue-label -c-)
+      (awhen (<x86-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
       (emit LEAVE frame-body-size)))
   entry-point-label)
@@ -457,66 +320,6 @@
 ;;;
 ;;; Special Forms
 ;;;
-(define-function compile/let-binding (binding comp)
-  ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
-  ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
-  ;; TODO cleanup! expand now brings let bindings to a normal form (to ease encode's job). think this through...
-  (unless (pair? binding)
-    (set binding (list binding ())))
-  (unless (cdr binding)
-    (set binding (list (car binding) ())))
-  (let ((var (car binding))
-        (tmp (compile/prog-into-temp (cdr binding) comp)))
-    (assert (= (type-of var) <variable>) "compile/let-binding: encountered a non-variable: " var)
-    (set (<variable>-value var) tmp)))
-
-(define-function compile/let (expr -c-)
-  (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
-    (list-do stmt (cdddr expr)
-      (comp stmt))
-    (free-temps temps)))
-
-(define-function compile/and (expr -c-)
-  (let ((done (UNIQUE-LABEL)))
-    (set expr (cdr expr))
-    (while expr
-      (comp (car expr))
-      (when (set expr (cdr expr))
-        (gen BF done)))
-    (gen DEFLABEL done)))
-
-(define-function compile/or (expr -c-)
-  (let ((done (UNIQUE-LABEL)))
-    (set expr (cdr expr))
-    (while expr
-      (comp (car expr))
-      (when (set expr (cdr expr))
-        (gen BT done)))
-    (gen DEFLABEL done)))
-
-(define-function compile/if (expr -c-)
-  (let ((l/false (UNIQUE-LABEL))
-        (l/end (UNIQUE-LABEL)))
-    (comp (second expr))
-    (gen BF l/false)
-    (comp (third expr))
-    (gen BR l/end)
-    (gen DEFLABEL l/false)
-    (list-do stmt (cdddr expr)
-      (comp stmt))
-    (gen DEFLABEL l/end)))
-
-(define-function compile/while (expr -c-)
-  (let ((l/body	(UNIQUE-LABEL))
-        (l/cond	(UNIQUE-LABEL)))
-    (gen BR l/cond)
-    (gen DEFLABEL l/body)
-    (list-do stmt (cddr expr)
-      (and stmt (comp stmt)))
-    (gen DEFLABEL l/cond)
-    (comp (second expr))
-    (gen BT l/body)))
-
 (define-function compile/set (expr -c-)
   (let* ((var	(second expr))
          (value	(<variable>-value var)))
@@ -536,12 +339,6 @@
   (let ((expr (eval form)))
     (gen LOAD (compile-expr expr () -c-))))
 
-(define-function compile/return (expr -c-)
-  (list-do stmt (cdr expr)
-    (comp stmt))
-  (gen BR (or (<x86-64-compiler>-fn-epilogue-label -c-)
-              (set (<x86-64-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
-
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
@@ -556,13 +353,6 @@
         ;;  (gen ADDR (<variable>-value var)))
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
-
-(define-function compile/C-string (expr -c-)
-  ;; just an optimization to compile string literals into a C string
-  ;; when they would be immediately converted anyway.
-  (assert (= (list-length expr) 2))
-  (let ((label (emit-object/C-string (second expr) -c-)))
-    (gen LOAD label)))
 
 ;;;
 ;;; *special-forms*

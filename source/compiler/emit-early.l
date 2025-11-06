@@ -183,6 +183,11 @@
                    ,@body)))
             (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
 
+;; FIXME n-regs should be extracted from the definition
+(define-form define-instruction/emit-forms (instr-name n-regs . emit-forms)
+  `(let ()
+     ,@(%define-instruction/emit-forms instr-name n-regs (symbol->type-name instr-name) emit-forms)))
+
 ;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
 (define-form define-instruction (instr-name reg-spec . emit-forms)
   (let ((has-input?		(first reg-spec))
@@ -205,6 +210,7 @@
                (n-regs			',n-regs)
                (produces-output?	,produces-output?))
            ,singleton-name))
+
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
 ;; this is faster than (emit COMMENT ...) by skipping the evaluation early
