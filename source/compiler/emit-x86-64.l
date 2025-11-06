@@ -42,7 +42,7 @@
 ;;;
 
 ;; TODO rename to WORD? bring closer to the llvm backend
-(define-instruction LONG	()
+(define-instruction CELL	()
   ((_)				(println "	.8byte	"$1)))
 
 (define-instruction PTR		()
@@ -178,7 +178,7 @@
              ;;(canary-value	(slave-value +canary-value+))
              (canary-emitter	(when (slave-value feature/object-canary)
                                   (lambda (-c-)
-                                    (emit LONG (slave-value +canary-value+))))))
+                                    (emit CELL (slave-value +canary-value+))))))
          (lambda (type type-id -c-)
            (emit-comment 1 "object header")
            ;; NOTE cannot use RODATA because the header and the object
@@ -194,9 +194,9 @@
 
            ; next         ; not emitted
            ; chunk size   ; not emitted
-           (emit LONG flags)
+           (emit CELL flags)
            (emit-comment 2 "type: "type)
-           (emit LONG type-id)
+           (emit CELL type-id)
            (when canary-emitter
              (canary-emitter -c-))
            ; the object pointer points here
@@ -216,7 +216,7 @@
               (emit-object/header <long> type-id -c-)
               (let ((object-label (UNIQUE-LABEL "olong")))
                 (emit DEFLABEL object-label)
-                (emit LONG self)
+                (emit CELL self)
                 object-label))))
          (else
           (error "emit-object/<long>: unexpected slave representation for <long>"))))
@@ -738,7 +738,7 @@
 (define-method compile-definition <long> (name -c-)
   (emit DATA)
   (emit DEFLABEL (LABEL name))
-  (emit LONG self))
+  (emit CELL self))
 
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
