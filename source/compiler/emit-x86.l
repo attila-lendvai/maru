@@ -94,14 +94,14 @@
 ;;;
 ;;; Compiler Infrastructure
 ;;;
-(define-record <x86-compiler> <compiler>
+(define-record <x86-32-compiler> <compiler>
   (param-offset
    arg-offset
    arg-limit
    fn-epilogue-label))
 
-(define-function x86-compiler (level)
-  (make <x86-compiler>
+(define-function x86-32-compiler (level)
+  (make <x86-32-compiler>
     (level			level)
     (temp-counter		0)
     (temp-limit			0)
@@ -111,7 +111,8 @@
     (arg-offset			0)
     (arg-limit			0)))
 
-(define compiler x86-compiler)
+(define-function run-compiler (env)
+  (compile-env env (x86-32-compiler 1)))
 
 (define-function new-temp (-c-)
   (TI32 (* (new-temp-index -c-) +word-size-in-bytes+)))
@@ -122,21 +123,21 @@
 
 ;; parameters are what functions have
 (define-function new-param (c)
-  (with-instance-accessors c <x86-compiler>
+  (with-instance-accessors c <x86-32-compiler>
     (let ((temp	(TI32 c.param-offset)))
       (incr c.param-offset +word-size-in-bytes+)
       temp)))
 
 ;; arguments are what we pass to functions when we call them
 (define-function new-arg (c)
-  (with-instance-accessors c <x86-compiler>
+  (with-instance-accessors c <x86-32-compiler>
     (let* ((offset	c.arg-offset)
            (temp	(TI32 offset)))
       (set c.arg-offset (+ offset +word-size-in-bytes+))
       temp)))
 
 (define-function free-args (c args)
-  (with-instance-accessors c <x86-compiler>
+  (with-instance-accessors c <x86-32-compiler>
     (when (< c.arg-limit c.arg-offset)
       (set c.arg-limit c.arg-offset))
     (set c.arg-offset 0)))
@@ -268,7 +269,7 @@
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
   (let* ((body		(<expr>-body self))
-         (-c-		(x86-compiler (+ 1 (<compiler>-level parent-comp))))
+         (-c-		(x86-32-compiler (+ 1 (<compiler>-level parent-comp))))
          (param-locs
            (map (lambda (var)
                   ;; KLUDGE this writes some internal
@@ -284,7 +285,7 @@
     (list-do el body
       (comp el))
     ;; Calculate the frame and emit the entire fn
-    (let* ((arg-size	(<x86-compiler>-arg-limit -c-))
+    (let* ((arg-size	(<x86-32-compiler>-arg-limit -c-))
            (temp-size	(* (<compiler>-temp-limit -c-) +word-size-in-bytes+))
            (frame-size	(align +call-frame-alignmet+
                                ;; 2 words: pushed ebp, and the return address (?)
@@ -310,7 +311,7 @@
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
       (emit-gen-buffer -c-) ; emit the body
-      (awhen (<x86-compiler>-fn-epilogue-label -c-)
+      (awhen (<x86-32-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
       (emit LEAVE frame-body-size)))
   entry-point-label)
@@ -495,8 +496,8 @@
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
-              (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
+  (gen BR (or (<x86-32-compiler>-fn-epilogue-label -c-)
+              (set (<x86-32-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -699,7 +700,7 @@
         (emit DEFLABEL label)
         (emit PTR object-label)))))
 
-(define-method emit-prelude <x86-compiler> ()
+(define-method emit-prelude <x86-32-compiler> ()
   (verbosity 1 (warn "\nCompiling to IA-32\n\n"))
   (initialize-object-emitters))
 

@@ -134,3 +134,6 @@ exit:
          (argv (+ sp (words-to-bytes 1))))
     (linux-syscall linux/exit
      (main/common argc argv linux/stdin linux/stdout linux/stderr))))
+
+;; KLUDGE
+(eval-in-host `(run-compiler ,*target-env*))

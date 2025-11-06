@@ -198,7 +198,8 @@
     (reg-counter		0)
     (label-counter		0)))
 
-(define compiler llvm-compiler)
+(define-function run-compiler (env)
+  (compile-env env (llvm-compiler 1)))
 
 (define-function new-temp (-c-)
   (TEMP (new-temp-index -c-)))

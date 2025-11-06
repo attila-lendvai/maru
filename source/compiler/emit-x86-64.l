@@ -95,7 +95,7 @@
 ;;;
 (define-constant +param-registers+ ''("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
 
-(define-record <x86-compiler> <compiler>
+(define-record <x86-64-compiler> <compiler>
   (param-offset
    ;; params-spilled? ; did we already copy our args to the stack?
    ;; params-must-be-spilled
@@ -104,8 +104,8 @@
    arg-limit
    fn-epilogue-label))
 
-(define-function x86-compiler (level)
-  (make <x86-compiler>
+(define-function x86-64-compiler (level)
+  (make <x86-64-compiler>
     (level			level)
     (temp-counter		0)
     (temp-limit			0)
@@ -117,7 +117,8 @@
     (arg-offset			0)
     (arg-limit			0)))
 
-(define compiler x86-compiler)
+(define-function run-compiler (env)
+  (compile-env env (x86-64-compiler 1)))
 
 (define-function new-temp (-c-)
   (TI64 (* (new-temp-index -c-) +word-size-in-bytes+)))
@@ -127,7 +128,7 @@
     (push (<compiler>-temps -c-) obj)))
 
 ;; (define-function new-param (c)
-;;   (with-instance-accessors c <x86-compiler>
+;;   (with-instance-accessors c <x86-64-compiler>
 ;;     (let ((reg (pop c.param-registers)))
 ;;       (if reg
 ;;           (let ()
@@ -138,7 +139,7 @@
 ;;           (TI64 offset))))))
 
 (define-function new-arg (c)
-  (with-instance-accessors c <x86-compiler>
+  (with-instance-accessors c <x86-64-compiler>
     (let ((reg (pop c.arg-registers)))
       (if reg
           (let ()
@@ -149,7 +150,7 @@
           (TI64 offset))))))
 
 (define-function free-args (c args)
-  (with-instance-accessors c <x86-compiler>
+  (with-instance-accessors c <x86-64-compiler>
     (when (< c.arg-limit c.arg-offset)
       (set c.arg-limit c.arg-offset))
     (set c.arg-offset 0)
@@ -290,7 +291,7 @@
 ;;          (let ((loc (<variable>-value var)))
 ;;            (unless (is <TI64> loc)
 ;;              (let ((reg (<variable>-value var))
-;;                    (temp (pop (<x86-compiler>-param-spill-locs -c-))))
+;;                    (temp (pop (<x86-64-compiler>-param-spill-locs -c-))))
 ;;                (assert temp)
 ;;                (assert (is <GR64> reg))
 ;;                (set (<variable>-value var) temp)
@@ -300,7 +301,7 @@
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
   (let* ((body	(<expr>-body self))
-         (-c-	(x86-compiler (+ 1 (<compiler>-level parent-comp))))
+         (-c-	(x86-64-compiler (+ 1 (<compiler>-level parent-comp))))
          (param-locs
            (let ((param-regs +param-registers+))
              (map (lambda (var)
@@ -312,8 +313,8 @@
                           ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
                           (set (<variable>-value var) spill-loc)
                           (GR64 it))
-                      (let ((offset (<x86-compiler>-param-offset -c-)))
-                        (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
+                      (let ((offset (<x86-64-compiler>-param-offset -c-)))
+                        (incr (<x86-64-compiler>-param-offset -c-) +word-size-in-bytes+)
                         ;; this extends the stack frame size as needed
                         (TI64 offset))))
                   (<expr>-parameters self)))))
@@ -333,7 +334,7 @@
       (comp el))
 
     ;; Calculate the frame and emit the entire fn
-    (let* ((arg-size	(<x86-compiler>-arg-limit -c-))
+    (let* ((arg-size	(<x86-64-compiler>-arg-limit -c-))
            (temp-size	(+ arg-size
                            (* (<compiler>-temp-limit -c-)
                               +word-size-in-bytes+)))
@@ -363,7 +364,7 @@
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
       (emit-gen-buffer -c-)
-      (awhen (<x86-compiler>-fn-epilogue-label -c-)
+      (awhen (<x86-64-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))
       (emit LEAVE frame-body-size)))
   entry-point-label)
@@ -383,7 +384,7 @@
 (define-function compile-call-form (op args raw? -c-)
   (emit-comment 2 "compile-call: "op", args: "args", raw?: "raw?)
   (safety 2 (assert (or (pair? op) (variable? op))))
-  ;; (set (<x86-compiler>-params-must-be-spilled -c-) true)
+  ;; (set (<x86-64-compiler>-params-must-be-spilled -c-) true)
   ;; NOTE this implements a left-to-right evaluation order, including the operator.
   ;; i.e. moving this op-tmp means changing the evaluation order!
   (let ((op-tmp		(when (pair? op)
@@ -559,8 +560,8 @@
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
-              (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
+  (gen BR (or (<x86-64-compiler>-fn-epilogue-label -c-)
+              (set (<x86-64-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -768,7 +769,7 @@
         (emit DEFLABEL label)
         (emit PTR object-label)))))
 
-(define-method emit-prelude <x86-compiler> ()
+(define-method emit-prelude <x86-64-compiler> ()
   (verbosity 1 (warn "\nCompiling to x86-64\n\n"))
   (initialize-object-emitters))
 

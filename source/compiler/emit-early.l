@@ -21,6 +21,8 @@
 (define-selector compile-definition)
 (define-selector compile-call-to)
 
+(define compile-env) ; forward
+
 ;;;
 ;;; Utils
 ;;;

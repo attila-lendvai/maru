@@ -73,3 +73,6 @@
 
 (define-function main (argc argv)
   (main/common argc argv libc/stdin libc/stdout libc/stderr))
+
+;; KLUDGE
+(eval-in-host `(run-compiler ,*target-env*))

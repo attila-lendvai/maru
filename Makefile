@@ -331,7 +331,6 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
 		source/platforms/$(PLATFORM)/eval.l				\
-		source/compiler/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
@@ -353,7 +352,6 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
 		source/platforms/$(PLATFORM)/eval.l				\
-		source/compiler/emit-finish.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
@@ -397,7 +395,6 @@ define compile-x86
 	boot.l									\
 	source/bootstrapping/late.l						\
 	$(3)									\
-	source/compiler/emit-finish.l						\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
@@ -418,7 +415,6 @@ define compile-llvm
 	boot.l									\
 	source/bootstrapping/late.l						\
 	$(3)									\
-	source/compiler/emit-finish.l						\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
