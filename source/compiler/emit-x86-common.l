@@ -5,12 +5,12 @@
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
 
-;; TODO introduce abstraction for ABIs...
+;; TODO ? introduce abstraction for ABIs...
 (define-constant +call-frame-alignmet+
     (case (target-value +word-size-in-bits+)
       (32 (case (target-value +operating-system+)
             (darwin	16)
-            (else	+word-size-in-bytes+)))
+            (else	4)))
       (64 16)))
 
 (define-constant +external-label-prefix+
@@ -380,12 +380,12 @@
                                     (println "	lea	"(* 4 offset)"(%eax), %ecx")
                                     (println "	mov	(%ecx), %eax"))))
   ((TEMP64)			(println "	mov	"$1", %rcx")
-				(println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rcx")
+				(println "	lea	(%rax, %rcx, 8), %rcx")
 				(println "	mov	(%rcx), %rax"))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	(%rax), %rax")
-                                    (println "	lea	"(* +word-size-in-bytes+ offset)"(%rax), %rcx")
+                                    (println "	lea	"(* 8 offset)"(%rax), %rcx")
                                     (println "	mov	(%rcx), %rax")))))
 
 (define-instruction STORE-OOP	(false 0 true)
@@ -412,22 +412,22 @@
   ((TEMP64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
                                     (let ()
                                       (println "	mov	"$1", %rcx")
-                                      (println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rcx")
+                                      (println "	lea	(%rax, %rcx, 8), %rcx")
                                       (println "	mov	"$2", %rax")
                                       (println "	mov	%rax, (%rcx)"))
                                   (println "	mov	"$1", %rcx")
-                                  (println "	lea	(%rax, %rcx, "+word-size-in-bytes+"), %rax")
+                                  (println "	lea	(%rax, %rcx, 8), %rax")
                                   (println "	mov	"$2", (%rax)")))
   ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand feature/strict-semantics-for-compiled-set
                                       (let ()
                                         (if (= 0 offset)
                                             (println "	mov	%rax, %rcx")
-                                          (println "	lea	"(* +word-size-in-bytes+ offset)"(%rax), %rcx"))
+                                          (println "	lea	"(* 8 offset)"(%rax), %rcx"))
                                         (println "	mov	"$2", %rax") ; this also leaves it as return value in %rax
                                         (println "	mov	%rax, (%rcx)"))
                                     (unless (= 0 offset)
-                                      (println "	lea	"(* +word-size-in-bytes+ offset)"(%rax), %rax"))
+                                      (println "	lea	"(* 8 offset)"(%rax), %rax"))
                                     (println "	mov	"$2", (%rax)")))))
 
 (define-form define-instruction/comparator (maru-name x86-name)
