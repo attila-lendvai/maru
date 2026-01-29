@@ -57,6 +57,11 @@ ifeq ($(HOST_OS),Linux)
   # issues (but it's problematic in containers/CI).
   TIME		= time --format="\n$(GREEN)user time: %U$(RESET)"
   EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
+  # This should be something that prints the file size, but otherwise
+  # fails gracefully when something is not available.
+  define print_file_size
+    { echo && echo -n "$(1): $(GREEN)" && stat -c%s $(1) | numfmt --grouping && echo "$(RESET)" || echo "$(RESET)"; }
+  endef
 else ifeq ($(HOST_OS),Darwin)
   LLVM_VERSION	=
   TARGET_VENDOR	?= apple
@@ -64,6 +69,8 @@ else ifeq ($(HOST_OS),Darwin)
   TARGET_OS	?= darwin
   EVAL_WRAPPER	:= time
 endif
+
+print_file_size ?= true
 
 # if you want to use the perf tool to profile the binary then also
 # include -g and the rest. -O3 may remain.
@@ -136,11 +143,6 @@ else
 endif
 
 BACKDATE_FILE	= touch -t 200012312359
-# This should be something that prints the file size, but otherwise
-# fails gracefully when something is not available.
-define print_file_size
-  { echo && echo -n "$(1): $(GREEN)" && stat -c%s $(1) | numfmt --grouping && echo "$(RESET)" || true; }
-endef
 
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
