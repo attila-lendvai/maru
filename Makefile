@@ -89,7 +89,6 @@ RESET		= $(shell tput sgr0)
 
 BACKDATE_FILE	= touch -t 200012312359
 
-LLC		= llc$(LLVM_VERSION) $(LLVM_ARGS)
 LLVM_OPT	= opt$(LLVM_VERSION) $(LLVM_ARGS)
 CLANG		= clang$(LLVM_VERSION) $(LLVM_ARGS)
 DIFF		= diff --unified --ignore-all-space
@@ -313,11 +312,9 @@ $(BUILD_x86)/%.o: source/evaluator/%.c
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
-	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
 	$(CLANG) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
 	@-$(STRIP) $@ -o $@.stripped
-	@-$(LLC) -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
 #	$(CLANG) --target=$(TARGET_llvm) -S -o $@.clang.s $<
 
 $(BUILD_llvm)/%.o: source/evaluator/%.c
