@@ -67,6 +67,7 @@ else ifeq ($(HOST_OS),Darwin)
   TARGET_VENDOR	?= apple
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
+  CFLAGS	+= -Wl,-no_uuid
   EVAL_WRAPPER	:= time
 endif
 
