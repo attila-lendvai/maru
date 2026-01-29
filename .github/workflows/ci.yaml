@@ -17,20 +17,34 @@ on:
       - 'doc/**'
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/attila-lendvai/maru-ci:latest
       options: --init
 
     steps:
+      - name: System info
+        run: |
+          echo "===== OS Info ====="
+          uname -a
+          sw_vers || lsb_release -a || cat /etc/os-release || true
+          echo "===== CPU Info ====="
+          uname -m
+          sysctl -n machdep.cpu.brand_string || lscpu || true
+          echo "===== Environment ====="
+          env
+
       - name: Calm down Git
         run: git config --global --add safe.directory /__w/maru/maru
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          show-progress: false
+
+      - run:  clang --version
 
       - run:  make PLATFORM=libc  test-bootstrap
       - run:  make PLATFORM=linux test-bootstrap
@@ -46,3 +60,87 @@ jobs:
       - run:  make PLATFORM=linux test-elf
 
       - run:  make PLATFORM=linux test-jit
+
+  build-darwin:
+    # if: false                   # TODO delme
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: System info
+        run: |
+          echo "===== OS Info ====="
+          uname -a
+          sw_vers || lsb_release -a || cat /etc/os-release || true
+          echo "===== CPU Info ====="
+          uname -m
+          sysctl -n machdep.cpu.brand_string || lscpu || true
+          echo "===== Environment ====="
+          env
+
+      - name: Calm down Git
+        run: git config --global --add safe.directory /__w/maru/maru
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Install clang
+        # this action caches the archives, but not the install
+        # itself. it's simpler this way, but it takes about a minute.
+        uses: gerlero/brew-install@v1
+        with:
+          packages: llvm
+
+      # - name: Cache Homebrew packages
+      #   uses: actions/cache@v4
+      #   with:
+      #     # Paths to cache:
+      #     # /usr/local/Homebrew - installation folder of Homebrew
+      #     # /usr/local/Cellar - installation folder of Homebrew formulae
+      #     # /usr/local/Frameworks, /usr/local/bin, /usr/local/opt - contain (links to) binaries installed by Homebrew formulae
+      #     # /usr/local/lib/python3.12 - Python3 packages installation
+      #     # /opt/homebrew - Apple Silicon path
+      #     path: |
+      #       /usr/local/Homebrew
+      #       /usr/local/Cellar
+      #       /usr/local/Frameworks
+      #       /usr/local/bin
+      #       /usr/local/opt
+      #       /opt/homebrew
+
+      #     key: macos-build-cache-${{ hashFiles('**/Brewfile') }}
+      #     restore-keys: macos-build-cache-
+
+      # - name: Install packages from Homebrew
+      #   run: |
+      #     brew update
+      #     brew install llvm || echo "clang already installed from cache"
+
+      - name: Add Homebrew LLVM to PATH
+        run: echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
+
+      - name: Log clang --version
+        run: clang --version
+
+      - run:  arch -arm64  make PLATFORM=libc             test-bootstrap-llvm
+        continue-on-error: true      # TODO
+
+      - run:  arch -arm64  make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
+        continue-on-error: true      # TODO
+
+      - run:  arch -x86_64 make PLATFORM=libc             test-bootstrap-x86
+        continue-on-error: true      # TODO
+
+      - run:  arch -x86_64 make PROFILER=1 PLATFORM=libc  test-bootstrap-x86
+        continue-on-error: true      # TODO
+
+      - run:  make test-evaluator
+        continue-on-error: true      # TODO
+
+      - run:  make test-parser
+        continue-on-error: true      # TODO
