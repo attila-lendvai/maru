@@ -5,9 +5,19 @@
 ;;;
 ;;; The libc FFI
 ;;;
-(define-C-variable libc/stdin  stdin  (* "%m_libc-FILE")) ; an opaque type that we define in the prelude of the llvm backend
-(define-C-variable libc/stdout stdout (* "%m_libc-FILE"))
-(define-C-variable libc/stderr stderr (* "%m_libc-FILE"))
+(if-at-expand (= 'darwin +operating-system+)
+    ;; %m_libc-FILE is an opaque type that we define in the prelude of
+    ;; the llvm backend.
+    (let ()
+      (define-C-variable libc/stdin  __stdinp  (* "%m_libc-FILE"))
+      (define-C-variable libc/stdout __stdoutp (* "%m_libc-FILE"))
+      (define-C-variable libc/stderr __stderrp (* "%m_libc-FILE")))
+  (define-C-variable libc/stdin  stdin  (* "%m_libc-FILE")) ; an opaque type that we define in the prelude of the llvm backend
+  (define-C-variable libc/stdout stdout (* "%m_libc-FILE"))
+  (define-C-variable libc/stderr stderr (* "%m_libc-FILE")))
+
+;; this works on linux, but it's probably not too portable.
+;;(define-C-variable libc/errno  errno  int "thread_local")
 
 (define-C-functions libc/
   (void abort ()) (void exit (int))
