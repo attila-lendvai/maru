@@ -120,7 +120,7 @@ eval-llvm: $(BUILD_llvm)/eval2
 # eval1 is the first version of us that gets built by the previous stage.
 # some functionality may be broken in this one. this is when we are 'evolving'.
 $(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
-	@mkdir --parents $(BUILD_x86)
+	@mkdir -p $(BUILD_x86)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		bootstrapping/prepare.l					\
@@ -134,7 +134,7 @@ $(BUILD_x86)/eval1.s: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
 			>$@ || { touch --date=2000-01-01 $@; exit 42; }
 
 $(BITCODE_DIR)/eval1.ll: $(HOST_DIR)/eval bootstrapping/*.l eval.l boot.l
-	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR)
+	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(TIME) $(HOST_DIR)/eval					\
 		$(HOST_DIR)/boot.l					\
 		bootstrapping/prepare.l					\
@@ -155,7 +155,7 @@ $(BUILD_x86)/eval2.s: $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) bootstrapping/
 
 # TODO change eval1 to llvm in the next stage (grep token: bootstrapping?)
 $(BITCODE_DIR)/eval2.ll: boot.l $(EMIT_FILES_llvm) bootstrapping/*.l eval.l
-	@mkdir --parents $(BUILD_llvm) $(BITCODE_DIR) # delme, too
+	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR) # delme, too
 	$(call ensure-built,$(BUILD_x86)/eval1)
 	$(call compile-llvm,$(BUILD_x86)/eval1,eval.l,$(BITCODE_DIR)/eval2.ll)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
@@ -172,7 +172,7 @@ $(BITCODE_DIR)/eval3.ll: $(BUILD_llvm)/eval2 boot.l $(EMIT_FILES_llvm) bootstrap
 
 $(HOST_DIR)/eval:
 	echo Building $(BUILD)/$(PREVIOUS_STAGE)
-	@mkdir --parents $(BUILD)
+	@mkdir -p $(BUILD)
 # after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
 	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
@@ -233,12 +233,12 @@ source/parsing/peg.l: $(BUILD)/peg.l
 ### Pattern rules
 ###
 $(BUILD)/%: $(BUILD)/%.s
-	@mkdir --parents $(@D)
+	@mkdir -p $(@D)
 	$(CC) -m32 -o $@ $<
 	@-$(STRIP) $@ -o $@.stripped
 
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
-	@mkdir --parents $(@D)
+	@mkdir -p $(@D)
 	$(LLC) -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
 	$(CLANG) --target=$(TARGET_llvm) -o $@ $@.o
 # the rest is just informational
@@ -277,7 +277,7 @@ $(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): tests/compiler-tests.l $(EMIT_FI
 	$(call compile-x86,$(TEST_EVAL),tests/compiler-tests.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
 
 $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): tests/compiler-tests.l $(EMIT_FILES_llvm)
-	@mkdir --parents $(BUILD_llvm)
+	@mkdir -p $(BUILD_llvm)
 	$(call ensure-built,$(TEST_EVAL))
 	$(call compile-llvm,$(TEST_EVAL),tests/compiler-tests.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
 
