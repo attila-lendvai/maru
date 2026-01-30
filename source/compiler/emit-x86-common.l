@@ -70,6 +70,7 @@
 (define-operand TEMP32 TEMP	()	self.offset"(%esp)")
 
 (define-operand GLOBAL64 GLOBAL-CELL)
+(define-operand GOT64 GLOBAL-CELL)     ; some Darwin indirection thing...
 (define-operand LI64 LITERAL)
 (define-operand R64 REGISTER ())
 (define-operand TEMP64 TEMP	()	self.offset"(%rsp)")
@@ -83,20 +84,29 @@
 (define-instruction INLINE	()
   ((string)			(println $1)))
 
-(define-instruction TEXT	()
-  (()				(println "	.text")))
-
-(define-instruction DATA	()
-  (()				(println "	.section .data")))
-
-(define-instruction RODATA	()
-  (()				(println "	.section .rodata")))
+;; KLUDGE this dispatch should happen at runtime, not load-time
+(if (= 'darwin (target-value +operating-system+))
+    (let ()
+      (define-instruction TEXT		()
+        (()				(println "	.section __TEXT,__text")))
+      (define-instruction DATA		()
+        (()				(println "	.section __DATA,__data")))
+      (define-instruction RODATA	()
+        (()				(println "	.section __TEXT,__const")))
+      ;; there's no .type on Darwin
+      (define-instruction TYPE	()
+        ((_ _)			)))
+  (define-instruction TEXT	()
+    (()				(println "	.text")))
+  (define-instruction DATA	()
+    (()				(println "	.section .data")))
+  (define-instruction RODATA	()
+    (()				(println "	.section .rodata")))
+  (define-instruction TYPE	()
+    ((_ _)			(println "	.type "$1", "$2))))
 
 ;;(define-instruction    (SECTION string)		(println "	.section "$1))
 ;;(define-instruction    (INDIRECT LABEL)		(println "	.indirect_symbol "$1))
-
-(define-instruction TYPE	()
-  ((_ _)			(println "	.type "$1", "$2)))
 
 (define-instruction ALIAS	()
   ((_ _)			(println "	.set "$1", "$2)))
@@ -286,12 +296,16 @@
   ((TEMP64)			(println "	mov	"$1", %rax"))
   ((R64)			(println "	mov	"$1", %rax"))
   ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax")
+				(println "	mov	(%rax), %rax"))
+  ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
 				(println "	mov	(%rax), %rax")))
 
 (define-instruction STORE	(true 0 false)
   ((R32 TEMP32)			(println "	mov	"$1", "$2))
   ((R32 GLOBAL32)		(println "	mov	"$1", "$2))
   ((R64 GLOBAL64)		(println "	lea	"$2"(%rip), %rbx")
+                                (println "	mov	"$1", (%rbx)"))
+  ((R64 GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
   ((R64 R64)			(println "	mov	"$1", ("$2")"))
   ((R64 TEMP64)			(println "	mov	"$1", "$2)))

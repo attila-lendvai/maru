@@ -331,7 +331,8 @@
        (gen STORE value))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GLOBAL64 (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL64)
+                   (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
        (gen STORE (GLOBAL64 (LABEL (<variable>-name var))))))))
 
@@ -432,7 +433,8 @@
           (gen LOAD (EXTERNAL-LABEL (<C-function>-name value))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD (GLOBAL64 (EXTERNAL-LABEL (<C-variable>-name value)))))
+          (gen LOAD ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL64)
+                     (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not feature/redefinable-functions-in-target)
                (is <expr> value))
           (gen LOAD (LABEL self.name)))
