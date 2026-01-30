@@ -81,17 +81,14 @@ libraries:
 sudo apt install gcc-multilib
 ```
 
-#### MacOS
+#### MacOS (darwin)
 
-Please note that x86 MacOS dropped support for 32 bit executables, so
-the current x86 backend won't work there. The even newer Mac's
-nowadays have ARM CPU's, and there's no ARM backend for Maru. There
-are no fundamental reasons why the LLVM backend shouldn't work on
-MacOS, but I don't own a Mac.
+As of this writing (2026) both the x86_64 and the LLVM backends can
+bootstrap on an x86_64 MacOS running in kvm on Linux. There's even CI
+set up for testing every commit on an arm64 runner using `arch -x86_64
+make [...]`, but they fail for now.
 
-PR's are welcome for fixes, setting up CI, or adjusting this readme.
-
-The following instructions used to work at around 2018:
+The following instructions worked in a kvm as of 2026:
 
 1. Make sure XCode is installed. In a Terminal:
 
