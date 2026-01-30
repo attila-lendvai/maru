@@ -133,10 +133,10 @@ jobs:
       - run:  arch -arm64  make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
         continue-on-error: true      # TODO
 
-      - run:  arch -x86_64 make PLATFORM=libc             test-bootstrap-x86
+      - run:  arch -x86_64 make PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
         continue-on-error: true      # TODO
 
-      - run:  arch -x86_64 make PROFILER=1 PLATFORM=libc  test-bootstrap-x86
+      - run:  arch -x86_64 make PROFILER=1 PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
         continue-on-error: true      # TODO
 
       - run:  make test-evaluator
