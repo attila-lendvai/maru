@@ -141,7 +141,7 @@ BITCODE_DIR	= $(BUILD_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
 
-EVAL0_PHASE=1
+#EVAL0_PHASE=1
 ifdef EVAL0_PHASE
   # This way eval0 is built each time
   EVAL0_DIR	= $(SLAVE_DIR)
