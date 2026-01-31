@@ -46,20 +46,20 @@ jobs:
 
       - run:  clang --version
 
-      - run:  make PLATFORM=libc  test-bootstrap
-      - run:  make PLATFORM=linux test-bootstrap
-      - run:  make TARGET_CPU=i686 PLATFORM=libc  test-bootstrap
-      - run:  make TARGET_CPU=i686 PLATFORM=linux test-bootstrap
+      - run:  timeout 5m make PLATFORM=libc  test-bootstrap
+      - run:  timeout 5m make PLATFORM=linux test-bootstrap
+      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=libc  test-bootstrap
+      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=linux test-bootstrap
 
-      - run:  make PROFILER=1 PLATFORM=libc  test-bootstrap
+      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap
 
-      - run:  make test-evaluator
-      - run:  make test-parser
+      - run:  timeout 5m make test-evaluator
+      - run:  timeout 5m make test-parser
 
-      - run:  make PLATFORM=libc  test-elf
-      - run:  make PLATFORM=linux test-elf
+      - run:  timeout 5m make PLATFORM=libc  test-elf
+      - run:  timeout 5m make PLATFORM=linux test-elf
 
-      - run:  make PLATFORM=linux test-jit
+      - run:  timeout 5m make PLATFORM=linux test-jit
 
   build-darwin:
     # if: false                   # TODO delme
@@ -94,7 +94,7 @@ jobs:
         # itself. it's simpler this way, but it takes about a minute.
         uses: gerlero/brew-install@v1
         with:
-          packages: llvm
+          packages: llvm coreutils
 
       # - name: Cache Homebrew packages
       #   uses: actions/cache@v4
@@ -122,25 +122,25 @@ jobs:
       #     brew install llvm || echo "clang already installed from cache"
 
       - name: Add Homebrew LLVM to PATH
-        run: echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
+        run: echo "$(brew --prefix llvm)/bin:$(brew --prefix coreutils)/bin" >> $GITHUB_PATH
 
       - name: Log clang --version
         run: clang --version
 
-      - run:  arch -arm64  make PLATFORM=libc             test-bootstrap-llvm
+      - run:  timeout 5m arch -arm64  make PLATFORM=libc test-bootstrap-llvm
         continue-on-error: true      # TODO
 
-      - run:  arch -arm64  make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
+      - run:  timeout 5m arch -arm64  make PROFILER=1 PLATFORM=libc test-bootstrap-llvm
         continue-on-error: true      # TODO
 
-      - run:  arch -x86_64 make PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
+      - run:  timeout 5m arch -x86_64 make PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
         continue-on-error: true      # TODO
 
-      - run:  arch -x86_64 make PROFILER=1 PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
+      - run:  timeout 5m arch -x86_64 make PROFILER=1 PLATFORM=libc TARGET_CPU=x86_64 test-bootstrap-x86
         continue-on-error: true      # TODO
 
-      - run:  make test-evaluator
+      - run:  timeout 5m make test-evaluator
         continue-on-error: true      # TODO
 
-      - run:  make test-parser
+      - run:  timeout 5m make test-parser
         continue-on-error: true      # TODO
