@@ -77,6 +77,8 @@ ifeq ($(TARGET_CPU_llvm),x86_64)
   BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
 else ifeq ($(TARGET_CPU_llvm),arm64)
   BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
+else ifeq ($(TARGET_CPU_llvm),aarch64)
+  BITCODE_DIR		= $(BUILD)/llvm/libc-64bit-le
 else ifeq ($(TARGET_CPU_llvm),i686)
   BITCODE_DIR		= $(BUILD)/llvm/libc-32bit-le
 else
