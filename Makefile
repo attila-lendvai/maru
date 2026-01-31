@@ -13,6 +13,8 @@
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
 #  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
+#  make TARGET_CPU=aarch64 PLATFORM=linux TARGET_VENDOR=gnu TARGET_OS=linux eval-llvm || beep
+#  make TARGET_CPU=i686 TARGET_VENDOR=gnu TARGET_OS=linux test-bootstrap-llvm eval-llvm || beep
 #  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
 #  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu PLATFORM=linux test-bootstrap-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep

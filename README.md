@@ -109,6 +109,15 @@ echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
+#### Guix on OpenWRT on aarch64
+
+I own a BPI-R4 (a powerful router) that is currently running
+OpenWrt. I installed Guix (an advanced package manager) on it out of
+curiosity.
+
+In that environment Maru can bootstrap itself using the LLVM backend
+and the libc platform.
+
 #### Other platforms
 
 Currently Maru should work everywhere where there's a `libc`, and either the
