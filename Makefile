@@ -129,6 +129,7 @@ ifeq ($(TARGET_CPU_x86),x86_64)
 else ifeq ($(TARGET_CPU_x86),i686)
   CFLAGS_x86	+= -m32
 # KLUDGE will be dropped when make is replaced
+else ifeq ($(TARGET_CPU_x86),aarch64)
 else ifeq ($(TARGET_CPU_x86),arm64)
 else
   $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
