@@ -49,8 +49,8 @@ RESET		= $(shell tput sgr0)
 ifeq ($(HOST_OS),Linux)
 #  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
   LLVM_VERSION	=
-  TARGET_VENDOR	?= linux
-  TARGET_OS	?= gnu
+  TARGET_VENDOR	?= gnu
+  TARGET_OS	?= linux
   # `command time` forces bash to use the external time command
   # setarch --addr-no-randomize improves debuggability of lowlevel
   # issues (but it's problematic in containers/CI).
@@ -140,6 +140,9 @@ BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
 BITCODE_DIR	= $(BUILD_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
+
+# $(info $$BUILD_llvm is [${BUILD_llvm}])
+# $(info $$BITCODE_DIR is [${BITCODE_DIR}])
 
 #EVAL0_PHASE=1
 ifdef EVAL0_PHASE
