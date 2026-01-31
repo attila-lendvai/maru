@@ -1,3 +1,11 @@
+# podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 -f Dockerfile.ci .
+# podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 -f Dockerfile.ci .
+
+# podman login ghcr.io -u attila-lendvai -p <personal-access-token>
+
+# podman push ghcr.io/attila-lendvai/maru-ci:amd64
+# podman push ghcr.io/attila-lendvai/maru-ci:arm64
+
 FROM docker.io/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

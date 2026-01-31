@@ -17,10 +17,10 @@ on:
       - 'doc/**'
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build-linux-amd64:
+    runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/attila-lendvai/maru-ci:latest
+      image: ghcr.io/attila-lendvai/maru-ci:amd64
       options: --init
 
     steps:
@@ -60,6 +60,50 @@ jobs:
       - run:  timeout 5m make PLATFORM=linux test-elf
 
       - run:  timeout 5m make PLATFORM=linux test-jit
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm64
+    container:
+      image: ghcr.io/attila-lendvai/maru-ci:arm64
+      options: --init
+
+    steps:
+      - name: System info
+        run: |
+          echo "===== OS Info ====="
+          uname -a
+          sw_vers || lsb_release -a || cat /etc/os-release || true
+          echo "===== CPU Info ====="
+          uname -m
+          sysctl -n machdep.cpu.brand_string || lscpu || true
+          echo "===== Environment ====="
+          env
+
+      - name: Calm down Git
+        run: git config --global --add safe.directory /__w/maru/maru
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - run:  clang --version
+
+      - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
+      - run:  timeout 5m make PLATFORM=linux test-bootstrap-llvm
+      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=libc  test-bootstrap-llvm
+      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=linux test-bootstrap-llvm
+
+      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
+
+      - run:  timeout 5m make test-evaluator
+      - run:  timeout 5m make test-parser
+
+      - run:  timeout 5m make PLATFORM=libc  test-elf
+      - run:  timeout 5m make PLATFORM=linux test-elf
+
+      # - run:  timeout 5m make PLATFORM=linux test-jit
 
   build-darwin:
     # if: false                   # TODO delme
