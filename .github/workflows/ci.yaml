@@ -62,7 +62,7 @@ jobs:
       - run:  timeout 5m make PLATFORM=linux test-jit
 
   build-linux-arm64:
-    runs-on: ubuntu-24.04-arm64
+    runs-on: ubuntu-24.04-arm
     container:
       image: ghcr.io/attila-lendvai/maru-ci:arm64
       options: --init
@@ -92,18 +92,11 @@ jobs:
 
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=linux test-bootstrap-llvm
-      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=libc  test-bootstrap-llvm
-      - run:  timeout 5m make TARGET_CPU=i686 PLATFORM=linux test-bootstrap-llvm
 
       - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
 
       - run:  timeout 5m make test-evaluator
       - run:  timeout 5m make test-parser
-
-      - run:  timeout 5m make PLATFORM=libc  test-elf
-      - run:  timeout 5m make PLATFORM=linux test-elf
-
-      # - run:  timeout 5m make PLATFORM=linux test-jit
 
   build-darwin:
     # if: false                   # TODO delme

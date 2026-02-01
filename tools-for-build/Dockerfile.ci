@@ -10,6 +10,10 @@ FROM docker.io/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG TARGETARCH
+
+RUN echo TARGETARCH="$TARGETARCH"
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
@@ -23,6 +27,9 @@ RUN apt-get update && \
         ca-certificates \
     # Conditional packages for x86
     && if [ "$TARGETARCH" = "amd64" ]; then \
+      dpkg --add-architecture i386 && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386; \
         apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386; \
     fi \
     && rm -rf /var/lib/apt/lists/*
