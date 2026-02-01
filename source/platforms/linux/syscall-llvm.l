@@ -7,13 +7,17 @@
   ;; TODO does this properly communicate to LLVM which registers get overwritten?
   ((pair)
    (print "	"$reg1" = call %oop asm sideeffect \"") ; sideffect means: never optimize away
-   (let (syscall regs output clobbers)
+   (let ((args $1)
+         instr
+         input-regs
+         output
+         clobbers)
      (case (slave-value +architecture+)
        (IA-32
         ;; at most 6 args passed in regs. the rest should be spilled
         ;; to the stack, but we don't support that.
-        (set syscall	"int	$$0x80")
-        (set regs	+linux/syscall/argument-registers/IA-32+)
+        (set instr	"int	$$0x80")
+        (set input-regs	+linux/syscall/argument-registers/IA-32+)
         ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
         ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
         ;; On IA-32 "A" means the edx:eax pair used together to
@@ -22,30 +26,48 @@
         (set output	"{eax}")
         (set clobbers	+linux/syscall/clobbered-registers/IA-32+))
        (x86-64
-        (set syscall	"syscall")
-        (set regs	+linux/syscall/argument-registers/x86_64+)
+        (set instr	"syscall")
+        (set input-regs	+linux/syscall/argument-registers/x86_64+)
         (set output	"{rax}")
         (set clobbers	+linux/syscall/clobbered-registers/x86_64+))
        (aarch64
-        (set syscall	"svc #0")
-        (set regs	+linux/syscall/argument-registers/aarch64+)
+        ;; TODO FIXME
+        ;; When a register is:
+        ;;  - initialized with an input value before the asm, and
+        ;;  - overwritten with an output value after the asm,
+        ;; you must use an input?output constraint; i.e. +{x0}
+        ;; %ret = call i64 asm sideeffect "svc #0",
+        ;; "+{x0},{x8},{x1},{x2},~{x3},~{x4},~{x5},~{x8},~{x16},~{x17},~{memory}"
+        ;; (
+        ;;   i64 %arg0,    ; +{x0}
+        ;;   i64 %sysno,   ; {x8}
+        ;;   i64 %arg1,    ; {x1}
+        ;;   i64 %arg2     ; {x2}
+        ;; )
+        ;; clobbers:
+        ;; x0?x5 (arguments + return)
+        ;; x8 (syscall number)
+        ;; x16, x17 (IP0/IP1)
+        ;; memory
+        (set input-regs	+linux/syscall/argument-registers/aarch64+)
         (set output	"{x0}")
+        (set instr	"svc #0")
         (set clobbers	+linux/syscall/clobbered-registers/aarch64+))
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
 
-     (println syscall"\", ")
+     (println instr"\", ")
      (print "	\"="output)
      (map (lambda (_ reg)
             (assert reg)   ; this will fail for more args than regs.
             (print ", {"reg"}"))
-          $1 regs)
+          args input-regs)
      (while clobbers
        (print ",~{"(pop clobbers)"}"))
      ;; ~{memory} indicates that the assembly writes to arbitrary undeclared memory
      ;; locations - not only the memory pointed to by a declared indirect output.
      (print ",~{memory}\"\n	(")
-     (emit/comma-separated-%oops $1)
+     (emit/comma-separated-%oops args)
      (println ")"))))
 
 (define-function compile/linux-syscall (expr -c-)
