@@ -23,41 +23,35 @@
         ;; On IA-32 "A" means the edx:eax pair used together to
         ;; represent a 64-bit quantity. (i don't think we need that?)
         ;;(set output "A")
-        (set output	"{eax}")
+        ;; NOTE: seems like +{eax} is not a good input-output spec on x86,
+        ;; i can't make it compile.
+        (set output	"={eax}")
         (set clobbers	+linux/syscall/clobbered-registers/IA-32+))
        (x86-64
         (set instr	"syscall")
         (set input-regs	+linux/syscall/argument-registers/x86_64+)
-        (set output	"{rax}")
+        (set output	"={rax}")
         (set clobbers	+linux/syscall/clobbered-registers/x86_64+))
        (aarch64
-        ;; TODO FIXME
-        ;; When a register is:
-        ;;  - initialized with an input value before the asm, and
-        ;;  - overwritten with an output value after the asm,
-        ;; you must use an input?output constraint; i.e. +{x0}
-        ;; %ret = call i64 asm sideeffect "svc #0",
-        ;; "+{x0},{x8},{x1},{x2},~{x3},~{x4},~{x5},~{x8},~{x16},~{x17},~{memory}"
-        ;; (
-        ;;   i64 %arg0,    ; +{x0}
-        ;;   i64 %sysno,   ; {x8}
-        ;;   i64 %arg1,    ; {x1}
-        ;;   i64 %arg2     ; {x2}
-        ;; )
-        ;; clobbers:
-        ;; x0?x5 (arguments + return)
-        ;; x8 (syscall number)
-        ;; x16, x17 (IP0/IP1)
-        ;; memory
-        (set input-regs	+linux/syscall/argument-registers/aarch64+)
-        (set output	"{x0}")
         (set instr	"svc #0")
+        (set input-regs +linux/syscall/argument-registers/aarch64+)
+        ;; first arg is the syscall number in x8, cdr is the first actual arg to the syscall.
+        ;; + prefix means it's both input and output reg.
+        ;; TODO ? (set output	(if (cdr args) "+{x0}" "={x0}"))
+        (set output	"={x0}")
         (set clobbers	+linux/syscall/clobbered-registers/aarch64+))
        (else
         (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
 
+     ;; limit input-regs to the number of args
+     (let ((regs input-regs))
+       (set input-regs ())
+       (list-do arg args
+         (push input-regs (pop regs)))
+       (set input-regs (list-reverse! input-regs)))
+
      (println instr"\", ")
-     (print "	\"="output)
+     (print "	\""output)
      (map (lambda (_ reg)
             (assert reg)   ; this will fail for more args than regs.
             (print ", {"reg"}"))
