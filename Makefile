@@ -150,7 +150,7 @@ BACKDATE_FILE	= touch -t 200012312359
 
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
-DIFF		= diff --unified --ignore-all-space
+DIFF		= diff --brief --unified --ignore-all-space
 STRIP		= strip
 
 ASM_FILE_EXT_x86	= s
