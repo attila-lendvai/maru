@@ -359,17 +359,18 @@
   ((_ _)			(println "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0")
 				(println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
 
-;; TODO this crashes llvm: https://bugs.llvm.org/show_bug.cgi?id=49635
+;; llvm.sponentry is only supported on arm64
 ;; reported as: https://github.com/llvm/llvm-project/issues/164427
-;; NOTE it's only supported on arm: https://llvm.org/docs/LangRef.html#id419
-;; (define-instruction SPONENTRY	(false 1 true)
-;;   (()				(println "	"$reg1" = call ptr @llvm.sponentry()")))
-;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
-(define-instruction SPONENTRY	(false 4 true)
-  (()				(println "	"$reg1" = call ptr @llvm.frameaddress(i32 0)")
-				(println "	"$reg2" = bitcast %oop "$reg1" to [0 x %oop]*")
-				(println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg2", %word 0, %word 1")
-                                (println "	"$reg4" = bitcast %oop* "$reg3" to %oop")))
+;; https://llvm.org/docs/LangRef.html#id419
+(if (= 'aarch64 (slave-value +architecture+))
+    (define-instruction SPONENTRY	(false 1 true)
+      (()				(println "	"$reg1" = call ptr @llvm.sponentry()")))
+  ;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
+  (define-instruction SPONENTRY	(false 4 true)
+    (()				(println "	"$reg1" = call ptr @llvm.frameaddress(i32 0)")
+     (println "	"$reg2" = bitcast %oop "$reg1" to [0 x %oop]*")
+     (println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg2", %word 0, %word 1")
+     (println "	"$reg4" = bitcast %oop* "$reg3" to %oop"))))
 
 ;; (define-instruction FRAMEADDRESS	(false 1 true)
 ;;   ((long)			(println "	"$reg1" = call ptr @llvm.frameaddress(i32 "$1")")))
