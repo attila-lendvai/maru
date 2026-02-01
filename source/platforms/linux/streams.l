@@ -11,7 +11,7 @@
 
 ;; TODO reaname these to file/open?
 (define-primitive-function file-open ((path <string>) (mode <string>))
-  (let ((fd (linux-syscall linux/open (string->C-string path)
+  (let ((fd (linux-syscall linux/openat linux/AT_FDCWD (string->C-string path)
                            (cond
                              ((or (not mode)
                                   (string= mode "r"))
