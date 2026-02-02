@@ -54,11 +54,18 @@ make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 <details>
 <summary>Platform specific instructions</summary>
 
+#### Guix
+
+My primary platform. There's a `manifest.scm` file in the repo, so you
+can run `guix shell` to enter into the same environment that I use
+when I work on Maru. Guix can also be used as a simple package manager
+on any Linux distro, no need to install Guix System.
+
 #### Nix and NixOS
 
-My primary platform. There's a `default.nix` file in the repo, so you
-can run `nix-shell` to enter into the same environment that I use when
-I work on Maru.
+Used to be my primary platform. There's a (potentially bitrotten)
+`default.nix` file in the repo, so you can run `nix-shell` to enter
+into the same environment that I used on NixOS.
 
 #### Debian, and derivatives
 
@@ -84,11 +91,11 @@ sudo apt install gcc-multilib
 #### MacOS (darwin)
 
 As of this writing (2026) both the x86_64 and the LLVM backends can
-bootstrap on an x86_64 MacOS running in kvm on Linux. There's even CI
+bootstrap on an x86_64 MacOS running in kvm on a Linux. There's even CI
 set up for testing every commit on an arm64 runner using `arch -x86_64
-make [...]`, but they fail for now.
+make [...]` (but they fail currently).
 
-The following instructions worked in a kvm as of 2026:
+The following instructions worked in the kvm setup as of 2026:
 
 1. Make sure XCode is installed. In a Terminal:
 
@@ -109,21 +116,22 @@ echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
-#### Guix on OpenWRT on aarch64
+#### Guix on OpenWRT on an aarch64 hw
 
 I own a BPI-R4 (a powerful router) that is currently running
 OpenWrt. I installed Guix (an advanced package manager) on it out of
 curiosity.
 
 In that environment Maru can bootstrap itself using the LLVM backend
-and the libc platform.
+and through both the `libc` and the `linux` platform.
 
 #### Other platforms
 
-Currently Maru should work everywhere where there's a `libc`, and either the
-GNU toolchain, or LLVM is available.
+Maru should work everywhere where there's a `libc` and LLVM/clang is
+available. Alternatively, it should be able to bootstrap on any x86
+machine where a libc and the gnu toolchain is available.
 
-Patches are welcome for other platforms.
+Patches are welcome to support other platforms.
 </details>
 
 ## Who
