@@ -444,6 +444,15 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
+# compile *.cgrov files into *.cgrov.l
+# Must use the host eval if we want to use its output while building this stage.
+%.cgrov.l: %.cgrov $(HOST_DIR)/eval
+	cd $(HOST_DIR) && make source/c-groveller/cgrov.g.l && ./eval boot.l source/c-groveller/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
+	$(CC) -o $<.exe $<.c
+	./$<.exe > $@.new
+	mv $@.new $@
+	rm -f $<.exe $<.c
+
 ###
 ### x86 assembler
 ###
