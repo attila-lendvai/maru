@@ -35,12 +35,12 @@ qualified_id	= idpart:x _ (qualifier:q -> `(qualified ,q ,x):x)?		-> x ;
 
 keyword		= !idpart _ ;
 
-definition	= "header"  keyword header*:i				 eol __	-> (def-headers  i)
-		| "integer" keyword qualified_id*:i			 eol __	-> (def-integers i)
-		| "float"   keyword qualified_id*:i			 eol __	-> (def-floats   i)
-		| "string"  keyword qualified_id*:i			 eol __	-> (def-strings  i)
-		| "type"    keyword identifier:i _ (!eol .)*@$:t	 eol __	-> (def-type   i t)
-		| "sizes"   keyword identifier*:i _ (!eol .)*@$:t	 eol __	-> (def-sizes    i)
-		| "default" keyword identifier:i dnl:e			     __	-> (def-alt    i e) ;
+definition	= "header"  keyword header*:i				__	-> (def-headers  i)
+		| "integer" keyword qualified_id*:i			__	-> (def-integers i)
+		| "float"   keyword qualified_id*:i			__	-> (def-floats   i)
+		| "string"  keyword qualified_id*:i			__	-> (def-strings  i)
+		| "type"    keyword identifier:i _ (!eol .)*@$:t	__	-> (def-type   i t)
+		| "sizes"   keyword identifier*:i _ (!eol .)*@$:t	__	-> (def-sizes    i)
+		| "default" keyword identifier:i dnl:e			__	-> (def-alt    i e) ;
 
 file		= __ definition* (!. ~"'header', 'integer', 'float' or 'type'") ;
