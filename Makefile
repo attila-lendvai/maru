@@ -425,6 +425,23 @@ $(BUILD)/generated/peg.g.l: $(GEN_EVAL) source/parsing/peg.g source/parsing/gen-
 source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	cp $< $@
 
+# compile *.g PEG rules into maru parser implementations
+%.g.l: %.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
+	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+		|| { $(BACKDATE_FILE) $@; exit 42; }
+
+# compile *.cgrov files into *.cgrov.l
+#
+# TODO evolving: if we want to use the groveler in the bootstrap, then
+# this rule must use $(HOST_DIR)/eval $(HOST_DIR)/boot.l but that is
+# currently broken with maru.9
+%.cgrov.l: %.cgrov $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/c-groveller/cgrov.g.l
+	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
+	$(CC) -o $<.exe $<.c
+	./$<.exe > $@.new
+	mv $@.new $@
+	rm -f $<.exe $<.c
+
 ###
 ### x86 assembler
 ###
