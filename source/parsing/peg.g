@@ -33,6 +33,7 @@ rparen     	= ")"  space ;
 lbrace      	= "{"  space ;
 rbrace     	= "}"  space ;
 dot       	= "."  space ;
+tilde       	= "~"  space ;
 digit		= [0-9] ;
 higit		= [0-9A-Fa-f] ;
 number		= ("-"? digit+) @$#:n space -> n ;
@@ -115,7 +116,11 @@ predicate	= pling     conversion:e			-> `(peek-not  ,e)
 			    )
 		| conversion ;
 
-sequence	= predicate:p	( predicate+:q			-> `(match-all ,p ,@q)
+require		= predicate:p	( tilde string:e		-> `(match-require ,p ,e)
+				|				-> p
+				) ;
+
+sequence	= require:p	( require+:q			-> `(match-all ,p ,@q)
 				|				-> p
 				) ;
 
@@ -190,6 +195,7 @@ value =
 					      (and (peg-match-rule ,(concat-symbol '$ name) _p)
 						   (let () (set self.result (<parser>-result _p)) 1)))
  | 'match-first value+:exps		-> `(or ,@exps)
+ | 'match-require (&(..) effect)*:e .:msg -> `(or ,@e (error "parser error (value); expected: " ,msg " at: " ($source-position (<parser-stream>-source self))))
  | 'match-all (&(..) effect)*:e value:v	-> `(let ((pos (<parser-stream>-position self.source)))
 					      (or (and ,@e ,v) (let () (set (<parser-stream>-position self.source) pos) ())))
  | 'match-zero-one value:exp		-> `(let ((_list_ (group)))
@@ -252,6 +258,7 @@ effect =
  | 'match-rule-in .:type .:name		-> `(peg-match-rule ,(concat-symbol '$$ name)
 					      (parser ,(concat-symbol '< (concat-symbol type '>)) self.source))
  | 'match-first     effect+:exps	-> `(or ,@exps)
+ | 'match-require (&(..) effect)*:e .:msg -> `(or ,@e (error "parser error (effect); expected: " ,msg " at: " ($source-position (<parser-stream>-source self))))
  | 'match-all       effect*:e		-> `(let ((pos (<parser-stream>-position self.source)))
 					      (or (and ,@e) (let () (set (<parser-stream>-position self.source) pos) ())))
  | 'match-zero-one  effect:exp		-> `(let () ,exp 1)
