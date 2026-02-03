@@ -35,6 +35,17 @@
    (define-constant linux/stdin			0)
    (define-constant linux/stdout		1)
    (define-constant linux/stderr		2)
+   ;; less $(guix build linux-libre-headers)/include/linux/sched.h
+   (define-constant linux/SIGCHLD		17)
+   (define-constant linux/CLONE_VM		0x100)
+   (define-constant linux/CLONE_VFORK		0x4000)
+   (define-constant linux/WNOHANG		1)
+   (define-constant linux/WSTOPPED		2)
+   (define-constant linux/WEXITED		4)
+   (define-constant linux/WNOWAIT		0x01000000)
+   (define-constant linux/P_ALL			0)
+   (define-constant linux/P_PID			1)
+   (define-constant linux/WEXITED		4)
    (cond
      ((= +architecture+ 'IA-32)
       ;; less $(guix build linux-libre-headers)/include/asm/unistd_32.h
@@ -49,6 +60,10 @@
       (define-constant linux/brk		45)
       (define-constant linux/fsync		118)
       (define-constant linux/mprotect		125)
+      (define-constant linux/clone		120)
+      (define-constant linux/execve		11)
+      (define-constant linux/waitid		284)
+      (define-constant linux/wait4		114)
       )
      ((= +architecture+ 'x86-64)
       ;; less $(guix build linux-libre-headers)/include/asm/unistd_64.h
@@ -63,6 +78,10 @@
       (define-constant linux/brk		12)
       (define-constant linux/fsync		74)
       (define-constant linux/mprotect		10)
+      (define-constant linux/clone		56)
+      (define-constant linux/execve		59)
+      (define-constant linux/waitid		247)
+      (define-constant linux/wait4		61)
       )
      ((= +architecture+ 'aarch64)
       ;; less $(guix build --target=aarch64-linux-gnu linux-libre-headers)/include/asm/unistd_64.h
@@ -76,6 +95,10 @@
       (define-constant linux/brk		214)
       (define-constant linux/fsync		82)
       (define-constant linux/mprotect		226)
+      (define-constant linux/clone		220)
+      (define-constant linux/execve		221)
+      (define-constant linux/waitid		95)
+      (define-constant linux/wait4		260)
       )
 
      (true (error "TODO: missing syscall constants for arch "+architecture+)))))

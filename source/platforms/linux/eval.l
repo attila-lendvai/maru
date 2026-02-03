@@ -93,6 +93,7 @@ exit:
     (error "set-working-directory: linux/chdir failed for "path)))
 
 (load "source/platforms/linux/streams.l")
+(load "source/platforms/linux/fork.l")
 (load "source/evaluator/vm-with-file-support.l")
 (load "source/evaluator/vm-late.l")
 
