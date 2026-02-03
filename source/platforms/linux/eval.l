@@ -71,7 +71,7 @@ exit:
             (print "linux-syscall encountered in interpreted code with args " args "\n")
             (abort)))))
 
-(load (concat-strings "source/platforms/linux/syscall.l"))
+(load "source/platforms/linux/syscall.l")
 
 (switch-to-target-env)
 

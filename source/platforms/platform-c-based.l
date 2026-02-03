@@ -8,7 +8,8 @@
 ;;; API visible in the target
 ;;;
 
-;; NOTE C-string is a compiler special form
+;; NOTE C-string is a compiler special form to emit a constant c
+;; string in the read-only data segment.
 
 (define-form define-C-function (maru-name return-type foreign-name parameter-types)
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))

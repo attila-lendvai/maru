@@ -93,7 +93,6 @@
 
 (define-function platform/acquire-memory (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
-  ;; TODO this really should be a function, but we don't yet have ERROR and ASSERT at this point
   (unless *initial-break*
     (set *current-break* (set *initial-break* (linux-syscall linux/brk 0)))
     ;; TODO too early, ASSERT and ERROR is not functional at this point

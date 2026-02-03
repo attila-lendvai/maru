@@ -19,6 +19,8 @@
     `(quote ,(map symbol->string '(x1 x2 x3 x4 x5 x8 x16 x17))))
 
 ;; TODO these should be groveled automatically
+;; find $(guix build glibc | tail -n 2 | head -n 1)/include/ | grep waitflags
+;; grep -r "P_PID" $(guix build glibc | tail -n 2 | head -n 1)/include/
 (eval-in-slave
  '(let ()
    (define-constant linux/O_RDONLY		0)

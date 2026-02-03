@@ -101,7 +101,7 @@ jobs:
       - run:  timeout 5m make test-parser
 
   build-darwin:
-    name: "aarch64 darwin (with errors ignored)"
+    name: "aarch64 darwin (errors ignored)"
     runs-on: macos-latest
     defaults:
       run:
