@@ -355,7 +355,7 @@
 
 ;;;----------------------------------------------------------------
 
-(define peg-grammar-string (contents-of-file-named "source/parsing/peg.g"))
+(define +peg-grammar-path+ "source/parsing/peg.g")
 
 ;;;----------------
 
@@ -365,15 +365,17 @@
 
 (define BEG)
 
-(let ((p (new <begpeg>))
-      (_ (parser-stream (string-stream peg-grammar-string))))
+(let* ((p (new <begpeg>))
+       (handle (file-open-or-die +peg-grammar-path+ "r"))
+       (_ (parser-stream (file-input-stream handle +peg-grammar-path+))))
   (while ($definition p _)
     ;;(println "\nBEG: " (<begpeg>-result p) " ")
     (set BEG (cons (<begpeg>-result p) BEG)))
   ;;(println)
   ($space p _)
-  (and (!= +end+ (parser-stream-peek _)) (error "syntax error in BEG near: "(parser-stream-context _)))
-  )
+  (unless (= +end+ (parser-stream-peek _))
+    (error "syntax error in BEG near: "(parser-stream-context _)))
+  (file-close-or-die handle))
 
 ;;(progress "generating compiled parser")
 
@@ -397,12 +399,15 @@
     (set (<peg>-grammar-name self) name)
     self))
 
-(let* ((s (parser-stream (string-stream peg-grammar-string)))
+(let* ((handle (file-open-or-die +peg-grammar-path+ "r"))
+       (s (parser-stream (file-input-stream handle +peg-grammar-path+)))
        (p (peg s '<peg>)))
   (while ($definition p)
     (set PEG (cons (<parser>-result p) PEG)))
   ($space p)
-  (and (!= +end+ (parser-stream-peek s)) (error "syntax error in PEG near: "(parser-stream-context s))))
+  (unless (= +end+ (parser-stream-peek s))
+    (error "syntax error in PEG near: "(parser-stream-context s)))
+  (file-close-or-die handle))
 
 (progress "comparing output")
 
