@@ -1,4 +1,4 @@
-;;; -*- coke -*-
+;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
 ;;; ./eval boot.l compile-peg-grammar.l <filename>.g ... | tee <filename>.l
 

@@ -239,7 +239,7 @@ value =
  | 'make-number .:r value:exp		-> `(and ,exp (set self.result (string->number-base (list->string self.result) ,r)))
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
  | 'result-expr .:exp			-> `(let () (peg-source-range-begin self) (set self.result ,exp) (peg-source-range-end self) 1)
- | .:op					->  (error "cannot generate value for "op)
+ | .:op					->  (error "cannot generate value for '"op"'")
  |					->  (error "cannot generate value for nil")
  ) ;
 
@@ -285,6 +285,6 @@ effect =
  | 'make-number .:r effect:exp		->  exp
  | 'assign-result .:name value:exp	-> `(and ,exp (let () (set ,name self.result) 1))
  | 'result-expr   .:exp			-> `(let () (peg-source-range-begin self) ,exp (peg-source-range-end self) 1)
- | .:op					->  (error "cannot generate value for "op)
- |					->  (error "cannot generate value for nil")
+ | .:op					->  (error "cannot generate effect for '"op"'")
+ |					->  (error "cannot generate effect for nil")
  ) ;

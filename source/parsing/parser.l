@@ -288,6 +288,7 @@
     (set (<parser-stream>-position self) p)
     (array->string a)))
 
+;; TODO FIXME this is probably buggy, i saw it in endless loop
 (define-function parser-stream-context (self)
   (let ((a (array))
 	(p (<parser-stream>-position self)))

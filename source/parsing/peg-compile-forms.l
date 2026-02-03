@@ -1,5 +1,9 @@
 ;;;
-;;; This file contains expansions for the forms that are referenced in the peg.g file.
+;;; This file contains expansions for the forms that are referenced by
+;;; the peg.g bootstrap rules -- at least I think these are not needed
+;;; by the bootstrapped parser.
+;;;
+;;; Original name: peg-compile.l
 ;;;
 
 ;;(define-function peg-invoke-rule (rule name parser)

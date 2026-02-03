@@ -6,7 +6,7 @@
 ## Reason for the new stage
 
 To eliminate modules. This opens up the possibility to relatively
-easily bootstral this stage using `eval.c` with a few additions like
+easily bootstrap this stage using `eval.c` with a few additions like
 the `--define` command line argument.
 
 ## Assorted changes
@@ -14,6 +14,8 @@ the `--define` command line argument.
  - Deleted the *module* abstraction. It was a mistake to introduce it
    because what i used them for can be done using env's chained the
    right way.
+
+ - Revived the C groveller (formerly known as osdefs).
 
 ## Stats
 

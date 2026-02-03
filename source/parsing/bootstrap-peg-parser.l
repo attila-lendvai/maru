@@ -105,6 +105,7 @@
 (define-rule lbrace   	(and (OBJECT ?{) (RULE space)))
 (define-rule rbrace   	(and (OBJECT ?}) (RULE space)))
 (define-rule dot      	(and (OBJECT ?.) (RULE space)))
+;; (define-rule tilde	(and (OBJECT ?~) (RULE space)))
 
 (define-rule letter
   (set self.result
@@ -260,6 +261,8 @@
 	  (set self.result (list 'peek-for self.result))
 	(RULE conversion)))))
 
+;; FIXME? i didn't add match-require (i.e. the ~ rule) to the
+;; bootstrap rules (currently not used in peg.g)
 (define-rule sequence
   (and (RULE predicate)
        (let ((p self.result)

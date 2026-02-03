@@ -5,6 +5,8 @@
 #
 # a sexp peg example: https://gist.github.com/nightscape/3372398
 
+<maru-parser> : <parser> ()
+
 equals		= "=" space ;
 blank		= [\t ] ;
 eol		= ("\n" "\r"*) | ("\r" "\n"*) ;
