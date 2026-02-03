@@ -56,7 +56,7 @@
 
 ;; FIXME this redefines the repl-stream exported by the lower
 (define-function repl-stream (stream prompt)	(repl-parser-stream (parser-stream stream) prompt))
-(define-function repl-file   (file prompt path)	(repl-stream (parser-input-stream (input-stream file path)) prompt))
+(define-function repl-file   (file prompt path)	(repl-stream (parser-input-stream (file-input-stream file path)) prompt))
 (define-function repl-path   (path prompt)	(repl-file (file-open-or-die path "r") prompt path))
 
 ;; recursive require/load comes back to here...

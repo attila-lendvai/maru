@@ -710,7 +710,7 @@
 
 (define-function parse-file (grammar rule path)
   (let* ((handle  (file-open-or-die path "r"))
-	 (stream  (input-stream handle path))
+	 (stream  (file-input-stream handle path))
 	 (result  (parse-stream grammar rule stream)))
     (file-close-or-die handle)
     result))

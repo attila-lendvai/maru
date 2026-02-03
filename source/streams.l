@@ -105,17 +105,17 @@
 
 ;;;----------------------------------------------------------------
 
-(define-record <input-stream> () (source pending srcpos))
+(define-record <file-input-stream> () (source pending srcpos))
 
-(define-function input-stream (source path)
-  (make <input-stream>
+(define-function file-input-stream (source path)
+  (make <file-input-stream>
     (source	source)
     (srcpos	(cons path 1))))
 
-(define-method $at-end? <input-stream> ()
+(define-method $at-end? <file-input-stream> ()
   (= () ($peek self)))
 
-(define-method $peek <input-stream> ()
+(define-method $peek <file-input-stream> ()
   (or self.pending
       (if self.source
 	  (let ((c (file-read-character self.source)))
@@ -127,12 +127,13 @@
 	      (set self.pending +end+)))
 	(set self.pending +end+))))
 
-(define-method $next <input-stream> ()
+(define-method $next <file-input-stream> ()
   (let ((c ($peek self)))
-    (set (<input-stream>-pending self) ())
+    (set self.pending ())
+    ;; TODO delme (set (<file-input-stream>-pending self) ())
     c))
 
-(define-method $source-position <input-stream> ()
+(define-method $source-position <file-input-stream> ()
   self.srcpos)
 
 (define-function input-stream-up-to (self delimiter)
@@ -142,8 +143,8 @@
     res))
 
 (define-function contents-of-file-named (name)
-  (input-stream-up-to (input-stream (file-open-or-die name "r")
-                                    name)
+  (input-stream-up-to (file-input-stream (file-open-or-die name "r")
+                                         name)
                       +end+))
 
 ;; (unit-test "<input-stream>"
