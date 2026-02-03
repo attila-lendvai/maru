@@ -105,11 +105,11 @@
 
 ;;;----------------------------------------------------------------
 
-(define-record <file-input-stream> () (source pending srcpos))
+(define-record <file-input-stream> () (file pending srcpos))
 
-(define-function file-input-stream (source path)
+(define-function file-input-stream (file path)
   (make <file-input-stream>
-    (source	source)
+    (file	file)
     (srcpos	(cons path 1))))
 
 (define-method $at-end? <file-input-stream> ()
@@ -117,13 +117,15 @@
 
 (define-method $peek <file-input-stream> ()
   (or self.pending
-      (if self.source
-	  (let ((c (file-read-character self.source)))
+      (if self.file
+	  (let ((c (file-read-character self.file)))
 	    (if c
 		(let ()
-		  (and (= ?\n c) (set self.srcpos (cons (car self.srcpos) (+ 1 (cdr self.srcpos)))))
+		  (when (= ?\n c)
+                    (set self.srcpos (cons (car self.srcpos)
+                                           (+ 1 (cdr self.srcpos)))))
 		  (set self.pending c))
-	      (set self.source ())
+	      (set self.file ()) ; TODO err...?
 	      (set self.pending +end+)))
 	(set self.pending +end+))))
 
