@@ -570,11 +570,11 @@ GC_API void GC_save(FILE *out, void (*saver)(FILE *, void *))
     } while (hdr != &gcbase);
 }
 
-static int32_t get32(FILE *in, int32_t *p)	{ if(fread(p, sizeof(*p), 1, in));  return *p; }
+static int32_t get32(FILE *in, int32_t *p)	{ fread(p, sizeof(*p), 1, in); return *p; }
 
 static void *getobj(FILE *in, void **value)
 {
-    if (fread(value, sizeof(void *), 1, in));
+    fread(value, sizeof(void *), 1, in);
     if (*value && !(((long)*value) & 1)) *value += (long)gcbase.next;
     //printf("  field %p\n", *value);
     return *value;
@@ -583,7 +583,7 @@ static void *getobj(FILE *in, void **value)
 GC_API void GC_loader(FILE *in, void *ptr)
 {
     gcheader *hdr= ptr2hdr(ptr);
-    if (hdr->atom)	{ if (fread(hdr2ptr(hdr), hdr->size, 1, in)); }
+    if (hdr->atom)	{ fread(hdr2ptr(hdr), hdr->size, 1, in); }
     else		{ int i;  for (i= 0;  i < hdr->size;  i += sizeof(void *))  getobj(in, ptr + i); }
 }
 

@@ -2893,7 +2893,7 @@ static void replPath(wchar_t *path)
     fatal(0);
   }
   fwide(stream, 1);
-  if (fscanf(stream, "#!%*[^\012\015]"));
+  fscanf(stream, "#!%*[^\012\015]");
   replFile(stream, path);
   fclose(stream);
 }
