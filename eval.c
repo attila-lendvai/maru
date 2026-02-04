@@ -1008,15 +1008,50 @@ static oop expandPair(oop expr, oop env)
 {
     oop head= expand(getHead(expr), env);			GC_PROTECT(head);
     if (is(Symbol, head)) {
-      oop val= findVariable(env, head);
-      if (is(Variable, val)) val= get(val, Variable,value);
-      if (is(Form, val) && (nil != get(val, Form,function))) {
-	oop args= newPairFrom(env, getTail(expr), expr);	GC_PROTECT(args);
-	head= apply(get(val, Form,function), args, nil);	GC_UNPROTECT(args);
-	head= expand(head, env);
-	if (verbosity > 1) { printf("EXPAND => ");  dumpln(head); }
-	setSource(head, get(expr, Pair,source));		GC_UNPROTECT(head);
-	return head;
+      if (s_let == head) {
+	// (let ...)
+	oop newBindings = nil;					GC_PROTECT(newBindings);
+	oop newBindingsLast = nil;
+	oop bindings = cadr(expr);
+	oop varInitProg = nil;					GC_PROTECT(varInitProg);
+	// (list-do entry bindings )
+	while (is(Pair, bindings)) {
+	  oop entry = car(bindings);
+	  oop varName = nil;
+	  varInitProg = nil;
+	  if (is(Pair, entry)) {
+	    varName = car(entry);
+	    varInitProg = expandAll(cdr(entry), env);
+	  } else {
+	    varName = entry;
+	    varInitProg = newPair(nil, nil);
+	  }
+	  oop newEntry = newPair(varName, varInitProg);		GC_PROTECT(newEntry);
+	  if (newBindings) {
+	    newBindingsLast = setTail(newBindingsLast, newPair(newEntry, nil));
+	  }
+	  else {
+	    newBindings = newPair(newEntry, nil);
+	    newBindingsLast = newBindings;
+	  }
+	  bindings = cdr(bindings);				GC_UNPROTECT(newEntry);
+	}
+	oop tmp = expandAll(cddr(expr), env);			GC_PROTECT(tmp);
+	tmp = newPair(newBindings, tmp);
+	tmp = newPair(s_let, tmp);				GC_UNPROTECT(tmp); GC_UNPROTECT(varInitProg); GC_UNPROTECT(newBindings); GC_UNPROTECT(head);
+	return tmp;
+      }
+      else {
+	oop val= findVariable(env, head);
+	if (is(Variable, val)) val= get(val, Variable,value);
+	if (is(Form, val) && (nil != get(val, Form,function))) {
+	  oop args= newPairFrom(env, getTail(expr), expr);	GC_PROTECT(args);
+	  head= apply(get(val, Form,function), args, nil);	GC_UNPROTECT(args);
+	  head= expand(head, env);
+	  if (verbosity > 1) { printf("EXPAND => ");  dumpln(head); }
+	  setSource(head, get(expr, Pair,source));		GC_UNPROTECT(head);
+	  return head;
+	}
       }
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
