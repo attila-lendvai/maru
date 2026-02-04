@@ -364,16 +364,17 @@
 ;;; boxed type (i.e. a full object with a header)
 
 (define-record <boxed-type> <type>
-  ;; NOTE: it's possible to allocate heap objects of any length
-  ;; regardless of what the types says. so, it's possible to allocate
-  ;; a large opaque object, put <symbol> as its type, and memcpy a
-  ;; cstring into the payload.
+  ;; NOTE: it's possible to allocate heap objects of any length and
+  ;; then set whatever type we want on them. so, it's possible to
+  ;; e.g. allocate a large opaque object, put <symbol> as its type,
+  ;; and memcpy an arbitrary long cstring into the object payload.
 
   ;; TODO this ONE-WORD? thing is silly. either rename to
   ;; SINGLE-WORD?, or come up with some alternative that generalizes
-  ;; better. how could (box <some-boxed-type> payload) work for not a
-  ;; single word payload, but something longer that needs to be
-  ;; memcpy'd into the object's body?
+  ;; better. how could (box <some-boxed-type> payload) work when the
+  ;; payload is not a single word, but something longer that needs to
+  ;; be memcpy'd into the object's body? maybe payload should then be
+  ;; a lisp <array> whose elements get copied?
   (one-word?))
 
 (define-function new-<boxed-type> (name one-word?)

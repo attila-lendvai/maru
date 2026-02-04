@@ -16,7 +16,8 @@
      (set tmp (box <target-pointer> ,target-name))
      (set tmp (file-stream tmp))
      (set ,our-name tmp)
-     ;; the maru-user module was create earlier, let's set it there, too.
+     ;; the maru-user env was create earlier, let's set it there, too.
+     ;; TODO clarify: why in maru-user?
      (set (global-variable-value *maru* ,(concat-symbol 'symbol/ our-name))
           tmp)))
 

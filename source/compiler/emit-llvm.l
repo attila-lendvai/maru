@@ -41,6 +41,7 @@
  '(define-form bitwise-not (value)
    `(bitwise-xor ,value -1)))
 
+;; TODO these should be groveled with the cgrov
 (define *C-type->llvm-type*
     (concat-list
      '((void		void))

@@ -184,26 +184,47 @@ for some `git fetch` and `git rebase`.
 
 ### Maru's status
 
-Backporting the latest semantics from the `piumarta` branch on top of
-the minimal version is done: the `eval.l` in the head of the `maru.3`
-branch should be semantically equivalent to the `eval.l` that resides
-in the `piumarta` branch, although, we have arrived to this state on
-two different paths:
+There's the `piumarta` branch preserving the old state and
+accumulating some recent fixes.
 
-  - Ian, while evolving Maru, kept his `eval.c` and `eval.l`
-    semantically in sync
+There's the `maru.1` line of development that started from the
+[minimal version](https://www.piumarta.com/software/maru/) of Maru and
+properly bootstrapped the extra features of the `piumarta` branch,
+i.e. without evolving `eval.c` in parallel. I only use the 2300 LoC of
+throwaway C code as the initial stepping stone in the bootstrap
+process, but once the first step is made, the C code is left behind
+for good. The head of the `maru.3` branch should be semantically
+equivalent to the `eval.l` that resides in the `piumarta` branch.
 
-  - in contrast, I have bootstrapped the new features: I started out
-    from the minimal version of the `eval.l` + `eval.c` couple (the
-    [original version](https://www.piumarta.com/software/maru/)
-    published on Ian's website). Then I bootstrapped the features of
-    the later versions of `eval.l` using an earlier version of
-    itself. This bootstrapping chain is formally implemented in the
-    build system. I only use the 2300 LoC of throwaway C code as the
-    initial stepping stone in the bootstrap process, but once the
-    first step is made the C code is left behind for good.
+After that I started to further evolve Maru's implementation in the
+`maru.4` branch and beyond. Each branch contains a readme explaining
+what's relevant for that stage.
 
-After that I started to further evolve Maru's implementation.
+### Critique of the current codebase
+
+IOW, it's sort of a high-level TODO:
+
+To accommodate the various experiments, I had to cut the lisp codebase
+into countless files. This tree of small files should/could be
+simplified, and hopefully will be done once I will have rewritten the
+build in Maru.
+
+The accidental complexity in the Makefile is an abomination compared
+to the rest of the project. I'm looking forward to forgetting it for
+good.
+
+Many interesting experiments in the Piumarta branch are not yet
+revived.
+
+The compiler accidentally got intertwined with the VM implementation
+and it cannot currently compile a simple standalone sexp to the
+target.
+
+I'm not happy about how types are done currently. First, they are just
+runtime tags really, not types in the type-check sense. A simple
+static type system should be added, if for nothing else to show where
+its place would be in the codebase, and to contrast it with the
+runtime tagged values.
 
 ### Notable new features
 
@@ -292,14 +313,6 @@ new features. Some that are worth mentioning:
     `source/buffer.l` both into the level-shifted code and into the evaluator.
     This is slowly happening, but it's nowhere near done, and I'm not even sure
     what being done means here.
-
-  - Use LLVM's [tablegen](https://llvm.org/docs/TableGen/index.html)
-    definitions to generate machine code assemblers for various CPU
-    architectures. It requires either:
-    - the reimplementation of the tablegen parser/logic in Maru
-      (doesn't seem to be trivial),
-    - or using `source/assembler/run-llvm-tblgen.sh` to generate a
-      json file from LLVM's tablegen data.
 
   - Maybe add [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/)
     to the repo as a branch, and use it as a bootstrap stage. It seems to
@@ -422,7 +435,10 @@ A list of projects that are relevant in this context:
     project feels of high standard, including its documentation.
 
   - [nanohs](https://github.com/bkomuves/nanohs): a tiny self-hosting
-    subset of Haskell.
+    subset of Haskell. It doesn't have any type-check implemented, but
+    it can parse (and ignore) type annotations. This setup enables
+    very simple self-hosting, while makes it possible to also
+    type-check the source using a fully implemented Haskell compiler.
 
   - [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/):
     runnable code to accompany Ian Piumarta's paper called *PEG-based
@@ -434,6 +450,11 @@ A list of projects that are relevant in this context:
   - [blynn's Haskell compiler](https://github.com/blynn/compiler):
     bootstrap a Haskell compiler incrementally from C, with extensive
     documentation..
+
+  - [ichbins](https://github.com/darius/ichbins) is a minimal
+    self-hosting compiler of a Lisp dialect to C in 6 pages of
+    code. [elv](https://github.com/darius/elv) is a VM built on it for
+    very basic Lisp + Erlang-style processes (abandoned).
 
   - [RefPerSys](http://refpersys.org/): a mostly symbolic artificial
     intelligence long-term project, with ambitious Artificial General

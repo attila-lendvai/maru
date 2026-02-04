@@ -120,6 +120,7 @@
 
 ;; TODO this is fast, but this way *verbosity* in the vm and in the target is not in sync automatically.
 ;; ideally, these variables could be in a super-module, and the codebase would't even have a global-variable?
+;; TODO (define-vm-variable *verbosity* <long> 0)
 (define *verbosity* 0)
 (define *optimised* 0)
 
