@@ -266,12 +266,12 @@
   `(accessor-for-set-test ,str ,i))
 
 (define-form accessor-for-set-test (str i)
-  `(char-at ,str ,i))
+  `(string-at ,str ,i))
 
 (define-form set-accessor-for-set-test (str i v)
-  `(set (char-at ,str ,i) ,(if (= i 1)
-                               ?j ; a joker that writes ?j at index 1, no matter what
-                             v)))
+  `(set (string-at ,str ,i) ,(if (= i 1)
+                                 ?j ; a joker that writes ?j at index 1, no matter what
+                               v)))
 
 ;; expand needs to check for a set-foo form at every step while expanding, and do
 ;; the set-conversion as early as a set-foo is available.
