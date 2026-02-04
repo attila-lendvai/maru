@@ -125,7 +125,7 @@ GC_API void *GC_malloc(size_t lbs)
 #if VERBOSE > 4
   {
     gcheader *h= gcnext;
-    do { 
+    do {
       fprintf(stderr, "  %2d %p -> %p = %i\n", h->flags, h, h->next, (int)h->size);
       h= h->next;
     } while (h != gcnext);
@@ -437,7 +437,7 @@ GC_API double GC_count_fragments(void)
 	hdr->next= hdr->next->next;
       }
       ++free;
-      //printf("%p\t\t%7d\n", hdr, (int)hdr->size); 
+      //printf("%p\t\t%7d\n", hdr, (int)hdr->size);
     }
     hdr= hdr->next;
   } while (hdr != &gcbase);

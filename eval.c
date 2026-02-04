@@ -1021,7 +1021,9 @@ static oop expand(oop expr, oop env)
       }
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
+    // (quote ...)
     if (s_quote != head) tail= exlist(tail, env);
+    // (set ...)
     if (s_set == head && is(Pair, car(tail)) && is(Symbol, caar(tail)) /*&& s_in != caar(tail)*/) {
       static struct buffer buf= BUFFER_INITIALISER;
       buffer_reset(&buf);
