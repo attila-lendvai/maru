@@ -1001,7 +1001,7 @@ static void setSource(oop obj, oop src)
   setSource(getTail(obj), src);
 }
 
-static oop exlist(oop obj, oop env);
+static oop expandAll(oop obj, oop env);
 static oop expand(oop expr, oop env);
 
 static oop expandPair(oop expr, oop env)
@@ -1021,7 +1021,7 @@ static oop expandPair(oop expr, oop env)
     }
     oop tail= getTail(expr);					GC_PROTECT(tail);
     // (quote ...)
-    if (s_quote != head) tail= exlist(tail, env);
+    if (s_quote != head) tail= expandAll(tail, env);
     // (set ...)
     if (s_set == head && is(Pair, car(tail)) && is(Symbol, caar(tail)) /*&& s_in != caar(tail)*/) {
       static struct buffer buf= BUFFER_INITIALISER;
@@ -1066,11 +1066,11 @@ static oop expand(oop expr, oop env)
   return expr;
 }
 
-static oop exlist(oop list, oop env)
+static oop expandAll(oop list, oop env)
 {
   if (!is(Pair, list)) return expand(list, env);
   oop head= expand(getHead(list), env);			GC_PROTECT(head);
-  oop tail= exlist(getTail(list), env);			GC_PROTECT(tail);
+  oop tail= expandAll(getTail(list), env);		GC_PROTECT(tail);
   head= newPairFrom(head, tail, list);			GC_UNPROTECT(tail);  GC_UNPROTECT(head);
   return head;
 }
