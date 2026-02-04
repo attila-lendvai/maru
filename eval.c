@@ -1066,8 +1066,8 @@ static oop expandPair(oop expr, oop env)
       head= intern(buffer_contents(&buf));
       tail= concat(getTail(getHead(tail)), getTail(tail));
     }
-    GC_UNPROTECT(tail);  GC_UNPROTECT(head);
-    return newPairFrom(head, tail, expr);
+    head= newPairFrom(head, tail, expr);			GC_UNPROTECT(tail); GC_UNPROTECT(head);
+    return head;
 }
 
 static oop expand(oop expr, oop env)
