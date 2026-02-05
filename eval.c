@@ -414,7 +414,7 @@ static oop lookup(oop env, oop name)
   return get(var, Variable,value);
 }
 
-static oop define(oop env, oop name, oop value)
+static oop environmentDefine(oop env, oop name, oop value)
 {
   oop bindings= get(env, Env,bindings);
   {
@@ -1118,7 +1118,7 @@ static void define_bindings(oop bindings, oop innerEnv)
     {
 	oop var= getHead(bindings);						GC_PROTECT(var);
 	if (!is(Symbol, var)) var= car(var);
-	var= define(innerEnv, var, nil);					GC_UNPROTECT(var);
+	var= environmentDefine(innerEnv, var, nil);					GC_UNPROTECT(var);
 	bindings= getTail(bindings);
     }										GC_UNPROTECT(bindings);
 }
@@ -1173,7 +1173,7 @@ static oop encode(oop expr, oop env)
 	  fdumpln(stderr, getHead(args));
 	  fatal(0);
 	}
-	define(env, getHead(args), nil);
+	environmentDefine(env, getHead(args), nil);
 	args= getTail(args);
       }
       if (nil != args) {
@@ -1182,13 +1182,13 @@ static oop encode(oop expr, oop env)
 	  fdumpln(stderr, args);
 	  fatal(0);
 	}
-	define(env, args, nil);
+	environmentDefine(env, args, nil);
       }
       tail= enlist(tail, env);
       tail= newPairFrom(env, tail, expr);			GC_UNPROTECT(env);
     }
     else if (f_define == head) {
-      oop var= define(get(globals, Variable,value), car(tail), nil);
+      oop var= environmentDefine(get(globals, Variable,value), car(tail), nil);
       tail= enlist(cdr(tail), env);
       tail= newPairFrom(var, tail, expr);
     }
@@ -3218,26 +3218,26 @@ int main(int argc, char **argv)
   oop tmp= nil;		GC_PROTECT(tmp);
 
   globals= newEnv(nil, 0, 0);
-  globals= define(globals, intern(L"*globals*"), globals);
+  globals= environmentDefine(globals, intern(L"*globals*"), globals);
 
   {
     oop s = intern(L"true");
-    define(get(globals, Variable,value), s, s);
+    environmentDefine(get(globals, Variable,value), s, s);
   }
 
-  expanders=	define(get(globals, Variable,value), intern(L"*expanders*"),   nil);
-  encoders=	define(get(globals, Variable,value), intern(L"*encoders*"),    nil);
-  evaluators=	define(get(globals, Variable,value), intern(L"*evaluators*"),  nil);
-  applicators=	define(get(globals, Variable,value), intern(L"*applicators*"), nil);
+  expanders=	environmentDefine(get(globals, Variable,value), intern(L"*expanders*"),   nil);
+  encoders=	environmentDefine(get(globals, Variable,value), intern(L"*encoders*"),    nil);
+  evaluators=	environmentDefine(get(globals, Variable,value), intern(L"*evaluators*"),  nil);
+  applicators=	environmentDefine(get(globals, Variable,value), intern(L"*applicators*"), nil);
 
   traceStack=	newArray(32);					GC_add_root(&traceStack);
 
-  backtrace=	define(get(globals, Variable,value), intern(L"*backtrace*"), nil);
-		define(get(globals, Variable,value), intern(L"*standard-output*"),	newString(L"dummy-*standard-output*"));
-		define(get(globals, Variable,value), intern(L"*error-output*"),		newString(L"dummy-*error-output*"));
+  backtrace=	environmentDefine(get(globals, Variable,value), intern(L"*backtrace*"), nil);
+		environmentDefine(get(globals, Variable,value), intern(L"*standard-output*"),	newString(L"dummy-*standard-output*"));
+		environmentDefine(get(globals, Variable,value), intern(L"*error-output*"),		newString(L"dummy-*error-output*"));
   // TODO
-  input=	define(get(globals, Variable,value), intern(L"*input*"), nil);
-  output=	define(get(globals, Variable,value), intern(L"*output*"), nil);
+  input=	environmentDefine(get(globals, Variable,value), intern(L"*input*"), nil);
+  output=	environmentDefine(get(globals, Variable,value), intern(L"*output*"), nil);
 
   currentPath= nil;			GC_add_root(&currentPath);
   currentLine= nil;			GC_add_root(&currentLine);
@@ -3249,7 +3249,7 @@ int main(int argc, char **argv)
       wchar_t *name= wcsdup(mbs2wcs(ptr->name + 1));
       tmp= newSubr(name, ptr->imp, 0);
       if ('.' == ptr->name[0]) tmp= newFixed(tmp);
-      define(get(globals, Variable,value), intern(name), tmp);
+      environmentDefine(get(globals, Variable,value), intern(name), tmp);
     }
   }
 
@@ -3287,7 +3287,7 @@ int main(int argc, char **argv)
 	  tmp= newPair(nil, tmp);
 	  setHead(tmp, newString(mbs2wcs(argv[argc])));
       }
-      arguments= define(get(globals, Variable,value), intern(L"*command-line-arguments*"), tmp);
+      arguments= environmentDefine(get(globals, Variable,value), intern(L"*command-line-arguments*"), tmp);
 
       tmp= nil;		GC_UNPROTECT(tmp);
   }
@@ -3312,8 +3312,8 @@ int main(int argc, char **argv)
       }
   }
 
-  define(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
-  define(get(globals, Variable,value), intern(L"*optimize*"),  newLong(optimize));
+  environmentDefine(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
+  environmentDefine(get(globals, Variable,value), intern(L"*optimize*"),  newLong(optimize));
 
   while (is(Pair, get(arguments, Variable,value))) {
     oop argl= get(arguments, Variable,value);		GC_PROTECT(argl);
@@ -3322,12 +3322,12 @@ int main(int argc, char **argv)
     wchar_t *arg= get(args, String,bits);
     if 	    (!wcscmp (arg, L"-v"))	{
       ++verbosity;
-      define(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
+      environmentDefine(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
     }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
     else if (!wcscmp (arg, L"-O"))	{
       ++optimize;
-      define(get(globals, Variable,value), intern(L"*optimize*"), newLong(optimize));
+      environmentDefine(get(globals, Variable,value), intern(L"*optimize*"), newLong(optimize));
     }
     else if (!wcscmp (arg, L"-")) {
       replFile(stdin, L"<stdin>");
@@ -3349,7 +3349,7 @@ int main(int argc, char **argv)
         value = newLong(valueInt);
       }
 
-      define(get(globals, Variable,value), name, value);	GC_UNPROTECT(name);
+      environmentDefine(get(globals, Variable,value), name, value);	GC_UNPROTECT(name);
     }
 #  if !defined(WIN32) && (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
