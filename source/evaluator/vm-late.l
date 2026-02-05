@@ -26,7 +26,7 @@
               (let* (((name fixed?)	entry)
                      (impl-name		(concat-symbol name '/evaluator-stub)))
                 `(%instantiate-primitive-function ,env ,(symbol->string name) ,impl-name ,(if fixed? 'true 'false))))
-            *primitive-function-registry*)))
+            *vm-function-registry*)))
 
 (define-function populate-env-with-maru-primitives (env)
   (debug (platform/diag-print "populate-env-with-maru-primitives"))

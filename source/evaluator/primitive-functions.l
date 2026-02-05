@@ -4,7 +4,7 @@
 
 ;; NOTE: not all of them are in this file.
 
-(define-primitive-function (define () fixed) ((variable <variable>) value-form)
+(define-vm-function (define () fixed) ((variable <variable>) value-form)
   (let ((value (eval value-form -ctx-)))
     (set (<variable>-value variable) value)
     ;; maybe set the <expr>'s name slot
@@ -17,8 +17,8 @@
           (set (<expr>-name tmp) (<variable>-name variable)))))
     value))
 
-;; TODO ideally, but it needs a gc/let*:(define-primitive-function (eval ()) (form (env <env> (environment *globals* 1 0)))
-(define-primitive-function (eval ()) _
+;; TODO ideally, but it needs a gc/let*:(define-vm-function (eval ()) (form (env <env> (environment *globals* 1 0)))
+(define-vm-function (eval ()) _
   (let ((env (if (cdr -args-) ; let's fail early when called with nil env
                  (cadr -args-)
                *globals*)))
@@ -34,11 +34,11 @@
         (set-current-globals prev-globals))
       result)))
 
-(define-primitive-function (lambda () fixed) ((env <env>) parameters . body)
+(define-vm-function (lambda () fixed) ((env <env>) parameters . body)
   (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
   (expr parameters body env -ctx-))
 
-(define-primitive-function (let () fixed) (env bindings . body)
+(define-vm-function (let () fixed) (env bindings . body)
   (let ((locals (<context>-bindings -ctx-)))
     (gc/let* (tmp)
       (list-do binding bindings
@@ -57,7 +57,7 @@
         (set tmp (eval exp -ctx-)))
       tmp)))
 
-(define-primitive-function (set () fixed) ((var <variable>) value-form)
+(define-vm-function (set () fixed) ((var <variable>) value-form)
   (debug-print "SET "var" = "value-form" IN "-ctx-)
   (gc/let* ((value (eval value-form -ctx-)))
     (if (global-variable? var)
@@ -72,7 +72,7 @@
           (debug-print "set primitive-function is setting local var in context "-ctx-" at index "(box <long> index)", to value "value)
           (set (array-at (<context>-bindings -ctx-) index) value))))))
 
-(define-primitive-function (while () fixed) _
+(define-vm-function (while () fixed) _
   (let ((test	(car -args-))
         (prog	-args-))
     (while (eval test -ctx-)
@@ -80,7 +80,7 @@
         (while (pair? (set body (cdr body)))
           (eval (get/head body) -ctx-))))))
 
-(define-primitive-function (if () fixed) (test then . else)
+(define-vm-function (if () fixed) (test then . else)
   (if (eval test -ctx-)
       (eval then -ctx-)
     (let ((ans ()))
@@ -89,14 +89,14 @@
         (set else (cdr else)))
       ans)))
 
-(define-primitive-function (or () fixed) _
+(define-vm-function (or () fixed) _
   (let ((ans ()))
     (while (pair? -args-)
       (and (set ans (eval (get/head -args-) -ctx-))
            (return ans))
       (set -args- (get/tail -args-)))))
 
-(define-primitive-function (and () fixed) _
+(define-vm-function (and () fixed) _
   (let ((ans symbol/true))
     (while (pair? -args-)
       (or (set ans (eval (get/head -args-) -ctx-))
@@ -104,14 +104,14 @@
       (set -args- (get/tail -args-)))
     ans))
 
-(define-primitive-function (quote () fixed) (thing)
+(define-vm-function (quote () fixed) (thing)
   thing)
 
-(define-primitive-function (not ()) (thing)
+(define-vm-function (not ()) (thing)
   (if thing () symbol/true))
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
-(define-primitive-function (- ()) _
+(define-vm-function (- ()) _
   (or (pair? -args-) (error "operator '-' called with zero arguments"))
   (let ((result	(unbox <long> (get/head -args-)))
         (rest	(get/tail -args-)))
@@ -122,7 +122,7 @@
       (set result (- result)))
     (box <long> result)))
 
-(define-primitive-function (+ ()) _
+(define-vm-function (+ ()) _
   (let ((result	0)
         (rest	()))
     (when (pair? -args-)
@@ -133,7 +133,7 @@
       (set rest (get/tail rest)))
     (box <long> result)))
 
-(define-primitive-function (/ ()) _
+(define-vm-function (/ ()) _
   (or (pair? -args-) (error "operator '/' called with zero arguments"))
   (let ((result	(unbox <long> (get/head -args-)))
         (rest	(get/tail -args-)))
@@ -144,7 +144,7 @@
       (set result (/ 1 result)))
     (box <long> result)))
 
-(define-primitive-function (* ()) _
+(define-vm-function (* ()) _
   (let ((result	1)
         (rest	()))
     (when (pair? -args-)
@@ -156,21 +156,21 @@
     (box <long> result)))
 
 (define-form define-binary-operator (op)
-  `(define-primitive-function (,op ()) ((lhs <long>) (rhs <long>))
+  `(define-vm-function (,op ()) ((lhs <long>) (rhs <long>))
      (box <long> (,op lhs rhs))))
 
 (define-binary-operator bitwise-and)
 (define-binary-operator bitwise-or)
 (define-binary-operator bitwise-xor)
 
-(define-primitive-function (bitwise-not ()) ((value <long>))
+(define-vm-function (bitwise-not ()) ((value <long>))
   (box <long> (bitwise-not value)))
 
-(define-primitive-function (bitwise-shift ()) ((value <long>) (shift <long>))
+(define-vm-function (bitwise-shift ()) ((value <long>) (shift <long>))
   (box <long> (bitwise-shift value shift)))
 
 (define-form define-relation (op)
-  `(define-primitive-function (,op ()) ((lhs <long>) (rhs <long>))
+  `(define-vm-function (,op ()) ((lhs <long>) (rhs <long>))
      (and (,op lhs rhs)
           symbol/true)))
 
@@ -180,7 +180,7 @@
 (define-relation >)
 
 ;; FIXME restore arity check
-(define-primitive-function (= ()) _
+(define-vm-function (= ()) _
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-))))
     (typecase lhs
@@ -194,31 +194,31 @@
       (else		(and (= lhs rhs)
                              symbol/true)))))
 
-(define-primitive-function (exit ()) ((exit-code <long> 0))
+(define-vm-function (exit ()) ((exit-code <long> 0))
   (when-at-expand feature/profiler
     (profiler/disable))
   (platform/flush-streams)
   (platform/halt exit-code))
 
-(define-primitive-function (warn ()) _
+(define-vm-function (warn ()) _
   (list-do arg -args-
     (do-print *error-output* arg false))
   (platform/flush-streams))
 
-(define-primitive-function (type-of ())	(thing) (box <long> (type-of thing)))
-(define-primitive-function (string? ())	(thing) (and (string? thing) symbol/true))
-(define-primitive-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
-(define-primitive-function (pair?   ())	(thing) (and (pair?   thing) symbol/true))
-(define-primitive-function (array?  ())	(thing)	(and (array?  thing) symbol/true))
+(define-vm-function (type-of ())	(thing) (box <long> (type-of thing)))
+(define-vm-function (string? ())	(thing) (and (string? thing) symbol/true))
+(define-vm-function (symbol? ())	(thing) (and (symbol? thing) symbol/true))
+(define-vm-function (pair?   ())	(thing) (and (pair?   thing) symbol/true))
+(define-vm-function (array?  ())	(thing)	(and (array?  thing) symbol/true))
 
-(define-primitive-function set-car ((pair <pair>) value)
+(define-vm-function set-car ((pair <pair>) value)
   (set (<pair>-head pair) value))
 
-(define-primitive-function set-cdr ((pair <pair>) value)
+(define-vm-function set-cdr ((pair <pair>) value)
   (set (<pair>-tail pair) value))
 
 (define-form define-oop-at-primfn (name args)
-  `(define-primitive-function (,name ()) (base (wordindex <long>) ,@args)
+  `(define-vm-function (,name ()) (base (wordindex <long>) ,@args)
      (safety 2
        (let ((header (gc/header-of base)))
          (assert (and (gc/valid-header-canary? header)
@@ -230,63 +230,63 @@
 (define-oop-at-primfn oop-at		())
 (define-oop-at-primfn set-oop-at	(value))
 
-;; (define-primitive-function (copy-oops ()) (from to (wordcount <long>))
+;; (define-vm-function (copy-oops ()) (from to (wordcount <long>))
 ;;   (error "copy-oops: who called me in interpreted code?! TODO i need proper bounds checking added.")
 ;;   (copy-oops from to wordcount))
 
 ;; bytes stuff is used by buffer.l, which is in turn is used by test-elf.l
 ;; TODO this should better be done by some magic that automatically exports
 ;; a kernel buffer.l implementation with types and functions into the evaluator
-(define-primitive-function (copy-bytes ()) (from to (count <long>))
+(define-vm-function (copy-bytes ()) (from to (count <long>))
   ;; TODO check bounds
   (copy-bytes from to count))
 
-(define-primitive-function (byte-at ()) (base (index <long>))
+(define-vm-function (byte-at ()) (base (index <long>))
   ;; TODO check bounds
   (box <long> (byte-at base index)))
 
-(define-primitive-function (set-byte-at ()) (base (index <long>) (value <long>))
+(define-vm-function (set-byte-at ()) (base (index <long>) (value <long>))
   ;; TODO check bounds
   (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
   (box <long> (set-byte-at base index value)))
 
 ;; NOTE used by the assembler proof-of-concept in test-elf.l
-(define-primitive-function (address-of ()) (thing)
+(define-vm-function (address-of ()) (thing)
   ;; KLUDGE when <long> is a tagged immediate then the address may get truncated.
   ;; add an assert?
   ;; or return a <target-pointer> here and define arithmetics on them?
   ;; or implement various boxed data types and return a boxed word-sized integer here?
   (box <long> thing))
 
-(define-primitive-function (array-length ()) ((arg <array>))
+(define-vm-function (array-length ()) ((arg <array>))
   (<array>-size arg))
 
-(define-primitive-function (string-length ()) ((arg <string>))
+(define-vm-function (string-length ()) ((arg <string>))
   (<string>-size arg))
 
-(define-primitive-function (string-compare ()) ((s1 <string>) (s2 <string>)))
+(define-vm-function (string-compare ()) ((s1 <string>) (s2 <string>)))
 
-(define-primitive-function (array-at ()) ((array <array>) (index <long>))
+(define-vm-function (array-at ()) ((array <array>) (index <long>))
   (array-at array index))
 
-(define-primitive-function (string-at ()) ((string <string>) (index <long>))
+(define-vm-function (string-at ()) ((string <string>) (index <long>))
   (box <long> (string-at string index)))
 
 ;; adding [set-]char-at to the evaluator makes it source-level compatible with the level-shifted code, and with that enables us to load files like buffer.l into both worlds
-(define-primitive-function (char-at ()) ((string <string>) (index <long>))
+(define-vm-function (char-at ()) ((string <string>) (index <long>))
   (box <long> (string-at string index)))
 
-(define-primitive-function (set-array-at ()) ((array <array>) (index <long>) value)
+(define-vm-function (set-array-at ()) ((array <array>) (index <long>) value)
   (set-array-at array index value))
 
-(define-primitive-function (set-string-at ()) ((string <string>) (index <long>) (value <long>))
+(define-vm-function (set-string-at ()) ((string <string>) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 2 (assert (<= index (string-length string))))
   (set-string-at string index value)
   (box <long> value))
 
-(define-primitive-function (set-char-at ()) ((string <string>) (index <long>) (value <long>))
+(define-vm-function (set-char-at ()) ((string <string>) (index <long>) (value <long>))
   ;; NOTE set-string-at happily extends the string with a gap of zeores, so
   ;; we also assert here that idx is out of bounds at most by +1.
   (safety 2 (assert (<= index (string-length string))))
@@ -294,43 +294,43 @@
   (set-string-at string index value)
   (box <long> value))
 
-(define-primitive-function (array-insert ()) ((array <array>) (index <long>) value))
+(define-vm-function (array-insert ()) ((array <array>) (index <long>) value))
 
-(define-primitive-function (string-insert ()) ((string <string>) (index <long>) (value <long>))
+(define-vm-function (string-insert ()) ((string <string>) (index <long>) (value <long>))
   (safety 2 (assert (and (<= value 256) (<= 0 value)) "string-insert: value is out of range: "(box <long> value)))
   (string-insert string index value)
   (box <long> value))
 
-(define-primitive-function (array-append ()) ((array <array>) value))
+(define-vm-function (array-append ()) ((array <array>) value))
 
-(define-primitive-function (string-append ()) ((string <string>) (value <long>))
+(define-vm-function (string-append ()) ((string <string>) (value <long>))
   (safety 2 (assert (and (<= value 255) (<= 0 value)) "string-append: value is out of range: "(box <long> value)))
   (box <long> (string-append string value)))
 
-(define-primitive-function number->string ((num <long>) (radix <long> 10))
+(define-vm-function number->string ((num <long>) (radix <long> 10))
   (long->string* num radix))
 
-(define-primitive-function integer->string ((num <long>) (radix <long> 10))
+(define-vm-function integer->string ((num <long>) (radix <long> 10))
   (long->string* num radix))
 
-(define-primitive-function string->number ((str <string>) (radix <long> 10))
+(define-vm-function string->number ((str <string>) (radix <long> 10))
   (let ((res (string->long* str radix)))
     (when (= res +end+)
       (error "string->number: failed for "str))
     (box <long> res)))
 
-(define-primitive-function string->integer ((str <string>) (radix <long> 10))
+(define-vm-function string->integer ((str <string>) (radix <long> 10))
   (let ((res (string->long* str radix)))
     (when (= res +end+)
       (error "string->integer: failed for "str))
     (box <long> res)))
 
-(define-primitive-function pointer->target-function (ptr)
+(define-vm-function pointer->target-function (ptr)
   (make <target-function>
     (program-code ptr)))
 
 (when-at-expand (= +architecture+ 'IA-32)
-  (define-primitive-function call-IA-32-machine-code (fn)
+  (define-vm-function call-IA-32-machine-code (fn)
     (debug-print "call-IA-32-machine-code will call "fn)
     (assert (is <target-function> fn) "call-IA-32-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
     (let ((result (box <long> (fn))))
@@ -338,7 +338,7 @@
       result)))
 
 (when-at-expand (= +architecture+ 'x86-64)
-  (define-primitive-function call-x86-64-machine-code (fn)
+  (define-vm-function call-x86-64-machine-code (fn)
     (debug-print "call-x86-64-machine-code will call "fn)
     (assert (is <target-function> fn) "call-x86-64-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
     (let ((result (box <long> (fn))))
@@ -346,5 +346,5 @@
       result)))
 
 (when-at-expand feature/debug-output
-  (define-primitive-function enable-debug-output	() (set *debug-output-enabled?* true))
-  (define-primitive-function disable-debug-output	() (set *debug-output-enabled?* false)))
+  (define-vm-function enable-debug-output	() (set *debug-output-enabled?* true))
+  (define-vm-function disable-debug-output	() (set *debug-output-enabled?* false)))

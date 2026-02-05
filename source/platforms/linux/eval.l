@@ -87,7 +87,7 @@ exit:
 (load "source/evaluator/gc.l")
 (load "source/evaluator/eval.l")
 
-(define-primitive-function set-working-directory ((path <string>))
+(define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
   (unless (= 0 (linux-syscall linux/chdir (string->C-string path)))
     (error "set-working-directory: linux/chdir failed for "path)))

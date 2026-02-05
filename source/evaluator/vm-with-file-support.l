@@ -32,7 +32,7 @@
   (initialize-stream err-handle	*error-output*)
   (initialize-stream err-handle	*debug-output*))
 
-(define-primitive-function repl-stream ((input _ *standard-input*)
+(define-vm-function repl-stream ((input _ *standard-input*)
                                         (output _ *standard-output*)
                                         (interactive? _ true))
   (safety 1 (assert (gc/valid-maru-value? input) (gc/valid-maru-value? output)))
@@ -67,7 +67,7 @@
        (file-close __file-handle)
        __result)))
 
-(define-primitive-function (load ()) ((path <string>))
+(define-vm-function (load ()) ((path <string>))
   (with-input-from-file (stream path)
     (expand-encode-eval-stream stream)))
 

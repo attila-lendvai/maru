@@ -40,7 +40,7 @@
 ;;         (box <long> result)
 ;;       (error "invalid number in string->long, libc/strtol has failed for string " str))))
 
-;; (define-primitive-function (libc/format ()) ((fmt <string>) oarg)
+;; (define-vm-function (libc/format ()) ((fmt <string>) oarg)
 ;;   (let ((typ (type-of oarg))
 ;;         (arg ()))
 ;;     ;; TODO use typecase
@@ -62,7 +62,7 @@
 ;;               (set size (* size 2))))))
 ;;       result)))
 
-(define-primitive-function set-working-directory ((path <string>))
+(define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
   (unless (= 0 (libc/chdir (string->C-string path)))
     (error "set-working-directory: libc/chdir failed for "path)))

@@ -51,7 +51,7 @@
 ;;; ----------------------------------------------------------------
 
 (begin-for-syntax
- (define *primitive-function-registry* ())
+ (define *vm-function-registry* ())
  (define *primitive-function-type-accessors*
      '((<long>			(long?)				(unbox <long>))
        (<string>		(string?))
@@ -67,10 +67,11 @@
   (error name": too many arguments: "args))
 
 ;; defines a function that will be exposed to the VM. as such, it
-;; needs to do some conversion for the values that are crossing the
-;; boundary between the VM and the target domain.
+;; needs to do some conversion of the values that are crossing the
+;; boundary between the VM and the lower/target domain.
+;;
 ;; TODO this is convoluted and needs better documentation
-(define-form define-primitive-function (name-and-props args . body)
+(define-form define-vm-function (name-and-props args . body)
   ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
   ;; ARGS: may be _ to skip arg parsing
   ;;       otherwise a list of entries like:
@@ -93,12 +94,12 @@
     (list-do prop name-and-props
       (case prop
         (fixed	(set fixed? true))
-        (else	(error "define-primitive-function: unexpected property "prop))))
+        (else	(error "define-vm-function: unexpected property "prop))))
     (let* ((stub-name		(concat-symbol prim-name '/evaluator-stub))
            (arg-names		())
            (binders		()))
       ;; TODO what about redefining a function? e.g. number->string in libc.l
-      (push *primitive-function-registry* (list prim-name fixed?))
+      (push *vm-function-registry* (list prim-name fixed?))
       (let ((entries args))
         (while (pair? entries)
           (let* ((entry		(ensure-list (first entries)))
@@ -117,7 +118,7 @@
             (list-do prop entry
               (case prop
                 (nounbox	(set unbox? ()))
-                (else		(error "define-primitive-function: unexpected property "prop))))
+                (else		(error "define-vm-function: unexpected property "prop))))
             (assert (or (not type) (symbol? type)))
             (push arg-names arg-name)
             (let* ((type-entry		(when type
@@ -171,7 +172,7 @@
 (define-function print-backtrace ()
   (platform/diag-print "print-backtrace is not available in this build\n"))
 
-(define-primitive-function abort _
+(define-vm-function abort _
   (when (<= 3 *error-level*)
     (fatal "ABORTING at error level " *error-level*))
   (print-backtrace)

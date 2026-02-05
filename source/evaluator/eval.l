@@ -25,12 +25,12 @@
   *standard-input* *standard-output* *error-output* *debug-output* *verbosity* *optimised*)
 
 ;; TODO should we turn these into macros? or introduce compiler macros?
-(define-primitive-function car (list)
+(define-vm-function car (list)
   (when list
     (safety 2 (assert (pair? list) "car called on non-list: " list))
     (get/head list)))
 
-(define-primitive-function cdr (list)
+(define-vm-function cdr (list)
   (when list
     (safety 2 (assert (pair? list) "cdr called on non-list: " list))
     (get/tail list)))
@@ -49,19 +49,19 @@
          ,@(%make-make-inits *env* 'self. inits)
          self))))
 
-(define-primitive-function allocate ((type <long>) (slot-count <long>))
+(define-vm-function allocate ((type <long>) (slot-count <long>))
   (gc/allocate type (words-to-bytes slot-count)))
 
 ;; TODO rename to allocate-opaque-data or something else
-(define-primitive-function allocate-data ((byte-size <long>))
+(define-vm-function allocate-data ((byte-size <long>))
   (gc/allocate-opaque <data> byte-size))
 
-(define-primitive-function cons ((head () ()) (tail () ()))
+(define-vm-function cons ((head () ()) (tail () ()))
   (make <pair>
     (head head)
     (tail tail)))
 
-(define-primitive-function string ((length <long> 0))
+(define-vm-function string ((length <long> 0))
   (make <string>
     (size	(box <long> 0))
     (elements	(when (< 0 length)
@@ -77,7 +77,7 @@
   (make <symbol>
     (name	name)))
 
-(define-primitive-function array ((capacity <long> 0))
+(define-vm-function array ((capacity <long> 0))
   (make <array>
     (size	(box <long> 0))
     (elements	(when (> capacity 0)
@@ -92,12 +92,12 @@
     (when-at-expand feature/profiler
       (profiler-counter (box <long> 0)))))
 
-(define-primitive-function form (fn (sym () ()))
+(define-vm-function form (fn (sym () ()))
   (make <form>
     (function	fn)
     (symbol	sym)))
 
-(define-primitive-function fixed (fn)
+(define-vm-function fixed (fn)
   (make <fixed>
     (function fn)))
 
@@ -109,14 +109,14 @@
     (when-at-expand feature/profiler
       (profiler-counter	(box <long> 0)))))
 
-(define-primitive-function variable ((name <symbol>) value (env <env>) (index <long>))
+(define-vm-function variable ((name <symbol>) value (env <env>) (index <long>))
   (make <variable>
     (name	name)
     (value	value)
     (env	env)
     (index	(box <long> index))))
 
-(define-primitive-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (<env>-offset parent))))
+(define-vm-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (<env>-offset parent))))
   (make <env>
     (parent	parent)
     (level	(box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
@@ -197,7 +197,7 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
-(define-primitive-function string->symbol ((str <string>))
+(define-vm-function string->symbol ((str <string>))
   ;; aka intern
   (array-binary-search *symbols*
                        str
@@ -211,7 +211,7 @@
                            (array-insert array index sym)
                            sym))))
 
-(define-primitive-function symbol->string (symbol)
+(define-vm-function symbol->string (symbol)
   ;; FIXME? isn't this too permissive? enable type check at the arg, and delete the if... and then fix the code that relies on this.
   (cond
     ((string? symbol)		symbol)
@@ -225,7 +225,7 @@
 ;; think this through: the host hands over to us <env>'s in e.g. <form>s
 ;; or as the module's env, and we need to access them, even while we load our own stuff
 ;; into the slave. we can't just redefine the host's DEFINED? function. this also applies to
-(define-primitive-function defined? ((name <symbol>) (env <env> *globals*))
+(define-vm-function defined? ((name <symbol>) (env <env> *globals*))
   (let ((result ()))
     (while (and env
                 (not (set result (find-local-variable env name))))
@@ -243,7 +243,7 @@
       (set (<env>-offset env) (box <long> (+ offset 1)))
       (array-append (<env>-bindings env) var))))
 
-(define-primitive-function environment-define ((env <env>) (name <symbol>) value)
+(define-vm-function environment-define ((env <env>) (name <symbol>) value)
   (debug-print "environment-define called, name is "(<symbol>-name name))
   (let ((var (find-local-variable env name)))
     (if var
@@ -273,10 +273,10 @@
 ;;; globals
 ;;; ----------------------------------------------------------------
 
-(define-primitive-function (current-globals ()) ()
+(define-vm-function (current-globals ()) ()
   *globals*)
 
-(define-primitive-function set-current-globals ((env <env>))
+(define-vm-function set-current-globals ((env <env>))
   (debug-print "set-current-globals "env)
   (set *globals* env)
   (capture-well-known-globals)
@@ -429,7 +429,7 @@
            (error "cannot apply: "fun" of type: "(box <long> type)", *globals*: "*globals*", *applicators* is: "
                   (and *applicators-var* (<variable>-value *applicators-var*)))))))))
 
-(define-primitive-function (apply ()) (fn args)
+(define-vm-function (apply ()) (fn args)
   (apply fn args -ctx-))
 
 ;;;
@@ -594,7 +594,7 @@
     exp))
 
 ;; TODO that <long> for the boolean is not ok
-(define-primitive-function expand (exp (env <env> (<context>-env -ctx-)) (one-step? <long> false))
+(define-vm-function expand (exp (env <env> (<context>-env -ctx-)) (one-step? <long> false))
   (debug-print "expand, exp "exp", env "env)
   (with-new-call-frame (symbol/expand () exp)
     (set (<call-frame>-env -call-frame-) env)
@@ -723,7 +723,7 @@
           (set (<env>-stable var-env) symbol/true))))
     var))
 
-(define-primitive-function encode (exp (env <env> (<context>-env -ctx-)))
+(define-vm-function encode (exp (env <env> (<context>-env -ctx-)))
   (debug-print "encode of exp "exp", in env "env)
   (with-new-call-frame (symbol/encode () exp)
     (set (<call-frame>-env -call-frame-) env)

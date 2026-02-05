@@ -6,28 +6,28 @@
 ;;; files
 ;;;
 
-(define-primitive-function file-open ((path <string>) (mode <string>))
+(define-vm-function file-open ((path <string>) (mode <string>))
   (awhen (libc/fopen (string->C-string path) (string->C-string mode))
     (box <target-pointer> it)))
 
-(define-primitive-function file-close ((handle <target-pointer> _ nounbox))
+(define-vm-function file-close ((handle <target-pointer> _ nounbox))
   ;; NOUNBOX because it is called from many places from inside the
   ;; target, i.e. they all would need to box it, because the auto
   ;; unboxing is only added to the /EVALUATOR-STUB.
   (when (= 0 (libc/fclose (unbox <target-pointer> handle)))
     symbol/true))
 
-(define-primitive-function file-read-character ((stream <target-pointer>))
+(define-vm-function file-read-character ((stream <target-pointer>))
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
         ()
       (box <long> c))))
 
-(define-primitive-function file-write-character ((char <long>) (stream <target-pointer>))
+(define-vm-function file-write-character ((char <long>) (stream <target-pointer>))
   (when (not (= libc/EOF (libc/fputc char stream)))
     symbol/true))
 
-;; (define-primitive-function file-flush ((stream <target-pointer>))
+;; (define-vm-function file-flush ((stream <target-pointer>))
 ;;   (unless (= 0 (libc/fflush stream))
 ;;     (error "file-flush: libc/fflush returned an error")))
 
@@ -37,7 +37,7 @@
 
 (define-record <libc-stream> <stream> (handle))
 
-(define-primitive-function file-stream ((handle <target-pointer> _ nounbox))
+(define-vm-function file-stream ((handle <target-pointer> _ nounbox))
   (make/opaque <libc-stream>
     (handle	(unbox <target-pointer> handle))))
 

@@ -18,13 +18,13 @@
 ;;               int *parent_tid, unsigned long tls,
 ;;               int *child_tid);
 
-(define-primitive-function fork ((flags <long> linux/SIGCHLD))
+(define-vm-function fork ((flags <long> linux/SIGCHLD))
   (let ((pid (linux-syscall linux/clone flags 0 0 0 0 0)))
     (if (<= 0 pid)
         (box <long> pid)
       (fatal "clone syscall returned with error "pid))))
 
-(define-primitive-function execve ((path <string>))
+(define-vm-function execve ((path <string>))
   (let* ((argv 0)
          (envp 0)
          (result (linux-syscall linux/execve
@@ -34,7 +34,7 @@
     ;; result is -errno
     (fatal "execve returned with "result)))
 
-(define-primitive-function waitpid ((pid <long>))
+(define-vm-function waitpid ((pid <long>))
   (let* ((status 0)
          (result (linux-syscall linux/wait4 pid (address-of status) 0 0)))
     (if (<= result 0)

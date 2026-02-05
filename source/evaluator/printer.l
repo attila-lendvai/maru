@@ -159,24 +159,24 @@
   (dump obj)
   ($put *standard-output* ?\n))
 
-(define-primitive-function (dump ()) _
+(define-vm-function (dump ()) _
   (list-do arg -args-
     (dump arg))
   (first -args-))
 
-(define-primitive-function (print ()) _
+(define-vm-function (print ()) _
   (list-do arg -args-
     (print arg))
   (first -args-))
 
-(define-primitive-function (dump-all ()) _
+(define-vm-function (dump-all ()) _
   (let ((stream (pop -args-)))
     (list-do arg -args-
       (do-print stream arg true))))
 
 ;; NOTE there's a print-all macro in vm-early.l; being a form it needs
 ;; to be defined very early, especially on high safety/debug level.
-(define-primitive-function (print-all ()) _
+(define-vm-function (print-all ()) _
   (let ((stream (pop -args-)))
     (list-do arg -args-
       (do-print stream arg false))))

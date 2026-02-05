@@ -10,7 +10,7 @@
 ;;;
 
 ;; TODO reaname these to file/open?
-(define-primitive-function file-open ((path <string>) (mode <string>))
+(define-vm-function file-open ((path <string>) (mode <string>))
   (let ((fd (linux-syscall linux/openat linux/AT_FDCWD (string->C-string path)
                            (cond
                              ((or (not mode)
@@ -30,12 +30,12 @@
       ;; TODO use <target-word> for boxing and unboxing
       (box <target-pointer> fd))))
 
-(define-primitive-function file-close ((fd <target-pointer>))
+(define-vm-function file-close ((fd <target-pointer>))
   ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
   (when (= 0 (linux-syscall linux/close fd))
     symbol/true))
 
-(define-primitive-function file-read-character ((fd <target-pointer>))
+(define-vm-function file-read-character ((fd <target-pointer>))
   (let ((char 0))
     (if (= 1 (linux-syscall linux/read fd (address-of char) 1))
         ;; TODO endianness, EAGAIN and stuff
@@ -43,12 +43,12 @@
       ;;(error "file-read-character: syscall returned with error")
       ())))
 
-(define-primitive-function file-write-character ((char <long>) (fd <target-pointer>))
+(define-vm-function file-write-character ((char <long>) (fd <target-pointer>))
   ;; TODO endianness? think this through...
   (when (= 1 (linux-syscall linux/write fd (address-of char) 1))
     symbol/true))
 
-;; (define-primitive-function file-flush ((fd <target-pointer>))
+;; (define-vm-function file-flush ((fd <target-pointer>))
 ;;   (unless (= 0 (linux-syscall linux/fsync fd))
 ;;     (error "file-flush: linux/fsync returned an error")))
 
@@ -60,7 +60,7 @@
   (fd
    peeked-value))
 
-(define-primitive-function file-stream ((fd <target-pointer> _ nounbox))
+(define-vm-function file-stream ((fd <target-pointer> _ nounbox))
   (assert (is <target-pointer> fd))
   (make/opaque <fd-stream>
     ;; TODO boxing...
