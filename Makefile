@@ -170,18 +170,18 @@ SLAVE_DIR	= $(CURDIR)
 #EVAL0_PHASE=1
 ifdef EVAL0_PHASE
   # This way eval0 is built each time
-  EVAL0_DIR	= $(SLAVE_DIR)
-  EVAL0_BINARY	= eval0-llvm
-  EVAL0		= $(BUILD_llvm)/eval0
+  EVAL0_DIR	?= $(SLAVE_DIR)
+  EVAL0_BINARY	?= eval0-llvm
+  EVAL0		?= $(BUILD_llvm)/eval0
 else
   # This way eval0 is built from the latest commit, checked out as a
   # working dir in build/eval0 and 'make update-eval0' must be used to
   # update its git working tree. This mode requires more attention when
   # dealing with sensitive bootstrapping issues, but then you can just
   # switch to build eval0 each time.
-  EVAL0_DIR	= $(CURDIR)/$(BUILD)/eval0
-  EVAL0_BINARY	= eval0-llvm
-  EVAL0		= $(EVAL0_DIR)/$(EVAL0_BINARY)
+  EVAL0_DIR	?= $(CURDIR)/$(BUILD)/eval0
+  EVAL0_BINARY	?= eval0-llvm
+  EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
 EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-x86.l emit-x86-64.l emit-late.l)
