@@ -1,31 +1,31 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 ;;;
-;;; the primitive-functions
+;;; the vm-functions
 ;;;
 ;;; ----------------------------------------------------------------
 
-(load "source/evaluator/primitive-functions.l")
+(load "source/evaluator/vm-functions.l")
 
-(define-function %instantiate-primitive-function (env name imp fixed?)
+(define-function %instantiate-vm-function (env name imp fixed?)
   ;; NOTE <target-function> is an opaque object, but it's ok to use
   ;; <symbols>'s as their name because they are held as gc roots by
   ;; the *symbols* array.
-  (debug (platform/format "%instantiate-primitive-function "(pointer imp)"\n"))
+  (debug (platform/format "%instantiate-vm-function "(pointer imp)"\n"))
   (gc/let* ((boxed-imp (box <target-pointer> imp))
-            (tmp (primitive-function boxed-imp name)))
+            (tmp (vm-function boxed-imp name)))
     (when fixed?
       (set tmp (fixed tmp)))
     ;; NOTE string->symbol doesn't need gc/let* because *symbols* is a gc root
     (environment-define env (string->symbol name) tmp)))
 
-(define-form %instantiate-primitive-functions (env)
+(define-form %instantiate-vm-functions (env)
   `(let ()
-     (debug (platform/diag-print "%instantiate-primitive-functions\n"))
+     (debug (platform/diag-print "%instantiate-vm-functions\n"))
      ,@(map (lambda (entry)
               (let* (((name fixed?)	entry)
                      (impl-name		(concat-symbol name '/evaluator-stub)))
-                `(%instantiate-primitive-function ,env ,(symbol->string name) ,impl-name ,(if fixed? 'true 'false))))
+                `(%instantiate-vm-function ,env ,(symbol->string name) ,impl-name ,(if fixed? 'true 'false))))
             *vm-function-registry*)))
 
 (define-function populate-env-with-maru-primitives (env)
@@ -44,7 +44,7 @@
   ;; true value will be the symbol 'true.
   (environment-define env symbol/true symbol/true)
 
-  (%instantiate-primitive-functions env)
+  (%instantiate-vm-functions env)
 
   ;; optimization: cache some values into the lower realm for fast lookup
   (with-forms ((var-value ((name) `(<variable>-value (defined? ,name env)))))

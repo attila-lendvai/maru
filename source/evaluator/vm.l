@@ -47,12 +47,13 @@
             args)))
 
 ;;;
-;;; primitive-function infrasrtucture
+;;; vm-function infrasrtucture, i.e. exposing lower functions to the
+;;; upper realm being implemented
 ;;; ----------------------------------------------------------------
 
 (begin-for-syntax
  (define *vm-function-registry* ())
- (define *primitive-function-type-accessors*
+ (define *vm-function-type-accessors*
      '((<long>			(long?)				(unbox <long>))
        (<string>		(string?))
        (<target-pointer>	(is <target-pointer>)		(unbox <target-pointer>))
@@ -122,7 +123,7 @@
             (assert (or (not type) (symbol? type)))
             (push arg-names arg-name)
             (let* ((type-entry		(when type
-                                          (or (assq type *primitive-function-type-accessors*)
+                                          (or (assq type *vm-function-type-accessors*)
                                               `(,type (is ,type) ()))))
                    (type-checker	(second type-entry))
                    (unboxer		(third type-entry)))

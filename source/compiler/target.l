@@ -34,6 +34,7 @@
 
 (switch-to-slave-env)
 
+;; a heap object with a function pointer, and optionally a name.
 (define-record <target-function> ()
   (program-code
    (when-at-expand feature/track-expr-names	name)
@@ -205,7 +206,7 @@
 
 ;; install stubs for the +special-operators+
 ;; (list-do name '()
-;;   ;; they need to be <primitive-function>'s (why?)
+;;   ;; they need to be <target-function>'s (why?)
 ;;   (eval `(define ,name error) *target-env*))
 
 (switch-to-host-env)

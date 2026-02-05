@@ -101,11 +101,16 @@
   (make <fixed>
     (function fn)))
 
-(define-function primitive-function (code name)
+;; a vm-function is something that will be made available in the VM we
+;; are implementing. a <target-function> is a heap object that points
+;; to a machine code block in the lower realm; i.e. a fitting
+;; instrument to represent a vm-function.
+(define-function vm-function (code name)
   (safety 2 (assert (and (is <target-pointer> code) (is <string> name))))
   (make <target-function>
     (program-code	code)
-    (name		name)
+    (when-at-expand feature/track-expr-names
+      (name		name))
     (when-at-expand feature/profiler
       (profiler-counter	(box <long> 0)))))
 

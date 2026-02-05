@@ -35,7 +35,7 @@
       result)))
 
 (define-vm-function (lambda () fixed) ((env <env>) parameters . body)
-  (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda primitive-function: parameters is of wrong type: " parameters)
+  (assert (or (not parameters) (is <variable> parameters) (pair? parameters)) "lambda vm-function: parameters is of wrong type: " parameters)
   (expr parameters body env -ctx-))
 
 (define-vm-function (let () fixed) (env bindings . body)
@@ -45,12 +45,12 @@
         (when (pair? binding)
           (let ((var  (get/head binding))
                 (prog (get/tail binding)))
-            (debug-print "let primitive-function is initializing var "var" in context "-ctx-)
+            (debug-print "let vm-function is initializing var "var" in context "-ctx-)
             (set tmp ())
             (while (pair? prog)
               (set tmp (eval (get/head prog) -ctx-))
               (set prog (get/tail prog)))
-            (debug-print "let primitive-function is setting var "var" to value "tmp" in context "-ctx-)
+            (debug-print "let vm-function is setting var "var" to value "tmp" in context "-ctx-)
             (set (array-at locals (unbox <long> (<variable>-index var))) tmp))))
       (set tmp ())
       (list-do exp body
@@ -64,12 +64,12 @@
         (set (<variable>-value var) value)
       (let ((delta (- (unbox <long> (<env>-level (<context>-env -ctx-)))
                   (unbox <long> (<env>-level (<variable>-env var))))))
-        (debug-print "set primitive-function is writing local var "var" with delta "(box <long> delta))
+        (debug-print "set vm-function is writing local var "var" with delta "(box <long> delta))
         (while (< 0 delta)
           (set -ctx- (<context>-home -ctx-))
           (decr delta))
         (let ((index (unbox <long> (<variable>-index var))))
-          (debug-print "set primitive-function is setting local var in context "-ctx-" at index "(box <long> index)", to value "value)
+          (debug-print "set vm-function is setting local var in context "-ctx-" at index "(box <long> index)", to value "value)
           (set (array-at (<context>-bindings -ctx-) index) value))))))
 
 (define-vm-function (while () fixed) _

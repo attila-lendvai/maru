@@ -462,7 +462,7 @@
 
 ;;; built-in types
 
-;; NOTE the primitive-functions provided by the eval executable assume
+;; NOTE the vm-functions provided by the eval executable assume
 ;; a certain memory layout for the built-in types.
 ;; what actually happens is encoded in the executable, and if you change any of these
 ;; then you need to bootstrap to reflect the changes in the next executable.
@@ -502,7 +502,7 @@
 (define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 
-;; TODO why are some of these here, and some are primitive-functions? unify one way or another!
+;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
