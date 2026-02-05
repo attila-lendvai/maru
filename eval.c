@@ -3164,6 +3164,53 @@ static subr_ent_t subr_tab[] = {
 #endif
     { 0,			0 }};
 
+void instantiatePrimitiveFunctions(oop env)
+{
+  oop tmp = nil;				GC_PROTECT(tmp);
+
+  subr_ent_t *ptr;
+  for (ptr = subr_tab;  ptr->name;  ++ptr) {
+    wchar_t *name = wcsdup(mbs2wcs(ptr->name + 1));
+    // fprintf(stderr, "Instantiating subr %ls\n", name);
+    tmp = newSubr(name, ptr->imp, 0);
+    if ('.' == ptr->name[0])
+      tmp = newFixed(tmp);
+    environmentDefine(env, intern(name), tmp);
+  }
+  GC_UNPROTECT(tmp);
+}
+
+void populateEnvWithMaruPrimitives(oop env)
+{
+  oop tmp = nil;		GC_PROTECT(tmp);
+
+  tmp = newLong(verbosity); environmentDefine(env, intern(L"*verbosity*"), tmp);
+  tmp = newLong(optimize);  environmentDefine(env, intern(L"*optimize*"),  tmp);
+
+  // create an uninterned singleton symbol (i.e. a unique identity that cannot be recreated in any other way)
+  // then define this value in the global env under the +end+ name, which is a normal, interned symbol.
+  tmp = newSymbol(L"+end+"); environmentDefine(env, intern(L"+end+"), tmp);
+
+  tmp = intern(L"true"); environmentDefine(env, tmp, tmp);
+
+  instantiatePrimitiveFunctions(env);
+
+  expanders=	environmentDefine(env, intern(L"*expanders*"),   nil);
+  encoders=	environmentDefine(env, intern(L"*encoders*"),    nil);
+  evaluators=	environmentDefine(env, intern(L"*evaluators*"),  nil);
+  applicators=	environmentDefine(env, intern(L"*applicators*"), nil);
+
+  backtrace=	environmentDefine(env, intern(L"*backtrace*"), nil);
+
+  input =  environmentDefine(env, intern(L"*standard-input*"), nil);
+  output = environmentDefine(env, intern(L"*standard-output*"),	nil);
+  tmp = environmentDefine(env, intern(L"*error-output*"),  nil);
+  set(tmp,  Variable,value, newLong((long)stderr));
+  environmentDefine(env, intern(L"*debug-output*"), tmp);
+
+  GC_UNPROTECT(tmp);
+}
+
 int main(int argc, char **argv)
 {
   switch (sizeof(long)) {
@@ -3217,41 +3264,16 @@ int main(int argc, char **argv)
 
   oop tmp= nil;		GC_PROTECT(tmp);
 
-  globals= newEnv(nil, 0, 0);
-  globals= environmentDefine(globals, intern(L"*globals*"), globals);
-
-  {
-    oop s = intern(L"true");
-    environmentDefine(get(globals, Variable,value), s, s);
-  }
-
-  expanders=	environmentDefine(get(globals, Variable,value), intern(L"*expanders*"),   nil);
-  encoders=	environmentDefine(get(globals, Variable,value), intern(L"*encoders*"),    nil);
-  evaluators=	environmentDefine(get(globals, Variable,value), intern(L"*evaluators*"),  nil);
-  applicators=	environmentDefine(get(globals, Variable,value), intern(L"*applicators*"), nil);
-
   traceStack=	newArray(32);					GC_add_root(&traceStack);
 
-  backtrace=	environmentDefine(get(globals, Variable,value), intern(L"*backtrace*"), nil);
-		environmentDefine(get(globals, Variable,value), intern(L"*standard-output*"),	newString(L"dummy-*standard-output*"));
-		environmentDefine(get(globals, Variable,value), intern(L"*error-output*"),		newString(L"dummy-*error-output*"));
-  // TODO
-  input=	environmentDefine(get(globals, Variable,value), intern(L"*input*"), nil);
-  output=	environmentDefine(get(globals, Variable,value), intern(L"*output*"), nil);
+  globals= newEnv(nil, 0, 0);
+  populateEnvWithMaruPrimitives(globals);
+  // TRAP: this turns globals from an Env into a Variable!
+  globals = environmentDefine(globals, intern(L"*globals*"), globals);
 
   currentPath= nil;			GC_add_root(&currentPath);
   currentLine= nil;			GC_add_root(&currentLine);
   currentSource= newPair(nil, nil);	GC_add_root(&currentSource);
-
-  {
-    subr_ent_t *ptr;
-    for (ptr= subr_tab;  ptr->name;  ++ptr) {
-      wchar_t *name= wcsdup(mbs2wcs(ptr->name + 1));
-      tmp= newSubr(name, ptr->imp, 0);
-      if ('.' == ptr->name[0]) tmp= newFixed(tmp);
-      environmentDefine(get(globals, Variable,value), intern(name), tmp);
-    }
-  }
 
   tmp= nil;		GC_UNPROTECT(tmp);
 
@@ -3311,9 +3333,6 @@ int main(int argc, char **argv)
 	  exit(0);
       }
   }
-
-  environmentDefine(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
-  environmentDefine(get(globals, Variable,value), intern(L"*optimize*"),  newLong(optimize));
 
   while (is(Pair, get(arguments, Variable,value))) {
     oop argl= get(arguments, Variable,value);		GC_PROTECT(argl);
