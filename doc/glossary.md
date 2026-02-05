@@ -1,24 +1,47 @@
 # Glossary
 
- - *VM*: Virtual Machine, i.e. a universe capable of evaluating
-   program code to yield literals. It has its own set of laws that are
-   treated as axioms to build upon.
+ - *VM*: Virtual Machine, i.e. a *realm* capable of evaluating program
+   code to yield values for an *upper*/encompassing/supervising
+   realm. It has its own set of laws that are treated as axioms when
+   building upon them.
 
- - *host*: The Maru VM animating/hosting the bootstrap process.
+ - *host*: The Maru VM animating/hosting the bootstrap process (note
+   that this is different from the GNU build-host-target
+   nomenclature).
 
  - *level-shift*: aka compilation; a semantics-preserving "level
-   shift" from s-expressions to machine code, letting the metacircular
-   evaluator in `eval.l` escape from the "infinite metacircular
-   regression" to a language grounded in hardware.
+   shift" operation turning s-expressions to machine code, letting the
+   metacircular evaluator in `eval.l` escape from the "infinite
+   metacircular regression" to a language grounded in hardware. An
+   operation that turns abstractions in the *upper* realm into
+   corresponding implementations in the *lower* or *target* realm.
 
- - *target*: The target VM of the "level-shift" operation. Examples
-   are: the 32 bit x86 CPU arch, LLVM bitcode, C99, etc. Additionally
-   it also provides some services in its runtime environment:
-    - *libc* provides `dlopen`; the stdlib functions; malloc/free
-      based memory management, etc.
-    - the Linux Kernel provides `syscall`s for input/output; memory
-      management through the `brk` syscall; killing the unix process
-      that was started to animate us, etc.
+ - *upper*/*lower*: the two sides of a *level-shift* operation.
+
+ - *target*: The target realm of the "level-shift" operation. It has
+   two important components:
+    1. one that provides the execution semantics, and
+    2. one that provides services to interface with the outside world.
+
+   Some example targets are:
+
+    - 32 bit x86 CPU machine code + the Linux kernel (i.e. using
+      kernel `syscall`s for input/output; memory management using the
+      `brk` syscall; killing the unix process in which we are being
+      animated)
+
+    - C99 semantics as execution engine; and *libc* providing the
+      services (the stdlib functions for IO; `malloc`/`free` based
+      memory management, etc)
+
+    - LLVM bitcode compiled to some (!) 64 bit arch + *libc* (*libc*
+      itself is independent of the specific arch, it (mostly) only
+      depends on the word size of the target)
+
+    - 32 bit C99 code; and the Linux kernel
+
+    - 32 bit x86 CPU; and reading/writing hardware registers (for IO
+      through a serial port, or accessing some storage device, etc).
 
  - *kernel*: the part of the codebase that runs in the target VM, and
    implements the evaluator building on the target's axioms.
