@@ -44,10 +44,9 @@
   ;; true value will be the symbol 'true.
   (environment-define env symbol/true symbol/true)
 
-  (environment-define env (string->symbol "*maru*") *maru*)
-
   (%instantiate-primitive-functions env)
 
+  ;; optimization: cache some values into the lower realm for fast lookup
   (with-forms ((var-value ((name) `(<variable>-value (defined? ,name env)))))
     (set fixed-primitive-function/quote		(var-value symbol/quote))
     (set fixed-primitive-function/lambda	(var-value symbol/lambda))
@@ -84,7 +83,7 @@
   (debug (platform/diag-print "initialize-vm is alive\n"))
 
   (safety 2
-    (debug (platform/diag-print "running basic type and box/unbox checks\n"))
+    (debug (platform/diag-print "running basic type and box/unbox sanity checks\n"))
     (or (= 42 (unbox <long> (box <long> 42)))		(fatal "box-unbox of <long> is broken"))
     (when-at-expand (eval-in-slave '(is <immediate-type> <long>))
       (or (= 85 (box <long> 42))			(fatal "box of <long> is broken"))
@@ -126,9 +125,7 @@
 
   (set *maru* (environment () 0 0))                            (when-at-expand feature/debug-info (set (<env>-name *maru*) "maru"))
   (populate-env-with-maru-primitives *maru*)
-  (environment-define *maru*
-                      (string->symbol "*maru*")
-                      *maru*)
+  (environment-define *maru* (string->symbol "*maru*") *maru*)
   (debug (platform/diag-print "initialized *maru*\n"))
 
   (set *globals* (set *maru-user* (environment *maru* 0 0)))   (when-at-expand feature/debug-info (set (<env>-name *maru-user*) "maru-user"))
