@@ -128,7 +128,11 @@
   (environment-define *maru* (string->symbol "*maru*") *maru*)
   (debug (platform/diag-print "initialized *maru*\n"))
 
-  (set *globals* (set *maru-user* (environment *maru* 0 0)))   (when-at-expand feature/debug-info (set (<env>-name *maru-user*) "maru-user"))
+  (let ((maru-user (environment *maru* 0 0)))
+    (when-at-expand feature/debug-info
+      (set (<env>-name maru-user) "maru-user"))
+    (set *globals* maru-user))
+
   (capture-well-known-globals)
   (debug (platform/diag-print "initialize-vm is done\n")))
 

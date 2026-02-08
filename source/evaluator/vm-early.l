@@ -78,7 +78,7 @@
             names)))
 
 (define-forwards
-    *globals* *maru* *maru-user* *symbols*
+    *globals* *maru* *symbols*
 
     *expanders-var* *encoders-var* *evaluators-var* *applicators-var*
 
