@@ -45,7 +45,7 @@ if [ ! -f ${SCRIPT_DIR}/build/quicklisp.lisp ]; then
     #
     cd ${SCRIPT_DIR}/build/
     wget http://beta.quicklisp.org/quicklisp.lisp
-    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\" :dist-url \"http://beta.quicklisp.org/dist/quicklisp/2021-02-28/distinfo.txt\")" --quit
+    ${LISP} --no-userinit --no-sysinit --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"${SCRIPT_DIR}/build/quicklisp\" :dist-url \"http://beta.quicklisp.org/dist/quicklisp/2026-01-01/distinfo.txt\")" --quit
 fi
 
 cd "${SCRIPT_DIR}"
