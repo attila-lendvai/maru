@@ -10,8 +10,24 @@
 ;;; Emitting objects
 ;;;
 
-;; KLUDGE? this shouldn't be done by hand, but automated based on the
-;; type meta-data.
+;; FIXME? most of this shouldn't be done by hand, but automated based
+;; on the type meta-data.
+
+;; FIXME what is the difference between compiling an object and
+;; emitting one? if there isn't any, then rename emit-object/foo to
+;; compile-object/foo.
+
+(define-function emit-object/C-string (self -c-)
+  (let ((label (UNIQUE-LABEL "cstr")))
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (emit ASCIZ self)
+    label))
+
+(define-function compile/C-string (expr -c-)
+  (assert (= (list-length expr) 2))
+  (let ((label (emit-object/C-string (second expr) -c-)))
+    (gen LOAD label)))
 
 ;; these will be functions instantiated later. reason: to calculate
 ;; some stuff and capture the result into closures. this is a poor
@@ -102,8 +118,8 @@
            ;; GC should never walk these objects, therefore we can
            ;; skip emitting the first two words of the header.
 
-           ; next         ; not emitted
-           ; chunk size   ; not emitted
+           ;; next         ; not emitted
+           ;; chunk size   ; not emitted
            (emit CELL flags)
            (emit-comment 2 "type: "type)
            (emit CELL type-id)

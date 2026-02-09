@@ -93,6 +93,7 @@
     (when rest
       `(define-print-method ,type-name (print-all -stream- ,@rest)))))
 
+;;;
 ;;; compiler infrastructure
 ;;;
 

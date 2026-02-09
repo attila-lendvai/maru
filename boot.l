@@ -155,9 +155,9 @@
                             `(define ,name (form (lambda (*env* ,@args) ,@body))))))
 
 (define-form define-symbol-form (name replacement)
-  ;; NOTE unless we instantiate the FORM in the body of the macro
-  ;; then in the bootstrap environment it will be bound to the target
-  ;; implementation of FORM.
+  ;; NOTE if we didn't instantiate the FORM with an eval in the body
+  ;; of this macro, then in the bootstrap environment it would resolve
+  ;; to the target implementation of FORM, which is not what we want.
   (let ((replacement (eval replacement *env*)))
     `(define ,name ,(form () (lambda _ replacement)))))
 

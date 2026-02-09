@@ -1132,6 +1132,7 @@
 
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
+;; FIXME merge this somehow into the compile-object protocol?
 (define-method compile-definition <array> (name -c-)
   (let ((compiled	(compile-array self -c-))
         (array-label	(GLOBAL (unique-name "arr"))))

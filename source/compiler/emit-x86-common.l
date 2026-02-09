@@ -529,17 +529,6 @@
   (LABEL (concat-string (symbol->string name) "__code")))
 
 ;;;
-;;; Emitting objects
-;;;
-
-(define-function emit-object/C-string (self -c-)
-  (let ((label (UNIQUE-LABEL "cstr")))
-    (emit RODATA)
-    (emit DEFLABEL label)
-    (emit ASCIZ self)
-    label))
-
-;;;
 ;;; Compiling lambdas
 ;;;
 
@@ -623,10 +612,3 @@
     (comp stmt))
   (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
               (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
-
-(define-function compile/C-string (expr -c-)
-  ;; just an optimization to compile string literals into a C string
-  ;; when they would be immediately converted anyway.
-  (assert (= (list-length expr) 2))
-  (let ((label (emit-object/C-string (second expr) -c-)))
-    (gen LOAD label)))

@@ -16,7 +16,7 @@
 ;;;   - no closures
 ;;;   - no variable number of args for functions
 ;;;   - some literal objects are emitted as valid objects that can participate
-;;;     in the heap; see emit-object/<string> and co. for an up-to-date list.
+;;;     in the heap; see the EMIT-OBJECT methods for an up-to-date list.
 ;;;   - probaby more
 ;;;   - see +special-operators+ and *special-forms* for the list of specially
 ;;;     handled constructs
@@ -219,6 +219,9 @@
       (emit LEAVE frame-body-size)))
   entry-point-label)
 
+;; TODO should this also go through the COMPILE-OBJECT selector? but
+;; what about the NAME arg then? there's a similar issue with
+;; emit-object/<target-function>.
 (define-function compile-expr (self name -c-)
   (emit-comment 1 "compiling fn "name", "self)
   (let ((entry-point (if name

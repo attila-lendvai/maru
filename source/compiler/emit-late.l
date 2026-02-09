@@ -35,6 +35,14 @@
 ;;;
 ;;; <selector>
 ;;;
+;; TODO ideally the method vector of the selector should be
+;; addressed/filled according to the slave type id's. when that is
+;; achieved, then we can simply COMPILE-DEFINITION the method array,
+;; without the translation.
+;;
+;; TODO this whole thing should be merged with the emit-object stuff,
+;; or rather, with whatever simplified will replace the current
+;; emit-object machinery.
 (define-method compile-definition (slave-value <selector>) (name -c-)
   (let ((target-env		(slave-value *globals*))
         (methods		(eval-in-slave `(<selector>-methods ,self)))
@@ -59,10 +67,9 @@
                                      (<variable>-name el))
                                    (<expr>-parameters impl-fn)))
               (assert (= (first parameters) 'self)))
-            (let ((impl-name (string->symbol (concat-strings (symbol->string name) "." (number->string slave-type-id)))))
-              (set (array-at target-methods (- slave-type-id index-min)) impl-fn))))))
+            (set (array-at target-methods (- slave-type-id index-min)) impl-fn)))))
     ;; define and emit the dispatch table
-    (emit-comment 1 "<selector> dispatch table for "name", from "index-min", to "index-max)
+    (emit-comment 1 "<selector> dispatch table for '"name"', from "index-min", to "index-max)
     (environment-define target-env dispatch-table-name target-methods)
     (compile-definition target-methods dispatch-table-name -c-)
     ;; the selector function
@@ -74,7 +81,7 @@
                         (unless (and (<= ,index-min type)
                                      (<= type ,index-max))
                           ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
-                          (error "selector '",(symbol->string name)" has no method for type " (box <long> type))))
+                          (error "selector '",(symbol->string name)"' has no method for type " (box <long> type))))
                       ;; TODO eliminate the extra indirection from the global var to the dispatch array
                       ((oop-at ,dispatch-table-name (- type ,index-min)) ,@parameters))))))
       (compile-definition stub name -c-))))
