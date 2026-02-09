@@ -526,6 +526,18 @@
 ;;;
 ;;; if you want to grok this, then you better head over to the x86 backend...
 
+;; KLUDGE due to load order headaches we set the default like this
+;; instead of at the DEFINE-SELECTOR.
+;; (set (<selector>-default compile)
+;;      (lambda (self -c-)
+;;        ;; FIXME in case of <undefined> we need this to reach the (LOAD
+;;        ;; LITERAL long) instruction emitter, but this way it leads to
+;;        ;; (LOAD LITERAL nil). another problem is that for full objects
+;;        ;; we need to skip the object header, but not for immediates.
+;;        ;; because of this we can only partially mirror the x86 infra
+;;        ;; here.
+;;        (gen LOAD (compile-object self -c-) self)))
+
 ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
 
 (define-function emit-object/C-string (self -c-)
@@ -536,10 +548,52 @@
 ;; these will be functions instantiated later. reason: to calculate
 ;; some stuff and capture the result into closures. this is a poor
 ;; man's staged computation to speed up object emission.
+;;
+;; FIXME get rid of these, but it's too early in the current load
+;; order to access any slave values from here.
 (define emit-object/header)
-(define emit-object/<string>)
-(define emit-object/<long>)
 (define emit-object/<target-function>)
+
+(cond
+  ((slave-value (is <immediate-type> <long>))
+
+   (define-method compile-object <long> (-c-)
+     (LITERAL (eval-in-slave `(box <long> ,self)))))
+
+  ((slave-value (and (is <boxed-type> <long>)
+                     (<boxed-type>-one-word? <long>)))
+   (let ((type-id (slave-value (<type>-slave-id <long>))))
+
+     (define-method compile-object <long> (-c-)
+       (let ((object-label	(GLOBAL (unique-name "olong"))))
+         ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+         (print object-label" = private unnamed_addr constant %\"<long-h>\" { ")
+         (emit-object/header type-id)
+         (print ", %\"<long>\" { %word "self" }}\n")
+         object-label))))
+
+  (else (error "compile-object: unexpected slave representation for <long>")))
+
+(define-method compile-object <undefined> (-c-)
+  (LITERAL (target-value false)))
+
+(let ((type-id (slave-value (<type>-slave-id <string>)))
+      (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
+                                "%word" "%oop")))
+
+  (define-method compile-object <string> (-c-)
+    ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+    (let ((elements	(emit-object/C-string self -c-))
+          (object-label	(GLOBAL (unique-name "ostr")))
+          (size		(compile-object (string-length self) -c-)))
+      ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+      (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
+      (emit-object/header type-id)
+      ;; FIXME this assumes that <long> is a tagged immediate
+      (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
+      (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
+             elements" to ptr) }}\n")
+      object-label)))
 
 (define-function initialize-object-emitters ()
   (set emit-object/header
@@ -559,48 +613,12 @@
            (canary-emitter)
            (print "}"))))
 
-  (set emit-object/<long>
-       (cond
-         ((slave-value (is <immediate-type> <long>))
-          (lambda (self -c-)
-            (eval-in-slave `(box <long> ,self))))
-         ((slave-value (and (is <boxed-type> <long>)
-                            (<boxed-type>-one-word? <long>)))
-          (let ((type-id (slave-value (<type>-slave-id <long>))))
-            (lambda (self -c-)
-              (let ((object-label	(GLOBAL (unique-name "olong"))))
-                ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-                (print object-label" = private unnamed_addr constant %\"<long-h>\" { ")
-                (emit-object/header type-id)
-                (print ", %\"<long>\" { %word "self" }}\n")
-                object-label))))
-         (else
-          (error "emit-object/<long>: unexpected slave representation for <long>"))))
-
-  (set emit-object/<string>
-       (let ((type-id (slave-value (<type>-slave-id <string>)))
-             (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
-                                       "%word" "%oop")))
-         (lambda (self -c-)
-           ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-           (let ((elements	(emit-object/C-string self -c-))
-                 (object-label	(GLOBAL (unique-name "ostr")))
-                 (size		(emit-object/<long> (string-length self) -c-)))
-             ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-             (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
-             (emit-object/header type-id)
-             ;; FIXME this assumes that <long> is a tagged immediate
-             (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
-             (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
-                    elements" to ptr) }}\n")
-             object-label))))
-
   (set emit-object/<target-function>
        (let ((type-id		(slave-value (<type>-slave-id <target-function>)))
              (name-factory	(when (slave-value feature/track-expr-names)
                                   (lambda (name -c-)
                                     (if name
-                                        (emit-object/<string> (symbol->string name) -c-)
+                                        (compile-object (symbol->string name) -c-)
                                       "null"))))
              (profiler?		(slave-value feature/profiler)))
          (lambda (expr name entry-label -c-)
@@ -608,7 +626,7 @@
                                     (closure-object-label name)
                                   (GLOBAL (unique-name "oclosure"))))
                  (name-object	(when name-factory (name-factory name -c-)))
-                 (counter	(when profiler? (emit-object/<long> 0 -c-))))
+                 (counter	(when profiler? (compile-object 0 -c-))))
              ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
              (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
              (emit-object/header type-id)
@@ -1083,7 +1101,7 @@
 
 (define-method compile <string> (-c-)
   (set (<compiler>-current-value -c-)
-       (emit-object/<string> self -c-))
+       (compile-object self -c-))
   (gen GEP (LOCAL '<string-h>) 0 1) ; 1 means skip the header
   (gen BITCAST "%word*" "%oop"))
 
