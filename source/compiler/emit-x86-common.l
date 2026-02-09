@@ -126,6 +126,7 @@
 
 ;; The natural pointer/word size of the target.
 (define-instruction CELL	()
+  ((LITERAL)			(println "	"(<x86-compiler>-asm-cell-type -c-)"	"(<LITERAL>-value $1)))
   ((_)				(println "	"(<x86-compiler>-asm-cell-type -c-)"	"$1)))
 
 (define-instruction LEAVE	()
@@ -629,5 +630,3 @@
   (assert (= (list-length expr) 2))
   (let ((label (emit-object/C-string (second expr) -c-)))
     (gen LOAD label)))
-
-(require "source/compiler/emit-x86-objects.l")

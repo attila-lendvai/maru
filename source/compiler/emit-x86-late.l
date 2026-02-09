@@ -1,5 +1,11 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-method compile <long> (-c-)
+  ;; FIXME: We can't call COMPILE-OBJECT here, because that would box
+  ;; the value. But then why the lack of symmetry with <string> and
+  ;; other literals in the code (they are emitted as full heap objects)?
+  (gen LOAD (LITERAL self)))
+
 ;;;
 ;;; COMPILE-DEFINITION
 ;;;

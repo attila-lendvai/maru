@@ -151,7 +151,7 @@
     (eval definer-form)     ; this way it will define into *slave-env* due to using the custom define-form above
     ()))
 
-(define-constant false 0)
+(define-constant false (<immediate-type>-tag-value <undefined>))
 (define-constant true  1)
 
 (safety 1

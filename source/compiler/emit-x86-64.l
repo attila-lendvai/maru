@@ -30,6 +30,14 @@
 
 (require "source/compiler/emit-x86-common.l")
 
+;; KLUDGE replace the env binding for the base class. the reason is
+;; that this way we can use (LITERAL 42) in some parts of the code
+;; that is shared between 32 and 64 bits... but there must be a nice
+;; way to achieve this.
+(define LITERAL LI64)
+
+(require "source/compiler/emit-x86-objects.l")
+
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
@@ -412,9 +420,6 @@
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI64 (target-value false))))
-(define-method compile <long>       (-c-)  (gen LOAD (LI64 self)))
-
 (define-method compile <variable> (-c-)
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
@@ -442,10 +447,6 @@
           (gen LOAD (GLOBAL64 (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
-
-(define-method compile <string> (-c-)
-  (let ((object-label (emit-object/<string> self -c-)))
-    (gen LOAD object-label)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))

@@ -16,7 +16,7 @@
 ;;;   - no closures
 ;;;   - no variable number of args for functions
 ;;;   - some literal objects are emitted as valid objects that can participate
-;;;     in the heap; see emit-object/<string> and co. for an up-to-date list.
+;;;     in the heap; see the EMIT-OBJECT methods for an up-to-date list.
 ;;;   - probaby more
 ;;;   - see +special-operators+ and *special-forms* for the list of specially
 ;;;     handled constructs
@@ -29,6 +29,14 @@
 ;;;   - *foo* is a global
 
 (require "source/compiler/emit-x86-common.l")
+
+;; KLUDGE replace the env binding for the base class. the reason is
+;; that this way we can use (LITERAL 42) in some parts of the code
+;; that is shared between 32 and 64 bits... but there must be a nice
+;; way to achieve this.
+(define LITERAL LI32)
+
+(require "source/compiler/emit-x86-objects.l")
 
 ;;;
 ;;; IA-32 -- INSTRUCTIONS
@@ -345,9 +353,6 @@
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
-(define-method compile <undefined>  (-c-)  (gen LOAD (LI32 (target-value false))))
-(define-method compile <long>       (-c-)  (gen LOAD (LI32 self)))
-
 (define-method compile <variable> (-c-)
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
@@ -373,10 +378,6 @@
           (gen LOAD (GLOBAL32 (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
-
-(define-method compile <string> (-c-)
-  (let ((object-label (emit-object/<string> self -c-)))
-    (gen LOAD object-label)))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))

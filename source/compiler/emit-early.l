@@ -17,6 +17,11 @@
 (define-constant feature/redefinable-functions-in-target ()) ; costs about 20-30% time increase in the bootstrap process
 (define-constant feature/strict-semantics-for-compiled-set true) ; compiled set-oop-at & co. also returns the value that was just set
 
+(define-selector compile-object)
+;; TODO its default should be specified like this:
+;; (define-selector compile (-c-)
+;;   (compile-object self -c-))
+;; but due to load order headaches we set the default in emit-x86-objects.l
 (define-selector compile)
 (define-selector compile-definition)
 (define-selector compile-call-to)
@@ -51,8 +56,7 @@
        (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
     n-params))
 
-;; this is kinda KLUDGEy
-(define emit-object/<long>) ; forward
+;; this, and the whole emit-object business is kinda KLUDGEy
 (define compile-expr) ; forward
 (define-function compile-array (self -c-)
   (let ((compiled (array (array-length self))))
@@ -60,8 +64,9 @@
       (let ((obj (array-at self i)))
         (set (array-at compiled i)
              (typecase obj
-               (<long>		(emit-object/<long> obj -c-))
-               (<expr>		(compile-expr obj () -c-))
+               (<long>		(compile-object obj -c-))
+               (<expr>		(compile-expr   obj () -c-))
+               (<undefined>	(compile-object obj -c-))
                (else (error "compile-array: don't know how to compile: "obj))))))
     compiled))
 
