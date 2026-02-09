@@ -158,7 +158,7 @@ static oop _newOops(int type, size_t size)	{ oop obj= GC_malloc(size);		setType(
 
 static char *argv0;
 
-static oop symbols= nil, globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil, backtrace= nil, arguments= nil, input= nil, output= nil;
+static oop symbols= nil, maru= nil, globals= nil, expanders= nil, encoders= nil, evaluators= nil, applicators= nil, backtrace= nil, arguments= nil, input= nil, output= nil;
 static oop s_set= nil, s_define= nil, s_let= nil, s_lambda= nil, s_quote= nil, s_quasiquote= nil, s_unquote= nil, s_unquote_splicing= nil, s_t= nil, s_dot= nil, s_bracket= nil, s_brace= nil, s_main= nil;
 static oop f_set= nil, f_quote= nil, f_lambda= nil, f_let= nil, f_define;
 
@@ -805,7 +805,7 @@ static void doprint(FILE *stream, oop obj, int storing)
     fprintf(stream, "()");
     return;
   }
-  if (obj == get(globals, Variable,value)) {
+  if (obj == globals) {
     fprintf(stream, "<globals>");
     return;
   }
@@ -955,7 +955,7 @@ static void doprint(FILE *stream, oop obj, int storing)
       break;
     }
     default: {
-      oop name= lookup(get(globals, Variable,value), intern(L"%type-names"));
+      oop name= lookup(globals, intern(L"%type-names"));
       if (is(Array, name)) {
 	name= arrayAt(name, getType(obj));
 	if (is(Symbol, name)) {
@@ -1188,7 +1188,7 @@ static oop encode(oop expr, oop env)
       tail= newPairFrom(env, tail, expr);			GC_UNPROTECT(env);
     }
     else if (f_define == head) {
-      oop var= environmentDefine(get(globals, Variable,value), car(tail), nil);
+      oop var= environmentDefine(globals, car(tail), nil);
       tail= enlist(cdr(tail), env);
       tail= newPairFrom(var, tail, expr);
     }
@@ -1693,8 +1693,18 @@ static subr(definedP)
 {
   oop symbol= car(args);
   oop theenv= cadr(args);
-  if (nil == theenv) theenv= get(globals, Variable,value);
+  if (nil == theenv) theenv= globals;
   return findVariable(theenv, symbol);
+}
+
+static subr(current_globals)
+{
+  return globals;
+}
+
+static subr(set_current_globals)
+{
+  return globals= car(args);
 }
 
 #define _do_unary()								\
@@ -2038,7 +2048,7 @@ static subr(eval)
 {
   oop x= car(args);  args= cdr(args);				GC_PROTECT(x);
   oop e= car(args);
-  if (nil == e) e= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(e);
+  if (nil == e) e= newEnv(globals, 1, 0);			GC_PROTECT(e);
   x= expand(x, e);
   x= encode(x, e);
   oop c= newBaseContext(nil, nil, e);				GC_PROTECT(c);
@@ -2879,7 +2889,7 @@ static subr(save)
 
 static oop expandEncodeEval(oop form) {
     GC_PROTECT(form);
-    oop env= newEnv(get(globals, Variable,value), 1, 0);	GC_PROTECT(env);
+    oop env= newEnv(globals, 1, 0);				GC_PROTECT(env);
     form= expand(form, env);
     form= encode(form, env);
     oop ctx= newBaseContext(nil, nil, env);			GC_PROTECT(ctx);
@@ -3063,6 +3073,8 @@ static subr_ent_t subr_tab[] = {
     { ".lambda",		subr_lambda },
     { ".define",		subr_define },
     { " defined?",		subr_definedP },
+    { " current-globals",	subr_current_globals },
+    { " set-current-globals",	subr_set_current_globals },
     { " exit",			subr_exit },
     { " abort",			subr_abort },
 //  { " current-environment",	subr_current_environment },
@@ -3236,6 +3248,7 @@ int main(int argc, char **argv)
   GC_INIT();
 
   GC_add_root(&symbols);
+  GC_add_root(&maru);
   GC_add_root(&globals);
   GC_add_root(&expanders);
   GC_add_root(&encoders);
@@ -3266,10 +3279,11 @@ int main(int argc, char **argv)
 
   traceStack=	newArray(32);					GC_add_root(&traceStack);
 
-  globals= newEnv(nil, 0, 0);
-  populateEnvWithMaruPrimitives(globals);
-  // TRAP: this turns globals from an Env into a Variable!
-  globals = environmentDefine(globals, intern(L"*globals*"), globals);
+  maru= newEnv(nil, 0, 0);
+  populateEnvWithMaruPrimitives(maru);
+  environmentDefine(maru, intern(L"*maru*"), maru);
+
+  globals= newEnv(maru, 0, 0); // this is the maru-user env in eval.l
 
   currentPath= nil;			GC_add_root(&currentPath);
   currentLine= nil;			GC_add_root(&currentLine);
@@ -3277,11 +3291,11 @@ int main(int argc, char **argv)
 
   tmp= nil;		GC_UNPROTECT(tmp);
 
-  f_set=    lookup(get(globals, Variable,value), s_set   );		GC_add_root(&f_set);
-  f_quote=  lookup(get(globals, Variable,value), s_quote );		GC_add_root(&f_quote);
-  f_lambda= lookup(get(globals, Variable,value), s_lambda);		GC_add_root(&f_lambda);
-  f_let=    lookup(get(globals, Variable,value), s_let   );		GC_add_root(&f_let);
-  f_define= lookup(get(globals, Variable,value), s_define);		GC_add_root(&f_define);
+  f_set=    lookup(globals, s_set   );		GC_add_root(&f_set);
+  f_quote=  lookup(globals, s_quote );		GC_add_root(&f_quote);
+  f_lambda= lookup(globals, s_lambda);		GC_add_root(&f_lambda);
+  f_let=    lookup(globals, s_let   );		GC_add_root(&f_let);
+  f_define= lookup(globals, s_define);		GC_add_root(&f_define);
 
 #if !defined(LIB_GC)
 
@@ -3309,7 +3323,7 @@ int main(int argc, char **argv)
 	  tmp= newPair(nil, tmp);
 	  setHead(tmp, newString(mbs2wcs(argv[argc])));
       }
-      arguments= environmentDefine(get(globals, Variable,value), intern(L"*command-line-arguments*"), tmp);
+      arguments= environmentDefine(globals, intern(L"*command-line-arguments*"), tmp);
 
       tmp= nil;		GC_UNPROTECT(tmp);
   }
@@ -3327,7 +3341,7 @@ int main(int argc, char **argv)
 #endif
 
   {
-      oop func= findVariable(get(globals, Variable,value), s_main);
+      oop func= findVariable(globals, s_main);
       if (is(Variable, func)) {
 	  apply(get(func, Variable,value), nil, nil);
 	  exit(0);
@@ -3341,12 +3355,12 @@ int main(int argc, char **argv)
     wchar_t *arg= get(args, String,bits);
     if 	    (!wcscmp (arg, L"-v"))	{
       ++verbosity;
-      environmentDefine(get(globals, Variable,value), intern(L"*verbosity*"), newLong(verbosity));
+      environmentDefine(globals, intern(L"*verbosity*"), newLong(verbosity));
     }
     else if (!wcscmp (arg, L"-g"))	{ ++opt_g;  opt_p= 0; }
     else if (!wcscmp (arg, L"-O"))	{
       ++optimize;
-      environmentDefine(get(globals, Variable,value), intern(L"*optimize*"), newLong(optimize));
+      environmentDefine(globals, intern(L"*optimize*"), newLong(optimize));
     }
     else if (!wcscmp (arg, L"-")) {
       replFile(stdin, L"<stdin>");
@@ -3368,7 +3382,7 @@ int main(int argc, char **argv)
         value = newLong(valueInt);
       }
 
-      environmentDefine(get(globals, Variable,value), name, value);	GC_UNPROTECT(name);
+      environmentDefine(globals, name, value);	GC_UNPROTECT(name);
     }
 #  if !defined(WIN32) && (!LIB_GC)
     else if (!wcsncmp(arg, L"-p", 2)) {
