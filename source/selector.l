@@ -70,9 +70,12 @@
 (define-selector add-method)
 
 (selector/add-method add-method <selector>
-  (lambda (self type args body)
-    (selector/add-method self type (eval `(lambda ,args (with-instance-accessors self ,type ,@body))))))
+  (lambda (self type body)
+    (selector/add-method self type body)))
 
 (define-form define-method (selector type args . body)
-  (or (defined? selector) (eval `(define-selector ,selector)))
-  `(add-method ,selector ,type ',(cons 'self args) ',body))
+  (or (defined? selector) (eval `(define-selector ,selector) *env*))
+  `(add-method ,selector ,type
+               (lambda (self ,@args)
+                 (with-instance-accessors self ,type
+                   ,@body))))
