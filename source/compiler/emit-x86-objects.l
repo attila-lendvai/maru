@@ -76,8 +76,8 @@
                  (object-label	(UNIQUE-LABEL "ostr")))
              (emit-object/header <string> type-id -c-)
              (emit DEFLABEL object-label)
-             (emit PTR size)
-             (emit PTR elements)
+             (emit CELL size)
+             (emit CELL elements)
              object-label))))
 
   (set emit-object/<target-function>
@@ -104,9 +104,9 @@
                                   (emit-object/<long> 0 -c-))))
              (emit-object/header type type-id -c-)
              (emit DEFLABEL object-label)
-             (emit PTR entry-label)
+             (emit CELL entry-label)
              (when name
-               (emit PTR name))
+               (emit CELL name))
              (when counter
-               (emit PTR counter))
+               (emit CELL counter))
              object-label)))))

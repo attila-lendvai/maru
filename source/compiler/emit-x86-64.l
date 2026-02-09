@@ -491,9 +491,11 @@
     (emit DATA)
     (emit DEFLABEL array-label)
     (array-do el compiled
-      (emit PTR el))
+      (emit CELL el))
+    ;; TODO comment on why an extra indirection is present here
+    ;; (probably to keep the harmony with other definitions).
     (emit DEFLABEL (LABEL name))
-    (emit PTR array-label)))
+    (emit CELL array-label)))
 
 (define-method compile-definition <expr> (name -c-)
   (assert name)
@@ -509,7 +511,7 @@
       (let ((label (LABEL name)))
         (emit DATA)
         (emit DEFLABEL label)
-        (emit PTR object-label)))))
+        (emit CELL object-label)))))
 
 (define-method emit-prelude <x86-64-compiler> ()
   (verbosity 1 (warn "\nCompiling to x86-64\n\n"))

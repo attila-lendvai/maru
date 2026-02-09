@@ -124,10 +124,8 @@
 (define-instruction DEFLABEL	()
   ((LABEL)			(println $1":")))
 
+;; The natural pointer/word size of the target.
 (define-instruction CELL	()
-  ((_)				(println "	"(<x86-compiler>-asm-cell-type -c-)"	"$1)))
-
-(define-instruction PTR		()
   ((_)				(println "	"(<x86-compiler>-asm-cell-type -c-)"	"$1)))
 
 (define-instruction LEAVE	()
