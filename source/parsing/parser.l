@@ -697,16 +697,16 @@
 
 ;;;----------------------------------------------------------------
 
-(define-function parse-stream (grammar rule stream)
-  (let* ((s (parser-stream stream))
+(define-function parse-stream (grammar rule input-stream)
+  (let* ((s (parser-stream input-stream))
 	 (p (parser grammar s)))
     (or (rule p)
 	(let ()
-	  (print "\nfailed to parse with gramamr "(name-of-type grammar)"."(<selector>-name rule)" near: ")
-	  (until (parser-stream-at-end stream)
-	    (print (character->string (parser-stream-next stream))))
+	  (print "\nfailed to parse with grammar "(name-of-type grammar)"."(<selector>-name rule)" near: ")
+	  (until (parser-stream-at-end s)
+	    (print (character->string (parser-stream-next s))))
 	  (println "<EOF>")
-	  (error "abort")))
+	  (error "parsing failed, error was printed to stdout")))
     (<parser>-result p)))
 
 (define-function parse-file (grammar rule path)
