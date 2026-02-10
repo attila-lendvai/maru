@@ -453,6 +453,14 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	mv $@.new $@
 	rm -f $<.exe $<.c
 
+# a debug version of the above that uses our stage to run the cgrov
+# %.cgrov.l: %.cgrov $(GEN_EVAL) source/c-groveller/cgrov.g.l source/c-groveller/compile-cgrov.l
+# 	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
+# 	$(CC) -o $<.exe $<.c
+# 	./$<.exe > $@.new
+# 	mv $@.new $@
+# 	rm -f $<.exe $<.c
+
 ###
 ### x86 assembler
 ###
