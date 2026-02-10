@@ -39,7 +39,8 @@
   (array-do elt arr
     (let* ((emitter (car  elt))
 	   (item    (cadr elt)))
-      (if (= (car item) 'qualified)
+      (if (and (pair? item)
+               (= (car item) 'qualified))
 	  (let ((qualifier (cadr  item))
 		(value     (caddr item)))
 	    (if (= qualifier 'defined?) (println "#ifdef "value) (println "#if "qualifier))
