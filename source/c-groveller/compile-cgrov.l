@@ -37,16 +37,18 @@
 
 (define-function process (arr)
   (array-do elt arr
-    (let* ((emitter (car  elt))
-	   (item    (cadr elt)))
+    (let ((emitter (first  elt))
+	  (item    (second elt)))
       (if (and (pair? item)
                (= (car item) 'qualified))
 	  (let ((qualifier (cadr  item))
 		(value     (caddr item)))
-	    (if (= qualifier 'defined?) (println "#ifdef "value) (println "#if "qualifier))
+	    (if (= qualifier 'defined?)
+                (println "#ifdef "value)
+              (println "#if "qualifier))
 	    (emitter value)
 	    (println "#endif"))
-	(apply emitter (cdr elt))))))
+	(apply emitter (rest elt))))))
 
 (define +generated-file-warning+ "This is compiled output from cgrov definitions; editing it is unwise!")
 (println "// " +generated-file-warning+)
