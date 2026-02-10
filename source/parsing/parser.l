@@ -186,14 +186,15 @@
     (position	(token ($next source) 0 ($source-position (<parser-stream>-source self))))
     (index	0)))
 
-(define-function parser-stream-at-end (self)
-  (and (= +end+ (<token>-value (<parser-stream>-position self)))))
-
+;; TODO should these be using <selector>?
 (define-function parser-stream-peek-token (self)
   (<parser-stream>-position self))
 
 (define-function parser-stream-peek (self)
-  (<token>-value (<parser-stream>-position self)))
+  (<token>-value (parser-stream-peek-token self)))
+
+(define-function parser-stream-at-end (self)
+  (= +end+ (parser-stream-peek self)))
 
 (define-function parser-stream-next-token (self)
   (let ((here (<parser-stream>-position self)))
