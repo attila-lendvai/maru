@@ -439,6 +439,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
 	$(CC) -o $<.exe $<.c
 	./$<.exe > $@.new
+	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
 	mv $@.new $@
 	rm -f $<.exe $<.c
 
