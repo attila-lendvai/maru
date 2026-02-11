@@ -294,13 +294,15 @@ $(EVAL0_DIR):
 	-find $@/$(BUILD) -type f -exec touch {} \;
 
 # "forward" this target to the makefile in build/eval0
-# NOTE: we fix TARGET_CPU to i686 (and platform to linux) because 32 bit LLVM is the fastest version of us.
+# NOTE: some of the reasons we fix some of these values for our bootstrap host:
+#  - libc is the most compatible platform
+#  - the 32 bit llvm target yields the fastest binary
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
 		TARGET_CPU=$(TARGET_CPU)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
-		PLATFORM=$(PLATFORM)			\
+		PLATFORM=libc				\
 		$(EVAL0_BINARY)
 
 # eval0 is the first version of us that gets built by the compiler of
