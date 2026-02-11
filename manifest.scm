@@ -56,5 +56,5 @@
       "man-pages"
       "less"
       "gdb"
-      "intel-xed" ; for authoritative disassembling
+      ;; "intel-xed" ; for authoritative disassembling
       )))))
