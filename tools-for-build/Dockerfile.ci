@@ -1,6 +1,7 @@
 # podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 -f Dockerfile.ci .
 # podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 -f Dockerfile.ci .
 
+# need to log in when run for the first time:
 # podman login ghcr.io -u attila-lendvai -p <personal-access-token>
 
 # podman push ghcr.io/attila-lendvai/maru-ci:amd64
@@ -17,10 +18,10 @@ RUN echo TARGETARCH="$TARGETARCH"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
-        build-essential \
         make \
         llvm \
         clang \
+        libc6-dev \
         libffi-dev \
         git \
         time \
@@ -29,8 +30,7 @@ RUN apt-get update && \
     && if [ "$TARGETARCH" = "amd64" ]; then \
       dpkg --add-architecture i386 && \
         apt-get update && \
-        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386; \
-        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386; \
+        apt-get install -y --no-install-recommends libc6-dev-i386; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 

@@ -5,12 +5,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        clang-21 \
         bash \
-        build-essential \
-        libffi-dev \
         make \
         llvm \
+        clang-21 \
+        libc6-dev \
+        libffi-dev \
         gdb \
         git \
         time \
@@ -20,7 +20,9 @@ RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list
         nano \
     # Conditional packages for x86
     && if [ "$TARGETARCH" = "amd64" ]; then \
-        apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 linux-headers-amd64; \
+      dpkg --add-architecture i386 && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends libc6-dev-i386; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
