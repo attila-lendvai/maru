@@ -56,19 +56,21 @@
                (= ?- (string-at str i)))
       (set sign (- sign))
       (incr i))
-    (while (< i len)
-      (let* ((c (string-at str i))
-             (d (cond
-                  ((and (<= ?0 c) (<= c ?9))	      (- c ?0) )
-                  ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
-                  ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
-                  (else
-		   (return +end+)))))
-        (unless (< d radix)
-          (return +end+))
-        (set num (+ (* radix num) d))
-        (incr i)))
-    (* sign num)))
+    (if (= 0 (- len i))
+        +end+               ; nothing left after a possible minus sign
+      (while (< i len)
+        (let* ((c (string-at str i))
+               (d (cond
+                    ((and (<= ?0 c) (<= c ?9))	      (- c ?0) )
+                    ((and (<= ?A c) (<= c ?Z))	(+ 10 (- c ?A)))
+                    ((and (<= ?a c) (<= c ?z))	(+ 10 (- c ?a)))
+                    (else
+		     (return +end+)))))
+          (unless (< d radix)
+            (return +end+))
+          (set num (+ (* radix num) d))
+          (incr i)))
+      (* sign num))))
 
 (define-function string->long (str)
   (let ((res (string->long* str 10)))
