@@ -4,6 +4,12 @@
 
 (require "source/platforms/platform-common.l")
 
+;; A simple toplevel REQUIRE would mean it's a call to require that
+;; should be compiled to the target. What we need is the cgrov
+;; definitions to be available in the slave to be used while loading
+;; the code.
+(eval-in-slave '(require "source/c-groveller/cgrov.l"))
+
 ;;;
 ;;; API visible in the target
 ;;;

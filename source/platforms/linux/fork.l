@@ -19,7 +19,7 @@
 ;;               int *child_tid);
 
 (define-vm-function fork ((flags <long> linux/SIGCHLD))
-  (let ((pid (linux-syscall linux/clone flags 0 0 0 0 0)))
+  (let ((pid (linux-syscall linux/SYS_clone flags 0 0 0 0 0)))
     (if (<= 0 pid)
         (box <long> pid)
       (fatal "clone syscall returned with error "pid))))
@@ -27,7 +27,7 @@
 (define-vm-function execve ((path <string>))
   (let* ((argv 0)
          (envp 0)
-         (result (linux-syscall linux/execve
+         (result (linux-syscall linux/SYS_execve
                                 (<string>-elements path)
                                 (address-of argv)
                                 (address-of envp))))
@@ -36,7 +36,7 @@
 
 (define-vm-function waitpid ((pid <long>))
   (let* ((status 0)
-         (result (linux-syscall linux/wait4 pid (address-of status) 0 0)))
+         (result (linux-syscall linux/SYS_wait4 pid (address-of status) 0 0)))
     (if (<= result 0)
         (fatal "wait4 syscall returned with "result)
       (box <long> status))))

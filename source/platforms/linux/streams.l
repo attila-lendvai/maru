@@ -11,7 +11,7 @@
 
 ;; TODO reaname these to file/open?
 (define-vm-function file-open ((path <string>) (mode <string>))
-  (let ((fd (linux-syscall linux/openat linux/AT_FDCWD (string->C-string path)
+  (let ((fd (linux-syscall linux/SYS_openat linux/AT_FDCWD (string->C-string path)
                            (cond
                              ((or (not mode)
                                   (string= mode "r"))
@@ -32,12 +32,12 @@
 
 (define-vm-function file-close ((fd <target-pointer>))
   ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
-  (when (= 0 (linux-syscall linux/close fd))
+  (when (= 0 (linux-syscall linux/SYS_close fd))
     symbol/true))
 
 (define-vm-function file-read-character ((fd <target-pointer>))
   (let ((char 0))
-    (if (= 1 (linux-syscall linux/read fd (address-of char) 1))
+    (if (= 1 (linux-syscall linux/SYS_read fd (address-of char) 1))
         ;; TODO endianness, EAGAIN and stuff
         (box <long> char)
       ;;(error "file-read-character: syscall returned with error")
@@ -45,12 +45,12 @@
 
 (define-vm-function file-write-character ((char <long>) (fd <target-pointer>))
   ;; TODO endianness? think this through...
-  (when (= 1 (linux-syscall linux/write fd (address-of char) 1))
+  (when (= 1 (linux-syscall linux/SYS_write fd (address-of char) 1))
     symbol/true))
 
 ;; (define-vm-function file-flush ((fd <target-pointer>))
-;;   (unless (= 0 (linux-syscall linux/fsync fd))
-;;     (error "file-flush: linux/fsync returned an error")))
+;;   (unless (= 0 (linux-syscall linux/SYS_fsync fd))
+;;     (error "file-flush: linux/SYS_fsync returned an error")))
 
 ;;;
 ;;; <fd-stream>
@@ -71,7 +71,7 @@
   (or (<= 0 (<fd-stream>-peeked-value stream))
       (let* ((fd	(<fd-stream>-fd stream))
              (char	0)
-             (rc	(linux-syscall linux/read fd (address-of char) 1)))
+             (rc	(linux-syscall linux/SYS_read fd (address-of char) 1)))
         (set (<fd-stream>-peeked-value stream)
              (if (= 1 rc)
                  char ; FIXME needs to be boxed, no?
@@ -97,7 +97,7 @@
 
 (define-method $put <fd-stream> (u/char)
   ;; FIXME endianness
-  (unless (= 1 (linux-syscall linux/write self.fd (address-of u/char) 1))
+  (unless (= 1 (linux-syscall linux/SYS_write self.fd (address-of u/char) 1))
     ;; TODO deal with EAGAIN and stuff...
     (error "<fd-stream> $put: write failed"))
   u/char)
@@ -108,7 +108,7 @@
     (<string>
      (let ((buf		(string->C-string elements))
            (size	(string-length elements)))
-       (unless (= size (linux-syscall linux/write self.fd buf size))
+       (unless (= size (linux-syscall linux/SYS_write self.fd buf size))
          ;; TODO deal with EAGAIN and stuff...
          (error "<fd-stream> $put-all: write failed"))))
     (else

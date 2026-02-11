@@ -180,7 +180,7 @@ EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-lat
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
 
-EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l streams.l) \
+EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l streams.l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
 
@@ -444,9 +444,9 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 
 # compile *.cgrov files into *.cgrov.l
 # Must use the host eval if we want to use its output while building this stage.
-%.cgrov.l: %.cgrov $(HOST_DIR)/eval
+%.cgrov.$(TARGET).l: %.cgrov $(HOST_DIR)/eval
 	cd $(HOST_DIR) && make source/c-groveller/cgrov.g.l && ./eval boot.l source/c-groveller/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
-	$(CC) -o $<.exe $<.c
+	$(CC) --target=$(TARGET) -o $<.exe $<.c
 	./$<.exe > $@.new
 	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
 	mv $@.new $@

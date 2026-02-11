@@ -1,10 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/platforms/platform-c-based.l")
-
-(define-constant fd/stdin  0)
-(define-constant fd/stdout 1)
-(define-constant fd/stderr 2)
+(require-cgrov "source/platforms/linux/linux")
 
 ;; define some llvm intrinsics as FFI calls
 ;; https://llvm.org/docs/LangRef.html#llvm-memcpy-intrinsic
@@ -21,8 +18,8 @@
 ;;; Platform API implementation when running on top of the Linux kernel.
 ;;;
 (define-function platform/flush-streams ()
-  (linux-syscall linux/fsync fd/stdout)
-  (linux-syscall linux/fsync fd/stderr))
+  (linux-syscall linux/SYS_fsync linux/STDOUT_FILENO)
+  (linux-syscall linux/SYS_fsync linux/STDERR_FILENO))
 
 ;; NOTE copy means it may not overlap. move means they may overlap.
 
@@ -71,13 +68,13 @@
 
 (define-form platform/diag-print (str)
   (if (is <string> str)
-      `(linux-syscall linux/write fd/stderr ,@(string+length str))
+      `(linux-syscall linux/SYS_write linux/STDERR_FILENO ,@(string+length str))
     `(let ((cstr (string->C-string ,str)))
-       (linux-syscall linux/write fd/stderr cstr (C-string-length cstr)))))
+       (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr)))))
 
 (define-function platform/diag-print-char (char)
   ;; TODO endianness?
-  (linux-syscall linux/write fd/stderr (address-of char) 1)
+  (linux-syscall linux/SYS_write linux/STDERR_FILENO (address-of char) 1)
   char)
 
 ;; TODO delme
@@ -86,7 +83,7 @@
 
 ;; needs to be a form; the compiler doesn't yet support . rest args
 (define-form platform/halt args
-  `(linux-syscall linux/exit ,@(or args '(-42))))
+  `(linux-syscall linux/SYS_exit ,@(or args '(-42))))
 
 (define *initial-break* 0)
 (define *current-break* 0)
@@ -94,17 +91,17 @@
 (define-function platform/acquire-memory (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
   (unless *initial-break*
-    (set *current-break* (set *initial-break* (linux-syscall linux/brk 0)))
+    (set *current-break* (set *initial-break* (linux-syscall linux/SYS_brk 0)))
     ;; TODO too early, ASSERT and ERROR is not functional at this point
     ;;(assert (< 0 *current-break*))
     )
-  (let ((new-break	(linux-syscall linux/brk (+ *current-break* size)))
+  (let ((new-break	(linux-syscall linux/SYS_brk (+ *current-break* size)))
         (result	*current-break*))
     ;;(assert (= size (- new-break *current-break*)))
     (set *current-break* new-break)
     ;; KLUDGE we make all allocated memory executable.
     ;; `make test-elf` generates machine code and wants to call it...
-    (linux-syscall linux/mprotect *initial-break*
+    (linux-syscall linux/SYS_mprotect *initial-break*
                    (- *current-break* *initial-break*)
                    (+ (+ linux/PROT_READ linux/PROT_WRITE)
                       linux/PROT_EXEC))

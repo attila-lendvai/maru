@@ -89,8 +89,8 @@ exit:
 
 (define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
-  (unless (= 0 (linux-syscall linux/chdir (string->C-string path)))
-    (error "set-working-directory: linux/chdir failed for "path)))
+  (unless (= 0 (linux-syscall linux/SYS_chdir (string->C-string path)))
+    (error "set-working-directory: linux/SYS_chdir failed for "path)))
 
 (load "source/platforms/linux/streams.l")
 (load "source/platforms/linux/fork.l")
@@ -133,8 +133,8 @@ exit:
   (let* ((sp (stack-pointer-on-entry))
          (argc (oop-at sp 0))
          (argv (+ sp (words-to-bytes 1))))
-    (linux-syscall linux/exit
-     (main/common argc argv linux/stdin linux/stdout linux/stderr))))
+    (linux-syscall linux/SYS_exit
+     (main/common argc argv linux/STDIN_FILENO linux/STDOUT_FILENO linux/STDERR_FILENO))))
 
 ;; KLUDGE
 (eval-in-host `(run-compiler ,*target-env*))
