@@ -5,7 +5,7 @@
 ;;;
 
 (let (arch word-size)
-  (case target/cpu
+  (case target/arch
     ("x86_64"
      (set arch		'x86-64)
      (set word-size	64))
@@ -19,16 +19,14 @@
      (set word-size	64))
 
     (else
-     (error "Couldn't identify architecture and word size from target/cpu: "target/cpu)))
+     (error "Couldn't identify architecture and word size from target/arch: "target/arch)))
 
   (eval-in-slave
    `(let ()
       (define-constant +architecture+		'',arch)
       (define-constant +operating-system+	'',(string->symbol target/os))
-      ;;(define-constant +cpu+			,target/cpu)
-      ;;(define-constant +vendor+		,target/vendor)
       (define-constant +little-endian?+		true) ; this is needed by the compiler tests
-      ;;(define-constant +target-triplet+	,(concat-strings target/cpu "-" target/vendor "-" target/os))
+      ;;(define-constant +target-triple+	,(concat-strings target/arch "-" target/vendor "-" target/os))
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
