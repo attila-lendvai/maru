@@ -12,8 +12,11 @@
 #  make PLATFORM=linux test-bootstrap-x86 || beep
 #  make -j test-compiler || beep
 #  make -j test-compiler-llvm || beep
-#  make TARGET_CPU=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
-#  make TARGET_CPU=i686 TARGET_VENDOR=linux TARGET_OS=gnu test-bootstrap-llvm eval-llvm || beep
+#  make TARGET_ARCH=x86_64 TARGET_VENDOR=apple TARGET_OS=darwin test-bootstrap-llvm || beep
+#  make PLATFORM=linux TARGET_ARCH=aarch64 TARGET_ABI=gnu TARGET_OS=linux eval-llvm || beep
+#  make TARGET_ARCH=i686 TARGET_ABI=gnu TARGET_OS=linux test-bootstrap-llvm eval-llvm || beep
+#  make TARGET_ARCH=i686 TARGET_ABI=gnu TARGET_OS=linux test-bootstrap-llvm eval-llvm || beep
+#  make PLATFORM=linux TARGET_ARCH=i686 TARGET_ABI=gnu TARGET_OS=linux test-bootstrap-llvm || beep
 #  make PROFILER=1 test-bootstrap-x86 || beep
 # to force a full bootstrap cycle all the way down from the/a bottom stage:
 #  make test-bootstrap-recursively || beep
@@ -36,7 +39,7 @@ PLATFORMS		= libc linux
 PREVIOUS_STAGE_BACKEND	= llvm
 
 HOST_OS		= $(shell uname -s)
-TARGET_CPU	?= $(shell uname -m)
+TARGET_ARCH	?= $(shell uname -m)
 PLATFORM	?= libc
 VERBOSITY	?= -v #-v -v
 
@@ -47,20 +50,19 @@ BLUE		= $(shell tput setaf 4)
 RESET		= $(shell tput sgr0)
 
 ifeq ($(HOST_OS),Linux)
-#  LLVM_VERSION	= -10		# just try whichever version you have. it should work at least with these: 8, 10
-  LLVM_VERSION	=
-  TARGET_VENDOR	?= gnu
+  TARGET_VENDOR	?= unknown
   TARGET_OS	?= linux
+  TARGET_ABI	?= gnu
   # `command time` forces bash to use the external time command
   # setarch --addr-no-randomize improves debuggability of lowlevel
   # issues (but it's problematic in containers/CI).
   TIME		= time --format="\n$(GREEN)user time: %U$(RESET)\n"
   EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
 else ifeq ($(HOST_OS),Darwin)
-  LLVM_VERSION	=
   TARGET_VENDOR	?= apple
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
+  TARGET_ABI	?=
   EVAL_WRAPPER	:= time
 endif
 
@@ -78,9 +80,9 @@ ifeq ($(PLATFORM),linux)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
 endif
 
-TARGET_x86	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
-TARGET_llvm	?= $(TARGET_CPU)-$(TARGET_VENDOR)-$(TARGET_OS)
-#TARGET_llvm	?= $(shell llvm-config$(LLVM_VERSION) --host-target)
+LLVM_VERSION	?=
+TARGET		?= $(TARGET_ARCH)-$(TARGET_VENDOR)-$(TARGET_OS)$(if $(TARGET_ABI),-$(TARGET_ABI))
+#TARGET		?= $(shell llvm-config$(LLVM_VERSION) --host-target)
 
 # used when generating maru sources during the build process
 # in the order of speed
@@ -100,26 +102,18 @@ PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
 
-TARGET_CPU_x86	= $(word 1, $(subst -, ,$(TARGET_x86)))
-TARGET_CPU_llvm	= $(word 1, $(subst -, ,$(TARGET_llvm)))
+TARGET_ARCH	?= $(word 1, $(subst -, ,$(TARGET)))
 
-ifeq ($(TARGET_CPU_x86),x86_64)
-else ifeq ($(TARGET_CPU_x86),i686)
+ifeq ($(TARGET_ARCH),x86_64)
+else ifeq ($(TARGET_ARCH),i686)
   CFLAGS_x86	+= -m32
-# KLUDGE will be dropped when make is replaced
-else ifeq ($(TARGET_CPU_x86),aarch64)
-else ifeq ($(TARGET_CPU_x86),arm64)
-else
-  $(error "Unexpected TARGET_CPU_x86 '$(TARGET_CPU_x86)'.")
-endif
-
-ifeq ($(TARGET_CPU_llvm),x86_64)
-else ifeq ($(TARGET_CPU_llvm),i686)
   CFLAGS_llvm	+= -m32
-else ifeq ($(TARGET_CPU_llvm),aarch64)
-else ifeq ($(TARGET_CPU_llvm),arm64)
+else ifeq ($(TARGET_ARCH),aarch64)
+else ifeq ($(TARGET_ARCH),arm64)
+  # darwin uname -m returns arm64, but life is simpler withtout that anomaly.
+  TARGET_ARCH=aarch64
 else
-  $(error "Unexpected TARGET_CPU_llvm '$(TARGET_CPU_llvm)'.")
+  $(error "Unexpected TARGET_ARCH '$(TARGET_ARCH)'.")
 endif
 
 BACKDATE_FILE	= touch -t 200012312359
@@ -135,8 +129,8 @@ ASM_FILE_EXT_llvm	= ll
 
 BUILD		= build
 
-BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET_x86)
-BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET_llvm)
+BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET)
+BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET)
 BITCODE_DIR	= $(BUILD_llvm)
 HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
 SLAVE_DIR	= $(CURDIR)
@@ -269,9 +263,10 @@ $(EVAL0_DIR):
 # -m32 executables on my nixos to test this properly.
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
-		TARGET_CPU=$(TARGET_CPU)		\
+		TARGET_ARCH=$(TARGET_ARCH)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
+		TARGET_ABI=$(TARGET_ABI)		\
 		PLATFORM=libc				\
 		$(EVAL0_BINARY)
 
@@ -309,7 +304,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		--define target/cpu 		$(TARGET_CPU_x86)		\
+		--define target/cpu 		$(TARGET_ARCH)			\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
 		$(EMIT_FILES_x86)						\
@@ -331,7 +326,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		--define target/cpu 		$(TARGET_CPU_llvm)		\
+		--define target/cpu 		$(TARGET_ARCH)			\
 		--define target/vendor 		$(TARGET_VENDOR)		\
 		--define target/os 		$(TARGET_OS)			\
 		$(EMIT_FILES_llvm)						\
@@ -375,7 +370,7 @@ define compile-x86
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/cpu 			$(TARGET_CPU_x86)		\
+	--define target/cpu 			$(TARGET_ARCH)			\
 	--define target/vendor 			$(TARGET_VENDOR)		\
 	--define target/os 			$(TARGET_OS)			\
 	$(EMIT_FILES_x86)							\
@@ -396,7 +391,7 @@ define compile-llvm
 	--define feature/profiler 		$(PROFILER)			\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	--define target/cpu 			$(TARGET_CPU_llvm)		\
+	--define target/cpu 			$(TARGET_ARCH)			\
 	--define target/vendor 			$(TARGET_VENDOR)		\
 	--define target/os 			$(TARGET_OS)			\
 	$(EMIT_FILES_llvm)							\
@@ -472,17 +467,17 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
 # TODO shall we go through llc and link the .o file(s)? llc seems to
 # generate different code. is it better or worse than clang's output?
-	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -o $@ $(EVAL_OBJ_llvm) $<
+	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET) -o $@ $(EVAL_OBJ_llvm) $<
 # the rest is just informational
 	objdump --disassemble $@ >$@.ll.s
 	@-$(STRIP) $@ -o $@.stripped
-#	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -S -o $@.clang.s $<
-#	$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=obj -o $@.o $<
-#	@-$(LLC) -O3 -mtriple=$(TARGET_llvm) -filetype=asm -o $@.opt.s $<
+#	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET) -S -o $@.clang.s $<
+#	$(LLC) -O3 -mtriple=$(TARGET) -filetype=obj -o $@.o $<
+#	@-$(LLC) -O3 -mtriple=$(TARGET) -filetype=asm -o $@.opt.s $<
 
 $(BUILD_llvm)/%.o: source/evaluator/%.c
 	@mkdir -p $(@D)
-	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET_llvm) -c -o $@ $<
+	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET) -c -o $@ $<
 
 ###
 ### Tests
