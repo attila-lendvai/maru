@@ -7,6 +7,10 @@
 ;;;
 ;;; The libc FFI
 ;;;
+
+;; TODO this should be handled by the cgrov, but how? it needs to
+;; compile in a generated .c file that defines a functional accessor,
+;; or maybe just a global variable with our own name?
 (if-at-expand (= 'darwin +operating-system+)
     ;; %m_libc-FILE is an opaque type that we define in the prelude of
     ;; the llvm backend.
@@ -42,11 +46,11 @@
 (define-constant libc/_SC_PAGESIZE		30)
 
 ;;;
-;;; Platform API implementation when running under libc.
+;;; Platform API implementation when running on libc.
 ;;;
 
 ;; NOTE OPTIMIZATION redefine the generic implementation with the one from libc
-;; this only works with the x86 backend: (set C-string-length libc/strlen)
+;; another solution, but only works with the x86 backend: (set C-string-length libc/strlen)
 (define-form C-string-length (cstr)
   `(libc/strlen ,cstr))
 
@@ -97,6 +101,7 @@
 ;; malloc doesn't return page-aligned memory, so we round down the
 ;; returned address, and round up the end address. this should work,
 ;; but using mmap would probably be the right way.
+;; TODO move this to posix
 (define-form platform/acquire-memory (size)
   `(let* ((page-size	(libc/sysconf libc/_SC_PAGESIZE))
           (buf		(libc/malloc size))

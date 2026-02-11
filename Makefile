@@ -84,7 +84,8 @@ ifeq ($(PLATFORM),linux)
 # NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still emits memset calls
 # https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
 # -Wl,-no-pie is needed to produce an ELF without a dynamic linker
-# reference (clang -m32 inserts to a dangling /gnu/store reference on Guix)
+# reference (clang -m32 even inserts a link to a non-existent /gnu/store
+# reference on Guix)
   CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-no-pie
 endif
 

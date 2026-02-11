@@ -7,7 +7,7 @@
 ;; -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic`.
 
 ;; So even if your handwritten code never mentions strlen, LLVM might:
-;;   - Recognize a simple string length loop in IR.
+;;   - Recognize an strlen impl in the IR and turn it to an strlen call.
 ;;   - Emit a call to strlen (libc function) during lowering to
 ;;     AArch64 assembly/object code.
 (define *llvm-platform-specific-prelude*

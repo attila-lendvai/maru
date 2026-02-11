@@ -257,7 +257,11 @@ new features. Some that are worth mentioning:
 
 ### Notable features
 
-  - It has a profiler.
+  - A statistical profiler scanning the backtrace.
+
+  - A bootstrapped PEG parser.
+
+  - A C groveller that uses a DSL implemented by a PEG grammar.
 
 ### Future plans
 

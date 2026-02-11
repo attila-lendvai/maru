@@ -66,10 +66,6 @@
 ;;; require
 ;;;
 
-;; TODO FIXME REQUIRE loads from the current directory. therefore the
-;; host, during the bootstrap process, loads the slave's
-;; definitions. fix LOAD so that the host's boot.l loads the host's
-;; files.
 (define *load-history* ())
 
 (define primitive/load load)
@@ -84,11 +80,11 @@
 
 (define require
   (lambda (path)
-    (let ((list *load-history*))
-      (while (and list
-                  (not (= path (car list))))
-        (set list (cdr list)))
-      (if (not list)
+    (let ((hist *load-history*))
+      (while (and hist
+                  (not (= path (car hist))))
+        (set hist (cdr hist)))
+      (if (not hist)
           (load path)))))
 
 (require "source/list-min.l")

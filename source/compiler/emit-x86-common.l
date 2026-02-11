@@ -13,6 +13,7 @@
             (else	4)))
       (64 16)))
 
+;; TODO use the grovelled __USER_LABEL_PREFIX__
 (define-constant +external-label-prefix+
     (case (target-value +operating-system+)
       (darwin	"_")
