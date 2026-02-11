@@ -2,6 +2,8 @@
 
 (require "source/platforms/platform-c-based.l")
 
+(require-cgrov "source/platforms/libc/libc")
+
 ;;;
 ;;; The libc FFI
 ;;;
@@ -33,10 +35,7 @@
   (long sysconf (int))
   )
 
-(define-constant libc/EOF			-1)
-(define-constant libc/MAP_FAILED		-1)
-(define-constant libc/MAP_PRIVATE		2)
-(define-constant libc/MAP_ANONYMOUS		0x20)
+;; TODO move this to posix
 (define-constant libc/PROT_READ			1)
 (define-constant libc/PROT_WRITE		2)
 (define-constant libc/PROT_EXEC			4)
