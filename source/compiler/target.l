@@ -26,7 +26,10 @@
       (define-constant +architecture+		'',arch)
       (define-constant +operating-system+	'',(string->symbol target/os))
       (define-constant +little-endian?+		true) ; this is needed by the compiler tests
-      ;;(define-constant +target-triple+	,(concat-strings target/arch "-" target/vendor "-" target/os))
+      (define-constant +target-triple+		,(concat-strings target/arch "-" target/vendor "-" target/os
+                                                                 (if (equal "" target/abi)
+                                                                     ""
+                                                                   (concat-string "-" target/abi))))
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
