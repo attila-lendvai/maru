@@ -199,3 +199,35 @@ jobs:
 
       - run:  timeout 3m make test-parser
         continue-on-error: true      # TODO
+
+  build-linux-amd64-full-bootstrap:
+    name: "linux x86_64 full bootstrap"
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/attila-lendvai/maru-ci:amd64
+      options: --init
+
+    steps:
+      - name: System info
+        run: |
+          echo "===== OS Info ====="
+          uname -a
+          sw_vers || lsb_release -a || cat /etc/os-release || true
+          echo "===== CPU Info ====="
+          uname -m
+          sysctl -n machdep.cpu.brand_string || lscpu || true
+          echo "===== Environment ====="
+          env
+
+      - name: Calm down Git
+        run: git config --global --add safe.directory /__w/maru/maru
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - run:  clang --version && cc --version
+
+      - run:  timeout 20m make test-bootstrap-recursively
