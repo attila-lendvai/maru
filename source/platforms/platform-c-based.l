@@ -21,15 +21,22 @@
   (let ((ff (eval-in-host `(C-function ',return-type ,(symbol->string foreign-name) ',parameter-types))))
     `(define ,maru-name ,ff)))
 
-(define-form define-C-functions (maru-prefix . entries)
-  `(let ()
-     ,@(map (lambda (entry)
-              (let* ((foreign-name (second entry))
-                     (maru-name (if maru-prefix
-                                    (concat-symbol maru-prefix foreign-name)
-                                  foreign-name)))
-                `(define-C-function ,maru-name ,@entry)))
-            entries)))
+(define-form define-C-functions (prefixes . entries)
+  (let ((maru-prefix	(first  (ensure-list prefixes)))
+        (foreign-prefix	(second (ensure-list prefixes))))
+    `(let ()
+       ,@(map (lambda (entry)
+                (let* ((return-type (first entry))
+                       (base-name   (second entry))
+                       (param-types (third entry))
+                       (foreign-name (if foreign-prefix
+                                         (concat-symbol foreign-prefix base-name)
+                                       base-name))
+                       (maru-name (if maru-prefix
+                                      (concat-symbol maru-prefix base-name)
+                                    base-name)))
+                  `(define-C-function ,maru-name ,return-type ,foreign-name ,param-types)))
+              entries))))
 
 (define-form define-C-variable (maru-name foreign-name type . attributes)
   (let ((fv (eval-in-host `(C-variable ,(symbol->string foreign-name)
