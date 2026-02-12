@@ -20,16 +20,32 @@
 ;; ld: cannot find -lgcc_s: No such file or directory
 ;; ld: cannot find crtendS.o: No such file or directory
 
-(use-modules (gnu packages llvm))
-(use-modules (gnu packages commencement))
+(use-modules
+ (gnu packages llvm)
+ (gnu packages commencement)
+ (guix)
+ (guix profiles)
+ (guix packages))
+
+(define (cross-package-entry pkg target-triplet)
+  (manifest-entry
+    (inherit (package->manifest-entry pkg))
+    (item
+     (with-parameters ((%current-target-system target-triplet))
+       pkg))))
 
 (manifest
  (append
    ;; you can pick specific version-classes here
   (map package->manifest-entry
-       (list clang-toolchain-20
-             ;; gcc-toolchain
-             ))
+       (list
+        clang-toolchain-21              ; use a specific version
+        ;; clang-toolchain                 ; use whatever is in guix (usually old)
+        ;; gcc-toolchain
+        ))
+
+  ;; This works, but the header file alone is not enough to compile to i686.
+  ;; (list (cross-package-entry glibc "i686-linux-gnu"))
 
   ;; get the latest from the channels you have `guix pull`ed
   (manifest-entries
