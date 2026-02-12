@@ -9714,6 +9714,7 @@ define %oop @"m_string->long*.code"(%oop %str, %oop %radix) {
 	%t8 = alloca %oop
 	%t9 = alloca %oop
 	%t10 = alloca %oop
+	%t11 = alloca %oop
 	store %oop %str, %oop* %t0
 	store %oop %radix, %oop* %t1
 	%r1 = inttoptr %word 0 to %oop
@@ -9855,245 +9856,268 @@ L8:
 	br label %L9
 L9:
 	%r98 = load %oop, %oop* %t6
-	br label %L14
+	%r99 = load %oop, %oop* %t3
+	%r100 = load %oop, %oop* %t4
+	%r104 = ptrtoint %oop %r100 to %word
+	%r103 = ptrtoint %oop %r99 to %word
+	%r102 = sub %word %r104, %r103
+	%r101 = inttoptr %word %r102 to %oop
+	%r105 = inttoptr %word 0 to %oop
+	%r109 = ptrtoint %oop %r105 to %word
+	%r108 = ptrtoint %oop %r101 to %word
+	%r107 = icmp eq %word %r109, %r108
+	%r106 = inttoptr i1 %r107 to %oop
+	%r111 = ptrtoint %oop %r106 to %word
+	%r110 = icmp ne %word %r111, 0
+	br i1 %r110, label %L13, label %L14
 L13:
-	%r99 = load %oop, %oop* %t0
-	%r100 = load %oop, %oop* %t3
-	%r101 = call %oop @m_string-at.code(%oop %r99, %oop %r100)
-	store %oop %r101, %oop* %t6
-	%r102 = inttoptr %word 1 to %oop
-	store %oop %r102, %oop* %t8
-	%r103 = load %oop, %oop* %t6
-	%r104 = inttoptr %word 48 to %oop
-	%r108 = ptrtoint %oop %r104 to %word
-	%r107 = ptrtoint %oop %r103 to %word
-	%r106 = icmp sle %word %r108, %r107
-	%r105 = inttoptr i1 %r106 to %oop
-	store %oop %r105, %oop* %t8
-	%r109 = inttoptr %word 0 to %oop
-	%r113 = ptrtoint %oop %r109 to %word
-	%r112 = ptrtoint %oop %r105 to %word
-	%r111 = icmp eq %word %r113, %r112
-	%r110 = inttoptr i1 %r111 to %oop
-	%r115 = ptrtoint %oop %r110 to %word
-	%r114 = icmp ne %word %r115, 0
-	br i1 %r114, label %L19, label %L20
-L20:
-	%r116 = inttoptr %word 57 to %oop
-	%r117 = load %oop, %oop* %t6
-	%r121 = ptrtoint %oop %r117 to %word
-	%r120 = ptrtoint %oop %r116 to %word
-	%r119 = icmp sle %word %r121, %r120
-	%r118 = inttoptr i1 %r119 to %oop
-	store %oop %r118, %oop* %t8
-	%r122 = inttoptr %word 0 to %oop
-	%r126 = ptrtoint %oop %r122 to %word
-	%r125 = ptrtoint %oop %r118 to %word
-	%r124 = icmp eq %word %r126, %r125
-	%r123 = inttoptr i1 %r124 to %oop
-	%r128 = ptrtoint %oop %r123 to %word
-	%r127 = icmp ne %word %r128, 0
-	br i1 %r127, label %L19, label %L21
-L21:
-	br label %L19
-L19:
-	%r129 = load %oop, %oop* %t8
-	%r131 = ptrtoint %oop %r129 to %word
-	%r130 = icmp ne %word %r131, 0
-	br i1 %r130, label %L16, label %L17
+	%r112 = load %oop, %oop* @"m_+end+"
+	store %oop %r112, %oop* %t6
+	br label %L15
+L14:
+	br label %L17
 L16:
-	%r132 = inttoptr %word 48 to %oop
-	%r133 = load %oop, %oop* %t6
-	%r137 = ptrtoint %oop %r133 to %word
-	%r136 = ptrtoint %oop %r132 to %word
-	%r135 = sub %word %r137, %r136
-	%r134 = inttoptr %word %r135 to %oop
-	store %oop %r134, %oop* %t7
-	br label %L18
-L17:
-	%r138 = inttoptr %word 1 to %oop
-	store %oop %r138, %oop* %t9
-	%r139 = load %oop, %oop* %t6
-	%r140 = inttoptr %word 65 to %oop
-	%r144 = ptrtoint %oop %r140 to %word
-	%r143 = ptrtoint %oop %r139 to %word
-	%r142 = icmp sle %word %r144, %r143
-	%r141 = inttoptr i1 %r142 to %oop
-	store %oop %r141, %oop* %t9
-	%r145 = inttoptr %word 0 to %oop
-	%r149 = ptrtoint %oop %r145 to %word
-	%r148 = ptrtoint %oop %r141 to %word
-	%r147 = icmp eq %word %r149, %r148
-	%r146 = inttoptr i1 %r147 to %oop
-	%r151 = ptrtoint %oop %r146 to %word
-	%r150 = icmp ne %word %r151, 0
-	br i1 %r150, label %L25, label %L26
-L26:
-	%r152 = inttoptr %word 90 to %oop
-	%r153 = load %oop, %oop* %t6
-	%r157 = ptrtoint %oop %r153 to %word
-	%r156 = ptrtoint %oop %r152 to %word
-	%r155 = icmp sle %word %r157, %r156
-	%r154 = inttoptr i1 %r155 to %oop
-	store %oop %r154, %oop* %t9
-	%r158 = inttoptr %word 0 to %oop
-	%r162 = ptrtoint %oop %r158 to %word
-	%r161 = ptrtoint %oop %r154 to %word
-	%r160 = icmp eq %word %r162, %r161
-	%r159 = inttoptr i1 %r160 to %oop
-	%r164 = ptrtoint %oop %r159 to %word
-	%r163 = icmp ne %word %r164, 0
-	br i1 %r163, label %L25, label %L27
-L27:
-	br label %L25
-L25:
-	%r165 = load %oop, %oop* %t9
-	%r167 = ptrtoint %oop %r165 to %word
-	%r166 = icmp ne %word %r167, 0
-	br i1 %r166, label %L22, label %L23
-L22:
-	%r168 = inttoptr %word 65 to %oop
-	%r169 = load %oop, %oop* %t6
-	%r173 = ptrtoint %oop %r169 to %word
-	%r172 = ptrtoint %oop %r168 to %word
-	%r171 = sub %word %r173, %r172
-	%r170 = inttoptr %word %r171 to %oop
-	%r174 = inttoptr %word 10 to %oop
-	%r178 = ptrtoint %oop %r174 to %word
-	%r177 = ptrtoint %oop %r170 to %word
-	%r176 = add %word %r178, %r177
-	%r175 = inttoptr %word %r176 to %oop
-	store %oop %r175, %oop* %t8
-	br label %L24
+	%r113 = load %oop, %oop* %t0
+	%r114 = load %oop, %oop* %t3
+	%r115 = call %oop @m_string-at.code(%oop %r113, %oop %r114)
+	store %oop %r115, %oop* %t7
+	%r116 = inttoptr %word 1 to %oop
+	store %oop %r116, %oop* %t9
+	%r117 = load %oop, %oop* %t7
+	%r118 = inttoptr %word 48 to %oop
+	%r122 = ptrtoint %oop %r118 to %word
+	%r121 = ptrtoint %oop %r117 to %word
+	%r120 = icmp sle %word %r122, %r121
+	%r119 = inttoptr i1 %r120 to %oop
+	store %oop %r119, %oop* %t9
+	%r123 = inttoptr %word 0 to %oop
+	%r127 = ptrtoint %oop %r123 to %word
+	%r126 = ptrtoint %oop %r119 to %word
+	%r125 = icmp eq %word %r127, %r126
+	%r124 = inttoptr i1 %r125 to %oop
+	%r129 = ptrtoint %oop %r124 to %word
+	%r128 = icmp ne %word %r129, 0
+	br i1 %r128, label %L22, label %L23
 L23:
-	%r179 = inttoptr %word 1 to %oop
-	store %oop %r179, %oop* %t10
-	%r180 = load %oop, %oop* %t6
-	%r181 = inttoptr %word 97 to %oop
-	%r185 = ptrtoint %oop %r181 to %word
-	%r184 = ptrtoint %oop %r180 to %word
-	%r183 = icmp sle %word %r185, %r184
-	%r182 = inttoptr i1 %r183 to %oop
-	store %oop %r182, %oop* %t10
-	%r186 = inttoptr %word 0 to %oop
-	%r190 = ptrtoint %oop %r186 to %word
-	%r189 = ptrtoint %oop %r182 to %word
-	%r188 = icmp eq %word %r190, %r189
-	%r187 = inttoptr i1 %r188 to %oop
-	%r192 = ptrtoint %oop %r187 to %word
-	%r191 = icmp ne %word %r192, 0
-	br i1 %r191, label %L31, label %L32
-L32:
-	%r193 = inttoptr %word 122 to %oop
-	%r194 = load %oop, %oop* %t6
-	%r198 = ptrtoint %oop %r194 to %word
-	%r197 = ptrtoint %oop %r193 to %word
-	%r196 = icmp sle %word %r198, %r197
-	%r195 = inttoptr i1 %r196 to %oop
-	store %oop %r195, %oop* %t10
-	%r199 = inttoptr %word 0 to %oop
-	%r203 = ptrtoint %oop %r199 to %word
-	%r202 = ptrtoint %oop %r195 to %word
-	%r201 = icmp eq %word %r203, %r202
-	%r200 = inttoptr i1 %r201 to %oop
-	%r205 = ptrtoint %oop %r200 to %word
-	%r204 = icmp ne %word %r205, 0
-	br i1 %r204, label %L31, label %L33
-L33:
-	br label %L31
-L31:
-	%r206 = load %oop, %oop* %t10
-	%r208 = ptrtoint %oop %r206 to %word
-	%r207 = icmp ne %word %r208, 0
-	br i1 %r207, label %L28, label %L29
-L28:
-	%r209 = inttoptr %word 97 to %oop
-	%r210 = load %oop, %oop* %t6
-	%r214 = ptrtoint %oop %r210 to %word
-	%r213 = ptrtoint %oop %r209 to %word
-	%r212 = sub %word %r214, %r213
-	%r211 = inttoptr %word %r212 to %oop
-	%r215 = inttoptr %word 10 to %oop
-	%r219 = ptrtoint %oop %r215 to %word
-	%r218 = ptrtoint %oop %r211 to %word
-	%r217 = add %word %r219, %r218
-	%r216 = inttoptr %word %r217 to %oop
-	store %oop %r216, %oop* %t9
-	br label %L30
-L29:
-	%r220 = load %oop, %oop* @"m_+end+"
-	ret %oop %r220
-	store %oop %r220, %oop* %t9
-	br label %L30
-L30:
-	%r222 = load %oop, %oop* %t9
-	store %oop %r222, %oop* %t8
-	br label %L24
+	%r130 = inttoptr %word 57 to %oop
+	%r131 = load %oop, %oop* %t7
+	%r135 = ptrtoint %oop %r131 to %word
+	%r134 = ptrtoint %oop %r130 to %word
+	%r133 = icmp sle %word %r135, %r134
+	%r132 = inttoptr i1 %r133 to %oop
+	store %oop %r132, %oop* %t9
+	%r136 = inttoptr %word 0 to %oop
+	%r140 = ptrtoint %oop %r136 to %word
+	%r139 = ptrtoint %oop %r132 to %word
+	%r138 = icmp eq %word %r140, %r139
+	%r137 = inttoptr i1 %r138 to %oop
+	%r142 = ptrtoint %oop %r137 to %word
+	%r141 = icmp ne %word %r142, 0
+	br i1 %r141, label %L22, label %L24
 L24:
-	%r223 = load %oop, %oop* %t8
-	store %oop %r223, %oop* %t7
-	br label %L18
-L18:
-	%r224 = load %oop, %oop* %t7
-	store %oop %r224, %oop* %t7
-	%r225 = load %oop, %oop* %t1
-	%r226 = load %oop, %oop* %t7
-	%r230 = ptrtoint %oop %r226 to %word
-	%r229 = ptrtoint %oop %r225 to %word
-	%r228 = icmp slt %word %r230, %r229
-	%r227 = inttoptr i1 %r228 to %oop
-	%r232 = ptrtoint %oop %r227 to %word
-	%r231 = icmp ne %word %r232, 0
-	br i1 %r231, label %L34, label %L35
-L34:
-	%r233 = inttoptr %word 0 to %oop
-	store %oop %r233, %oop* %t8
-	br label %L36
+	br label %L22
+L22:
+	%r143 = load %oop, %oop* %t9
+	%r145 = ptrtoint %oop %r143 to %word
+	%r144 = icmp ne %word %r145, 0
+	br i1 %r144, label %L19, label %L20
+L19:
+	%r146 = inttoptr %word 48 to %oop
+	%r147 = load %oop, %oop* %t7
+	%r151 = ptrtoint %oop %r147 to %word
+	%r150 = ptrtoint %oop %r146 to %word
+	%r149 = sub %word %r151, %r150
+	%r148 = inttoptr %word %r149 to %oop
+	store %oop %r148, %oop* %t8
+	br label %L21
+L20:
+	%r152 = inttoptr %word 1 to %oop
+	store %oop %r152, %oop* %t10
+	%r153 = load %oop, %oop* %t7
+	%r154 = inttoptr %word 65 to %oop
+	%r158 = ptrtoint %oop %r154 to %word
+	%r157 = ptrtoint %oop %r153 to %word
+	%r156 = icmp sle %word %r158, %r157
+	%r155 = inttoptr i1 %r156 to %oop
+	store %oop %r155, %oop* %t10
+	%r159 = inttoptr %word 0 to %oop
+	%r163 = ptrtoint %oop %r159 to %word
+	%r162 = ptrtoint %oop %r155 to %word
+	%r161 = icmp eq %word %r163, %r162
+	%r160 = inttoptr i1 %r161 to %oop
+	%r165 = ptrtoint %oop %r160 to %word
+	%r164 = icmp ne %word %r165, 0
+	br i1 %r164, label %L28, label %L29
+L29:
+	%r166 = inttoptr %word 90 to %oop
+	%r167 = load %oop, %oop* %t7
+	%r171 = ptrtoint %oop %r167 to %word
+	%r170 = ptrtoint %oop %r166 to %word
+	%r169 = icmp sle %word %r171, %r170
+	%r168 = inttoptr i1 %r169 to %oop
+	store %oop %r168, %oop* %t10
+	%r172 = inttoptr %word 0 to %oop
+	%r176 = ptrtoint %oop %r172 to %word
+	%r175 = ptrtoint %oop %r168 to %word
+	%r174 = icmp eq %word %r176, %r175
+	%r173 = inttoptr i1 %r174 to %oop
+	%r178 = ptrtoint %oop %r173 to %word
+	%r177 = icmp ne %word %r178, 0
+	br i1 %r177, label %L28, label %L30
+L30:
+	br label %L28
+L28:
+	%r179 = load %oop, %oop* %t10
+	%r181 = ptrtoint %oop %r179 to %word
+	%r180 = icmp ne %word %r181, 0
+	br i1 %r180, label %L25, label %L26
+L25:
+	%r182 = inttoptr %word 65 to %oop
+	%r183 = load %oop, %oop* %t7
+	%r187 = ptrtoint %oop %r183 to %word
+	%r186 = ptrtoint %oop %r182 to %word
+	%r185 = sub %word %r187, %r186
+	%r184 = inttoptr %word %r185 to %oop
+	%r188 = inttoptr %word 10 to %oop
+	%r192 = ptrtoint %oop %r188 to %word
+	%r191 = ptrtoint %oop %r184 to %word
+	%r190 = add %word %r192, %r191
+	%r189 = inttoptr %word %r190 to %oop
+	store %oop %r189, %oop* %t9
+	br label %L27
+L26:
+	%r193 = inttoptr %word 1 to %oop
+	store %oop %r193, %oop* %t11
+	%r194 = load %oop, %oop* %t7
+	%r195 = inttoptr %word 97 to %oop
+	%r199 = ptrtoint %oop %r195 to %word
+	%r198 = ptrtoint %oop %r194 to %word
+	%r197 = icmp sle %word %r199, %r198
+	%r196 = inttoptr i1 %r197 to %oop
+	store %oop %r196, %oop* %t11
+	%r200 = inttoptr %word 0 to %oop
+	%r204 = ptrtoint %oop %r200 to %word
+	%r203 = ptrtoint %oop %r196 to %word
+	%r202 = icmp eq %word %r204, %r203
+	%r201 = inttoptr i1 %r202 to %oop
+	%r206 = ptrtoint %oop %r201 to %word
+	%r205 = icmp ne %word %r206, 0
+	br i1 %r205, label %L34, label %L35
 L35:
+	%r207 = inttoptr %word 122 to %oop
+	%r208 = load %oop, %oop* %t7
+	%r212 = ptrtoint %oop %r208 to %word
+	%r211 = ptrtoint %oop %r207 to %word
+	%r210 = icmp sle %word %r212, %r211
+	%r209 = inttoptr i1 %r210 to %oop
+	store %oop %r209, %oop* %t11
+	%r213 = inttoptr %word 0 to %oop
+	%r217 = ptrtoint %oop %r213 to %word
+	%r216 = ptrtoint %oop %r209 to %word
+	%r215 = icmp eq %word %r217, %r216
+	%r214 = inttoptr i1 %r215 to %oop
+	%r219 = ptrtoint %oop %r214 to %word
+	%r218 = icmp ne %word %r219, 0
+	br i1 %r218, label %L34, label %L36
+L36:
+	br label %L34
+L34:
+	%r220 = load %oop, %oop* %t11
+	%r222 = ptrtoint %oop %r220 to %word
+	%r221 = icmp ne %word %r222, 0
+	br i1 %r221, label %L31, label %L32
+L31:
+	%r223 = inttoptr %word 97 to %oop
+	%r224 = load %oop, %oop* %t7
+	%r228 = ptrtoint %oop %r224 to %word
+	%r227 = ptrtoint %oop %r223 to %word
+	%r226 = sub %word %r228, %r227
+	%r225 = inttoptr %word %r226 to %oop
+	%r229 = inttoptr %word 10 to %oop
+	%r233 = ptrtoint %oop %r229 to %word
+	%r232 = ptrtoint %oop %r225 to %word
+	%r231 = add %word %r233, %r232
+	%r230 = inttoptr %word %r231 to %oop
+	store %oop %r230, %oop* %t10
+	br label %L33
+L32:
 	%r234 = load %oop, %oop* @"m_+end+"
 	ret %oop %r234
-	store %oop %r234, %oop* %t8
-	br label %L36
-L36:
-	%r236 = load %oop, %oop* %t8
-	%r237 = load %oop, %oop* %t7
-	%r238 = load %oop, %oop* %t2
+	store %oop %r234, %oop* %t10
+	br label %L33
+L33:
+	%r236 = load %oop, %oop* %t10
+	store %oop %r236, %oop* %t9
+	br label %L27
+L27:
+	%r237 = load %oop, %oop* %t9
+	store %oop %r237, %oop* %t8
+	br label %L21
+L21:
+	%r238 = load %oop, %oop* %t8
+	store %oop %r238, %oop* %t8
 	%r239 = load %oop, %oop* %t1
+	%r240 = load %oop, %oop* %t8
+	%r244 = ptrtoint %oop %r240 to %word
 	%r243 = ptrtoint %oop %r239 to %word
-	%r242 = ptrtoint %oop %r238 to %word
-	%r241 = mul %word %r243, %r242
-	%r240 = inttoptr %word %r241 to %oop
-	%r247 = ptrtoint %oop %r240 to %word
-	%r246 = ptrtoint %oop %r237 to %word
-	%r245 = add %word %r247, %r246
-	%r244 = inttoptr %word %r245 to %oop
-	store %oop %r244, %oop* %t2
-	%r248 = inttoptr %word 1 to %oop
-	%r249 = load %oop, %oop* %t3
-	%r253 = ptrtoint %oop %r249 to %word
-	%r252 = ptrtoint %oop %r248 to %word
-	%r251 = add %word %r253, %r252
-	%r250 = inttoptr %word %r251 to %oop
-	store %oop %r250, %oop* %t3
-	br label %L14
-L14:
-	%r254 = load %oop, %oop* %t4
-	%r255 = load %oop, %oop* %t3
-	%r259 = ptrtoint %oop %r255 to %word
-	%r258 = ptrtoint %oop %r254 to %word
-	%r257 = icmp slt %word %r259, %r258
-	%r256 = inttoptr i1 %r257 to %oop
-	%r261 = ptrtoint %oop %r256 to %word
-	%r260 = icmp ne %word %r261, 0
-	br i1 %r260, label %L13, label %L15
-L15:
-	%r262 = load %oop, %oop* %t2
-	%r263 = load %oop, %oop* %t5
+	%r242 = icmp slt %word %r244, %r243
+	%r241 = inttoptr i1 %r242 to %oop
+	%r246 = ptrtoint %oop %r241 to %word
+	%r245 = icmp ne %word %r246, 0
+	br i1 %r245, label %L37, label %L38
+L37:
+	%r247 = inttoptr %word 0 to %oop
+	store %oop %r247, %oop* %t9
+	br label %L39
+L38:
+	%r248 = load %oop, %oop* @"m_+end+"
+	ret %oop %r248
+	store %oop %r248, %oop* %t9
+	br label %L39
+L39:
+	%r250 = load %oop, %oop* %t9
+	%r251 = load %oop, %oop* %t8
+	%r252 = load %oop, %oop* %t2
+	%r253 = load %oop, %oop* %t1
+	%r257 = ptrtoint %oop %r253 to %word
+	%r256 = ptrtoint %oop %r252 to %word
+	%r255 = mul %word %r257, %r256
+	%r254 = inttoptr %word %r255 to %oop
+	%r261 = ptrtoint %oop %r254 to %word
+	%r260 = ptrtoint %oop %r251 to %word
+	%r259 = add %word %r261, %r260
+	%r258 = inttoptr %word %r259 to %oop
+	store %oop %r258, %oop* %t2
+	%r262 = inttoptr %word 1 to %oop
+	%r263 = load %oop, %oop* %t3
 	%r267 = ptrtoint %oop %r263 to %word
 	%r266 = ptrtoint %oop %r262 to %word
-	%r265 = mul %word %r267, %r266
+	%r265 = add %word %r267, %r266
 	%r264 = inttoptr %word %r265 to %oop
-	ret %oop %r264
+	store %oop %r264, %oop* %t3
+	br label %L17
+L17:
+	%r268 = load %oop, %oop* %t4
+	%r269 = load %oop, %oop* %t3
+	%r273 = ptrtoint %oop %r269 to %word
+	%r272 = ptrtoint %oop %r268 to %word
+	%r271 = icmp slt %word %r273, %r272
+	%r270 = inttoptr i1 %r271 to %oop
+	%r275 = ptrtoint %oop %r270 to %word
+	%r274 = icmp ne %word %r275, 0
+	br i1 %r274, label %L16, label %L18
+L18:
+	%r276 = load %oop, %oop* %t2
+	%r277 = load %oop, %oop* %t5
+	%r281 = ptrtoint %oop %r277 to %word
+	%r280 = ptrtoint %oop %r276 to %word
+	%r279 = mul %word %r281, %r280
+	%r278 = inttoptr %word %r279 to %oop
+	store %oop %r278, %oop* %t6
+	br label %L15
+L15:
+	%r282 = load %oop, %oop* %t6
+	ret %oop %r282
 }
 @m_cstr733 = private unnamed_addr constant [14 x i8] c"string->long*\00"
 @m_ostr734 = private unnamed_addr constant %"<string>" { %"<header>" { %word 3, %word 13}, %word 27, %oop bitcast ([14 x i8]* @m_cstr733 to %oop) }
