@@ -1,8 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(switch-to-target-env)
-
-(load "source/platforms/libc/libc.l")
 (load "source/evaluator/vm-early.l")
 (load "source/debug-min.l")
 (load "source/evaluator/vm.l")

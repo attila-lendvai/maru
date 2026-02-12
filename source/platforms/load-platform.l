@@ -7,3 +7,7 @@
   (set *compiler-backend* "x86-64"))
 
 (require (concat-strings "source/compiler/emit-" *compiler-backend* ".l"))
+
+(switch-to-target-env)
+
+(load (host-value (concat-strings "source/platforms/"target/platform"/"target/platform".l")))

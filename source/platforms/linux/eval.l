@@ -10,8 +10,9 @@
 ;;   - Recognize an strlen impl in the IR and turn it to an strlen call.
 ;;   - Emit a call to strlen (libc function) during lowering to
 ;;     AArch64 assembly/object code.
-(define *llvm-platform-specific-prelude*
-  "
+(eval-in-host
+ '(define *llvm-platform-specific-prelude*
+   "
 define weak dso_local ptr @memset(ptr %dst, i32 %val, %word %len) {
 entry:
   %end = getelementptr i8, ptr %dst, %word %len
@@ -52,23 +53,11 @@ exit:
   %len   = sub i64 %end, %start
   ret i64 %len
 }
-")
+"))
 
-;; this is a placeholder object in the target on which we can register
-;; a special-form. theoretically this could be any objcect, but we
-;; leave a recognizable trace should something go off track somewhere.
-(eval-in-target
- '(define linux-syscall
-   (fixed (lambda args
-            (print "linux-syscall encountered in interpreted code with args " args "\n")
-            (abort)))))
-
-(load "source/platforms/linux/syscall.l")
-
-(switch-to-target-env)
+(eval-in-host '(load "source/platforms/linux/syscall.l"))
 
 (load "source/evaluator/vm-early.l")
-(load "source/platforms/linux/linux.l")
 (load "source/debug-min.l")
 (load "source/evaluator/vm.l")
 

@@ -14,6 +14,15 @@
 ;;       ;; TODO add align: https://llvm.org/docs/LangRef.html#attr-align
 ;;       `(llvm.memcpy.p0i8.p0i8.i32 ,to ,from (words-to-bytes ,wordcount) 1)))
 
+;; this is a placeholder object in the target on which we can register
+;; a special-form later. theoretically, this could be any object
+;; (including nil), but we leave a recognizable trace for better
+;; potential error messages.
+(define linux-syscall
+  (fixed (lambda args
+           (print "linux-syscall encountered in interpreted code with args " args "\n")
+           (abort))))
+
 ;;;
 ;;; Platform API implementation when running on top of the Linux kernel.
 ;;;

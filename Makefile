@@ -180,12 +180,13 @@ else
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/compiler/,load-compiler.l emit-early.l emit-x86-common.l emit-x86-objects.l emit-x86.l emit-x86-64.l emit-late.l)
+EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-x86-objects.l emit-x86.l emit-x86-64.l emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
 
 EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l streams.l) \
+ $(addprefix source/platforms/,load-platform.l platform-c-based.l platform-common.l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
 
@@ -316,13 +317,14 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
-		--define *host-directory* 	"$(HOST_DIR)"			\
-		--define *slave-directory* 	"$(SLAVE_DIR)"			\
-		--define *compiler-backend* 	"x86"				\
-		--define target/arch 		"$(TARGET_ARCH)"			\
-		--define target/vendor 		"$(TARGET_VENDOR)"		\
-		--define target/os 		"$(TARGET_OS)"			\
-		--define target/abi 		"$(TARGET_ABI)"			\
+		--define *host-directory*	"$(HOST_DIR)"			\
+		--define *slave-directory*	"$(SLAVE_DIR)"			\
+		--define *compiler-backend*	"x86"				\
+		--define target/arch		"$(TARGET_ARCH)"		\
+		--define target/vendor		"$(TARGET_VENDOR)"		\
+		--define target/os		"$(TARGET_OS)"			\
+		--define target/abi		"$(TARGET_ABI)"			\
+		--define target/platform	"$(PLATFORM)"			\
 		--define feature/profiler	"$(PROFILER_MARU)"		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
@@ -332,7 +334,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		source/compiler/load-compiler.l					\
+		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -342,10 +344,11 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
 		--define *compiler-backend* 	"llvm"				\
-		--define target/arch 		"$(TARGET_ARCH)"			\
+		--define target/arch 		"$(TARGET_ARCH)"		\
 		--define target/vendor 		"$(TARGET_VENDOR)"		\
 		--define target/os 		"$(TARGET_OS)"			\
 		--define target/abi 		"$(TARGET_ABI)"			\
+		--define target/platform	"$(PLATFORM)"			\
 		--define feature/profiler	"$(PROFILER_MARU)"		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
@@ -355,7 +358,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
-		source/compiler/load-compiler.l					\
+		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -389,10 +392,11 @@ define compile-x86
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	--define *compiler-backend* 	"x86"					\
-	--define target/arch 		"$(TARGET_ARCH)"				\
+	--define target/arch 		"$(TARGET_ARCH)"			\
 	--define target/vendor 		"$(TARGET_VENDOR)"			\
 	--define target/os 		"$(TARGET_OS)"				\
 	--define target/abi 		"$(TARGET_ABI)"				\
+	--define target/platform	"$(PLATFORM)"				\
 	--define feature/profiler	"$(PROFILER_MARU)"			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
@@ -400,7 +404,7 @@ define compile-x86
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	source/compiler/load-compiler.l						\
+	source/platforms/load-platform.l					\
 	$(3)									\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
@@ -411,10 +415,11 @@ define compile-llvm
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	--define *compiler-backend* 	"llvm"					\
-	--define target/arch 		"$(TARGET_ARCH)"				\
+	--define target/arch 		"$(TARGET_ARCH)"			\
 	--define target/vendor 		"$(TARGET_VENDOR)"			\
 	--define target/os 		"$(TARGET_OS)"				\
 	--define target/abi 		"$(TARGET_ABI)"				\
+	--define target/platform	"$(PLATFORM)"				\
 	--define feature/profiler	"$(PROFILER_MARU)"			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
@@ -422,7 +427,7 @@ define compile-llvm
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
-	source/compiler/load-compiler.l						\
+	source/platforms/load-platform.l					\
 	$(3)									\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
