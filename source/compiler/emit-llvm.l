@@ -1149,8 +1149,8 @@
       (println "* "(closure-code-label name)))
     (when feature/redefinable-functions-in-target
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
-      (println (GLOBAL name)" = global %oop ")
-      (emit/header->payload object-label))))
+      (print (GLOBAL name)" = global %oop ")
+      (emit/header->payload/in-constants object-label))))
 
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
