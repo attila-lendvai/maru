@@ -185,7 +185,9 @@ EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-lat
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
 
-EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l streams.l) \
+# We can only list files in souce/platforms/$(PLATFORM) that are
+# universally available in each platform.
+EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l) \
  $(addprefix source/platforms/,load-platform.l platform-c-based.l platform-common.l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
@@ -193,6 +195,11 @@ EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLAT
 # for some optional C files, e.g. profiler.c
 EVAL_OBJ_x86	=
 EVAL_OBJ_llvm	=
+
+ifneq (,$(filter $(PLATFORM),libc posix))
+  EVAL_OBJ_x86	+= $(BUILD_x86)/compat-wrappers.o
+  EVAL_OBJ_llvm	+= $(BUILD_llvm)/compat-wrappers.o
+endif
 
 PROFILER ?= false
 
@@ -501,6 +508,11 @@ $(BUILD_x86)/%.o: source/platforms/$(PLATFORM)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_x86) -c -o $@ $<
 
+# KLUDGE for compat-wrapper.c
+$(BUILD_x86)/%.o: source/platforms/libc/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_x86) -c -o $@ $<
+
 $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 	@mkdir -p $(@D)
 # TODO shall we go through llc and link the .o file(s)? llc seems to
@@ -515,6 +527,11 @@ $(BUILD_llvm)/%: $(BITCODE_DIR)/%.ll
 #	@-$(LLC) -O3 -mtriple=$(TARGET) -filetype=asm -o $@.opt.s $<
 
 $(BUILD_llvm)/%.o: source/platforms/$(PLATFORM)/%.c
+	@mkdir -p $(@D)
+	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET) -c -o $@ $<
+
+# KLUDGE for compat-wrapper.c
+$(BUILD_llvm)/%.o: source/platforms/libc/%.c
 	@mkdir -p $(@D)
 	$(CLANG) $(CFLAGS_llvm) --target=$(TARGET) -c -o $@ $<
 

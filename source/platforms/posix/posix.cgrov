@@ -1,0 +1,15 @@
+// default _GNU_SOURCE 1
+
+prefix posix/
+
+header	unistd.h signal.h sys/wait.h sys/mman.h
+
+integer SIGCHLD WNOHANG WSTOPPED WEXITED WNOWAIT
+
+integer STDIN_FILENO STDOUT_FILENO STDERR_FILENO
+
+integer PROT_READ PROT_WRITE PROT_EXEC _SC_PAGESIZE
+
+integer P_ALL P_PID
+
+integer MAP_FAILED MAP_PRIVATE MAP_ANONYMOUS PROT_READ PROT_WRITE PROT_EXEC
