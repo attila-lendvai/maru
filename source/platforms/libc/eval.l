@@ -1,17 +1,9 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; KLUDGE should be arranged for by the build side
-(require "source/compiler/emit-early.l")
-(when (and (equal "x86" *compiler-backend*)
-           (= 64 (slave-value +word-size-in-bits+)))
-  (set *compiler-backend* "x86-64"))
-
-(load (concat-strings "source/compiler/emit-" *compiler-backend* ".l"))
-
 (switch-to-target-env)
 
-(load "source/evaluator/vm-early.l")
 (load "source/platforms/libc/libc.l")
+(load "source/evaluator/vm-early.l")
 (load "source/debug-min.l")
 (load "source/evaluator/vm.l")
 

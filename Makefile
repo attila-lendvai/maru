@@ -180,7 +180,7 @@ else
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-x86-objects.l emit-x86.l emit-x86-64.l emit-late.l)
+EMIT_FILES_x86	= $(addprefix source/compiler/,load-compiler.l emit-early.l emit-x86-common.l emit-x86-objects.l emit-x86.l emit-x86-64.l emit-late.l)
 EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-late.l)
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
@@ -332,6 +332,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
+		source/compiler/load-compiler.l					\
 		source/platforms/$(PLATFORM)/eval.l				\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -354,6 +355,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		boot.l								\
 		source/bootstrapping/slave-extras.l				\
 		source/bootstrapping/late.l					\
+		source/compiler/load-compiler.l					\
 		source/platforms/$(PLATFORM)/eval.l				\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -398,6 +400,7 @@ define compile-x86
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
+	source/compiler/load-compiler.l						\
 	$(3)									\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
@@ -419,6 +422,7 @@ define compile-llvm
 	source/bootstrapping/early.l						\
 	boot.l									\
 	source/bootstrapping/late.l						\
+	source/compiler/load-compiler.l						\
 	$(3)									\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
