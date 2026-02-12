@@ -433,7 +433,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 # currently broken with maru.9
 %.cgrov.l: %.cgrov $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/c-groveller/cgrov.g.l
 	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
-	$(CC) -o $<.exe $<.c
+	$(CLANG) -o $<.exe $<.c
 	./$<.exe > $@.new
 	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
 	mv $@.new $@
