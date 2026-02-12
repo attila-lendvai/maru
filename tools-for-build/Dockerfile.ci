@@ -20,7 +20,7 @@ RUN apt-get update && \
         bash \
         make \
         llvm \
-        clang \
+        clang-20 \
         libc6-dev \
         libffi-dev \
         git \
@@ -30,11 +30,14 @@ RUN apt-get update && \
     && if [ "$TARGETARCH" = "amd64" ]; then \
       dpkg --add-architecture i386 && \
         apt-get update && \
-        apt-get install -y --no-install-recommends libc6-dev-i386; \
+        apt-get install -y --no-install-recommends libc6-dev-i386 gcc-multilib; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure bash is the default shell
 # SHELL ["/bin/bash", "-c"]
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100
 
 WORKDIR /workspace

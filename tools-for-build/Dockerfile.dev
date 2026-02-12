@@ -1,6 +1,13 @@
+# podman build --platform linux/amd64 -t maru -f Dockerfile.dev .
+# podman run  --tty --rm --interactive --volume "$(pwd)":/workspace --workdir /workspace maru /bin/bash
+
 FROM docker.io/debian:unstable
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+ARG TARGETARCH
+
+RUN echo TARGETARCH="$TARGETARCH"
 
 RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
@@ -8,7 +15,7 @@ RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list
         bash \
         make \
         llvm \
-        clang-21 \
+        clang \
         libc6-dev \
         libffi-dev \
         gdb \
@@ -22,7 +29,7 @@ RUN sed -i 's/Components: main$/Components: main contrib/' /etc/apt/sources.list
     && if [ "$TARGETARCH" = "amd64" ]; then \
       dpkg --add-architecture i386 && \
         apt-get update && \
-        apt-get install -y --no-install-recommends libc6-dev-i386; \
+        apt-get install -y --no-install-recommends libc6-dev-i386 gcc-multilib; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
