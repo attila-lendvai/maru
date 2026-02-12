@@ -41,7 +41,9 @@
  '(define-form bitwise-not (value)
    `(bitwise-xor ,value -1)))
 
-;; TODO these should be groveled with the cgrov
+;; TODO these should be groveled with the cgrov... but keep in mind
+;; that the linux platform should be able to eventually emit an elf
+;; binary without any external dependencies.
 (define *C-type->llvm-type*
     (concat-list
      '((void		void))
