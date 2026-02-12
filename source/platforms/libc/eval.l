@@ -58,10 +58,6 @@
 
 (load "source/platforms/libc/streams.l")
 (load "source/evaluator/vm-with-file-support.l")
-(load "source/evaluator/vm-late.l")
 
 (define-function main (argc argv)
   (main/common argc argv libc/stdin libc/stdout libc/stderr))
-
-;; KLUDGE
-(eval-in-host `(run-compiler ,*target-env*))

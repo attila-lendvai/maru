@@ -16,6 +16,9 @@
   (int mprotect (* size_t int))
   (* mmap (* size_t int int int off_t))
   (long sysconf (int))
+  (pid_t fork ())
+  (pid_t execve (* * *))
+  (pid_t waitpid (pid_t * int))
   )
 
 ;; malloc doesn't return page-aligned memory, so we round down the

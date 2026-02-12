@@ -74,9 +74,8 @@ exit:
     (error "set-working-directory: linux/SYS_chdir failed for "path)))
 
 (load "source/platforms/linux/streams.l")
-(load "source/platforms/linux/fork.l")
+(load "source/platforms/linux/vm-functions.l")
 (load "source/evaluator/vm-with-file-support.l")
-(load "source/evaluator/vm-late.l")
 
 ;; https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; http://www.dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html
@@ -116,6 +115,3 @@ exit:
          (argv (+ sp (words-to-bytes 1))))
     (linux-syscall linux/SYS_exit
      (main/common argc argv linux/STDIN_FILENO linux/STDOUT_FILENO linux/STDERR_FILENO))))
-
-;; KLUDGE
-(eval-in-host `(run-compiler ,*target-env*))

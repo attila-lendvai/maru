@@ -34,7 +34,7 @@
 
 # backends to build
 BACKENDS		= x86 llvm
-PLATFORMS		= libc linux
+PLATFORMS		= libc posix linux
 # use this backend of the previous stage when it needs to be built.
 PREVIOUS_STAGE_BACKEND	= -llvm
 
@@ -343,6 +343,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/bootstrapping/late.l					\
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
+		source/platforms/run-compiler.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
@@ -367,6 +368,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		source/bootstrapping/late.l					\
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
+		source/platforms/run-compiler.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
@@ -413,6 +415,7 @@ define compile-x86
 	source/bootstrapping/late.l						\
 	source/platforms/load-platform.l					\
 	$(3)									\
+	source/platforms/run-compiler.l						\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
@@ -436,6 +439,7 @@ define compile-llvm
 	source/bootstrapping/late.l						\
 	source/platforms/load-platform.l					\
 	$(3)									\
+	source/platforms/run-compiler.l						\
 	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
 endef
 #	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }

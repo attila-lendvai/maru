@@ -100,6 +100,9 @@
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
     environment-define defined? global-variable-value set-global-variable-value
+
+    ;; KLUDGE to ease load order constraints
+    main/common
     )
 
 (define *call-stack-index*	0)
