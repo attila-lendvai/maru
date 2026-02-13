@@ -2,9 +2,10 @@
 
 (require "source/compiler/emit-early.l")
 
-(when (and (equal "x86" *compiler-backend*)
-           (= 64 (slave-value +word-size-in-bits+)))
-  (set *compiler-backend* "x86-64"))
+(when (equal "x86" *compiler-backend*)
+  (case (slave-value +word-size-in-bits+)
+    (32 (set *compiler-backend* "i686"))
+    (64 (set *compiler-backend* "x86-64"))))
 
 (require (concat-strings "source/compiler/emit-" *compiler-backend* ".l"))
 

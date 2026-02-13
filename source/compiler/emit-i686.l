@@ -28,6 +28,7 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
+(require "source/compiler/emit-early.l")
 (require "source/compiler/emit-x86-common.l")
 
 ;; KLUDGE replace the env binding for the base class. the reason is
