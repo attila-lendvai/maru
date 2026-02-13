@@ -120,16 +120,6 @@
 ;;; Compiling lambdas
 ;;;
 
-(define-function compile/expr-into-temp-or-literal (expr -c-)
-  (cond
-    ((long? expr)
-     (LI64 expr))
-    (else
-      (comp expr)
-      (let ((temp (alloc-temp -c-)))
-        (gen STORE temp)
-        temp))))
-
 ;; When a function calls another function then it will need to
 ;; overwrite the registers where it has received its own params. A
 ;; simple solution is to spill the params to the stack when we
@@ -382,30 +372,6 @@
 ;;;
 ;;; Special Operators
 ;;;
-
-(define-function compile/unary-operator (op args -c-)
-  (comp (car args))
-  (gen op))
-
-;; FIXME? these implement a right-to-left evaluation order, while
-;; function calls implement the opposite. note that this is entangled
-;; with e.g. the LOAD/STORE instructions above, as they expect arg0 to
-;; be loaded in %rax.
-(define-function compile/binary-operator (op args -c-)
-  (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
-    (comp (car args))
-    (free-temp tmp)
-    (gen op tmp)))
-
-(define-function compile/ternary-operator (op args -c-)
-  (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
-        (tmp1 (compile/expr-into-temp-or-literal (cadr  args) -c-)))
-    (comp (car args))
-    (free-temp tmp1)
-    (free-temp tmp2)
-    (gen op tmp1 tmp2)))
-
-(define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
 (define-method compile <variable> (-c-)
   (accessible-variable-or-die self -c-)
