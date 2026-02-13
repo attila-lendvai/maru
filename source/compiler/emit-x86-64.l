@@ -28,6 +28,7 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
+(require "source/compiler/emit-early.l")
 (require "source/compiler/emit-x86-common.l")
 
 ;; KLUDGE replace the env binding for the base class. the reason is
@@ -218,17 +219,6 @@
         (emit DEFLABEL it))
       (emit LEAVE frame-body-size)))
   entry-point-label)
-
-;; TODO should this also go through the COMPILE-OBJECT selector? but
-;; what about the NAME arg then? there's a similar issue with
-;; emit-object/<target-function>.
-(define-function compile-expr (self name -c-)
-  (emit-comment 1 "compiling fn "name", "self)
-  (let ((entry-point (if name
-                         (closure-code-label name)
-                       (UNIQUE-LABEL "code"))))
-    (emit-expr-code self entry-point -c-)
-    (emit-object/<target-function> name entry-point -c-)))
 
 ;;;
 ;;; Compiling calls

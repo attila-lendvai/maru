@@ -17,18 +17,6 @@
 ;; emitting one? if there isn't any, then rename emit-object/foo to
 ;; compile-object/foo.
 
-(define-function emit-object/C-string (self -c-)
-  (let ((label (UNIQUE-LABEL "cstr")))
-    (emit RODATA)
-    (emit DEFLABEL label)
-    (emit ASCIZ self)
-    label))
-
-(define-function compile/C-string (expr -c-)
-  (assert (= (list-length expr) 2))
-  (let ((label (emit-object/C-string (second expr) -c-)))
-    (gen LOAD label)))
-
 ;; these will be functions instantiated later. reason: to calculate
 ;; some stuff and capture the result into closures. this is a poor
 ;; man's staged computation to speed up object emission.
@@ -58,6 +46,20 @@
       (when counter
         (emit CELL counter))
       object-label)))
+
+;; forward
+(define emit-expr-code)
+
+;; TODO should this also go through the COMPILE-OBJECT selector? but
+;; what about the NAME arg then? there's a similar issue with
+;; emit-object/<target-function>.
+(define-function compile-expr (self name -c-)
+  (emit-comment 1 "compiling fn "name", "self)
+  (let ((entry-point (if name
+                         (closure-code-label name)
+                       (UNIQUE-LABEL "code"))))
+    (emit-expr-code self entry-point -c-)
+    (emit-object/<target-function> name entry-point -c-)))
 
 (define-method compile-object <undefined> (-c-)
   (LITERAL (target-value false)))

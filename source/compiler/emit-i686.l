@@ -168,14 +168,6 @@
       (emit LEAVE frame-body-size)))
   entry-point-label)
 
-(define-function compile-expr (self name -c-)
-  (emit-comment 1 "compiling fn "name", "self)
-  (let ((entry-point (if name
-                         (closure-code-label name)
-                       (UNIQUE-LABEL "code"))))
-    (emit-expr-code self entry-point -c-)
-    (emit-object/<target-function> name entry-point -c-)))
-
 ;;;
 ;;; Compiling calls
 ;;;

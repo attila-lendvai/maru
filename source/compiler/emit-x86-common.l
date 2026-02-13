@@ -1,7 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/compiler/emit-early.l")
-
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
 
@@ -613,3 +611,15 @@
     (comp stmt))
   (gen BR (or (<x86-compiler>-fn-epilogue-label -c-)
               (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
+
+(define-function emit-object/C-string (self -c-)
+  (let ((label (UNIQUE-LABEL "cstr")))
+    (emit RODATA)
+    (emit DEFLABEL label)
+    (emit ASCIZ self)
+    label))
+
+(define-function compile/C-string (expr -c-)
+  (assert (= (list-length expr) 2))
+  (let ((label (emit-object/C-string (second expr) -c-)))
+    (gen LOAD label)))
