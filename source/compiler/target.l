@@ -205,7 +205,7 @@
                   (else value)))
     (else	`(%bitwise-shift ,value ,shift))))
 
-;; install stubs for the +special-operators+
+;; install stubs for the *special-operators*
 ;; (list-do name '()
 ;;   ;; they need to be <target-function>'s (why?)
 ;;   (eval `(define ,name error) *target-env*))

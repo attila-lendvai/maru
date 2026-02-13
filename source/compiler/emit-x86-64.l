@@ -18,7 +18,7 @@
 ;;;   - some literal objects are emitted as valid objects that can participate
 ;;;     in the heap; see the EMIT-OBJECT methods for an up-to-date list.
 ;;;   - probaby more
-;;;   - see +special-operators+ and *special-forms* for the list of specially
+;;;   - see *special-operators* and *special-forms* for the list of specially
 ;;;     handled constructs
 ;;;
 ;;; Naming:
@@ -340,7 +340,7 @@
       (emit-comment 1 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
     ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
     (cond
-      ((set handler (second (assq op-value (array-at +special-operators+ arity))))
+      ((set handler (second (assq op-value (array-at *special-operators* arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
       ((is <fixed> op)
        (let ((handler (cdr (assq op *special-forms*))))

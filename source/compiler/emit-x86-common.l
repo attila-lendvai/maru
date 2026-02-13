@@ -473,7 +473,7 @@
 ;;(define-instruction/comparator NE "setne")
 
 ;; a vector of assoc lists indexed by operator arity
-(define +special-operators+
+(define *special-operators*
     (let ((table
            `(;; nullary
              ()
@@ -496,7 +496,7 @@
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-target op-name)))
-                       (assert op "operator not found while building +special-operators+: "op)
+                       (assert op "operator not found while building *special-operators* "op)
                        (cons op (cdr entry))))
                    arity-line))
             table))))

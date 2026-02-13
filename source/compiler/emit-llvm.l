@@ -19,7 +19,7 @@
 ;;;     go astray because "foo" will be emitted as a null terminated string of
 ;;;     ascii bytes (instead of a Maru object of type <string>).
 ;;;   - probaby more
-;;;   - see +special-operators+ and *special-forms* for the list of specially
+;;;   - see *special-operators* and *special-forms* for the list of specially
 ;;;     handled constructs
 ;;;
 ;;; Naming:
@@ -1046,7 +1046,7 @@
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
 ;; a vector of assoc lists indexed by operator arity
-(define +special-operators+
+(define *special-operators*
     (let ((table
            `(;; nullary
              ()
@@ -1069,7 +1069,7 @@
               (map (lambda (entry)
                      (let* ((op-name (car entry))
                             (op (eval-in-target op-name)))
-                       (assert op "operator not found while building +special-operators+: "op)
+                       (assert op "operator not found while building *special-operators* "op)
                        (cons op (cdr entry))))
                    arity-line))
             table))))
@@ -1120,7 +1120,7 @@
          (arity		(list-length args))
          (handler	()))
     (cond
-      ((set handler (second (assq op-value (array-at +special-operators+ arity))))
+      ((set handler (second (assq op-value (array-at *special-operators* arity))))
        ((array-at +operator-compilers+ arity) handler args -c-))
       ((is <fixed> op)
        (let ((handler (cdr (assq op *special-forms*))))
