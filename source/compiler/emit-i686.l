@@ -160,64 +160,6 @@
 ;;; Compiling calls
 ;;;
 
-(define-function compile-call-form (op args raw? -c-)
-  (emit-comment 2 "compile-call: "op", args: "args", raw?: "raw?)
-  (safety 2 (assert (or (pair? op) (variable? op))))
-  ;; NOTE this implements a left-to-right evaluation order, including the operator.
-  ;; i.e. moving this op-tmp means changing the evaluation order!
-  (let ((op-tmp		(when (pair? op)
-                          ;; optimization:
-                          ;; we can spare a STORE/LOAD when we know that op
-                          ;; doesn't evaluate anything; i.e. we can delay
-                          ;; its evaluation, i.e. a simple LOAD, to the
-                          ;; final, COMPILE-CALL-TO step.
-                          (compile/expr-into-temp-or-literal op -c-)))
-        (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
-        (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
-    ;; set up the stack for the call
-    (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
-    (free-temps arg-tmps)
-
-    (let* ((op-value	(or op-tmp
-                            (if (variable? op)
-                                (<variable>-value op)
-                              op)))
-           (n-params	(if raw?
-                            (let ()
-                              (gen LOAD op-value)
-                              (gen CALLPTR arg-locs)
-                              ())
-                          (emit-comment 2 "compile-call-to: "op-value)
-                          (compile-call-to op-value op arg-locs -c-)))
-           (arity	(list-length args)))
-      (when (and n-params
-                 (not (= n-params arity)))
-        (error "compile: calling "op" with the wrong number of arguments: "
-               args", while expecting "n-params)))
-
-    (free-args -c- arg-locs)
-    (free-temp op-tmp)))
-
-(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
-  (define-function compile-call-to-object (arg-locs -c-)
-    ;; TODO assert the type to be <target-function>
-    ;; TODO assert nr of args = params
-    (gen LOAD-OOP (LI32 program-code-offset))
-    (gen CALLPTR arg-locs)
-    ()))
-
-(define-function compile-call-to-global-function (op arg-locs -c-)
-  (if feature/redefinable-functions-in-target
-      (let ()
-        (comp op)
-        (compile-call-to-object arg-locs -c-))
-    (gen CALL (closure-code-label (<variable>-name op)) arg-locs))
-  ())
-
-(define-method compile-call-to (slave-value <target-function>) (op arg-locs -c-)
-  (comp op)
-  (compile-call-to-object arg-locs -c-))
-
 (define-method compile-call-to <TEMP32> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-object arg-locs -c-))
@@ -227,21 +169,10 @@
 ;;   (comp op)
 ;;   (compile-call-to-object arg-locs -c-))
 
-(define-method compile-call-to <expr> (op arg-locs -c-)
-  ;; NOTE the fact that a literal <expr> is found in a variable's
-  ;; value slot at compile time implies that it's a global definition.
-  (compile-call-to-global-function op arg-locs -c-)
-  (expr-n-required-parameters self))
-
 (define-method compile-call-to <C-function> (op arg-locs -c-)
   (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)
   (unless (<C-function>-vararg? self)
     (list-length (<C-function>-parameter-types self))))
-
-(define-method compile-call-to (slave-value <selector>) (op arg-locs -c-)
-  (compile-call-to-global-function op arg-locs -c-)
-  ;; TODO extract and return n-params
-  ())
 
 ;;;
 ;;; Special Forms

@@ -28,6 +28,10 @@
 ;; forwards
 (define compile-expr)
 (define compile-env)
+(define new-arg)
+(define free-args)
+(define new-temp) ; forward
+(define %free-temp) ; forward
 
 ;;;
 ;;; Utils
@@ -105,9 +109,6 @@
    gen-buffer
    current-value              ; the output of the previous-instruction
    ))
-
-(define new-temp) ; forward
-(define %free-temp) ; forward
 
 (define-function new-temp-index (c)
   (with-instance-accessors c <compiler>
