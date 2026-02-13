@@ -30,8 +30,8 @@
 (define compile-env)
 (define new-arg)
 (define free-args)
-(define new-temp) ; forward
-(define %free-temp) ; forward
+(define new-temp)
+(define %free-temp)
 
 ;;;
 ;;; Utils

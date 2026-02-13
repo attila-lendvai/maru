@@ -1,5 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; forwards
+(define *special-forms*)
+
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
 
@@ -739,3 +742,25 @@
     (gen op tmp1 tmp2)))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
+
+(define-method compile <pair> (-c-)
+  (let* ((op		(first self))
+         (op-is-a-var?	(variable? op))
+         (op-value	(if op-is-a-var?
+                            (or (<variable>-value op)
+                                (error "error: calling undefined function: "op))
+                          op))
+         (args		(rest self))
+         (arity		(list-length args))
+         (handler	()))
+    (emit-comment 2 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args)
+    ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
+    (cond
+      ((set handler (second (assq op-value (array-at *special-operators* arity))))
+       ((array-at +operator-compilers+ arity) handler args -c-))
+      ((is <fixed> op)
+       (let ((handler (cdr (assq op *special-forms*))))
+         (or handler (error "No handler for fixed form: " self))
+         (handler self -c-)))
+      (else
+       (compile-call-form op args false -c-)))))

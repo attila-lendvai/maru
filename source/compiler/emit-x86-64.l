@@ -326,29 +326,6 @@
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
-(define-method compile <pair> (-c-)
-  (let* ((op		(first self))
-         (op-is-a-var?	(variable? op))
-         (op-value	(if op-is-a-var?
-                            (or (<variable>-value op)
-                                (error "error: calling undefined function: "op))
-                          op))
-         (args		(rest self))
-         (arity		(list-length args))
-         (handler	()))
-    (when (<= 2 *compiler-verbosity*)
-      (emit-comment 1 "call of op: "op", op-is-a-var? "op-is-a-var?", args: " args))
-    ;; TODO add compiler-macros. use them to optimize stuff on the lisp semantic level
-    (cond
-      ((set handler (second (assq op-value (array-at *special-operators* arity))))
-       ((array-at +operator-compilers+ arity) handler args -c-))
-      ((is <fixed> op)
-       (let ((handler (cdr (assq op *special-forms*))))
-         (or handler (error "No handler for fixed form: " self))
-         (handler self -c-)))
-      (else
-       (compile-call-form op args false -c-)))))
-
 (require "source/compiler/emit-x86-objects.l")
 
 (define-method emit-prelude <x86-64-compiler> ()
