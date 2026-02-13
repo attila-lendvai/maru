@@ -623,3 +623,7 @@
   (assert (= (list-length expr) 2))
   (let ((label (emit-object/C-string (second expr) -c-)))
     (gen LOAD label)))
+
+(define-function compile/lambda (form -c-)
+  (let ((expr (eval form)))
+    (gen LOAD (compile-expr expr () -c-))))

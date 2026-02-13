@@ -335,10 +335,6 @@
       (else
        (gen STORE (GLOBAL64 (LABEL (<variable>-name var))))))))
 
-(define-function compile/lambda (form -c-)
-  (let ((expr (eval form)))
-    (gen LOAD (compile-expr expr () -c-))))
-
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))

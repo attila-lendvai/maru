@@ -25,8 +25,9 @@
 (define-selector compile)
 (define-selector compile-definition)
 (define-selector compile-call-to)
-
-(define compile-env) ; forward
+;; forwards
+(define compile-expr)
+(define compile-env)
 
 ;;;
 ;;; Utils
@@ -57,7 +58,6 @@
     n-params))
 
 ;; this, and the whole emit-object business is kinda KLUDGEy
-(define compile-expr) ; forward
 (define-function compile-array (self -c-)
   (let ((compiled (array (array-length self))))
     (for (i 0 (array-length self))
