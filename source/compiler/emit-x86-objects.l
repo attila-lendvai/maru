@@ -47,9 +47,6 @@
         (emit CELL counter))
       object-label)))
 
-;; forward
-(define emit-expr-code)
-
 ;; TODO should this also go through the COMPILE-OBJECT selector? but
 ;; what about the NAME arg then? there's a similar issue with
 ;; emit-object/<target-function>.

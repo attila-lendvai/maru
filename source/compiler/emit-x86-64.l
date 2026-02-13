@@ -37,8 +37,6 @@
 ;; way to achieve this.
 (define LITERAL LI64)
 
-(require "source/compiler/emit-x86-objects.l")
-
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
@@ -463,6 +461,8 @@
          (handler self -c-)))
       (else
        (compile-call-form op args false -c-)))))
+
+(require "source/compiler/emit-x86-objects.l")
 
 (define-method emit-prelude <x86-64-compiler> ()
   (verbosity 1 (warn "\nCompiling to x86-64\n\n"))
