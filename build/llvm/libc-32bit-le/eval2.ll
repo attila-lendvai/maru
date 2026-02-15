@@ -2249,7 +2249,7 @@ define %ptr @fatal2(%ptr %fmt, %ptr %arg1, %ptr %arg2) {
 	ret %ptr %r12
 }
 @"gc/minimum-growth-unit" = global %ptr inttoptr (%word 51200 to %ptr)
-@"gc/frequency" = global %ptr inttoptr (%word 32768 to %ptr)
+@"gc/frequency" = global %ptr inttoptr (%word 131072 to %ptr)
 @"gc/objects-live" = global %ptr inttoptr (%word 0 to %ptr)
 @"gc/bytes-used" = global %ptr inttoptr (%word 0 to %ptr)
 @"gc/bytes-free" = global %ptr inttoptr (%word 0 to %ptr)
@@ -4515,100 +4515,50 @@ define %ptr @"new-<context>"(%ptr %home, %ptr %caller, %ptr %env) {
 	%t1 = alloca %ptr
 	%t4 = alloca %ptr
 	%t5 = alloca %ptr
-	%t6 = alloca %ptr
 	store %ptr %home, %ptr* %t1
 	store %ptr %caller, %ptr* %t2
 	store %ptr %env, %ptr* %t3
-	%r1 = inttoptr %word 0 to %ptr
-	store %ptr %r1, %ptr* %t4
-	%r2 = inttoptr %word 1 to %ptr
-	store %ptr %r2, %ptr* %t6
-	%r3 = load %ptr, %ptr* %t2
-	store %ptr %r3, %ptr* %t6
-	%r4 = inttoptr %word 0 to %ptr
-	%r8 = ptrtoint %ptr %r4 to %word
-	%r7 = ptrtoint %ptr %r3 to %word
-	%r6 = icmp eq %word %r8, %r7
-	%r5 = inttoptr i1 %r6 to %ptr
-	%r10 = ptrtoint %ptr %r5 to %word
-	%r9 = icmp ne %word %r10, 0
-	br i1 %r9, label %L392, label %L393
-L393:
-	%r11 = inttoptr %word 3 to %ptr
-	%r12 = load %ptr, %ptr* %t2
-	%r16 = bitcast %ptr %r12 to [0 x %ptr]*
-	%r15 = ptrtoint %ptr %r11 to %word
-	%r14 = getelementptr [0 x %ptr], [0 x %ptr]* %r16, %word 0, %word %r15
-	%r13 = load %ptr, %ptr* %r14
-	store %ptr %r13, %ptr* %t4
-	store %ptr %r13, %ptr* %t6
-	%r17 = inttoptr %word 0 to %ptr
-	%r21 = ptrtoint %ptr %r17 to %word
-	%r20 = ptrtoint %ptr %r13 to %word
-	%r19 = icmp eq %word %r21, %r20
-	%r18 = inttoptr i1 %r19 to %ptr
-	%r23 = ptrtoint %ptr %r18 to %word
-	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L392, label %L394
-L394:
-	br label %L392
-L392:
-	%r24 = load %ptr, %ptr* %t6
-	%r26 = ptrtoint %ptr %r24 to %word
-	%r25 = icmp ne %word %r26, 0
-	br i1 %r25, label %L389, label %L390
-L389:
-	%r27 = load %ptr, %ptr* %t1
-	%r28 = inttoptr %word 0 to %ptr
-	%r29 = load %ptr, %ptr* %t4
-	%r33 = bitcast %ptr %r29 to [0 x %ptr]*
-	%r32 = ptrtoint %ptr %r28 to %word
-	%r31 = getelementptr [0 x %ptr], [0 x %ptr]* %r33, %word 0, %word %r32
-	store %ptr %r27, %ptr* %r31
-	%r30 = bitcast %ptr %r27 to %ptr
-	%r34 = load %ptr, %ptr* %t3
-	%r35 = inttoptr %word 1 to %ptr
-	%r36 = load %ptr, %ptr* %t4
-	%r40 = bitcast %ptr %r36 to [0 x %ptr]*
-	%r39 = ptrtoint %ptr %r35 to %word
-	%r38 = getelementptr [0 x %ptr], [0 x %ptr]* %r40, %word 0, %word %r39
-	store %ptr %r34, %ptr* %r38
-	%r37 = bitcast %ptr %r34 to %ptr
-	store %ptr %r37, %ptr* %t5
-	br label %L391
+	%r1 = load %ptr, %ptr* %t1
+	%r2 = load %ptr, %ptr* %t2
+	%r3 = load %ptr, %ptr* %t3
+	%r4 = call %ptr @"new-base-<context>"(%ptr %r1, %ptr %r2, %ptr %r3)
+	store %ptr %r4, %ptr* %t4
+	%r5 = inttoptr %word 1 to %ptr
+	store %ptr %r5, %ptr* %t5
+	%r6 = load %ptr, %ptr* %t2
+	store %ptr %r6, %ptr* %t5
+	%r7 = inttoptr %word 0 to %ptr
+	%r11 = ptrtoint %ptr %r7 to %word
+	%r10 = ptrtoint %ptr %r6 to %word
+	%r9 = icmp eq %word %r11, %r10
+	%r8 = inttoptr i1 %r9 to %ptr
+	%r13 = ptrtoint %ptr %r8 to %word
+	%r12 = icmp ne %word %r13, 0
+	br i1 %r12, label %L389, label %L390
 L390:
-	%r41 = load %ptr, %ptr* %t1
-	%r42 = load %ptr, %ptr* %t2
-	%r43 = load %ptr, %ptr* %t3
-	%r44 = call %ptr @"new-base-<context>"(%ptr %r41, %ptr %r42, %ptr %r43)
-	store %ptr %r44, %ptr* %t4
-	%r45 = load %ptr, %ptr* %t2
-	%r47 = ptrtoint %ptr %r45 to %word
-	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L395, label %L396
-L395:
-	%r48 = load %ptr, %ptr* %t4
-	%r49 = inttoptr %word 3 to %ptr
-	%r50 = load %ptr, %ptr* %t2
-	%r54 = bitcast %ptr %r50 to [0 x %ptr]*
-	%r53 = ptrtoint %ptr %r49 to %word
-	%r52 = getelementptr [0 x %ptr], [0 x %ptr]* %r54, %word 0, %word %r53
-	store %ptr %r48, %ptr* %r52
-	%r51 = bitcast %ptr %r48 to %ptr
-	store %ptr %r51, %ptr* %t6
-	br label %L397
-L396:
-	%r55 = inttoptr %word 0 to %ptr
-	store %ptr %r55, %ptr* %t6
-	br label %L397
-L397:
-	%r56 = load %ptr, %ptr* %t6
-	store %ptr %r56, %ptr* %t5
-	br label %L391
+	%r14 = load %ptr, %ptr* %t4
+	%r15 = inttoptr %word 3 to %ptr
+	%r16 = load %ptr, %ptr* %t2
+	%r20 = bitcast %ptr %r16 to [0 x %ptr]*
+	%r19 = ptrtoint %ptr %r15 to %word
+	%r18 = getelementptr [0 x %ptr], [0 x %ptr]* %r20, %word 0, %word %r19
+	store %ptr %r14, %ptr* %r18
+	%r17 = bitcast %ptr %r14 to %ptr
+	store %ptr %r17, %ptr* %t5
+	%r21 = inttoptr %word 0 to %ptr
+	%r25 = ptrtoint %ptr %r21 to %word
+	%r24 = ptrtoint %ptr %r17 to %word
+	%r23 = icmp eq %word %r25, %r24
+	%r22 = inttoptr i1 %r23 to %ptr
+	%r27 = ptrtoint %ptr %r22 to %word
+	%r26 = icmp ne %word %r27, 0
+	br i1 %r26, label %L389, label %L391
 L391:
-	%r57 = load %ptr, %ptr* %t5
-	%r58 = load %ptr, %ptr* %t4
-	ret %ptr %r58
+	br label %L389
+L389:
+	%r28 = load %ptr, %ptr* %t5
+	%r29 = load %ptr, %ptr* %t4
+	ret %ptr %r29
 }
 define %ptr @"k/concat-list"(%ptr %head, %ptr %tail) {
 	%t2 = alloca %ptr
@@ -4627,8 +4577,8 @@ define %ptr @"k/concat-list"(%ptr %head, %ptr %tail) {
 	%r4 = inttoptr i1 %r5 to %ptr
 	%r9 = ptrtoint %ptr %r4 to %word
 	%r8 = icmp ne %word %r9, 0
-	br i1 %r8, label %L398, label %L399
-L398:
+	br i1 %r8, label %L392, label %L393
+L392:
 	%r10 = inttoptr %word 1 to %ptr
 	%r11 = load %ptr, %ptr* %t1
 	%r15 = bitcast %ptr %r11 to [0 x %ptr]*
@@ -4655,12 +4605,12 @@ L398:
 	%r31 = call %ptr @"gc/pop-root"(%ptr %r29)
 	%r32 = load %ptr, %ptr* %t5
 	store %ptr %r32, %ptr* %t3
-	br label %L400
-L399:
+	br label %L394
+L393:
 	%r33 = load %ptr, %ptr* %t2
 	store %ptr %r33, %ptr* %t3
-	br label %L400
-L400:
+	br label %L394
+L394:
 	%r34 = load %ptr, %ptr* %t3
 	ret %ptr %r34
 }
@@ -4715,8 +4665,8 @@ define %ptr @"k/array-at"(%ptr %obj, %ptr %idx) {
 	%r18 = inttoptr i1 %r19 to %ptr
 	%r23 = ptrtoint %ptr %r18 to %word
 	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L401, label %L402
-L402:
+	br i1 %r22, label %L395, label %L396
+L396:
 	%r24 = load %ptr, %ptr* %t2
 	%r25 = load %ptr, %ptr* %t3
 	%r29 = bitcast %ptr %r25 to [0 x %ptr]*
@@ -4731,10 +4681,10 @@ L402:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L401, label %L403
-L403:
-	br label %L401
-L401:
+	br i1 %r35, label %L395, label %L397
+L397:
+	br label %L395
+L395:
 	%r37 = load %ptr, %ptr* %t5
 	ret %ptr %r37
 }
@@ -4774,8 +4724,8 @@ define %ptr @"set-k/array-at"(%ptr %obj, %ptr %idx, %ptr %val) {
 	%r19 = load %ptr, %ptr* %t4
 	%r21 = ptrtoint %ptr %r19 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L404, label %L405
-L404:
+	br i1 %r20, label %L398, label %L399
+L398:
 	%r22 = inttoptr %word 4 to %ptr
 	%r23 = load %ptr, %ptr* %t4
 	%r24 = call %ptr @"gc/object-size"(%ptr %r23)
@@ -4784,12 +4734,12 @@ L404:
 	%r26 = sdiv %word %r28, %r27
 	%r25 = inttoptr %word %r26 to %ptr
 	store %ptr %r25, %ptr* %t6
-	br label %L406
-L405:
+	br label %L400
+L399:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t6
-	br label %L406
-L406:
+	br label %L400
+L400:
 	%r30 = load %ptr, %ptr* %t6
 	store %ptr %r30, %ptr* %t6
 	%r31 = load %ptr, %ptr* %t6
@@ -4800,12 +4750,12 @@ L406:
 	%r33 = inttoptr i1 %r34 to %ptr
 	%r38 = ptrtoint %ptr %r33 to %word
 	%r37 = icmp ne %word %r38, 0
-	br i1 %r37, label %L407, label %L408
-L407:
+	br i1 %r37, label %L401, label %L402
+L401:
 	%r39 = inttoptr %word 0 to %ptr
 	store %ptr %r39, %ptr* %t7
-	br label %L409
-L408:
+	br label %L403
+L402:
 	%r40 = load %ptr, %ptr* %t6
 	%r41 = inttoptr %word 0 to %ptr
 	%r45 = ptrtoint %ptr %r41 to %word
@@ -4814,20 +4764,20 @@ L408:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L410, label %L411
-L410:
+	br i1 %r46, label %L404, label %L405
+L404:
 	%r48 = inttoptr %word 4 to %ptr
 	store %ptr %r48, %ptr* %t6
 	store %ptr %r48, %ptr* %t8
-	br label %L412
-L411:
+	br label %L406
+L405:
 	%r49 = inttoptr %word 0 to %ptr
 	store %ptr %r49, %ptr* %t8
-	br label %L412
-L412:
+	br label %L406
+L406:
 	%r50 = load %ptr, %ptr* %t8
-	br label %L414
-L413:
+	br label %L408
+L407:
 	%r51 = inttoptr %word 2 to %ptr
 	%r52 = load %ptr, %ptr* %t6
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -4835,8 +4785,8 @@ L413:
 	%r54 = mul %word %r56, %r55
 	%r53 = inttoptr %word %r54 to %ptr
 	store %ptr %r53, %ptr* %t6
-	br label %L414
-L414:
+	br label %L408
+L408:
 	%r57 = load %ptr, %ptr* %t6
 	%r58 = load %ptr, %ptr* %t2
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -4849,8 +4799,8 @@ L414:
 	%r63 = inttoptr %word %r64 to %ptr
 	%r68 = ptrtoint %ptr %r63 to %word
 	%r67 = icmp ne %word %r68, 0
-	br i1 %r67, label %L413, label %L415
-L415:
+	br i1 %r67, label %L407, label %L409
+L409:
 	%r69 = inttoptr %word 4 to %ptr
 	%r70 = inttoptr %word 4 to %ptr
 	%r71 = load %ptr, %ptr* %t6
@@ -4888,8 +4838,8 @@ L415:
 	%r99 = call %ptr @"gc/pop-root"(%ptr %r97)
 	%r100 = load %ptr, %ptr* %t9
 	store %ptr %r100, %ptr* %t7
-	br label %L409
-L409:
+	br label %L403
+L403:
 	%r101 = load %ptr, %ptr* %t7
 	%r102 = load %ptr, %ptr* %t2
 	%r103 = load %ptr, %ptr* %t5
@@ -4899,8 +4849,8 @@ L409:
 	%r104 = inttoptr i1 %r105 to %ptr
 	%r109 = ptrtoint %ptr %r104 to %word
 	%r108 = icmp ne %word %r109, 0
-	br i1 %r108, label %L416, label %L417
-L416:
+	br i1 %r108, label %L410, label %L411
+L410:
 	%r110 = inttoptr %word 1 to %ptr
 	%r111 = inttoptr %word 1 to %ptr
 	%r112 = load %ptr, %ptr* %t2
@@ -4925,12 +4875,12 @@ L416:
 	store %ptr %r122, %ptr* %r129
 	%r128 = bitcast %ptr %r122 to %ptr
 	store %ptr %r128, %ptr* %t7
-	br label %L418
-L417:
+	br label %L412
+L411:
 	%r132 = inttoptr %word 0 to %ptr
 	store %ptr %r132, %ptr* %t7
-	br label %L418
-L418:
+	br label %L412
+L412:
 	%r133 = load %ptr, %ptr* %t7
 	%r134 = load %ptr, %ptr* %t3
 	%r135 = load %ptr, %ptr* %t2
@@ -4979,8 +4929,8 @@ define %ptr @"k/array-insert"(%ptr %obj, %ptr %idx, %ptr %value) {
 	%r8 = inttoptr i1 %r9 to %ptr
 	%r13 = ptrtoint %ptr %r8 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L419, label %L420
-L419:
+	br i1 %r12, label %L413, label %L414
+L413:
 	%r14 = inttoptr %word 1 to %ptr
 	%r15 = load %ptr, %ptr* %t1
 	%r19 = bitcast %ptr %r15 to [0 x %ptr]*
@@ -5021,12 +4971,12 @@ L419:
 	%ffi-cast49 = ptrtoint %ptr %r45 to i32
 	%r50 = call %ptr @memmove(%ptr %r33, %ptr %r37, i32 %ffi-cast49)
 	store %ptr %r50, %ptr* %t5
-	br label %L421
-L420:
+	br label %L415
+L414:
 	%r51 = inttoptr %word 0 to %ptr
 	store %ptr %r51, %ptr* %t5
-	br label %L421
-L421:
+	br label %L415
+L415:
 	%r52 = load %ptr, %ptr* %t5
 	%r53 = load %ptr, %ptr* %t1
 	%r54 = load %ptr, %ptr* %t2
@@ -5117,8 +5067,8 @@ define %ptr @"k/string-at"(%ptr %obj, %ptr %idx) {
 	%r18 = inttoptr i1 %r19 to %ptr
 	%r23 = ptrtoint %ptr %r18 to %word
 	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L422, label %L423
-L423:
+	br i1 %r22, label %L416, label %L417
+L417:
 	%r24 = load %ptr, %ptr* %t2
 	%r25 = load %ptr, %ptr* %t3
 	%r30 = bitcast %ptr %r25 to [0 x i8]*
@@ -5134,10 +5084,10 @@ L423:
 	%r32 = inttoptr i1 %r33 to %ptr
 	%r37 = ptrtoint %ptr %r32 to %word
 	%r36 = icmp ne %word %r37, 0
-	br i1 %r36, label %L422, label %L424
-L424:
-	br label %L422
-L422:
+	br i1 %r36, label %L416, label %L418
+L418:
+	br label %L416
+L416:
 	%r38 = load %ptr, %ptr* %t5
 	ret %ptr %r38
 }
@@ -5177,8 +5127,8 @@ define %ptr @"set-k/string-at"(%ptr %obj, %ptr %idx, %ptr %val) {
 	%r19 = load %ptr, %ptr* %t4
 	%r21 = ptrtoint %ptr %r19 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L425, label %L426
-L425:
+	br i1 %r20, label %L419, label %L420
+L419:
 	%r22 = inttoptr %word 1 to %ptr
 	%r23 = load %ptr, %ptr* %t4
 	%r24 = call %ptr @"gc/object-size"(%ptr %r23)
@@ -5187,12 +5137,12 @@ L425:
 	%r26 = sdiv %word %r28, %r27
 	%r25 = inttoptr %word %r26 to %ptr
 	store %ptr %r25, %ptr* %t6
-	br label %L427
-L426:
+	br label %L421
+L420:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t6
-	br label %L427
-L427:
+	br label %L421
+L421:
 	%r30 = load %ptr, %ptr* %t6
 	store %ptr %r30, %ptr* %t6
 	%r31 = load %ptr, %ptr* %t6
@@ -5203,12 +5153,12 @@ L427:
 	%r33 = inttoptr i1 %r34 to %ptr
 	%r38 = ptrtoint %ptr %r33 to %word
 	%r37 = icmp ne %word %r38, 0
-	br i1 %r37, label %L428, label %L429
-L428:
+	br i1 %r37, label %L422, label %L423
+L422:
 	%r39 = inttoptr %word 0 to %ptr
 	store %ptr %r39, %ptr* %t7
-	br label %L430
-L429:
+	br label %L424
+L423:
 	%r40 = load %ptr, %ptr* %t6
 	%r41 = inttoptr %word 0 to %ptr
 	%r45 = ptrtoint %ptr %r41 to %word
@@ -5217,20 +5167,20 @@ L429:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L431, label %L432
-L431:
+	br i1 %r46, label %L425, label %L426
+L425:
 	%r48 = inttoptr %word 4 to %ptr
 	store %ptr %r48, %ptr* %t6
 	store %ptr %r48, %ptr* %t8
-	br label %L433
-L432:
+	br label %L427
+L426:
 	%r49 = inttoptr %word 0 to %ptr
 	store %ptr %r49, %ptr* %t8
-	br label %L433
-L433:
+	br label %L427
+L427:
 	%r50 = load %ptr, %ptr* %t8
-	br label %L435
-L434:
+	br label %L429
+L428:
 	%r51 = inttoptr %word 2 to %ptr
 	%r52 = load %ptr, %ptr* %t6
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -5238,8 +5188,8 @@ L434:
 	%r54 = mul %word %r56, %r55
 	%r53 = inttoptr %word %r54 to %ptr
 	store %ptr %r53, %ptr* %t6
-	br label %L435
-L435:
+	br label %L429
+L429:
 	%r57 = load %ptr, %ptr* %t6
 	%r58 = load %ptr, %ptr* %t2
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -5252,8 +5202,8 @@ L435:
 	%r63 = inttoptr %word %r64 to %ptr
 	%r68 = ptrtoint %ptr %r63 to %word
 	%r67 = icmp ne %word %r68, 0
-	br i1 %r67, label %L434, label %L436
-L436:
+	br i1 %r67, label %L428, label %L430
+L430:
 	%r69 = inttoptr %word 4 to %ptr
 	%r70 = inttoptr %word 1 to %ptr
 	%r71 = load %ptr, %ptr* %t6
@@ -5286,8 +5236,8 @@ L436:
 	%r94 = call %ptr @"gc/pop-root"(%ptr %r92)
 	%r95 = load %ptr, %ptr* %t9
 	store %ptr %r95, %ptr* %t7
-	br label %L430
-L430:
+	br label %L424
+L424:
 	%r96 = load %ptr, %ptr* %t7
 	%r97 = load %ptr, %ptr* %t2
 	%r98 = load %ptr, %ptr* %t5
@@ -5297,8 +5247,8 @@ L430:
 	%r99 = inttoptr i1 %r100 to %ptr
 	%r104 = ptrtoint %ptr %r99 to %word
 	%r103 = icmp ne %word %r104, 0
-	br i1 %r103, label %L437, label %L438
-L437:
+	br i1 %r103, label %L431, label %L432
+L431:
 	%r105 = inttoptr %word 1 to %ptr
 	%r106 = inttoptr %word 1 to %ptr
 	%r107 = load %ptr, %ptr* %t2
@@ -5323,12 +5273,12 @@ L437:
 	store %ptr %r117, %ptr* %r124
 	%r123 = bitcast %ptr %r117 to %ptr
 	store %ptr %r123, %ptr* %t7
-	br label %L439
-L438:
+	br label %L433
+L432:
 	%r127 = inttoptr %word 0 to %ptr
 	store %ptr %r127, %ptr* %t7
-	br label %L439
-L439:
+	br label %L433
+L433:
 	%r128 = load %ptr, %ptr* %t7
 	%r129 = load %ptr, %ptr* %t3
 	%r130 = load %ptr, %ptr* %t2
@@ -5379,8 +5329,8 @@ define %ptr @"k/string-insert"(%ptr %obj, %ptr %idx, %ptr %value) {
 	%r8 = inttoptr i1 %r9 to %ptr
 	%r13 = ptrtoint %ptr %r8 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L440, label %L441
-L440:
+	br i1 %r12, label %L434, label %L435
+L434:
 	%r14 = inttoptr %word 1 to %ptr
 	%r15 = load %ptr, %ptr* %t1
 	%r19 = bitcast %ptr %r15 to [0 x %ptr]*
@@ -5416,12 +5366,12 @@ L440:
 	%ffi-cast44 = ptrtoint %ptr %r40 to i32
 	%r45 = call %ptr @memmove(%ptr %r33, %ptr %r37, i32 %ffi-cast44)
 	store %ptr %r45, %ptr* %t5
-	br label %L442
-L441:
+	br label %L436
+L435:
 	%r46 = inttoptr %word 0 to %ptr
 	store %ptr %r46, %ptr* %t5
-	br label %L442
-L442:
+	br label %L436
+L436:
 	%r47 = load %ptr, %ptr* %t5
 	%r48 = load %ptr, %ptr* %t1
 	%r49 = load %ptr, %ptr* %t2
@@ -5487,8 +5437,8 @@ define %ptr @array-binary-search(%ptr %array, %ptr %item, %ptr %comparator, %ptr
 	%r6 = sub %word %r8, %r7
 	%r5 = inttoptr %word %r6 to %ptr
 	store %ptr %r5, %ptr* %t6
-	br label %L444
-L443:
+	br label %L438
+L437:
 	%r9 = inttoptr %word 2 to %ptr
 	%r10 = load %ptr, %ptr* %t6
 	%r11 = load %ptr, %ptr* %t5
@@ -5519,8 +5469,8 @@ L443:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L446, label %L447
-L446:
+	br i1 %r34, label %L440, label %L441
+L440:
 	%r36 = inttoptr %word 1 to %ptr
 	%r37 = load %ptr, %ptr* %t7
 	%r41 = ptrtoint %ptr %r37 to %word
@@ -5529,8 +5479,8 @@ L446:
 	%r38 = inttoptr %word %r39 to %ptr
 	store %ptr %r38, %ptr* %t6
 	store %ptr %r38, %ptr* %t10
-	br label %L448
-L447:
+	br label %L442
+L441:
 	%r42 = inttoptr %word 0 to %ptr
 	%r43 = load %ptr, %ptr* %t9
 	%r47 = ptrtoint %ptr %r43 to %word
@@ -5539,8 +5489,8 @@ L447:
 	%r44 = inttoptr i1 %r45 to %ptr
 	%r49 = ptrtoint %ptr %r44 to %word
 	%r48 = icmp ne %word %r49, 0
-	br i1 %r48, label %L449, label %L450
-L449:
+	br i1 %r48, label %L443, label %L444
+L443:
 	%r50 = inttoptr %word 1 to %ptr
 	%r51 = load %ptr, %ptr* %t7
 	%r55 = ptrtoint %ptr %r51 to %word
@@ -5549,20 +5499,20 @@ L449:
 	%r52 = inttoptr %word %r53 to %ptr
 	store %ptr %r52, %ptr* %t5
 	store %ptr %r52, %ptr* %t11
-	br label %L451
-L450:
+	br label %L445
+L444:
 	%r56 = load %ptr, %ptr* %t8
 	ret %ptr %r56
 	store %ptr %r56, %ptr* %t11
-	br label %L451
-L451:
+	br label %L445
+L445:
 	%r58 = load %ptr, %ptr* %t11
 	store %ptr %r58, %ptr* %t10
-	br label %L448
-L448:
+	br label %L442
+L442:
 	%r59 = load %ptr, %ptr* %t10
-	br label %L444
-L444:
+	br label %L438
+L438:
 	%r60 = load %ptr, %ptr* %t6
 	%r61 = load %ptr, %ptr* %t5
 	%r65 = ptrtoint %ptr %r61 to %word
@@ -5571,13 +5521,13 @@ L444:
 	%r62 = inttoptr i1 %r63 to %ptr
 	%r67 = ptrtoint %ptr %r62 to %word
 	%r66 = icmp ne %word %r67, 0
-	br i1 %r66, label %L443, label %L445
-L445:
+	br i1 %r66, label %L437, label %L439
+L439:
 	%r68 = load %ptr, %ptr* %t4
 	%r70 = ptrtoint %ptr %r68 to %word
 	%r69 = icmp ne %word %r70, 0
-	br i1 %r69, label %L452, label %L453
-L452:
+	br i1 %r69, label %L446, label %L447
+L446:
 	%r71 = load %ptr, %ptr* %t1
 	%r72 = load %ptr, %ptr* %t5
 	%r73 = load %ptr, %ptr* %t2
@@ -5585,12 +5535,12 @@ L452:
 	%r76 = bitcast %ptr %r74 to %ptr (%ptr, %ptr, %ptr)*
 	%r75 = call %ptr %r76(%ptr %r71, %ptr %r72, %ptr %r73)
 	store %ptr %r75, %ptr* %t7
-	br label %L454
-L453:
+	br label %L448
+L447:
 	%r77 = inttoptr %word 0 to %ptr
 	store %ptr %r77, %ptr* %t7
-	br label %L454
-L454:
+	br label %L448
+L448:
 	%r78 = load %ptr, %ptr* %t7
 	ret %ptr %r78
 }
@@ -5645,8 +5595,8 @@ define %ptr @buffer-at(%ptr %obj, %ptr %idx) {
 	%r18 = inttoptr i1 %r19 to %ptr
 	%r23 = ptrtoint %ptr %r18 to %word
 	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L455, label %L456
-L456:
+	br i1 %r22, label %L449, label %L450
+L450:
 	%r24 = load %ptr, %ptr* %t2
 	%r25 = load %ptr, %ptr* %t3
 	%r30 = bitcast %ptr %r25 to [0 x i8]*
@@ -5662,10 +5612,10 @@ L456:
 	%r32 = inttoptr i1 %r33 to %ptr
 	%r37 = ptrtoint %ptr %r32 to %word
 	%r36 = icmp ne %word %r37, 0
-	br i1 %r36, label %L455, label %L457
-L457:
-	br label %L455
-L455:
+	br i1 %r36, label %L449, label %L451
+L451:
+	br label %L449
+L449:
 	%r38 = load %ptr, %ptr* %t5
 	ret %ptr %r38
 }
@@ -5705,8 +5655,8 @@ define %ptr @set-buffer-at(%ptr %obj, %ptr %idx, %ptr %val) {
 	%r19 = load %ptr, %ptr* %t4
 	%r21 = ptrtoint %ptr %r19 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L458, label %L459
-L458:
+	br i1 %r20, label %L452, label %L453
+L452:
 	%r22 = inttoptr %word 1 to %ptr
 	%r23 = load %ptr, %ptr* %t4
 	%r24 = call %ptr @"gc/object-size"(%ptr %r23)
@@ -5715,12 +5665,12 @@ L458:
 	%r26 = sdiv %word %r28, %r27
 	%r25 = inttoptr %word %r26 to %ptr
 	store %ptr %r25, %ptr* %t6
-	br label %L460
-L459:
+	br label %L454
+L453:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t6
-	br label %L460
-L460:
+	br label %L454
+L454:
 	%r30 = load %ptr, %ptr* %t6
 	store %ptr %r30, %ptr* %t6
 	%r31 = load %ptr, %ptr* %t6
@@ -5731,12 +5681,12 @@ L460:
 	%r33 = inttoptr i1 %r34 to %ptr
 	%r38 = ptrtoint %ptr %r33 to %word
 	%r37 = icmp ne %word %r38, 0
-	br i1 %r37, label %L461, label %L462
-L461:
+	br i1 %r37, label %L455, label %L456
+L455:
 	%r39 = inttoptr %word 0 to %ptr
 	store %ptr %r39, %ptr* %t7
-	br label %L463
-L462:
+	br label %L457
+L456:
 	%r40 = load %ptr, %ptr* %t6
 	%r41 = inttoptr %word 0 to %ptr
 	%r45 = ptrtoint %ptr %r41 to %word
@@ -5745,20 +5695,20 @@ L462:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L464, label %L465
-L464:
+	br i1 %r46, label %L458, label %L459
+L458:
 	%r48 = inttoptr %word 4 to %ptr
 	store %ptr %r48, %ptr* %t6
 	store %ptr %r48, %ptr* %t8
-	br label %L466
-L465:
+	br label %L460
+L459:
 	%r49 = inttoptr %word 0 to %ptr
 	store %ptr %r49, %ptr* %t8
-	br label %L466
-L466:
+	br label %L460
+L460:
 	%r50 = load %ptr, %ptr* %t8
-	br label %L468
-L467:
+	br label %L462
+L461:
 	%r51 = inttoptr %word 2 to %ptr
 	%r52 = load %ptr, %ptr* %t6
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -5766,8 +5716,8 @@ L467:
 	%r54 = mul %word %r56, %r55
 	%r53 = inttoptr %word %r54 to %ptr
 	store %ptr %r53, %ptr* %t6
-	br label %L468
-L468:
+	br label %L462
+L462:
 	%r57 = load %ptr, %ptr* %t6
 	%r58 = load %ptr, %ptr* %t2
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -5780,8 +5730,8 @@ L468:
 	%r63 = inttoptr %word %r64 to %ptr
 	%r68 = ptrtoint %ptr %r63 to %word
 	%r67 = icmp ne %word %r68, 0
-	br i1 %r67, label %L467, label %L469
-L469:
+	br i1 %r67, label %L461, label %L463
+L463:
 	%r69 = inttoptr %word 4 to %ptr
 	%r70 = inttoptr %word 1 to %ptr
 	%r71 = load %ptr, %ptr* %t6
@@ -5814,8 +5764,8 @@ L469:
 	%r94 = call %ptr @"gc/pop-root"(%ptr %r92)
 	%r95 = load %ptr, %ptr* %t9
 	store %ptr %r95, %ptr* %t7
-	br label %L463
-L463:
+	br label %L457
+L457:
 	%r96 = load %ptr, %ptr* %t7
 	%r97 = load %ptr, %ptr* %t2
 	%r98 = load %ptr, %ptr* %t5
@@ -5825,8 +5775,8 @@ L463:
 	%r99 = inttoptr i1 %r100 to %ptr
 	%r104 = ptrtoint %ptr %r99 to %word
 	%r103 = icmp ne %word %r104, 0
-	br i1 %r103, label %L470, label %L471
-L470:
+	br i1 %r103, label %L464, label %L465
+L464:
 	%r105 = inttoptr %word 1 to %ptr
 	%r106 = inttoptr %word 1 to %ptr
 	%r107 = load %ptr, %ptr* %t2
@@ -5851,12 +5801,12 @@ L470:
 	store %ptr %r117, %ptr* %r124
 	%r123 = bitcast %ptr %r117 to %ptr
 	store %ptr %r123, %ptr* %t7
-	br label %L472
-L471:
+	br label %L466
+L465:
 	%r127 = inttoptr %word 0 to %ptr
 	store %ptr %r127, %ptr* %t7
-	br label %L472
-L472:
+	br label %L466
+L466:
 	%r128 = load %ptr, %ptr* %t7
 	%r129 = load %ptr, %ptr* %t3
 	%r130 = load %ptr, %ptr* %t2
@@ -5907,8 +5857,8 @@ define %ptr @buffer-insert(%ptr %obj, %ptr %idx, %ptr %value) {
 	%r8 = inttoptr i1 %r9 to %ptr
 	%r13 = ptrtoint %ptr %r8 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L473, label %L474
-L473:
+	br i1 %r12, label %L467, label %L468
+L467:
 	%r14 = inttoptr %word 1 to %ptr
 	%r15 = load %ptr, %ptr* %t1
 	%r19 = bitcast %ptr %r15 to [0 x %ptr]*
@@ -5944,12 +5894,12 @@ L473:
 	%ffi-cast44 = ptrtoint %ptr %r40 to i32
 	%r45 = call %ptr @memmove(%ptr %r33, %ptr %r37, i32 %ffi-cast44)
 	store %ptr %r45, %ptr* %t5
-	br label %L475
-L474:
+	br label %L469
+L468:
 	%r46 = inttoptr %word 0 to %ptr
 	store %ptr %r46, %ptr* %t5
-	br label %L475
-L475:
+	br label %L469
+L469:
 	%r47 = load %ptr, %ptr* %t5
 	%r48 = load %ptr, %ptr* %t1
 	%r49 = load %ptr, %ptr* %t2
@@ -6062,8 +6012,8 @@ define %ptr @buffer-append-string(%ptr %buf, %ptr %str) {
 	store %ptr %r1, %ptr* %t3
 	%r2 = inttoptr %word 0 to %ptr
 	store %ptr %r2, %ptr* %t4
-	br label %L477
-L476:
+	br label %L471
+L470:
 	%r3 = load %ptr, %ptr* %t1
 	%r4 = load %ptr, %ptr* %t4
 	%r5 = call %ptr @buffer-append(%ptr %r3, %ptr %r4)
@@ -6074,8 +6024,8 @@ L476:
 	%r9 = add %word %r11, %r10
 	%r8 = inttoptr %word %r9 to %ptr
 	store %ptr %r8, %ptr* %t3
-	br label %L477
-L477:
+	br label %L471
+L471:
 	%r12 = load %ptr, %ptr* %t3
 	%r13 = load %ptr, %ptr* %t2
 	%r18 = bitcast %ptr %r13 to [0 x i8]*
@@ -6086,41 +6036,41 @@ L477:
 	store %ptr %r14, %ptr* %t4
 	%r20 = ptrtoint %ptr %r14 to %word
 	%r19 = icmp ne %word %r20, 0
-	br i1 %r19, label %L476, label %L478
-L478:
+	br i1 %r19, label %L470, label %L472
+L472:
 	ret %ptr %r14
 }
-@str482 = private unnamed_addr constant [3 x i8] c"()\00"
-@str486 = private unnamed_addr constant [4 x i8] c"%ld\00"
-@str493 = private unnamed_addr constant [3 x i8] c"%s\00"
-@str494 = private unnamed_addr constant [2 x i8] c"\22\00"
-@str507 = private unnamed_addr constant [3 x i8] c"\5C\22\00"
-@str511 = private unnamed_addr constant [3 x i8] c"\5C\5C\00"
-@str512 = private unnamed_addr constant [3 x i8] c"%c\00"
-@str513 = private unnamed_addr constant [6 x i8] c"\5C%03o\00"
-@str514 = private unnamed_addr constant [2 x i8] c"\22\00"
-@str518 = private unnamed_addr constant [3 x i8] c"%s\00"
-@str522 = private unnamed_addr constant [2 x i8] c"(\00"
-@str528 = private unnamed_addr constant [2 x i8] c" \00"
-@str532 = private unnamed_addr constant [4 x i8] c" . \00"
-@str534 = private unnamed_addr constant [2 x i8] c")\00"
-@str538 = private unnamed_addr constant [7 x i8] c"Array(\00"
-@str544 = private unnamed_addr constant [2 x i8] c" \00"
-@str546 = private unnamed_addr constant [2 x i8] c")\00"
-@str550 = private unnamed_addr constant [6 x i8] c"Expr<\00"
+@str476 = private unnamed_addr constant [3 x i8] c"()\00"
+@str480 = private unnamed_addr constant [4 x i8] c"%ld\00"
+@str487 = private unnamed_addr constant [3 x i8] c"%s\00"
+@str488 = private unnamed_addr constant [2 x i8] c"\22\00"
+@str501 = private unnamed_addr constant [3 x i8] c"\5C\22\00"
+@str505 = private unnamed_addr constant [3 x i8] c"\5C\5C\00"
+@str506 = private unnamed_addr constant [3 x i8] c"%c\00"
+@str507 = private unnamed_addr constant [6 x i8] c"\5C%03o\00"
+@str508 = private unnamed_addr constant [2 x i8] c"\22\00"
+@str512 = private unnamed_addr constant [3 x i8] c"%s\00"
+@str516 = private unnamed_addr constant [2 x i8] c"(\00"
+@str522 = private unnamed_addr constant [2 x i8] c" \00"
+@str526 = private unnamed_addr constant [4 x i8] c" . \00"
+@str528 = private unnamed_addr constant [2 x i8] c")\00"
+@str532 = private unnamed_addr constant [7 x i8] c"Array(\00"
+@str538 = private unnamed_addr constant [2 x i8] c" \00"
+@str540 = private unnamed_addr constant [2 x i8] c")\00"
+@str544 = private unnamed_addr constant [6 x i8] c"Expr<\00"
+@str545 = private unnamed_addr constant [2 x i8] c">\00"
+@str549 = private unnamed_addr constant [6 x i8] c"Form<\00"
+@str550 = private unnamed_addr constant [2 x i8] c",\00"
 @str551 = private unnamed_addr constant [2 x i8] c">\00"
-@str555 = private unnamed_addr constant [6 x i8] c"Form<\00"
-@str556 = private unnamed_addr constant [2 x i8] c",\00"
-@str557 = private unnamed_addr constant [2 x i8] c">\00"
-@str561 = private unnamed_addr constant [7 x i8] c"Fixed<\00"
-@str562 = private unnamed_addr constant [2 x i8] c">\00"
-@str566 = private unnamed_addr constant [9 x i8] c"Subr<%s>\00"
-@str573 = private unnamed_addr constant [2 x i8] c".\00"
-@str574 = private unnamed_addr constant [2 x i8] c"+\00"
-@str584 = private unnamed_addr constant [13 x i8] c"Env<%ld,%ld>\00"
-@str585 = private unnamed_addr constant [6 x i8] c"Env<>\00"
-@str589 = private unnamed_addr constant [10 x i8] c"Context<>\00"
-@str590 = private unnamed_addr constant [11 x i8] c"<type:%ld>\00"
+@str555 = private unnamed_addr constant [7 x i8] c"Fixed<\00"
+@str556 = private unnamed_addr constant [2 x i8] c">\00"
+@str560 = private unnamed_addr constant [9 x i8] c"Subr<%s>\00"
+@str567 = private unnamed_addr constant [2 x i8] c".\00"
+@str568 = private unnamed_addr constant [2 x i8] c"+\00"
+@str578 = private unnamed_addr constant [13 x i8] c"Env<%ld,%ld>\00"
+@str579 = private unnamed_addr constant [6 x i8] c"Env<>\00"
+@str583 = private unnamed_addr constant [10 x i8] c"Context<>\00"
+@str584 = private unnamed_addr constant [11 x i8] c"<type:%ld>\00"
 define %ptr @do_print(%ptr %obj, %ptr %storing) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -6155,14 +6105,14 @@ define %ptr @do_print(%ptr %obj, %ptr %storing) {
 	%r6 = inttoptr i1 %r7 to %ptr
 	%r11 = ptrtoint %ptr %r6 to %word
 	%r10 = icmp ne %word %r11, 0
-	br i1 %r10, label %L479, label %L480
-L479:
-	%r12 = getelementptr [3 x i8], [3 x i8]* @str482, %word 0, %word 0
+	br i1 %r10, label %L473, label %L474
+L473:
+	%r12 = getelementptr [3 x i8], [3 x i8]* @str476, %word 0, %word 0
 	%r14 = call i32 (%ptr, ...) @printf(%ptr %r12)
 	%r15 = inttoptr %word %r14 to %ptr
 	store %ptr %r15, %ptr* %t4
-	br label %L481
-L480:
+	br label %L475
+L474:
 	%r16 = inttoptr %word 6 to %ptr
 	%r17 = load %ptr, %ptr* %t3
 	%r21 = ptrtoint %ptr %r17 to %word
@@ -6171,9 +6121,9 @@ L480:
 	%r18 = inttoptr i1 %r19 to %ptr
 	%r23 = ptrtoint %ptr %r18 to %word
 	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L483, label %L484
-L483:
-	%r24 = getelementptr [4 x i8], [4 x i8]* @str486, %word 0, %word 0
+	br i1 %r22, label %L477, label %L478
+L477:
+	%r24 = getelementptr [4 x i8], [4 x i8]* @str480, %word 0, %word 0
 	%r26 = inttoptr %word 1 to %ptr
 	%r27 = load %ptr, %ptr* %t1
 	%r31 = ptrtoint %ptr %r27 to %word
@@ -6183,8 +6133,8 @@ L483:
 	%r32 = call i32 (%ptr, ...) @printf(%ptr %r24, %ptr %r28)
 	%r33 = inttoptr %word %r32 to %ptr
 	store %ptr %r33, %ptr* %t5
-	br label %L485
-L484:
+	br label %L479
+L478:
 	%r34 = inttoptr %word 8 to %ptr
 	%r35 = load %ptr, %ptr* %t3
 	%r39 = ptrtoint %ptr %r35 to %word
@@ -6193,8 +6143,8 @@ L484:
 	%r36 = inttoptr i1 %r37 to %ptr
 	%r41 = ptrtoint %ptr %r36 to %word
 	%r40 = icmp ne %word %r41, 0
-	br i1 %r40, label %L487, label %L488
-L487:
+	br i1 %r40, label %L481, label %L482
+L481:
 	%r42 = load %ptr, %ptr* %t1
 	%r43 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r42)
 	%r44 = inttoptr %word 1 to %ptr
@@ -6212,24 +6162,24 @@ L487:
 	%r52 = inttoptr %word %r53 to %ptr
 	%r57 = ptrtoint %ptr %r52 to %word
 	%r56 = icmp ne %word %r57, 0
-	br i1 %r56, label %L490, label %L491
-L490:
-	%r58 = getelementptr [3 x i8], [3 x i8]* @str493, %word 0, %word 0
+	br i1 %r56, label %L484, label %L485
+L484:
+	%r58 = getelementptr [3 x i8], [3 x i8]* @str487, %word 0, %word 0
 	%r60 = load %ptr, %ptr* %t7
 	%r61 = call i32 (%ptr, ...) @printf(%ptr %r58, %ptr %r60)
 	%r62 = inttoptr %word %r61 to %ptr
 	store %ptr %r62, %ptr* %t8
-	br label %L492
-L491:
+	br label %L486
+L485:
 	%r63 = inttoptr %word 0 to %ptr
 	store %ptr %r63, %ptr* %t9
 	%r64 = inttoptr %word 0 to %ptr
 	store %ptr %r64, %ptr* %t10
-	%r65 = getelementptr [2 x i8], [2 x i8]* @str494, %word 0, %word 0
+	%r65 = getelementptr [2 x i8], [2 x i8]* @str488, %word 0, %word 0
 	%r67 = call i32 (%ptr, ...) @printf(%ptr %r65)
 	%r68 = inttoptr %word %r67 to %ptr
-	br label %L496
-L495:
+	br label %L490
+L489:
 	%r69 = inttoptr %word 1 to %ptr
 	store %ptr %r69, %ptr* %t12
 	%r70 = load %ptr, %ptr* %t10
@@ -6246,8 +6196,8 @@ L495:
 	%r77 = inttoptr i1 %r78 to %ptr
 	%r82 = ptrtoint %ptr %r77 to %word
 	%r81 = icmp ne %word %r82, 0
-	br i1 %r81, label %L501, label %L502
-L502:
+	br i1 %r81, label %L495, label %L496
+L496:
 	%r83 = inttoptr %word 126 to %ptr
 	%r84 = load %ptr, %ptr* %t10
 	%r88 = ptrtoint %ptr %r84 to %word
@@ -6262,15 +6212,15 @@ L502:
 	%r90 = inttoptr i1 %r91 to %ptr
 	%r95 = ptrtoint %ptr %r90 to %word
 	%r94 = icmp ne %word %r95, 0
-	br i1 %r94, label %L501, label %L503
-L503:
-	br label %L501
-L501:
+	br i1 %r94, label %L495, label %L497
+L497:
+	br label %L495
+L495:
 	%r96 = load %ptr, %ptr* %t12
 	%r98 = ptrtoint %ptr %r96 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L498, label %L499
-L498:
+	br i1 %r97, label %L492, label %L493
+L492:
 	%r99 = inttoptr %word 34 to %ptr
 	%r100 = load %ptr, %ptr* %t10
 	%r104 = ptrtoint %ptr %r100 to %word
@@ -6279,14 +6229,14 @@ L498:
 	%r101 = inttoptr i1 %r102 to %ptr
 	%r106 = ptrtoint %ptr %r101 to %word
 	%r105 = icmp ne %word %r106, 0
-	br i1 %r105, label %L504, label %L505
-L504:
-	%r107 = getelementptr [3 x i8], [3 x i8]* @str507, %word 0, %word 0
+	br i1 %r105, label %L498, label %L499
+L498:
+	%r107 = getelementptr [3 x i8], [3 x i8]* @str501, %word 0, %word 0
 	%r109 = call i32 (%ptr, ...) @printf(%ptr %r107)
 	%r110 = inttoptr %word %r109 to %ptr
 	store %ptr %r110, %ptr* %t12
-	br label %L506
-L505:
+	br label %L500
+L499:
 	%r111 = inttoptr %word 92 to %ptr
 	%r112 = load %ptr, %ptr* %t10
 	%r116 = ptrtoint %ptr %r112 to %word
@@ -6295,36 +6245,36 @@ L505:
 	%r113 = inttoptr i1 %r114 to %ptr
 	%r118 = ptrtoint %ptr %r113 to %word
 	%r117 = icmp ne %word %r118, 0
-	br i1 %r117, label %L508, label %L509
-L508:
-	%r119 = getelementptr [3 x i8], [3 x i8]* @str511, %word 0, %word 0
+	br i1 %r117, label %L502, label %L503
+L502:
+	%r119 = getelementptr [3 x i8], [3 x i8]* @str505, %word 0, %word 0
 	%r121 = call i32 (%ptr, ...) @printf(%ptr %r119)
 	%r122 = inttoptr %word %r121 to %ptr
 	store %ptr %r122, %ptr* %t13
-	br label %L510
-L509:
-	%r123 = getelementptr [3 x i8], [3 x i8]* @str512, %word 0, %word 0
+	br label %L504
+L503:
+	%r123 = getelementptr [3 x i8], [3 x i8]* @str506, %word 0, %word 0
 	%r125 = load %ptr, %ptr* %t10
 	%r126 = call i32 (%ptr, ...) @printf(%ptr %r123, %ptr %r125)
 	%r127 = inttoptr %word %r126 to %ptr
 	store %ptr %r127, %ptr* %t13
-	br label %L510
-L510:
+	br label %L504
+L504:
 	%r128 = load %ptr, %ptr* %t13
 	store %ptr %r128, %ptr* %t12
-	br label %L506
-L506:
+	br label %L500
+L500:
 	%r129 = load %ptr, %ptr* %t12
 	store %ptr %r129, %ptr* %t11
-	br label %L500
-L499:
-	%r130 = getelementptr [6 x i8], [6 x i8]* @str513, %word 0, %word 0
+	br label %L494
+L493:
+	%r130 = getelementptr [6 x i8], [6 x i8]* @str507, %word 0, %word 0
 	%r132 = load %ptr, %ptr* %t10
 	%r133 = call i32 (%ptr, ...) @printf(%ptr %r130, %ptr %r132)
 	%r134 = inttoptr %word %r133 to %ptr
 	store %ptr %r134, %ptr* %t11
-	br label %L500
-L500:
+	br label %L494
+L494:
 	%r135 = load %ptr, %ptr* %t11
 	%r136 = load %ptr, %ptr* %t9
 	%r137 = inttoptr %word 1 to %ptr
@@ -6333,8 +6283,8 @@ L500:
 	%r139 = add %word %r141, %r140
 	%r138 = inttoptr %word %r139 to %ptr
 	store %ptr %r138, %ptr* %t9
-	br label %L496
-L496:
+	br label %L490
+L490:
 	%r142 = load %ptr, %ptr* %t9
 	%r143 = load %ptr, %ptr* %t7
 	%r148 = bitcast %ptr %r143 to [0 x i8]*
@@ -6345,18 +6295,18 @@ L496:
 	store %ptr %r144, %ptr* %t10
 	%r150 = ptrtoint %ptr %r144 to %word
 	%r149 = icmp ne %word %r150, 0
-	br i1 %r149, label %L495, label %L497
-L497:
-	%r151 = getelementptr [2 x i8], [2 x i8]* @str514, %word 0, %word 0
+	br i1 %r149, label %L489, label %L491
+L491:
+	%r151 = getelementptr [2 x i8], [2 x i8]* @str508, %word 0, %word 0
 	%r153 = call i32 (%ptr, ...) @printf(%ptr %r151)
 	%r154 = inttoptr %word %r153 to %ptr
 	store %ptr %r154, %ptr* %t8
-	br label %L492
-L492:
+	br label %L486
+L486:
 	%r155 = load %ptr, %ptr* %t8
 	store %ptr %r155, %ptr* %t6
-	br label %L489
-L488:
+	br label %L483
+L482:
 	%r156 = inttoptr %word 18 to %ptr
 	%r157 = load %ptr, %ptr* %t3
 	%r161 = ptrtoint %ptr %r157 to %word
@@ -6365,9 +6315,9 @@ L488:
 	%r158 = inttoptr i1 %r159 to %ptr
 	%r163 = ptrtoint %ptr %r158 to %word
 	%r162 = icmp ne %word %r163, 0
-	br i1 %r162, label %L515, label %L516
-L515:
-	%r164 = getelementptr [3 x i8], [3 x i8]* @str518, %word 0, %word 0
+	br i1 %r162, label %L509, label %L510
+L509:
+	%r164 = getelementptr [3 x i8], [3 x i8]* @str512, %word 0, %word 0
 	%r166 = inttoptr %word 0 to %ptr
 	%r167 = load %ptr, %ptr* %t1
 	%r171 = bitcast %ptr %r167 to [0 x %ptr]*
@@ -6377,8 +6327,8 @@ L515:
 	%r172 = call i32 (%ptr, ...) @printf(%ptr %r164, %ptr %r168)
 	%r173 = inttoptr %word %r172 to %ptr
 	store %ptr %r173, %ptr* %t7
-	br label %L517
-L516:
+	br label %L511
+L510:
 	%r174 = inttoptr %word 19 to %ptr
 	%r175 = load %ptr, %ptr* %t3
 	%r179 = ptrtoint %ptr %r175 to %word
@@ -6387,13 +6337,13 @@ L516:
 	%r176 = inttoptr i1 %r177 to %ptr
 	%r181 = ptrtoint %ptr %r176 to %word
 	%r180 = icmp ne %word %r181, 0
-	br i1 %r180, label %L519, label %L520
-L519:
-	%r182 = getelementptr [2 x i8], [2 x i8]* @str522, %word 0, %word 0
+	br i1 %r180, label %L513, label %L514
+L513:
+	%r182 = getelementptr [2 x i8], [2 x i8]* @str516, %word 0, %word 0
 	%r184 = call i32 (%ptr, ...) @printf(%ptr %r182)
 	%r185 = inttoptr %word %r184 to %ptr
-	br label %L524
-L523:
+	br label %L518
+L517:
 	%r186 = inttoptr %word 0 to %ptr
 	%r187 = load %ptr, %ptr* %t1
 	%r191 = bitcast %ptr %r187 to [0 x %ptr]*
@@ -6425,9 +6375,9 @@ L523:
 	%r208 = inttoptr i1 %r209 to %ptr
 	%r213 = ptrtoint %ptr %r208 to %word
 	%r212 = icmp ne %word %r213, 0
-	br i1 %r212, label %L526, label %L527
-L527:
-	%r214 = getelementptr [2 x i8], [2 x i8]* @str528, %word 0, %word 0
+	br i1 %r212, label %L520, label %L521
+L521:
+	%r214 = getelementptr [2 x i8], [2 x i8]* @str522, %word 0, %word 0
 	%r216 = call i32 (%ptr, ...) @printf(%ptr %r214)
 	%r217 = inttoptr %word %r216 to %ptr
 	store %ptr %r217, %ptr* %t10
@@ -6438,13 +6388,13 @@ L527:
 	%r219 = inttoptr i1 %r220 to %ptr
 	%r224 = ptrtoint %ptr %r219 to %word
 	%r223 = icmp ne %word %r224, 0
-	br i1 %r223, label %L526, label %L529
-L529:
-	br label %L526
-L526:
+	br i1 %r223, label %L520, label %L523
+L523:
+	br label %L520
+L520:
 	%r225 = load %ptr, %ptr* %t10
-	br label %L524
-L524:
+	br label %L518
+L518:
 	%r226 = load %ptr, %ptr* %t1
 	%r227 = call %ptr @"get/type"(%ptr %r226)
 	%r228 = inttoptr %word 19 to %ptr
@@ -6454,8 +6404,8 @@ L524:
 	%r229 = inttoptr i1 %r230 to %ptr
 	%r234 = ptrtoint %ptr %r229 to %word
 	%r233 = icmp ne %word %r234, 0
-	br i1 %r233, label %L523, label %L525
-L525:
+	br i1 %r233, label %L517, label %L519
+L519:
 	%r235 = inttoptr %word 1 to %ptr
 	store %ptr %r235, %ptr* %t10
 	%r236 = load %ptr, %ptr* %t1
@@ -6467,9 +6417,9 @@ L525:
 	%r238 = inttoptr i1 %r239 to %ptr
 	%r243 = ptrtoint %ptr %r238 to %word
 	%r242 = icmp ne %word %r243, 0
-	br i1 %r242, label %L530, label %L531
-L531:
-	%r244 = getelementptr [4 x i8], [4 x i8]* @str532, %word 0, %word 0
+	br i1 %r242, label %L524, label %L525
+L525:
+	%r244 = getelementptr [4 x i8], [4 x i8]* @str526, %word 0, %word 0
 	%r246 = call i32 (%ptr, ...) @printf(%ptr %r244)
 	%r247 = inttoptr %word %r246 to %ptr
 	%r248 = load %ptr, %ptr* %t1
@@ -6483,17 +6433,17 @@ L531:
 	%r252 = inttoptr i1 %r253 to %ptr
 	%r257 = ptrtoint %ptr %r252 to %word
 	%r256 = icmp ne %word %r257, 0
-	br i1 %r256, label %L530, label %L533
-L533:
-	br label %L530
-L530:
+	br i1 %r256, label %L524, label %L527
+L527:
+	br label %L524
+L524:
 	%r258 = load %ptr, %ptr* %t10
-	%r259 = getelementptr [2 x i8], [2 x i8]* @str534, %word 0, %word 0
+	%r259 = getelementptr [2 x i8], [2 x i8]* @str528, %word 0, %word 0
 	%r261 = call i32 (%ptr, ...) @printf(%ptr %r259)
 	%r262 = inttoptr %word %r261 to %ptr
 	store %ptr %r262, %ptr* %t8
-	br label %L521
-L520:
+	br label %L515
+L514:
 	%r263 = inttoptr %word 7 to %ptr
 	%r264 = load %ptr, %ptr* %t3
 	%r268 = ptrtoint %ptr %r264 to %word
@@ -6502,20 +6452,20 @@ L520:
 	%r265 = inttoptr i1 %r266 to %ptr
 	%r270 = ptrtoint %ptr %r265 to %word
 	%r269 = icmp ne %word %r270, 0
-	br i1 %r269, label %L535, label %L536
-L535:
+	br i1 %r269, label %L529, label %L530
+L529:
 	%r271 = load %ptr, %ptr* %t1
 	%r272 = call %ptr @"k/array-length"(%ptr %r271)
 	store %ptr %r272, %ptr* %t9
-	%r273 = getelementptr [7 x i8], [7 x i8]* @str538, %word 0, %word 0
+	%r273 = getelementptr [7 x i8], [7 x i8]* @str532, %word 0, %word 0
 	%r275 = call i32 (%ptr, ...) @printf(%ptr %r273)
 	%r276 = inttoptr %word %r275 to %ptr
 	%r277 = inttoptr %word 0 to %ptr
 	store %ptr %r277, %ptr* %t11
 	%r278 = load %ptr, %ptr* %t9
 	store %ptr %r278, %ptr* %t12
-	br label %L540
-L539:
+	br label %L534
+L533:
 	%r279 = inttoptr %word 1 to %ptr
 	store %ptr %r279, %ptr* %t13
 	%r280 = load %ptr, %ptr* %t11
@@ -6527,9 +6477,9 @@ L539:
 	%r282 = inttoptr i1 %r283 to %ptr
 	%r287 = ptrtoint %ptr %r282 to %word
 	%r286 = icmp ne %word %r287, 0
-	br i1 %r286, label %L542, label %L543
-L543:
-	%r288 = getelementptr [2 x i8], [2 x i8]* @str544, %word 0, %word 0
+	br i1 %r286, label %L536, label %L537
+L537:
+	%r288 = getelementptr [2 x i8], [2 x i8]* @str538, %word 0, %word 0
 	%r290 = call i32 (%ptr, ...) @printf(%ptr %r288)
 	%r291 = inttoptr %word %r290 to %ptr
 	store %ptr %r291, %ptr* %t13
@@ -6540,10 +6490,10 @@ L543:
 	%r293 = inttoptr i1 %r294 to %ptr
 	%r298 = ptrtoint %ptr %r293 to %word
 	%r297 = icmp ne %word %r298, 0
-	br i1 %r297, label %L542, label %L545
-L545:
-	br label %L542
-L542:
+	br i1 %r297, label %L536, label %L539
+L539:
+	br label %L536
+L536:
 	%r299 = load %ptr, %ptr* %t13
 	%r300 = load %ptr, %ptr* %t1
 	%r301 = load %ptr, %ptr* %t11
@@ -6557,8 +6507,8 @@ L542:
 	%r308 = add %word %r310, %r309
 	%r307 = inttoptr %word %r308 to %ptr
 	store %ptr %r307, %ptr* %t11
-	br label %L540
-L540:
+	br label %L534
+L534:
 	%r311 = load %ptr, %ptr* %t12
 	%r312 = load %ptr, %ptr* %t11
 	%r316 = ptrtoint %ptr %r312 to %word
@@ -6567,14 +6517,14 @@ L540:
 	%r313 = inttoptr i1 %r314 to %ptr
 	%r318 = ptrtoint %ptr %r313 to %word
 	%r317 = icmp ne %word %r318, 0
-	br i1 %r317, label %L539, label %L541
-L541:
-	%r319 = getelementptr [2 x i8], [2 x i8]* @str546, %word 0, %word 0
+	br i1 %r317, label %L533, label %L535
+L535:
+	%r319 = getelementptr [2 x i8], [2 x i8]* @str540, %word 0, %word 0
 	%r321 = call i32 (%ptr, ...) @printf(%ptr %r319)
 	%r322 = inttoptr %word %r321 to %ptr
 	store %ptr %r322, %ptr* %t10
-	br label %L537
-L536:
+	br label %L531
+L530:
 	%r323 = inttoptr %word 9 to %ptr
 	%r324 = load %ptr, %ptr* %t3
 	%r328 = ptrtoint %ptr %r324 to %word
@@ -6583,9 +6533,9 @@ L536:
 	%r325 = inttoptr i1 %r326 to %ptr
 	%r330 = ptrtoint %ptr %r325 to %word
 	%r329 = icmp ne %word %r330, 0
-	br i1 %r329, label %L547, label %L548
-L547:
-	%r331 = getelementptr [6 x i8], [6 x i8]* @str550, %word 0, %word 0
+	br i1 %r329, label %L541, label %L542
+L541:
+	%r331 = getelementptr [6 x i8], [6 x i8]* @str544, %word 0, %word 0
 	%r333 = call i32 (%ptr, ...) @printf(%ptr %r331)
 	%r334 = inttoptr %word %r333 to %ptr
 	%r335 = inttoptr %word 0 to %ptr
@@ -6596,12 +6546,12 @@ L547:
 	%r337 = load %ptr, %ptr* %r338
 	%r341 = load %ptr, %ptr* %t2
 	%r342 = call %ptr @do_print(%ptr %r337, %ptr %r341)
-	%r343 = getelementptr [2 x i8], [2 x i8]* @str551, %word 0, %word 0
+	%r343 = getelementptr [2 x i8], [2 x i8]* @str545, %word 0, %word 0
 	%r345 = call i32 (%ptr, ...) @printf(%ptr %r343)
 	%r346 = inttoptr %word %r345 to %ptr
 	store %ptr %r346, %ptr* %t9
-	br label %L549
-L548:
+	br label %L543
+L542:
 	%r347 = inttoptr %word 10 to %ptr
 	%r348 = load %ptr, %ptr* %t3
 	%r352 = ptrtoint %ptr %r348 to %word
@@ -6610,9 +6560,9 @@ L548:
 	%r349 = inttoptr i1 %r350 to %ptr
 	%r354 = ptrtoint %ptr %r349 to %word
 	%r353 = icmp ne %word %r354, 0
-	br i1 %r353, label %L552, label %L553
-L552:
-	%r355 = getelementptr [6 x i8], [6 x i8]* @str555, %word 0, %word 0
+	br i1 %r353, label %L546, label %L547
+L546:
+	%r355 = getelementptr [6 x i8], [6 x i8]* @str549, %word 0, %word 0
 	%r357 = call i32 (%ptr, ...) @printf(%ptr %r355)
 	%r358 = inttoptr %word %r357 to %ptr
 	%r359 = inttoptr %word 0 to %ptr
@@ -6623,7 +6573,7 @@ L552:
 	%r361 = load %ptr, %ptr* %r362
 	%r365 = load %ptr, %ptr* %t2
 	%r366 = call %ptr @do_print(%ptr %r361, %ptr %r365)
-	%r367 = getelementptr [2 x i8], [2 x i8]* @str556, %word 0, %word 0
+	%r367 = getelementptr [2 x i8], [2 x i8]* @str550, %word 0, %word 0
 	%r369 = call i32 (%ptr, ...) @printf(%ptr %r367)
 	%r370 = inttoptr %word %r369 to %ptr
 	%r371 = inttoptr %word 1 to %ptr
@@ -6634,12 +6584,12 @@ L552:
 	%r373 = load %ptr, %ptr* %r374
 	%r377 = load %ptr, %ptr* %t2
 	%r378 = call %ptr @do_print(%ptr %r373, %ptr %r377)
-	%r379 = getelementptr [2 x i8], [2 x i8]* @str557, %word 0, %word 0
+	%r379 = getelementptr [2 x i8], [2 x i8]* @str551, %word 0, %word 0
 	%r381 = call i32 (%ptr, ...) @printf(%ptr %r379)
 	%r382 = inttoptr %word %r381 to %ptr
 	store %ptr %r382, %ptr* %t12
-	br label %L554
-L553:
+	br label %L548
+L547:
 	%r383 = inttoptr %word 11 to %ptr
 	%r384 = load %ptr, %ptr* %t3
 	%r388 = ptrtoint %ptr %r384 to %word
@@ -6648,9 +6598,9 @@ L553:
 	%r385 = inttoptr i1 %r386 to %ptr
 	%r390 = ptrtoint %ptr %r385 to %word
 	%r389 = icmp ne %word %r390, 0
-	br i1 %r389, label %L558, label %L559
-L558:
-	%r391 = getelementptr [7 x i8], [7 x i8]* @str561, %word 0, %word 0
+	br i1 %r389, label %L552, label %L553
+L552:
+	%r391 = getelementptr [7 x i8], [7 x i8]* @str555, %word 0, %word 0
 	%r393 = call i32 (%ptr, ...) @printf(%ptr %r391)
 	%r394 = inttoptr %word %r393 to %ptr
 	%r395 = inttoptr %word 0 to %ptr
@@ -6661,12 +6611,12 @@ L558:
 	%r397 = load %ptr, %ptr* %r398
 	%r401 = load %ptr, %ptr* %t2
 	%r402 = call %ptr @do_print(%ptr %r397, %ptr %r401)
-	%r403 = getelementptr [2 x i8], [2 x i8]* @str562, %word 0, %word 0
+	%r403 = getelementptr [2 x i8], [2 x i8]* @str556, %word 0, %word 0
 	%r405 = call i32 (%ptr, ...) @printf(%ptr %r403)
 	%r406 = inttoptr %word %r405 to %ptr
 	store %ptr %r406, %ptr* %t11
-	br label %L560
-L559:
+	br label %L554
+L553:
 	%r407 = inttoptr %word 12 to %ptr
 	%r408 = load %ptr, %ptr* %t3
 	%r412 = ptrtoint %ptr %r408 to %word
@@ -6675,9 +6625,9 @@ L559:
 	%r409 = inttoptr i1 %r410 to %ptr
 	%r414 = ptrtoint %ptr %r409 to %word
 	%r413 = icmp ne %word %r414, 0
-	br i1 %r413, label %L563, label %L564
-L563:
-	%r415 = getelementptr [9 x i8], [9 x i8]* @str566, %word 0, %word 0
+	br i1 %r413, label %L557, label %L558
+L557:
+	%r415 = getelementptr [9 x i8], [9 x i8]* @str560, %word 0, %word 0
 	%r417 = inttoptr %word 1 to %ptr
 	%r418 = load %ptr, %ptr* %t1
 	%r422 = bitcast %ptr %r418 to [0 x %ptr]*
@@ -6687,8 +6637,8 @@ L563:
 	%r423 = call i32 (%ptr, ...) @printf(%ptr %r415, %ptr %r419)
 	%r424 = inttoptr %word %r423 to %ptr
 	store %ptr %r424, %ptr* %t13
-	br label %L565
-L564:
+	br label %L559
+L558:
 	%r425 = inttoptr %word 13 to %ptr
 	%r426 = load %ptr, %ptr* %t3
 	%r430 = ptrtoint %ptr %r426 to %word
@@ -6697,8 +6647,8 @@ L564:
 	%r427 = inttoptr i1 %r428 to %ptr
 	%r432 = ptrtoint %ptr %r427 to %word
 	%r431 = icmp ne %word %r432, 0
-	br i1 %r431, label %L567, label %L568
-L567:
+	br i1 %r431, label %L561, label %L562
+L561:
 	%r433 = inttoptr %word 2 to %ptr
 	%r434 = load %ptr, %ptr* %t1
 	%r438 = bitcast %ptr %r434 to [0 x %ptr]*
@@ -6717,9 +6667,9 @@ L567:
 	%r447 = load %ptr, %ptr* %t15
 	%r449 = ptrtoint %ptr %r447 to %word
 	%r448 = icmp ne %word %r449, 0
-	br i1 %r448, label %L570, label %L571
-L570:
-	%r450 = getelementptr [2 x i8], [2 x i8]* @str573, %word 0, %word 0
+	br i1 %r448, label %L564, label %L565
+L564:
+	%r450 = getelementptr [2 x i8], [2 x i8]* @str567, %word 0, %word 0
 	%r452 = call i32 (%ptr, ...) @printf(%ptr %r450)
 	%r453 = inttoptr %word %r452 to %ptr
 	%r454 = inttoptr %word 1 to %ptr
@@ -6730,7 +6680,7 @@ L570:
 	%r456 = load %ptr, %ptr* %r457
 	%r460 = load %ptr, %ptr* %t2
 	%r461 = call %ptr @do_print(%ptr %r456, %ptr %r460)
-	%r462 = getelementptr [2 x i8], [2 x i8]* @str574, %word 0, %word 0
+	%r462 = getelementptr [2 x i8], [2 x i8]* @str568, %word 0, %word 0
 	%r464 = call i32 (%ptr, ...) @printf(%ptr %r462)
 	%r465 = inttoptr %word %r464 to %ptr
 	%r466 = inttoptr %word 3 to %ptr
@@ -6742,16 +6692,16 @@ L570:
 	%r472 = load %ptr, %ptr* %t2
 	%r473 = call %ptr @do_print(%ptr %r468, %ptr %r472)
 	store %ptr %r473, %ptr* %t16
-	br label %L572
-L571:
+	br label %L566
+L565:
 	%r474 = inttoptr %word 0 to %ptr
 	store %ptr %r474, %ptr* %t16
-	br label %L572
-L572:
+	br label %L566
+L566:
 	%r475 = load %ptr, %ptr* %t16
 	store %ptr %r475, %ptr* %t14
-	br label %L569
-L568:
+	br label %L563
+L562:
 	%r476 = inttoptr %word 14 to %ptr
 	%r477 = load %ptr, %ptr* %t3
 	%r481 = ptrtoint %ptr %r477 to %word
@@ -6760,8 +6710,8 @@ L568:
 	%r478 = inttoptr i1 %r479 to %ptr
 	%r483 = ptrtoint %ptr %r478 to %word
 	%r482 = icmp ne %word %r483, 0
-	br i1 %r482, label %L575, label %L576
-L575:
+	br i1 %r482, label %L569, label %L570
+L569:
 	%r484 = inttoptr %word 1 to %ptr
 	%r485 = load %ptr, %ptr* %t1
 	%r489 = bitcast %ptr %r485 to [0 x %ptr]*
@@ -6787,8 +6737,8 @@ L575:
 	%r499 = inttoptr i1 %r500 to %ptr
 	%r504 = ptrtoint %ptr %r499 to %word
 	%r503 = icmp ne %word %r504, 0
-	br i1 %r503, label %L581, label %L582
-L582:
+	br i1 %r503, label %L575, label %L576
+L576:
 	%r505 = load %ptr, %ptr* %t17
 	store %ptr %r505, %ptr* %t19
 	%r506 = inttoptr %word 0 to %ptr
@@ -6798,16 +6748,16 @@ L582:
 	%r507 = inttoptr i1 %r508 to %ptr
 	%r512 = ptrtoint %ptr %r507 to %word
 	%r511 = icmp ne %word %r512, 0
-	br i1 %r511, label %L581, label %L583
-L583:
-	br label %L581
-L581:
+	br i1 %r511, label %L575, label %L577
+L577:
+	br label %L575
+L575:
 	%r513 = load %ptr, %ptr* %t19
 	%r515 = ptrtoint %ptr %r513 to %word
 	%r514 = icmp ne %word %r515, 0
-	br i1 %r514, label %L578, label %L579
-L578:
-	%r516 = getelementptr [13 x i8], [13 x i8]* @str584, %word 0, %word 0
+	br i1 %r514, label %L572, label %L573
+L572:
+	%r516 = getelementptr [13 x i8], [13 x i8]* @str578, %word 0, %word 0
 	%r518 = inttoptr %word 1 to %ptr
 	%r519 = load %ptr, %ptr* %t16
 	%r523 = ptrtoint %ptr %r519 to %word
@@ -6819,18 +6769,18 @@ L578:
 	%r526 = call i32 (%ptr, ...) @printf(%ptr %r516, %ptr %r520, %ptr %r525)
 	%r527 = inttoptr %word %r526 to %ptr
 	store %ptr %r527, %ptr* %t18
-	br label %L580
-L579:
-	%r528 = getelementptr [6 x i8], [6 x i8]* @str585, %word 0, %word 0
+	br label %L574
+L573:
+	%r528 = getelementptr [6 x i8], [6 x i8]* @str579, %word 0, %word 0
 	%r530 = call i32 (%ptr, ...) @printf(%ptr %r528)
 	%r531 = inttoptr %word %r530 to %ptr
 	store %ptr %r531, %ptr* %t18
-	br label %L580
-L580:
+	br label %L574
+L574:
 	%r532 = load %ptr, %ptr* %t18
 	store %ptr %r532, %ptr* %t15
-	br label %L577
-L576:
+	br label %L571
+L570:
 	%r533 = inttoptr %word 15 to %ptr
 	%r534 = load %ptr, %ptr* %t3
 	%r538 = ptrtoint %ptr %r534 to %word
@@ -6839,80 +6789,80 @@ L576:
 	%r535 = inttoptr i1 %r536 to %ptr
 	%r540 = ptrtoint %ptr %r535 to %word
 	%r539 = icmp ne %word %r540, 0
-	br i1 %r539, label %L586, label %L587
-L586:
-	%r541 = getelementptr [10 x i8], [10 x i8]* @str589, %word 0, %word 0
+	br i1 %r539, label %L580, label %L581
+L580:
+	%r541 = getelementptr [10 x i8], [10 x i8]* @str583, %word 0, %word 0
 	%r543 = call i32 (%ptr, ...) @printf(%ptr %r541)
 	%r544 = inttoptr %word %r543 to %ptr
 	store %ptr %r544, %ptr* %t17
-	br label %L588
-L587:
-	%r545 = getelementptr [11 x i8], [11 x i8]* @str590, %word 0, %word 0
+	br label %L582
+L581:
+	%r545 = getelementptr [11 x i8], [11 x i8]* @str584, %word 0, %word 0
 	%r547 = load %ptr, %ptr* %t3
 	%r548 = call i32 (%ptr, ...) @printf(%ptr %r545, %ptr %r547)
 	%r549 = inttoptr %word %r548 to %ptr
 	store %ptr %r549, %ptr* %t17
-	br label %L588
-L588:
+	br label %L582
+L582:
 	%r550 = load %ptr, %ptr* %t17
 	store %ptr %r550, %ptr* %t15
-	br label %L577
-L577:
+	br label %L571
+L571:
 	%r551 = load %ptr, %ptr* %t15
 	store %ptr %r551, %ptr* %t14
-	br label %L569
-L569:
+	br label %L563
+L563:
 	%r552 = load %ptr, %ptr* %t14
 	store %ptr %r552, %ptr* %t13
-	br label %L565
-L565:
+	br label %L559
+L559:
 	%r553 = load %ptr, %ptr* %t13
 	store %ptr %r553, %ptr* %t11
-	br label %L560
-L560:
-	%r554 = load %ptr, %ptr* %t11
-	store %ptr %r554, %ptr* %t12
 	br label %L554
 L554:
+	%r554 = load %ptr, %ptr* %t11
+	store %ptr %r554, %ptr* %t12
+	br label %L548
+L548:
 	%r555 = load %ptr, %ptr* %t12
 	store %ptr %r555, %ptr* %t9
-	br label %L549
-L549:
+	br label %L543
+L543:
 	%r556 = load %ptr, %ptr* %t9
 	store %ptr %r556, %ptr* %t10
-	br label %L537
-L537:
+	br label %L531
+L531:
 	%r557 = load %ptr, %ptr* %t10
 	store %ptr %r557, %ptr* %t8
-	br label %L521
-L521:
+	br label %L515
+L515:
 	%r558 = load %ptr, %ptr* %t8
 	store %ptr %r558, %ptr* %t7
-	br label %L517
-L517:
+	br label %L511
+L511:
 	%r559 = load %ptr, %ptr* %t7
 	store %ptr %r559, %ptr* %t6
-	br label %L489
-L489:
+	br label %L483
+L483:
 	%r560 = load %ptr, %ptr* %t6
 	store %ptr %r560, %ptr* %t5
-	br label %L485
-L485:
+	br label %L479
+L479:
 	%r561 = load %ptr, %ptr* %t5
 	store %ptr %r561, %ptr* %t4
-	br label %L481
-L481:
+	br label %L475
+L475:
 	%r562 = load %ptr, %ptr* %t4
 	ret %ptr %r562
 }
-@str591 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str585 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"k/println"(%ptr %obj) {
 	%t1 = alloca %ptr
 	store %ptr %obj, %ptr* %t1
 	%r1 = load %ptr, %ptr* %t1
 	%r2 = inttoptr %word 0 to %ptr
 	%r3 = call %ptr @do_print(%ptr %r1, %ptr %r2)
-	%r4 = getelementptr [2 x i8], [2 x i8]* @str591, %word 0, %word 0
+	%r4 = getelementptr [2 x i8], [2 x i8]* @str585, %word 0, %word 0
 	%r6 = call i32 (%ptr, ...) @printf(%ptr %r4)
 	%r7 = inttoptr %word %r6 to %ptr
 	ret %ptr %r7
@@ -6925,14 +6875,14 @@ define %ptr @"k/dump"(%ptr %obj) {
 	%r3 = call %ptr @do_print(%ptr %r1, %ptr %r2)
 	ret %ptr %r3
 }
-@str592 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str586 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"k/dumpln"(%ptr %obj) {
 	%t1 = alloca %ptr
 	store %ptr %obj, %ptr* %t1
 	%r1 = load %ptr, %ptr* %t1
 	%r2 = inttoptr %word 1 to %ptr
 	%r3 = call %ptr @do_print(%ptr %r1, %ptr %r2)
-	%r4 = getelementptr [2 x i8], [2 x i8]* @str592, %word 0, %word 0
+	%r4 = getelementptr [2 x i8], [2 x i8]* @str586, %word 0, %word 0
 	%r6 = call i32 (%ptr, ...) @printf(%ptr %r4)
 	%r7 = inttoptr %word %r6 to %ptr
 	ret %ptr %r7
@@ -6960,8 +6910,8 @@ define %ptr @"global-variable?"(%ptr %var) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L593, label %L594
-L594:
+	br i1 %r14, label %L587, label %L588
+L588:
 	%r16 = inttoptr %word 1 to %ptr
 	%r17 = inttoptr %word 1 to %ptr
 	%r18 = load %ptr, %ptr* %t2
@@ -6986,10 +6936,10 @@ L594:
 	%r33 = inttoptr i1 %r34 to %ptr
 	%r38 = ptrtoint %ptr %r33 to %word
 	%r37 = icmp ne %word %r38, 0
-	br i1 %r37, label %L593, label %L595
-L595:
-	br label %L593
-L593:
+	br i1 %r37, label %L587, label %L589
+L589:
+	br label %L587
+L587:
 	%r39 = load %ptr, %ptr* %t3
 	ret %ptr %r39
 }
@@ -7005,8 +6955,8 @@ define %ptr @"k/env/lookup-variable"(%ptr %env, %ptr %name) {
 	store %ptr %name, %ptr* %t2
 	%r1 = inttoptr %word 0 to %ptr
 	%r2 = inttoptr %word 0 to %ptr
-	br label %L597
-L596:
+	br label %L591
+L590:
 	%r3 = inttoptr %word 3 to %ptr
 	%r4 = load %ptr, %ptr* %t1
 	%r8 = bitcast %ptr %r4 to [0 x %ptr]*
@@ -7024,8 +6974,8 @@ L596:
 	%r14 = getelementptr [0 x %ptr], [0 x %ptr]* %r16, %word 0, %word %r15
 	%r13 = load %ptr, %ptr* %r14
 	store %ptr %r13, %ptr* %t5
-	br label %L600
-L599:
+	br label %L594
+L593:
 	%r17 = load %ptr, %ptr* %t4
 	%r18 = load %ptr, %ptr* %t5
 	%r22 = bitcast %ptr %r18 to [0 x %ptr]*
@@ -7054,8 +7004,8 @@ L599:
 	%r36 = inttoptr i1 %r37 to %ptr
 	%r41 = ptrtoint %ptr %r36 to %word
 	%r40 = icmp ne %word %r41, 0
-	br i1 %r40, label %L602, label %L603
-L603:
+	br i1 %r40, label %L596, label %L597
+L597:
 	%r42 = load %ptr, %ptr* %t6
 	ret %ptr %r42
 	store %ptr %r42, %ptr* %t7
@@ -7066,13 +7016,13 @@ L603:
 	%r45 = inttoptr i1 %r46 to %ptr
 	%r50 = ptrtoint %ptr %r45 to %word
 	%r49 = icmp ne %word %r50, 0
-	br i1 %r49, label %L602, label %L604
-L604:
-	br label %L602
-L602:
+	br i1 %r49, label %L596, label %L598
+L598:
+	br label %L596
+L596:
 	%r51 = load %ptr, %ptr* %t7
-	br label %L600
-L600:
+	br label %L594
+L594:
 	%r52 = inttoptr %word 1 to %ptr
 	%r53 = load %ptr, %ptr* %t4
 	%r57 = ptrtoint %ptr %r53 to %word
@@ -7087,8 +7037,8 @@ L600:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L599, label %L601
-L601:
+	br i1 %r63, label %L593, label %L595
+L595:
 	%r65 = inttoptr %word 0 to %ptr
 	%r66 = load %ptr, %ptr* %t1
 	%r70 = bitcast %ptr %r66 to [0 x %ptr]*
@@ -7096,16 +7046,16 @@ L601:
 	%r68 = getelementptr [0 x %ptr], [0 x %ptr]* %r70, %word 0, %word %r69
 	%r67 = load %ptr, %ptr* %r68
 	store %ptr %r67, %ptr* %t1
-	br label %L597
-L597:
+	br label %L591
+L591:
 	%r71 = load %ptr, %ptr* %t1
 	%r73 = ptrtoint %ptr %r71 to %word
 	%r72 = icmp ne %word %r73, 0
-	br i1 %r72, label %L596, label %L598
-L598:
+	br i1 %r72, label %L590, label %L592
+L592:
 	ret %ptr %r71
 }
-@str610 = private unnamed_addr constant [43 x i8] c"k/env/lookup-variable-or-die failed for %s\00"
+@str604 = private unnamed_addr constant [43 x i8] c"k/env/lookup-variable-or-die failed for %s\00"
 define %ptr @"k/env/lookup-variable-or-die"(%ptr %env, %ptr %name) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -7131,8 +7081,8 @@ define %ptr @"k/env/lookup-variable-or-die"(%ptr %env, %ptr %name) {
 	%r8 = inttoptr i1 %r9 to %ptr
 	%r13 = ptrtoint %ptr %r8 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L606, label %L607
-L607:
+	br i1 %r12, label %L600, label %L601
+L601:
 	%r14 = load %ptr, %ptr* %t3
 	%r15 = call %ptr @"get/type"(%ptr %r14)
 	%r16 = inttoptr %word 13 to %ptr
@@ -7148,10 +7098,10 @@ L607:
 	%r22 = inttoptr i1 %r23 to %ptr
 	%r27 = ptrtoint %ptr %r22 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L606, label %L608
-L608:
-	br label %L606
-L606:
+	br i1 %r26, label %L600, label %L602
+L602:
+	br label %L600
+L600:
 	%r28 = load %ptr, %ptr* %t5
 	store %ptr %r28, %ptr* %t4
 	%r29 = inttoptr %word 0 to %ptr
@@ -7161,9 +7111,9 @@ L606:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L609, label %L605
-L609:
-	%r36 = getelementptr [43 x i8], [43 x i8]* @str610, %word 0, %word 0
+	br i1 %r34, label %L603, label %L599
+L603:
+	%r36 = getelementptr [43 x i8], [43 x i8]* @str604, %word 0, %word 0
 	%r38 = inttoptr %word 0 to %ptr
 	%r39 = load %ptr, %ptr* %t2
 	%r43 = bitcast %ptr %r39 to [0 x %ptr]*
@@ -7179,15 +7129,15 @@ L609:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L611, label %L605
-L611:
-	br label %L605
+	br i1 %r50, label %L605, label %L599
 L605:
+	br label %L599
+L599:
 	%r52 = load %ptr, %ptr* %t4
 	%r53 = load %ptr, %ptr* %t3
 	ret %ptr %r53
 }
-@str615 = private unnamed_addr constant [45 x i8] c"undefined variable in env/variable-value: %s\00"
+@str609 = private unnamed_addr constant [45 x i8] c"undefined variable in env/variable-value: %s\00"
 define %ptr @"k/env/variable-value"(%ptr %env, %ptr %name) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -7202,8 +7152,8 @@ define %ptr @"k/env/variable-value"(%ptr %env, %ptr %name) {
 	%r4 = load %ptr, %ptr* %t3
 	%r6 = ptrtoint %ptr %r4 to %word
 	%r5 = icmp ne %word %r6, 0
-	br i1 %r5, label %L612, label %L613
-L612:
+	br i1 %r5, label %L606, label %L607
+L606:
 	%r7 = inttoptr %word 1 to %ptr
 	%r8 = load %ptr, %ptr* %t3
 	%r12 = bitcast %ptr %r8 to [0 x %ptr]*
@@ -7211,9 +7161,9 @@ L612:
 	%r10 = getelementptr [0 x %ptr], [0 x %ptr]* %r12, %word 0, %word %r11
 	%r9 = load %ptr, %ptr* %r10
 	store %ptr %r9, %ptr* %t4
-	br label %L614
-L613:
-	%r13 = getelementptr [45 x i8], [45 x i8]* @str615, %word 0, %word 0
+	br label %L608
+L607:
+	%r13 = getelementptr [45 x i8], [45 x i8]* @str609, %word 0, %word 0
 	%r15 = inttoptr %word 0 to %ptr
 	%r16 = load %ptr, %ptr* %t2
 	%r20 = bitcast %ptr %r16 to [0 x %ptr]*
@@ -7222,8 +7172,8 @@ L613:
 	%r17 = load %ptr, %ptr* %r18
 	%r21 = call %ptr @fatal1(%ptr %r13, %ptr %r17)
 	store %ptr %r21, %ptr* %t4
-	br label %L614
-L614:
+	br label %L608
+L608:
 	%r22 = load %ptr, %ptr* %t4
 	ret %ptr %r22
 }
@@ -7249,8 +7199,8 @@ define %ptr @"k/env/ensure-variable"(%ptr %env, %ptr %name) {
 	%r9 = load %ptr, %ptr* %t3
 	%r10 = call %ptr @"k/array-length"(%ptr %r9)
 	store %ptr %r10, %ptr* %t4
-	br label %L617
-L616:
+	br label %L611
+L610:
 	%r11 = load %ptr, %ptr* %t3
 	%r12 = load %ptr, %ptr* %t4
 	%r13 = call %ptr @"k/array-at"(%ptr %r11, %ptr %r12)
@@ -7276,8 +7226,8 @@ L616:
 	%r27 = inttoptr i1 %r28 to %ptr
 	%r32 = ptrtoint %ptr %r27 to %word
 	%r31 = icmp ne %word %r32, 0
-	br i1 %r31, label %L619, label %L620
-L620:
+	br i1 %r31, label %L613, label %L614
+L614:
 	%r33 = load %ptr, %ptr* %t5
 	ret %ptr %r33
 	store %ptr %r33, %ptr* %t6
@@ -7288,13 +7238,13 @@ L620:
 	%r36 = inttoptr i1 %r37 to %ptr
 	%r41 = ptrtoint %ptr %r36 to %word
 	%r40 = icmp ne %word %r41, 0
-	br i1 %r40, label %L619, label %L621
-L621:
-	br label %L619
-L619:
+	br i1 %r40, label %L613, label %L615
+L615:
+	br label %L613
+L613:
 	%r42 = load %ptr, %ptr* %t6
-	br label %L617
-L617:
+	br label %L611
+L611:
 	%r43 = inttoptr %word 1 to %ptr
 	%r44 = load %ptr, %ptr* %t4
 	%r48 = ptrtoint %ptr %r44 to %word
@@ -7309,8 +7259,8 @@ L617:
 	%r50 = inttoptr i1 %r51 to %ptr
 	%r55 = ptrtoint %ptr %r50 to %word
 	%r54 = icmp ne %word %r55, 0
-	br i1 %r54, label %L616, label %L618
-L618:
+	br i1 %r54, label %L610, label %L612
+L612:
 	%r56 = inttoptr %word 1 to %ptr
 	%r57 = inttoptr %word 2 to %ptr
 	%r58 = load %ptr, %ptr* %t1
@@ -7391,7 +7341,7 @@ define %ptr @"k/env/define"(%ptr %env, %ptr %name, %ptr %value) {
 	%r14 = load %ptr, %ptr* %t4
 	ret %ptr %r14
 }
-define %ptr @closure-628(%ptr %item, %ptr %candidate) {
+define %ptr @closure-622(%ptr %item, %ptr %candidate) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
 	store %ptr %item, %ptr* %t1
@@ -7407,7 +7357,7 @@ define %ptr @closure-628(%ptr %item, %ptr %candidate) {
 	%r9 = inttoptr %word %r8 to %ptr
 	ret %ptr %r9
 }
-define %ptr @closure-629(%ptr %array, %ptr %index, %ptr %item) {
+define %ptr @closure-623(%ptr %array, %ptr %index, %ptr %item) {
 	%t3 = alloca %ptr
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -7453,8 +7403,8 @@ define %ptr @"k/intern"(%ptr %cstr) {
 	store %ptr %r5, %ptr* %t4
 	%r6 = load %ptr, %ptr* %t2
 	store %ptr %r6, %ptr* %t5
-	br label %L623
-L622:
+	br label %L617
+L616:
 	%r7 = load %ptr, %ptr* %t4
 	%r8 = load %ptr, %ptr* %t1
 	%r13 = bitcast %ptr %r8 to [0 x i8]*
@@ -7469,8 +7419,8 @@ L622:
 	%r15 = inttoptr i1 %r16 to %ptr
 	%r20 = ptrtoint %ptr %r15 to %word
 	%r19 = icmp ne %word %r20, 0
-	br i1 %r19, label %L625, label %L626
-L625:
+	br i1 %r19, label %L619, label %L620
+L619:
 	%r21 = load %ptr, %ptr* %t4
 	%r22 = load %ptr, %ptr* %t1
 	%r26 = ptrtoint %ptr %r22 to %word
@@ -7485,12 +7435,12 @@ L625:
 	%r32 = call %ptr @"k/intern"(%ptr %r28)
 	ret %ptr %r32
 	store %ptr %r32, %ptr* %t6
-	br label %L627
-L626:
+	br label %L621
+L620:
 	%r34 = inttoptr %word 0 to %ptr
 	store %ptr %r34, %ptr* %t6
-	br label %L627
-L627:
+	br label %L621
+L621:
 	%r35 = load %ptr, %ptr* %t6
 	%r36 = inttoptr %word 1 to %ptr
 	%r37 = load %ptr, %ptr* %t4
@@ -7499,8 +7449,8 @@ L627:
 	%r39 = add %word %r41, %r40
 	%r38 = inttoptr %word %r39 to %ptr
 	store %ptr %r38, %ptr* %t4
-	br label %L623
-L623:
+	br label %L617
+L617:
 	%r42 = load %ptr, %ptr* %t5
 	%r43 = load %ptr, %ptr* %t4
 	%r47 = ptrtoint %ptr %r43 to %word
@@ -7509,12 +7459,12 @@ L623:
 	%r44 = inttoptr i1 %r45 to %ptr
 	%r49 = ptrtoint %ptr %r44 to %word
 	%r48 = icmp ne %word %r49, 0
-	br i1 %r48, label %L622, label %L624
-L624:
+	br i1 %r48, label %L616, label %L618
+L618:
 	%r50 = load %ptr, %ptr* @"*symbols*"
 	%r51 = load %ptr, %ptr* %t1
-	%r52 = bitcast %ptr (%ptr, %ptr)* @closure-628 to %ptr
-	%r53 = bitcast %ptr (%ptr, %ptr, %ptr)* @closure-629 to %ptr
+	%r52 = bitcast %ptr (%ptr, %ptr)* @closure-622 to %ptr
+	%r53 = bitcast %ptr (%ptr, %ptr, %ptr)* @closure-623 to %ptr
 	%r54 = call %ptr @array-binary-search(%ptr %r50, %ptr %r51, %ptr %r52, %ptr %r53)
 	ret %ptr %r54
 }
@@ -7538,8 +7488,8 @@ define %ptr @is_blank(%ptr %c) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L631, label %L630
-L631:
+	br i1 %r13, label %L625, label %L624
+L625:
 	%r15 = load %ptr, %ptr* %t1
 	%r16 = inttoptr %word 9 to %ptr
 	%r20 = ptrtoint %ptr %r16 to %word
@@ -7554,8 +7504,8 @@ L631:
 	%r22 = inttoptr i1 %r23 to %ptr
 	%r27 = ptrtoint %ptr %r22 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L632, label %L630
-L632:
+	br i1 %r26, label %L626, label %L624
+L626:
 	%r28 = load %ptr, %ptr* %t1
 	%r29 = inttoptr %word 10 to %ptr
 	%r33 = ptrtoint %ptr %r29 to %word
@@ -7570,8 +7520,8 @@ L632:
 	%r35 = inttoptr i1 %r36 to %ptr
 	%r40 = ptrtoint %ptr %r35 to %word
 	%r39 = icmp ne %word %r40, 0
-	br i1 %r39, label %L633, label %L630
-L633:
+	br i1 %r39, label %L627, label %L624
+L627:
 	%r41 = load %ptr, %ptr* %t1
 	%r42 = inttoptr %word 11 to %ptr
 	%r46 = ptrtoint %ptr %r42 to %word
@@ -7586,8 +7536,8 @@ L633:
 	%r48 = inttoptr i1 %r49 to %ptr
 	%r53 = ptrtoint %ptr %r48 to %word
 	%r52 = icmp ne %word %r53, 0
-	br i1 %r52, label %L634, label %L630
-L634:
+	br i1 %r52, label %L628, label %L624
+L628:
 	%r54 = load %ptr, %ptr* %t1
 	%r55 = inttoptr %word 12 to %ptr
 	%r59 = ptrtoint %ptr %r55 to %word
@@ -7602,8 +7552,8 @@ L634:
 	%r61 = inttoptr i1 %r62 to %ptr
 	%r66 = ptrtoint %ptr %r61 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L635, label %L630
-L635:
+	br i1 %r65, label %L629, label %L624
+L629:
 	%r67 = load %ptr, %ptr* %t1
 	%r68 = inttoptr %word 13 to %ptr
 	%r72 = ptrtoint %ptr %r68 to %word
@@ -7618,10 +7568,10 @@ L635:
 	%r74 = inttoptr i1 %r75 to %ptr
 	%r79 = ptrtoint %ptr %r74 to %word
 	%r78 = icmp ne %word %r79, 0
-	br i1 %r78, label %L636, label %L630
-L636:
-	br label %L630
+	br i1 %r78, label %L630, label %L624
 L630:
+	br label %L624
+L624:
 	%r80 = load %ptr, %ptr* %t2
 	ret %ptr %r80
 }
@@ -7645,8 +7595,8 @@ define %ptr @is_digit10(%ptr %c) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L637, label %L638
-L638:
+	br i1 %r13, label %L631, label %L632
+L632:
 	%r15 = inttoptr %word 57 to %ptr
 	%r16 = load %ptr, %ptr* %t1
 	%r20 = ptrtoint %ptr %r16 to %word
@@ -7661,10 +7611,10 @@ L638:
 	%r22 = inttoptr i1 %r23 to %ptr
 	%r27 = ptrtoint %ptr %r22 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L637, label %L639
-L639:
-	br label %L637
-L637:
+	br i1 %r26, label %L631, label %L633
+L633:
+	br label %L631
+L631:
 	%r28 = load %ptr, %ptr* %t2
 	ret %ptr %r28
 }
@@ -7691,8 +7641,8 @@ define %ptr @is_digit16(%ptr %c) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L641, label %L642
-L642:
+	br i1 %r14, label %L635, label %L636
+L636:
 	%r16 = inttoptr %word 57 to %ptr
 	%r17 = load %ptr, %ptr* %t1
 	%r21 = ptrtoint %ptr %r17 to %word
@@ -7707,10 +7657,10 @@ L642:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L641, label %L643
-L643:
-	br label %L641
-L641:
+	br i1 %r27, label %L635, label %L637
+L637:
+	br label %L635
+L635:
 	%r29 = load %ptr, %ptr* %t3
 	store %ptr %r29, %ptr* %t2
 	%r30 = inttoptr %word 0 to %ptr
@@ -7720,8 +7670,8 @@ L641:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L644, label %L640
-L644:
+	br i1 %r35, label %L638, label %L634
+L638:
 	%r37 = inttoptr %word 1 to %ptr
 	store %ptr %r37, %ptr* %t3
 	%r38 = load %ptr, %ptr* %t1
@@ -7738,8 +7688,8 @@ L644:
 	%r45 = inttoptr i1 %r46 to %ptr
 	%r50 = ptrtoint %ptr %r45 to %word
 	%r49 = icmp ne %word %r50, 0
-	br i1 %r49, label %L645, label %L646
-L646:
+	br i1 %r49, label %L639, label %L640
+L640:
 	%r51 = inttoptr %word 102 to %ptr
 	%r52 = load %ptr, %ptr* %t1
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -7754,10 +7704,10 @@ L646:
 	%r58 = inttoptr i1 %r59 to %ptr
 	%r63 = ptrtoint %ptr %r58 to %word
 	%r62 = icmp ne %word %r63, 0
-	br i1 %r62, label %L645, label %L647
-L647:
-	br label %L645
-L645:
+	br i1 %r62, label %L639, label %L641
+L641:
+	br label %L639
+L639:
 	%r64 = load %ptr, %ptr* %t3
 	store %ptr %r64, %ptr* %t2
 	%r65 = inttoptr %word 0 to %ptr
@@ -7767,8 +7717,8 @@ L645:
 	%r66 = inttoptr i1 %r67 to %ptr
 	%r71 = ptrtoint %ptr %r66 to %word
 	%r70 = icmp ne %word %r71, 0
-	br i1 %r70, label %L648, label %L640
-L648:
+	br i1 %r70, label %L642, label %L634
+L642:
 	%r72 = inttoptr %word 1 to %ptr
 	store %ptr %r72, %ptr* %t3
 	%r73 = load %ptr, %ptr* %t1
@@ -7785,8 +7735,8 @@ L648:
 	%r80 = inttoptr i1 %r81 to %ptr
 	%r85 = ptrtoint %ptr %r80 to %word
 	%r84 = icmp ne %word %r85, 0
-	br i1 %r84, label %L649, label %L650
-L650:
+	br i1 %r84, label %L643, label %L644
+L644:
 	%r86 = inttoptr %word 70 to %ptr
 	%r87 = load %ptr, %ptr* %t1
 	%r91 = ptrtoint %ptr %r87 to %word
@@ -7801,10 +7751,10 @@ L650:
 	%r93 = inttoptr i1 %r94 to %ptr
 	%r98 = ptrtoint %ptr %r93 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L649, label %L651
-L651:
-	br label %L649
-L649:
+	br i1 %r97, label %L643, label %L645
+L645:
+	br label %L643
+L643:
 	%r99 = load %ptr, %ptr* %t3
 	store %ptr %r99, %ptr* %t2
 	%r100 = inttoptr %word 0 to %ptr
@@ -7814,10 +7764,10 @@ L649:
 	%r101 = inttoptr i1 %r102 to %ptr
 	%r106 = ptrtoint %ptr %r101 to %word
 	%r105 = icmp ne %word %r106, 0
-	br i1 %r105, label %L652, label %L640
-L652:
-	br label %L640
-L640:
+	br i1 %r105, label %L646, label %L634
+L646:
+	br label %L634
+L634:
 	%r107 = load %ptr, %ptr* %t2
 	ret %ptr %r107
 }
@@ -7844,8 +7794,8 @@ define %ptr @is_alpha(%ptr %c) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L654, label %L655
-L655:
+	br i1 %r14, label %L648, label %L649
+L649:
 	%r16 = inttoptr %word 122 to %ptr
 	%r17 = load %ptr, %ptr* %t1
 	%r21 = ptrtoint %ptr %r17 to %word
@@ -7860,10 +7810,10 @@ L655:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L654, label %L656
-L656:
-	br label %L654
-L654:
+	br i1 %r27, label %L648, label %L650
+L650:
+	br label %L648
+L648:
 	%r29 = load %ptr, %ptr* %t3
 	store %ptr %r29, %ptr* %t2
 	%r30 = inttoptr %word 0 to %ptr
@@ -7873,8 +7823,8 @@ L654:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L657, label %L653
-L657:
+	br i1 %r35, label %L651, label %L647
+L651:
 	%r37 = inttoptr %word 1 to %ptr
 	store %ptr %r37, %ptr* %t3
 	%r38 = load %ptr, %ptr* %t1
@@ -7891,8 +7841,8 @@ L657:
 	%r45 = inttoptr i1 %r46 to %ptr
 	%r50 = ptrtoint %ptr %r45 to %word
 	%r49 = icmp ne %word %r50, 0
-	br i1 %r49, label %L658, label %L659
-L659:
+	br i1 %r49, label %L652, label %L653
+L653:
 	%r51 = inttoptr %word 90 to %ptr
 	%r52 = load %ptr, %ptr* %t1
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -7907,10 +7857,10 @@ L659:
 	%r58 = inttoptr i1 %r59 to %ptr
 	%r63 = ptrtoint %ptr %r58 to %word
 	%r62 = icmp ne %word %r63, 0
-	br i1 %r62, label %L658, label %L660
-L660:
-	br label %L658
-L658:
+	br i1 %r62, label %L652, label %L654
+L654:
+	br label %L652
+L652:
 	%r64 = load %ptr, %ptr* %t3
 	store %ptr %r64, %ptr* %t2
 	%r65 = inttoptr %word 0 to %ptr
@@ -7920,10 +7870,10 @@ L658:
 	%r66 = inttoptr i1 %r67 to %ptr
 	%r71 = ptrtoint %ptr %r66 to %word
 	%r70 = icmp ne %word %r71, 0
-	br i1 %r70, label %L661, label %L653
-L661:
-	br label %L653
-L653:
+	br i1 %r70, label %L655, label %L647
+L655:
+	br label %L647
+L647:
 	%r72 = load %ptr, %ptr* %t2
 	ret %ptr %r72
 }
@@ -7948,8 +7898,8 @@ define %ptr @is_letter(%ptr %c) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L663, label %L662
-L663:
+	br i1 %r13, label %L657, label %L656
+L657:
 	%r15 = inttoptr %word 1 to %ptr
 	store %ptr %r15, %ptr* %t3
 	%r16 = load %ptr, %ptr* %t1
@@ -7966,8 +7916,8 @@ L663:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L664, label %L665
-L665:
+	br i1 %r27, label %L658, label %L659
+L659:
 	%r29 = inttoptr %word 38 to %ptr
 	%r30 = load %ptr, %ptr* %t1
 	%r34 = ptrtoint %ptr %r30 to %word
@@ -7982,10 +7932,10 @@ L665:
 	%r36 = inttoptr i1 %r37 to %ptr
 	%r41 = ptrtoint %ptr %r36 to %word
 	%r40 = icmp ne %word %r41, 0
-	br i1 %r40, label %L664, label %L666
-L666:
-	br label %L664
-L664:
+	br i1 %r40, label %L658, label %L660
+L660:
+	br label %L658
+L658:
 	%r42 = load %ptr, %ptr* %t3
 	store %ptr %r42, %ptr* %t2
 	%r43 = inttoptr %word 0 to %ptr
@@ -7995,8 +7945,8 @@ L664:
 	%r44 = inttoptr i1 %r45 to %ptr
 	%r49 = ptrtoint %ptr %r44 to %word
 	%r48 = icmp ne %word %r49, 0
-	br i1 %r48, label %L667, label %L662
-L667:
+	br i1 %r48, label %L661, label %L656
+L661:
 	%r50 = inttoptr %word 1 to %ptr
 	store %ptr %r50, %ptr* %t3
 	%r51 = load %ptr, %ptr* %t1
@@ -8013,8 +7963,8 @@ L667:
 	%r58 = inttoptr i1 %r59 to %ptr
 	%r63 = ptrtoint %ptr %r58 to %word
 	%r62 = icmp ne %word %r63, 0
-	br i1 %r62, label %L668, label %L669
-L669:
+	br i1 %r62, label %L662, label %L663
+L663:
 	%r64 = inttoptr %word 47 to %ptr
 	%r65 = load %ptr, %ptr* %t1
 	%r69 = ptrtoint %ptr %r65 to %word
@@ -8029,10 +7979,10 @@ L669:
 	%r71 = inttoptr i1 %r72 to %ptr
 	%r76 = ptrtoint %ptr %r71 to %word
 	%r75 = icmp ne %word %r76, 0
-	br i1 %r75, label %L668, label %L670
-L670:
-	br label %L668
-L668:
+	br i1 %r75, label %L662, label %L664
+L664:
+	br label %L662
+L662:
 	%r77 = load %ptr, %ptr* %t3
 	store %ptr %r77, %ptr* %t2
 	%r78 = inttoptr %word 0 to %ptr
@@ -8042,8 +7992,8 @@ L668:
 	%r79 = inttoptr i1 %r80 to %ptr
 	%r84 = ptrtoint %ptr %r79 to %word
 	%r83 = icmp ne %word %r84, 0
-	br i1 %r83, label %L671, label %L662
-L671:
+	br i1 %r83, label %L665, label %L656
+L665:
 	%r85 = load %ptr, %ptr* %t1
 	%r86 = inttoptr %word 58 to %ptr
 	%r90 = ptrtoint %ptr %r86 to %word
@@ -8058,8 +8008,8 @@ L671:
 	%r92 = inttoptr i1 %r93 to %ptr
 	%r97 = ptrtoint %ptr %r92 to %word
 	%r96 = icmp ne %word %r97, 0
-	br i1 %r96, label %L672, label %L662
-L672:
+	br i1 %r96, label %L666, label %L656
+L666:
 	%r98 = inttoptr %word 1 to %ptr
 	store %ptr %r98, %ptr* %t3
 	%r99 = load %ptr, %ptr* %t1
@@ -8076,8 +8026,8 @@ L672:
 	%r106 = inttoptr i1 %r107 to %ptr
 	%r111 = ptrtoint %ptr %r106 to %word
 	%r110 = icmp ne %word %r111, 0
-	br i1 %r110, label %L673, label %L674
-L674:
+	br i1 %r110, label %L667, label %L668
+L668:
 	%r112 = inttoptr %word 90 to %ptr
 	%r113 = load %ptr, %ptr* %t1
 	%r117 = ptrtoint %ptr %r113 to %word
@@ -8092,10 +8042,10 @@ L674:
 	%r119 = inttoptr i1 %r120 to %ptr
 	%r124 = ptrtoint %ptr %r119 to %word
 	%r123 = icmp ne %word %r124, 0
-	br i1 %r123, label %L673, label %L675
-L675:
-	br label %L673
-L673:
+	br i1 %r123, label %L667, label %L669
+L669:
+	br label %L667
+L667:
 	%r125 = load %ptr, %ptr* %t3
 	store %ptr %r125, %ptr* %t2
 	%r126 = inttoptr %word 0 to %ptr
@@ -8105,8 +8055,8 @@ L673:
 	%r127 = inttoptr i1 %r128 to %ptr
 	%r132 = ptrtoint %ptr %r127 to %word
 	%r131 = icmp ne %word %r132, 0
-	br i1 %r131, label %L676, label %L662
-L676:
+	br i1 %r131, label %L670, label %L656
+L670:
 	%r133 = load %ptr, %ptr* %t1
 	%r134 = inttoptr %word 92 to %ptr
 	%r138 = ptrtoint %ptr %r134 to %word
@@ -8121,8 +8071,8 @@ L676:
 	%r140 = inttoptr i1 %r141 to %ptr
 	%r145 = ptrtoint %ptr %r140 to %word
 	%r144 = icmp ne %word %r145, 0
-	br i1 %r144, label %L677, label %L662
-L677:
+	br i1 %r144, label %L671, label %L656
+L671:
 	%r146 = load %ptr, %ptr* %t1
 	%r147 = inttoptr %word 94 to %ptr
 	%r151 = ptrtoint %ptr %r147 to %word
@@ -8137,8 +8087,8 @@ L677:
 	%r153 = inttoptr i1 %r154 to %ptr
 	%r158 = ptrtoint %ptr %r153 to %word
 	%r157 = icmp ne %word %r158, 0
-	br i1 %r157, label %L678, label %L662
-L678:
+	br i1 %r157, label %L672, label %L656
+L672:
 	%r159 = load %ptr, %ptr* %t1
 	%r160 = inttoptr %word 95 to %ptr
 	%r164 = ptrtoint %ptr %r160 to %word
@@ -8153,8 +8103,8 @@ L678:
 	%r166 = inttoptr i1 %r167 to %ptr
 	%r171 = ptrtoint %ptr %r166 to %word
 	%r170 = icmp ne %word %r171, 0
-	br i1 %r170, label %L679, label %L662
-L679:
+	br i1 %r170, label %L673, label %L656
+L673:
 	%r172 = inttoptr %word 1 to %ptr
 	store %ptr %r172, %ptr* %t3
 	%r173 = load %ptr, %ptr* %t1
@@ -8171,8 +8121,8 @@ L679:
 	%r180 = inttoptr i1 %r181 to %ptr
 	%r185 = ptrtoint %ptr %r180 to %word
 	%r184 = icmp ne %word %r185, 0
-	br i1 %r184, label %L680, label %L681
-L681:
+	br i1 %r184, label %L674, label %L675
+L675:
 	%r186 = inttoptr %word 122 to %ptr
 	%r187 = load %ptr, %ptr* %t1
 	%r191 = ptrtoint %ptr %r187 to %word
@@ -8187,10 +8137,10 @@ L681:
 	%r193 = inttoptr i1 %r194 to %ptr
 	%r198 = ptrtoint %ptr %r193 to %word
 	%r197 = icmp ne %word %r198, 0
-	br i1 %r197, label %L680, label %L682
-L682:
-	br label %L680
-L680:
+	br i1 %r197, label %L674, label %L676
+L676:
+	br label %L674
+L674:
 	%r199 = load %ptr, %ptr* %t3
 	store %ptr %r199, %ptr* %t2
 	%r200 = inttoptr %word 0 to %ptr
@@ -8200,8 +8150,8 @@ L680:
 	%r201 = inttoptr i1 %r202 to %ptr
 	%r206 = ptrtoint %ptr %r201 to %word
 	%r205 = icmp ne %word %r206, 0
-	br i1 %r205, label %L683, label %L662
-L683:
+	br i1 %r205, label %L677, label %L656
+L677:
 	%r207 = load %ptr, %ptr* %t1
 	%r208 = inttoptr %word 124 to %ptr
 	%r212 = ptrtoint %ptr %r208 to %word
@@ -8216,8 +8166,8 @@ L683:
 	%r214 = inttoptr i1 %r215 to %ptr
 	%r219 = ptrtoint %ptr %r214 to %word
 	%r218 = icmp ne %word %r219, 0
-	br i1 %r218, label %L684, label %L662
-L684:
+	br i1 %r218, label %L678, label %L656
+L678:
 	%r220 = load %ptr, %ptr* %t1
 	%r221 = inttoptr %word 126 to %ptr
 	%r225 = ptrtoint %ptr %r221 to %word
@@ -8232,10 +8182,10 @@ L684:
 	%r227 = inttoptr i1 %r228 to %ptr
 	%r232 = ptrtoint %ptr %r227 to %word
 	%r231 = icmp ne %word %r232, 0
-	br i1 %r231, label %L685, label %L662
-L685:
-	br label %L662
-L662:
+	br i1 %r231, label %L679, label %L656
+L679:
+	br label %L656
+L656:
 	%r233 = load %ptr, %ptr* %t2
 	ret %ptr %r233
 }
@@ -8259,8 +8209,8 @@ define %ptr @is_octal(%ptr %c) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L686, label %L687
-L687:
+	br i1 %r13, label %L680, label %L681
+L681:
 	%r15 = inttoptr %word 55 to %ptr
 	%r16 = load %ptr, %ptr* %t1
 	%r20 = ptrtoint %ptr %r16 to %word
@@ -8275,10 +8225,10 @@ L687:
 	%r22 = inttoptr i1 %r23 to %ptr
 	%r27 = ptrtoint %ptr %r22 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L686, label %L688
-L688:
-	br label %L686
-L686:
+	br i1 %r26, label %L680, label %L682
+L682:
+	br label %L680
+L680:
 	%r28 = load %ptr, %ptr* %t2
 	ret %ptr %r28
 }
@@ -8305,8 +8255,8 @@ define %ptr @is_hexadecimal(%ptr %c) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L690, label %L691
-L691:
+	br i1 %r14, label %L684, label %L685
+L685:
 	%r16 = inttoptr %word 57 to %ptr
 	%r17 = load %ptr, %ptr* %t1
 	%r21 = ptrtoint %ptr %r17 to %word
@@ -8321,10 +8271,10 @@ L691:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L690, label %L692
-L692:
-	br label %L690
-L690:
+	br i1 %r27, label %L684, label %L686
+L686:
+	br label %L684
+L684:
 	%r29 = load %ptr, %ptr* %t3
 	store %ptr %r29, %ptr* %t2
 	%r30 = inttoptr %word 0 to %ptr
@@ -8334,8 +8284,8 @@ L690:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L693, label %L689
-L693:
+	br i1 %r35, label %L687, label %L683
+L687:
 	%r37 = inttoptr %word 1 to %ptr
 	store %ptr %r37, %ptr* %t3
 	%r38 = load %ptr, %ptr* %t1
@@ -8352,8 +8302,8 @@ L693:
 	%r45 = inttoptr i1 %r46 to %ptr
 	%r50 = ptrtoint %ptr %r45 to %word
 	%r49 = icmp ne %word %r50, 0
-	br i1 %r49, label %L694, label %L695
-L695:
+	br i1 %r49, label %L688, label %L689
+L689:
 	%r51 = inttoptr %word 102 to %ptr
 	%r52 = load %ptr, %ptr* %t1
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -8368,10 +8318,10 @@ L695:
 	%r58 = inttoptr i1 %r59 to %ptr
 	%r63 = ptrtoint %ptr %r58 to %word
 	%r62 = icmp ne %word %r63, 0
-	br i1 %r62, label %L694, label %L696
-L696:
-	br label %L694
-L694:
+	br i1 %r62, label %L688, label %L690
+L690:
+	br label %L688
+L688:
 	%r64 = load %ptr, %ptr* %t3
 	store %ptr %r64, %ptr* %t2
 	%r65 = inttoptr %word 0 to %ptr
@@ -8381,8 +8331,8 @@ L694:
 	%r66 = inttoptr i1 %r67 to %ptr
 	%r71 = ptrtoint %ptr %r66 to %word
 	%r70 = icmp ne %word %r71, 0
-	br i1 %r70, label %L697, label %L689
-L697:
+	br i1 %r70, label %L691, label %L683
+L691:
 	%r72 = inttoptr %word 1 to %ptr
 	store %ptr %r72, %ptr* %t3
 	%r73 = load %ptr, %ptr* %t1
@@ -8399,8 +8349,8 @@ L697:
 	%r80 = inttoptr i1 %r81 to %ptr
 	%r85 = ptrtoint %ptr %r80 to %word
 	%r84 = icmp ne %word %r85, 0
-	br i1 %r84, label %L698, label %L699
-L699:
+	br i1 %r84, label %L692, label %L693
+L693:
 	%r86 = inttoptr %word 70 to %ptr
 	%r87 = load %ptr, %ptr* %t1
 	%r91 = ptrtoint %ptr %r87 to %word
@@ -8415,10 +8365,10 @@ L699:
 	%r93 = inttoptr i1 %r94 to %ptr
 	%r98 = ptrtoint %ptr %r93 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L698, label %L700
-L700:
-	br label %L698
-L698:
+	br i1 %r97, label %L692, label %L694
+L694:
+	br label %L692
+L692:
 	%r99 = load %ptr, %ptr* %t3
 	store %ptr %r99, %ptr* %t2
 	%r100 = inttoptr %word 0 to %ptr
@@ -8428,14 +8378,14 @@ L698:
 	%r101 = inttoptr i1 %r102 to %ptr
 	%r106 = ptrtoint %ptr %r101 to %word
 	%r105 = icmp ne %word %r106, 0
-	br i1 %r105, label %L701, label %L689
-L701:
-	br label %L689
-L689:
+	br i1 %r105, label %L695, label %L683
+L695:
+	br label %L683
+L683:
 	%r107 = load %ptr, %ptr* %t2
 	ret %ptr %r107
 }
-@str720 = private unnamed_addr constant [38 x i8] c"illegal digit in character escape: %c\00"
+@str714 = private unnamed_addr constant [38 x i8] c"illegal digit in character escape: %c\00"
 define %ptr @digit_value(%ptr %c) {
 	%t1 = alloca %ptr
 	%t2 = alloca %ptr
@@ -8459,8 +8409,8 @@ define %ptr @digit_value(%ptr %c) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L705, label %L706
-L706:
+	br i1 %r13, label %L699, label %L700
+L700:
 	%r15 = inttoptr %word 57 to %ptr
 	%r16 = load %ptr, %ptr* %t1
 	%r20 = ptrtoint %ptr %r16 to %word
@@ -8475,15 +8425,15 @@ L706:
 	%r22 = inttoptr i1 %r23 to %ptr
 	%r27 = ptrtoint %ptr %r22 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L705, label %L707
-L707:
-	br label %L705
-L705:
+	br i1 %r26, label %L699, label %L701
+L701:
+	br label %L699
+L699:
 	%r28 = load %ptr, %ptr* %t3
 	%r30 = ptrtoint %ptr %r28 to %word
 	%r29 = icmp ne %word %r30, 0
-	br i1 %r29, label %L702, label %L703
-L702:
+	br i1 %r29, label %L696, label %L697
+L696:
 	%r31 = inttoptr %word 48 to %ptr
 	%r32 = load %ptr, %ptr* %t1
 	%r36 = ptrtoint %ptr %r32 to %word
@@ -8491,8 +8441,8 @@ L702:
 	%r34 = sub %word %r36, %r35
 	%r33 = inttoptr %word %r34 to %ptr
 	store %ptr %r33, %ptr* %t2
-	br label %L704
-L703:
+	br label %L698
+L697:
 	%r37 = inttoptr %word 1 to %ptr
 	store %ptr %r37, %ptr* %t4
 	%r38 = load %ptr, %ptr* %t1
@@ -8509,8 +8459,8 @@ L703:
 	%r45 = inttoptr i1 %r46 to %ptr
 	%r50 = ptrtoint %ptr %r45 to %word
 	%r49 = icmp ne %word %r50, 0
-	br i1 %r49, label %L711, label %L712
-L712:
+	br i1 %r49, label %L705, label %L706
+L706:
 	%r51 = inttoptr %word 122 to %ptr
 	%r52 = load %ptr, %ptr* %t1
 	%r56 = ptrtoint %ptr %r52 to %word
@@ -8525,15 +8475,15 @@ L712:
 	%r58 = inttoptr i1 %r59 to %ptr
 	%r63 = ptrtoint %ptr %r58 to %word
 	%r62 = icmp ne %word %r63, 0
-	br i1 %r62, label %L711, label %L713
-L713:
-	br label %L711
-L711:
+	br i1 %r62, label %L705, label %L707
+L707:
+	br label %L705
+L705:
 	%r64 = load %ptr, %ptr* %t4
 	%r66 = ptrtoint %ptr %r64 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L708, label %L709
-L708:
+	br i1 %r65, label %L702, label %L703
+L702:
 	%r67 = inttoptr %word 10 to %ptr
 	%r68 = inttoptr %word 97 to %ptr
 	%r72 = ptrtoint %ptr %r68 to %word
@@ -8546,8 +8496,8 @@ L708:
 	%r75 = sub %word %r77, %r76
 	%r74 = inttoptr %word %r75 to %ptr
 	store %ptr %r74, %ptr* %t3
-	br label %L710
-L709:
+	br label %L704
+L703:
 	%r78 = inttoptr %word 1 to %ptr
 	store %ptr %r78, %ptr* %t5
 	%r79 = load %ptr, %ptr* %t1
@@ -8564,8 +8514,8 @@ L709:
 	%r86 = inttoptr i1 %r87 to %ptr
 	%r91 = ptrtoint %ptr %r86 to %word
 	%r90 = icmp ne %word %r91, 0
-	br i1 %r90, label %L717, label %L718
-L718:
+	br i1 %r90, label %L711, label %L712
+L712:
 	%r92 = inttoptr %word 90 to %ptr
 	%r93 = load %ptr, %ptr* %t1
 	%r97 = ptrtoint %ptr %r93 to %word
@@ -8580,15 +8530,15 @@ L718:
 	%r99 = inttoptr i1 %r100 to %ptr
 	%r104 = ptrtoint %ptr %r99 to %word
 	%r103 = icmp ne %word %r104, 0
-	br i1 %r103, label %L717, label %L719
-L719:
-	br label %L717
-L717:
+	br i1 %r103, label %L711, label %L713
+L713:
+	br label %L711
+L711:
 	%r105 = load %ptr, %ptr* %t5
 	%r107 = ptrtoint %ptr %r105 to %word
 	%r106 = icmp ne %word %r107, 0
-	br i1 %r106, label %L714, label %L715
-L714:
+	br i1 %r106, label %L708, label %L709
+L708:
 	%r108 = inttoptr %word 10 to %ptr
 	%r109 = inttoptr %word 65 to %ptr
 	%r113 = ptrtoint %ptr %r109 to %word
@@ -8601,35 +8551,35 @@ L714:
 	%r116 = sub %word %r118, %r117
 	%r115 = inttoptr %word %r116 to %ptr
 	store %ptr %r115, %ptr* %t4
-	br label %L716
-L715:
-	%r119 = getelementptr [38 x i8], [38 x i8]* @str720, %word 0, %word 0
+	br label %L710
+L709:
+	%r119 = getelementptr [38 x i8], [38 x i8]* @str714, %word 0, %word 0
 	%r121 = load %ptr, %ptr* %t1
 	%r122 = call %ptr @fatal1(%ptr %r119, %ptr %r121)
 	store %ptr %r122, %ptr* %t4
-	br label %L716
-L716:
-	%r123 = load %ptr, %ptr* %t4
-	store %ptr %r123, %ptr* %t3
 	br label %L710
 L710:
-	%r124 = load %ptr, %ptr* %t3
-	store %ptr %r124, %ptr* %t2
+	%r123 = load %ptr, %ptr* %t4
+	store %ptr %r123, %ptr* %t3
 	br label %L704
 L704:
+	%r124 = load %ptr, %ptr* %t3
+	store %ptr %r124, %ptr* %t2
+	br label %L698
+L698:
 	%r125 = load %ptr, %ptr* %t2
 	ret %ptr %r125
 }
-@str755 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str756 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
-@str757 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str768 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str769 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
-@str770 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str783 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str784 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
-@str785 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str792 = private unnamed_addr constant [30 x i8] c"illegal character escape: \5C%c\00"
+@str749 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str750 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
+@str751 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str762 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str763 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
+@str764 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str777 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str778 = private unnamed_addr constant [25 x i8] c"illegal character escape\00"
+@str779 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str786 = private unnamed_addr constant [30 x i8] c"illegal character escape: \5C%c\00"
 define %ptr @read_char(%ptr %c, %ptr %stream) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -8658,8 +8608,8 @@ define %ptr @read_char(%ptr %c, %ptr %stream) {
 	%r3 = inttoptr i1 %r4 to %ptr
 	%r8 = ptrtoint %ptr %r3 to %word
 	%r7 = icmp ne %word %r8, 0
-	br i1 %r7, label %L721, label %L722
-L721:
+	br i1 %r7, label %L715, label %L716
+L715:
 	%r9 = load %ptr, %ptr* %t2
 	%r10 = call i32 @fgetc(%ptr %r9)
 	%r11 = inttoptr %word %r10 to %ptr
@@ -8672,12 +8622,12 @@ L721:
 	%r14 = inttoptr i1 %r15 to %ptr
 	%r19 = ptrtoint %ptr %r14 to %word
 	%r18 = icmp ne %word %r19, 0
-	br i1 %r18, label %L724, label %L725
-L724:
+	br i1 %r18, label %L718, label %L719
+L718:
 	%r20 = inttoptr %word 7 to %ptr
 	store %ptr %r20, %ptr* %t4
-	br label %L726
-L725:
+	br label %L720
+L719:
 	%r21 = inttoptr %word 98 to %ptr
 	%r22 = load %ptr, %ptr* %t1
 	%r26 = ptrtoint %ptr %r22 to %word
@@ -8686,12 +8636,12 @@ L725:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L727, label %L728
-L727:
+	br i1 %r27, label %L721, label %L722
+L721:
 	%r29 = inttoptr %word 8 to %ptr
 	store %ptr %r29, %ptr* %t5
-	br label %L729
-L728:
+	br label %L723
+L722:
 	%r30 = inttoptr %word 102 to %ptr
 	%r31 = load %ptr, %ptr* %t1
 	%r35 = ptrtoint %ptr %r31 to %word
@@ -8700,12 +8650,12 @@ L728:
 	%r32 = inttoptr i1 %r33 to %ptr
 	%r37 = ptrtoint %ptr %r32 to %word
 	%r36 = icmp ne %word %r37, 0
-	br i1 %r36, label %L730, label %L731
-L730:
+	br i1 %r36, label %L724, label %L725
+L724:
 	%r38 = inttoptr %word 12 to %ptr
 	store %ptr %r38, %ptr* %t6
-	br label %L732
-L731:
+	br label %L726
+L725:
 	%r39 = inttoptr %word 110 to %ptr
 	%r40 = load %ptr, %ptr* %t1
 	%r44 = ptrtoint %ptr %r40 to %word
@@ -8714,12 +8664,12 @@ L731:
 	%r41 = inttoptr i1 %r42 to %ptr
 	%r46 = ptrtoint %ptr %r41 to %word
 	%r45 = icmp ne %word %r46, 0
-	br i1 %r45, label %L733, label %L734
-L733:
+	br i1 %r45, label %L727, label %L728
+L727:
 	%r47 = inttoptr %word 10 to %ptr
 	store %ptr %r47, %ptr* %t7
-	br label %L735
-L734:
+	br label %L729
+L728:
 	%r48 = inttoptr %word 114 to %ptr
 	%r49 = load %ptr, %ptr* %t1
 	%r53 = ptrtoint %ptr %r49 to %word
@@ -8728,12 +8678,12 @@ L734:
 	%r50 = inttoptr i1 %r51 to %ptr
 	%r55 = ptrtoint %ptr %r50 to %word
 	%r54 = icmp ne %word %r55, 0
-	br i1 %r54, label %L736, label %L737
-L736:
+	br i1 %r54, label %L730, label %L731
+L730:
 	%r56 = inttoptr %word 13 to %ptr
 	store %ptr %r56, %ptr* %t8
-	br label %L738
-L737:
+	br label %L732
+L731:
 	%r57 = inttoptr %word 116 to %ptr
 	%r58 = load %ptr, %ptr* %t1
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -8742,12 +8692,12 @@ L737:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L739, label %L740
-L739:
+	br i1 %r63, label %L733, label %L734
+L733:
 	%r65 = inttoptr %word 9 to %ptr
 	store %ptr %r65, %ptr* %t9
-	br label %L741
-L740:
+	br label %L735
+L734:
 	%r66 = inttoptr %word 118 to %ptr
 	%r67 = load %ptr, %ptr* %t1
 	%r71 = ptrtoint %ptr %r67 to %word
@@ -8756,12 +8706,12 @@ L740:
 	%r68 = inttoptr i1 %r69 to %ptr
 	%r73 = ptrtoint %ptr %r68 to %word
 	%r72 = icmp ne %word %r73, 0
-	br i1 %r72, label %L742, label %L743
-L742:
+	br i1 %r72, label %L736, label %L737
+L736:
 	%r74 = inttoptr %word 11 to %ptr
 	store %ptr %r74, %ptr* %t10
-	br label %L744
-L743:
+	br label %L738
+L737:
 	%r75 = inttoptr %word 117 to %ptr
 	%r76 = load %ptr, %ptr* %t1
 	%r80 = ptrtoint %ptr %r76 to %word
@@ -8770,8 +8720,8 @@ L743:
 	%r77 = inttoptr i1 %r78 to %ptr
 	%r82 = ptrtoint %ptr %r77 to %word
 	%r81 = icmp ne %word %r82, 0
-	br i1 %r81, label %L745, label %L746
-L745:
+	br i1 %r81, label %L739, label %L740
+L739:
 	%r83 = load %ptr, %ptr* %t2
 	%r84 = call i32 @fgetc(%ptr %r83)
 	%r85 = inttoptr %word %r84 to %ptr
@@ -8802,8 +8752,8 @@ L745:
 	%r100 = inttoptr i1 %r101 to %ptr
 	%r105 = ptrtoint %ptr %r100 to %word
 	%r104 = icmp ne %word %r105, 0
-	br i1 %r104, label %L749, label %L750
-L750:
+	br i1 %r104, label %L743, label %L744
+L744:
 	%r106 = load %ptr, %ptr* %t13
 	%r107 = call %ptr @is_hexadecimal(%ptr %r106)
 	store %ptr %r107, %ptr* %t17
@@ -8814,8 +8764,8 @@ L750:
 	%r109 = inttoptr i1 %r110 to %ptr
 	%r114 = ptrtoint %ptr %r109 to %word
 	%r113 = icmp ne %word %r114, 0
-	br i1 %r113, label %L749, label %L751
-L751:
+	br i1 %r113, label %L743, label %L745
+L745:
 	%r115 = load %ptr, %ptr* %t14
 	%r116 = call %ptr @is_hexadecimal(%ptr %r115)
 	store %ptr %r116, %ptr* %t17
@@ -8826,8 +8776,8 @@ L751:
 	%r118 = inttoptr i1 %r119 to %ptr
 	%r123 = ptrtoint %ptr %r118 to %word
 	%r122 = icmp ne %word %r123, 0
-	br i1 %r122, label %L749, label %L752
-L752:
+	br i1 %r122, label %L743, label %L746
+L746:
 	%r124 = load %ptr, %ptr* %t15
 	%r125 = call %ptr @is_hexadecimal(%ptr %r124)
 	store %ptr %r125, %ptr* %t17
@@ -8838,10 +8788,10 @@ L752:
 	%r127 = inttoptr i1 %r128 to %ptr
 	%r132 = ptrtoint %ptr %r127 to %word
 	%r131 = icmp ne %word %r132, 0
-	br i1 %r131, label %L749, label %L753
-L753:
-	br label %L749
-L749:
+	br i1 %r131, label %L743, label %L747
+L747:
+	br label %L743
+L743:
 	%r133 = load %ptr, %ptr* %t17
 	store %ptr %r133, %ptr* %t16
 	%r134 = inttoptr %word 0 to %ptr
@@ -8851,15 +8801,15 @@ L749:
 	%r135 = inttoptr i1 %r136 to %ptr
 	%r140 = ptrtoint %ptr %r135 to %word
 	%r139 = icmp ne %word %r140, 0
-	br i1 %r139, label %L754, label %L748
-L754:
-	%r141 = getelementptr [9 x i8], [9 x i8]* @str755, %word 0, %word 0
+	br i1 %r139, label %L748, label %L742
+L748:
+	%r141 = getelementptr [9 x i8], [9 x i8]* @str749, %word 0, %word 0
 	%r143 = call i32 (%ptr, ...) @printf(%ptr %r141)
 	%r144 = inttoptr %word %r143 to %ptr
-	%r145 = getelementptr [25 x i8], [25 x i8]* @str756, %word 0, %word 0
+	%r145 = getelementptr [25 x i8], [25 x i8]* @str750, %word 0, %word 0
 	%r147 = call i32 (%ptr, ...) @printf(%ptr %r145)
 	%r148 = inttoptr %word %r147 to %ptr
-	%r149 = getelementptr [2 x i8], [2 x i8]* @str757, %word 0, %word 0
+	%r149 = getelementptr [2 x i8], [2 x i8]* @str751, %word 0, %word 0
 	%r151 = call i32 (%ptr, ...) @printf(%ptr %r149)
 	%r152 = inttoptr %word %r151 to %ptr
 	%r153 = call %ptr @die()
@@ -8871,10 +8821,10 @@ L754:
 	%r155 = inttoptr i1 %r156 to %ptr
 	%r160 = ptrtoint %ptr %r155 to %word
 	%r159 = icmp ne %word %r160, 0
-	br i1 %r159, label %L758, label %L748
-L758:
-	br label %L748
-L748:
+	br i1 %r159, label %L752, label %L742
+L752:
+	br label %L742
+L742:
 	%r161 = load %ptr, %ptr* %t16
 	%r162 = load %ptr, %ptr* %t15
 	%r163 = call %ptr @digit_value(%ptr %r162)
@@ -8912,8 +8862,8 @@ L748:
 	%r194 = add %word %r196, %r195
 	%r193 = inttoptr %word %r194 to %ptr
 	store %ptr %r193, %ptr* %t11
-	br label %L747
-L746:
+	br label %L741
+L740:
 	%r197 = inttoptr %word 120 to %ptr
 	%r198 = load %ptr, %ptr* %t1
 	%r202 = ptrtoint %ptr %r198 to %word
@@ -8922,8 +8872,8 @@ L746:
 	%r199 = inttoptr i1 %r200 to %ptr
 	%r204 = ptrtoint %ptr %r199 to %word
 	%r203 = icmp ne %word %r204, 0
-	br i1 %r203, label %L759, label %L760
-L759:
+	br i1 %r203, label %L753, label %L754
+L753:
 	%r205 = inttoptr %word 0 to %ptr
 	store %ptr %r205, %ptr* %t14
 	%r206 = load %ptr, %ptr* %t2
@@ -8933,8 +8883,8 @@ L759:
 	%r209 = call %ptr @is_hexadecimal(%ptr %r208)
 	%r211 = ptrtoint %ptr %r209 to %word
 	%r210 = icmp ne %word %r211, 0
-	br i1 %r210, label %L762, label %L763
-L762:
+	br i1 %r210, label %L756, label %L757
+L756:
 	%r212 = load %ptr, %ptr* %t1
 	%r213 = call %ptr @digit_value(%ptr %r212)
 	store %ptr %r213, %ptr* %t14
@@ -8945,8 +8895,8 @@ L762:
 	%r217 = call %ptr @is_hexadecimal(%ptr %r216)
 	%r219 = ptrtoint %ptr %r217 to %word
 	%r218 = icmp ne %word %r219, 0
-	br i1 %r218, label %L765, label %L766
-L765:
+	br i1 %r218, label %L759, label %L760
+L759:
 	%r220 = load %ptr, %ptr* %t1
 	%r221 = call %ptr @digit_value(%ptr %r220)
 	%r222 = inttoptr %word 16 to %ptr
@@ -8965,29 +8915,29 @@ L765:
 	%r234 = inttoptr %word %r233 to %ptr
 	store %ptr %r234, %ptr* %t1
 	store %ptr %r234, %ptr* %t12
-	br label %L767
-L766:
-	%r235 = getelementptr [9 x i8], [9 x i8]* @str768, %word 0, %word 0
+	br label %L761
+L760:
+	%r235 = getelementptr [9 x i8], [9 x i8]* @str762, %word 0, %word 0
 	%r237 = call i32 (%ptr, ...) @printf(%ptr %r235)
 	%r238 = inttoptr %word %r237 to %ptr
-	%r239 = getelementptr [25 x i8], [25 x i8]* @str769, %word 0, %word 0
+	%r239 = getelementptr [25 x i8], [25 x i8]* @str763, %word 0, %word 0
 	%r241 = call i32 (%ptr, ...) @printf(%ptr %r239)
 	%r242 = inttoptr %word %r241 to %ptr
-	%r243 = getelementptr [2 x i8], [2 x i8]* @str770, %word 0, %word 0
+	%r243 = getelementptr [2 x i8], [2 x i8]* @str764, %word 0, %word 0
 	%r245 = call i32 (%ptr, ...) @printf(%ptr %r243)
 	%r246 = inttoptr %word %r245 to %ptr
 	%r247 = call %ptr @die()
 	store %ptr %r247, %ptr* %t12
-	br label %L767
-L767:
+	br label %L761
+L761:
 	%r248 = load %ptr, %ptr* %t12
 	store %ptr %r248, %ptr* %t13
-	br label %L764
-L763:
+	br label %L758
+L757:
 	%r249 = inttoptr %word 0 to %ptr
 	store %ptr %r249, %ptr* %t13
-	br label %L764
-L764:
+	br label %L758
+L758:
 	%r250 = load %ptr, %ptr* %t13
 	%r251 = load %ptr, %ptr* %t1
 	%r252 = load %ptr, %ptr* %t2
@@ -8996,8 +8946,8 @@ L764:
 	%r255 = inttoptr %word %r254 to %ptr
 	%r256 = load %ptr, %ptr* %t14
 	store %ptr %r256, %ptr* %t15
-	br label %L761
-L760:
+	br label %L755
+L754:
 	%r257 = inttoptr %word 1 to %ptr
 	store %ptr %r257, %ptr* %t13
 	%r258 = load %ptr, %ptr* %t1
@@ -9014,8 +8964,8 @@ L760:
 	%r265 = inttoptr i1 %r266 to %ptr
 	%r270 = ptrtoint %ptr %r265 to %word
 	%r269 = icmp ne %word %r270, 0
-	br i1 %r269, label %L774, label %L775
-L775:
+	br i1 %r269, label %L768, label %L769
+L769:
 	%r271 = inttoptr %word 55 to %ptr
 	%r272 = load %ptr, %ptr* %t1
 	%r276 = ptrtoint %ptr %r272 to %word
@@ -9030,15 +8980,15 @@ L775:
 	%r278 = inttoptr i1 %r279 to %ptr
 	%r283 = ptrtoint %ptr %r278 to %word
 	%r282 = icmp ne %word %r283, 0
-	br i1 %r282, label %L774, label %L776
-L776:
-	br label %L774
-L774:
+	br i1 %r282, label %L768, label %L770
+L770:
+	br label %L768
+L768:
 	%r284 = load %ptr, %ptr* %t13
 	%r286 = ptrtoint %ptr %r284 to %word
 	%r285 = icmp ne %word %r286, 0
-	br i1 %r285, label %L771, label %L772
-L771:
+	br i1 %r285, label %L765, label %L766
+L765:
 	%r287 = load %ptr, %ptr* %t1
 	%r288 = call %ptr @digit_value(%ptr %r287)
 	store %ptr %r288, %ptr* %t13
@@ -9049,8 +8999,8 @@ L771:
 	%r292 = call %ptr @is_octal(%ptr %r291)
 	%r294 = ptrtoint %ptr %r292 to %word
 	%r293 = icmp ne %word %r294, 0
-	br i1 %r293, label %L777, label %L778
-L777:
+	br i1 %r293, label %L771, label %L772
+L771:
 	%r295 = load %ptr, %ptr* %t1
 	%r296 = call %ptr @digit_value(%ptr %r295)
 	%r297 = inttoptr %word 8 to %ptr
@@ -9071,8 +9021,8 @@ L777:
 	%r310 = call %ptr @is_octal(%ptr %r309)
 	%r312 = ptrtoint %ptr %r310 to %word
 	%r311 = icmp ne %word %r312, 0
-	br i1 %r311, label %L780, label %L781
-L780:
+	br i1 %r311, label %L774, label %L775
+L774:
 	%r313 = load %ptr, %ptr* %t1
 	%r314 = call %ptr @digit_value(%ptr %r313)
 	%r315 = inttoptr %word 8 to %ptr
@@ -9091,29 +9041,29 @@ L780:
 	%r327 = inttoptr %word %r326 to %ptr
 	store %ptr %r327, %ptr* %t1
 	store %ptr %r327, %ptr* %t16
-	br label %L782
-L781:
-	%r328 = getelementptr [9 x i8], [9 x i8]* @str783, %word 0, %word 0
+	br label %L776
+L775:
+	%r328 = getelementptr [9 x i8], [9 x i8]* @str777, %word 0, %word 0
 	%r330 = call i32 (%ptr, ...) @printf(%ptr %r328)
 	%r331 = inttoptr %word %r330 to %ptr
-	%r332 = getelementptr [25 x i8], [25 x i8]* @str784, %word 0, %word 0
+	%r332 = getelementptr [25 x i8], [25 x i8]* @str778, %word 0, %word 0
 	%r334 = call i32 (%ptr, ...) @printf(%ptr %r332)
 	%r335 = inttoptr %word %r334 to %ptr
-	%r336 = getelementptr [2 x i8], [2 x i8]* @str785, %word 0, %word 0
+	%r336 = getelementptr [2 x i8], [2 x i8]* @str779, %word 0, %word 0
 	%r338 = call i32 (%ptr, ...) @printf(%ptr %r336)
 	%r339 = inttoptr %word %r338 to %ptr
 	%r340 = call %ptr @die()
 	store %ptr %r340, %ptr* %t16
-	br label %L782
-L782:
+	br label %L776
+L776:
 	%r341 = load %ptr, %ptr* %t16
 	store %ptr %r341, %ptr* %t12
-	br label %L779
-L778:
+	br label %L773
+L772:
 	%r342 = inttoptr %word 0 to %ptr
 	store %ptr %r342, %ptr* %t12
-	br label %L779
-L779:
+	br label %L773
+L773:
 	%r343 = load %ptr, %ptr* %t12
 	%r344 = load %ptr, %ptr* %t1
 	%r345 = load %ptr, %ptr* %t2
@@ -9122,8 +9072,8 @@ L779:
 	%r348 = inttoptr %word %r347 to %ptr
 	%r349 = load %ptr, %ptr* %t13
 	store %ptr %r349, %ptr* %t14
-	br label %L773
-L772:
+	br label %L767
+L766:
 	%r350 = inttoptr %word 0 to %ptr
 	store %ptr %r350, %ptr* %t12
 	%r351 = load %ptr, %ptr* %t1
@@ -9136,8 +9086,8 @@ L772:
 	%r354 = inttoptr i1 %r355 to %ptr
 	%r359 = ptrtoint %ptr %r354 to %word
 	%r358 = icmp ne %word %r359, 0
-	br i1 %r358, label %L790, label %L789
-L790:
+	br i1 %r358, label %L784, label %L783
+L784:
 	%r360 = load %ptr, %ptr* %t1
 	%r361 = call %ptr @is_digit10(%ptr %r360)
 	store %ptr %r361, %ptr* %t12
@@ -9148,78 +9098,78 @@ L790:
 	%r363 = inttoptr i1 %r364 to %ptr
 	%r368 = ptrtoint %ptr %r363 to %word
 	%r367 = icmp ne %word %r368, 0
-	br i1 %r367, label %L791, label %L789
-L791:
-	br label %L789
-L789:
+	br i1 %r367, label %L785, label %L783
+L785:
+	br label %L783
+L783:
 	%r369 = load %ptr, %ptr* %t12
 	%r371 = ptrtoint %ptr %r369 to %word
 	%r370 = icmp ne %word %r371, 0
-	br i1 %r370, label %L786, label %L787
-L786:
-	%r372 = getelementptr [30 x i8], [30 x i8]* @str792, %word 0, %word 0
+	br i1 %r370, label %L780, label %L781
+L780:
+	%r372 = getelementptr [30 x i8], [30 x i8]* @str786, %word 0, %word 0
 	%r374 = load %ptr, %ptr* %t1
 	%r375 = call %ptr @fatal1(%ptr %r372, %ptr %r374)
 	store %ptr %r375, %ptr* %t13
-	br label %L788
-L787:
+	br label %L782
+L781:
 	%r376 = load %ptr, %ptr* %t1
 	store %ptr %r376, %ptr* %t13
-	br label %L788
-L788:
+	br label %L782
+L782:
 	%r377 = load %ptr, %ptr* %t13
 	store %ptr %r377, %ptr* %t14
-	br label %L773
-L773:
+	br label %L767
+L767:
 	%r378 = load %ptr, %ptr* %t14
 	store %ptr %r378, %ptr* %t15
-	br label %L761
-L761:
+	br label %L755
+L755:
 	%r379 = load %ptr, %ptr* %t15
 	store %ptr %r379, %ptr* %t11
-	br label %L747
-L747:
-	%r380 = load %ptr, %ptr* %t11
-	store %ptr %r380, %ptr* %t10
-	br label %L744
-L744:
-	%r381 = load %ptr, %ptr* %t10
-	store %ptr %r381, %ptr* %t9
 	br label %L741
 L741:
-	%r382 = load %ptr, %ptr* %t9
-	store %ptr %r382, %ptr* %t8
+	%r380 = load %ptr, %ptr* %t11
+	store %ptr %r380, %ptr* %t10
 	br label %L738
 L738:
-	%r383 = load %ptr, %ptr* %t8
-	store %ptr %r383, %ptr* %t7
+	%r381 = load %ptr, %ptr* %t10
+	store %ptr %r381, %ptr* %t9
 	br label %L735
 L735:
-	%r384 = load %ptr, %ptr* %t7
-	store %ptr %r384, %ptr* %t6
+	%r382 = load %ptr, %ptr* %t9
+	store %ptr %r382, %ptr* %t8
 	br label %L732
 L732:
-	%r385 = load %ptr, %ptr* %t6
-	store %ptr %r385, %ptr* %t5
+	%r383 = load %ptr, %ptr* %t8
+	store %ptr %r383, %ptr* %t7
 	br label %L729
 L729:
-	%r386 = load %ptr, %ptr* %t5
-	store %ptr %r386, %ptr* %t4
+	%r384 = load %ptr, %ptr* %t7
+	store %ptr %r384, %ptr* %t6
 	br label %L726
 L726:
-	%r387 = load %ptr, %ptr* %t4
-	store %ptr %r387, %ptr* %t3
-	br label %L723
-L722:
-	%r388 = load %ptr, %ptr* %t1
-	store %ptr %r388, %ptr* %t3
+	%r385 = load %ptr, %ptr* %t6
+	store %ptr %r385, %ptr* %t5
 	br label %L723
 L723:
+	%r386 = load %ptr, %ptr* %t5
+	store %ptr %r386, %ptr* %t4
+	br label %L720
+L720:
+	%r387 = load %ptr, %ptr* %t4
+	store %ptr %r387, %ptr* %t3
+	br label %L717
+L716:
+	%r388 = load %ptr, %ptr* %t1
+	store %ptr %r388, %ptr* %t3
+	br label %L717
+L717:
 	%r389 = load %ptr, %ptr* %t3
 	ret %ptr %r389
 }
-@str815 = private unnamed_addr constant [2 x i8] c"1\00"
-@str818 = private unnamed_addr constant [92 x i8] c"invalid number in source code, libc/strtoul failed for '%s' (printed without the sign here)\00"
+@str809 = private unnamed_addr constant [2 x i8] c"1\00"
+@str812 = private unnamed_addr constant [92 x i8] c"invalid number in source code, libc/strtoul failed for '%s' (printed without the sign here)\00"
 define %ptr @read_number(%ptr %c, %ptr %stream) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -9251,27 +9201,27 @@ define %ptr @read_number(%ptr %c, %ptr %stream) {
 	%r9 = inttoptr i1 %r10 to %ptr
 	%r14 = ptrtoint %ptr %r9 to %word
 	%r13 = icmp ne %word %r14, 0
-	br i1 %r13, label %L793, label %L794
-L793:
+	br i1 %r13, label %L787, label %L788
+L787:
 	%r15 = inttoptr %word 1 to %ptr
 	store %ptr %r15, %ptr* %t4
 	store %ptr %r15, %ptr* %t6
-	br label %L795
-L794:
+	br label %L789
+L788:
 	%r16 = load %ptr, %ptr* %t3
 	%r17 = load %ptr, %ptr* %t1
 	%r18 = call %ptr @buffer-append(%ptr %r16, %ptr %r17)
 	store %ptr %r18, %ptr* %t6
-	br label %L795
-L795:
+	br label %L789
+L789:
 	%r19 = load %ptr, %ptr* %t6
-	br label %L797
-L796:
+	br label %L791
+L790:
 	%r20 = load %ptr, %ptr* %t3
 	%r21 = load %ptr, %ptr* %t1
 	%r22 = call %ptr @buffer-append(%ptr %r20, %ptr %r21)
-	br label %L797
-L797:
+	br label %L791
+L791:
 	%r23 = load %ptr, %ptr* %t2
 	%r24 = call i32 @fgetc(%ptr %r23)
 	%r25 = inttoptr %word %r24 to %ptr
@@ -9279,8 +9229,8 @@ L797:
 	%r26 = call %ptr @is_digit10(%ptr %r25)
 	%r28 = ptrtoint %ptr %r26 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L796, label %L798
-L798:
+	br i1 %r27, label %L790, label %L792
+L792:
 	%r29 = inttoptr %word 1 to %ptr
 	store %ptr %r29, %ptr* %t7
 	%r30 = load %ptr, %ptr* %t1
@@ -9297,8 +9247,8 @@ L798:
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L802, label %L803
-L803:
+	br i1 %r41, label %L796, label %L797
+L797:
 	%r43 = load %ptr, %ptr* %t3
 	%r44 = call %ptr @buffer-length(%ptr %r43)
 	%r45 = inttoptr %word 1 to %ptr
@@ -9314,27 +9264,27 @@ L803:
 	%r51 = inttoptr i1 %r52 to %ptr
 	%r56 = ptrtoint %ptr %r51 to %word
 	%r55 = icmp ne %word %r56, 0
-	br i1 %r55, label %L802, label %L804
-L804:
-	br label %L802
-L802:
+	br i1 %r55, label %L796, label %L798
+L798:
+	br label %L796
+L796:
 	%r57 = load %ptr, %ptr* %t7
 	%r59 = ptrtoint %ptr %r57 to %word
 	%r58 = icmp ne %word %r59, 0
-	br i1 %r58, label %L799, label %L800
-L799:
+	br i1 %r58, label %L793, label %L794
+L793:
 	%r60 = inttoptr %word 16 to %ptr
 	store %ptr %r60, %ptr* %t5
 	%r61 = load %ptr, %ptr* %t3
 	%r62 = load %ptr, %ptr* %t1
 	%r63 = call %ptr @buffer-append(%ptr %r61, %ptr %r62)
-	br label %L806
-L805:
+	br label %L800
+L799:
 	%r64 = load %ptr, %ptr* %t3
 	%r65 = load %ptr, %ptr* %t1
 	%r66 = call %ptr @buffer-append(%ptr %r64, %ptr %r65)
-	br label %L806
-L806:
+	br label %L800
+L800:
 	%r67 = load %ptr, %ptr* %t2
 	%r68 = call i32 @fgetc(%ptr %r67)
 	%r69 = inttoptr %word %r68 to %ptr
@@ -9342,15 +9292,15 @@ L806:
 	%r70 = call %ptr @is_digit16(%ptr %r69)
 	%r72 = ptrtoint %ptr %r70 to %word
 	%r71 = icmp ne %word %r72, 0
-	br i1 %r71, label %L805, label %L807
-L807:
+	br i1 %r71, label %L799, label %L801
+L801:
 	store %ptr %r70, %ptr* %t6
-	br label %L801
-L800:
+	br label %L795
+L794:
 	%r73 = inttoptr %word 0 to %ptr
 	store %ptr %r73, %ptr* %t6
-	br label %L801
-L801:
+	br label %L795
+L795:
 	%r74 = load %ptr, %ptr* %t6
 	%r75 = load %ptr, %ptr* %t1
 	%r76 = load %ptr, %ptr* %t2
@@ -9386,8 +9336,8 @@ L801:
 	%r98 = inttoptr i1 %r99 to %ptr
 	%r103 = ptrtoint %ptr %r98 to %word
 	%r102 = icmp ne %word %r103, 0
-	br i1 %r102, label %L811, label %L812
-L812:
+	br i1 %r102, label %L805, label %L806
+L806:
 	%r104 = inttoptr %word 0 to %ptr
 	store %ptr %r104, %ptr* %t11
 	%r105 = load %ptr, %ptr* %t4
@@ -9403,10 +9353,10 @@ L812:
 	%r111 = inttoptr i1 %r112 to %ptr
 	%r116 = ptrtoint %ptr %r111 to %word
 	%r115 = icmp ne %word %r116, 0
-	br i1 %r115, label %L814, label %L813
-L814:
+	br i1 %r115, label %L808, label %L807
+L808:
 	%r117 = load %ptr, %ptr* %t6
-	%r118 = getelementptr [2 x i8], [2 x i8]* @str815, %word 0, %word 0
+	%r118 = getelementptr [2 x i8], [2 x i8]* @str809, %word 0, %word 0
 	%r120 = call i32 @strcmp(%ptr %r117, %ptr %r118)
 	%r121 = inttoptr %word %r120 to %ptr
 	%r122 = inttoptr %word 0 to %ptr
@@ -9426,10 +9376,10 @@ L814:
 	%r132 = inttoptr i1 %r133 to %ptr
 	%r137 = ptrtoint %ptr %r132 to %word
 	%r136 = icmp ne %word %r137, 0
-	br i1 %r136, label %L816, label %L813
-L816:
-	br label %L813
-L813:
+	br i1 %r136, label %L810, label %L807
+L810:
+	br label %L807
+L807:
 	%r138 = load %ptr, %ptr* %t11
 	store %ptr %r138, %ptr* %t10
 	%r139 = inttoptr %word 0 to %ptr
@@ -9439,44 +9389,44 @@ L813:
 	%r140 = inttoptr i1 %r141 to %ptr
 	%r145 = ptrtoint %ptr %r140 to %word
 	%r144 = icmp ne %word %r145, 0
-	br i1 %r144, label %L811, label %L817
-L817:
-	br label %L811
+	br i1 %r144, label %L805, label %L811
 L811:
+	br label %L805
+L805:
 	%r146 = load %ptr, %ptr* %t10
 	%r148 = ptrtoint %ptr %r146 to %word
 	%r147 = icmp ne %word %r148, 0
-	br i1 %r147, label %L808, label %L809
-L808:
-	%r149 = getelementptr [92 x i8], [92 x i8]* @str818, %word 0, %word 0
+	br i1 %r147, label %L802, label %L803
+L802:
+	%r149 = getelementptr [92 x i8], [92 x i8]* @str812, %word 0, %word 0
 	%r151 = load %ptr, %ptr* %t6
 	%r152 = call %ptr @fatal1(%ptr %r149, %ptr %r151)
 	store %ptr %r152, %ptr* %t9
-	br label %L810
-L809:
+	br label %L804
+L803:
 	%r153 = inttoptr %word 0 to %ptr
 	store %ptr %r153, %ptr* %t9
-	br label %L810
-L810:
+	br label %L804
+L804:
 	%r154 = load %ptr, %ptr* %t9
 	%r155 = inttoptr %word 1 to %ptr
 	%r156 = inttoptr %word 1 to %ptr
 	%r157 = load %ptr, %ptr* %t4
 	%r159 = ptrtoint %ptr %r157 to %word
 	%r158 = icmp ne %word %r159, 0
-	br i1 %r158, label %L819, label %L820
-L819:
+	br i1 %r158, label %L813, label %L814
+L813:
 	%r160 = load %ptr, %ptr* %t8
 	%r163 = ptrtoint %ptr %r160 to %word
 	%r162 = sub nsw %word 0, %r163
 	%r161 = inttoptr %word %r162 to %ptr
 	store %ptr %r161, %ptr* %t9
-	br label %L821
-L820:
+	br label %L815
+L814:
 	%r164 = load %ptr, %ptr* %t8
 	store %ptr %r164, %ptr* %t9
-	br label %L821
-L821:
+	br label %L815
+L815:
 	%r165 = load %ptr, %ptr* %t9
 	%r169 = ptrtoint %ptr %r165 to %word
 	%r168 = ptrtoint %ptr %r156 to %word
@@ -9505,8 +9455,8 @@ define %ptr @read_symbol(%ptr %c, %ptr %stream) {
 	%r3 = getelementptr %ptr, %ptr* %t3, %word 0
 	%r2 = bitcast %ptr* %r3 to %ptr
 	%r4 = call %ptr @"gc/push-root"(%ptr %r2)
-	br label %L823
-L822:
+	br label %L817
+L816:
 	%r5 = load %ptr, %ptr* %t3
 	%r6 = load %ptr, %ptr* %t1
 	%r7 = call %ptr @buffer-append(%ptr %r5, %ptr %r6)
@@ -9514,8 +9464,8 @@ L822:
 	%r9 = call i32 @fgetc(%ptr %r8)
 	%r10 = inttoptr %word %r9 to %ptr
 	store %ptr %r10, %ptr* %t1
-	br label %L823
-L823:
+	br label %L817
+L817:
 	%r11 = inttoptr %word 0 to %ptr
 	store %ptr %r11, %ptr* %t4
 	%r12 = load %ptr, %ptr* %t1
@@ -9528,8 +9478,8 @@ L823:
 	%r15 = inttoptr i1 %r16 to %ptr
 	%r20 = ptrtoint %ptr %r15 to %word
 	%r19 = icmp ne %word %r20, 0
-	br i1 %r19, label %L826, label %L825
-L826:
+	br i1 %r19, label %L820, label %L819
+L820:
 	%r21 = load %ptr, %ptr* %t1
 	%r22 = call %ptr @is_digit10(%ptr %r21)
 	store %ptr %r22, %ptr* %t4
@@ -9540,15 +9490,15 @@ L826:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L827, label %L825
-L827:
-	br label %L825
-L825:
+	br i1 %r28, label %L821, label %L819
+L821:
+	br label %L819
+L819:
 	%r30 = load %ptr, %ptr* %t4
 	%r32 = ptrtoint %ptr %r30 to %word
 	%r31 = icmp ne %word %r32, 0
-	br i1 %r31, label %L822, label %L824
-L824:
+	br i1 %r31, label %L816, label %L818
+L818:
 	%r33 = load %ptr, %ptr* %t1
 	%r34 = load %ptr, %ptr* %t2
 	%ffi-cast35 = ptrtoint %ptr %r33 to i32
@@ -9564,9 +9514,9 @@ L824:
 	%r44 = load %ptr, %ptr* %t4
 	ret %ptr %r44
 }
-@str834 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str835 = private unnamed_addr constant [28 x i8] c"unterminated string literal\00"
-@str836 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str828 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str829 = private unnamed_addr constant [28 x i8] c"unterminated string literal\00"
+@str830 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @read_string(%ptr %c, %ptr %stream) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -9579,8 +9529,8 @@ define %ptr @read_string(%ptr %c, %ptr %stream) {
 	%r3 = getelementptr %ptr, %ptr* %t3, %word 0
 	%r2 = bitcast %ptr* %r3 to %ptr
 	%r4 = call %ptr @"gc/push-root"(%ptr %r2)
-	br label %L829
-L828:
+	br label %L823
+L822:
 	%r5 = load %ptr, %ptr* %t1
 	%r6 = load %ptr, %ptr* %t2
 	%r7 = call %ptr @read_char(%ptr %r5, %ptr %r6)
@@ -9593,31 +9543,31 @@ L828:
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L831, label %L832
-L831:
-	%r16 = getelementptr [9 x i8], [9 x i8]* @str834, %word 0, %word 0
+	br i1 %r14, label %L825, label %L826
+L825:
+	%r16 = getelementptr [9 x i8], [9 x i8]* @str828, %word 0, %word 0
 	%r18 = call i32 (%ptr, ...) @printf(%ptr %r16)
 	%r19 = inttoptr %word %r18 to %ptr
-	%r20 = getelementptr [28 x i8], [28 x i8]* @str835, %word 0, %word 0
+	%r20 = getelementptr [28 x i8], [28 x i8]* @str829, %word 0, %word 0
 	%r22 = call i32 (%ptr, ...) @printf(%ptr %r20)
 	%r23 = inttoptr %word %r22 to %ptr
-	%r24 = getelementptr [2 x i8], [2 x i8]* @str836, %word 0, %word 0
+	%r24 = getelementptr [2 x i8], [2 x i8]* @str830, %word 0, %word 0
 	%r26 = call i32 (%ptr, ...) @printf(%ptr %r24)
 	%r27 = inttoptr %word %r26 to %ptr
 	%r28 = call %ptr @die()
 	store %ptr %r28, %ptr* %t4
-	br label %L833
-L832:
+	br label %L827
+L826:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t4
-	br label %L833
-L833:
+	br label %L827
+L827:
 	%r30 = load %ptr, %ptr* %t4
 	%r31 = load %ptr, %ptr* %t3
 	%r32 = load %ptr, %ptr* %t1
 	%r33 = call %ptr @buffer-append(%ptr %r31, %ptr %r32)
-	br label %L829
-L829:
+	br label %L823
+L823:
 	%r34 = load %ptr, %ptr* %t2
 	%r35 = call i32 @fgetc(%ptr %r34)
 	%r36 = inttoptr %word %r35 to %ptr
@@ -9629,8 +9579,8 @@ L829:
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L828, label %L830
-L830:
+	br i1 %r42, label %L822, label %L824
+L824:
 	%r44 = load %ptr, %ptr* %t3
 	%r45 = call %ptr @buffer-contents(%ptr %r44)
 	%r46 = call %ptr @"new-<string>-from-cstring"(%ptr %r45)
@@ -9641,7 +9591,7 @@ L830:
 	%r50 = load %ptr, %ptr* %t4
 	ret %ptr %r50
 }
-@str849 = private unnamed_addr constant [50 x i8] c"missing closing '%c' delimiter while reading list\00"
+@str843 = private unnamed_addr constant [50 x i8] c"missing closing '%c' delimiter while reading list\00"
 define %ptr @read_list(%ptr %delim, %ptr %stream) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -9666,8 +9616,8 @@ define %ptr @read_list(%ptr %delim, %ptr %stream) {
 	%r10 = getelementptr %ptr, %ptr* %t5, %word 0
 	%r9 = bitcast %ptr* %r10 to %ptr
 	%r11 = call %ptr @"gc/push-root"(%ptr %r9)
-	br label %L838
-L837:
+	br label %L832
+L831:
 	%r12 = load %ptr, %ptr* %t5
 	%r13 = inttoptr %word 0 to %ptr
 	%r14 = call %ptr @"new-<pair>"(%ptr %r12, %ptr %r13)
@@ -9681,8 +9631,8 @@ L837:
 	store %ptr %r15, %ptr* %r19
 	%r18 = bitcast %ptr %r15 to %ptr
 	store %ptr %r18, %ptr* %t4
-	br label %L838
-L838:
+	br label %L832
+L832:
 	%r22 = inttoptr %word 1 to %ptr
 	store %ptr %r22, %ptr* %t6
 	%r23 = load %ptr, %ptr* %t2
@@ -9701,8 +9651,8 @@ L838:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L840, label %L841
-L841:
+	br i1 %r35, label %L834, label %L835
+L835:
 	%r37 = load %ptr, %ptr* %t5
 	%r38 = load %ptr, %ptr* @"symbol/dot"
 	%r42 = ptrtoint %ptr %r38 to %word
@@ -9717,15 +9667,15 @@ L841:
 	%r44 = inttoptr i1 %r45 to %ptr
 	%r49 = ptrtoint %ptr %r44 to %word
 	%r48 = icmp ne %word %r49, 0
-	br i1 %r48, label %L840, label %L842
-L842:
-	br label %L840
-L840:
+	br i1 %r48, label %L834, label %L836
+L836:
+	br label %L834
+L834:
 	%r50 = load %ptr, %ptr* %t6
 	%r52 = ptrtoint %ptr %r50 to %word
 	%r51 = icmp ne %word %r52, 0
-	br i1 %r51, label %L837, label %L839
-L839:
+	br i1 %r51, label %L831, label %L833
+L833:
 	%r53 = inttoptr %word 1 to %ptr
 	store %ptr %r53, %ptr* %t6
 	%r54 = load %ptr, %ptr* %t5
@@ -9742,8 +9692,8 @@ L839:
 	%r61 = inttoptr i1 %r62 to %ptr
 	%r66 = ptrtoint %ptr %r61 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L843, label %L844
-L844:
+	br i1 %r65, label %L837, label %L838
+L838:
 	%r67 = load %ptr, %ptr* %t2
 	%r68 = call %ptr @"k/read"(%ptr %r67)
 	%r69 = inttoptr %word 1 to %ptr
@@ -9761,10 +9711,10 @@ L844:
 	%r76 = inttoptr i1 %r77 to %ptr
 	%r81 = ptrtoint %ptr %r76 to %word
 	%r80 = icmp ne %word %r81, 0
-	br i1 %r80, label %L843, label %L845
-L845:
-	br label %L843
-L843:
+	br i1 %r80, label %L837, label %L839
+L839:
+	br label %L837
+L837:
 	%r82 = load %ptr, %ptr* %t6
 	store %ptr %r82, %ptr* %t6
 	%r84 = getelementptr %ptr, %ptr* %t5, %word 0
@@ -9786,8 +9736,8 @@ L843:
 	%r95 = inttoptr i1 %r96 to %ptr
 	%r100 = ptrtoint %ptr %r95 to %word
 	%r99 = icmp ne %word %r100, 0
-	br i1 %r99, label %L846, label %L847
-L846:
+	br i1 %r99, label %L840, label %L841
+L840:
 	%r101 = inttoptr %word 1 to %ptr
 	%r102 = load %ptr, %ptr* %t3
 	%r106 = bitcast %ptr %r102 to [0 x %ptr]*
@@ -9795,20 +9745,20 @@ L846:
 	%r104 = getelementptr [0 x %ptr], [0 x %ptr]* %r106, %word 0, %word %r105
 	%r103 = load %ptr, %ptr* %r104
 	store %ptr %r103, %ptr* %t7
-	br label %L848
-L847:
-	%r107 = getelementptr [50 x i8], [50 x i8]* @str849, %word 0, %word 0
+	br label %L842
+L841:
+	%r107 = getelementptr [50 x i8], [50 x i8]* @str843, %word 0, %word 0
 	%r109 = load %ptr, %ptr* %t1
 	%r110 = call %ptr @fatal1(%ptr %r107, %ptr %r109)
 	store %ptr %r110, %ptr* %t7
-	br label %L848
-L848:
+	br label %L842
+L842:
 	%r111 = load %ptr, %ptr* %t7
 	ret %ptr %r111
 }
-@str853 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str854 = private unnamed_addr constant [33 x i8] c"EOF while reading quoted literal\00"
-@str855 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str847 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str848 = private unnamed_addr constant [33 x i8] c"EOF while reading quoted literal\00"
+@str849 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @read_quote(%ptr %prefix, %ptr %stream) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -9830,25 +9780,25 @@ define %ptr @read_quote(%ptr %prefix, %ptr %stream) {
 	%r8 = inttoptr i1 %r9 to %ptr
 	%r13 = ptrtoint %ptr %r8 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L850, label %L851
-L850:
-	%r14 = getelementptr [9 x i8], [9 x i8]* @str853, %word 0, %word 0
+	br i1 %r12, label %L844, label %L845
+L844:
+	%r14 = getelementptr [9 x i8], [9 x i8]* @str847, %word 0, %word 0
 	%r16 = call i32 (%ptr, ...) @printf(%ptr %r14)
 	%r17 = inttoptr %word %r16 to %ptr
-	%r18 = getelementptr [33 x i8], [33 x i8]* @str854, %word 0, %word 0
+	%r18 = getelementptr [33 x i8], [33 x i8]* @str848, %word 0, %word 0
 	%r20 = call i32 (%ptr, ...) @printf(%ptr %r18)
 	%r21 = inttoptr %word %r20 to %ptr
-	%r22 = getelementptr [2 x i8], [2 x i8]* @str855, %word 0, %word 0
+	%r22 = getelementptr [2 x i8], [2 x i8]* @str849, %word 0, %word 0
 	%r24 = call i32 (%ptr, ...) @printf(%ptr %r22)
 	%r25 = inttoptr %word %r24 to %ptr
 	%r26 = call %ptr @die()
 	store %ptr %r26, %ptr* %t4
-	br label %L852
-L851:
+	br label %L846
+L845:
 	%r27 = inttoptr %word 0 to %ptr
 	store %ptr %r27, %ptr* %t4
-	br label %L852
-L852:
+	br label %L846
+L846:
 	%r28 = load %ptr, %ptr* %t4
 	%r29 = load %ptr, %ptr* %t3
 	%r30 = inttoptr %word 0 to %ptr
@@ -9886,12 +9836,12 @@ define %ptr @"%new-call-frame"(%ptr %callee-designator, %ptr %callee, %ptr %args
 	%r6 = load %ptr, %ptr* %t4
 	%r8 = ptrtoint %ptr %r6 to %word
 	%r7 = icmp ne %word %r8, 0
-	br i1 %r7, label %L856, label %L857
-L856:
+	br i1 %r7, label %L850, label %L851
+L850:
 	%r9 = inttoptr %word 0 to %ptr
 	store %ptr %r9, %ptr* %t5
-	br label %L858
-L857:
+	br label %L852
+L851:
 	%r10 = inttoptr %word 24 to %ptr
 	%r11 = inttoptr %word 12 to %ptr
 	%r12 = call %ptr @"gc/allocate"(%ptr %r10, %ptr %r11)
@@ -9911,8 +9861,8 @@ L857:
 	%r23 = call %ptr @"gc/pop-root"(%ptr %r21)
 	%r24 = load %ptr, %ptr* %t7
 	store %ptr %r24, %ptr* %t5
-	br label %L858
-L858:
+	br label %L852
+L852:
 	%r25 = load %ptr, %ptr* %t5
 	%r26 = load %ptr, %ptr* %t1
 	%r27 = inttoptr %word 0 to %ptr
@@ -9951,8 +9901,8 @@ define %ptr @current-call-frame() {
 	%r3 = inttoptr i1 %r4 to %ptr
 	%r8 = ptrtoint %ptr %r3 to %word
 	%r7 = icmp ne %word %r8, 0
-	br i1 %r7, label %L859, label %L860
-L859:
+	br i1 %r7, label %L853, label %L854
+L853:
 	%r9 = load %ptr, %ptr* @"*call-stack*"
 	%r10 = inttoptr %word 1 to %ptr
 	%r11 = load %ptr, %ptr* @"*call-stack-index*"
@@ -9962,26 +9912,26 @@ L859:
 	%r12 = inttoptr %word %r13 to %ptr
 	%r16 = call %ptr @"k/array-at"(%ptr %r9, %ptr %r12)
 	store %ptr %r16, %ptr* %t1
-	br label %L861
-L860:
+	br label %L855
+L854:
 	%r17 = inttoptr %word 0 to %ptr
 	store %ptr %r17, %ptr* %t1
-	br label %L861
-L861:
+	br label %L855
+L855:
 	%r18 = load %ptr, %ptr* %t1
 	ret %ptr %r18
 }
-@str865 = private unnamed_addr constant [6 x i8] c"  A  \00"
-@str866 = private unnamed_addr constant [2 x i8] c" \00"
-@str867 = private unnamed_addr constant [2 x i8] c" \00"
-@str873 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str874 = private unnamed_addr constant [23 x i8] c"too few arguments for \00"
-@str875 = private unnamed_addr constant [3 x i8] c": \00"
-@str876 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str884 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str885 = private unnamed_addr constant [24 x i8] c"too many arguments for \00"
-@str886 = private unnamed_addr constant [3 x i8] c": \00"
-@str887 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str859 = private unnamed_addr constant [6 x i8] c"  A  \00"
+@str860 = private unnamed_addr constant [2 x i8] c" \00"
+@str861 = private unnamed_addr constant [2 x i8] c" \00"
+@str867 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str868 = private unnamed_addr constant [23 x i8] c"too few arguments for \00"
+@str869 = private unnamed_addr constant [3 x i8] c": \00"
+@str870 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str878 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str879 = private unnamed_addr constant [24 x i8] c"too many arguments for \00"
+@str880 = private unnamed_addr constant [3 x i8] c": \00"
+@str881 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"k/apply-expr"(%ptr %fun, %ptr %arguments, %ptr %parent-ctx) {
 	%t3 = alloca %ptr
 	%t2 = alloca %ptr
@@ -10003,31 +9953,31 @@ define %ptr @"k/apply-expr"(%ptr %fun, %ptr %arguments, %ptr %parent-ctx) {
 	%r3 = inttoptr i1 %r4 to %ptr
 	%r8 = ptrtoint %ptr %r3 to %word
 	%r7 = icmp ne %word %r8, 0
-	br i1 %r7, label %L862, label %L863
-L862:
-	%r9 = getelementptr [6 x i8], [6 x i8]* @str865, %word 0, %word 0
+	br i1 %r7, label %L856, label %L857
+L856:
+	%r9 = getelementptr [6 x i8], [6 x i8]* @str859, %word 0, %word 0
 	%r11 = call i32 (%ptr, ...) @printf(%ptr %r9)
 	%r12 = inttoptr %word %r11 to %ptr
 	%r13 = load %ptr, %ptr* %t1
 	%r14 = call %ptr @"k/dump"(%ptr %r13)
-	%r15 = getelementptr [2 x i8], [2 x i8]* @str866, %word 0, %word 0
+	%r15 = getelementptr [2 x i8], [2 x i8]* @str860, %word 0, %word 0
 	%r17 = call i32 (%ptr, ...) @printf(%ptr %r15)
 	%r18 = inttoptr %word %r17 to %ptr
 	%r19 = load %ptr, %ptr* %t2
 	%r20 = call %ptr @"k/dump"(%ptr %r19)
-	%r21 = getelementptr [2 x i8], [2 x i8]* @str867, %word 0, %word 0
+	%r21 = getelementptr [2 x i8], [2 x i8]* @str861, %word 0, %word 0
 	%r23 = call i32 (%ptr, ...) @printf(%ptr %r21)
 	%r24 = inttoptr %word %r23 to %ptr
 	%r25 = load %ptr, %ptr* %t3
 	%r26 = call %ptr @"k/dumpln"(%ptr %r25)
 	%r27 = call %ptr @"libc/flush-streams"()
 	store %ptr %r27, %ptr* %t4
-	br label %L864
-L863:
+	br label %L858
+L857:
 	%r28 = inttoptr %word 0 to %ptr
 	store %ptr %r28, %ptr* %t4
-	br label %L864
-L864:
+	br label %L858
+L858:
 	%r29 = load %ptr, %ptr* %t4
 	%r30 = inttoptr %word 2 to %ptr
 	%r31 = load %ptr, %ptr* %t1
@@ -10065,8 +10015,8 @@ L864:
 	store %ptr %r56, %ptr* %t7
 	%r60 = load %ptr, %ptr* %t2
 	store %ptr %r60, %ptr* %t8
-	br label %L869
-L868:
+	br label %L863
+L862:
 	%r61 = inttoptr %word 0 to %ptr
 	store %ptr %r61, %ptr* %t9
 	%r62 = load %ptr, %ptr* %t8
@@ -10084,22 +10034,22 @@ L868:
 	%r70 = inttoptr i1 %r71 to %ptr
 	%r75 = ptrtoint %ptr %r70 to %word
 	%r74 = icmp ne %word %r75, 0
-	br i1 %r74, label %L872, label %L871
-L872:
-	%r76 = getelementptr [9 x i8], [9 x i8]* @str873, %word 0, %word 0
+	br i1 %r74, label %L866, label %L865
+L866:
+	%r76 = getelementptr [9 x i8], [9 x i8]* @str867, %word 0, %word 0
 	%r78 = call i32 (%ptr, ...) @printf(%ptr %r76)
 	%r79 = inttoptr %word %r78 to %ptr
-	%r80 = getelementptr [23 x i8], [23 x i8]* @str874, %word 0, %word 0
+	%r80 = getelementptr [23 x i8], [23 x i8]* @str868, %word 0, %word 0
 	%r82 = call i32 (%ptr, ...) @printf(%ptr %r80)
 	%r83 = inttoptr %word %r82 to %ptr
 	%r84 = load %ptr, %ptr* %t1
 	%r85 = call %ptr @"k/print"(%ptr %r84)
-	%r86 = getelementptr [3 x i8], [3 x i8]* @str875, %word 0, %word 0
+	%r86 = getelementptr [3 x i8], [3 x i8]* @str869, %word 0, %word 0
 	%r88 = call i32 (%ptr, ...) @printf(%ptr %r86)
 	%r89 = inttoptr %word %r88 to %ptr
 	%r90 = load %ptr, %ptr* %t2
 	%r91 = call %ptr @"k/print"(%ptr %r90)
-	%r92 = getelementptr [2 x i8], [2 x i8]* @str876, %word 0, %word 0
+	%r92 = getelementptr [2 x i8], [2 x i8]* @str870, %word 0, %word 0
 	%r94 = call i32 (%ptr, ...) @printf(%ptr %r92)
 	%r95 = inttoptr %word %r94 to %ptr
 	%r96 = call %ptr @die()
@@ -10111,10 +10061,10 @@ L872:
 	%r98 = inttoptr i1 %r99 to %ptr
 	%r103 = ptrtoint %ptr %r98 to %word
 	%r102 = icmp ne %word %r103, 0
-	br i1 %r102, label %L877, label %L871
-L877:
-	br label %L871
+	br i1 %r102, label %L871, label %L865
 L871:
+	br label %L865
+L865:
 	%r104 = load %ptr, %ptr* %t9
 	%r105 = load %ptr, %ptr* %t7
 	%r106 = inttoptr %word 1 to %ptr
@@ -10154,8 +10104,8 @@ L871:
 	%r138 = getelementptr [0 x %ptr], [0 x %ptr]* %r140, %word 0, %word %r139
 	%r137 = load %ptr, %ptr* %r138
 	store %ptr %r137, %ptr* %t8
-	br label %L869
-L869:
+	br label %L863
+L863:
 	%r141 = load %ptr, %ptr* %t5
 	%r142 = call %ptr @"get/type"(%ptr %r141)
 	%r143 = inttoptr %word 19 to %ptr
@@ -10165,8 +10115,8 @@ L869:
 	%r144 = inttoptr i1 %r145 to %ptr
 	%r149 = ptrtoint %ptr %r144 to %word
 	%r148 = icmp ne %word %r149, 0
-	br i1 %r148, label %L868, label %L870
-L870:
+	br i1 %r148, label %L862, label %L864
+L864:
 	%r150 = load %ptr, %ptr* %t5
 	%r151 = call %ptr @"get/type"(%ptr %r150)
 	%r152 = inttoptr %word 13 to %ptr
@@ -10176,8 +10126,8 @@ L870:
 	%r153 = inttoptr i1 %r154 to %ptr
 	%r158 = ptrtoint %ptr %r153 to %word
 	%r157 = icmp ne %word %r158, 0
-	br i1 %r157, label %L878, label %L879
-L878:
+	br i1 %r157, label %L872, label %L873
+L872:
 	%r159 = load %ptr, %ptr* %t7
 	%r160 = inttoptr %word 1 to %ptr
 	%r161 = inttoptr %word 3 to %ptr
@@ -10195,42 +10145,42 @@ L878:
 	%r173 = inttoptr %word 0 to %ptr
 	store %ptr %r173, %ptr* %t8
 	store %ptr %r173, %ptr* %t9
-	br label %L880
-L879:
+	br label %L874
+L873:
 	%r174 = inttoptr %word 0 to %ptr
 	store %ptr %r174, %ptr* %t9
-	br label %L880
-L880:
+	br label %L874
+L874:
 	%r175 = load %ptr, %ptr* %t9
 	%r176 = load %ptr, %ptr* %t8
 	%r178 = ptrtoint %ptr %r176 to %word
 	%r177 = icmp ne %word %r178, 0
-	br i1 %r177, label %L881, label %L882
-L881:
-	%r179 = getelementptr [9 x i8], [9 x i8]* @str884, %word 0, %word 0
+	br i1 %r177, label %L875, label %L876
+L875:
+	%r179 = getelementptr [9 x i8], [9 x i8]* @str878, %word 0, %word 0
 	%r181 = call i32 (%ptr, ...) @printf(%ptr %r179)
 	%r182 = inttoptr %word %r181 to %ptr
-	%r183 = getelementptr [24 x i8], [24 x i8]* @str885, %word 0, %word 0
+	%r183 = getelementptr [24 x i8], [24 x i8]* @str879, %word 0, %word 0
 	%r185 = call i32 (%ptr, ...) @printf(%ptr %r183)
 	%r186 = inttoptr %word %r185 to %ptr
 	%r187 = load %ptr, %ptr* %t1
 	%r188 = call %ptr @"k/print"(%ptr %r187)
-	%r189 = getelementptr [3 x i8], [3 x i8]* @str886, %word 0, %word 0
+	%r189 = getelementptr [3 x i8], [3 x i8]* @str880, %word 0, %word 0
 	%r191 = call i32 (%ptr, ...) @printf(%ptr %r189)
 	%r192 = inttoptr %word %r191 to %ptr
 	%r193 = load %ptr, %ptr* %t2
 	%r194 = call %ptr @"k/print"(%ptr %r193)
-	%r195 = getelementptr [2 x i8], [2 x i8]* @str887, %word 0, %word 0
+	%r195 = getelementptr [2 x i8], [2 x i8]* @str881, %word 0, %word 0
 	%r197 = call i32 (%ptr, ...) @printf(%ptr %r195)
 	%r198 = inttoptr %word %r197 to %ptr
 	%r199 = call %ptr @die()
 	store %ptr %r199, %ptr* %t9
-	br label %L883
-L882:
+	br label %L877
+L876:
 	%r200 = inttoptr %word 0 to %ptr
 	store %ptr %r200, %ptr* %t9
-	br label %L883
-L883:
+	br label %L877
+L877:
 	%r201 = load %ptr, %ptr* %t9
 	%r202 = inttoptr %word 1 to %ptr
 	%r203 = load %ptr, %ptr* %t1
@@ -10241,8 +10191,8 @@ L883:
 	store %ptr %r204, %ptr* %t8
 	%r208 = inttoptr %word 0 to %ptr
 	store %ptr %r208, %ptr* %t7
-	br label %L889
-L888:
+	br label %L883
+L882:
 	%r209 = inttoptr %word 0 to %ptr
 	%r210 = load %ptr, %ptr* %t8
 	%r214 = bitcast %ptr %r210 to [0 x %ptr]*
@@ -10259,8 +10209,8 @@ L888:
 	%r220 = getelementptr [0 x %ptr], [0 x %ptr]* %r222, %word 0, %word %r221
 	%r219 = load %ptr, %ptr* %r220
 	store %ptr %r219, %ptr* %t8
-	br label %L889
-L889:
+	br label %L883
+L883:
 	%r223 = load %ptr, %ptr* %t8
 	%r224 = call %ptr @"get/type"(%ptr %r223)
 	%r225 = inttoptr %word 19 to %ptr
@@ -10270,8 +10220,8 @@ L889:
 	%r226 = inttoptr i1 %r227 to %ptr
 	%r231 = ptrtoint %ptr %r226 to %word
 	%r230 = icmp ne %word %r231, 0
-	br i1 %r230, label %L888, label %L890
-L890:
+	br i1 %r230, label %L882, label %L884
+L884:
 	%r232 = inttoptr %word 4 to %ptr
 	%r233 = load %ptr, %ptr* %t4
 	%r237 = bitcast %ptr %r233 to [0 x %ptr]*
@@ -10280,8 +10230,8 @@ L890:
 	%r234 = load %ptr, %ptr* %r235
 	%r239 = ptrtoint %ptr %r234 to %word
 	%r238 = icmp ne %word %r239, 0
-	br i1 %r238, label %L891, label %L892
-L891:
+	br i1 %r238, label %L885, label %L886
+L885:
 	%r240 = inttoptr %word 0 to %ptr
 	%r241 = inttoptr %word 3 to %ptr
 	%r242 = load %ptr, %ptr* %t6
@@ -10291,12 +10241,12 @@ L891:
 	store %ptr %r240, %ptr* %r244
 	%r243 = bitcast %ptr %r240 to %ptr
 	store %ptr %r243, %ptr* %t9
-	br label %L893
-L892:
+	br label %L887
+L886:
 	%r247 = inttoptr %word 0 to %ptr
 	store %ptr %r247, %ptr* %t9
-	br label %L893
-L893:
+	br label %L887
+L887:
 	%r248 = load %ptr, %ptr* %t9
 	%r249 = load %ptr, %ptr* %t7
 	store %ptr %r249, %ptr* %t7
@@ -10306,10 +10256,10 @@ L893:
 	%r253 = load %ptr, %ptr* %t7
 	ret %ptr %r253
 }
-@str897 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
-@str910 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str911 = private unnamed_addr constant [15 x i8] c"cannot apply: \00"
-@str912 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str891 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
+@str904 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str905 = private unnamed_addr constant [15 x i8] c"cannot apply: \00"
+@str906 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"k/apply"(%ptr %fun, %ptr %arguments, %ptr %ctx) {
 	%t3 = alloca %ptr
 	%t2 = alloca %ptr
@@ -10347,18 +10297,18 @@ define %ptr @"k/apply"(%ptr %fun, %ptr %arguments, %ptr %ctx) {
 	%r14 = inttoptr i1 %r15 to %ptr
 	%r19 = ptrtoint %ptr %r14 to %word
 	%r18 = icmp ne %word %r19, 0
-	br i1 %r18, label %L894, label %L895
-L894:
-	%r20 = getelementptr [53 x i8], [53 x i8]* @str897, %word 0, %word 0
+	br i1 %r18, label %L888, label %L889
+L888:
+	%r20 = getelementptr [53 x i8], [53 x i8]* @str891, %word 0, %word 0
 	%r22 = load %ptr, %ptr* @"*call-stack-index*"
 	%r23 = call %ptr @fatal1(%ptr %r20, %ptr %r22)
 	store %ptr %r23, %ptr* %t5
-	br label %L896
-L895:
+	br label %L890
+L889:
 	%r24 = inttoptr %word 0 to %ptr
 	store %ptr %r24, %ptr* %t5
-	br label %L896
-L896:
+	br label %L890
+L890:
 	%r25 = load %ptr, %ptr* %t5
 	%r26 = load %ptr, %ptr* %t1
 	%r27 = call %ptr @"get/type"(%ptr %r26)
@@ -10371,15 +10321,15 @@ L896:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L898, label %L899
-L898:
+	br i1 %r34, label %L892, label %L893
+L892:
 	%r36 = load %ptr, %ptr* %t1
 	%r37 = load %ptr, %ptr* %t2
 	%r38 = load %ptr, %ptr* %t3
 	%r39 = call %ptr @"k/apply-expr"(%ptr %r36, %ptr %r37, %ptr %r38)
 	store %ptr %r39, %ptr* %t6
-	br label %L900
-L899:
+	br label %L894
+L893:
 	%r40 = inttoptr %word 11 to %ptr
 	%r41 = load %ptr, %ptr* %t5
 	%r45 = ptrtoint %ptr %r41 to %word
@@ -10388,8 +10338,8 @@ L899:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L901, label %L902
-L901:
+	br i1 %r46, label %L895, label %L896
+L895:
 	%r48 = inttoptr %word 0 to %ptr
 	%r49 = load %ptr, %ptr* %t1
 	%r53 = bitcast %ptr %r49 to [0 x %ptr]*
@@ -10400,8 +10350,8 @@ L901:
 	%r55 = load %ptr, %ptr* %t3
 	%r56 = call %ptr @"k/apply"(%ptr %r50, %ptr %r54, %ptr %r55)
 	store %ptr %r56, %ptr* %t7
-	br label %L903
-L902:
+	br label %L897
+L896:
 	%r57 = inttoptr %word 12 to %ptr
 	%r58 = load %ptr, %ptr* %t5
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -10410,8 +10360,8 @@ L902:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L904, label %L905
-L904:
+	br i1 %r63, label %L898, label %L899
+L898:
 	%r65 = load %ptr, %ptr* %t2
 	%r66 = load %ptr, %ptr* %t3
 	%r67 = inttoptr %word 0 to %ptr
@@ -10423,8 +10373,8 @@ L904:
 	%r74 = bitcast %ptr %r69 to %ptr (%ptr, %ptr)*
 	%r73 = call %ptr %r74(%ptr %r65, %ptr %r66)
 	store %ptr %r73, %ptr* %t8
-	br label %L906
-L905:
+	br label %L900
+L899:
 	%r75 = inttoptr %word 1 to %ptr
 	%r76 = load %ptr, %ptr* @"var/*applicators*"
 	%r80 = bitcast %ptr %r76 to [0 x %ptr]*
@@ -10438,8 +10388,8 @@ L905:
 	%r84 = load %ptr, %ptr* %t9
 	%r86 = ptrtoint %ptr %r84 to %word
 	%r85 = icmp ne %word %r86, 0
-	br i1 %r85, label %L907, label %L908
-L907:
+	br i1 %r85, label %L901, label %L902
+L901:
 	%r87 = load %ptr, %ptr* %t2
 	store %ptr %r87, %ptr* %t11
 	%r89 = getelementptr %ptr, %ptr* %t11, %word 0
@@ -10459,35 +10409,35 @@ L907:
 	%r100 = call %ptr @"gc/pop-root"(%ptr %r98)
 	%r101 = load %ptr, %ptr* %t12
 	store %ptr %r101, %ptr* %t10
-	br label %L909
-L908:
-	%r102 = getelementptr [9 x i8], [9 x i8]* @str910, %word 0, %word 0
+	br label %L903
+L902:
+	%r102 = getelementptr [9 x i8], [9 x i8]* @str904, %word 0, %word 0
 	%r104 = call i32 (%ptr, ...) @printf(%ptr %r102)
 	%r105 = inttoptr %word %r104 to %ptr
-	%r106 = getelementptr [15 x i8], [15 x i8]* @str911, %word 0, %word 0
+	%r106 = getelementptr [15 x i8], [15 x i8]* @str905, %word 0, %word 0
 	%r108 = call i32 (%ptr, ...) @printf(%ptr %r106)
 	%r109 = inttoptr %word %r108 to %ptr
 	%r110 = load %ptr, %ptr* %t1
 	%r111 = call %ptr @"k/print"(%ptr %r110)
-	%r112 = getelementptr [2 x i8], [2 x i8]* @str912, %word 0, %word 0
+	%r112 = getelementptr [2 x i8], [2 x i8]* @str906, %word 0, %word 0
 	%r114 = call i32 (%ptr, ...) @printf(%ptr %r112)
 	%r115 = inttoptr %word %r114 to %ptr
 	%r116 = call %ptr @die()
 	store %ptr %r116, %ptr* %t10
-	br label %L909
-L909:
-	%r117 = load %ptr, %ptr* %t10
-	store %ptr %r117, %ptr* %t8
-	br label %L906
-L906:
-	%r118 = load %ptr, %ptr* %t8
-	store %ptr %r118, %ptr* %t7
 	br label %L903
 L903:
-	%r119 = load %ptr, %ptr* %t7
-	store %ptr %r119, %ptr* %t6
+	%r117 = load %ptr, %ptr* %t10
+	store %ptr %r117, %ptr* %t8
 	br label %L900
 L900:
+	%r118 = load %ptr, %ptr* %t8
+	store %ptr %r118, %ptr* %t7
+	br label %L897
+L897:
+	%r119 = load %ptr, %ptr* %t7
+	store %ptr %r119, %ptr* %t6
+	br label %L894
+L894:
 	%r120 = load %ptr, %ptr* %t6
 	store %ptr %r120, %ptr* %t4
 	%r121 = inttoptr %word 1 to %ptr
@@ -10505,8 +10455,8 @@ L900:
 	%r129 = inttoptr i1 %r130 to %ptr
 	%r134 = ptrtoint %ptr %r129 to %word
 	%r133 = icmp ne %word %r134, 0
-	br i1 %r133, label %L913, label %L914
-L913:
+	br i1 %r133, label %L907, label %L908
+L907:
 	%r135 = load %ptr, %ptr* @"*call-stack*"
 	%r136 = load %ptr, %ptr* @"*call-stack-index*"
 	%r137 = call %ptr @"k/array-at"(%ptr %r135, %ptr %r136)
@@ -10536,19 +10486,19 @@ L913:
 	store %ptr %r152, %ptr* %r156
 	%r155 = bitcast %ptr %r152 to %ptr
 	store %ptr %r155, %ptr* %t5
-	br label %L915
-L914:
+	br label %L909
+L908:
 	%r159 = inttoptr %word 0 to %ptr
 	store %ptr %r159, %ptr* %t5
-	br label %L915
-L915:
+	br label %L909
+L909:
 	%r160 = load %ptr, %ptr* %t5
 	%r161 = inttoptr %word 0 to %ptr
 	%r162 = load %ptr, %ptr* %t4
 	ret %ptr %r162
 }
-@str919 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
-@str943 = private unnamed_addr constant [5 x i8] c"set-\00"
+@str913 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
+@str937 = private unnamed_addr constant [5 x i8] c"set-\00"
 define %ptr @"k/expand"(%ptr %exp, %ptr %env) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -10587,18 +10537,18 @@ define %ptr @"k/expand"(%ptr %exp, %ptr %env) {
 	%r14 = inttoptr i1 %r15 to %ptr
 	%r19 = ptrtoint %ptr %r14 to %word
 	%r18 = icmp ne %word %r19, 0
-	br i1 %r18, label %L916, label %L917
-L916:
-	%r20 = getelementptr [53 x i8], [53 x i8]* @str919, %word 0, %word 0
+	br i1 %r18, label %L910, label %L911
+L910:
+	%r20 = getelementptr [53 x i8], [53 x i8]* @str913, %word 0, %word 0
 	%r22 = load %ptr, %ptr* @"*call-stack-index*"
 	%r23 = call %ptr @fatal1(%ptr %r20, %ptr %r22)
 	store %ptr %r23, %ptr* %t5
-	br label %L918
-L917:
+	br label %L912
+L911:
 	%r24 = inttoptr %word 0 to %ptr
 	store %ptr %r24, %ptr* %t5
-	br label %L918
-L918:
+	br label %L912
+L912:
 	%r25 = load %ptr, %ptr* %t5
 	%r26 = load %ptr, %ptr* %t1
 	%r27 = call %ptr @"get/type"(%ptr %r26)
@@ -10609,8 +10559,8 @@ L918:
 	%r29 = inttoptr i1 %r30 to %ptr
 	%r34 = ptrtoint %ptr %r29 to %word
 	%r33 = icmp ne %word %r34, 0
-	br i1 %r33, label %L920, label %L921
-L920:
+	br i1 %r33, label %L914, label %L915
+L914:
 	%r35 = inttoptr %word 0 to %ptr
 	%r36 = load %ptr, %ptr* %t1
 	%r40 = bitcast %ptr %r36 to [0 x %ptr]*
@@ -10678,8 +10628,8 @@ L920:
 	%r88 = inttoptr i1 %r89 to %ptr
 	%r93 = ptrtoint %ptr %r88 to %word
 	%r92 = icmp ne %word %r93, 0
-	br i1 %r92, label %L926, label %L927
-L927:
+	br i1 %r92, label %L920, label %L921
+L921:
 	%r94 = load %ptr, %ptr* %t2
 	%r95 = load %ptr, %ptr* %t6
 	%r96 = call %ptr @"k/env/lookup-variable"(%ptr %r94, %ptr %r95)
@@ -10692,8 +10642,8 @@ L927:
 	%r98 = inttoptr i1 %r99 to %ptr
 	%r103 = ptrtoint %ptr %r98 to %word
 	%r102 = icmp ne %word %r103, 0
-	br i1 %r102, label %L926, label %L928
-L928:
+	br i1 %r102, label %L920, label %L922
+L922:
 	%r104 = load %ptr, %ptr* %t7
 	%r105 = call %ptr @"get/type"(%ptr %r104)
 	%r106 = inttoptr %word 13 to %ptr
@@ -10709,8 +10659,8 @@ L928:
 	%r112 = inttoptr i1 %r113 to %ptr
 	%r117 = ptrtoint %ptr %r112 to %word
 	%r116 = icmp ne %word %r117, 0
-	br i1 %r116, label %L926, label %L929
-L929:
+	br i1 %r116, label %L920, label %L923
+L923:
 	%r118 = inttoptr %word 1 to %ptr
 	%r119 = load %ptr, %ptr* %t7
 	%r123 = bitcast %ptr %r119 to [0 x %ptr]*
@@ -10726,8 +10676,8 @@ L929:
 	%r125 = inttoptr i1 %r126 to %ptr
 	%r130 = ptrtoint %ptr %r125 to %word
 	%r129 = icmp ne %word %r130, 0
-	br i1 %r129, label %L926, label %L930
-L930:
+	br i1 %r129, label %L920, label %L924
+L924:
 	%r131 = load %ptr, %ptr* %t7
 	%r132 = call %ptr @"get/type"(%ptr %r131)
 	%r133 = inttoptr %word 10 to %ptr
@@ -10743,8 +10693,8 @@ L930:
 	%r139 = inttoptr i1 %r140 to %ptr
 	%r144 = ptrtoint %ptr %r139 to %word
 	%r143 = icmp ne %word %r144, 0
-	br i1 %r143, label %L926, label %L931
-L931:
+	br i1 %r143, label %L920, label %L925
+L925:
 	%r145 = inttoptr %word 0 to %ptr
 	%r146 = load %ptr, %ptr* %t7
 	%r150 = bitcast %ptr %r146 to [0 x %ptr]*
@@ -10760,15 +10710,15 @@ L931:
 	%r152 = inttoptr i1 %r153 to %ptr
 	%r157 = ptrtoint %ptr %r152 to %word
 	%r156 = icmp ne %word %r157, 0
-	br i1 %r156, label %L926, label %L932
-L932:
-	br label %L926
+	br i1 %r156, label %L920, label %L926
 L926:
+	br label %L920
+L920:
 	%r158 = load %ptr, %ptr* %t10
 	%r160 = ptrtoint %ptr %r158 to %word
 	%r159 = icmp ne %word %r160, 0
-	br i1 %r159, label %L923, label %L924
-L923:
+	br i1 %r159, label %L917, label %L918
+L917:
 	%r161 = load %ptr, %ptr* %t2
 	%r162 = inttoptr %word 1 to %ptr
 	%r163 = load %ptr, %ptr* %t1
@@ -10796,8 +10746,8 @@ L923:
 	%r181 = call %ptr @"gc/pop-root"(%ptr %r179)
 	%r182 = load %ptr, %ptr* %t11
 	store %ptr %r182, %ptr* %t9
-	br label %L925
-L924:
+	br label %L919
+L918:
 	%r183 = inttoptr %word 1 to %ptr
 	%r184 = load %ptr, %ptr* %t1
 	%r188 = bitcast %ptr %r184 to [0 x %ptr]*
@@ -10816,19 +10766,19 @@ L924:
 	%r194 = inttoptr i1 %r195 to %ptr
 	%r199 = ptrtoint %ptr %r194 to %word
 	%r198 = icmp ne %word %r199, 0
-	br i1 %r198, label %L933, label %L934
-L933:
+	br i1 %r198, label %L927, label %L928
+L927:
 	%r200 = inttoptr %word 0 to %ptr
 	store %ptr %r200, %ptr* %t11
-	br label %L935
-L934:
+	br label %L929
+L928:
 	%r201 = load %ptr, %ptr* %t10
 	%r202 = load %ptr, %ptr* %t2
 	%r203 = call %ptr @"k/expand/list"(%ptr %r201, %ptr %r202)
 	store %ptr %r203, %ptr* %t10
 	store %ptr %r203, %ptr* %t11
-	br label %L935
-L935:
+	br label %L929
+L929:
 	%r204 = load %ptr, %ptr* %t11
 	%r205 = inttoptr %word 1 to %ptr
 	store %ptr %r205, %ptr* %t12
@@ -10846,8 +10796,8 @@ L935:
 	%r213 = inttoptr i1 %r214 to %ptr
 	%r218 = ptrtoint %ptr %r213 to %word
 	%r217 = icmp ne %word %r218, 0
-	br i1 %r217, label %L939, label %L940
-L940:
+	br i1 %r217, label %L933, label %L934
+L934:
 	%r219 = load %ptr, %ptr* %t10
 	%r220 = call %ptr @"k/car"(%ptr %r219)
 	%r221 = call %ptr @"get/type"(%ptr %r220)
@@ -10864,8 +10814,8 @@ L940:
 	%r228 = inttoptr i1 %r229 to %ptr
 	%r233 = ptrtoint %ptr %r228 to %word
 	%r232 = icmp ne %word %r233, 0
-	br i1 %r232, label %L939, label %L941
-L941:
+	br i1 %r232, label %L933, label %L935
+L935:
 	%r234 = load %ptr, %ptr* %t10
 	%r235 = call %ptr @"k/caar"(%ptr %r234)
 	%r236 = call %ptr @"get/type"(%ptr %r235)
@@ -10882,22 +10832,22 @@ L941:
 	%r243 = inttoptr i1 %r244 to %ptr
 	%r248 = ptrtoint %ptr %r243 to %word
 	%r247 = icmp ne %word %r248, 0
-	br i1 %r247, label %L939, label %L942
-L942:
-	br label %L939
-L939:
+	br i1 %r247, label %L933, label %L936
+L936:
+	br label %L933
+L933:
 	%r249 = load %ptr, %ptr* %t12
 	%r251 = ptrtoint %ptr %r249 to %word
 	%r250 = icmp ne %word %r251, 0
-	br i1 %r250, label %L936, label %L937
-L936:
+	br i1 %r250, label %L930, label %L931
+L930:
 	%r252 = call %ptr @"new-<buffer>"()
 	store %ptr %r252, %ptr* %t12
 	%r254 = getelementptr %ptr, %ptr* %t12, %word 0
 	%r253 = bitcast %ptr* %r254 to %ptr
 	%r255 = call %ptr @"gc/push-root"(%ptr %r253)
 	%r256 = load %ptr, %ptr* %t12
-	%r257 = getelementptr [5 x i8], [5 x i8]* @str943, %word 0, %word 0
+	%r257 = getelementptr [5 x i8], [5 x i8]* @str937, %word 0, %word 0
 	%r259 = call %ptr @buffer-append-string(%ptr %r256, %ptr %r257)
 	%r260 = load %ptr, %ptr* %t12
 	%r261 = inttoptr %word 0 to %ptr
@@ -10946,12 +10896,12 @@ L936:
 	%r301 = call %ptr @"gc/pop-root"(%ptr %r299)
 	%r302 = load %ptr, %ptr* %t13
 	store %ptr %r302, %ptr* %t11
-	br label %L938
-L937:
+	br label %L932
+L931:
 	%r303 = inttoptr %word 0 to %ptr
 	store %ptr %r303, %ptr* %t11
-	br label %L938
-L938:
+	br label %L932
+L932:
 	%r304 = load %ptr, %ptr* %t11
 	%r305 = load %ptr, %ptr* %t6
 	%r306 = load %ptr, %ptr* %t10
@@ -10963,8 +10913,8 @@ L938:
 	%r310 = call %ptr @"gc/pop-root"(%ptr %r308)
 	%r311 = load %ptr, %ptr* %t11
 	store %ptr %r311, %ptr* %t9
-	br label %L925
-L925:
+	br label %L919
+L919:
 	%r312 = load %ptr, %ptr* %t9
 	store %ptr %r312, %ptr* %t8
 	%r314 = getelementptr %ptr, %ptr* %t6, %word 0
@@ -10972,8 +10922,8 @@ L925:
 	%r315 = call %ptr @"gc/pop-root"(%ptr %r313)
 	%r316 = load %ptr, %ptr* %t8
 	store %ptr %r316, %ptr* %t5
-	br label %L922
-L921:
+	br label %L916
+L915:
 	%r317 = load %ptr, %ptr* %t1
 	%r318 = call %ptr @"get/type"(%ptr %r317)
 	%r319 = inttoptr %word 18 to %ptr
@@ -10983,8 +10933,8 @@ L921:
 	%r320 = inttoptr i1 %r321 to %ptr
 	%r325 = ptrtoint %ptr %r320 to %word
 	%r324 = icmp ne %word %r325, 0
-	br i1 %r324, label %L944, label %L945
-L944:
+	br i1 %r324, label %L938, label %L939
+L938:
 	%r326 = inttoptr %word 0 to %ptr
 	store %ptr %r326, %ptr* %t8
 	%r327 = inttoptr %word 0 to %ptr
@@ -11003,8 +10953,8 @@ L944:
 	%r333 = inttoptr i1 %r334 to %ptr
 	%r338 = ptrtoint %ptr %r333 to %word
 	%r337 = icmp ne %word %r338, 0
-	br i1 %r337, label %L950, label %L951
-L951:
+	br i1 %r337, label %L944, label %L945
+L945:
 	%r339 = load %ptr, %ptr* %t8
 	%r340 = call %ptr @"get/type"(%ptr %r339)
 	%r341 = inttoptr %word 13 to %ptr
@@ -11020,8 +10970,8 @@ L951:
 	%r347 = inttoptr i1 %r348 to %ptr
 	%r352 = ptrtoint %ptr %r347 to %word
 	%r351 = icmp ne %word %r352, 0
-	br i1 %r351, label %L950, label %L952
-L952:
+	br i1 %r351, label %L944, label %L946
+L946:
 	%r353 = inttoptr %word 1 to %ptr
 	%r354 = load %ptr, %ptr* %t8
 	%r358 = bitcast %ptr %r354 to [0 x %ptr]*
@@ -11037,8 +10987,8 @@ L952:
 	%r360 = inttoptr i1 %r361 to %ptr
 	%r365 = ptrtoint %ptr %r360 to %word
 	%r364 = icmp ne %word %r365, 0
-	br i1 %r364, label %L950, label %L953
-L953:
+	br i1 %r364, label %L944, label %L947
+L947:
 	%r366 = load %ptr, %ptr* %t8
 	%r367 = call %ptr @"get/type"(%ptr %r366)
 	%r368 = inttoptr %word 10 to %ptr
@@ -11054,8 +11004,8 @@ L953:
 	%r374 = inttoptr i1 %r375 to %ptr
 	%r379 = ptrtoint %ptr %r374 to %word
 	%r378 = icmp ne %word %r379, 0
-	br i1 %r378, label %L950, label %L954
-L954:
+	br i1 %r378, label %L944, label %L948
+L948:
 	%r380 = inttoptr %word 1 to %ptr
 	%r381 = load %ptr, %ptr* %t8
 	%r385 = bitcast %ptr %r381 to [0 x %ptr]*
@@ -11071,15 +11021,15 @@ L954:
 	%r387 = inttoptr i1 %r388 to %ptr
 	%r392 = ptrtoint %ptr %r387 to %word
 	%r391 = icmp ne %word %r392, 0
-	br i1 %r391, label %L950, label %L955
-L955:
-	br label %L950
-L950:
+	br i1 %r391, label %L944, label %L949
+L949:
+	br label %L944
+L944:
 	%r393 = load %ptr, %ptr* %t10
 	%r395 = ptrtoint %ptr %r393 to %word
 	%r394 = icmp ne %word %r395, 0
-	br i1 %r394, label %L947, label %L948
-L947:
+	br i1 %r394, label %L941, label %L942
+L941:
 	%r396 = load %ptr, %ptr* %t1
 	%r397 = inttoptr %word 0 to %ptr
 	%r398 = call %ptr @"new-<pair>"(%ptr %r396, %ptr %r397)
@@ -11106,16 +11056,16 @@ L947:
 	%r414 = call %ptr @"gc/pop-root"(%ptr %r412)
 	%r415 = load %ptr, %ptr* %t11
 	store %ptr %r415, %ptr* %t9
-	br label %L949
-L948:
+	br label %L943
+L942:
 	%r416 = inttoptr %word 0 to %ptr
 	store %ptr %r416, %ptr* %t9
-	br label %L949
-L949:
+	br label %L943
+L943:
 	%r417 = load %ptr, %ptr* %t9
 	store %ptr %r417, %ptr* %t6
-	br label %L946
-L945:
+	br label %L940
+L939:
 	%r418 = inttoptr %word 1 to %ptr
 	%r419 = load %ptr, %ptr* @"var/*expanders*"
 	%r423 = bitcast %ptr %r419 to [0 x %ptr]*
@@ -11129,8 +11079,8 @@ L945:
 	%r427 = load %ptr, %ptr* %t7
 	%r429 = ptrtoint %ptr %r427 to %word
 	%r428 = icmp ne %word %r429, 0
-	br i1 %r428, label %L956, label %L957
-L956:
+	br i1 %r428, label %L950, label %L951
+L950:
 	%r430 = load %ptr, %ptr* %t1
 	%r431 = inttoptr %word 0 to %ptr
 	%r432 = call %ptr @"new-<pair>"(%ptr %r430, %ptr %r431)
@@ -11149,20 +11099,20 @@ L956:
 	%r442 = call %ptr @"gc/pop-root"(%ptr %r440)
 	%r443 = load %ptr, %ptr* %t10
 	store %ptr %r443, %ptr* %t8
-	br label %L958
-L957:
+	br label %L952
+L951:
 	%r444 = inttoptr %word 0 to %ptr
 	store %ptr %r444, %ptr* %t8
-	br label %L958
-L958:
+	br label %L952
+L952:
 	%r445 = load %ptr, %ptr* %t8
 	store %ptr %r445, %ptr* %t6
-	br label %L946
-L946:
+	br label %L940
+L940:
 	%r446 = load %ptr, %ptr* %t6
 	store %ptr %r446, %ptr* %t5
-	br label %L922
-L922:
+	br label %L916
+L916:
 	%r447 = load %ptr, %ptr* %t5
 	store %ptr %r447, %ptr* %t4
 	%r448 = inttoptr %word 1 to %ptr
@@ -11180,8 +11130,8 @@ L922:
 	%r456 = inttoptr i1 %r457 to %ptr
 	%r461 = ptrtoint %ptr %r456 to %word
 	%r460 = icmp ne %word %r461, 0
-	br i1 %r460, label %L959, label %L960
-L959:
+	br i1 %r460, label %L953, label %L954
+L953:
 	%r462 = load %ptr, %ptr* @"*call-stack*"
 	%r463 = load %ptr, %ptr* @"*call-stack-index*"
 	%r464 = call %ptr @"k/array-at"(%ptr %r462, %ptr %r463)
@@ -11211,22 +11161,22 @@ L959:
 	store %ptr %r479, %ptr* %r483
 	%r482 = bitcast %ptr %r479 to %ptr
 	store %ptr %r482, %ptr* %t5
-	br label %L961
-L960:
+	br label %L955
+L954:
 	%r486 = inttoptr %word 0 to %ptr
 	store %ptr %r486, %ptr* %t5
-	br label %L961
-L961:
+	br label %L955
+L955:
 	%r487 = load %ptr, %ptr* %t5
 	%r488 = inttoptr %word 0 to %ptr
 	%r489 = load %ptr, %ptr* %t4
 	%r490 = load %ptr, %ptr* %t3
 	ret %ptr %r490
 }
-@str988 = private unnamed_addr constant [28 x i8] c"set: undefined variable: %s\00"
-@str995 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str996 = private unnamed_addr constant [34 x i8] c"encode: malformed SET expression \00"
-@str997 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str982 = private unnamed_addr constant [28 x i8] c"set: undefined variable: %s\00"
+@str989 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str990 = private unnamed_addr constant [34 x i8] c"encode: malformed SET expression \00"
+@str991 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"k/encode/pair"(%ptr %exp, %ptr %env) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -11271,8 +11221,8 @@ define %ptr @"k/encode/pair"(%ptr %exp, %ptr %env) {
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L962, label %L963
-L962:
+	br i1 %r27, label %L956, label %L957
+L956:
 	%r29 = load %ptr, %ptr* %t1
 	%r30 = call %ptr @"k/cadr"(%ptr %r29)
 	store %ptr %r30, %ptr* %t6
@@ -11294,8 +11244,8 @@ L962:
 	%r46 = getelementptr %ptr, %ptr* %t7, %word 0
 	%r45 = bitcast %ptr* %r46 to %ptr
 	%r47 = call %ptr @"gc/push-root"(%ptr %r45)
-	br label %L966
-L965:
+	br label %L960
+L959:
 	%r48 = inttoptr %word 0 to %ptr
 	%r49 = load %ptr, %ptr* %t6
 	%r53 = bitcast %ptr %r49 to [0 x %ptr]*
@@ -11320,8 +11270,8 @@ L965:
 	%r63 = inttoptr i1 %r64 to %ptr
 	%r68 = ptrtoint %ptr %r63 to %word
 	%r67 = icmp ne %word %r68, 0
-	br i1 %r67, label %L968, label %L969
-L969:
+	br i1 %r67, label %L962, label %L963
+L963:
 	%r69 = inttoptr %word 0 to %ptr
 	%r70 = load %ptr, %ptr* %t8
 	%r74 = bitcast %ptr %r70 to [0 x %ptr]*
@@ -11337,10 +11287,10 @@ L969:
 	%r76 = inttoptr i1 %r77 to %ptr
 	%r81 = ptrtoint %ptr %r76 to %word
 	%r80 = icmp ne %word %r81, 0
-	br i1 %r80, label %L968, label %L970
-L970:
-	br label %L968
-L968:
+	br i1 %r80, label %L962, label %L964
+L964:
+	br label %L962
+L962:
 	%r82 = load %ptr, %ptr* %t9
 	%r83 = load %ptr, %ptr* %t7
 	%r84 = load %ptr, %ptr* %t8
@@ -11353,8 +11303,8 @@ L968:
 	%r90 = getelementptr [0 x %ptr], [0 x %ptr]* %r92, %word 0, %word %r91
 	%r89 = load %ptr, %ptr* %r90
 	store %ptr %r89, %ptr* %t6
-	br label %L966
-L966:
+	br label %L960
+L960:
 	%r93 = load %ptr, %ptr* %t6
 	%r94 = call %ptr @"get/type"(%ptr %r93)
 	%r95 = inttoptr %word 19 to %ptr
@@ -11364,8 +11314,8 @@ L966:
 	%r96 = inttoptr i1 %r97 to %ptr
 	%r101 = ptrtoint %ptr %r96 to %word
 	%r100 = icmp ne %word %r101, 0
-	br i1 %r100, label %L965, label %L967
-L967:
+	br i1 %r100, label %L959, label %L961
+L961:
 	%r102 = load %ptr, %ptr* %t4
 	%r103 = load %ptr, %ptr* %t7
 	%r104 = call %ptr @"k/encode/list"(%ptr %r102, %ptr %r103)
@@ -11380,8 +11330,8 @@ L967:
 	%r110 = call %ptr @"gc/pop-root"(%ptr %r108)
 	%r111 = load %ptr, %ptr* %t8
 	store %ptr %r111, %ptr* %t5
-	br label %L964
-L963:
+	br label %L958
+L957:
 	%r112 = load %ptr, %ptr* @"fixed-subr/lambda"
 	%r113 = load %ptr, %ptr* %t3
 	%r117 = ptrtoint %ptr %r113 to %word
@@ -11390,8 +11340,8 @@ L963:
 	%r114 = inttoptr i1 %r115 to %ptr
 	%r119 = ptrtoint %ptr %r114 to %word
 	%r118 = icmp ne %word %r119, 0
-	br i1 %r118, label %L971, label %L972
-L971:
+	br i1 %r118, label %L965, label %L966
+L965:
 	%r120 = load %ptr, %ptr* %t1
 	%r121 = call %ptr @"k/cadr"(%ptr %r120)
 	store %ptr %r121, %ptr* %t7
@@ -11403,8 +11353,8 @@ L971:
 	%r127 = getelementptr %ptr, %ptr* %t8, %word 0
 	%r126 = bitcast %ptr* %r127 to %ptr
 	%r128 = call %ptr @"gc/push-root"(%ptr %r126)
-	br label %L975
-L974:
+	br label %L969
+L968:
 	%r129 = load %ptr, %ptr* %t8
 	%r130 = inttoptr %word 0 to %ptr
 	%r131 = load %ptr, %ptr* %t7
@@ -11421,8 +11371,8 @@ L974:
 	%r141 = getelementptr [0 x %ptr], [0 x %ptr]* %r143, %word 0, %word %r142
 	%r140 = load %ptr, %ptr* %r141
 	store %ptr %r140, %ptr* %t7
-	br label %L975
-L975:
+	br label %L969
+L969:
 	%r144 = load %ptr, %ptr* %t7
 	%r145 = call %ptr @"get/type"(%ptr %r144)
 	%r146 = inttoptr %word 19 to %ptr
@@ -11432,8 +11382,8 @@ L975:
 	%r147 = inttoptr i1 %r148 to %ptr
 	%r152 = ptrtoint %ptr %r147 to %word
 	%r151 = icmp ne %word %r152, 0
-	br i1 %r151, label %L974, label %L976
-L976:
+	br i1 %r151, label %L968, label %L970
+L970:
 	%r153 = inttoptr %word 1 to %ptr
 	store %ptr %r153, %ptr* %t9
 	%r154 = load %ptr, %ptr* %t7
@@ -11445,8 +11395,8 @@ L976:
 	%r156 = inttoptr i1 %r157 to %ptr
 	%r161 = ptrtoint %ptr %r156 to %word
 	%r160 = icmp ne %word %r161, 0
-	br i1 %r160, label %L977, label %L978
-L978:
+	br i1 %r160, label %L971, label %L972
+L972:
 	%r162 = load %ptr, %ptr* %t8
 	%r163 = load %ptr, %ptr* %t7
 	%r164 = inttoptr %word 0 to %ptr
@@ -11459,10 +11409,10 @@ L978:
 	%r167 = inttoptr i1 %r168 to %ptr
 	%r172 = ptrtoint %ptr %r167 to %word
 	%r171 = icmp ne %word %r172, 0
-	br i1 %r171, label %L977, label %L979
-L979:
-	br label %L977
-L977:
+	br i1 %r171, label %L971, label %L973
+L973:
+	br label %L971
+L971:
 	%r173 = load %ptr, %ptr* %t9
 	%r174 = load %ptr, %ptr* %t4
 	%r175 = load %ptr, %ptr* %t8
@@ -11478,8 +11428,8 @@ L977:
 	%r182 = call %ptr @"gc/pop-root"(%ptr %r180)
 	%r183 = load %ptr, %ptr* %t9
 	store %ptr %r183, %ptr* %t6
-	br label %L973
-L972:
+	br label %L967
+L966:
 	%r184 = load %ptr, %ptr* @"fixed-subr/define"
 	%r185 = load %ptr, %ptr* %t3
 	%r189 = ptrtoint %ptr %r185 to %word
@@ -11488,8 +11438,8 @@ L972:
 	%r186 = inttoptr i1 %r187 to %ptr
 	%r191 = ptrtoint %ptr %r186 to %word
 	%r190 = icmp ne %word %r191, 0
-	br i1 %r190, label %L980, label %L981
-L980:
+	br i1 %r190, label %L974, label %L975
+L974:
 	%r192 = inttoptr %word 1 to %ptr
 	%r193 = inttoptr %word 1 to %ptr
 	%r194 = load %ptr, %ptr* @"*module*"
@@ -11515,8 +11465,8 @@ L980:
 	%r212 = call %ptr @"new-<pair>"(%ptr %r210, %ptr %r211)
 	store %ptr %r212, %ptr* %t4
 	store %ptr %r212, %ptr* %t7
-	br label %L982
-L981:
+	br label %L976
+L975:
 	%r213 = load %ptr, %ptr* @"fixed-subr/set"
 	%r214 = load %ptr, %ptr* %t3
 	%r218 = ptrtoint %ptr %r214 to %word
@@ -11525,8 +11475,8 @@ L981:
 	%r215 = inttoptr i1 %r216 to %ptr
 	%r220 = ptrtoint %ptr %r215 to %word
 	%r219 = icmp ne %word %r220, 0
-	br i1 %r219, label %L983, label %L984
-L983:
+	br i1 %r219, label %L977, label %L978
+L977:
 	%r221 = load %ptr, %ptr* %t2
 	%r222 = load %ptr, %ptr* %t4
 	%r223 = call %ptr @"k/car"(%ptr %r222)
@@ -11543,9 +11493,9 @@ L983:
 	%r228 = inttoptr i1 %r229 to %ptr
 	%r233 = ptrtoint %ptr %r228 to %word
 	%r232 = icmp ne %word %r233, 0
-	br i1 %r232, label %L987, label %L986
-L987:
-	%r234 = getelementptr [28 x i8], [28 x i8]* @str988, %word 0, %word 0
+	br i1 %r232, label %L981, label %L980
+L981:
+	%r234 = getelementptr [28 x i8], [28 x i8]* @str982, %word 0, %word 0
 	%r236 = inttoptr %word 0 to %ptr
 	%r237 = load %ptr, %ptr* %t4
 	%r238 = call %ptr @"k/car"(%ptr %r237)
@@ -11562,10 +11512,10 @@ L987:
 	%r245 = inttoptr i1 %r246 to %ptr
 	%r250 = ptrtoint %ptr %r245 to %word
 	%r249 = icmp ne %word %r250, 0
-	br i1 %r249, label %L989, label %L986
-L989:
-	br label %L986
-L986:
+	br i1 %r249, label %L983, label %L980
+L983:
+	br label %L980
+L980:
 	%r251 = load %ptr, %ptr* %t10
 	%r252 = inttoptr %word 1 to %ptr
 	store %ptr %r252, %ptr* %t10
@@ -11585,8 +11535,8 @@ L986:
 	%r261 = inttoptr i1 %r262 to %ptr
 	%r266 = ptrtoint %ptr %r261 to %word
 	%r265 = icmp ne %word %r266, 0
-	br i1 %r265, label %L992, label %L991
-L992:
+	br i1 %r265, label %L986, label %L985
+L986:
 	%r267 = load %ptr, %ptr* %t4
 	%r268 = call %ptr @"k/cddr"(%ptr %r267)
 	store %ptr %r268, %ptr* %t11
@@ -11597,10 +11547,10 @@ L992:
 	%r270 = inttoptr i1 %r271 to %ptr
 	%r275 = ptrtoint %ptr %r270 to %word
 	%r274 = icmp ne %word %r275, 0
-	br i1 %r274, label %L993, label %L991
-L993:
-	br label %L991
-L991:
+	br i1 %r274, label %L987, label %L985
+L987:
+	br label %L985
+L985:
 	%r276 = load %ptr, %ptr* %t11
 	store %ptr %r276, %ptr* %t10
 	%r277 = inttoptr %word 0 to %ptr
@@ -11610,17 +11560,17 @@ L991:
 	%r278 = inttoptr i1 %r279 to %ptr
 	%r283 = ptrtoint %ptr %r278 to %word
 	%r282 = icmp ne %word %r283, 0
-	br i1 %r282, label %L990, label %L994
-L994:
-	%r284 = getelementptr [9 x i8], [9 x i8]* @str995, %word 0, %word 0
+	br i1 %r282, label %L984, label %L988
+L988:
+	%r284 = getelementptr [9 x i8], [9 x i8]* @str989, %word 0, %word 0
 	%r286 = call i32 (%ptr, ...) @printf(%ptr %r284)
 	%r287 = inttoptr %word %r286 to %ptr
-	%r288 = getelementptr [34 x i8], [34 x i8]* @str996, %word 0, %word 0
+	%r288 = getelementptr [34 x i8], [34 x i8]* @str990, %word 0, %word 0
 	%r290 = call i32 (%ptr, ...) @printf(%ptr %r288)
 	%r291 = inttoptr %word %r290 to %ptr
 	%r292 = load %ptr, %ptr* %t1
 	%r293 = call %ptr @"k/print"(%ptr %r292)
-	%r294 = getelementptr [2 x i8], [2 x i8]* @str997, %word 0, %word 0
+	%r294 = getelementptr [2 x i8], [2 x i8]* @str991, %word 0, %word 0
 	%r296 = call i32 (%ptr, ...) @printf(%ptr %r294)
 	%r297 = inttoptr %word %r296 to %ptr
 	%r298 = call %ptr @die()
@@ -11632,10 +11582,10 @@ L994:
 	%r300 = inttoptr i1 %r301 to %ptr
 	%r305 = ptrtoint %ptr %r300 to %word
 	%r304 = icmp ne %word %r305, 0
-	br i1 %r304, label %L990, label %L998
-L998:
-	br label %L990
-L990:
+	br i1 %r304, label %L984, label %L992
+L992:
+	br label %L984
+L984:
 	%r306 = load %ptr, %ptr* %t10
 	%r307 = load %ptr, %ptr* %t4
 	%r308 = call %ptr @"k/cdr"(%ptr %r307)
@@ -11647,8 +11597,8 @@ L990:
 	%r313 = call %ptr @"new-<pair>"(%ptr %r311, %ptr %r312)
 	store %ptr %r313, %ptr* %t4
 	store %ptr %r313, %ptr* %t8
-	br label %L985
-L984:
+	br label %L979
+L978:
 	%r314 = load %ptr, %ptr* @"fixed-subr/quote"
 	%r315 = load %ptr, %ptr* %t3
 	%r319 = ptrtoint %ptr %r315 to %word
@@ -11657,35 +11607,35 @@ L984:
 	%r316 = inttoptr i1 %r317 to %ptr
 	%r321 = ptrtoint %ptr %r316 to %word
 	%r320 = icmp ne %word %r321, 0
-	br i1 %r320, label %L999, label %L1000
-L999:
+	br i1 %r320, label %L993, label %L994
+L993:
 	%r322 = load %ptr, %ptr* %t4
 	%r323 = load %ptr, %ptr* %t2
 	%r324 = call %ptr @"k/encode/list"(%ptr %r322, %ptr %r323)
 	store %ptr %r324, %ptr* %t4
 	store %ptr %r324, %ptr* %t9
-	br label %L1001
-L1000:
+	br label %L995
+L994:
 	%r325 = inttoptr %word 0 to %ptr
 	store %ptr %r325, %ptr* %t9
-	br label %L1001
-L1001:
+	br label %L995
+L995:
 	%r326 = load %ptr, %ptr* %t9
 	store %ptr %r326, %ptr* %t8
-	br label %L985
-L985:
+	br label %L979
+L979:
 	%r327 = load %ptr, %ptr* %t8
 	store %ptr %r327, %ptr* %t7
-	br label %L982
-L982:
+	br label %L976
+L976:
 	%r328 = load %ptr, %ptr* %t7
 	store %ptr %r328, %ptr* %t6
-	br label %L973
-L973:
+	br label %L967
+L967:
 	%r329 = load %ptr, %ptr* %t6
 	store %ptr %r329, %ptr* %t5
-	br label %L964
-L964:
+	br label %L958
+L958:
 	%r330 = load %ptr, %ptr* %t5
 	%r331 = load %ptr, %ptr* %t3
 	%r332 = load %ptr, %ptr* %t4
@@ -11702,7 +11652,7 @@ L964:
 	%r341 = load %ptr, %ptr* %t4
 	ret %ptr %r341
 }
-@str1004 = private unnamed_addr constant [35 x i8] c"undefined variable in encode: '%s'\00"
+@str998 = private unnamed_addr constant [35 x i8] c"undefined variable in encode: '%s'\00"
 define %ptr @"k/encode/symbol"(%ptr %exp, %ptr %env) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -11728,9 +11678,9 @@ define %ptr @"k/encode/symbol"(%ptr %exp, %ptr %env) {
 	%r7 = inttoptr i1 %r8 to %ptr
 	%r12 = ptrtoint %ptr %r7 to %word
 	%r11 = icmp ne %word %r12, 0
-	br i1 %r11, label %L1003, label %L1002
-L1003:
-	%r13 = getelementptr [35 x i8], [35 x i8]* @str1004, %word 0, %word 0
+	br i1 %r11, label %L997, label %L996
+L997:
+	%r13 = getelementptr [35 x i8], [35 x i8]* @str998, %word 0, %word 0
 	%r15 = inttoptr %word 0 to %ptr
 	%r16 = load %ptr, %ptr* %t1
 	%r20 = bitcast %ptr %r16 to [0 x %ptr]*
@@ -11746,10 +11696,10 @@ L1003:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L1005, label %L1002
-L1005:
-	br label %L1002
-L1002:
+	br i1 %r27, label %L999, label %L996
+L999:
+	br label %L996
+L996:
 	%r29 = load %ptr, %ptr* %t4
 	%r30 = load %ptr, %ptr* %t3
 	store %ptr %r30, %ptr* %t1
@@ -11757,8 +11707,8 @@ L1002:
 	%r32 = call %ptr @"global-variable?"(%ptr %r31)
 	%r34 = ptrtoint %ptr %r32 to %word
 	%r33 = icmp ne %word %r34, 0
-	br i1 %r33, label %L1006, label %L1007
-L1006:
+	br i1 %r33, label %L1000, label %L1001
+L1000:
 	%r35 = inttoptr %word 1 to %ptr
 	%r36 = load %ptr, %ptr* %t1
 	%r40 = bitcast %ptr %r36 to [0 x %ptr]*
@@ -11783,8 +11733,8 @@ L1006:
 	%r50 = inttoptr i1 %r51 to %ptr
 	%r55 = ptrtoint %ptr %r50 to %word
 	%r54 = icmp ne %word %r55, 0
-	br i1 %r54, label %L1013, label %L1012
-L1013:
+	br i1 %r54, label %L1007, label %L1006
+L1007:
 	%r56 = load %ptr, %ptr* %t5
 	%r57 = call %ptr @"get/type"(%ptr %r56)
 	%r58 = inttoptr %word 11 to %ptr
@@ -11800,28 +11750,28 @@ L1013:
 	%r64 = inttoptr i1 %r65 to %ptr
 	%r69 = ptrtoint %ptr %r64 to %word
 	%r68 = icmp ne %word %r69, 0
-	br i1 %r68, label %L1014, label %L1012
-L1014:
-	br label %L1012
-L1012:
+	br i1 %r68, label %L1008, label %L1006
+L1008:
+	br label %L1006
+L1006:
 	%r70 = load %ptr, %ptr* %t7
 	%r72 = ptrtoint %ptr %r70 to %word
 	%r71 = icmp ne %word %r72, 0
-	br i1 %r71, label %L1009, label %L1010
-L1009:
+	br i1 %r71, label %L1003, label %L1004
+L1003:
 	%r73 = load %ptr, %ptr* %t5
 	store %ptr %r73, %ptr* %t1
 	store %ptr %r73, %ptr* %t6
-	br label %L1011
-L1010:
+	br label %L1005
+L1004:
 	%r74 = inttoptr %word 0 to %ptr
 	store %ptr %r74, %ptr* %t6
-	br label %L1011
-L1011:
+	br label %L1005
+L1005:
 	%r75 = load %ptr, %ptr* %t6
 	store %ptr %r75, %ptr* %t4
-	br label %L1008
-L1007:
+	br label %L1002
+L1001:
 	%r76 = inttoptr %word 2 to %ptr
 	%r77 = load %ptr, %ptr* %t1
 	%r81 = bitcast %ptr %r77 to [0 x %ptr]*
@@ -11857,12 +11807,12 @@ L1007:
 	%r104 = inttoptr i1 %r105 to %ptr
 	%r109 = ptrtoint %ptr %r104 to %word
 	%r108 = icmp ne %word %r109, 0
-	br i1 %r108, label %L1015, label %L1016
-L1015:
+	br i1 %r108, label %L1009, label %L1010
+L1009:
 	%r110 = inttoptr %word 0 to %ptr
 	store %ptr %r110, %ptr* %t6
-	br label %L1017
-L1016:
+	br label %L1011
+L1010:
 	%r111 = load %ptr, %ptr* @"symbol/true"
 	%r112 = inttoptr %word 4 to %ptr
 	%r113 = load %ptr, %ptr* %t5
@@ -11872,12 +11822,12 @@ L1016:
 	store %ptr %r111, %ptr* %r115
 	%r114 = bitcast %ptr %r111 to %ptr
 	store %ptr %r114, %ptr* %t6
-	br label %L1017
-L1017:
+	br label %L1011
+L1011:
 	%r118 = load %ptr, %ptr* %t6
 	store %ptr %r118, %ptr* %t4
-	br label %L1008
-L1008:
+	br label %L1002
+L1002:
 	%r119 = load %ptr, %ptr* %t4
 	%r120 = load %ptr, %ptr* %t1
 	ret %ptr %r120
@@ -11905,8 +11855,8 @@ define %ptr @"k/encode/other"(%ptr %exp, %ptr %env) {
 	%r11 = load %ptr, %ptr* %t3
 	%r13 = ptrtoint %ptr %r11 to %word
 	%r12 = icmp ne %word %r13, 0
-	br i1 %r12, label %L1018, label %L1019
-L1018:
+	br i1 %r12, label %L1012, label %L1013
+L1012:
 	%r14 = load %ptr, %ptr* %t2
 	%r15 = inttoptr %word 0 to %ptr
 	%r16 = call %ptr @"new-<pair>"(%ptr %r14, %ptr %r15)
@@ -11930,12 +11880,12 @@ L1018:
 	%r30 = call %ptr @"gc/pop-root"(%ptr %r28)
 	%r31 = load %ptr, %ptr* %t6
 	store %ptr %r31, %ptr* %t4
-	br label %L1020
-L1019:
+	br label %L1014
+L1013:
 	%r32 = inttoptr %word 0 to %ptr
 	store %ptr %r32, %ptr* %t4
-	br label %L1020
-L1020:
+	br label %L1014
+L1014:
 	%r33 = load %ptr, %ptr* %t4
 	%r34 = load %ptr, %ptr* %t1
 	ret %ptr %r34
@@ -11958,8 +11908,8 @@ define %ptr @"k/eval/list"(%ptr %obj, %ptr %ctx) {
 	%r4 = inttoptr i1 %r5 to %ptr
 	%r9 = ptrtoint %ptr %r4 to %word
 	%r8 = icmp ne %word %r9, 0
-	br i1 %r8, label %L1021, label %L1022
-L1021:
+	br i1 %r8, label %L1015, label %L1016
+L1015:
 	%r10 = inttoptr %word 0 to %ptr
 	%r11 = load %ptr, %ptr* %t1
 	%r15 = bitcast %ptr %r11 to [0 x %ptr]*
@@ -11998,16 +11948,16 @@ L1021:
 	%r41 = call %ptr @"gc/pop-root"(%ptr %r39)
 	%r42 = load %ptr, %ptr* %t5
 	store %ptr %r42, %ptr* %t3
-	br label %L1023
-L1022:
+	br label %L1017
+L1016:
 	%r43 = load %ptr, %ptr* %t1
 	store %ptr %r43, %ptr* %t3
-	br label %L1023
-L1023:
+	br label %L1017
+L1017:
 	%r44 = load %ptr, %ptr* %t3
 	ret %ptr %r44
 }
-@str1027 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
+@str1021 = private unnamed_addr constant [53 x i8] c"infinite recursion guard triggered at call depth %ld\00"
 define %ptr @"k/eval/with-backtrace"(%ptr %type, %ptr %exp, %ptr %ctx) {
 	%t3 = alloca %ptr
 	%t2 = alloca %ptr
@@ -12040,18 +11990,18 @@ define %ptr @"k/eval/with-backtrace"(%ptr %type, %ptr %exp, %ptr %ctx) {
 	%r12 = inttoptr i1 %r13 to %ptr
 	%r17 = ptrtoint %ptr %r12 to %word
 	%r16 = icmp ne %word %r17, 0
-	br i1 %r16, label %L1024, label %L1025
-L1024:
-	%r18 = getelementptr [53 x i8], [53 x i8]* @str1027, %word 0, %word 0
+	br i1 %r16, label %L1018, label %L1019
+L1018:
+	%r18 = getelementptr [53 x i8], [53 x i8]* @str1021, %word 0, %word 0
 	%r20 = load %ptr, %ptr* @"*call-stack-index*"
 	%r21 = call %ptr @fatal1(%ptr %r18, %ptr %r20)
 	store %ptr %r21, %ptr* %t5
-	br label %L1026
-L1025:
+	br label %L1020
+L1019:
 	%r22 = inttoptr %word 0 to %ptr
 	store %ptr %r22, %ptr* %t5
-	br label %L1026
-L1026:
+	br label %L1020
+L1020:
 	%r23 = load %ptr, %ptr* %t5
 	%r24 = inttoptr %word 19 to %ptr
 	%r25 = load %ptr, %ptr* %t1
@@ -12061,8 +12011,8 @@ L1026:
 	%r26 = inttoptr i1 %r27 to %ptr
 	%r31 = ptrtoint %ptr %r26 to %word
 	%r30 = icmp ne %word %r31, 0
-	br i1 %r30, label %L1028, label %L1029
-L1028:
+	br i1 %r30, label %L1022, label %L1023
+L1022:
 	%r32 = inttoptr %word 0 to %ptr
 	%r33 = load %ptr, %ptr* %t2
 	%r37 = bitcast %ptr %r33 to [0 x %ptr]*
@@ -12119,8 +12069,8 @@ L1028:
 	%r78 = inttoptr i1 %r79 to %ptr
 	%r83 = ptrtoint %ptr %r78 to %word
 	%r82 = icmp ne %word %r83, 0
-	br i1 %r82, label %L1031, label %L1032
-L1031:
+	br i1 %r82, label %L1025, label %L1026
+L1025:
 	%r84 = inttoptr %word 0 to %ptr
 	%r85 = load %ptr, %ptr* %t6
 	%r89 = bitcast %ptr %r85 to [0 x %ptr]*
@@ -12136,8 +12086,8 @@ L1031:
 	%r96 = load %ptr, %ptr* %t3
 	%r97 = call %ptr @"k/apply"(%ptr %r86, %ptr %r92, %ptr %r96)
 	store %ptr %r97, %ptr* %t7
-	br label %L1033
-L1032:
+	br label %L1027
+L1026:
 	%r98 = inttoptr %word 1 to %ptr
 	%r99 = load %ptr, %ptr* %t2
 	%r103 = bitcast %ptr %r99 to [0 x %ptr]*
@@ -12168,8 +12118,8 @@ L1032:
 	%r122 = call %ptr @"gc/pop-root"(%ptr %r120)
 	%r123 = load %ptr, %ptr* %t9
 	store %ptr %r123, %ptr* %t7
-	br label %L1033
-L1033:
+	br label %L1027
+L1027:
 	%r124 = load %ptr, %ptr* %t7
 	store %ptr %r124, %ptr* %t7
 	%r126 = getelementptr %ptr, %ptr* %t6, %word 0
@@ -12177,8 +12127,8 @@ L1033:
 	%r127 = call %ptr @"gc/pop-root"(%ptr %r125)
 	%r128 = load %ptr, %ptr* %t7
 	store %ptr %r128, %ptr* %t5
-	br label %L1030
-L1029:
+	br label %L1024
+L1023:
 	%r129 = load %ptr, %ptr* %t2
 	%r130 = inttoptr %word 0 to %ptr
 	%r131 = load %ptr, %ptr* %t4
@@ -12199,8 +12149,8 @@ L1029:
 	%r144 = load %ptr, %ptr* %t6
 	%r146 = ptrtoint %ptr %r144 to %word
 	%r145 = icmp ne %word %r146, 0
-	br i1 %r145, label %L1034, label %L1035
-L1034:
+	br i1 %r145, label %L1028, label %L1029
+L1028:
 	%r147 = load %ptr, %ptr* %t2
 	%r148 = inttoptr %word 0 to %ptr
 	%r149 = call %ptr @"new-<pair>"(%ptr %r147, %ptr %r148)
@@ -12226,16 +12176,16 @@ L1034:
 	%r166 = call %ptr @"gc/pop-root"(%ptr %r164)
 	%r167 = load %ptr, %ptr* %t9
 	store %ptr %r167, %ptr* %t7
-	br label %L1036
-L1035:
+	br label %L1030
+L1029:
 	%r168 = load %ptr, %ptr* %t2
 	store %ptr %r168, %ptr* %t7
-	br label %L1036
-L1036:
-	%r169 = load %ptr, %ptr* %t7
-	store %ptr %r169, %ptr* %t5
 	br label %L1030
 L1030:
+	%r169 = load %ptr, %ptr* %t7
+	store %ptr %r169, %ptr* %t5
+	br label %L1024
+L1024:
 	%r170 = load %ptr, %ptr* %t5
 	store %ptr %r170, %ptr* %t4
 	%r171 = inttoptr %word 1 to %ptr
@@ -12253,8 +12203,8 @@ L1030:
 	%r179 = inttoptr i1 %r180 to %ptr
 	%r184 = ptrtoint %ptr %r179 to %word
 	%r183 = icmp ne %word %r184, 0
-	br i1 %r183, label %L1037, label %L1038
-L1037:
+	br i1 %r183, label %L1031, label %L1032
+L1031:
 	%r185 = load %ptr, %ptr* @"*call-stack*"
 	%r186 = load %ptr, %ptr* @"*call-stack-index*"
 	%r187 = call %ptr @"k/array-at"(%ptr %r185, %ptr %r186)
@@ -12284,21 +12234,21 @@ L1037:
 	store %ptr %r202, %ptr* %r206
 	%r205 = bitcast %ptr %r202 to %ptr
 	store %ptr %r205, %ptr* %t5
-	br label %L1039
-L1038:
+	br label %L1033
+L1032:
 	%r209 = inttoptr %word 0 to %ptr
 	store %ptr %r209, %ptr* %t5
-	br label %L1039
-L1039:
+	br label %L1033
+L1033:
 	%r210 = load %ptr, %ptr* %t5
 	%r211 = inttoptr %word 0 to %ptr
 	%r212 = load %ptr, %ptr* %t4
 	ret %ptr %r212
 }
-@str1043 = private unnamed_addr constant [5 x i8] c";;; \00"
-@str1047 = private unnamed_addr constant [9 x i8] c"expd--> \00"
-@str1051 = private unnamed_addr constant [9 x i8] c"encd--> \00"
-@str1055 = private unnamed_addr constant [8 x i8] c";;; => \00"
+@str1037 = private unnamed_addr constant [5 x i8] c";;; \00"
+@str1041 = private unnamed_addr constant [9 x i8] c"expd--> \00"
+@str1045 = private unnamed_addr constant [9 x i8] c"encd--> \00"
+@str1049 = private unnamed_addr constant [8 x i8] c";;; => \00"
 define %ptr @"k/expand-encode-eval"(%ptr %form, %ptr %env) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -12328,20 +12278,20 @@ define %ptr @"k/expand-encode-eval"(%ptr %form, %ptr %env) {
 	%r14 = inttoptr i1 %r15 to %ptr
 	%r19 = ptrtoint %ptr %r14 to %word
 	%r18 = icmp ne %word %r19, 0
-	br i1 %r18, label %L1040, label %L1041
-L1040:
-	%r20 = getelementptr [5 x i8], [5 x i8]* @str1043, %word 0, %word 0
+	br i1 %r18, label %L1034, label %L1035
+L1034:
+	%r20 = getelementptr [5 x i8], [5 x i8]* @str1037, %word 0, %word 0
 	%r22 = call i32 (%ptr, ...) @printf(%ptr %r20)
 	%r23 = inttoptr %word %r22 to %ptr
 	%r24 = load %ptr, %ptr* %t3
 	%r25 = call %ptr @"k/dumpln"(%ptr %r24)
 	store %ptr %r25, %ptr* %t5
-	br label %L1042
-L1041:
+	br label %L1036
+L1035:
 	%r26 = inttoptr %word 0 to %ptr
 	store %ptr %r26, %ptr* %t5
-	br label %L1042
-L1042:
+	br label %L1036
+L1036:
 	%r27 = load %ptr, %ptr* %t5
 	%r28 = load %ptr, %ptr* %t3
 	%r29 = load %ptr, %ptr* %t2
@@ -12355,20 +12305,20 @@ L1042:
 	%r33 = inttoptr i1 %r34 to %ptr
 	%r38 = ptrtoint %ptr %r33 to %word
 	%r37 = icmp ne %word %r38, 0
-	br i1 %r37, label %L1044, label %L1045
-L1044:
-	%r39 = getelementptr [9 x i8], [9 x i8]* @str1047, %word 0, %word 0
+	br i1 %r37, label %L1038, label %L1039
+L1038:
+	%r39 = getelementptr [9 x i8], [9 x i8]* @str1041, %word 0, %word 0
 	%r41 = call i32 (%ptr, ...) @printf(%ptr %r39)
 	%r42 = inttoptr %word %r41 to %ptr
 	%r43 = load %ptr, %ptr* %t3
 	%r44 = call %ptr @"k/dumpln"(%ptr %r43)
 	store %ptr %r44, %ptr* %t5
-	br label %L1046
-L1045:
+	br label %L1040
+L1039:
 	%r45 = inttoptr %word 0 to %ptr
 	store %ptr %r45, %ptr* %t5
-	br label %L1046
-L1046:
+	br label %L1040
+L1040:
 	%r46 = load %ptr, %ptr* %t5
 	%r47 = load %ptr, %ptr* %t3
 	%r48 = load %ptr, %ptr* %t2
@@ -12382,20 +12332,20 @@ L1046:
 	%r52 = inttoptr i1 %r53 to %ptr
 	%r57 = ptrtoint %ptr %r52 to %word
 	%r56 = icmp ne %word %r57, 0
-	br i1 %r56, label %L1048, label %L1049
-L1048:
-	%r58 = getelementptr [9 x i8], [9 x i8]* @str1051, %word 0, %word 0
+	br i1 %r56, label %L1042, label %L1043
+L1042:
+	%r58 = getelementptr [9 x i8], [9 x i8]* @str1045, %word 0, %word 0
 	%r60 = call i32 (%ptr, ...) @printf(%ptr %r58)
 	%r61 = inttoptr %word %r60 to %ptr
 	%r62 = load %ptr, %ptr* %t3
 	%r63 = call %ptr @"k/dumpln"(%ptr %r62)
 	store %ptr %r63, %ptr* %t5
-	br label %L1050
-L1049:
+	br label %L1044
+L1043:
 	%r64 = inttoptr %word 0 to %ptr
 	store %ptr %r64, %ptr* %t5
-	br label %L1050
-L1050:
+	br label %L1044
+L1044:
 	%r65 = load %ptr, %ptr* %t5
 	%r66 = load %ptr, %ptr* %t3
 	%r67 = load %ptr, %ptr* %t4
@@ -12409,20 +12359,20 @@ L1050:
 	%r71 = inttoptr i1 %r72 to %ptr
 	%r76 = ptrtoint %ptr %r71 to %word
 	%r75 = icmp ne %word %r76, 0
-	br i1 %r75, label %L1052, label %L1053
-L1052:
-	%r77 = getelementptr [8 x i8], [8 x i8]* @str1055, %word 0, %word 0
+	br i1 %r75, label %L1046, label %L1047
+L1046:
+	%r77 = getelementptr [8 x i8], [8 x i8]* @str1049, %word 0, %word 0
 	%r79 = call i32 (%ptr, ...) @printf(%ptr %r77)
 	%r80 = inttoptr %word %r79 to %ptr
 	%r81 = load %ptr, %ptr* %t3
 	%r82 = call %ptr @"k/dumpln"(%ptr %r81)
 	store %ptr %r82, %ptr* %t5
-	br label %L1054
-L1053:
+	br label %L1048
+L1047:
 	%r83 = inttoptr %word 0 to %ptr
 	store %ptr %r83, %ptr* %t5
-	br label %L1054
-L1054:
+	br label %L1048
+L1048:
 	%r84 = load %ptr, %ptr* %t5
 	%r85 = load %ptr, %ptr* %t3
 	store %ptr %r85, %ptr* %t5
@@ -12437,10 +12387,10 @@ L1054:
 	%r93 = load %ptr, %ptr* %t4
 	ret %ptr %r93
 }
-@str1059 = private unnamed_addr constant [10 x i8] c"#!%*[^\0A\0D]\00"
-@str1066 = private unnamed_addr constant [6 x i8] c"print\00"
-@str1070 = private unnamed_addr constant [2 x i8] c".\00"
-@str1073 = private unnamed_addr constant [23 x i8] c"\0Amorituri te salutant\0A\00"
+@str1053 = private unnamed_addr constant [10 x i8] c"#!%*[^\0A\0D]\00"
+@str1060 = private unnamed_addr constant [6 x i8] c"print\00"
+@str1064 = private unnamed_addr constant [2 x i8] c".\00"
+@str1067 = private unnamed_addr constant [23 x i8] c"\0Amorituri te salutant\0A\00"
 define %ptr @"k/repl-stream"(%ptr %stream) {
 	%t1 = alloca %ptr
 	%t2 = alloca %ptr
@@ -12475,27 +12425,27 @@ define %ptr @"k/repl-stream"(%ptr %stream) {
 	%r20 = inttoptr i1 %r21 to %ptr
 	%r25 = ptrtoint %ptr %r20 to %word
 	%r24 = icmp ne %word %r25, 0
-	br i1 %r24, label %L1056, label %L1057
-L1056:
+	br i1 %r24, label %L1050, label %L1051
+L1050:
 	%r26 = inttoptr %word 0 to %ptr
 	store %ptr %r26, %ptr* %t2
-	br label %L1058
-L1057:
+	br label %L1052
+L1051:
 	%r27 = load %ptr, %ptr* %t1
-	%r28 = getelementptr [10 x i8], [10 x i8]* @str1059, %word 0, %word 0
+	%r28 = getelementptr [10 x i8], [10 x i8]* @str1053, %word 0, %word 0
 	%r30 = call i32 (%ptr, %ptr, ...) @fscanf(%ptr %r27, %ptr %r28)
 	%r31 = inttoptr %word %r30 to %ptr
 	store %ptr %r31, %ptr* %t2
-	br label %L1058
-L1058:
+	br label %L1052
+L1052:
 	%r32 = load %ptr, %ptr* %t2
 	%r33 = inttoptr %word 0 to %ptr
 	store %ptr %r33, %ptr* %t2
 	%r35 = getelementptr %ptr, %ptr* %t2, %word 0
 	%r34 = bitcast %ptr* %r35 to %ptr
 	%r36 = call %ptr @"gc/push-root"(%ptr %r34)
-	br label %L1061
-L1060:
+	br label %L1055
+L1054:
 	%r37 = inttoptr %word 1 to %ptr
 	%r38 = inttoptr %word 1 to %ptr
 	%r39 = load %ptr, %ptr* @"*module*"
@@ -12526,8 +12476,8 @@ L1060:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L1063, label %L1064
-L1063:
+	br i1 %r63, label %L1057, label %L1058
+L1057:
 	%r65 = load %ptr, %ptr* %t2
 	%r66 = inttoptr %word 0 to %ptr
 	%r67 = call %ptr @"new-<pair>"(%ptr %r65, %ptr %r66)
@@ -12541,7 +12491,7 @@ L1063:
 	%r74 = inttoptr %word 0 to %ptr
 	%r75 = call %ptr @"new-<pair>"(%ptr %r73, %ptr %r74)
 	store %ptr %r75, %ptr* %t5
-	%r76 = getelementptr [6 x i8], [6 x i8]* @str1066, %word 0, %word 0
+	%r76 = getelementptr [6 x i8], [6 x i8]* @str1060, %word 0, %word 0
 	%r78 = call %ptr @"k/intern"(%ptr %r76)
 	%r79 = load %ptr, %ptr* %t5
 	%r80 = call %ptr @"new-<pair>"(%ptr %r78, %ptr %r79)
@@ -12556,20 +12506,20 @@ L1063:
 	%r87 = load %ptr, %ptr* %t6
 	%r88 = call %ptr @"libc/flush-streams"()
 	store %ptr %r88, %ptr* %t4
-	br label %L1065
-L1064:
+	br label %L1059
+L1058:
 	%r89 = inttoptr %word 0 to %ptr
 	store %ptr %r89, %ptr* %t4
-	br label %L1065
-L1065:
+	br label %L1059
+L1059:
 	%r90 = load %ptr, %ptr* %t4
 	store %ptr %r90, %ptr* %t4
 	%r92 = getelementptr %ptr, %ptr* %t3, %word 0
 	%r91 = bitcast %ptr* %r92 to %ptr
 	%r93 = call %ptr @"gc/pop-root"(%ptr %r91)
 	%r94 = load %ptr, %ptr* %t4
-	br label %L1061
-L1061:
+	br label %L1055
+L1055:
 	%r95 = load %ptr, %ptr* %t1
 	%r96 = load %ptr, %ptr* @"libc/stdin"
 	%r100 = ptrtoint %ptr %r96 to %word
@@ -12578,19 +12528,19 @@ L1061:
 	%r97 = inttoptr i1 %r98 to %ptr
 	%r102 = ptrtoint %ptr %r97 to %word
 	%r101 = icmp ne %word %r102, 0
-	br i1 %r101, label %L1067, label %L1068
-L1067:
-	%r103 = getelementptr [2 x i8], [2 x i8]* @str1070, %word 0, %word 0
+	br i1 %r101, label %L1061, label %L1062
+L1061:
+	%r103 = getelementptr [2 x i8], [2 x i8]* @str1064, %word 0, %word 0
 	%r105 = call i32 (%ptr, ...) @printf(%ptr %r103)
 	%r106 = inttoptr %word %r105 to %ptr
 	%r107 = call %ptr @"libc/flush-streams"()
 	store %ptr %r107, %ptr* %t3
-	br label %L1069
-L1068:
+	br label %L1063
+L1062:
 	%r108 = inttoptr %word 0 to %ptr
 	store %ptr %r108, %ptr* %t3
-	br label %L1069
-L1069:
+	br label %L1063
+L1063:
 	%r109 = load %ptr, %ptr* %t3
 	%r110 = load %ptr, %ptr* %t1
 	%r111 = call %ptr @"k/read"(%ptr %r110)
@@ -12602,8 +12552,8 @@ L1069:
 	%r113 = inttoptr i1 %r114 to %ptr
 	%r118 = ptrtoint %ptr %r113 to %word
 	%r117 = icmp ne %word %r118, 0
-	br i1 %r117, label %L1060, label %L1062
-L1062:
+	br i1 %r117, label %L1054, label %L1056
+L1056:
 	%r119 = inttoptr %word 1 to %ptr
 	store %ptr %r119, %ptr* %t3
 	%r120 = load %ptr, %ptr* %t1
@@ -12620,9 +12570,9 @@ L1062:
 	%r127 = inttoptr i1 %r128 to %ptr
 	%r132 = ptrtoint %ptr %r127 to %word
 	%r131 = icmp ne %word %r132, 0
-	br i1 %r131, label %L1071, label %L1072
-L1072:
-	%r133 = getelementptr [23 x i8], [23 x i8]* @str1073, %word 0, %word 0
+	br i1 %r131, label %L1065, label %L1066
+L1066:
+	%r133 = getelementptr [23 x i8], [23 x i8]* @str1067, %word 0, %word 0
 	%r135 = call i32 (%ptr, ...) @printf(%ptr %r133)
 	%r136 = inttoptr %word %r135 to %ptr
 	store %ptr %r136, %ptr* %t3
@@ -12633,10 +12583,10 @@ L1072:
 	%r138 = inttoptr i1 %r139 to %ptr
 	%r143 = ptrtoint %ptr %r138 to %word
 	%r142 = icmp ne %word %r143, 0
-	br i1 %r142, label %L1071, label %L1074
-L1074:
-	br label %L1071
-L1071:
+	br i1 %r142, label %L1065, label %L1068
+L1068:
+	br label %L1065
+L1065:
 	%r144 = load %ptr, %ptr* %t3
 	%r145 = load %ptr, %ptr* %t2
 	store %ptr %r145, %ptr* %t3
@@ -12646,7 +12596,7 @@ L1071:
 	%r149 = load %ptr, %ptr* %t3
 	ret %ptr %r149
 }
-@str1075 = private unnamed_addr constant [10 x i8] c"*globals*\00"
+@str1069 = private unnamed_addr constant [10 x i8] c"*globals*\00"
 define %ptr @"new-<module>"() {
 	%t1 = alloca %ptr
 	%t2 = alloca %ptr
@@ -12677,7 +12627,7 @@ define %ptr @"new-<module>"() {
 	store %ptr %r16, %ptr* %r20
 	%r19 = bitcast %ptr %r16 to %ptr
 	%r23 = load %ptr, %ptr* %t2
-	%r24 = getelementptr [10 x i8], [10 x i8]* @str1075, %word 0, %word 0
+	%r24 = getelementptr [10 x i8], [10 x i8]* @str1069, %word 0, %word 0
 	%r26 = call %ptr @"k/intern"(%ptr %r24)
 	%r27 = load %ptr, %ptr* %t2
 	%r28 = call %ptr @"k/env/define"(%ptr %r23, %ptr %r26, %ptr %r27)
@@ -12713,10 +12663,10 @@ define %ptr @"k/set-current-module"(%ptr %module) {
 	%r3 = call %ptr @capture-well-known-vm-values()
 	ret %ptr %r3
 }
-@str1087 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1088 = private unnamed_addr constant [11 x i8] c"Operator '\00"
-@str1089 = private unnamed_addr constant [46 x i8] c"' called with the wrong number of arguments: \00"
-@str1090 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1081 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1082 = private unnamed_addr constant [11 x i8] c"Operator '\00"
+@str1083 = private unnamed_addr constant [46 x i8] c"' called with the wrong number of arguments: \00"
+@str1084 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"%check-arity"(%ptr %op, %ptr %arity, %ptr %args) {
 	%t3 = alloca %ptr
 	%t2 = alloca %ptr
@@ -12732,8 +12682,8 @@ define %ptr @"%check-arity"(%ptr %op, %ptr %arity, %ptr %args) {
 	store %ptr %r1, %ptr* %t4
 	%r2 = load %ptr, %ptr* %t3
 	store %ptr %r2, %ptr* %t5
-	br label %L1077
-L1076:
+	br label %L1071
+L1070:
 	%r3 = inttoptr %word 1 to %ptr
 	%r4 = load %ptr, %ptr* %t5
 	%r8 = bitcast %ptr %r4 to [0 x %ptr]*
@@ -12748,8 +12698,8 @@ L1076:
 	%r12 = sub %word %r14, %r13
 	%r11 = inttoptr %word %r12 to %ptr
 	store %ptr %r11, %ptr* %t4
-	br label %L1077
-L1077:
+	br label %L1071
+L1071:
 	%r15 = inttoptr %word 1 to %ptr
 	store %ptr %r15, %ptr* %t6
 	%r16 = load %ptr, %ptr* %t4
@@ -12766,8 +12716,8 @@ L1077:
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L1079, label %L1080
-L1080:
+	br i1 %r27, label %L1073, label %L1074
+L1074:
 	%r29 = load %ptr, %ptr* %t5
 	%r30 = call %ptr @"get/type"(%ptr %r29)
 	%r31 = inttoptr %word 19 to %ptr
@@ -12783,15 +12733,15 @@ L1080:
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1079, label %L1081
-L1081:
-	br label %L1079
-L1079:
+	br i1 %r41, label %L1073, label %L1075
+L1075:
+	br label %L1073
+L1073:
 	%r43 = load %ptr, %ptr* %t6
 	%r45 = ptrtoint %ptr %r43 to %word
 	%r44 = icmp ne %word %r45, 0
-	br i1 %r44, label %L1076, label %L1078
-L1078:
+	br i1 %r44, label %L1070, label %L1072
+L1072:
 	%r46 = inttoptr %word 0 to %ptr
 	store %ptr %r46, %ptr* %t6
 	%r47 = inttoptr %word 1 to %ptr
@@ -12810,8 +12760,8 @@ L1078:
 	%r55 = inttoptr i1 %r56 to %ptr
 	%r60 = ptrtoint %ptr %r55 to %word
 	%r59 = icmp ne %word %r60, 0
-	br i1 %r59, label %L1083, label %L1084
-L1084:
+	br i1 %r59, label %L1077, label %L1078
+L1078:
 	%r61 = load %ptr, %ptr* %t5
 	%r65 = ptrtoint %ptr %r61 to %word
 	%r64 = icmp eq %word %r65, 0
@@ -12825,10 +12775,10 @@ L1084:
 	%r67 = inttoptr i1 %r68 to %ptr
 	%r72 = ptrtoint %ptr %r67 to %word
 	%r71 = icmp ne %word %r72, 0
-	br i1 %r71, label %L1083, label %L1085
-L1085:
-	br label %L1083
-L1083:
+	br i1 %r71, label %L1077, label %L1079
+L1079:
+	br label %L1077
+L1077:
 	%r73 = load %ptr, %ptr* %t7
 	store %ptr %r73, %ptr* %t6
 	%r74 = inttoptr %word 0 to %ptr
@@ -12838,22 +12788,22 @@ L1083:
 	%r75 = inttoptr i1 %r76 to %ptr
 	%r80 = ptrtoint %ptr %r75 to %word
 	%r79 = icmp ne %word %r80, 0
-	br i1 %r79, label %L1086, label %L1082
-L1086:
-	%r81 = getelementptr [9 x i8], [9 x i8]* @str1087, %word 0, %word 0
+	br i1 %r79, label %L1080, label %L1076
+L1080:
+	%r81 = getelementptr [9 x i8], [9 x i8]* @str1081, %word 0, %word 0
 	%r83 = call i32 (%ptr, ...) @printf(%ptr %r81)
 	%r84 = inttoptr %word %r83 to %ptr
-	%r85 = getelementptr [11 x i8], [11 x i8]* @str1088, %word 0, %word 0
+	%r85 = getelementptr [11 x i8], [11 x i8]* @str1082, %word 0, %word 0
 	%r87 = call i32 (%ptr, ...) @printf(%ptr %r85)
 	%r88 = inttoptr %word %r87 to %ptr
 	%r89 = load %ptr, %ptr* %t1
 	%r90 = call %ptr @"k/print"(%ptr %r89)
-	%r91 = getelementptr [46 x i8], [46 x i8]* @str1089, %word 0, %word 0
+	%r91 = getelementptr [46 x i8], [46 x i8]* @str1083, %word 0, %word 0
 	%r93 = call i32 (%ptr, ...) @printf(%ptr %r91)
 	%r94 = inttoptr %word %r93 to %ptr
 	%r95 = load %ptr, %ptr* %t3
 	%r96 = call %ptr @"k/print"(%ptr %r95)
-	%r97 = getelementptr [2 x i8], [2 x i8]* @str1090, %word 0, %word 0
+	%r97 = getelementptr [2 x i8], [2 x i8]* @str1084, %word 0, %word 0
 	%r99 = call i32 (%ptr, ...) @printf(%ptr %r97)
 	%r100 = inttoptr %word %r99 to %ptr
 	%r101 = call %ptr @die()
@@ -12865,15 +12815,15 @@ L1086:
 	%r103 = inttoptr i1 %r104 to %ptr
 	%r108 = ptrtoint %ptr %r103 to %word
 	%r107 = icmp ne %word %r108, 0
-	br i1 %r107, label %L1091, label %L1082
-L1091:
-	br label %L1082
-L1082:
+	br i1 %r107, label %L1085, label %L1076
+L1085:
+	br label %L1076
+L1076:
 	%r109 = load %ptr, %ptr* %t6
 	ret %ptr %r109
 }
-@str1095 = private unnamed_addr constant [33 x i8] c"\0Aerror: non-variable in define: \00"
-@str1096 = private unnamed_addr constant [9 x i8] c"aborting\00"
+@str1089 = private unnamed_addr constant [33 x i8] c"\0Aerror: non-variable in define: \00"
+@str1090 = private unnamed_addr constant [9 x i8] c"aborting\00"
 define %ptr @"subr/define"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -12896,22 +12846,22 @@ define %ptr @"subr/define"(%ptr %-args-, %ptr %-ctx-) {
 	%r6 = inttoptr i1 %r7 to %ptr
 	%r11 = ptrtoint %ptr %r6 to %word
 	%r10 = icmp ne %word %r11, 0
-	br i1 %r10, label %L1092, label %L1093
-L1092:
+	br i1 %r10, label %L1086, label %L1087
+L1086:
 	%r12 = inttoptr %word 0 to %ptr
 	store %ptr %r12, %ptr* %t4
-	br label %L1094
-L1093:
-	%r13 = getelementptr [33 x i8], [33 x i8]* @str1095, %word 0, %word 0
+	br label %L1088
+L1087:
+	%r13 = getelementptr [33 x i8], [33 x i8]* @str1089, %word 0, %word 0
 	%r15 = call i32 (%ptr, ...) @printf(%ptr %r13)
 	%r16 = inttoptr %word %r15 to %ptr
 	%r17 = load %ptr, %ptr* %t3
 	%r18 = call %ptr @"k/dumpln"(%ptr %r17)
-	%r19 = getelementptr [9 x i8], [9 x i8]* @str1096, %word 0, %word 0
+	%r19 = getelementptr [9 x i8], [9 x i8]* @str1090, %word 0, %word 0
 	%r21 = call %ptr @fatal(%ptr %r19)
 	store %ptr %r21, %ptr* %t4
-	br label %L1094
-L1094:
+	br label %L1088
+L1088:
 	%r22 = load %ptr, %ptr* %t4
 	%r23 = load %ptr, %ptr* %t1
 	%r24 = call %ptr @"k/cadr"(%ptr %r23)
@@ -12937,8 +12887,8 @@ L1094:
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1097, label %L1098
-L1097:
+	br i1 %r42, label %L1091, label %L1092
+L1091:
 	%r44 = inttoptr %word 0 to %ptr
 	%r45 = load %ptr, %ptr* %t5
 	%r49 = bitcast %ptr %r45 to [0 x %ptr]*
@@ -12947,12 +12897,12 @@ L1097:
 	%r46 = load %ptr, %ptr* %r47
 	store %ptr %r46, %ptr* %t5
 	store %ptr %r46, %ptr* %t6
-	br label %L1099
-L1098:
+	br label %L1093
+L1092:
 	%r50 = inttoptr %word 0 to %ptr
 	store %ptr %r50, %ptr* %t6
-	br label %L1099
-L1099:
+	br label %L1093
+L1093:
 	%r51 = load %ptr, %ptr* %t6
 	%r52 = inttoptr %word 1 to %ptr
 	store %ptr %r52, %ptr* %t7
@@ -12971,8 +12921,8 @@ L1099:
 	%r61 = inttoptr i1 %r62 to %ptr
 	%r66 = ptrtoint %ptr %r61 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L1103, label %L1104
-L1104:
+	br i1 %r65, label %L1097, label %L1098
+L1098:
 	%r67 = inttoptr %word 4 to %ptr
 	%r68 = load %ptr, %ptr* %t5
 	%r72 = bitcast %ptr %r68 to [0 x %ptr]*
@@ -12991,15 +12941,15 @@ L1104:
 	%r78 = inttoptr i1 %r79 to %ptr
 	%r83 = ptrtoint %ptr %r78 to %word
 	%r82 = icmp ne %word %r83, 0
-	br i1 %r82, label %L1103, label %L1105
-L1105:
-	br label %L1103
-L1103:
+	br i1 %r82, label %L1097, label %L1099
+L1099:
+	br label %L1097
+L1097:
 	%r84 = load %ptr, %ptr* %t7
 	%r86 = ptrtoint %ptr %r84 to %word
 	%r85 = icmp ne %word %r86, 0
-	br i1 %r85, label %L1100, label %L1101
-L1100:
+	br i1 %r85, label %L1094, label %L1095
+L1094:
 	%r87 = inttoptr %word 0 to %ptr
 	%r88 = load %ptr, %ptr* %t3
 	%r92 = bitcast %ptr %r88 to [0 x %ptr]*
@@ -13014,12 +12964,12 @@ L1100:
 	store %ptr %r89, %ptr* %r96
 	%r95 = bitcast %ptr %r89 to %ptr
 	store %ptr %r95, %ptr* %t6
-	br label %L1102
-L1101:
+	br label %L1096
+L1095:
 	%r99 = inttoptr %word 0 to %ptr
 	store %ptr %r99, %ptr* %t6
-	br label %L1102
-L1102:
+	br label %L1096
+L1096:
 	%r100 = load %ptr, %ptr* %t6
 	%r101 = load %ptr, %ptr* %t4
 	ret %ptr %r101
@@ -13051,8 +13001,8 @@ define %ptr @"subr/defined?"(%ptr %-args-, %ptr %-ctx-) {
 	%r12 = inttoptr i1 %r13 to %ptr
 	%r17 = ptrtoint %ptr %r12 to %word
 	%r16 = icmp ne %word %r17, 0
-	br i1 %r16, label %L1107, label %L1106
-L1107:
+	br i1 %r16, label %L1101, label %L1100
+L1101:
 	%r18 = inttoptr %word 1 to %ptr
 	%r19 = inttoptr %word 1 to %ptr
 	%r20 = load %ptr, %ptr* @"*module*"
@@ -13072,10 +13022,10 @@ L1107:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L1108, label %L1106
-L1108:
-	br label %L1106
-L1106:
+	br i1 %r34, label %L1102, label %L1100
+L1102:
+	br label %L1100
+L1100:
 	%r36 = load %ptr, %ptr* %t4
 	store %ptr %r36, %ptr* %t4
 	%r37 = load %ptr, %ptr* %t4
@@ -13083,9 +13033,9 @@ L1106:
 	%r39 = call %ptr @"k/env/lookup-variable"(%ptr %r37, %ptr %r38)
 	ret %ptr %r39
 }
-@str1111 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1112 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
-@str1113 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1105 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1106 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
+@str1107 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/lambda"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -13121,15 +13071,15 @@ define %ptr @"subr/lambda"(%ptr %-args-, %ptr %-ctx-) {
 	%r16 = inttoptr i1 %r17 to %ptr
 	%r21 = ptrtoint %ptr %r16 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L1110, label %L1109
-L1110:
-	%r22 = getelementptr [9 x i8], [9 x i8]* @str1111, %word 0, %word 0
+	br i1 %r20, label %L1104, label %L1103
+L1104:
+	%r22 = getelementptr [9 x i8], [9 x i8]* @str1105, %word 0, %word 0
 	%r24 = call i32 (%ptr, ...) @printf(%ptr %r22)
 	%r25 = inttoptr %word %r24 to %ptr
-	%r26 = getelementptr [24 x i8], [24 x i8]* @str1112, %word 0, %word 0
+	%r26 = getelementptr [24 x i8], [24 x i8]* @str1106, %word 0, %word 0
 	%r28 = call i32 (%ptr, ...) @printf(%ptr %r26)
 	%r29 = inttoptr %word %r28 to %ptr
-	%r30 = getelementptr [2 x i8], [2 x i8]* @str1113, %word 0, %word 0
+	%r30 = getelementptr [2 x i8], [2 x i8]* @str1107, %word 0, %word 0
 	%r32 = call i32 (%ptr, ...) @printf(%ptr %r30)
 	%r33 = inttoptr %word %r32 to %ptr
 	%r34 = call %ptr @die()
@@ -13141,10 +13091,10 @@ L1110:
 	%r36 = inttoptr i1 %r37 to %ptr
 	%r41 = ptrtoint %ptr %r36 to %word
 	%r40 = icmp ne %word %r41, 0
-	br i1 %r40, label %L1114, label %L1109
-L1114:
-	br label %L1109
-L1109:
+	br i1 %r40, label %L1108, label %L1103
+L1108:
+	br label %L1103
+L1103:
 	%r42 = load %ptr, %ptr* %t6
 	%r43 = load %ptr, %ptr* %t4
 	%r44 = load %ptr, %ptr* %t5
@@ -13184,8 +13134,8 @@ define %ptr @"subr/let"(%ptr %-args-, %ptr %-ctx-) {
 	%r13 = getelementptr %ptr, %ptr* %t3, %word 0
 	%r12 = bitcast %ptr* %r13 to %ptr
 	%r14 = call %ptr @"gc/push-root"(%ptr %r12)
-	br label %L1116
-L1115:
+	br label %L1110
+L1109:
 	%r15 = inttoptr %word 0 to %ptr
 	%r16 = load %ptr, %ptr* %t4
 	%r20 = bitcast %ptr %r16 to [0 x %ptr]*
@@ -13202,8 +13152,8 @@ L1115:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1118, label %L1119
-L1118:
+	br i1 %r28, label %L1112, label %L1113
+L1112:
 	%r30 = inttoptr %word 0 to %ptr
 	%r31 = load %ptr, %ptr* %t7
 	%r35 = bitcast %ptr %r31 to [0 x %ptr]*
@@ -13220,8 +13170,8 @@ L1118:
 	store %ptr %r38, %ptr* %t10
 	%r42 = inttoptr %word 0 to %ptr
 	store %ptr %r42, %ptr* %t3
-	br label %L1122
-L1121:
+	br label %L1116
+L1115:
 	%r43 = inttoptr %word 0 to %ptr
 	%r44 = load %ptr, %ptr* %t10
 	%r48 = bitcast %ptr %r44 to [0 x %ptr]*
@@ -13238,8 +13188,8 @@ L1121:
 	%r54 = getelementptr [0 x %ptr], [0 x %ptr]* %r56, %word 0, %word %r55
 	%r53 = load %ptr, %ptr* %r54
 	store %ptr %r53, %ptr* %t10
-	br label %L1122
-L1122:
+	br label %L1116
+L1116:
 	%r57 = load %ptr, %ptr* %t10
 	%r58 = call %ptr @"get/type"(%ptr %r57)
 	%r59 = inttoptr %word 19 to %ptr
@@ -13249,8 +13199,8 @@ L1122:
 	%r60 = inttoptr i1 %r61 to %ptr
 	%r65 = ptrtoint %ptr %r60 to %word
 	%r64 = icmp ne %word %r65, 0
-	br i1 %r64, label %L1121, label %L1123
-L1123:
+	br i1 %r64, label %L1115, label %L1117
+L1117:
 	%r66 = load %ptr, %ptr* %t5
 	%r67 = inttoptr %word 1 to %ptr
 	%r68 = inttoptr %word 3 to %ptr
@@ -13266,12 +13216,12 @@ L1123:
 	%r78 = load %ptr, %ptr* %t3
 	%r79 = call %ptr @"set-k/array-at"(%ptr %r66, %ptr %r74, %ptr %r78)
 	store %ptr %r79, %ptr* %t8
-	br label %L1120
-L1119:
+	br label %L1114
+L1113:
 	%r80 = inttoptr %word 0 to %ptr
 	store %ptr %r80, %ptr* %t8
-	br label %L1120
-L1120:
+	br label %L1114
+L1114:
 	%r81 = load %ptr, %ptr* %t8
 	%r82 = inttoptr %word 1 to %ptr
 	%r83 = load %ptr, %ptr* %t4
@@ -13280,8 +13230,8 @@ L1120:
 	%r85 = getelementptr [0 x %ptr], [0 x %ptr]* %r87, %word 0, %word %r86
 	%r84 = load %ptr, %ptr* %r85
 	store %ptr %r84, %ptr* %t4
-	br label %L1116
-L1116:
+	br label %L1110
+L1110:
 	%r88 = load %ptr, %ptr* %t4
 	%r89 = call %ptr @"get/type"(%ptr %r88)
 	%r90 = inttoptr %word 19 to %ptr
@@ -13291,12 +13241,12 @@ L1116:
 	%r91 = inttoptr i1 %r92 to %ptr
 	%r96 = ptrtoint %ptr %r91 to %word
 	%r95 = icmp ne %word %r96, 0
-	br i1 %r95, label %L1115, label %L1117
-L1117:
+	br i1 %r95, label %L1109, label %L1111
+L1111:
 	%r97 = inttoptr %word 0 to %ptr
 	store %ptr %r97, %ptr* %t3
-	br label %L1125
-L1124:
+	br label %L1119
+L1118:
 	%r98 = inttoptr %word 0 to %ptr
 	%r99 = load %ptr, %ptr* %t6
 	%r103 = bitcast %ptr %r99 to [0 x %ptr]*
@@ -13313,8 +13263,8 @@ L1124:
 	%r109 = getelementptr [0 x %ptr], [0 x %ptr]* %r111, %word 0, %word %r110
 	%r108 = load %ptr, %ptr* %r109
 	store %ptr %r108, %ptr* %t6
-	br label %L1125
-L1125:
+	br label %L1119
+L1119:
 	%r112 = load %ptr, %ptr* %t6
 	%r113 = call %ptr @"get/type"(%ptr %r112)
 	%r114 = inttoptr %word 19 to %ptr
@@ -13324,8 +13274,8 @@ L1125:
 	%r115 = inttoptr i1 %r116 to %ptr
 	%r120 = ptrtoint %ptr %r115 to %word
 	%r119 = icmp ne %word %r120, 0
-	br i1 %r119, label %L1124, label %L1126
-L1126:
+	br i1 %r119, label %L1118, label %L1120
+L1120:
 	store %ptr %r115, %ptr* %t7
 	%r122 = getelementptr %ptr, %ptr* %t3, %word 0
 	%r121 = bitcast %ptr* %r122 to %ptr
@@ -13334,8 +13284,8 @@ L1126:
 	%r125 = load %ptr, %ptr* %t3
 	ret %ptr %r125
 }
-@str1130 = private unnamed_addr constant [33 x i8] c"\0Acannot set undefined variable: \00"
-@str1131 = private unnamed_addr constant [9 x i8] c"aborting\00"
+@str1124 = private unnamed_addr constant [33 x i8] c"\0Acannot set undefined variable: \00"
+@str1125 = private unnamed_addr constant [9 x i8] c"aborting\00"
 define %ptr @"subr/set"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -13362,22 +13312,22 @@ define %ptr @"subr/set"(%ptr %-args-, %ptr %-ctx-) {
 	%r11 = inttoptr i1 %r12 to %ptr
 	%r16 = ptrtoint %ptr %r11 to %word
 	%r15 = icmp ne %word %r16, 0
-	br i1 %r15, label %L1127, label %L1128
-L1127:
+	br i1 %r15, label %L1121, label %L1122
+L1121:
 	%r17 = inttoptr %word 0 to %ptr
 	store %ptr %r17, %ptr* %t4
-	br label %L1129
-L1128:
-	%r18 = getelementptr [33 x i8], [33 x i8]* @str1130, %word 0, %word 0
+	br label %L1123
+L1122:
+	%r18 = getelementptr [33 x i8], [33 x i8]* @str1124, %word 0, %word 0
 	%r20 = call i32 (%ptr, ...) @printf(%ptr %r18)
 	%r21 = inttoptr %word %r20 to %ptr
 	%r22 = load %ptr, %ptr* %t3
 	%r23 = call %ptr @"k/dumpln"(%ptr %r22)
-	%r24 = getelementptr [9 x i8], [9 x i8]* @str1131, %word 0, %word 0
+	%r24 = getelementptr [9 x i8], [9 x i8]* @str1125, %word 0, %word 0
 	%r26 = call %ptr @fatal(%ptr %r24)
 	store %ptr %r26, %ptr* %t4
-	br label %L1129
-L1129:
+	br label %L1123
+L1123:
 	%r27 = load %ptr, %ptr* %t4
 	%r28 = inttoptr %word 0 to %ptr
 	%r29 = inttoptr %word 1 to %ptr
@@ -13397,8 +13347,8 @@ L1129:
 	%r42 = call %ptr @"global-variable?"(%ptr %r41)
 	%r44 = ptrtoint %ptr %r42 to %word
 	%r43 = icmp ne %word %r44, 0
-	br i1 %r43, label %L1132, label %L1133
-L1132:
+	br i1 %r43, label %L1126, label %L1127
+L1126:
 	%r45 = load %ptr, %ptr* %t4
 	%r46 = inttoptr %word 1 to %ptr
 	%r47 = load %ptr, %ptr* %t3
@@ -13408,8 +13358,8 @@ L1132:
 	store %ptr %r45, %ptr* %r49
 	%r48 = bitcast %ptr %r45 to %ptr
 	store %ptr %r48, %ptr* %t5
-	br label %L1134
-L1133:
+	br label %L1128
+L1127:
 	%r52 = inttoptr %word 1 to %ptr
 	%r53 = inttoptr %word 1 to %ptr
 	%r54 = inttoptr %word 2 to %ptr
@@ -13447,8 +13397,8 @@ L1133:
 	%r85 = sub %word %r87, %r86
 	%r84 = inttoptr %word %r85 to %ptr
 	store %ptr %r84, %ptr* %t6
-	br label %L1136
-L1135:
+	br label %L1130
+L1129:
 	%r88 = inttoptr %word 0 to %ptr
 	%r89 = load %ptr, %ptr* %t2
 	%r93 = bitcast %ptr %r89 to [0 x %ptr]*
@@ -13463,8 +13413,8 @@ L1135:
 	%r97 = sub %word %r99, %r98
 	%r96 = inttoptr %word %r97 to %ptr
 	store %ptr %r96, %ptr* %t6
-	br label %L1136
-L1136:
+	br label %L1130
+L1130:
 	%r100 = load %ptr, %ptr* %t6
 	%r101 = inttoptr %word 0 to %ptr
 	%r105 = ptrtoint %ptr %r101 to %word
@@ -13473,8 +13423,8 @@ L1136:
 	%r102 = inttoptr i1 %r103 to %ptr
 	%r107 = ptrtoint %ptr %r102 to %word
 	%r106 = icmp ne %word %r107, 0
-	br i1 %r106, label %L1135, label %L1137
-L1137:
+	br i1 %r106, label %L1129, label %L1131
+L1131:
 	%r108 = inttoptr %word 2 to %ptr
 	%r109 = load %ptr, %ptr* %t2
 	%r113 = bitcast %ptr %r109 to [0 x %ptr]*
@@ -13495,8 +13445,8 @@ L1137:
 	%r125 = load %ptr, %ptr* %t4
 	%r126 = call %ptr @"set-k/array-at"(%ptr %r110, %ptr %r121, %ptr %r125)
 	store %ptr %r126, %ptr* %t5
-	br label %L1134
-L1134:
+	br label %L1128
+L1128:
 	%r127 = load %ptr, %ptr* %t5
 	ret %ptr %r127
 }
@@ -13513,12 +13463,12 @@ define %ptr @"subr/while"(%ptr %-args-, %ptr %-ctx-) {
 	store %ptr %r2, %ptr* %t3
 	%r3 = load %ptr, %ptr* %t1
 	store %ptr %r3, %ptr* %t4
-	br label %L1139
-L1138:
+	br label %L1133
+L1132:
 	%r4 = load %ptr, %ptr* %t4
 	store %ptr %r4, %ptr* %t5
-	br label %L1142
-L1141:
+	br label %L1136
+L1135:
 	%r5 = inttoptr %word 0 to %ptr
 	%r6 = load %ptr, %ptr* %t5
 	%r10 = bitcast %ptr %r6 to [0 x %ptr]*
@@ -13527,8 +13477,8 @@ L1141:
 	%r7 = load %ptr, %ptr* %r8
 	%r11 = load %ptr, %ptr* %t2
 	%r12 = call %ptr @"k/eval"(%ptr %r7, %ptr %r11)
-	br label %L1142
-L1142:
+	br label %L1136
+L1136:
 	%r13 = load %ptr, %ptr* %t5
 	%r14 = call %ptr @"k/cdr"(%ptr %r13)
 	store %ptr %r14, %ptr* %t5
@@ -13540,17 +13490,17 @@ L1142:
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1141, label %L1143
-L1143:
-	br label %L1139
-L1139:
+	br i1 %r21, label %L1135, label %L1137
+L1137:
+	br label %L1133
+L1133:
 	%r23 = load %ptr, %ptr* %t3
 	%r24 = load %ptr, %ptr* %t2
 	%r25 = call %ptr @"k/eval"(%ptr %r23, %ptr %r24)
 	%r27 = ptrtoint %ptr %r25 to %word
 	%r26 = icmp ne %word %r27, 0
-	br i1 %r26, label %L1138, label %L1140
-L1140:
+	br i1 %r26, label %L1132, label %L1134
+L1134:
 	ret %ptr %r25
 }
 define %ptr @"subr/if"(%ptr %-args-, %ptr %-ctx-) {
@@ -13566,22 +13516,22 @@ define %ptr @"subr/if"(%ptr %-args-, %ptr %-ctx-) {
 	%r4 = call %ptr @"k/eval"(%ptr %r2, %ptr %r3)
 	%r6 = ptrtoint %ptr %r4 to %word
 	%r5 = icmp ne %word %r6, 0
-	br i1 %r5, label %L1144, label %L1145
-L1144:
+	br i1 %r5, label %L1138, label %L1139
+L1138:
 	%r7 = load %ptr, %ptr* %t1
 	%r8 = call %ptr @"k/cadr"(%ptr %r7)
 	%r9 = load %ptr, %ptr* %t2
 	%r10 = call %ptr @"k/eval"(%ptr %r8, %ptr %r9)
 	store %ptr %r10, %ptr* %t3
-	br label %L1146
-L1145:
+	br label %L1140
+L1139:
 	%r11 = inttoptr %word 0 to %ptr
 	store %ptr %r11, %ptr* %t4
 	%r12 = load %ptr, %ptr* %t1
 	%r13 = call %ptr @"k/cdr"(%ptr %r12)
 	store %ptr %r13, %ptr* %t1
-	br label %L1148
-L1147:
+	br label %L1142
+L1141:
 	%r14 = inttoptr %word 0 to %ptr
 	%r15 = load %ptr, %ptr* %t1
 	%r19 = bitcast %ptr %r15 to [0 x %ptr]*
@@ -13591,8 +13541,8 @@ L1147:
 	%r20 = load %ptr, %ptr* %t2
 	%r21 = call %ptr @"k/eval"(%ptr %r16, %ptr %r20)
 	store %ptr %r21, %ptr* %t4
-	br label %L1148
-L1148:
+	br label %L1142
+L1142:
 	%r22 = load %ptr, %ptr* %t1
 	%r23 = call %ptr @"k/cdr"(%ptr %r22)
 	store %ptr %r23, %ptr* %t1
@@ -13604,12 +13554,12 @@ L1148:
 	%r26 = inttoptr i1 %r27 to %ptr
 	%r31 = ptrtoint %ptr %r26 to %word
 	%r30 = icmp ne %word %r31, 0
-	br i1 %r30, label %L1147, label %L1149
-L1149:
+	br i1 %r30, label %L1141, label %L1143
+L1143:
 	%r32 = load %ptr, %ptr* %t4
 	store %ptr %r32, %ptr* %t3
-	br label %L1146
-L1146:
+	br label %L1140
+L1140:
 	%r33 = load %ptr, %ptr* %t3
 	ret %ptr %r33
 }
@@ -13622,8 +13572,8 @@ define %ptr @"subr/or"(%ptr %-args-, %ptr %-ctx-) {
 	store %ptr %-ctx-, %ptr* %t2
 	%r1 = inttoptr %word 0 to %ptr
 	store %ptr %r1, %ptr* %t3
-	br label %L1151
-L1150:
+	br label %L1145
+L1144:
 	%r2 = inttoptr %word 1 to %ptr
 	store %ptr %r2, %ptr* %t4
 	%r3 = inttoptr %word 0 to %ptr
@@ -13643,8 +13593,8 @@ L1150:
 	%r12 = inttoptr i1 %r13 to %ptr
 	%r17 = ptrtoint %ptr %r12 to %word
 	%r16 = icmp ne %word %r17, 0
-	br i1 %r16, label %L1153, label %L1154
-L1154:
+	br i1 %r16, label %L1147, label %L1148
+L1148:
 	%r18 = load %ptr, %ptr* %t3
 	ret %ptr %r18
 	store %ptr %r18, %ptr* %t4
@@ -13655,7 +13605,76 @@ L1154:
 	%r21 = inttoptr i1 %r22 to %ptr
 	%r26 = ptrtoint %ptr %r21 to %word
 	%r25 = icmp ne %word %r26, 0
-	br i1 %r25, label %L1153, label %L1155
+	br i1 %r25, label %L1147, label %L1149
+L1149:
+	br label %L1147
+L1147:
+	%r27 = load %ptr, %ptr* %t4
+	%r28 = inttoptr %word 1 to %ptr
+	%r29 = load %ptr, %ptr* %t1
+	%r33 = bitcast %ptr %r29 to [0 x %ptr]*
+	%r32 = ptrtoint %ptr %r28 to %word
+	%r31 = getelementptr [0 x %ptr], [0 x %ptr]* %r33, %word 0, %word %r32
+	%r30 = load %ptr, %ptr* %r31
+	store %ptr %r30, %ptr* %t1
+	br label %L1145
+L1145:
+	%r34 = load %ptr, %ptr* %t1
+	%r35 = call %ptr @"get/type"(%ptr %r34)
+	%r36 = inttoptr %word 19 to %ptr
+	%r40 = ptrtoint %ptr %r36 to %word
+	%r39 = ptrtoint %ptr %r35 to %word
+	%r38 = icmp eq %word %r40, %r39
+	%r37 = inttoptr i1 %r38 to %ptr
+	%r42 = ptrtoint %ptr %r37 to %word
+	%r41 = icmp ne %word %r42, 0
+	br i1 %r41, label %L1144, label %L1146
+L1146:
+	ret %ptr %r37
+}
+define %ptr @"subr/and"(%ptr %-args-, %ptr %-ctx-) {
+	%t2 = alloca %ptr
+	%t1 = alloca %ptr
+	%t3 = alloca %ptr
+	%t4 = alloca %ptr
+	store %ptr %-args-, %ptr* %t1
+	store %ptr %-ctx-, %ptr* %t2
+	%r1 = load %ptr, %ptr* @"symbol/true"
+	store %ptr %r1, %ptr* %t3
+	br label %L1151
+L1150:
+	%r2 = inttoptr %word 0 to %ptr
+	store %ptr %r2, %ptr* %t4
+	%r3 = inttoptr %word 0 to %ptr
+	%r4 = load %ptr, %ptr* %t1
+	%r8 = bitcast %ptr %r4 to [0 x %ptr]*
+	%r7 = ptrtoint %ptr %r3 to %word
+	%r6 = getelementptr [0 x %ptr], [0 x %ptr]* %r8, %word 0, %word %r7
+	%r5 = load %ptr, %ptr* %r6
+	%r9 = load %ptr, %ptr* %t2
+	%r10 = call %ptr @"k/eval"(%ptr %r5, %ptr %r9)
+	store %ptr %r10, %ptr* %t3
+	store %ptr %r10, %ptr* %t4
+	%r11 = inttoptr %word 0 to %ptr
+	%r15 = ptrtoint %ptr %r11 to %word
+	%r14 = ptrtoint %ptr %r10 to %word
+	%r13 = icmp eq %word %r15, %r14
+	%r12 = inttoptr i1 %r13 to %ptr
+	%r17 = ptrtoint %ptr %r12 to %word
+	%r16 = icmp ne %word %r17, 0
+	br i1 %r16, label %L1154, label %L1153
+L1154:
+	%r18 = inttoptr %word 0 to %ptr
+	ret %ptr %r18
+	store %ptr %r18, %ptr* %t4
+	%r20 = inttoptr %word 0 to %ptr
+	%r24 = ptrtoint %ptr %r20 to %word
+	%r23 = ptrtoint %ptr %r18 to %word
+	%r22 = icmp eq %word %r24, %r23
+	%r21 = inttoptr i1 %r22 to %ptr
+	%r26 = ptrtoint %ptr %r21 to %word
+	%r25 = icmp ne %word %r26, 0
+	br i1 %r25, label %L1155, label %L1153
 L1155:
 	br label %L1153
 L1153:
@@ -13680,75 +13699,6 @@ L1151:
 	%r41 = icmp ne %word %r42, 0
 	br i1 %r41, label %L1150, label %L1152
 L1152:
-	ret %ptr %r37
-}
-define %ptr @"subr/and"(%ptr %-args-, %ptr %-ctx-) {
-	%t2 = alloca %ptr
-	%t1 = alloca %ptr
-	%t3 = alloca %ptr
-	%t4 = alloca %ptr
-	store %ptr %-args-, %ptr* %t1
-	store %ptr %-ctx-, %ptr* %t2
-	%r1 = load %ptr, %ptr* @"symbol/true"
-	store %ptr %r1, %ptr* %t3
-	br label %L1157
-L1156:
-	%r2 = inttoptr %word 0 to %ptr
-	store %ptr %r2, %ptr* %t4
-	%r3 = inttoptr %word 0 to %ptr
-	%r4 = load %ptr, %ptr* %t1
-	%r8 = bitcast %ptr %r4 to [0 x %ptr]*
-	%r7 = ptrtoint %ptr %r3 to %word
-	%r6 = getelementptr [0 x %ptr], [0 x %ptr]* %r8, %word 0, %word %r7
-	%r5 = load %ptr, %ptr* %r6
-	%r9 = load %ptr, %ptr* %t2
-	%r10 = call %ptr @"k/eval"(%ptr %r5, %ptr %r9)
-	store %ptr %r10, %ptr* %t3
-	store %ptr %r10, %ptr* %t4
-	%r11 = inttoptr %word 0 to %ptr
-	%r15 = ptrtoint %ptr %r11 to %word
-	%r14 = ptrtoint %ptr %r10 to %word
-	%r13 = icmp eq %word %r15, %r14
-	%r12 = inttoptr i1 %r13 to %ptr
-	%r17 = ptrtoint %ptr %r12 to %word
-	%r16 = icmp ne %word %r17, 0
-	br i1 %r16, label %L1160, label %L1159
-L1160:
-	%r18 = inttoptr %word 0 to %ptr
-	ret %ptr %r18
-	store %ptr %r18, %ptr* %t4
-	%r20 = inttoptr %word 0 to %ptr
-	%r24 = ptrtoint %ptr %r20 to %word
-	%r23 = ptrtoint %ptr %r18 to %word
-	%r22 = icmp eq %word %r24, %r23
-	%r21 = inttoptr i1 %r22 to %ptr
-	%r26 = ptrtoint %ptr %r21 to %word
-	%r25 = icmp ne %word %r26, 0
-	br i1 %r25, label %L1161, label %L1159
-L1161:
-	br label %L1159
-L1159:
-	%r27 = load %ptr, %ptr* %t4
-	%r28 = inttoptr %word 1 to %ptr
-	%r29 = load %ptr, %ptr* %t1
-	%r33 = bitcast %ptr %r29 to [0 x %ptr]*
-	%r32 = ptrtoint %ptr %r28 to %word
-	%r31 = getelementptr [0 x %ptr], [0 x %ptr]* %r33, %word 0, %word %r32
-	%r30 = load %ptr, %ptr* %r31
-	store %ptr %r30, %ptr* %t1
-	br label %L1157
-L1157:
-	%r34 = load %ptr, %ptr* %t1
-	%r35 = call %ptr @"get/type"(%ptr %r34)
-	%r36 = inttoptr %word 19 to %ptr
-	%r40 = ptrtoint %ptr %r36 to %word
-	%r39 = ptrtoint %ptr %r35 to %word
-	%r38 = icmp eq %word %r40, %r39
-	%r37 = inttoptr i1 %r38 to %ptr
-	%r42 = ptrtoint %ptr %r37 to %word
-	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1156, label %L1158
-L1158:
 	%r43 = load %ptr, %ptr* %t3
 	ret %ptr %r43
 }
@@ -13781,16 +13731,16 @@ define %ptr @"subr/not"(%ptr %-args-, %ptr %-ctx-) {
 	%r4 = load %ptr, %ptr* %r5
 	%r9 = ptrtoint %ptr %r4 to %word
 	%r8 = icmp ne %word %r9, 0
-	br i1 %r8, label %L1162, label %L1163
-L1162:
+	br i1 %r8, label %L1156, label %L1157
+L1156:
 	%r10 = inttoptr %word 0 to %ptr
 	store %ptr %r10, %ptr* %t3
-	br label %L1164
-L1163:
+	br label %L1158
+L1157:
 	%r11 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r11, %ptr* %t3
-	br label %L1164
-L1164:
+	br label %L1158
+L1158:
 	%r12 = load %ptr, %ptr* %t3
 	ret %ptr %r12
 }
@@ -13859,9 +13809,9 @@ define %ptr @"subr/variable"(%ptr %-args-, %ptr %-ctx-) {
 	%r41 = call %ptr @"new-<variable>"(%ptr %r4, %ptr %r15, %ptr %r26, %ptr %r37)
 	ret %ptr %r41
 }
-@str1167 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1168 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
-@str1169 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1161 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1162 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
+@str1163 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/environment"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -13894,15 +13844,15 @@ define %ptr @"subr/environment"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1166, label %L1165
-L1166:
-	%r23 = getelementptr [9 x i8], [9 x i8]* @str1167, %word 0, %word 0
+	br i1 %r21, label %L1160, label %L1159
+L1160:
+	%r23 = getelementptr [9 x i8], [9 x i8]* @str1161, %word 0, %word 0
 	%r25 = call i32 (%ptr, ...) @printf(%ptr %r23)
 	%r26 = inttoptr %word %r25 to %ptr
-	%r27 = getelementptr [24 x i8], [24 x i8]* @str1168, %word 0, %word 0
+	%r27 = getelementptr [24 x i8], [24 x i8]* @str1162, %word 0, %word 0
 	%r29 = call i32 (%ptr, ...) @printf(%ptr %r27)
 	%r30 = inttoptr %word %r29 to %ptr
-	%r31 = getelementptr [2 x i8], [2 x i8]* @str1169, %word 0, %word 0
+	%r31 = getelementptr [2 x i8], [2 x i8]* @str1163, %word 0, %word 0
 	%r33 = call i32 (%ptr, ...) @printf(%ptr %r31)
 	%r34 = inttoptr %word %r33 to %ptr
 	%r35 = call %ptr @die()
@@ -13914,10 +13864,10 @@ L1166:
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1170, label %L1165
-L1170:
-	br label %L1165
-L1165:
+	br i1 %r41, label %L1164, label %L1159
+L1164:
+	br label %L1159
+L1159:
 	%r43 = load %ptr, %ptr* %t4
 	%r44 = load %ptr, %ptr* %t3
 	%r45 = inttoptr %word 0 to %ptr
@@ -13935,12 +13885,12 @@ L1165:
 	%r57 = call %ptr @"new-<env>"(%ptr %r44, %ptr %r45, %ptr %r53)
 	ret %ptr %r57
 }
+@str1167 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1168 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
+@str1169 = private unnamed_addr constant [2 x i8] c"\0A\00"
 @str1173 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
 @str1174 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
 @str1175 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1179 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1180 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
-@str1181 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/environment-define"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -14003,15 +13953,15 @@ define %ptr @"subr/environment-define"(%ptr %-args-, %ptr %-ctx-) {
 	%r39 = inttoptr i1 %r40 to %ptr
 	%r44 = ptrtoint %ptr %r39 to %word
 	%r43 = icmp ne %word %r44, 0
-	br i1 %r43, label %L1172, label %L1171
-L1172:
-	%r45 = getelementptr [9 x i8], [9 x i8]* @str1173, %word 0, %word 0
+	br i1 %r43, label %L1166, label %L1165
+L1166:
+	%r45 = getelementptr [9 x i8], [9 x i8]* @str1167, %word 0, %word 0
 	%r47 = call i32 (%ptr, ...) @printf(%ptr %r45)
 	%r48 = inttoptr %word %r47 to %ptr
-	%r49 = getelementptr [24 x i8], [24 x i8]* @str1174, %word 0, %word 0
+	%r49 = getelementptr [24 x i8], [24 x i8]* @str1168, %word 0, %word 0
 	%r51 = call i32 (%ptr, ...) @printf(%ptr %r49)
 	%r52 = inttoptr %word %r51 to %ptr
-	%r53 = getelementptr [2 x i8], [2 x i8]* @str1175, %word 0, %word 0
+	%r53 = getelementptr [2 x i8], [2 x i8]* @str1169, %word 0, %word 0
 	%r55 = call i32 (%ptr, ...) @printf(%ptr %r53)
 	%r56 = inttoptr %word %r55 to %ptr
 	%r57 = call %ptr @die()
@@ -14023,10 +13973,10 @@ L1172:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L1176, label %L1171
-L1176:
-	br label %L1171
-L1171:
+	br i1 %r63, label %L1170, label %L1165
+L1170:
+	br label %L1165
+L1165:
 	%r65 = load %ptr, %ptr* %t6
 	%r66 = inttoptr %word 0 to %ptr
 	store %ptr %r66, %ptr* %t6
@@ -14045,15 +13995,15 @@ L1171:
 	%r75 = inttoptr i1 %r76 to %ptr
 	%r80 = ptrtoint %ptr %r75 to %word
 	%r79 = icmp ne %word %r80, 0
-	br i1 %r79, label %L1178, label %L1177
-L1178:
-	%r81 = getelementptr [9 x i8], [9 x i8]* @str1179, %word 0, %word 0
+	br i1 %r79, label %L1172, label %L1171
+L1172:
+	%r81 = getelementptr [9 x i8], [9 x i8]* @str1173, %word 0, %word 0
 	%r83 = call i32 (%ptr, ...) @printf(%ptr %r81)
 	%r84 = inttoptr %word %r83 to %ptr
-	%r85 = getelementptr [24 x i8], [24 x i8]* @str1180, %word 0, %word 0
+	%r85 = getelementptr [24 x i8], [24 x i8]* @str1174, %word 0, %word 0
 	%r87 = call i32 (%ptr, ...) @printf(%ptr %r85)
 	%r88 = inttoptr %word %r87 to %ptr
-	%r89 = getelementptr [2 x i8], [2 x i8]* @str1181, %word 0, %word 0
+	%r89 = getelementptr [2 x i8], [2 x i8]* @str1175, %word 0, %word 0
 	%r91 = call i32 (%ptr, ...) @printf(%ptr %r89)
 	%r92 = inttoptr %word %r91 to %ptr
 	%r93 = call %ptr @die()
@@ -14065,10 +14015,10 @@ L1178:
 	%r95 = inttoptr i1 %r96 to %ptr
 	%r100 = ptrtoint %ptr %r95 to %word
 	%r99 = icmp ne %word %r100, 0
-	br i1 %r99, label %L1182, label %L1177
-L1182:
-	br label %L1177
-L1177:
+	br i1 %r99, label %L1176, label %L1171
+L1176:
+	br label %L1171
+L1171:
 	%r101 = load %ptr, %ptr* %t6
 	%r102 = inttoptr %word 3 to %ptr
 	%r103 = load %ptr, %ptr* %t3
@@ -14132,9 +14082,9 @@ L1177:
 	%r156 = load %ptr, %ptr* %t9
 	ret %ptr %r156
 }
-@str1185 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1186 = private unnamed_addr constant [40 x i8] c"operator '-' called with zero arguments\00"
-@str1187 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1179 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1180 = private unnamed_addr constant [40 x i8] c"operator '-' called with zero arguments\00"
+@str1181 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/-"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -14160,15 +14110,15 @@ define %ptr @"subr/-"(%ptr %-args-, %ptr %-ctx-) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L1184, label %L1183
-L1184:
-	%r16 = getelementptr [9 x i8], [9 x i8]* @str1185, %word 0, %word 0
+	br i1 %r14, label %L1178, label %L1177
+L1178:
+	%r16 = getelementptr [9 x i8], [9 x i8]* @str1179, %word 0, %word 0
 	%r18 = call i32 (%ptr, ...) @printf(%ptr %r16)
 	%r19 = inttoptr %word %r18 to %ptr
-	%r20 = getelementptr [40 x i8], [40 x i8]* @str1186, %word 0, %word 0
+	%r20 = getelementptr [40 x i8], [40 x i8]* @str1180, %word 0, %word 0
 	%r22 = call i32 (%ptr, ...) @printf(%ptr %r20)
 	%r23 = inttoptr %word %r22 to %ptr
-	%r24 = getelementptr [2 x i8], [2 x i8]* @str1187, %word 0, %word 0
+	%r24 = getelementptr [2 x i8], [2 x i8]* @str1181, %word 0, %word 0
 	%r26 = call i32 (%ptr, ...) @printf(%ptr %r24)
 	%r27 = inttoptr %word %r26 to %ptr
 	%r28 = call %ptr @die()
@@ -14180,10 +14130,10 @@ L1184:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L1188, label %L1183
-L1188:
-	br label %L1183
-L1183:
+	br i1 %r34, label %L1182, label %L1177
+L1182:
+	br label %L1177
+L1177:
 	%r36 = load %ptr, %ptr* %t3
 	%r37 = inttoptr %word 1 to %ptr
 	%r38 = inttoptr %word 0 to %ptr
@@ -14213,12 +14163,12 @@ L1183:
 	%r57 = inttoptr i1 %r58 to %ptr
 	%r62 = ptrtoint %ptr %r57 to %word
 	%r61 = icmp ne %word %r62, 0
-	br i1 %r61, label %L1189, label %L1190
-L1189:
-	br label %L1193
-L1192:
-	br label %L1193
-L1193:
+	br i1 %r61, label %L1183, label %L1184
+L1183:
+	br label %L1187
+L1186:
+	br label %L1187
+L1187:
 	%r63 = inttoptr %word 1 to %ptr
 	%r64 = inttoptr %word 0 to %ptr
 	%r65 = load %ptr, %ptr* %t4
@@ -14251,19 +14201,19 @@ L1193:
 	%r87 = inttoptr i1 %r88 to %ptr
 	%r92 = ptrtoint %ptr %r87 to %word
 	%r91 = icmp ne %word %r92, 0
-	br i1 %r91, label %L1192, label %L1194
-L1194:
+	br i1 %r91, label %L1186, label %L1188
+L1188:
 	store %ptr %r87, %ptr* %t5
-	br label %L1191
-L1190:
+	br label %L1185
+L1184:
 	%r93 = load %ptr, %ptr* %t3
 	%r96 = ptrtoint %ptr %r93 to %word
 	%r95 = sub nsw %word 0, %r96
 	%r94 = inttoptr %word %r95 to %ptr
 	store %ptr %r94, %ptr* %t3
 	store %ptr %r94, %ptr* %t5
-	br label %L1191
-L1191:
+	br label %L1185
+L1185:
 	%r97 = load %ptr, %ptr* %t5
 	%r98 = inttoptr %word 1 to %ptr
 	%r99 = inttoptr %word 1 to %ptr
@@ -14299,8 +14249,8 @@ define %ptr @"subr/+"(%ptr %-args-, %ptr %-ctx-) {
 	%r6 = inttoptr i1 %r7 to %ptr
 	%r11 = ptrtoint %ptr %r6 to %word
 	%r10 = icmp ne %word %r11, 0
-	br i1 %r10, label %L1195, label %L1196
-L1195:
+	br i1 %r10, label %L1189, label %L1190
+L1189:
 	%r12 = inttoptr %word 1 to %ptr
 	%r13 = inttoptr %word 0 to %ptr
 	%r14 = load %ptr, %ptr* %t1
@@ -14321,15 +14271,15 @@ L1195:
 	%r25 = load %ptr, %ptr* %r26
 	store %ptr %r25, %ptr* %t4
 	store %ptr %r25, %ptr* %t5
-	br label %L1197
-L1196:
+	br label %L1191
+L1190:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t5
-	br label %L1197
-L1197:
+	br label %L1191
+L1191:
 	%r30 = load %ptr, %ptr* %t5
-	br label %L1199
-L1198:
+	br label %L1193
+L1192:
 	%r31 = inttoptr %word 1 to %ptr
 	%r32 = inttoptr %word 0 to %ptr
 	%r33 = load %ptr, %ptr* %t4
@@ -14354,8 +14304,8 @@ L1198:
 	%r50 = getelementptr [0 x %ptr], [0 x %ptr]* %r52, %word 0, %word %r51
 	%r49 = load %ptr, %ptr* %r50
 	store %ptr %r49, %ptr* %t4
-	br label %L1199
-L1199:
+	br label %L1193
+L1193:
 	%r53 = load %ptr, %ptr* %t4
 	%r54 = call %ptr @"get/type"(%ptr %r53)
 	%r55 = inttoptr %word 19 to %ptr
@@ -14365,8 +14315,8 @@ L1199:
 	%r56 = inttoptr i1 %r57 to %ptr
 	%r61 = ptrtoint %ptr %r56 to %word
 	%r60 = icmp ne %word %r61, 0
-	br i1 %r60, label %L1198, label %L1200
-L1200:
+	br i1 %r60, label %L1192, label %L1194
+L1194:
 	%r62 = inttoptr %word 1 to %ptr
 	%r63 = inttoptr %word 1 to %ptr
 	%r64 = load %ptr, %ptr* %t3
@@ -14380,9 +14330,9 @@ L1200:
 	%r69 = inttoptr %word %r70 to %ptr
 	ret %ptr %r69
 }
-@str1203 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1204 = private unnamed_addr constant [40 x i8] c"operator '/' called with zero arguments\00"
-@str1205 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1197 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1198 = private unnamed_addr constant [40 x i8] c"operator '/' called with zero arguments\00"
+@str1199 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr//"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -14408,15 +14358,15 @@ define %ptr @"subr//"(%ptr %-args-, %ptr %-ctx-) {
 	%r10 = inttoptr i1 %r11 to %ptr
 	%r15 = ptrtoint %ptr %r10 to %word
 	%r14 = icmp ne %word %r15, 0
-	br i1 %r14, label %L1202, label %L1201
-L1202:
-	%r16 = getelementptr [9 x i8], [9 x i8]* @str1203, %word 0, %word 0
+	br i1 %r14, label %L1196, label %L1195
+L1196:
+	%r16 = getelementptr [9 x i8], [9 x i8]* @str1197, %word 0, %word 0
 	%r18 = call i32 (%ptr, ...) @printf(%ptr %r16)
 	%r19 = inttoptr %word %r18 to %ptr
-	%r20 = getelementptr [40 x i8], [40 x i8]* @str1204, %word 0, %word 0
+	%r20 = getelementptr [40 x i8], [40 x i8]* @str1198, %word 0, %word 0
 	%r22 = call i32 (%ptr, ...) @printf(%ptr %r20)
 	%r23 = inttoptr %word %r22 to %ptr
-	%r24 = getelementptr [2 x i8], [2 x i8]* @str1205, %word 0, %word 0
+	%r24 = getelementptr [2 x i8], [2 x i8]* @str1199, %word 0, %word 0
 	%r26 = call i32 (%ptr, ...) @printf(%ptr %r24)
 	%r27 = inttoptr %word %r26 to %ptr
 	%r28 = call %ptr @die()
@@ -14428,10 +14378,10 @@ L1202:
 	%r30 = inttoptr i1 %r31 to %ptr
 	%r35 = ptrtoint %ptr %r30 to %word
 	%r34 = icmp ne %word %r35, 0
-	br i1 %r34, label %L1206, label %L1201
-L1206:
-	br label %L1201
-L1201:
+	br i1 %r34, label %L1200, label %L1195
+L1200:
+	br label %L1195
+L1195:
 	%r36 = load %ptr, %ptr* %t3
 	%r37 = inttoptr %word 1 to %ptr
 	%r38 = inttoptr %word 0 to %ptr
@@ -14461,12 +14411,12 @@ L1201:
 	%r57 = inttoptr i1 %r58 to %ptr
 	%r62 = ptrtoint %ptr %r57 to %word
 	%r61 = icmp ne %word %r62, 0
-	br i1 %r61, label %L1207, label %L1208
-L1207:
-	br label %L1211
-L1210:
-	br label %L1211
-L1211:
+	br i1 %r61, label %L1201, label %L1202
+L1201:
+	br label %L1205
+L1204:
+	br label %L1205
+L1205:
 	%r63 = inttoptr %word 1 to %ptr
 	%r64 = inttoptr %word 0 to %ptr
 	%r65 = load %ptr, %ptr* %t4
@@ -14499,11 +14449,11 @@ L1211:
 	%r87 = inttoptr i1 %r88 to %ptr
 	%r92 = ptrtoint %ptr %r87 to %word
 	%r91 = icmp ne %word %r92, 0
-	br i1 %r91, label %L1210, label %L1212
-L1212:
+	br i1 %r91, label %L1204, label %L1206
+L1206:
 	store %ptr %r87, %ptr* %t5
-	br label %L1209
-L1208:
+	br label %L1203
+L1202:
 	%r93 = load %ptr, %ptr* %t3
 	%r94 = inttoptr %word 1 to %ptr
 	%r98 = ptrtoint %ptr %r94 to %word
@@ -14512,8 +14462,8 @@ L1208:
 	%r95 = inttoptr %word %r96 to %ptr
 	store %ptr %r95, %ptr* %t3
 	store %ptr %r95, %ptr* %t5
-	br label %L1209
-L1209:
+	br label %L1203
+L1203:
 	%r99 = load %ptr, %ptr* %t5
 	%r100 = inttoptr %word 1 to %ptr
 	%r101 = inttoptr %word 1 to %ptr
@@ -14549,8 +14499,8 @@ define %ptr @"subr/*"(%ptr %-args-, %ptr %-ctx-) {
 	%r6 = inttoptr i1 %r7 to %ptr
 	%r11 = ptrtoint %ptr %r6 to %word
 	%r10 = icmp ne %word %r11, 0
-	br i1 %r10, label %L1213, label %L1214
-L1213:
+	br i1 %r10, label %L1207, label %L1208
+L1207:
 	%r12 = inttoptr %word 1 to %ptr
 	%r13 = inttoptr %word 0 to %ptr
 	%r14 = load %ptr, %ptr* %t1
@@ -14571,15 +14521,15 @@ L1213:
 	%r25 = load %ptr, %ptr* %r26
 	store %ptr %r25, %ptr* %t4
 	store %ptr %r25, %ptr* %t5
-	br label %L1215
-L1214:
+	br label %L1209
+L1208:
 	%r29 = inttoptr %word 0 to %ptr
 	store %ptr %r29, %ptr* %t5
-	br label %L1215
-L1215:
+	br label %L1209
+L1209:
 	%r30 = load %ptr, %ptr* %t5
-	br label %L1217
-L1216:
+	br label %L1211
+L1210:
 	%r31 = inttoptr %word 1 to %ptr
 	%r32 = inttoptr %word 0 to %ptr
 	%r33 = load %ptr, %ptr* %t4
@@ -14604,8 +14554,8 @@ L1216:
 	%r50 = getelementptr [0 x %ptr], [0 x %ptr]* %r52, %word 0, %word %r51
 	%r49 = load %ptr, %ptr* %r50
 	store %ptr %r49, %ptr* %t4
-	br label %L1217
-L1217:
+	br label %L1211
+L1211:
 	%r53 = load %ptr, %ptr* %t4
 	%r54 = call %ptr @"get/type"(%ptr %r53)
 	%r55 = inttoptr %word 19 to %ptr
@@ -14615,8 +14565,8 @@ L1217:
 	%r56 = inttoptr i1 %r57 to %ptr
 	%r61 = ptrtoint %ptr %r56 to %word
 	%r60 = icmp ne %word %r61, 0
-	br i1 %r60, label %L1216, label %L1218
-L1218:
+	br i1 %r60, label %L1210, label %L1212
+L1212:
 	%r62 = inttoptr %word 1 to %ptr
 	%r63 = inttoptr %word 1 to %ptr
 	%r64 = load %ptr, %ptr* %t3
@@ -14899,12 +14849,12 @@ define %ptr @"subr/bitwise-shift"(%ptr %-args-, %ptr %-ctx-) {
 	%r40 = inttoptr i1 %r41 to %ptr
 	%r45 = ptrtoint %ptr %r40 to %word
 	%r44 = icmp ne %word %r45, 0
-	br i1 %r44, label %L1219, label %L1220
-L1219:
+	br i1 %r44, label %L1213, label %L1214
+L1213:
 	%r46 = inttoptr %word 0 to %ptr
 	store %ptr %r46, %ptr* %t7
-	br label %L1221
-L1220:
+	br label %L1215
+L1214:
 	%r47 = load %ptr, %ptr* %t4
 	%r48 = inttoptr %word 0 to %ptr
 	%r52 = ptrtoint %ptr %r48 to %word
@@ -14913,8 +14863,8 @@ L1220:
 	%r49 = inttoptr i1 %r50 to %ptr
 	%r54 = ptrtoint %ptr %r49 to %word
 	%r53 = icmp ne %word %r54, 0
-	br i1 %r53, label %L1222, label %L1223
-L1222:
+	br i1 %r53, label %L1216, label %L1217
+L1216:
 	%r55 = load %ptr, %ptr* %t4
 	%r56 = load %ptr, %ptr* %t3
 	%r60 = ptrtoint %ptr %r56 to %word
@@ -14922,8 +14872,8 @@ L1222:
 	%r58 = shl %word %r60, %r59
 	%r57 = inttoptr %word %r58 to %ptr
 	store %ptr %r57, %ptr* %t8
-	br label %L1224
-L1223:
+	br label %L1218
+L1217:
 	%r61 = load %ptr, %ptr* %t6
 	%r64 = ptrtoint %ptr %r61 to %word
 	%r63 = sub nsw %word 0, %r64
@@ -14935,8 +14885,8 @@ L1223:
 	%r66 = inttoptr i1 %r67 to %ptr
 	%r71 = ptrtoint %ptr %r66 to %word
 	%r70 = icmp ne %word %r71, 0
-	br i1 %r70, label %L1225, label %L1226
-L1225:
+	br i1 %r70, label %L1219, label %L1220
+L1219:
 	%r72 = inttoptr %word 0 to %ptr
 	%r73 = load %ptr, %ptr* %t3
 	%r77 = ptrtoint %ptr %r73 to %word
@@ -14945,20 +14895,20 @@ L1225:
 	%r74 = inttoptr i1 %r75 to %ptr
 	%r79 = ptrtoint %ptr %r74 to %word
 	%r78 = icmp ne %word %r79, 0
-	br i1 %r78, label %L1228, label %L1229
-L1228:
+	br i1 %r78, label %L1222, label %L1223
+L1222:
 	%r80 = inttoptr %word -1 to %ptr
 	store %ptr %r80, %ptr* %t10
-	br label %L1230
-L1229:
+	br label %L1224
+L1223:
 	%r81 = inttoptr %word 0 to %ptr
 	store %ptr %r81, %ptr* %t10
-	br label %L1230
-L1230:
+	br label %L1224
+L1224:
 	%r82 = load %ptr, %ptr* %t10
 	store %ptr %r82, %ptr* %t9
-	br label %L1227
-L1226:
+	br label %L1221
+L1220:
 	%r83 = inttoptr %word 0 to %ptr
 	%r84 = load %ptr, %ptr* %t4
 	%r88 = ptrtoint %ptr %r84 to %word
@@ -14967,8 +14917,8 @@ L1226:
 	%r85 = inttoptr i1 %r86 to %ptr
 	%r90 = ptrtoint %ptr %r85 to %word
 	%r89 = icmp ne %word %r90, 0
-	br i1 %r89, label %L1231, label %L1232
-L1231:
+	br i1 %r89, label %L1225, label %L1226
+L1225:
 	%r91 = load %ptr, %ptr* %t4
 	%r94 = ptrtoint %ptr %r91 to %word
 	%r93 = sub nsw %word 0, %r94
@@ -14979,8 +14929,8 @@ L1231:
 	%r97 = ashr %word %r99, %r98
 	%r96 = inttoptr %word %r97 to %ptr
 	store %ptr %r96, %ptr* %t10
-	br label %L1233
-L1232:
+	br label %L1227
+L1226:
 	%r100 = load %ptr, %ptr* %t4
 	%r101 = inttoptr %word 0 to %ptr
 	%r105 = ptrtoint %ptr %r101 to %word
@@ -14989,32 +14939,32 @@ L1232:
 	%r102 = inttoptr i1 %r103 to %ptr
 	%r107 = ptrtoint %ptr %r102 to %word
 	%r106 = icmp ne %word %r107, 0
-	br i1 %r106, label %L1234, label %L1235
-L1234:
+	br i1 %r106, label %L1228, label %L1229
+L1228:
 	%r108 = load %ptr, %ptr* %t3
 	store %ptr %r108, %ptr* %t11
-	br label %L1236
-L1235:
+	br label %L1230
+L1229:
 	%r109 = inttoptr %word 0 to %ptr
 	store %ptr %r109, %ptr* %t11
-	br label %L1236
-L1236:
+	br label %L1230
+L1230:
 	%r110 = load %ptr, %ptr* %t11
 	store %ptr %r110, %ptr* %t10
-	br label %L1233
-L1233:
-	%r111 = load %ptr, %ptr* %t10
-	store %ptr %r111, %ptr* %t9
 	br label %L1227
 L1227:
-	%r112 = load %ptr, %ptr* %t9
-	store %ptr %r112, %ptr* %t8
-	br label %L1224
-L1224:
-	%r113 = load %ptr, %ptr* %t8
-	store %ptr %r113, %ptr* %t7
+	%r111 = load %ptr, %ptr* %t10
+	store %ptr %r111, %ptr* %t9
 	br label %L1221
 L1221:
+	%r112 = load %ptr, %ptr* %t9
+	store %ptr %r112, %ptr* %t8
+	br label %L1218
+L1218:
+	%r113 = load %ptr, %ptr* %t8
+	store %ptr %r113, %ptr* %t7
+	br label %L1215
+L1215:
 	%r114 = load %ptr, %ptr* %t7
 	%r118 = ptrtoint %ptr %r114 to %word
 	%r117 = ptrtoint %ptr %r37 to %word
@@ -15081,8 +15031,8 @@ define %ptr @"subr/<"(%ptr %-args-, %ptr %-ctx-) {
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1237, label %L1238
-L1238:
+	br i1 %r42, label %L1231, label %L1232
+L1232:
 	%r44 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r44, %ptr* %t5
 	%r45 = inttoptr %word 0 to %ptr
@@ -15092,10 +15042,10 @@ L1238:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1237, label %L1239
-L1239:
-	br label %L1237
-L1237:
+	br i1 %r50, label %L1231, label %L1233
+L1233:
+	br label %L1231
+L1231:
 	%r52 = load %ptr, %ptr* %t5
 	ret %ptr %r52
 }
@@ -15154,8 +15104,8 @@ define %ptr @"subr/<="(%ptr %-args-, %ptr %-ctx-) {
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1240, label %L1241
-L1241:
+	br i1 %r42, label %L1234, label %L1235
+L1235:
 	%r44 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r44, %ptr* %t5
 	%r45 = inttoptr %word 0 to %ptr
@@ -15165,10 +15115,10 @@ L1241:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1240, label %L1242
-L1242:
-	br label %L1240
-L1240:
+	br i1 %r50, label %L1234, label %L1236
+L1236:
+	br label %L1234
+L1234:
 	%r52 = load %ptr, %ptr* %t5
 	ret %ptr %r52
 }
@@ -15227,8 +15177,8 @@ define %ptr @"subr/>="(%ptr %-args-, %ptr %-ctx-) {
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1243, label %L1244
-L1244:
+	br i1 %r42, label %L1237, label %L1238
+L1238:
 	%r44 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r44, %ptr* %t5
 	%r45 = inttoptr %word 0 to %ptr
@@ -15238,10 +15188,10 @@ L1244:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1243, label %L1245
-L1245:
-	br label %L1243
-L1243:
+	br i1 %r50, label %L1237, label %L1239
+L1239:
+	br label %L1237
+L1237:
 	%r52 = load %ptr, %ptr* %t5
 	ret %ptr %r52
 }
@@ -15300,8 +15250,8 @@ define %ptr @"subr/>"(%ptr %-args-, %ptr %-ctx-) {
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1246, label %L1247
-L1247:
+	br i1 %r42, label %L1240, label %L1241
+L1241:
 	%r44 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r44, %ptr* %t5
 	%r45 = inttoptr %word 0 to %ptr
@@ -15311,10 +15261,10 @@ L1247:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1246, label %L1248
-L1248:
-	br label %L1246
-L1246:
+	br i1 %r50, label %L1240, label %L1242
+L1242:
+	br label %L1240
+L1240:
 	%r52 = load %ptr, %ptr* %t5
 	ret %ptr %r52
 }
@@ -15360,8 +15310,8 @@ define %ptr @"subr/="(%ptr %-args-, %ptr %-ctx-) {
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L1249, label %L1250
-L1249:
+	br i1 %r27, label %L1243, label %L1244
+L1243:
 	%r29 = inttoptr %word 1 to %ptr
 	store %ptr %r29, %ptr* %t7
 	%r30 = load %ptr, %ptr* %t4
@@ -15379,8 +15329,8 @@ L1249:
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1252, label %L1253
-L1253:
+	br i1 %r42, label %L1246, label %L1247
+L1247:
 	%r44 = inttoptr %word 1 to %ptr
 	%r45 = load %ptr, %ptr* %t4
 	%r49 = ptrtoint %ptr %r45 to %word
@@ -15405,8 +15355,8 @@ L1253:
 	%r61 = inttoptr i1 %r62 to %ptr
 	%r66 = ptrtoint %ptr %r61 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L1252, label %L1254
-L1254:
+	br i1 %r65, label %L1246, label %L1248
+L1248:
 	%r67 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r67, %ptr* %t7
 	%r68 = inttoptr %word 0 to %ptr
@@ -15416,14 +15366,14 @@ L1254:
 	%r69 = inttoptr i1 %r70 to %ptr
 	%r74 = ptrtoint %ptr %r69 to %word
 	%r73 = icmp ne %word %r74, 0
-	br i1 %r73, label %L1252, label %L1255
-L1255:
-	br label %L1252
-L1252:
+	br i1 %r73, label %L1246, label %L1249
+L1249:
+	br label %L1246
+L1246:
 	%r75 = load %ptr, %ptr* %t7
 	store %ptr %r75, %ptr* %t6
-	br label %L1251
-L1250:
+	br label %L1245
+L1244:
 	%r76 = inttoptr %word 8 to %ptr
 	%r77 = load %ptr, %ptr* %t5
 	%r81 = ptrtoint %ptr %r77 to %word
@@ -15432,8 +15382,8 @@ L1250:
 	%r78 = inttoptr i1 %r79 to %ptr
 	%r83 = ptrtoint %ptr %r78 to %word
 	%r82 = icmp ne %word %r83, 0
-	br i1 %r82, label %L1256, label %L1257
-L1256:
+	br i1 %r82, label %L1250, label %L1251
+L1250:
 	%r84 = inttoptr %word 1 to %ptr
 	store %ptr %r84, %ptr* %t8
 	%r85 = load %ptr, %ptr* %t4
@@ -15451,8 +15401,8 @@ L1256:
 	%r93 = inttoptr i1 %r94 to %ptr
 	%r98 = ptrtoint %ptr %r93 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L1259, label %L1260
-L1260:
+	br i1 %r97, label %L1253, label %L1254
+L1254:
 	%r99 = inttoptr %word 1 to %ptr
 	%r100 = load %ptr, %ptr* %t3
 	%r101 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r100)
@@ -15481,8 +15431,8 @@ L1260:
 	%r120 = inttoptr i1 %r121 to %ptr
 	%r125 = ptrtoint %ptr %r120 to %word
 	%r124 = icmp ne %word %r125, 0
-	br i1 %r124, label %L1259, label %L1261
-L1261:
+	br i1 %r124, label %L1253, label %L1255
+L1255:
 	%r126 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r126, %ptr* %t8
 	%r127 = inttoptr %word 0 to %ptr
@@ -15492,14 +15442,14 @@ L1261:
 	%r128 = inttoptr i1 %r129 to %ptr
 	%r133 = ptrtoint %ptr %r128 to %word
 	%r132 = icmp ne %word %r133, 0
-	br i1 %r132, label %L1259, label %L1262
-L1262:
-	br label %L1259
-L1259:
+	br i1 %r132, label %L1253, label %L1256
+L1256:
+	br label %L1253
+L1253:
 	%r134 = load %ptr, %ptr* %t8
 	store %ptr %r134, %ptr* %t7
-	br label %L1258
-L1257:
+	br label %L1252
+L1251:
 	%r135 = inttoptr %word 1 to %ptr
 	store %ptr %r135, %ptr* %t8
 	%r136 = load %ptr, %ptr* %t4
@@ -15516,8 +15466,8 @@ L1257:
 	%r143 = inttoptr i1 %r144 to %ptr
 	%r148 = ptrtoint %ptr %r143 to %word
 	%r147 = icmp ne %word %r148, 0
-	br i1 %r147, label %L1263, label %L1264
-L1264:
+	br i1 %r147, label %L1257, label %L1258
+L1258:
 	%r149 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r149, %ptr* %t8
 	%r150 = inttoptr %word 0 to %ptr
@@ -15527,18 +15477,18 @@ L1264:
 	%r151 = inttoptr i1 %r152 to %ptr
 	%r156 = ptrtoint %ptr %r151 to %word
 	%r155 = icmp ne %word %r156, 0
-	br i1 %r155, label %L1263, label %L1265
-L1265:
-	br label %L1263
-L1263:
+	br i1 %r155, label %L1257, label %L1259
+L1259:
+	br label %L1257
+L1257:
 	%r157 = load %ptr, %ptr* %t8
 	store %ptr %r157, %ptr* %t7
-	br label %L1258
-L1258:
+	br label %L1252
+L1252:
 	%r158 = load %ptr, %ptr* %t7
 	store %ptr %r158, %ptr* %t6
-	br label %L1251
-L1251:
+	br label %L1245
+L1245:
 	%r159 = load %ptr, %ptr* %t6
 	ret %ptr %r159
 }
@@ -15584,8 +15534,8 @@ define %ptr @"subr/!="(%ptr %-args-, %ptr %-ctx-) {
 	%r23 = inttoptr i1 %r24 to %ptr
 	%r28 = ptrtoint %ptr %r23 to %word
 	%r27 = icmp ne %word %r28, 0
-	br i1 %r27, label %L1266, label %L1267
-L1266:
+	br i1 %r27, label %L1260, label %L1261
+L1260:
 	%r29 = inttoptr %word 1 to %ptr
 	store %ptr %r29, %ptr* %t7
 	%r30 = load %ptr, %ptr* %t4
@@ -15603,8 +15553,8 @@ L1266:
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1269, label %L1270
-L1270:
+	br i1 %r42, label %L1263, label %L1264
+L1264:
 	%r44 = inttoptr %word 1 to %ptr
 	%r45 = load %ptr, %ptr* %t4
 	%r49 = ptrtoint %ptr %r45 to %word
@@ -15629,8 +15579,8 @@ L1270:
 	%r61 = inttoptr i1 %r62 to %ptr
 	%r66 = ptrtoint %ptr %r61 to %word
 	%r65 = icmp ne %word %r66, 0
-	br i1 %r65, label %L1269, label %L1271
-L1271:
+	br i1 %r65, label %L1263, label %L1265
+L1265:
 	%r67 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r67, %ptr* %t7
 	%r68 = inttoptr %word 0 to %ptr
@@ -15640,14 +15590,14 @@ L1271:
 	%r69 = inttoptr i1 %r70 to %ptr
 	%r74 = ptrtoint %ptr %r69 to %word
 	%r73 = icmp ne %word %r74, 0
-	br i1 %r73, label %L1269, label %L1272
-L1272:
-	br label %L1269
-L1269:
+	br i1 %r73, label %L1263, label %L1266
+L1266:
+	br label %L1263
+L1263:
 	%r75 = load %ptr, %ptr* %t7
 	store %ptr %r75, %ptr* %t6
-	br label %L1268
-L1267:
+	br label %L1262
+L1261:
 	%r76 = inttoptr %word 8 to %ptr
 	%r77 = load %ptr, %ptr* %t5
 	%r81 = ptrtoint %ptr %r77 to %word
@@ -15656,8 +15606,8 @@ L1267:
 	%r78 = inttoptr i1 %r79 to %ptr
 	%r83 = ptrtoint %ptr %r78 to %word
 	%r82 = icmp ne %word %r83, 0
-	br i1 %r82, label %L1273, label %L1274
-L1273:
+	br i1 %r82, label %L1267, label %L1268
+L1267:
 	%r84 = inttoptr %word 1 to %ptr
 	store %ptr %r84, %ptr* %t8
 	%r85 = load %ptr, %ptr* %t4
@@ -15675,8 +15625,8 @@ L1273:
 	%r93 = inttoptr i1 %r94 to %ptr
 	%r98 = ptrtoint %ptr %r93 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L1276, label %L1277
-L1277:
+	br i1 %r97, label %L1270, label %L1271
+L1271:
 	%r99 = inttoptr %word 1 to %ptr
 	%r100 = load %ptr, %ptr* %t3
 	%r101 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r100)
@@ -15701,15 +15651,15 @@ L1277:
 	%r116 = inttoptr i1 %r117 to %ptr
 	%r121 = ptrtoint %ptr %r116 to %word
 	%r120 = icmp ne %word %r121, 0
-	br i1 %r120, label %L1276, label %L1278
-L1278:
-	br label %L1276
-L1276:
+	br i1 %r120, label %L1270, label %L1272
+L1272:
+	br label %L1270
+L1270:
 	%r122 = load %ptr, %ptr* %t8
 	%r123 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r123, %ptr* %t7
-	br label %L1275
-L1274:
+	br label %L1269
+L1268:
 	%r124 = inttoptr %word 1 to %ptr
 	store %ptr %r124, %ptr* %t8
 	%r125 = load %ptr, %ptr* %t4
@@ -15726,8 +15676,8 @@ L1274:
 	%r132 = inttoptr i1 %r133 to %ptr
 	%r137 = ptrtoint %ptr %r132 to %word
 	%r136 = icmp ne %word %r137, 0
-	br i1 %r136, label %L1279, label %L1280
-L1280:
+	br i1 %r136, label %L1273, label %L1274
+L1274:
 	%r138 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r138, %ptr* %t8
 	%r139 = inttoptr %word 0 to %ptr
@@ -15737,18 +15687,18 @@ L1280:
 	%r140 = inttoptr i1 %r141 to %ptr
 	%r145 = ptrtoint %ptr %r140 to %word
 	%r144 = icmp ne %word %r145, 0
-	br i1 %r144, label %L1279, label %L1281
-L1281:
-	br label %L1279
-L1279:
+	br i1 %r144, label %L1273, label %L1275
+L1275:
+	br label %L1273
+L1273:
 	%r146 = load %ptr, %ptr* %t8
 	store %ptr %r146, %ptr* %t7
-	br label %L1275
-L1275:
+	br label %L1269
+L1269:
 	%r147 = load %ptr, %ptr* %t7
 	store %ptr %r147, %ptr* %t6
-	br label %L1268
-L1268:
+	br label %L1262
+L1262:
 	%r148 = load %ptr, %ptr* %t6
 	ret %ptr %r148
 }
@@ -15764,9 +15714,9 @@ define %ptr @"subr/abort"(%ptr %-args-, %ptr %-ctx-) {
 	%r5 = inttoptr %word 0 to %ptr
 	ret %ptr %r5
 }
-@str1284 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1285 = private unnamed_addr constant [40 x i8] c"argument to subr_exit is not a <long>: \00"
-@str1286 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1278 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1279 = private unnamed_addr constant [40 x i8] c"argument to subr_exit is not a <long>: \00"
+@str1280 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/exit"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -15799,17 +15749,17 @@ define %ptr @"subr/exit"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1283, label %L1282
-L1283:
-	%r23 = getelementptr [9 x i8], [9 x i8]* @str1284, %word 0, %word 0
+	br i1 %r21, label %L1277, label %L1276
+L1277:
+	%r23 = getelementptr [9 x i8], [9 x i8]* @str1278, %word 0, %word 0
 	%r25 = call i32 (%ptr, ...) @printf(%ptr %r23)
 	%r26 = inttoptr %word %r25 to %ptr
-	%r27 = getelementptr [40 x i8], [40 x i8]* @str1285, %word 0, %word 0
+	%r27 = getelementptr [40 x i8], [40 x i8]* @str1279, %word 0, %word 0
 	%r29 = call i32 (%ptr, ...) @printf(%ptr %r27)
 	%r30 = inttoptr %word %r29 to %ptr
 	%r31 = load %ptr, %ptr* %t3
 	%r32 = call %ptr @"k/print"(%ptr %r31)
-	%r33 = getelementptr [2 x i8], [2 x i8]* @str1286, %word 0, %word 0
+	%r33 = getelementptr [2 x i8], [2 x i8]* @str1280, %word 0, %word 0
 	%r35 = call i32 (%ptr, ...) @printf(%ptr %r33)
 	%r36 = inttoptr %word %r35 to %ptr
 	%r37 = call %ptr @die()
@@ -15821,10 +15771,10 @@ L1283:
 	%r39 = inttoptr i1 %r40 to %ptr
 	%r44 = ptrtoint %ptr %r39 to %word
 	%r43 = icmp ne %word %r44, 0
-	br i1 %r43, label %L1287, label %L1282
-L1287:
-	br label %L1282
-L1282:
+	br i1 %r43, label %L1281, label %L1276
+L1281:
+	br label %L1276
+L1276:
 	%r45 = load %ptr, %ptr* %t4
 	%r46 = inttoptr %word 0 to %ptr
 	%r47 = call %ptr @"libc/flush-streams"()
@@ -15895,8 +15845,8 @@ define %ptr @"subr/libc/fopen"(%ptr %-args-, %ptr %-ctx-) {
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1288, label %L1289
-L1289:
+	br i1 %r41, label %L1282, label %L1283
+L1283:
 	%r43 = load %ptr, %ptr* %t5
 	%r44 = call %ptr @"new-<target-vm-pointer>"(%ptr %r43)
 	store %ptr %r44, %ptr* %t6
@@ -15907,10 +15857,10 @@ L1289:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1288, label %L1290
-L1290:
-	br label %L1288
-L1288:
+	br i1 %r50, label %L1282, label %L1284
+L1284:
+	br label %L1282
+L1282:
 	%r52 = load %ptr, %ptr* %t6
 	ret %ptr %r52
 }
@@ -15980,8 +15930,8 @@ define %ptr @"subr/libc/fgetc"(%ptr %-args-, %ptr %-ctx-) {
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1291, label %L1292
-L1292:
+	br i1 %r28, label %L1285, label %L1286
+L1286:
 	%r30 = inttoptr %word 1 to %ptr
 	%r31 = inttoptr %word 1 to %ptr
 	%r32 = load %ptr, %ptr* %t4
@@ -16001,10 +15951,10 @@ L1292:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L1291, label %L1293
-L1293:
-	br label %L1291
-L1291:
+	br i1 %r46, label %L1285, label %L1287
+L1287:
+	br label %L1285
+L1285:
 	%r48 = load %ptr, %ptr* %t5
 	ret %ptr %r48
 }
@@ -16061,7 +16011,7 @@ define %ptr @"subr/libc/fputc"(%ptr %-args-, %ptr %-ctx-) {
 	%r39 = inttoptr %word %r40 to %ptr
 	ret %ptr %r39
 }
-@str1296 = private unnamed_addr constant [36 x i8] c"subr/libc/format: non-string format\00"
+@str1290 = private unnamed_addr constant [36 x i8] c"subr/libc/format: non-string format\00"
 define %ptr @"subr/libc/format"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -16115,9 +16065,9 @@ define %ptr @"subr/libc/format"(%ptr %-args-, %ptr %-ctx-) {
 	%r28 = inttoptr i1 %r29 to %ptr
 	%r33 = ptrtoint %ptr %r28 to %word
 	%r32 = icmp ne %word %r33, 0
-	br i1 %r32, label %L1295, label %L1294
-L1295:
-	%r34 = getelementptr [36 x i8], [36 x i8]* @str1296, %word 0, %word 0
+	br i1 %r32, label %L1289, label %L1288
+L1289:
+	%r34 = getelementptr [36 x i8], [36 x i8]* @str1290, %word 0, %word 0
 	%r36 = call %ptr @fatal(%ptr %r34)
 	store %ptr %r36, %ptr* %t5
 	%r37 = inttoptr %word 0 to %ptr
@@ -16127,10 +16077,10 @@ L1295:
 	%r38 = inttoptr i1 %r39 to %ptr
 	%r43 = ptrtoint %ptr %r38 to %word
 	%r42 = icmp ne %word %r43, 0
-	br i1 %r42, label %L1297, label %L1294
-L1297:
-	br label %L1294
-L1294:
+	br i1 %r42, label %L1291, label %L1288
+L1291:
+	br label %L1288
+L1288:
 	%r44 = load %ptr, %ptr* %t5
 	%r45 = inttoptr %word 1 to %ptr
 	%r46 = load %ptr, %ptr* %t3
@@ -16153,12 +16103,12 @@ L1294:
 	%r57 = inttoptr i1 %r58 to %ptr
 	%r62 = ptrtoint %ptr %r57 to %word
 	%r61 = icmp ne %word %r62, 0
-	br i1 %r61, label %L1298, label %L1299
-L1298:
+	br i1 %r61, label %L1292, label %L1293
+L1292:
 	%r63 = inttoptr %word 0 to %ptr
 	store %ptr %r63, %ptr* %t8
-	br label %L1300
-L1299:
+	br label %L1294
+L1293:
 	%r64 = inttoptr %word 6 to %ptr
 	%r65 = load %ptr, %ptr* %t6
 	%r69 = ptrtoint %ptr %r65 to %word
@@ -16167,8 +16117,8 @@ L1299:
 	%r66 = inttoptr i1 %r67 to %ptr
 	%r71 = ptrtoint %ptr %r66 to %word
 	%r70 = icmp ne %word %r71, 0
-	br i1 %r70, label %L1301, label %L1302
-L1301:
+	br i1 %r70, label %L1295, label %L1296
+L1295:
 	%r72 = inttoptr %word 1 to %ptr
 	%r73 = load %ptr, %ptr* %t4
 	%r77 = ptrtoint %ptr %r73 to %word
@@ -16177,8 +16127,8 @@ L1301:
 	%r74 = inttoptr %word %r75 to %ptr
 	store %ptr %r74, %ptr* %t7
 	store %ptr %r74, %ptr* %t9
-	br label %L1303
-L1302:
+	br label %L1297
+L1296:
 	%r78 = inttoptr %word 8 to %ptr
 	%r79 = load %ptr, %ptr* %t6
 	%r83 = ptrtoint %ptr %r79 to %word
@@ -16187,8 +16137,8 @@ L1302:
 	%r80 = inttoptr i1 %r81 to %ptr
 	%r85 = ptrtoint %ptr %r80 to %word
 	%r84 = icmp ne %word %r85, 0
-	br i1 %r84, label %L1304, label %L1305
-L1304:
+	br i1 %r84, label %L1298, label %L1299
+L1298:
 	%r86 = inttoptr %word 1 to %ptr
 	%r87 = load %ptr, %ptr* %t4
 	%r88 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r87)
@@ -16198,8 +16148,8 @@ L1304:
 	%r89 = load %ptr, %ptr* %r90
 	store %ptr %r89, %ptr* %t7
 	store %ptr %r89, %ptr* %t10
-	br label %L1306
-L1305:
+	br label %L1300
+L1299:
 	%r93 = inttoptr %word 18 to %ptr
 	%r94 = load %ptr, %ptr* %t6
 	%r98 = ptrtoint %ptr %r94 to %word
@@ -16208,8 +16158,8 @@ L1305:
 	%r95 = inttoptr i1 %r96 to %ptr
 	%r100 = ptrtoint %ptr %r95 to %word
 	%r99 = icmp ne %word %r100, 0
-	br i1 %r99, label %L1307, label %L1308
-L1307:
+	br i1 %r99, label %L1301, label %L1302
+L1301:
 	%r101 = inttoptr %word 0 to %ptr
 	%r102 = load %ptr, %ptr* %t4
 	%r106 = bitcast %ptr %r102 to [0 x %ptr]*
@@ -16218,25 +16168,25 @@ L1307:
 	%r103 = load %ptr, %ptr* %r104
 	store %ptr %r103, %ptr* %t7
 	store %ptr %r103, %ptr* %t11
-	br label %L1309
-L1308:
+	br label %L1303
+L1302:
 	%r107 = load %ptr, %ptr* %t4
 	store %ptr %r107, %ptr* %t7
 	store %ptr %r107, %ptr* %t11
-	br label %L1309
-L1309:
-	%r108 = load %ptr, %ptr* %t11
-	store %ptr %r108, %ptr* %t10
-	br label %L1306
-L1306:
-	%r109 = load %ptr, %ptr* %t10
-	store %ptr %r109, %ptr* %t9
 	br label %L1303
 L1303:
-	%r110 = load %ptr, %ptr* %t9
-	store %ptr %r110, %ptr* %t8
+	%r108 = load %ptr, %ptr* %t11
+	store %ptr %r108, %ptr* %t10
 	br label %L1300
 L1300:
+	%r109 = load %ptr, %ptr* %t10
+	store %ptr %r109, %ptr* %t9
+	br label %L1297
+L1297:
+	%r110 = load %ptr, %ptr* %t9
+	store %ptr %r110, %ptr* %t8
+	br label %L1294
+L1294:
 	%r111 = load %ptr, %ptr* %t8
 	%r112 = inttoptr %word 100 to %ptr
 	store %ptr %r112, %ptr* %t8
@@ -16247,8 +16197,8 @@ L1300:
 	%r116 = getelementptr %ptr, %ptr* %t10, %word 0
 	%r115 = bitcast %ptr* %r116 to %ptr
 	%r117 = call %ptr @"gc/push-root"(%ptr %r115)
-	br label %L1311
-L1310:
+	br label %L1305
+L1304:
 	%r118 = inttoptr %word 4 to %ptr
 	%r119 = load %ptr, %ptr* %t8
 	%r120 = call %ptr @"gc/allocate-opaque"(%ptr %r118, %ptr %r119)
@@ -16277,8 +16227,8 @@ L1310:
 	%r136 = inttoptr i1 %r137 to %ptr
 	%r141 = ptrtoint %ptr %r136 to %word
 	%r140 = icmp ne %word %r141, 0
-	br i1 %r140, label %L1316, label %L1317
-L1317:
+	br i1 %r140, label %L1310, label %L1311
+L1311:
 	%r142 = load %ptr, %ptr* %t8
 	%r143 = load %ptr, %ptr* %t11
 	%r147 = ptrtoint %ptr %r143 to %word
@@ -16293,21 +16243,21 @@ L1317:
 	%r149 = inttoptr i1 %r150 to %ptr
 	%r154 = ptrtoint %ptr %r149 to %word
 	%r153 = icmp ne %word %r154, 0
-	br i1 %r153, label %L1316, label %L1318
-L1318:
-	br label %L1316
-L1316:
+	br i1 %r153, label %L1310, label %L1312
+L1312:
+	br label %L1310
+L1310:
 	%r155 = load %ptr, %ptr* %t13
 	%r157 = ptrtoint %ptr %r155 to %word
 	%r156 = icmp ne %word %r157, 0
-	br i1 %r156, label %L1313, label %L1314
-L1313:
+	br i1 %r156, label %L1307, label %L1308
+L1307:
 	%r158 = load %ptr, %ptr* %t10
 	%r159 = call %ptr @"new-<string>-from-cstring"(%ptr %r158)
 	store %ptr %r159, %ptr* %t9
 	store %ptr %r159, %ptr* %t12
-	br label %L1315
-L1314:
+	br label %L1309
+L1308:
 	%r160 = inttoptr %word 2 to %ptr
 	%r161 = load %ptr, %ptr* %t8
 	%r165 = ptrtoint %ptr %r161 to %word
@@ -16316,11 +16266,11 @@ L1314:
 	%r162 = inttoptr %word %r163 to %ptr
 	store %ptr %r162, %ptr* %t8
 	store %ptr %r162, %ptr* %t12
-	br label %L1315
-L1315:
+	br label %L1309
+L1309:
 	%r166 = load %ptr, %ptr* %t12
-	br label %L1311
-L1311:
+	br label %L1305
+L1305:
 	%r167 = load %ptr, %ptr* %t9
 	%r171 = ptrtoint %ptr %r167 to %word
 	%r170 = icmp eq %word %r171, 0
@@ -16328,8 +16278,8 @@ L1311:
 	%r168 = inttoptr %word %r169 to %ptr
 	%r173 = ptrtoint %ptr %r168 to %word
 	%r172 = icmp ne %word %r173, 0
-	br i1 %r172, label %L1310, label %L1312
-L1312:
+	br i1 %r172, label %L1304, label %L1306
+L1306:
 	store %ptr %r168, %ptr* %t11
 	%r175 = getelementptr %ptr, %ptr* %t10, %word 0
 	%r174 = bitcast %ptr* %r175 to %ptr
@@ -16338,16 +16288,16 @@ L1312:
 	%r178 = load %ptr, %ptr* %t9
 	ret %ptr %r178
 }
-@str1326 = private unnamed_addr constant [18 x i8] c"loading file: %s\0A\00"
-@str1327 = private unnamed_addr constant [2 x i8] c"r\00"
-@str1334 = private unnamed_addr constant [20 x i8] c"loading from stdin\0A\00"
-@str1335 = private unnamed_addr constant [2 x i8] c"r\00"
-@str1336 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1337 = private unnamed_addr constant [30 x i8] c"load: don't know how to open \00"
-@str1338 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1340 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1341 = private unnamed_addr constant [23 x i8] c"load: fopen failed on \00"
-@str1342 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1320 = private unnamed_addr constant [18 x i8] c"loading file: %s\0A\00"
+@str1321 = private unnamed_addr constant [2 x i8] c"r\00"
+@str1328 = private unnamed_addr constant [20 x i8] c"loading from stdin\0A\00"
+@str1329 = private unnamed_addr constant [2 x i8] c"r\00"
+@str1330 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1331 = private unnamed_addr constant [30 x i8] c"load: don't know how to open \00"
+@str1332 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1334 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1335 = private unnamed_addr constant [23 x i8] c"load: fopen failed on \00"
+@str1336 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/load"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -16377,8 +16327,8 @@ define %ptr @"subr/load"(%ptr %-args-, %ptr %-ctx-) {
 	%r12 = inttoptr i1 %r13 to %ptr
 	%r17 = ptrtoint %ptr %r12 to %word
 	%r16 = icmp ne %word %r17, 0
-	br i1 %r16, label %L1320, label %L1321
-L1320:
+	br i1 %r16, label %L1314, label %L1315
+L1314:
 	%r18 = load %ptr, %ptr* @"*verbosity*"
 	%r19 = inttoptr %word 1 to %ptr
 	%r23 = ptrtoint %ptr %r19 to %word
@@ -16387,10 +16337,10 @@ L1320:
 	%r20 = inttoptr i1 %r21 to %ptr
 	%r25 = ptrtoint %ptr %r20 to %word
 	%r24 = icmp ne %word %r25, 0
-	br i1 %r24, label %L1323, label %L1324
-L1323:
+	br i1 %r24, label %L1317, label %L1318
+L1317:
 	%r26 = load %ptr, %ptr* @"libc/stderr"
-	%r27 = getelementptr [18 x i8], [18 x i8]* @str1326, %word 0, %word 0
+	%r27 = getelementptr [18 x i8], [18 x i8]* @str1320, %word 0, %word 0
 	%r29 = inttoptr %word 1 to %ptr
 	%r30 = load %ptr, %ptr* %t3
 	%r31 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r30)
@@ -16401,12 +16351,12 @@ L1323:
 	%r36 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r26, %ptr %r27, %ptr %r32)
 	%r37 = inttoptr %word %r36 to %ptr
 	store %ptr %r37, %ptr* %t6
-	br label %L1325
-L1324:
+	br label %L1319
+L1318:
 	%r38 = inttoptr %word 0 to %ptr
 	store %ptr %r38, %ptr* %t6
-	br label %L1325
-L1325:
+	br label %L1319
+L1319:
 	%r39 = load %ptr, %ptr* %t6
 	%r40 = inttoptr %word 1 to %ptr
 	%r41 = load %ptr, %ptr* %t3
@@ -16415,11 +16365,11 @@ L1325:
 	%r45 = ptrtoint %ptr %r40 to %word
 	%r44 = getelementptr [0 x %ptr], [0 x %ptr]* %r46, %word 0, %word %r45
 	%r43 = load %ptr, %ptr* %r44
-	%r47 = getelementptr [2 x i8], [2 x i8]* @str1327, %word 0, %word 0
+	%r47 = getelementptr [2 x i8], [2 x i8]* @str1321, %word 0, %word 0
 	%r49 = call %ptr @fopen(%ptr %r43, %ptr %r47)
 	store %ptr %r49, %ptr* %t5
-	br label %L1322
-L1321:
+	br label %L1316
+L1315:
 	%r50 = load %ptr, %ptr* %t3
 	%r54 = ptrtoint %ptr %r50 to %word
 	%r53 = icmp eq %word %r54, 0
@@ -16427,8 +16377,8 @@ L1321:
 	%r51 = inttoptr %word %r52 to %ptr
 	%r56 = ptrtoint %ptr %r51 to %word
 	%r55 = icmp ne %word %r56, 0
-	br i1 %r55, label %L1328, label %L1329
-L1328:
+	br i1 %r55, label %L1322, label %L1323
+L1322:
 	%r57 = load %ptr, %ptr* @"*verbosity*"
 	%r58 = inttoptr %word 1 to %ptr
 	%r62 = ptrtoint %ptr %r58 to %word
@@ -16437,46 +16387,46 @@ L1328:
 	%r59 = inttoptr i1 %r60 to %ptr
 	%r64 = ptrtoint %ptr %r59 to %word
 	%r63 = icmp ne %word %r64, 0
-	br i1 %r63, label %L1331, label %L1332
-L1331:
+	br i1 %r63, label %L1325, label %L1326
+L1325:
 	%r65 = load %ptr, %ptr* @"libc/stderr"
-	%r66 = getelementptr [20 x i8], [20 x i8]* @str1334, %word 0, %word 0
+	%r66 = getelementptr [20 x i8], [20 x i8]* @str1328, %word 0, %word 0
 	%r68 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r65, %ptr %r66)
 	%r69 = inttoptr %word %r68 to %ptr
 	store %ptr %r69, %ptr* %t7
-	br label %L1333
-L1332:
+	br label %L1327
+L1326:
 	%r70 = inttoptr %word 0 to %ptr
 	store %ptr %r70, %ptr* %t7
-	br label %L1333
-L1333:
+	br label %L1327
+L1327:
 	%r71 = load %ptr, %ptr* %t7
 	%r72 = load %ptr, %ptr* @"libc/stdin"
-	%r73 = getelementptr [2 x i8], [2 x i8]* @str1335, %word 0, %word 0
+	%r73 = getelementptr [2 x i8], [2 x i8]* @str1329, %word 0, %word 0
 	%ffi-cast75 = ptrtoint %ptr %r72 to i32
 	%r76 = call %ptr @fdopen(i32 %ffi-cast75, %ptr %r73)
 	store %ptr %r76, %ptr* %t6
-	br label %L1330
-L1329:
-	%r77 = getelementptr [9 x i8], [9 x i8]* @str1336, %word 0, %word 0
+	br label %L1324
+L1323:
+	%r77 = getelementptr [9 x i8], [9 x i8]* @str1330, %word 0, %word 0
 	%r79 = call i32 (%ptr, ...) @printf(%ptr %r77)
 	%r80 = inttoptr %word %r79 to %ptr
-	%r81 = getelementptr [30 x i8], [30 x i8]* @str1337, %word 0, %word 0
+	%r81 = getelementptr [30 x i8], [30 x i8]* @str1331, %word 0, %word 0
 	%r83 = call i32 (%ptr, ...) @printf(%ptr %r81)
 	%r84 = inttoptr %word %r83 to %ptr
 	%r85 = load %ptr, %ptr* %t3
 	%r86 = call %ptr @"k/print"(%ptr %r85)
-	%r87 = getelementptr [2 x i8], [2 x i8]* @str1338, %word 0, %word 0
+	%r87 = getelementptr [2 x i8], [2 x i8]* @str1332, %word 0, %word 0
 	%r89 = call i32 (%ptr, ...) @printf(%ptr %r87)
 	%r90 = inttoptr %word %r89 to %ptr
 	%r91 = call %ptr @die()
 	store %ptr %r91, %ptr* %t6
-	br label %L1330
-L1330:
+	br label %L1324
+L1324:
 	%r92 = load %ptr, %ptr* %t6
 	store %ptr %r92, %ptr* %t5
-	br label %L1322
-L1322:
+	br label %L1316
+L1316:
 	%r93 = load %ptr, %ptr* %t5
 	store %ptr %r93, %ptr* %t4
 	%r94 = inttoptr %word 0 to %ptr
@@ -16486,17 +16436,17 @@ L1322:
 	%r95 = inttoptr i1 %r96 to %ptr
 	%r100 = ptrtoint %ptr %r95 to %word
 	%r99 = icmp ne %word %r100, 0
-	br i1 %r99, label %L1339, label %L1319
-L1339:
-	%r101 = getelementptr [9 x i8], [9 x i8]* @str1340, %word 0, %word 0
+	br i1 %r99, label %L1333, label %L1313
+L1333:
+	%r101 = getelementptr [9 x i8], [9 x i8]* @str1334, %word 0, %word 0
 	%r103 = call i32 (%ptr, ...) @printf(%ptr %r101)
 	%r104 = inttoptr %word %r103 to %ptr
-	%r105 = getelementptr [23 x i8], [23 x i8]* @str1341, %word 0, %word 0
+	%r105 = getelementptr [23 x i8], [23 x i8]* @str1335, %word 0, %word 0
 	%r107 = call i32 (%ptr, ...) @printf(%ptr %r105)
 	%r108 = inttoptr %word %r107 to %ptr
 	%r109 = load %ptr, %ptr* %t3
 	%r110 = call %ptr @"k/print"(%ptr %r109)
-	%r111 = getelementptr [2 x i8], [2 x i8]* @str1342, %word 0, %word 0
+	%r111 = getelementptr [2 x i8], [2 x i8]* @str1336, %word 0, %word 0
 	%r113 = call i32 (%ptr, ...) @printf(%ptr %r111)
 	%r114 = inttoptr %word %r113 to %ptr
 	%r115 = call %ptr @die()
@@ -16508,10 +16458,10 @@ L1339:
 	%r117 = inttoptr i1 %r118 to %ptr
 	%r122 = ptrtoint %ptr %r117 to %word
 	%r121 = icmp ne %word %r122, 0
-	br i1 %r121, label %L1343, label %L1319
-L1343:
-	br label %L1319
-L1319:
+	br i1 %r121, label %L1337, label %L1313
+L1337:
+	br label %L1313
+L1313:
 	%r123 = load %ptr, %ptr* %t4
 	store %ptr %r123, %ptr* %t4
 	%r124 = load %ptr, %ptr* %t4
@@ -16551,8 +16501,8 @@ define %ptr @"subr/dump"(%ptr %-args-, %ptr %-ctx-) {
 	%t1 = alloca %ptr
 	store %ptr %-args-, %ptr* %t1
 	store %ptr %-ctx-, %ptr* %t2
-	br label %L1345
-L1344:
+	br label %L1339
+L1338:
 	%r1 = inttoptr %word 0 to %ptr
 	%r2 = load %ptr, %ptr* %t1
 	%r6 = bitcast %ptr %r2 to [0 x %ptr]*
@@ -16567,8 +16517,8 @@ L1344:
 	%r11 = getelementptr [0 x %ptr], [0 x %ptr]* %r13, %word 0, %word %r12
 	%r10 = load %ptr, %ptr* %r11
 	store %ptr %r10, %ptr* %t1
-	br label %L1345
-L1345:
+	br label %L1339
+L1339:
 	%r14 = load %ptr, %ptr* %t1
 	%r15 = call %ptr @"get/type"(%ptr %r14)
 	%r16 = inttoptr %word 19 to %ptr
@@ -16578,8 +16528,8 @@ L1345:
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1344, label %L1346
-L1346:
+	br i1 %r21, label %L1338, label %L1340
+L1340:
 	ret %ptr %r17
 }
 define %ptr @"subr/print"(%ptr %-args-, %ptr %-ctx-) {
@@ -16587,8 +16537,8 @@ define %ptr @"subr/print"(%ptr %-args-, %ptr %-ctx-) {
 	%t1 = alloca %ptr
 	store %ptr %-args-, %ptr* %t1
 	store %ptr %-ctx-, %ptr* %t2
-	br label %L1348
-L1347:
+	br label %L1342
+L1341:
 	%r1 = inttoptr %word 0 to %ptr
 	%r2 = load %ptr, %ptr* %t1
 	%r6 = bitcast %ptr %r2 to [0 x %ptr]*
@@ -16603,8 +16553,8 @@ L1347:
 	%r11 = getelementptr [0 x %ptr], [0 x %ptr]* %r13, %word 0, %word %r12
 	%r10 = load %ptr, %ptr* %r11
 	store %ptr %r10, %ptr* %t1
-	br label %L1348
-L1348:
+	br label %L1342
+L1342:
 	%r14 = load %ptr, %ptr* %t1
 	%r15 = call %ptr @"get/type"(%ptr %r14)
 	%r16 = inttoptr %word 19 to %ptr
@@ -16614,14 +16564,14 @@ L1348:
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1347, label %L1349
-L1349:
+	br i1 %r21, label %L1341, label %L1343
+L1343:
 	ret %ptr %r17
 }
-@str1356 = private unnamed_addr constant [3 x i8] c"%s\00"
-@str1360 = private unnamed_addr constant [3 x i8] c"%s\00"
-@str1364 = private unnamed_addr constant [4 x i8] c"%ld\00"
-@str1365 = private unnamed_addr constant [35 x i8] c"<unable to print {%p} of type %ld>\00"
+@str1350 = private unnamed_addr constant [3 x i8] c"%s\00"
+@str1354 = private unnamed_addr constant [3 x i8] c"%s\00"
+@str1358 = private unnamed_addr constant [4 x i8] c"%ld\00"
+@str1359 = private unnamed_addr constant [35 x i8] c"<unable to print {%p} of type %ld>\00"
 define %ptr @"subr/warn"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -16632,8 +16582,8 @@ define %ptr @"subr/warn"(%ptr %-args-, %ptr %-ctx-) {
 	%t7 = alloca %ptr
 	store %ptr %-args-, %ptr* %t1
 	store %ptr %-ctx-, %ptr* %t2
-	br label %L1351
-L1350:
+	br label %L1345
+L1344:
 	%r1 = inttoptr %word 0 to %ptr
 	%r2 = load %ptr, %ptr* %t1
 	%r6 = bitcast %ptr %r2 to [0 x %ptr]*
@@ -16652,10 +16602,10 @@ L1350:
 	%r11 = inttoptr i1 %r12 to %ptr
 	%r16 = ptrtoint %ptr %r11 to %word
 	%r15 = icmp ne %word %r16, 0
-	br i1 %r15, label %L1353, label %L1354
-L1353:
+	br i1 %r15, label %L1347, label %L1348
+L1347:
 	%r17 = load %ptr, %ptr* @"libc/stderr"
-	%r18 = getelementptr [3 x i8], [3 x i8]* @str1356, %word 0, %word 0
+	%r18 = getelementptr [3 x i8], [3 x i8]* @str1350, %word 0, %word 0
 	%r20 = inttoptr %word 1 to %ptr
 	%r21 = load %ptr, %ptr* %t3
 	%r22 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r21)
@@ -16666,8 +16616,8 @@ L1353:
 	%r27 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r17, %ptr %r18, %ptr %r23)
 	%r28 = inttoptr %word %r27 to %ptr
 	store %ptr %r28, %ptr* %t5
-	br label %L1355
-L1354:
+	br label %L1349
+L1348:
 	%r29 = inttoptr %word 18 to %ptr
 	%r30 = load %ptr, %ptr* %t4
 	%r34 = ptrtoint %ptr %r30 to %word
@@ -16676,10 +16626,10 @@ L1354:
 	%r31 = inttoptr i1 %r32 to %ptr
 	%r36 = ptrtoint %ptr %r31 to %word
 	%r35 = icmp ne %word %r36, 0
-	br i1 %r35, label %L1357, label %L1358
-L1357:
+	br i1 %r35, label %L1351, label %L1352
+L1351:
 	%r37 = load %ptr, %ptr* @"libc/stderr"
-	%r38 = getelementptr [3 x i8], [3 x i8]* @str1360, %word 0, %word 0
+	%r38 = getelementptr [3 x i8], [3 x i8]* @str1354, %word 0, %word 0
 	%r40 = inttoptr %word 0 to %ptr
 	%r41 = load %ptr, %ptr* %t3
 	%r45 = bitcast %ptr %r41 to [0 x %ptr]*
@@ -16689,8 +16639,8 @@ L1357:
 	%r46 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r37, %ptr %r38, %ptr %r42)
 	%r47 = inttoptr %word %r46 to %ptr
 	store %ptr %r47, %ptr* %t6
-	br label %L1359
-L1358:
+	br label %L1353
+L1352:
 	%r48 = inttoptr %word 6 to %ptr
 	%r49 = load %ptr, %ptr* %t4
 	%r53 = ptrtoint %ptr %r49 to %word
@@ -16699,10 +16649,10 @@ L1358:
 	%r50 = inttoptr i1 %r51 to %ptr
 	%r55 = ptrtoint %ptr %r50 to %word
 	%r54 = icmp ne %word %r55, 0
-	br i1 %r54, label %L1361, label %L1362
-L1361:
+	br i1 %r54, label %L1355, label %L1356
+L1355:
 	%r56 = load %ptr, %ptr* @"libc/stderr"
-	%r57 = getelementptr [4 x i8], [4 x i8]* @str1364, %word 0, %word 0
+	%r57 = getelementptr [4 x i8], [4 x i8]* @str1358, %word 0, %word 0
 	%r59 = inttoptr %word 1 to %ptr
 	%r60 = load %ptr, %ptr* %t3
 	%r64 = ptrtoint %ptr %r60 to %word
@@ -16712,25 +16662,25 @@ L1361:
 	%r65 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r56, %ptr %r57, %ptr %r61)
 	%r66 = inttoptr %word %r65 to %ptr
 	store %ptr %r66, %ptr* %t7
-	br label %L1363
-L1362:
+	br label %L1357
+L1356:
 	%r67 = load %ptr, %ptr* @"libc/stderr"
-	%r68 = getelementptr [35 x i8], [35 x i8]* @str1365, %word 0, %word 0
+	%r68 = getelementptr [35 x i8], [35 x i8]* @str1359, %word 0, %word 0
 	%r70 = load %ptr, %ptr* %t3
 	%r71 = load %ptr, %ptr* %t4
 	%r72 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r67, %ptr %r68, %ptr %r70, %ptr %r71)
 	%r73 = inttoptr %word %r72 to %ptr
 	store %ptr %r73, %ptr* %t7
-	br label %L1363
-L1363:
+	br label %L1357
+L1357:
 	%r74 = load %ptr, %ptr* %t7
 	store %ptr %r74, %ptr* %t6
-	br label %L1359
-L1359:
+	br label %L1353
+L1353:
 	%r75 = load %ptr, %ptr* %t6
 	store %ptr %r75, %ptr* %t5
-	br label %L1355
-L1355:
+	br label %L1349
+L1349:
 	%r76 = load %ptr, %ptr* %t5
 	%r77 = inttoptr %word 1 to %ptr
 	%r78 = load %ptr, %ptr* %t1
@@ -16739,8 +16689,8 @@ L1355:
 	%r80 = getelementptr [0 x %ptr], [0 x %ptr]* %r82, %word 0, %word %r81
 	%r79 = load %ptr, %ptr* %r80
 	store %ptr %r79, %ptr* %t1
-	br label %L1351
-L1351:
+	br label %L1345
+L1345:
 	%r83 = load %ptr, %ptr* %t1
 	%r84 = call %ptr @"get/type"(%ptr %r83)
 	%r85 = inttoptr %word 19 to %ptr
@@ -16750,8 +16700,8 @@ L1351:
 	%r86 = inttoptr i1 %r87 to %ptr
 	%r91 = ptrtoint %ptr %r86 to %word
 	%r90 = icmp ne %word %r91, 0
-	br i1 %r90, label %L1350, label %L1352
-L1352:
+	br i1 %r90, label %L1344, label %L1346
+L1346:
 	%r92 = call %ptr @"libc/flush-streams"()
 	ret %ptr %r92
 }
@@ -16801,8 +16751,8 @@ define %ptr @"subr/eval"(%ptr %-args-, %ptr %-ctx-) {
 	%r5 = inttoptr i1 %r6 to %ptr
 	%r10 = ptrtoint %ptr %r5 to %word
 	%r9 = icmp ne %word %r10, 0
-	br i1 %r9, label %L1367, label %L1366
-L1367:
+	br i1 %r9, label %L1361, label %L1360
+L1361:
 	%r11 = inttoptr %word 1 to %ptr
 	%r12 = inttoptr %word 1 to %ptr
 	%r13 = load %ptr, %ptr* @"*module*"
@@ -16825,10 +16775,10 @@ L1367:
 	%r26 = inttoptr i1 %r27 to %ptr
 	%r31 = ptrtoint %ptr %r26 to %word
 	%r30 = icmp ne %word %r31, 0
-	br i1 %r30, label %L1368, label %L1366
-L1368:
-	br label %L1366
-L1366:
+	br i1 %r30, label %L1362, label %L1360
+L1362:
+	br label %L1360
+L1360:
 	%r32 = load %ptr, %ptr* %t3
 	store %ptr %r32, %ptr* %t3
 	%r34 = getelementptr %ptr, %ptr* %t3, %word 0
@@ -16865,8 +16815,8 @@ define %ptr @"subr/encode"(%ptr %-args-, %ptr %-ctx-) {
 	%r7 = inttoptr i1 %r8 to %ptr
 	%r12 = ptrtoint %ptr %r7 to %word
 	%r11 = icmp ne %word %r12, 0
-	br i1 %r11, label %L1370, label %L1369
-L1370:
+	br i1 %r11, label %L1364, label %L1363
+L1364:
 	%r13 = inttoptr %word 1 to %ptr
 	%r14 = load %ptr, %ptr* %t2
 	%r18 = bitcast %ptr %r14 to [0 x %ptr]*
@@ -16881,10 +16831,10 @@ L1370:
 	%r20 = inttoptr i1 %r21 to %ptr
 	%r25 = ptrtoint %ptr %r20 to %word
 	%r24 = icmp ne %word %r25, 0
-	br i1 %r24, label %L1371, label %L1369
-L1371:
-	br label %L1369
-L1369:
+	br i1 %r24, label %L1365, label %L1363
+L1365:
+	br label %L1363
+L1363:
 	%r26 = load %ptr, %ptr* %t3
 	%r27 = call %ptr @"k/encode"(%ptr %r2, %ptr %r26)
 	ret %ptr %r27
@@ -16909,8 +16859,8 @@ define %ptr @"subr/expand"(%ptr %-args-, %ptr %-ctx-) {
 	%r7 = inttoptr i1 %r8 to %ptr
 	%r12 = ptrtoint %ptr %r7 to %word
 	%r11 = icmp ne %word %r12, 0
-	br i1 %r11, label %L1373, label %L1372
-L1373:
+	br i1 %r11, label %L1367, label %L1366
+L1367:
 	%r13 = inttoptr %word 1 to %ptr
 	%r14 = load %ptr, %ptr* %t2
 	%r18 = bitcast %ptr %r14 to [0 x %ptr]*
@@ -16925,10 +16875,10 @@ L1373:
 	%r20 = inttoptr i1 %r21 to %ptr
 	%r25 = ptrtoint %ptr %r20 to %word
 	%r24 = icmp ne %word %r25, 0
-	br i1 %r24, label %L1374, label %L1372
-L1374:
-	br label %L1372
-L1372:
+	br i1 %r24, label %L1368, label %L1366
+L1368:
+	br label %L1366
+L1366:
 	%r26 = load %ptr, %ptr* %t3
 	%r27 = call %ptr @"k/expand"(%ptr %r2, %ptr %r26)
 	ret %ptr %r27
@@ -16989,8 +16939,8 @@ define %ptr @"subr/array"(%ptr %-args-, %ptr %-ctx-) {
 	%r11 = inttoptr i1 %r12 to %ptr
 	%r16 = ptrtoint %ptr %r11 to %word
 	%r15 = icmp ne %word %r16, 0
-	br i1 %r15, label %L1375, label %L1376
-L1376:
+	br i1 %r15, label %L1369, label %L1370
+L1370:
 	%r17 = inttoptr %word 1 to %ptr
 	%r18 = inttoptr %word 0 to %ptr
 	%r19 = load %ptr, %ptr* %t1
@@ -17010,10 +16960,10 @@ L1376:
 	%r29 = inttoptr i1 %r30 to %ptr
 	%r34 = ptrtoint %ptr %r29 to %word
 	%r33 = icmp ne %word %r34, 0
-	br i1 %r33, label %L1375, label %L1377
-L1377:
-	br label %L1375
-L1375:
+	br i1 %r33, label %L1369, label %L1371
+L1371:
+	br label %L1369
+L1369:
 	%r35 = load %ptr, %ptr* %t3
 	%r36 = call %ptr @"new-<array>"(%ptr %r35)
 	ret %ptr %r36
@@ -17158,8 +17108,8 @@ define %ptr @"subr/string?"(%ptr %-args-, %ptr %-ctx-) {
 	%r16 = inttoptr i1 %r17 to %ptr
 	%r21 = ptrtoint %ptr %r16 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L1378, label %L1379
-L1379:
+	br i1 %r20, label %L1372, label %L1373
+L1373:
 	%r22 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r22, %ptr* %t3
 	%r23 = inttoptr %word 0 to %ptr
@@ -17169,10 +17119,10 @@ L1379:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1378, label %L1380
-L1380:
-	br label %L1378
-L1378:
+	br i1 %r28, label %L1372, label %L1374
+L1374:
+	br label %L1372
+L1372:
 	%r30 = load %ptr, %ptr* %t3
 	ret %ptr %r30
 }
@@ -17205,8 +17155,8 @@ define %ptr @"subr/symbol?"(%ptr %-args-, %ptr %-ctx-) {
 	%r16 = inttoptr i1 %r17 to %ptr
 	%r21 = ptrtoint %ptr %r16 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L1381, label %L1382
-L1382:
+	br i1 %r20, label %L1375, label %L1376
+L1376:
 	%r22 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r22, %ptr* %t3
 	%r23 = inttoptr %word 0 to %ptr
@@ -17216,10 +17166,10 @@ L1382:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1381, label %L1383
-L1383:
-	br label %L1381
-L1381:
+	br i1 %r28, label %L1375, label %L1377
+L1377:
+	br label %L1375
+L1375:
 	%r30 = load %ptr, %ptr* %t3
 	ret %ptr %r30
 }
@@ -17252,8 +17202,8 @@ define %ptr @"subr/pair?"(%ptr %-args-, %ptr %-ctx-) {
 	%r16 = inttoptr i1 %r17 to %ptr
 	%r21 = ptrtoint %ptr %r16 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L1384, label %L1385
-L1385:
+	br i1 %r20, label %L1378, label %L1379
+L1379:
 	%r22 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r22, %ptr* %t3
 	%r23 = inttoptr %word 0 to %ptr
@@ -17263,10 +17213,10 @@ L1385:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1384, label %L1386
-L1386:
-	br label %L1384
-L1384:
+	br i1 %r28, label %L1378, label %L1380
+L1380:
+	br label %L1378
+L1378:
 	%r30 = load %ptr, %ptr* %t3
 	ret %ptr %r30
 }
@@ -17299,8 +17249,8 @@ define %ptr @"subr/array?"(%ptr %-args-, %ptr %-ctx-) {
 	%r16 = inttoptr i1 %r17 to %ptr
 	%r21 = ptrtoint %ptr %r16 to %word
 	%r20 = icmp ne %word %r21, 0
-	br i1 %r20, label %L1387, label %L1388
-L1388:
+	br i1 %r20, label %L1381, label %L1382
+L1382:
 	%r22 = load %ptr, %ptr* @"symbol/true"
 	store %ptr %r22, %ptr* %t3
 	%r23 = inttoptr %word 0 to %ptr
@@ -17310,10 +17260,10 @@ L1388:
 	%r24 = inttoptr i1 %r25 to %ptr
 	%r29 = ptrtoint %ptr %r24 to %word
 	%r28 = icmp ne %word %r29, 0
-	br i1 %r28, label %L1387, label %L1389
-L1389:
-	br label %L1387
-L1387:
+	br i1 %r28, label %L1381, label %L1383
+L1383:
+	br label %L1381
+L1381:
 	%r30 = load %ptr, %ptr* %t3
 	ret %ptr %r30
 }
@@ -17379,8 +17329,8 @@ define %ptr @"subr/set-car"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1390, label %L1391
-L1391:
+	br i1 %r21, label %L1384, label %L1385
+L1385:
 	%r23 = inttoptr %word 0 to %ptr
 	%r24 = inttoptr %word 1 to %ptr
 	%r25 = load %ptr, %ptr* %t1
@@ -17407,10 +17357,10 @@ L1391:
 	%r41 = inttoptr i1 %r42 to %ptr
 	%r46 = ptrtoint %ptr %r41 to %word
 	%r45 = icmp ne %word %r46, 0
-	br i1 %r45, label %L1390, label %L1392
-L1392:
-	br label %L1390
-L1390:
+	br i1 %r45, label %L1384, label %L1386
+L1386:
+	br label %L1384
+L1384:
 	%r47 = load %ptr, %ptr* %t4
 	ret %ptr %r47
 }
@@ -17446,8 +17396,8 @@ define %ptr @"subr/set-cdr"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1393, label %L1394
-L1394:
+	br i1 %r21, label %L1387, label %L1388
+L1388:
 	%r23 = inttoptr %word 0 to %ptr
 	%r24 = inttoptr %word 1 to %ptr
 	%r25 = load %ptr, %ptr* %t1
@@ -17474,10 +17424,10 @@ L1394:
 	%r41 = inttoptr i1 %r42 to %ptr
 	%r46 = ptrtoint %ptr %r41 to %word
 	%r45 = icmp ne %word %r46, 0
-	br i1 %r45, label %L1393, label %L1395
-L1395:
-	br label %L1393
-L1393:
+	br i1 %r45, label %L1387, label %L1389
+L1389:
+	br label %L1387
+L1387:
 	%r47 = load %ptr, %ptr* %t4
 	ret %ptr %r47
 }
@@ -18222,12 +18172,12 @@ define %ptr @"subr/string->symbol"(%ptr %-args-, %ptr %-ctx-) {
 	%r11 = inttoptr i1 %r12 to %ptr
 	%r16 = ptrtoint %ptr %r11 to %word
 	%r15 = icmp ne %word %r16, 0
-	br i1 %r15, label %L1396, label %L1397
-L1396:
+	br i1 %r15, label %L1390, label %L1391
+L1390:
 	%r17 = load %ptr, %ptr* %t3
 	store %ptr %r17, %ptr* %t4
-	br label %L1398
-L1397:
+	br label %L1392
+L1391:
 	%r18 = inttoptr %word 1 to %ptr
 	store %ptr %r18, %ptr* %t5
 	%r19 = load %ptr, %ptr* %t3
@@ -18245,8 +18195,8 @@ L1397:
 	%r27 = inttoptr i1 %r28 to %ptr
 	%r32 = ptrtoint %ptr %r27 to %word
 	%r31 = icmp ne %word %r32, 0
-	br i1 %r31, label %L1399, label %L1400
-L1400:
+	br i1 %r31, label %L1393, label %L1394
+L1394:
 	%r33 = inttoptr %word 1 to %ptr
 	%r34 = load %ptr, %ptr* %t3
 	%r35 = call %ptr @"k/string-ensure-zero-terminated"(%ptr %r34)
@@ -18263,14 +18213,14 @@ L1400:
 	%r42 = inttoptr i1 %r43 to %ptr
 	%r47 = ptrtoint %ptr %r42 to %word
 	%r46 = icmp ne %word %r47, 0
-	br i1 %r46, label %L1399, label %L1401
-L1401:
-	br label %L1399
-L1399:
+	br i1 %r46, label %L1393, label %L1395
+L1395:
+	br label %L1393
+L1393:
 	%r48 = load %ptr, %ptr* %t5
 	store %ptr %r48, %ptr* %t4
-	br label %L1398
-L1398:
+	br label %L1392
+L1392:
 	%r49 = load %ptr, %ptr* %t4
 	ret %ptr %r49
 }
@@ -18299,12 +18249,12 @@ define %ptr @"subr/symbol->string"(%ptr %-args-, %ptr %-ctx-) {
 	%r11 = inttoptr i1 %r12 to %ptr
 	%r16 = ptrtoint %ptr %r11 to %word
 	%r15 = icmp ne %word %r16, 0
-	br i1 %r15, label %L1402, label %L1403
-L1402:
+	br i1 %r15, label %L1396, label %L1397
+L1396:
 	%r17 = load %ptr, %ptr* %t3
 	store %ptr %r17, %ptr* %t4
-	br label %L1404
-L1403:
+	br label %L1398
+L1397:
 	%r18 = inttoptr %word 1 to %ptr
 	store %ptr %r18, %ptr* %t5
 	%r19 = load %ptr, %ptr* %t3
@@ -18322,8 +18272,8 @@ L1403:
 	%r27 = inttoptr i1 %r28 to %ptr
 	%r32 = ptrtoint %ptr %r27 to %word
 	%r31 = icmp ne %word %r32, 0
-	br i1 %r31, label %L1405, label %L1406
-L1406:
+	br i1 %r31, label %L1399, label %L1400
+L1400:
 	%r33 = inttoptr %word 0 to %ptr
 	%r34 = load %ptr, %ptr* %t3
 	%r38 = bitcast %ptr %r34 to [0 x %ptr]*
@@ -18339,21 +18289,21 @@ L1406:
 	%r41 = inttoptr i1 %r42 to %ptr
 	%r46 = ptrtoint %ptr %r41 to %word
 	%r45 = icmp ne %word %r46, 0
-	br i1 %r45, label %L1405, label %L1407
-L1407:
-	br label %L1405
-L1405:
+	br i1 %r45, label %L1399, label %L1401
+L1401:
+	br label %L1399
+L1399:
 	%r47 = load %ptr, %ptr* %t5
 	store %ptr %r47, %ptr* %t4
-	br label %L1404
-L1404:
+	br label %L1398
+L1398:
 	%r48 = load %ptr, %ptr* %t4
 	ret %ptr %r48
 }
-@str1410 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1411 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
-@str1412 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1414 = private unnamed_addr constant [4 x i8] c"%ld\00"
+@str1404 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1405 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
+@str1406 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1408 = private unnamed_addr constant [4 x i8] c"%ld\00"
 define %ptr @"subr/long->string"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -18386,15 +18336,15 @@ define %ptr @"subr/long->string"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1409, label %L1408
-L1409:
-	%r23 = getelementptr [9 x i8], [9 x i8]* @str1410, %word 0, %word 0
+	br i1 %r21, label %L1403, label %L1402
+L1403:
+	%r23 = getelementptr [9 x i8], [9 x i8]* @str1404, %word 0, %word 0
 	%r25 = call i32 (%ptr, ...) @printf(%ptr %r23)
 	%r26 = inttoptr %word %r25 to %ptr
-	%r27 = getelementptr [24 x i8], [24 x i8]* @str1411, %word 0, %word 0
+	%r27 = getelementptr [24 x i8], [24 x i8]* @str1405, %word 0, %word 0
 	%r29 = call i32 (%ptr, ...) @printf(%ptr %r27)
 	%r30 = inttoptr %word %r29 to %ptr
-	%r31 = getelementptr [2 x i8], [2 x i8]* @str1412, %word 0, %word 0
+	%r31 = getelementptr [2 x i8], [2 x i8]* @str1406, %word 0, %word 0
 	%r33 = call i32 (%ptr, ...) @printf(%ptr %r31)
 	%r34 = inttoptr %word %r33 to %ptr
 	%r35 = call %ptr @die()
@@ -18406,17 +18356,17 @@ L1409:
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1413, label %L1408
-L1413:
-	br label %L1408
-L1408:
+	br i1 %r41, label %L1407, label %L1402
+L1407:
+	br label %L1402
+L1402:
 	%r43 = load %ptr, %ptr* %t4
 	%r44 = inttoptr %word 4 to %ptr
 	%r45 = inttoptr %word 32 to %ptr
 	%r46 = call %ptr @"gc/allocate-opaque"(%ptr %r44, %ptr %r45)
 	store %ptr %r46, %ptr* %t4
 	%r47 = load %ptr, %ptr* %t4
-	%r48 = getelementptr [4 x i8], [4 x i8]* @str1414, %word 0, %word 0
+	%r48 = getelementptr [4 x i8], [4 x i8]* @str1408, %word 0, %word 0
 	%r50 = inttoptr %word 1 to %ptr
 	%r51 = load %ptr, %ptr* %t3
 	%r55 = ptrtoint %ptr %r51 to %word
@@ -18429,10 +18379,10 @@ L1408:
 	%r59 = call %ptr @"new-<string>-from-cstring"(%ptr %r58)
 	ret %ptr %r59
 }
-@str1417 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1418 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
-@str1419 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1424 = private unnamed_addr constant [60 x i8] c"invalid number in string->long, libc/strtol failed for '%s'\00"
+@str1411 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1412 = private unnamed_addr constant [24 x i8] c"kernel assertion failed\00"
+@str1413 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1418 = private unnamed_addr constant [60 x i8] c"invalid number in string->long, libc/strtol failed for '%s'\00"
 define %ptr @"subr/string->long"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -18468,15 +18418,15 @@ define %ptr @"subr/string->long"(%ptr %-args-, %ptr %-ctx-) {
 	%r17 = inttoptr i1 %r18 to %ptr
 	%r22 = ptrtoint %ptr %r17 to %word
 	%r21 = icmp ne %word %r22, 0
-	br i1 %r21, label %L1416, label %L1415
-L1416:
-	%r23 = getelementptr [9 x i8], [9 x i8]* @str1417, %word 0, %word 0
+	br i1 %r21, label %L1410, label %L1409
+L1410:
+	%r23 = getelementptr [9 x i8], [9 x i8]* @str1411, %word 0, %word 0
 	%r25 = call i32 (%ptr, ...) @printf(%ptr %r23)
 	%r26 = inttoptr %word %r25 to %ptr
-	%r27 = getelementptr [24 x i8], [24 x i8]* @str1418, %word 0, %word 0
+	%r27 = getelementptr [24 x i8], [24 x i8]* @str1412, %word 0, %word 0
 	%r29 = call i32 (%ptr, ...) @printf(%ptr %r27)
 	%r30 = inttoptr %word %r29 to %ptr
-	%r31 = getelementptr [2 x i8], [2 x i8]* @str1419, %word 0, %word 0
+	%r31 = getelementptr [2 x i8], [2 x i8]* @str1413, %word 0, %word 0
 	%r33 = call i32 (%ptr, ...) @printf(%ptr %r31)
 	%r34 = inttoptr %word %r33 to %ptr
 	%r35 = call %ptr @die()
@@ -18488,10 +18438,10 @@ L1416:
 	%r37 = inttoptr i1 %r38 to %ptr
 	%r42 = ptrtoint %ptr %r37 to %word
 	%r41 = icmp ne %word %r42, 0
-	br i1 %r41, label %L1420, label %L1415
-L1420:
-	br label %L1415
-L1415:
+	br i1 %r41, label %L1414, label %L1409
+L1414:
+	br label %L1409
+L1409:
 	%r43 = load %ptr, %ptr* %t4
 	%r44 = inttoptr %word 1 to %ptr
 	%r45 = load %ptr, %ptr* %t3
@@ -18525,8 +18475,8 @@ L1415:
 	%r67 = inttoptr i1 %r68 to %ptr
 	%r72 = ptrtoint %ptr %r67 to %word
 	%r71 = icmp ne %word %r72, 0
-	br i1 %r71, label %L1421, label %L1422
-L1421:
+	br i1 %r71, label %L1415, label %L1416
+L1415:
 	%r73 = inttoptr %word 1 to %ptr
 	%r74 = inttoptr %word 1 to %ptr
 	%r75 = load %ptr, %ptr* %t6
@@ -18539,19 +18489,19 @@ L1421:
 	%r81 = add %word %r83, %r82
 	%r80 = inttoptr %word %r81 to %ptr
 	store %ptr %r80, %ptr* %t7
-	br label %L1423
-L1422:
-	%r84 = getelementptr [60 x i8], [60 x i8]* @str1424, %word 0, %word 0
+	br label %L1417
+L1416:
+	%r84 = getelementptr [60 x i8], [60 x i8]* @str1418, %word 0, %word 0
 	%r86 = load %ptr, %ptr* %t4
 	%r87 = call %ptr @fatal1(%ptr %r84, %ptr %r86)
 	store %ptr %r87, %ptr* %t7
-	br label %L1423
-L1423:
+	br label %L1417
+L1417:
 	%r88 = load %ptr, %ptr* %t7
 	ret %ptr %r88
 }
-@str1433 = private unnamed_addr constant [28 x i8] c"read: non-String argument: \00"
-@str1435 = private unnamed_addr constant [2 x i8] c"r\00"
+@str1427 = private unnamed_addr constant [28 x i8] c"read: non-String argument: \00"
+@str1429 = private unnamed_addr constant [2 x i8] c"r\00"
 define %ptr @"subr/read"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -18574,8 +18524,8 @@ define %ptr @"subr/read"(%ptr %-args-, %ptr %-ctx-) {
 	%r3 = inttoptr i1 %r4 to %ptr
 	%r8 = ptrtoint %ptr %r3 to %word
 	%r7 = icmp ne %word %r8, 0
-	br i1 %r7, label %L1425, label %L1426
-L1425:
+	br i1 %r7, label %L1419, label %L1420
+L1419:
 	%r9 = load %ptr, %ptr* @"libc/stdin"
 	%r10 = call %ptr @"k/read"(%ptr %r9)
 	store %ptr %r10, %ptr* %t4
@@ -18595,8 +18545,8 @@ L1425:
 	%r19 = inttoptr i1 %r20 to %ptr
 	%r24 = ptrtoint %ptr %r19 to %word
 	%r23 = icmp ne %word %r24, 0
-	br i1 %r23, label %L1428, label %L1429
-L1429:
+	br i1 %r23, label %L1422, label %L1423
+L1423:
 	%r25 = inttoptr %word 0 to %ptr
 	store %ptr %r25, %ptr* %t4
 	store %ptr %r25, %ptr* %t5
@@ -18607,15 +18557,15 @@ L1429:
 	%r27 = inttoptr i1 %r28 to %ptr
 	%r32 = ptrtoint %ptr %r27 to %word
 	%r31 = icmp ne %word %r32, 0
-	br i1 %r31, label %L1428, label %L1430
-L1430:
-	br label %L1428
-L1428:
+	br i1 %r31, label %L1422, label %L1424
+L1424:
+	br label %L1422
+L1422:
 	%r33 = load %ptr, %ptr* %t5
 	%r34 = load %ptr, %ptr* %t4
 	store %ptr %r34, %ptr* %t3
-	br label %L1427
-L1426:
+	br label %L1421
+L1420:
 	%r35 = load %ptr, %ptr* %t1
 	%r36 = call %ptr @"k/car"(%ptr %r35)
 	store %ptr %r36, %ptr* %t4
@@ -18636,9 +18586,9 @@ L1426:
 	%r46 = inttoptr i1 %r47 to %ptr
 	%r51 = ptrtoint %ptr %r46 to %word
 	%r50 = icmp ne %word %r51, 0
-	br i1 %r50, label %L1432, label %L1431
-L1432:
-	%r52 = getelementptr [28 x i8], [28 x i8]* @str1433, %word 0, %word 0
+	br i1 %r50, label %L1426, label %L1425
+L1426:
+	%r52 = getelementptr [28 x i8], [28 x i8]* @str1427, %word 0, %word 0
 	%r54 = load %ptr, %ptr* %t4
 	%r55 = call %ptr @fatal1(%ptr %r52, %ptr %r54)
 	store %ptr %r55, %ptr* %t5
@@ -18649,10 +18599,10 @@ L1432:
 	%r57 = inttoptr i1 %r58 to %ptr
 	%r62 = ptrtoint %ptr %r57 to %word
 	%r61 = icmp ne %word %r62, 0
-	br i1 %r61, label %L1434, label %L1431
-L1434:
-	br label %L1431
-L1431:
+	br i1 %r61, label %L1428, label %L1425
+L1428:
+	br label %L1425
+L1425:
 	%r63 = load %ptr, %ptr* %t5
 	%r64 = inttoptr %word 1 to %ptr
 	%r65 = load %ptr, %ptr* %t4
@@ -18663,14 +18613,14 @@ L1431:
 	%r67 = load %ptr, %ptr* %r68
 	store %ptr %r67, %ptr* %t5
 	%r71 = load %ptr, %ptr* %t5
-	%r72 = getelementptr [2 x i8], [2 x i8]* @str1435, %word 0, %word 0
+	%r72 = getelementptr [2 x i8], [2 x i8]* @str1429, %word 0, %word 0
 	%r74 = call %ptr @fopen(%ptr %r71, %ptr %r72)
 	store %ptr %r74, %ptr* %t6
 	%r75 = load %ptr, %ptr* %t6
 	%r77 = ptrtoint %ptr %r75 to %word
 	%r76 = icmp ne %word %r77, 0
-	br i1 %r76, label %L1436, label %L1437
-L1436:
+	br i1 %r76, label %L1430, label %L1431
+L1430:
 	%r78 = inttoptr %word 0 to %ptr
 	%r79 = inttoptr %word 0 to %ptr
 	%r80 = call %ptr @"new-<pair>"(%ptr %r78, %ptr %r79)
@@ -18685,8 +18635,8 @@ L1436:
 	%r87 = getelementptr %ptr, %ptr* %t10, %word 0
 	%r86 = bitcast %ptr* %r87 to %ptr
 	%r88 = call %ptr @"gc/push-root"(%ptr %r86)
-	br label %L1440
-L1439:
+	br label %L1434
+L1433:
 	%r89 = load %ptr, %ptr* %t10
 	%r90 = inttoptr %word 0 to %ptr
 	%r91 = call %ptr @"new-<pair>"(%ptr %r89, %ptr %r90)
@@ -18698,8 +18648,8 @@ L1439:
 	store %ptr %r91, %ptr* %r95
 	%r94 = bitcast %ptr %r91 to %ptr
 	store %ptr %r94, %ptr* %t9
-	br label %L1440
-L1440:
+	br label %L1434
+L1434:
 	%r98 = load %ptr, %ptr* %t6
 	%r99 = call %ptr @"k/read"(%ptr %r98)
 	store %ptr %r99, %ptr* %t10
@@ -18710,8 +18660,8 @@ L1440:
 	%r101 = inttoptr i1 %r102 to %ptr
 	%r106 = ptrtoint %ptr %r101 to %word
 	%r105 = icmp ne %word %r106, 0
-	br i1 %r105, label %L1439, label %L1441
-L1441:
+	br i1 %r105, label %L1433, label %L1435
+L1435:
 	store %ptr %r101, %ptr* %t11
 	%r108 = getelementptr %ptr, %ptr* %t10, %word 0
 	%r107 = bitcast %ptr* %r108 to %ptr
@@ -18730,16 +18680,16 @@ L1441:
 	%r120 = getelementptr [0 x %ptr], [0 x %ptr]* %r122, %word 0, %word %r121
 	%r119 = load %ptr, %ptr* %r120
 	store %ptr %r119, %ptr* %t7
-	br label %L1438
-L1437:
+	br label %L1432
+L1431:
 	%r123 = inttoptr %word 0 to %ptr
 	store %ptr %r123, %ptr* %t7
-	br label %L1438
-L1438:
+	br label %L1432
+L1432:
 	%r124 = load %ptr, %ptr* %t7
 	store %ptr %r124, %ptr* %t3
-	br label %L1427
-L1427:
+	br label %L1421
+L1421:
 	%r125 = load %ptr, %ptr* %t3
 	ret %ptr %r125
 }
@@ -18845,10 +18795,10 @@ define %ptr @"subr/eval-in-module"(%ptr %-args-, %ptr %-ctx-) {
 	%r47 = load %ptr, %ptr* %t7
 	ret %ptr %r47
 }
-@str1444 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1445 = private unnamed_addr constant [53 x i8] c"call-IA-32-machine-code: cannot call object of type \00"
-@str1446 = private unnamed_addr constant [15 x i8] c", printing as \00"
-@str1447 = private unnamed_addr constant [2 x i8] c"\0A\00"
+@str1438 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1439 = private unnamed_addr constant [53 x i8] c"call-IA-32-machine-code: cannot call object of type \00"
+@str1440 = private unnamed_addr constant [15 x i8] c", printing as \00"
+@str1441 = private unnamed_addr constant [2 x i8] c"\0A\00"
 define %ptr @"subr/call-IA-32-machine-code"(%ptr %-args-, %ptr %-ctx-) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -18882,23 +18832,23 @@ define %ptr @"subr/call-IA-32-machine-code"(%ptr %-args-, %ptr %-ctx-) {
 	%r18 = inttoptr i1 %r19 to %ptr
 	%r23 = ptrtoint %ptr %r18 to %word
 	%r22 = icmp ne %word %r23, 0
-	br i1 %r22, label %L1443, label %L1442
-L1443:
-	%r24 = getelementptr [9 x i8], [9 x i8]* @str1444, %word 0, %word 0
+	br i1 %r22, label %L1437, label %L1436
+L1437:
+	%r24 = getelementptr [9 x i8], [9 x i8]* @str1438, %word 0, %word 0
 	%r26 = call i32 (%ptr, ...) @printf(%ptr %r24)
 	%r27 = inttoptr %word %r26 to %ptr
-	%r28 = getelementptr [53 x i8], [53 x i8]* @str1445, %word 0, %word 0
+	%r28 = getelementptr [53 x i8], [53 x i8]* @str1439, %word 0, %word 0
 	%r30 = call i32 (%ptr, ...) @printf(%ptr %r28)
 	%r31 = inttoptr %word %r30 to %ptr
 	%r32 = load %ptr, %ptr* %t3
 	%r33 = call %ptr @"get/type"(%ptr %r32)
 	%r34 = call %ptr @"k/print"(%ptr %r33)
-	%r35 = getelementptr [15 x i8], [15 x i8]* @str1446, %word 0, %word 0
+	%r35 = getelementptr [15 x i8], [15 x i8]* @str1440, %word 0, %word 0
 	%r37 = call i32 (%ptr, ...) @printf(%ptr %r35)
 	%r38 = inttoptr %word %r37 to %ptr
 	%r39 = load %ptr, %ptr* %t3
 	%r40 = call %ptr @"k/print"(%ptr %r39)
-	%r41 = getelementptr [2 x i8], [2 x i8]* @str1447, %word 0, %word 0
+	%r41 = getelementptr [2 x i8], [2 x i8]* @str1441, %word 0, %word 0
 	%r43 = call i32 (%ptr, ...) @printf(%ptr %r41)
 	%r44 = inttoptr %word %r43 to %ptr
 	%r45 = call %ptr @die()
@@ -18910,10 +18860,10 @@ L1443:
 	%r47 = inttoptr i1 %r48 to %ptr
 	%r52 = ptrtoint %ptr %r47 to %word
 	%r51 = icmp ne %word %r52, 0
-	br i1 %r51, label %L1448, label %L1442
-L1448:
-	br label %L1442
+	br i1 %r51, label %L1442, label %L1436
 L1442:
+	br label %L1436
+L1436:
 	%r53 = load %ptr, %ptr* %t4
 	%r54 = load %ptr, %ptr* %t3
 	%r56 = bitcast %ptr %r54 to %ptr ()*
@@ -18943,18 +18893,18 @@ define %ptr @"%instantiate-subr"(%ptr %name, %ptr %imp, %ptr %"fixed?", %ptr %mo
 	%r7 = load %ptr, %ptr* %t3
 	%r9 = ptrtoint %ptr %r7 to %word
 	%r8 = icmp ne %word %r9, 0
-	br i1 %r8, label %L1449, label %L1450
-L1449:
+	br i1 %r8, label %L1443, label %L1444
+L1443:
 	%r10 = load %ptr, %ptr* %t5
 	%r11 = call %ptr @"new-<fixed>"(%ptr %r10)
 	store %ptr %r11, %ptr* %t5
 	store %ptr %r11, %ptr* %t6
-	br label %L1451
-L1450:
+	br label %L1445
+L1444:
 	%r12 = inttoptr %word 0 to %ptr
 	store %ptr %r12, %ptr* %t6
-	br label %L1451
-L1451:
+	br label %L1445
+L1445:
 	%r13 = load %ptr, %ptr* %t6
 	%r14 = inttoptr %word 1 to %ptr
 	%r15 = inttoptr %word 1 to %ptr
@@ -18978,31 +18928,31 @@ L1451:
 	%r32 = load %ptr, %ptr* %t6
 	ret %ptr %r32
 }
-@str1452 = private unnamed_addr constant [2 x i8] c"r\00"
-@str1453 = private unnamed_addr constant [2 x i8] c"a\00"
-@str1454 = private unnamed_addr constant [2 x i8] c"a\00"
+@str1446 = private unnamed_addr constant [2 x i8] c"r\00"
+@str1447 = private unnamed_addr constant [2 x i8] c"a\00"
+@str1448 = private unnamed_addr constant [2 x i8] c"a\00"
+@str1451 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
+@str1452 = private unnamed_addr constant [30 x i8] c"get/type for <long> is broken\00"
+@str1453 = private unnamed_addr constant [2 x i8] c"\0A\00"
 @str1457 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1458 = private unnamed_addr constant [30 x i8] c"get/type for <long> is broken\00"
+@str1458 = private unnamed_addr constant [19 x i8] c"get/long is broken\00"
 @str1459 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1463 = private unnamed_addr constant [9 x i8] c"\0Aerror: \00"
-@str1464 = private unnamed_addr constant [19 x i8] c"get/long is broken\00"
-@str1465 = private unnamed_addr constant [2 x i8] c"\0A\00"
-@str1467 = private unnamed_addr constant [25 x i8] c"*command-line-arguments*\00"
-@str1477 = private unnamed_addr constant [3 x i8] c"-v\00"
-@str1478 = private unnamed_addr constant [12 x i8] c"*verbosity*\00"
-@str1482 = private unnamed_addr constant [3 x i8] c"-O\00"
-@str1483 = private unnamed_addr constant [12 x i8] c"*optimised*\00"
-@str1487 = private unnamed_addr constant [3 x i8] c"-p\00"
-@str1488 = private unnamed_addr constant [50 x i8] c"WARNING: this build has no profiler, ignoring -p\0A\00"
-@str1492 = private unnamed_addr constant [2 x i8] c"-\00"
-@str1496 = private unnamed_addr constant [7 x i8] c"--call\00"
-@str1500 = private unnamed_addr constant [28 x i8] c"--call requires an argument\00"
-@str1504 = private unnamed_addr constant [9 x i8] c"--define\00"
-@str1511 = private unnamed_addr constant [32 x i8] c"--define requires two arguments\00"
-@str1518 = private unnamed_addr constant [29 x i8] c"loading file: %s\09(as a CLA)\0A\00"
-@str1519 = private unnamed_addr constant [2 x i8] c"r\00"
-@str1522 = private unnamed_addr constant [17 x i8] c"no such file: %s\00"
-@str1524 = private unnamed_addr constant [42 x i8] c"%ld objects in %ld bytes, %ld bytes free\0A\00"
+@str1461 = private unnamed_addr constant [25 x i8] c"*command-line-arguments*\00"
+@str1471 = private unnamed_addr constant [3 x i8] c"-v\00"
+@str1472 = private unnamed_addr constant [12 x i8] c"*verbosity*\00"
+@str1476 = private unnamed_addr constant [3 x i8] c"-O\00"
+@str1477 = private unnamed_addr constant [12 x i8] c"*optimised*\00"
+@str1481 = private unnamed_addr constant [3 x i8] c"-p\00"
+@str1482 = private unnamed_addr constant [50 x i8] c"WARNING: this build has no profiler, ignoring -p\0A\00"
+@str1486 = private unnamed_addr constant [2 x i8] c"-\00"
+@str1490 = private unnamed_addr constant [7 x i8] c"--call\00"
+@str1494 = private unnamed_addr constant [28 x i8] c"--call requires an argument\00"
+@str1498 = private unnamed_addr constant [9 x i8] c"--define\00"
+@str1505 = private unnamed_addr constant [32 x i8] c"--define requires two arguments\00"
+@str1512 = private unnamed_addr constant [29 x i8] c"loading file: %s\09(as a CLA)\0A\00"
+@str1513 = private unnamed_addr constant [2 x i8] c"r\00"
+@str1516 = private unnamed_addr constant [17 x i8] c"no such file: %s\00"
+@str1518 = private unnamed_addr constant [42 x i8] c"%ld objects in %ld bytes, %ld bytes free\0A\00"
 define %ptr @main(%ptr %argc, %ptr %argv) {
 	%t2 = alloca %ptr
 	%t1 = alloca %ptr
@@ -19027,17 +18977,17 @@ define %ptr @main(%ptr %argc, %ptr %argv) {
 	store %ptr %argv, %ptr* %t2
 	%r1 = inttoptr %word 0 to %ptr
 	%r2 = inttoptr %word 0 to %ptr
-	%r3 = getelementptr [2 x i8], [2 x i8]* @str1452, %word 0, %word 0
+	%r3 = getelementptr [2 x i8], [2 x i8]* @str1446, %word 0, %word 0
 	%ffi-cast5 = ptrtoint %ptr %r2 to i32
 	%r6 = call %ptr @fdopen(i32 %ffi-cast5, %ptr %r3)
 	store %ptr %r6, %ptr* @"libc/stdin"
 	%r7 = inttoptr %word 1 to %ptr
-	%r8 = getelementptr [2 x i8], [2 x i8]* @str1453, %word 0, %word 0
+	%r8 = getelementptr [2 x i8], [2 x i8]* @str1447, %word 0, %word 0
 	%ffi-cast10 = ptrtoint %ptr %r7 to i32
 	%r11 = call %ptr @fdopen(i32 %ffi-cast10, %ptr %r8)
 	store %ptr %r11, %ptr* @"libc/stdout"
 	%r12 = inttoptr %word 2 to %ptr
-	%r13 = getelementptr [2 x i8], [2 x i8]* @str1454, %word 0, %word 0
+	%r13 = getelementptr [2 x i8], [2 x i8]* @str1448, %word 0, %word 0
 	%ffi-cast15 = ptrtoint %ptr %r12 to i32
 	%r16 = call %ptr @fdopen(i32 %ffi-cast15, %ptr %r13)
 	store %ptr %r16, %ptr* @"libc/stderr"
@@ -19075,15 +19025,15 @@ define %ptr @main(%ptr %argc, %ptr %argv) {
 	%r43 = inttoptr i1 %r44 to %ptr
 	%r48 = ptrtoint %ptr %r43 to %word
 	%r47 = icmp ne %word %r48, 0
-	br i1 %r47, label %L1456, label %L1455
-L1456:
-	%r49 = getelementptr [9 x i8], [9 x i8]* @str1457, %word 0, %word 0
+	br i1 %r47, label %L1450, label %L1449
+L1450:
+	%r49 = getelementptr [9 x i8], [9 x i8]* @str1451, %word 0, %word 0
 	%r51 = call i32 (%ptr, ...) @printf(%ptr %r49)
 	%r52 = inttoptr %word %r51 to %ptr
-	%r53 = getelementptr [30 x i8], [30 x i8]* @str1458, %word 0, %word 0
+	%r53 = getelementptr [30 x i8], [30 x i8]* @str1452, %word 0, %word 0
 	%r55 = call i32 (%ptr, ...) @printf(%ptr %r53)
 	%r56 = inttoptr %word %r55 to %ptr
-	%r57 = getelementptr [2 x i8], [2 x i8]* @str1459, %word 0, %word 0
+	%r57 = getelementptr [2 x i8], [2 x i8]* @str1453, %word 0, %word 0
 	%r59 = call i32 (%ptr, ...) @printf(%ptr %r57)
 	%r60 = inttoptr %word %r59 to %ptr
 	%r61 = call %ptr @die()
@@ -19095,10 +19045,10 @@ L1456:
 	%r63 = inttoptr i1 %r64 to %ptr
 	%r68 = ptrtoint %ptr %r63 to %word
 	%r67 = icmp ne %word %r68, 0
-	br i1 %r67, label %L1460, label %L1455
-L1460:
-	br label %L1455
-L1455:
+	br i1 %r67, label %L1454, label %L1449
+L1454:
+	br label %L1449
+L1449:
 	%r69 = load %ptr, %ptr* %t3
 	%r70 = inttoptr %word 0 to %ptr
 	store %ptr %r70, %ptr* %t3
@@ -19131,15 +19081,15 @@ L1455:
 	%r93 = inttoptr i1 %r94 to %ptr
 	%r98 = ptrtoint %ptr %r93 to %word
 	%r97 = icmp ne %word %r98, 0
-	br i1 %r97, label %L1462, label %L1461
-L1462:
-	%r99 = getelementptr [9 x i8], [9 x i8]* @str1463, %word 0, %word 0
+	br i1 %r97, label %L1456, label %L1455
+L1456:
+	%r99 = getelementptr [9 x i8], [9 x i8]* @str1457, %word 0, %word 0
 	%r101 = call i32 (%ptr, ...) @printf(%ptr %r99)
 	%r102 = inttoptr %word %r101 to %ptr
-	%r103 = getelementptr [19 x i8], [19 x i8]* @str1464, %word 0, %word 0
+	%r103 = getelementptr [19 x i8], [19 x i8]* @str1458, %word 0, %word 0
 	%r105 = call i32 (%ptr, ...) @printf(%ptr %r103)
 	%r106 = inttoptr %word %r105 to %ptr
-	%r107 = getelementptr [2 x i8], [2 x i8]* @str1465, %word 0, %word 0
+	%r107 = getelementptr [2 x i8], [2 x i8]* @str1459, %word 0, %word 0
 	%r109 = call i32 (%ptr, ...) @printf(%ptr %r107)
 	%r110 = inttoptr %word %r109 to %ptr
 	%r111 = call %ptr @die()
@@ -19151,10 +19101,10 @@ L1462:
 	%r113 = inttoptr i1 %r114 to %ptr
 	%r118 = ptrtoint %ptr %r113 to %word
 	%r117 = icmp ne %word %r118, 0
-	br i1 %r117, label %L1466, label %L1461
-L1466:
-	br label %L1461
-L1461:
+	br i1 %r117, label %L1460, label %L1455
+L1460:
+	br label %L1455
+L1455:
 	%r119 = load %ptr, %ptr* %t3
 	%r121 = getelementptr %ptr, %ptr* @"*module*", %word 0
 	%r120 = bitcast %ptr* %r121 to %ptr
@@ -19201,7 +19151,7 @@ L1461:
 	%r160 = ptrtoint %ptr %r151 to %word
 	%r159 = getelementptr [0 x %ptr], [0 x %ptr]* %r161, %word 0, %word %r160
 	%r158 = load %ptr, %ptr* %r159
-	%r162 = getelementptr [25 x i8], [25 x i8]* @str1467, %word 0, %word 0
+	%r162 = getelementptr [25 x i8], [25 x i8]* @str1461, %word 0, %word 0
 	%r164 = call %ptr @"k/intern"(%ptr %r162)
 	%r165 = call %ptr @"k/env/lookup-variable"(%ptr %r158, %ptr %r164)
 	store %ptr %r165, %ptr* %t3
@@ -19212,8 +19162,8 @@ L1461:
 	%r169 = call %ptr @"gc/push-root"(%ptr %r167)
 	%r170 = load %ptr, %ptr* %t1
 	store %ptr %r170, %ptr* %t5
-	br label %L1469
-L1468:
+	br label %L1463
+L1462:
 	%r171 = inttoptr %word 0 to %ptr
 	%r172 = load %ptr, %ptr* %t4
 	%r173 = call %ptr @"new-<pair>"(%ptr %r171, %ptr %r172)
@@ -19232,8 +19182,8 @@ L1468:
 	%r184 = getelementptr [0 x %ptr], [0 x %ptr]* %r186, %word 0, %word %r185
 	store %ptr %r180, %ptr* %r184
 	%r183 = bitcast %ptr %r180 to %ptr
-	br label %L1469
-L1469:
+	br label %L1463
+L1463:
 	%r187 = inttoptr %word 1 to %ptr
 	%r188 = load %ptr, %ptr* %t5
 	%r192 = ptrtoint %ptr %r188 to %word
@@ -19248,8 +19198,8 @@ L1469:
 	%r194 = inttoptr i1 %r195 to %ptr
 	%r199 = ptrtoint %ptr %r194 to %word
 	%r198 = icmp ne %word %r199, 0
-	br i1 %r198, label %L1468, label %L1470
-L1470:
+	br i1 %r198, label %L1462, label %L1464
+L1464:
 	%r200 = load %ptr, %ptr* %t4
 	%r201 = inttoptr %word 1 to %ptr
 	%r202 = load %ptr, %ptr* %t3
@@ -19268,8 +19218,8 @@ L1470:
 	store %ptr %r212, %ptr* %t4
 	%r213 = inttoptr %word 0 to %ptr
 	store %ptr %r213, %ptr* %t5
-	br label %L1472
-L1471:
+	br label %L1466
+L1465:
 	%r214 = inttoptr %word 0 to %ptr
 	%r215 = load %ptr, %ptr* %t4
 	%r219 = bitcast %ptr %r215 to [0 x %ptr]*
@@ -19306,7 +19256,7 @@ L1471:
 	store %ptr %r235, %ptr* %r242
 	%r241 = bitcast %ptr %r235 to %ptr
 	%r245 = load %ptr, %ptr* %t7
-	%r246 = getelementptr [3 x i8], [3 x i8]* @str1477, %word 0, %word 0
+	%r246 = getelementptr [3 x i8], [3 x i8]* @str1471, %word 0, %word 0
 	%r248 = call i32 @strcmp(%ptr %r245, %ptr %r246)
 	%r249 = inttoptr %word %r248 to %ptr
 	%r253 = ptrtoint %ptr %r249 to %word
@@ -19315,8 +19265,8 @@ L1471:
 	%r250 = inttoptr %word %r251 to %ptr
 	%r255 = ptrtoint %ptr %r250 to %word
 	%r254 = icmp ne %word %r255, 0
-	br i1 %r254, label %L1474, label %L1475
-L1474:
+	br i1 %r254, label %L1468, label %L1469
+L1468:
 	%r256 = inttoptr %word 1 to %ptr
 	%r257 = load %ptr, %ptr* @"*verbosity*"
 	%r261 = ptrtoint %ptr %r257 to %word
@@ -19349,7 +19299,7 @@ L1474:
 	%r284 = ptrtoint %ptr %r275 to %word
 	%r283 = getelementptr [0 x %ptr], [0 x %ptr]* %r285, %word 0, %word %r284
 	%r282 = load %ptr, %ptr* %r283
-	%r286 = getelementptr [12 x i8], [12 x i8]* @str1478, %word 0, %word 0
+	%r286 = getelementptr [12 x i8], [12 x i8]* @str1472, %word 0, %word 0
 	%r288 = call %ptr @"k/intern"(%ptr %r286)
 	%r289 = call %ptr @"k/env/lookup-variable"(%ptr %r282, %ptr %r288)
 	%r293 = bitcast %ptr %r289 to [0 x %ptr]*
@@ -19358,10 +19308,10 @@ L1474:
 	store %ptr %r273, %ptr* %r291
 	%r290 = bitcast %ptr %r273 to %ptr
 	store %ptr %r290, %ptr* %t8
-	br label %L1476
-L1475:
+	br label %L1470
+L1469:
 	%r294 = load %ptr, %ptr* %t7
-	%r295 = getelementptr [3 x i8], [3 x i8]* @str1482, %word 0, %word 0
+	%r295 = getelementptr [3 x i8], [3 x i8]* @str1476, %word 0, %word 0
 	%r297 = call i32 @strcmp(%ptr %r294, %ptr %r295)
 	%r298 = inttoptr %word %r297 to %ptr
 	%r302 = ptrtoint %ptr %r298 to %word
@@ -19370,8 +19320,8 @@ L1475:
 	%r299 = inttoptr %word %r300 to %ptr
 	%r304 = ptrtoint %ptr %r299 to %word
 	%r303 = icmp ne %word %r304, 0
-	br i1 %r303, label %L1479, label %L1480
-L1479:
+	br i1 %r303, label %L1473, label %L1474
+L1473:
 	%r305 = inttoptr %word 1 to %ptr
 	%r306 = load %ptr, %ptr* @"*optimised*"
 	%r310 = ptrtoint %ptr %r306 to %word
@@ -19404,7 +19354,7 @@ L1479:
 	%r333 = ptrtoint %ptr %r324 to %word
 	%r332 = getelementptr [0 x %ptr], [0 x %ptr]* %r334, %word 0, %word %r333
 	%r331 = load %ptr, %ptr* %r332
-	%r335 = getelementptr [12 x i8], [12 x i8]* @str1483, %word 0, %word 0
+	%r335 = getelementptr [12 x i8], [12 x i8]* @str1477, %word 0, %word 0
 	%r337 = call %ptr @"k/intern"(%ptr %r335)
 	%r338 = call %ptr @"k/env/lookup-variable"(%ptr %r331, %ptr %r337)
 	%r342 = bitcast %ptr %r338 to [0 x %ptr]*
@@ -19413,10 +19363,10 @@ L1479:
 	store %ptr %r322, %ptr* %r340
 	%r339 = bitcast %ptr %r322 to %ptr
 	store %ptr %r339, %ptr* %t9
-	br label %L1481
-L1480:
+	br label %L1475
+L1474:
 	%r343 = load %ptr, %ptr* %t7
-	%r344 = getelementptr [3 x i8], [3 x i8]* @str1487, %word 0, %word 0
+	%r344 = getelementptr [3 x i8], [3 x i8]* @str1481, %word 0, %word 0
 	%r346 = call i32 @strcmp(%ptr %r343, %ptr %r344)
 	%r347 = inttoptr %word %r346 to %ptr
 	%r351 = ptrtoint %ptr %r347 to %word
@@ -19425,17 +19375,17 @@ L1480:
 	%r348 = inttoptr %word %r349 to %ptr
 	%r353 = ptrtoint %ptr %r348 to %word
 	%r352 = icmp ne %word %r353, 0
-	br i1 %r352, label %L1484, label %L1485
-L1484:
+	br i1 %r352, label %L1478, label %L1479
+L1478:
 	%r354 = load %ptr, %ptr* @"libc/stderr"
-	%r355 = getelementptr [50 x i8], [50 x i8]* @str1488, %word 0, %word 0
+	%r355 = getelementptr [50 x i8], [50 x i8]* @str1482, %word 0, %word 0
 	%r357 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r354, %ptr %r355)
 	%r358 = inttoptr %word %r357 to %ptr
 	store %ptr %r358, %ptr* %t10
-	br label %L1486
-L1485:
+	br label %L1480
+L1479:
 	%r359 = load %ptr, %ptr* %t7
-	%r360 = getelementptr [2 x i8], [2 x i8]* @str1492, %word 0, %word 0
+	%r360 = getelementptr [2 x i8], [2 x i8]* @str1486, %word 0, %word 0
 	%r362 = call i32 @strcmp(%ptr %r359, %ptr %r360)
 	%r363 = inttoptr %word %r362 to %ptr
 	%r367 = ptrtoint %ptr %r363 to %word
@@ -19444,15 +19394,15 @@ L1485:
 	%r364 = inttoptr %word %r365 to %ptr
 	%r369 = ptrtoint %ptr %r364 to %word
 	%r368 = icmp ne %word %r369, 0
-	br i1 %r368, label %L1489, label %L1490
-L1489:
+	br i1 %r368, label %L1483, label %L1484
+L1483:
 	%r370 = load %ptr, %ptr* @"libc/stdin"
 	%r371 = call %ptr @"k/repl-stream"(%ptr %r370)
 	store %ptr %r371, %ptr* %t11
-	br label %L1491
-L1490:
+	br label %L1485
+L1484:
 	%r372 = load %ptr, %ptr* %t7
-	%r373 = getelementptr [7 x i8], [7 x i8]* @str1496, %word 0, %word 0
+	%r373 = getelementptr [7 x i8], [7 x i8]* @str1490, %word 0, %word 0
 	%r375 = call i32 @strcmp(%ptr %r372, %ptr %r373)
 	%r376 = inttoptr %word %r375 to %ptr
 	%r380 = ptrtoint %ptr %r376 to %word
@@ -19461,8 +19411,8 @@ L1490:
 	%r377 = inttoptr %word %r378 to %ptr
 	%r382 = ptrtoint %ptr %r377 to %word
 	%r381 = icmp ne %word %r382, 0
-	br i1 %r381, label %L1493, label %L1494
-L1493:
+	br i1 %r381, label %L1487, label %L1488
+L1487:
 	%r383 = inttoptr %word 0 to %ptr
 	%r384 = load %ptr, %ptr* %t4
 	%r385 = call %ptr @"get/type"(%ptr %r384)
@@ -19473,17 +19423,17 @@ L1493:
 	%r387 = inttoptr i1 %r388 to %ptr
 	%r392 = ptrtoint %ptr %r387 to %word
 	%r391 = icmp ne %word %r392, 0
-	br i1 %r391, label %L1497, label %L1498
-L1497:
+	br i1 %r391, label %L1491, label %L1492
+L1491:
 	%r393 = inttoptr %word 0 to %ptr
 	store %ptr %r393, %ptr* %t13
-	br label %L1499
-L1498:
-	%r394 = getelementptr [28 x i8], [28 x i8]* @str1500, %word 0, %word 0
+	br label %L1493
+L1492:
+	%r394 = getelementptr [28 x i8], [28 x i8]* @str1494, %word 0, %word 0
 	%r396 = call %ptr @fatal(%ptr %r394)
 	store %ptr %r396, %ptr* %t13
-	br label %L1499
-L1499:
+	br label %L1493
+L1493:
 	%r397 = load %ptr, %ptr* %t13
 	%r398 = inttoptr %word 0 to %ptr
 	%r399 = load %ptr, %ptr* %t4
@@ -19543,10 +19493,10 @@ L1499:
 	%r446 = call %ptr @"gc/pop-root"(%ptr %r444)
 	%r447 = load %ptr, %ptr* %t15
 	store %ptr %r447, %ptr* %t12
-	br label %L1495
-L1494:
+	br label %L1489
+L1488:
 	%r448 = load %ptr, %ptr* %t7
-	%r449 = getelementptr [9 x i8], [9 x i8]* @str1504, %word 0, %word 0
+	%r449 = getelementptr [9 x i8], [9 x i8]* @str1498, %word 0, %word 0
 	%r451 = call i32 @strcmp(%ptr %r448, %ptr %r449)
 	%r452 = inttoptr %word %r451 to %ptr
 	%r456 = ptrtoint %ptr %r452 to %word
@@ -19555,8 +19505,8 @@ L1494:
 	%r453 = inttoptr %word %r454 to %ptr
 	%r458 = ptrtoint %ptr %r453 to %word
 	%r457 = icmp ne %word %r458, 0
-	br i1 %r457, label %L1501, label %L1502
-L1501:
+	br i1 %r457, label %L1495, label %L1496
+L1495:
 	%r459 = inttoptr %word 0 to %ptr
 	%r460 = inttoptr %word 1 to %ptr
 	store %ptr %r460, %ptr* %t15
@@ -19575,8 +19525,8 @@ L1501:
 	%r469 = inttoptr i1 %r470 to %ptr
 	%r474 = ptrtoint %ptr %r469 to %word
 	%r473 = icmp ne %word %r474, 0
-	br i1 %r473, label %L1508, label %L1509
-L1509:
+	br i1 %r473, label %L1502, label %L1503
+L1503:
 	%r475 = inttoptr %word 1 to %ptr
 	%r476 = load %ptr, %ptr* %t4
 	%r480 = bitcast %ptr %r476 to [0 x %ptr]*
@@ -19597,24 +19547,24 @@ L1509:
 	%r488 = inttoptr i1 %r489 to %ptr
 	%r493 = ptrtoint %ptr %r488 to %word
 	%r492 = icmp ne %word %r493, 0
-	br i1 %r492, label %L1508, label %L1510
-L1510:
-	br label %L1508
-L1508:
+	br i1 %r492, label %L1502, label %L1504
+L1504:
+	br label %L1502
+L1502:
 	%r494 = load %ptr, %ptr* %t15
 	%r496 = ptrtoint %ptr %r494 to %word
 	%r495 = icmp ne %word %r496, 0
-	br i1 %r495, label %L1505, label %L1506
-L1505:
+	br i1 %r495, label %L1499, label %L1500
+L1499:
 	%r497 = inttoptr %word 0 to %ptr
 	store %ptr %r497, %ptr* %t14
-	br label %L1507
-L1506:
-	%r498 = getelementptr [32 x i8], [32 x i8]* @str1511, %word 0, %word 0
+	br label %L1501
+L1500:
+	%r498 = getelementptr [32 x i8], [32 x i8]* @str1505, %word 0, %word 0
 	%r500 = call %ptr @fatal(%ptr %r498)
 	store %ptr %r500, %ptr* %t14
-	br label %L1507
-L1507:
+	br label %L1501
+L1501:
 	%r501 = load %ptr, %ptr* %t14
 	%r502 = load %ptr, %ptr* %t4
 	%r503 = call %ptr @"k/car"(%ptr %r502)
@@ -19673,8 +19623,8 @@ L1507:
 	%r546 = inttoptr i1 %r547 to %ptr
 	%r551 = ptrtoint %ptr %r546 to %word
 	%r550 = icmp ne %word %r551, 0
-	br i1 %r550, label %L1512, label %L1513
-L1512:
+	br i1 %r550, label %L1506, label %L1507
+L1506:
 	%r552 = inttoptr %word 1 to %ptr
 	%r553 = inttoptr %word 1 to %ptr
 	%r554 = load %ptr, %ptr* %t18
@@ -19688,12 +19638,12 @@ L1512:
 	%r559 = inttoptr %word %r560 to %ptr
 	store %ptr %r559, %ptr* %t15
 	store %ptr %r559, %ptr* %t19
-	br label %L1514
-L1513:
+	br label %L1508
+L1507:
 	%r563 = inttoptr %word 0 to %ptr
 	store %ptr %r563, %ptr* %t19
-	br label %L1514
-L1514:
+	br label %L1508
+L1508:
 	%r564 = load %ptr, %ptr* %t19
 	%r565 = load %ptr, %ptr* %t15
 	%r566 = inttoptr %word 0 to %ptr
@@ -19736,8 +19686,8 @@ L1514:
 	%r599 = call %ptr @"gc/pop-root"(%ptr %r597)
 	%r600 = load %ptr, %ptr* %t17
 	store %ptr %r600, %ptr* %t13
-	br label %L1503
-L1502:
+	br label %L1497
+L1496:
 	%r601 = load %ptr, %ptr* @"*verbosity*"
 	%r602 = inttoptr %word 1 to %ptr
 	%r606 = ptrtoint %ptr %r602 to %word
@@ -19746,23 +19696,23 @@ L1502:
 	%r603 = inttoptr i1 %r604 to %ptr
 	%r608 = ptrtoint %ptr %r603 to %word
 	%r607 = icmp ne %word %r608, 0
-	br i1 %r607, label %L1515, label %L1516
-L1515:
+	br i1 %r607, label %L1509, label %L1510
+L1509:
 	%r609 = load %ptr, %ptr* @"libc/stderr"
-	%r610 = getelementptr [29 x i8], [29 x i8]* @str1518, %word 0, %word 0
+	%r610 = getelementptr [29 x i8], [29 x i8]* @str1512, %word 0, %word 0
 	%r612 = load %ptr, %ptr* %t7
 	%r613 = call i32 (%ptr, %ptr, ...) @fprintf(%ptr %r609, %ptr %r610, %ptr %r612)
 	%r614 = inttoptr %word %r613 to %ptr
 	store %ptr %r614, %ptr* %t15
-	br label %L1517
-L1516:
+	br label %L1511
+L1510:
 	%r615 = inttoptr %word 0 to %ptr
 	store %ptr %r615, %ptr* %t15
-	br label %L1517
-L1517:
+	br label %L1511
+L1511:
 	%r616 = load %ptr, %ptr* %t15
 	%r617 = load %ptr, %ptr* %t7
-	%r618 = getelementptr [2 x i8], [2 x i8]* @str1519, %word 0, %word 0
+	%r618 = getelementptr [2 x i8], [2 x i8]* @str1513, %word 0, %word 0
 	%r620 = call %ptr @fopen(%ptr %r617, %ptr %r618)
 	store %ptr %r620, %ptr* %t15
 	%r621 = inttoptr %word 0 to %ptr
@@ -19776,9 +19726,9 @@ L1517:
 	%r624 = inttoptr i1 %r625 to %ptr
 	%r629 = ptrtoint %ptr %r624 to %word
 	%r628 = icmp ne %word %r629, 0
-	br i1 %r628, label %L1521, label %L1520
-L1521:
-	%r630 = getelementptr [17 x i8], [17 x i8]* @str1522, %word 0, %word 0
+	br i1 %r628, label %L1515, label %L1514
+L1515:
+	%r630 = getelementptr [17 x i8], [17 x i8]* @str1516, %word 0, %word 0
 	%r632 = load %ptr, %ptr* %t7
 	%r633 = call %ptr @fatal1(%ptr %r630, %ptr %r632)
 	store %ptr %r633, %ptr* %t14
@@ -19789,10 +19739,10 @@ L1521:
 	%r635 = inttoptr i1 %r636 to %ptr
 	%r640 = ptrtoint %ptr %r635 to %word
 	%r639 = icmp ne %word %r640, 0
-	br i1 %r639, label %L1523, label %L1520
-L1523:
-	br label %L1520
-L1520:
+	br i1 %r639, label %L1517, label %L1514
+L1517:
+	br label %L1514
+L1514:
 	%r641 = load %ptr, %ptr* %t14
 	%r642 = load %ptr, %ptr* %t15
 	%r643 = call %ptr @"k/repl-stream"(%ptr %r642)
@@ -19800,28 +19750,28 @@ L1520:
 	%r645 = call i32 @fclose(%ptr %r644)
 	%r646 = inttoptr %word %r645 to %ptr
 	store %ptr %r646, %ptr* %t13
-	br label %L1503
-L1503:
+	br label %L1497
+L1497:
 	%r647 = load %ptr, %ptr* %t13
 	store %ptr %r647, %ptr* %t12
-	br label %L1495
-L1495:
+	br label %L1489
+L1489:
 	%r648 = load %ptr, %ptr* %t12
 	store %ptr %r648, %ptr* %t11
-	br label %L1491
-L1491:
+	br label %L1485
+L1485:
 	%r649 = load %ptr, %ptr* %t11
 	store %ptr %r649, %ptr* %t10
-	br label %L1486
-L1486:
+	br label %L1480
+L1480:
 	%r650 = load %ptr, %ptr* %t10
 	store %ptr %r650, %ptr* %t9
-	br label %L1481
-L1481:
+	br label %L1475
+L1475:
 	%r651 = load %ptr, %ptr* %t9
 	store %ptr %r651, %ptr* %t8
-	br label %L1476
-L1476:
+	br label %L1470
+L1470:
 	%r652 = load %ptr, %ptr* %t8
 	store %ptr %r652, %ptr* %t8
 	%r654 = getelementptr %ptr, %ptr* %t5, %word 0
@@ -19831,8 +19781,8 @@ L1476:
 	%r656 = bitcast %ptr* %r657 to %ptr
 	%r658 = call %ptr @"gc/pop-root"(%ptr %r656)
 	%r659 = load %ptr, %ptr* %t8
-	br label %L1472
-L1472:
+	br label %L1466
+L1466:
 	%r660 = inttoptr %word 1 to %ptr
 	%r661 = load %ptr, %ptr* %t3
 	%r665 = bitcast %ptr %r661 to [0 x %ptr]*
@@ -19848,12 +19798,12 @@ L1472:
 	%r668 = inttoptr i1 %r669 to %ptr
 	%r673 = ptrtoint %ptr %r668 to %word
 	%r672 = icmp ne %word %r673, 0
-	br i1 %r672, label %L1471, label %L1473
-L1473:
+	br i1 %r672, label %L1465, label %L1467
+L1467:
 	%r674 = inttoptr %word 0 to %ptr
 	%r675 = call %ptr @"gc/collect"()
 	%r676 = load %ptr, %ptr* @"libc/stderr"
-	%r677 = getelementptr [42 x i8], [42 x i8]* @str1524, %word 0, %word 0
+	%r677 = getelementptr [42 x i8], [42 x i8]* @str1518, %word 0, %word 0
 	%r679 = load %ptr, %ptr* @"gc/objects-live"
 	%r680 = load %ptr, %ptr* @"gc/bytes-used"
 	%r681 = load %ptr, %ptr* @"gc/bytes-free"
