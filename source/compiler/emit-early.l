@@ -25,6 +25,7 @@
 (define-selector compile)
 (define-selector compile-definition)
 (define-selector compile-call-to)
+(define-selector emit-prelude _) ; default is NOP
 ;; forwards
 (define compile-expr)
 (define compile-env)

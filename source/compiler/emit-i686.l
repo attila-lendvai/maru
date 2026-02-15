@@ -263,10 +263,4 @@
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
-(require "source/compiler/emit-x86-objects.l")
-
-(define-method emit-prelude <x86-32-compiler> ()
-  (verbosity 1 (warn "\nCompiling to IA-32\n\n"))
-  (initialize-object-emitters))
-
 (require "source/compiler/emit-x86-late.l")

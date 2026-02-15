@@ -4,4 +4,9 @@
 
 (load "source/evaluator/vm-late.l")
 
+(eval-in-host
+ '(case *compiler-backend*
+   (("i686" "x86-64")
+    (load "source/compiler/emit-x86-objects.l"))))
+
 (eval-in-host `(run-compiler ,*target-env*))

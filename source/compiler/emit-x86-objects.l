@@ -92,37 +92,30 @@
       (emit CELL elements)
       object-label)))
 
-(define-function initialize-object-emitters ()
-  ;; FIXME this would be too early to read the slave header flags at the toplevel
-  (set emit-object/header
-       (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-             ;; TODO FIXME adding another level of let, or using let*
-             ;; results in confused bindings and/or closure capturing.
-             ;; TODO undo the inlining once eval/closures/bug/1 is fixed
-             ;; TODO extract a test case into tests/evaluator-tests.l
-             ;;(canary-value	(slave-value +canary-value+))
-             (canary-emitter	(when (slave-value feature/object-canary)
-                                  (lambda (-c-)
-                                    (emit CELL (slave-value +canary-value+))))))
-         (lambda (type type-id -c-)
-           (emit-comment 1 "object header")
-           ;; NOTE cannot use RODATA because the header and the object
-           ;; payload must be consequtive, but the payload values must
-           ;; be relocatable.
-           (emit DATA)
-           (emit ALIGN +word-size-in-bytes+)
+(let* ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
+       (canary-value	(slave-value +canary-value+))
+       (canary-emitter	(when (slave-value feature/object-canary)
+                          (lambda (-c-)
+                            (emit CELL canary-value)))))
+  (define-function emit-object/header (type type-id -c-)
+    (emit-comment 1 "object header")
+    ;; NOTE cannot use RODATA because the header and the object
+    ;; payload must be consequtive, but the payload values must
+    ;; be relocatable.
+    (emit DATA)
+    (emit ALIGN +word-size-in-bytes+)
 
-           ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
-           ;; but this here is the emission of read-only literals. the
-           ;; GC should never walk these objects, therefore we can
-           ;; skip emitting the first two words of the header.
+    ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
+    ;; but this here is the emission of read-only literals. the
+    ;; GC should never walk these objects, therefore we can
+    ;; skip emitting the first two words of the header.
 
-           ;; next         ; not emitted
-           ;; chunk size   ; not emitted
-           (emit CELL flags)
-           (emit-comment 2 "type: "type)
-           (emit CELL type-id)
-           (when canary-emitter
-             (canary-emitter -c-))
-           ;; the object pointer points here
-           ))))
+    ;; next         ; not emitted
+    ;; chunk size   ; not emitted
+    (emit CELL flags)
+    (emit-comment 2 "type: "type)
+    (emit CELL type-id)
+    (when canary-emitter
+      (canary-emitter -c-))
+    ;; the object pointer points here
+    ))
