@@ -48,14 +48,17 @@
       object-label)))
 
 ;; TODO should this also go through the COMPILE-OBJECT selector? but
-;; what about the NAME arg then? there's a similar issue with
-;; emit-object/<target-function>.
+;; what about the NAME arg then?
 (define-function compile-expr (self name -c-)
   (emit-comment 1 "compiling fn "name", "self)
   (let ((entry-point (if name
                          (closure-code-label name)
                        (UNIQUE-LABEL "code"))))
     (emit-expr-code self entry-point -c-)
+    ;; we emit a full expr object to keep the rest of the code more
+    ;; uniform. FIXME: write a better reasoning why this is done this
+    ;; way. it should have to do something with funcall'ing random
+    ;; closures, of which compiled functions are just one kind.
     (emit-object/<target-function> name entry-point -c-)))
 
 (define-method compile-object <undefined> (-c-)

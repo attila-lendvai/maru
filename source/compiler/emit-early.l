@@ -20,7 +20,7 @@
 (define-selector compile-object)
 ;; TODO its default should be specified like this:
 ;; (define-selector compile (-c-)
-;;   (compile-object self -c-))
+;;   (gen LOAD (compile-object self -c-)))
 ;; but due to load order headaches we set the default in emit-x86-objects.l
 (define-selector compile)
 (define-selector compile-definition)

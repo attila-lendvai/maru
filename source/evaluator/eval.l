@@ -61,11 +61,11 @@
     (head head)
     (tail tail)))
 
-(define-vm-function string ((length <long> 0))
+(define-vm-function string ((capacity <long> 0))
   (make <string>
     (size	(box <long> 0))
-    (elements	(when (< 0 length)
-                  (allocate-data length)))))
+    (elements	(when (< 0 capacity)
+                  (allocate-data capacity)))))
 
 (define-function ascii-bytes->string (buf length)
   (let ((str (string length)))

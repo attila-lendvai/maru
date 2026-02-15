@@ -5,7 +5,7 @@
 
 (define-form slave-repl ()
   '(eval-in-slave
-    '(repl-stream)))
+    '(repl-stream *standard-input* *debug-output*)))
 
 (switch-to-host-env)
 

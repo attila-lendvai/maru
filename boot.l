@@ -13,8 +13,8 @@
 
 (if bootstrapping?
     (and (<= 1 *verbosity*)
-         (warn "boot.l speaking with *verbosity* " *verbosity* "; we're bootstrapping")
          (let ()
+           (warn "boot.l speaking with *verbosity* " *verbosity* "; we're bootstrapping")
            (if evolving?
                (warn "; we're evolving"))
            (warn "\n"))))
@@ -221,11 +221,11 @@
   (and (equal (car a) (car b))
        (equal (cdr a) (cdr b))))
 
-(set equal (lambda (a b)
+(define-function equal (a b)
   (or (= a b)
       (and (pair? a)
            (pair? b)
-           (equal-lists a b)))))
+           (equal-lists a b))))
 
 ;;; math
 
