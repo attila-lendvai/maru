@@ -4,11 +4,22 @@
 > The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
 
 ## Assorted smaller changes
+
  - more detailed backtraces
- - the symbol true now evaluates to itself. it was just too much hassle not to have a self-evaluating true value.
- - first successful LLVM (cross)compile to Darwin.
- - added very basic constant propagation for the x86 backend, yet it nicely yielded around 10% speedup with the bootstrap.
- - symbols are once again in a single global namespace (i.e. not module-specific anymore). this was an unnecessary complexity, it's enough for modules to have isolated bindings.
+
+ - the symbol true now evaluates to itself. it was just too much
+   hassle not to have a self-evaluating true value.
+
+ - first successful LLVM (cross)compile to Darwin (MacOS).
+
+ - added very basic constant propagation for the x86 backend, yet it
+   nicely yielded around 10% speedup with the bootstrap.
+
+ - symbols are once again in a single global namespace (i.e. they are
+   not module-specific anymore). this was an unnecessary complexity.
+   it's enough for modules to have isolated environments. (NOTE: this
+   will be further simplified in maru.10 by dropping modules
+   altogether.)
 
 ## Stats
 
