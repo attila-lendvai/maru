@@ -33,13 +33,14 @@ This has made the situation much better regarding:
    to hold files that are loaded in different moments in the bootstrap
    process.
 
- - The build process has been updated to repeate three times the
+ - The build process has been updated to repeat three times the
    compilation, and check whether the 2nd and 3rd iteration produces
    the same output. (The first iteration may contain dummies that are
-   needed for the bootstrap.
+   needed for the bootstrap.)
 
-If there was an assembler written in Maru, then this slave VM
-could be started under the full supervision of the host VM.
+If there were an assembler written in Maru, then this slave VM could
+be started under the full supervision of the host VM, kinda like a
+container, or another VM in virtualization.
 
 ## Backported the latest from eval.l from the piumarta branch
 
@@ -50,6 +51,6 @@ in the *piumarta* branch have been backported into our lineage.
 `eval.l` in the piumarta branch.**
 
 There are some trivialities left to be addressed, but the executional
-semantics should be the same. It's similar enough in behavior to at
-least bootstrap itself and load/use the `boot.l` from the *piumarta*
-branch.
+semantics should be the same. It's close enough in behavior to at
+least be able to bootstrap itself and load/use the `boot.l` from the
+*piumarta* branch.
