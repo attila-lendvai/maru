@@ -5,6 +5,9 @@
 
 (load "source/evaluator/types.l")
 
+(when (feature backtrace)
+  (require "source/ansiterm.l"))
+
 ;; cache some symbols into the symbol/foo global variables
 ;; TODO add compilation of symbols and drop this cache
 (define-form define-symbol-cache symbols
@@ -358,10 +361,12 @@
                                         (= callee-des symbol/encode))))
             (times-do (- 3 (string-length index-label))
               (string-insert index-label 0 ?\ ))
-            (print-all out index-label": "(<call-frame>-callee-designator call-frame)"\n")
+            (print-all out term/FG-BLUE index-label term/RESET ": "
+                       (<call-frame>-callee-designator call-frame)"\n")
 
             (unless expand-or-encode?
-              (print-all out "\tcallee:\t"(<call-frame>-callee call-frame)"\n"))
+              (print-all out "\tcallee:\t" term/FG-GREEN
+                         (<call-frame>-callee call-frame) term/RESET "\n"))
 
             (when (<= *error-level* 1)
               (let ((args (<call-frame>-arguments call-frame)))
