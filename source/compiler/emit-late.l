@@ -7,8 +7,9 @@
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
          '(+operating-system+ +architecture+ +little-endian?+
            +word-size-in-bits+
-           oop/alignment-in-bytes oop/align-padding
-           oop/payload-mask oop/tag-mask)))
+           ;;oop/alignment-in-bytes oop/align-padding
+           ;;oop/payload-mask oop/tag-mask
+           )))
   (emit-comment
    0 "features: profiler="(feature profiler)", "
    "track-expr-names="(feature track-expr-names)", "

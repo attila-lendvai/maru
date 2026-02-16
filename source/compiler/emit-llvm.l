@@ -31,6 +31,9 @@
 
 (require "source/compiler/emit-early.l")
 
+(define compile-call-to-<target-function>) ; forward
+(define closure-code-label) ; forward
+
 ;; Shall we map function params directly to LLVM IR function params?
 ;; NOTE: They are read-only in LLVM IR, and as of now eval.l violates this assumption.
 (define-constant +function-parameters-are-read-only+ ())
@@ -174,11 +177,6 @@
 
 (define-function temp? (obj)
   (= <TEMP> (type-of obj)))
-
-(define-function closure-code-label (name)
-  ;; KLUDGE object "names" (i.e. addresses) should be tied together
-  ;; explicitly, not through giving them the "right" name
-  (GLOBAL (concat-string (symbol->string name) ".code")))
 
 (define-function closure-object-label (name)
   (GLOBAL (if (feature redefinable-functions-in-target)
@@ -335,8 +333,11 @@
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  expr)		(if-at-expand (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
-                                  (print "	"$reg1" = ")
-                                  (emit/header->payload $1)
+                                  (if (feature emit-with-object-headers)
+                                      (let ()
+                                        (print "	"$reg1" = ")
+                                        (emit/header->payload $1))
+                                    (print "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0"))
                                   (println)))
   ;; closures
   ((CONSTANT expr)		(print "	"$reg1" = ")
@@ -549,102 +550,6 @@
     (emit DEFINE const self)
     const))
 
-;; these will be functions instantiated later. reason: to calculate
-;; some stuff and capture the result into closures. this is a poor
-;; man's staged computation to speed up object emission.
-;;
-;; FIXME get rid of these, but it's too early in the current load
-;; order to access any slave values from here.
-(define emit-object/header)
-(define emit-object/<target-function>)
-
-(cond
-  ((slave-value (is <immediate-type> <long>))
-
-   (define-method compile-object <long> (-c-)
-     (LITERAL (eval-in-slave `(box <long> ,self)))))
-
-  ((slave-value (and (is <boxed-type> <long>)
-                     (<boxed-type>-one-word? <long>)))
-   (let ((type-id (slave-value (<type>-slave-id <long>))))
-
-     (define-method compile-object <long> (-c-)
-       (let ((object-label	(GLOBAL (unique-name "olong"))))
-         ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-         (print object-label" = private unnamed_addr constant %\"<long-h>\" { ")
-         (emit-object/header type-id)
-         (print ", %\"<long>\" { %word "self" }}\n")
-         object-label))))
-
-  (else (error "compile-object: unexpected slave representation for <long>")))
-
-(define-method compile-object <undefined> (-c-)
-  (LITERAL (target-value false)))
-
-(let ((type-id (slave-value (<type>-slave-id <string>)))
-      (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
-                                "%word" "%oop")))
-
-  (define-method compile-object <string> (-c-)
-    ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-    (let ((elements	(emit-object/C-string self -c-))
-          (object-label	(GLOBAL (unique-name "ostr")))
-          (size		(compile-object (string-length self) -c-)))
-      ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-      (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
-      (emit-object/header type-id)
-      ;; FIXME this assumes that <long> is a tagged immediate
-      (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
-      (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
-             elements" to ptr) }}\n")
-      object-label)))
-
-(define-function initialize-object-emitters ()
-  (set emit-object/header
-       (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-             ;; TODO FIXME if this let is a let*, and the canary-value
-             ;; binding is also uncommented, then it results in
-             ;; confused bindings and/or closure capturing that
-             ;; crashes while compiling (ERROR: cannot apply: 13 of
-             ;; type: 7). i couldn't yet extract a reproducer.
-
-             ;;(canary-value (slave-value +canary-value+))
-             (canary-emitter	(if (feature object-canary)
-                                    (lambda () (print ", %word "(slave-value +canary-value+)))
-                                  (lambda ()))))
-         (lambda (type-id)
-           (print "%\"<header>\" { %word "flags", %word "type-id)
-           (canary-emitter)
-           (print "}"))))
-
-  (set emit-object/<target-function>
-       (let ((type-id		(slave-value (<type>-slave-id <target-function>)))
-             (name-factory	(when (feature track-expr-names)
-                                  (lambda (name -c-)
-                                    (if name
-                                        (compile-object (symbol->string name) -c-)
-                                      "null"))))
-             (profiler?		(feature profiler)))
-         (lambda (expr name entry-label -c-)
-           (let ((object-label	(if name
-                                    (closure-object-label name)
-                                  (GLOBAL (unique-name "oclosure"))))
-                 (name-object	(when name-factory (name-factory name -c-)))
-                 (counter	(when profiler? (compile-object 0 -c-))))
-             ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-             (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
-             (emit-object/header type-id)
-             (print ", %\"<target-function>\" { %oop bitcast (")
-             (emit-llvm-fn-type-for-expr expr)
-             (print "* "entry-label" to %oop)")
-             (when name-object
-               (print ", %\"<string-h>\"* "name-object))
-             (when counter
-               (print ", %oop ")
-               (emit/header->payload/in-constants name-object))
-             (print " }}\n")
-             (CONSTANT object-label expr))))))
-
 ;;;
 ;;; Compiling lambdas
 ;;;
@@ -718,14 +623,6 @@
 
     (emit/function-epilogue)))
 
-(define-function compile-expr (self name -c-)
-  (emit-comment 1 "compiling fn "name", "self)
-  (let ((entry-point-label (if name
-                               (closure-code-label name)
-                             (GLOBAL (unique-name "fn")))))
-    (emit-expr-code self entry-point-label -c-)
-    (emit-object/<target-function> self name entry-point-label -c-)))
-
 ;;;
 ;;; Compiling calls
 ;;;
@@ -778,36 +675,27 @@
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))))
 
-(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
-  (define-function compile-call-to-object (arg-regs -c-)
-    ;; TODO assert the type to be <target-function>
-    ;; TODO assert nr of args = params
-    (gen BITCAST '%oop "%\"<target-function>\"*")
-    (gen LOAD-OOP (LITERAL program-code-offset))
-    (gen CALLPTR arg-regs)
-    ()))
-
 (define-function compile-call-to-global-function (op arg-regs -c-)
   (if (feature redefinable-functions-in-target)
       (let ()
         (comp op)
-        (compile-call-to-object arg-regs -c-))
+        (compile-call-to-<target-function> arg-regs -c-))
     (gen CALL (closure-code-label (<variable>-name op)) arg-regs))
   ())
 
 (define-method compile-call-to (slave-value <target-function>) (op arg-regs -c-)
   (comp op)
-  (compile-call-to-object arg-regs -c-)
+  (compile-call-to-<target-function> arg-regs -c-)
   ())
 
 (define-method compile-call-to <TEMP> (op arg-regs -c-)
   (comp op)
-  (compile-call-to-object arg-regs -c-)
+  (compile-call-to-<target-function> arg-regs -c-)
   ())
 
 (define-method compile-call-to <pair> (op arg-regs -c-)
   (comp op)
-  (compile-call-to-object arg-regs -c-)
+  (compile-call-to-<target-function> arg-regs -c-)
   ())
 
 (define-method compile-call-to <expr> (op arg-regs -c-)
@@ -1171,7 +1059,6 @@
            array-label" to %oop)")))
 
 (define-method emit-prelude <llvm-compiler> ()
-  (initialize-object-emitters)
   (let (;;(target-triplet		(slave-value +target-triplet+))
         (word-size		(target-value +word-size-in-bits+))
         (-c- self))

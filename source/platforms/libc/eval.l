@@ -61,3 +61,5 @@
 
 (define-function main (argc argv)
   (main/common argc argv libc/stdin libc/stdout libc/stderr))
+
+(load "source/evaluator/vm-late.l")

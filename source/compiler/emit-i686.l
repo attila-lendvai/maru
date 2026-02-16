@@ -162,12 +162,12 @@
 
 (define-method compile-call-to <TEMP32> (op arg-locs -c-)
   (gen LOAD self)
-  (compile-call-to-object arg-locs -c-))
+  (compile-call-to-<target-function> arg-locs -c-))
 
 ;; this case is handled early in compile-call
 ;; (define-method compile-call-to <pair> (op arg-locs -c-)
 ;;   (comp op)
-;;   (compile-call-to-object arg-locs -c-))
+;;   (compile-call-to-<target-function> arg-locs -c-))
 
 (define-method compile-call-to <C-function> (op arg-locs -c-)
   (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)

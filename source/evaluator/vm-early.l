@@ -18,6 +18,8 @@
 ;;;  - bridge execution into and out of our universe;
 ;;;    e.g. main() and exit() in the case of libc.
 
+(eval-in-slave '(set (feature emit-with-object-headers) true))
+
 (define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
 
 ;; we can't have a function in the target for print-all, because

@@ -214,11 +214,11 @@
 
 (define-method compile-call-to <TEMP64> (op arg-locs -c-)
   (gen LOAD self)
-  (compile-call-to-object arg-locs -c-))
+  (compile-call-to-<target-function> arg-locs -c-))
 
 (define-method compile-call-to <R64> (op arg-locs -c-)
   (gen LOAD self)
-  (compile-call-to-object arg-locs -c-))
+  (compile-call-to-<target-function> arg-locs -c-))
 
 (define-method compile-call-to <C-function> (op arg-locs -c-)
   (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)

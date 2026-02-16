@@ -1,62 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
-
-;; let's declare a memset function because clang -O can emit
-;; references to it (and memcpy and memmove) even with `clang
-;; -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic`.
-
-;; So even if your handwritten code never mentions strlen, LLVM might:
-;;   - Recognize an strlen impl in the IR and turn it to an strlen call.
-;;   - Emit a call to strlen (libc function) during lowering to
-;;     AArch64 assembly/object code.
-(eval-in-host
- '(define *llvm-platform-specific-prelude*
-   "
-define weak dso_local ptr @memset(ptr %dst, i32 %val, %word %len) {
-entry:
-  %end = getelementptr i8, ptr %dst, %word %len
-  %val8 = trunc i32 %val to i8
-  br label %loop
-
-loop:
-  %cur = phi ptr [ %dst, %entry ], [ %next, %store ]
-  %done = icmp eq ptr %cur, %end
-  br i1 %done, label %exit, label %store
-
-store:
-  store i8 %val8, ptr %cur
-  %next = getelementptr i8, ptr %cur, %word 1
-  br label %loop
-
-exit:
-  ret ptr %dst
-}
-
-define weak dso_local i64 @strlen(ptr %str) {
-entry:
-  br label %loop
-
-loop:
-  ; %cur starts as %str, then advances by 1 each iteration
-  %cur = phi ptr [ %str, %entry ], [ %next, %loop ]
-
-  %ch = load i8, ptr %cur
-  %zero = icmp eq i8 %ch, 0
-  %next = getelementptr i8, ptr %cur, i64 1
-  br i1 %zero, label %exit, label %loop
-
-exit:
-  %endptr = phi ptr [ %cur, %loop ]
-  %start = ptrtoint ptr %str to i64
-  %end   = ptrtoint ptr %endptr to i64
-  %len   = sub i64 %end, %start
-  ret i64 %len
-}
-"))
-
-(eval-in-host '(load "source/platforms/linux/syscall.l"))
-
 (load "source/evaluator/vm-early.l")
 (load "source/debug-min.l")
 (load "source/evaluator/vm.l")
@@ -115,3 +58,5 @@ exit:
          (argv (+ sp (words-to-bytes 1))))
     (linux-syscall linux/SYS_exit
      (main/common argc argv linux/STDIN_FILENO linux/STDOUT_FILENO linux/STDERR_FILENO))))
+
+(load "source/evaluator/vm-late.l")

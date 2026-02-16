@@ -1,7 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; forwards
-(define *special-forms*)
+(define *special-forms*) ; forward
+(define compile-call-to-<target-function>) ; forward
+(define closure-code-label) ; forward
 
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
@@ -525,11 +526,6 @@
     (array-append (<compiler>-gen-buffer -c-) (cons instr args))
     ()))
 
-(define-function closure-code-label (name)
-  ;; KLUDGE object "names" (i.e. addresses) should be tied together
-  ;; explicitly, not through giving them the "right" name
-  (LABEL (concat-string (symbol->string name) "__code")))
-
 ;;;
 ;;; Compiling lambdas
 ;;;
@@ -593,30 +589,22 @@
     (free-args -c- arg-locs)
     (free-temp op-tmp)))
 
-(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
-  (define-function compile-call-to-object (arg-locs -c-)
-    ;; TODO assert the type to be <target-function>
-    ;; TODO assert nr of args = params
-    (gen LOAD-OOP (LITERAL program-code-offset))
-    (gen CALLPTR arg-locs)
-    ()))
-
 (define-function compile-call-to-global-function (op arg-locs -c-)
   (if (feature redefinable-functions-in-target)
       (let ()
         (comp op)
-        (compile-call-to-object arg-locs -c-))
+        (compile-call-to-<target-function> arg-locs -c-))
     (gen CALL (closure-code-label (<variable>-name op)) arg-locs))
   ())
 
 (define-method compile-call-to (slave-value <target-function>) (op arg-locs -c-)
   (comp op)
-  (compile-call-to-object arg-locs -c-))
+  (compile-call-to-<target-function> arg-locs -c-))
 
 ;; this case is handled early in compile-call
 ;; (define-method compile-call-to <pair> (op arg-locs -c-)
 ;;   (comp op)
-;;   (compile-call-to-object arg-locs -c-))
+;;   (compile-call-to-<target-function> arg-locs -c-))
 
 (define-method compile-call-to <expr> (op arg-locs -c-)
   ;; NOTE the fact that a literal <expr> is found in a variable's

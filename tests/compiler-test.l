@@ -5,41 +5,7 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
-;;; TODO this is kind of a mess. currently it REQUIRE's way more than
-;;; it should need.
-
-(load (concat-strings "source/emit-" *compiler-backend* ".l"))
-
-;; (require (concat-strings "source/platforms/linux/syscall-" *compiler-backend* ".l"))
-
-(switch-to-target-env)
-
-;; disable unconditionally
-;;(define-form debug		prog ())
-
-(require "source/platforms/libc/libc.l")
-
-;; turn off some stuff that would bring in more dependencies
-;; (define-form assert (test . args) ())
-;; (define-function error-prologue ()
-;;   (platform/diag-print "\nERROR: "))
-;; (define-function %error (arg)
-;;   (platform/diag-print "%error reached"))
-;; (define-form fatal forms
-;;   `(let ()
-;;      (platform/diag-print "FATAL happened")
-;;      (platform/halt)))
-
-;;(define gc/let* let*)
-
-;; (require "source/platforms/linux/linux.l")
-
-;;(require "source/evaluator/vm-early.l")
-
-;;(require "source/debug-min.l")
-
-;;(require "source/evaluator/gc.l")
-;;(require "source/evaluator/types.l")
+(eval-in-slave '(set (feature emit-with-object-headers) false))
 
 (define-form assert (test . args)
   `(or ,test (failure ,@(or args (list "an assert failed")))))
@@ -129,31 +95,57 @@
   42)
 
 (define-test compile/local-call/3
-    (let ((buf (libc/malloc 16)))
+    (let ((buf (platform/acquire-memory 16)))
       (set (oop-at buf 0) sum-of-three)
       ((oop-at buf 0) 10 30 2))
   42)
 
-(define-test compile/foreign-function/1
-    (libc/strcmp (C-string "bigyo") (C-string "bigyo"))
-  0)
+(when-at-expand (feature platform/libc)
 
-(define-test compile/foreign-function/2
-    (< 0 (libc/strcmp (C-string "foo") (C-string "bar")))
-  true)
+  (define-test compile/foreign-function/1
+      (libc/strcmp (C-string "bigyo") (C-string "bigyo"))
+    0)
 
-(define-test compile/foreign-function/3
-    (> 0 (libc/strcmp (C-string "bar") (C-string "foo")))
-  true)
+  (define-test compile/foreign-function/2
+      (< 0 (libc/strcmp (C-string "foo") (C-string "bar")))
+    true)
 
-(define-test compile/foreign-function/4
-    (let* ((size	128)
-           (buf		(libc/malloc size)))
-      (libc/snprintf buf size (C-string "foo%sbaz%ld") (C-string "bar") 42)
-      (let ((res (= 0 (libc/strcmp (C-string "foobarbaz42") buf))))
-        (libc/free buf)
-        res))
-  true)
+  (define-test compile/foreign-function/3
+      (> 0 (libc/strcmp (C-string "bar") (C-string "foo")))
+    true)
+
+  (define-test compile/foreign-function/4
+      (let* ((size	128)
+             (buf	(platform/acquire-memory size)))
+        (libc/snprintf buf size (C-string "foo%sbaz%ld") (C-string "bar") 42)
+        (let ((res (= 0 (libc/strcmp (C-string "foobarbaz42") buf))))
+          (libc/free buf)
+          res))
+    true)
+
+  (define-test compile/set-char-at/1
+      ;; NOTE if we just set-char-at on the constant, then LLVM optimizes it into oblivion without any notice
+      (let* ((buf (libc/strdup (C-string "bogyo")))
+             (value ?i))
+        (set (char-at buf 1) value)
+        (libc/strcmp buf (C-string "bigyo")))
+    0)
+
+  (define-test compile/set-char-at/2
+      (let ((buf (libc/strdup (C-string "123"))))
+        (set (char-at buf 0) ?x)
+        (libc/strcmp buf (C-string "x23")))
+    0)
+
+  (define-test compile/set-char-at/3
+      (let* ((buf (libc/strdup (C-string "123")))
+             (ret (set (char-at buf 1) ?x)))
+        ;; let's not rely on the evaluation order of the args until
+        ;; there's a commitment in the compiler.
+        (+ ret
+           (libc/strcmp buf (C-string "1x3")))) ; should return 0 upon match
+    ?x)
+  )
 
 (define-test compile/load-store/1
     (let ((x 42))
@@ -253,7 +245,7 @@
       (+ y 2))
   42)
 
-(when-at-expand (host-value feature/redefinable-functions-in-target)
+(when-at-expand (feature redefinable-functions-in-target)
   (define-function returns-42 ()
     (return 42))
 
@@ -374,29 +366,6 @@
     (char-at (C-string "alma") 2)
   ?m)
 
-(define-test compile/set-char-at/1
-    ;; NOTE if we just set-char-at on the constant, then LLVM optimizes it into oblivion without any notice
-    (let* ((buf (libc/strdup (C-string "bogyo")))
-           (value ?i))
-      (set (char-at buf 1) value)
-      (libc/strcmp buf (C-string "bigyo")))
-  0)
-
-(define-test compile/set-char-at/2
-    (let ((buf (libc/strdup (C-string "123"))))
-      (set (char-at buf 0) ?x)
-      (libc/strcmp buf (C-string "x23")))
-  0)
-
-(define-test compile/set-char-at/3
-    (let* ((buf (libc/strdup (C-string "123")))
-           (ret (set (char-at buf 1) ?x)))
-      ;; let's not rely on the evaluation order of the args until
-      ;; there's a commitment in the compiler.
-      (+ ret
-         (libc/strcmp buf (C-string "1x3")))) ; should return 0 upon match
-  ?x)
-
 ;; NOTE one must be careful with those 0x123 constants when <long> is tagged, i.e. smaller than the target's word size
 ;; NOTE a 32 bit eval cannot read 64 bit numbers, so we need to >> everything by 32 bits there
 ;; NOTE shifting right is signed
@@ -421,49 +390,51 @@
     ((= 64 +word-size-in-bits+)
      (if +little-endian?+ 0x31783131 0x317a3131))))
 
-(define-test compile/set-oop-at/1
-    (let* ((buf (libc/strdup (C-string "0123456789abcdefghijklmnopqrst")))
-           (value 0x316b756b)) ; "1kuk"
-      (set (oop-at buf 1) value)
-      (libc/strcmp buf
-                   (cond
-                     ((= 32 +word-size-in-bits+)
-                      (if +little-endian?+
-                          (C-string "0123kuk189abcdefghijklmnopqrst")
-                        (C-string "01231kuk89abcdefghijklmnopqrst")))
-                     ((= 64 +word-size-in-bits+)
-                      ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if +little-endian?+
-                          (C-string "01234567kuk1")
-                        (C-string "TODO fill me in"))))))
-  0)
+(when-at-expand (feature platform/libc)
+  (define-test compile/set-oop-at/1
+      (let* ((buf (libc/strdup (C-string "0123456789abcdefghijklmnopqrst")))
+             (value 0x316b756b))        ; "1kuk"
+        (set (oop-at buf 1) value)
+        (libc/strcmp buf
+                     (cond
+                       ((= 32 +word-size-in-bits+)
+                        (if +little-endian?+
+                            (C-string "0123kuk189abcdefghijklmnopqrst")
+                          (C-string "01231kuk89abcdefghijklmnopqrst")))
+                       ((= 64 +word-size-in-bits+)
+                        ;; NOTE the lower 32 bits are zero, so they end the cstr
+                        (if +little-endian?+
+                            (C-string "01234567kuk1")
+                          (C-string "TODO fill me in"))))))
+    0)
 
-(define-test compile/set-oop-at/2
-    (let* ((buf (libc/strdup (C-string "0123456789abcdefghijklmnopqrst")))
-           (value 0x316b756b)           ; "1kuk"
-           (index 2))
-      (set (oop-at buf index) value)
-      (libc/strcmp buf
-                   (cond
-                     ((= 32 +word-size-in-bits+)
-                      (if +little-endian?+
-                          (C-string "01234567kuk1cdefghijklmnopqrst")
-                        (C-string "012345671kukcdefghijklmnopqrst")))
-                     ((= 64 +word-size-in-bits+)
-                      ;; NOTE the lower 32 bits are zero, so they end the cstr
-                      (if +little-endian?+
-                          (C-string "0123456789abcdefkuk1")
-                        (C-string "TODO fill me in"))))))
-  0)
+  (define-test compile/set-oop-at/2
+      (let* ((buf (libc/strdup (C-string "0123456789abcdefghijklmnopqrst")))
+             (value 0x316b756b)         ; "1kuk"
+             (index 2))
+        (set (oop-at buf index) value)
+        (libc/strcmp buf
+                     (cond
+                       ((= 32 +word-size-in-bits+)
+                        (if +little-endian?+
+                            (C-string "01234567kuk1cdefghijklmnopqrst")
+                          (C-string "012345671kukcdefghijklmnopqrst")))
+                       ((= 64 +word-size-in-bits+)
+                        ;; NOTE the lower 32 bits are zero, so they end the cstr
+                        (if +little-endian?+
+                            (C-string "0123456789abcdefkuk1")
+                          (C-string "TODO fill me in"))))))
+    0)
+  )
 
 (define-test compile/set-oop-at/return-value
-    (let* ((buf (libc/malloc 16))
+    (let* ((buf (platform/acquire-memory 16))
            (value 999))
       (set (oop-at buf 0) value))
   999)
 
 (define-test compile/set-oop-at/3
-    (let* ((buf (libc/malloc 16)))
+    (let* ((buf (platform/acquire-memory 16)))
       (set (oop-at buf 0) 9940)
       (set (oop-at buf 1) 2)
       (+ (oop-at buf 0)
@@ -471,12 +442,12 @@
   9942)
 
 (define-test compile/set-oop-at/4
-    (let* ((place (libc/malloc 16)))
+    (let* ((place (platform/acquire-memory 16)))
       (set (oop-at place 0) 42))
   42)
 
 (define-test compile/set-oop-at/5
-    (let* ((place (libc/malloc 16))
+    (let* ((place (platform/acquire-memory 16))
            (value 42))
       (set (oop-at place 0) value))
   42)
@@ -575,10 +546,10 @@
 ;;         (incr result (- char ?0))))
 ;;   (+ 3 5))
 
-(define-function main (argc argv)
-  (platform/diag-print "Printing test command line args:\n")
+(define-function main/common (argc argv)
+  (platform/print-diag-fmt "Printing test command line args:\n")
   (for (i 0 argc)
-       (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
+    (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
 
   (let ((idx argc))
     (while (< 0 (set idx (- idx 1)))
@@ -592,10 +563,22 @@
   (unless (= global42 42)
     (failure "global42 is %ld" global42))
 
-  (set libc/stdout (libc/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
+  ;; TODO stdout is a macro on darwin, therefore we wrap it in a
+  ;; getter, therefore we can't set it as we did before
+  ;; (set libc/stdout (libc/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
 
-  (platform/print-diag-fmt "\e[32mAbout to start running the compiled tests\e[m\n")
+  (platform/diag-print "\e[32mAbout to start running the compiled tests\e[m\n")
   (run-tests)
-  (platform/print-diag-fmt "\n\e[32mFinished running the compiled tests\e[m\n")
+  (platform/diag-print "\n\e[32mFinished running the compiled tests\e[m\n")
 
   (return *exit-code*))
+
+(if-at-expand (feature platform/linux)
+    (define-function _start ()
+      (let* ((sp (stack-pointer-on-entry))
+             (argc (oop-at sp 0))
+             (argv (+ sp (words-to-bytes 1))))
+        (linux-syscall linux/SYS_exit (main/common argc argv))))
+
+  (define-function main (argc argv)
+    (main/common argc argv)))
