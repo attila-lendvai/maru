@@ -112,9 +112,16 @@
 
 (switch-to-target-env)
 
+(define false (form () (lambda _ (<immediate-type>-tag-value <undefined>))))
+(define true  (form () (lambda _ 1)))
+
 (safety 1
   (assert (not (= *globals* *slave-env*)))
   (assert (not (= *globals* (host-value *slave-env*))))
+  (assert (= 0 false))
+  (assert (= 1 true))
+  (eval-in-slave '(assert (= () false)))
+  (eval-in-slave '(assert (symbol? true)))
   (assert (= 42 (eval-in-slave '(+ 40 2))))
   (assert (= 42 ((eval-in-slave '(lambda () 42)))))
   (eval-in-slave '(define %im-a-test 42))
@@ -160,11 +167,8 @@
     (eval definer-form)     ; this way it will define into *slave-env* due to using the custom define-form above
     ()))
 
-(define-constant false (<immediate-type>-tag-value <undefined>))
-(define-constant true  1)
-
 (safety 1
-  (define-form %im-a-test () (+ true 41)))
+  (define-form %im-a-test () (+ 1 41)))
 (safety 1
   ;; (assert (not (find-local-variable *globals* '%im-a-test)))
   (assert (defined? '%im-a-test *slave-env*))
