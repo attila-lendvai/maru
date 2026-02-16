@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(set (feature platform/libc) true)
+
 (require "source/platforms/platform-c-based.l")
 
 (require-cgrov "source/platforms/libc/libc")

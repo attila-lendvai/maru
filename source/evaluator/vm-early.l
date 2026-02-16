@@ -19,11 +19,6 @@
 ;;;    e.g. main() and exit() in the case of libc.
 
 (define-constant +maximum-call-stack-depth+	10000) ; to detect infinite recursion before the info gets lost into a sigsegv...
-(define-constant feature/backtrace		(or true feature/profiler (< 0 *safety*)))
-(define-constant feature/object-canary		(or () (<= 3 *safety*)))
-;; TODO set up proper framework for optimization control, merge with *optimised*
-(define-constant feature/optimize-space		true)
-(define-constant feature/optimize-speed		(and (not feature/optimize-space) (<= *safety* 2)))
 
 ;; we can't have a function in the target for print-all, because
 ;; there's no support for &rest args yet in the compiler.
@@ -55,7 +50,7 @@
 (define-form slot-value (type-name slot-name object)
   (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
-    `(oop-at ,(if feature/typecheck-slot-access
+    `(oop-at ,(if (feature typecheck-slot-access)
                   `(%accessor-typecheck ,(<type>-slave-id type) ,object)
                 object)
              ,slot-index)))
@@ -63,7 +58,7 @@
 (define-form set-slot-value (type-name slot-name object value)
   (let* ((type		(eval type-name *env*))
          (slot-index	(record/slot-index type slot-name)))
-    `(set (oop-at ,(if feature/typecheck-slot-access
+    `(set (oop-at ,(if (feature typecheck-slot-access)
                        `(%accessor-typecheck ,(<type>-slave-id type) ,object)
                      object)
                   ,slot-index)
@@ -106,7 +101,7 @@
     )
 
 (define *call-stack-index*	0)
-(when-at-expand feature/backtrace
+(when-at-expand (feature backtrace)
   (define *call-stack*		0))
 
 ;; this installs symbol macros that get/set the value from/to the

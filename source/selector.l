@@ -45,7 +45,7 @@
     (default   default)))
 
 (define-function selector/add-method (self type method)
-  (when-at-expand (and feature/track-expr-names
+  (when-at-expand (and (feature track-expr-names)
                        (not bootstrapping?))
     ;; expr's (lambdas) are instantiated by the host, so let's not assume anything about their object layout.
     (when (and (expr? method)

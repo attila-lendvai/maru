@@ -7,7 +7,7 @@
 ;;; GC header
 ;;;
 (define-record <header> ()
-  (next size flags type (when-at-expand feature/object-canary canary))
+  (next size flags type (when-at-expand (feature object-canary) canary))
   raw-slot-access)
 
 (define-constant size-of-<header> (words-to-bytes (record/effective-slot-count <header>)))
@@ -28,12 +28,12 @@
 (define-constant +canary-value+ 0xDEADBEE) ; an easy to notice token without any meaning
 
 (define-form gc/valid-header-canary? (header)
-  (if feature/object-canary
+  (if (feature object-canary)
       `(= (<header>-canary ,header) ,+canary-value+)
     true))
 
 (define-form gc/initialize-header-canary (header)
-  (when feature/object-canary
+  (when (feature object-canary)
     `(set (<header>-canary ,header) ,+canary-value+)))
 
 (define-form gc/valid-maru-value? (obj)
@@ -42,7 +42,7 @@
          ;; NOTE this is to catch low pointers. theoretically this may get false positives if we are running close to the 0 address.
          ;; NOTE we can't use gc/memory-base here, because this may encounter stuff from the read-only memory segment
          (and (< 10000 __obj__)
-              ,(if feature/object-canary
+              ,(if (feature object-canary)
                    '(gc/valid-header-canary? (gc/header-of __obj__))
                  'true)))))
 

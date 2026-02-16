@@ -26,7 +26,7 @@
 (define-constant +multimethod-type-id-offset+ 1)
 
 (define-method add-method <generic> (types method)
-  (when-at-expand (and feature/track-expr-names
+  (when-at-expand (and (feature track-expr-names)
                        (not bootstrapping?))
     ;; expr's (lambdas) are instantiated by the host, so let's not
     ;; assume anything about their object layout when we are

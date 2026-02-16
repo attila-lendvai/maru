@@ -5,6 +5,8 @@
 ;;; and then define and redefine some more.
 ;;;
 
+(set (feature platform/posix) true)
+
 (require "source/platforms/libc/libc.l")
 
 (require-cgrov "source/platforms/posix/posix")

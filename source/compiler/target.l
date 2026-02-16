@@ -35,11 +35,19 @@
 
 (switch-to-slave-env)
 
+(set (feature redefinable-functions-in-target) false) ; costs about 20-30% time increase in the bootstrap process
+(set (feature strict-semantics-for-compiled-set) true) ; compiled set-oop-at & co. also returns the value that was just set
+(set (feature backtrace)		(or true (feature profiler) (< 0 *safety*)))
+(set (feature object-canary)		(or () (<= 3 *safety*)))
+;; TODO set up proper framework for optimization control, merge with *optimised*
+(set (feature optimize-space)		true)
+(set (feature optimize-speed)		(and (not (feature optimize-space)) (<= *safety* 2)))
+
 ;; a heap object with a function pointer, and optionally a name.
 (define-record <target-function> ()
   (program-code
-   (when-at-expand feature/track-expr-names	name)
-   (when-at-expand feature/profiler		profiler-counter)))
+   (when-at-expand (feature track-expr-names)	name)
+   (when-at-expand (feature profiler)		profiler-counter)))
 
 ;; (define-method do-pretty <target-function> (port col)
 ;;   (port-write port "<target-function>"))
@@ -91,7 +99,7 @@
 (assert (= *slave-env* *globals*))
 (define *target-env* (environment *slave-env*))
 
-(when-at-expand feature/debug-info
+(when-at-expand (feature debug-info)
   (eval-in-host `(set (<env>-name ,*target-env*) "target")))
 
 (eval-in-host `(define *target-env* ,*target-env*))

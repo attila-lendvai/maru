@@ -3,6 +3,17 @@
 ;;; This file is loaded when the host VM is ready, basically right
 ;;; after it has loaded its own boot.l
 
+;; evolving
+(unless (defined? 'feature)
+  (eval '(define-form feature (name)
+          (concat-symbol 'feature/ name)))
+  (eval '(define-form set-feature (name value-form)
+          (let ((var-name (concat-symbol 'feature/ name))
+                (value (eval value-form *env*)))
+            (assert (symbol? var-name))
+            ;; this is effectively a DEFINE-SYMBOL-FORM
+            `(environment-define *globals* ',var-name ,(form () (lambda _ value)))))))
+
 (set-working-directory *slave-directory*)
 
 (define *host-env* *globals*)
@@ -16,7 +27,7 @@
                                 *maru*))))
   (assert (= 0 (<env>-level slave-env)))
   ;; NOTE this can only come in once we have evolved; evolving?
-  (when-at-expand feature/debug-info
+  (when-at-expand (feature debug-info)
     (set (<env>-name slave-env) "slave"))
   (define *slave-env* slave-env)
   (environment-define *slave-env* 'switch-to-host-env
@@ -64,6 +75,6 @@
 (define-form slave-value (form)
   `(eval-in-slave ',form))
 
-(when-at-expand feature/debug-info
+(when-at-expand (feature debug-info)
   ;; maru-user is the host
   (assert (= "maru-user" (<env>-name *globals*))))

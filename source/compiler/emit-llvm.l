@@ -181,7 +181,7 @@
   (GLOBAL (concat-string (symbol->string name) ".code")))
 
 (define-function closure-object-label (name)
-  (GLOBAL (if feature/redefinable-functions-in-target
+  (GLOBAL (if (feature redefinable-functions-in-target)
               (concat-string (symbol->string name) ".obj")
             name)))
 
@@ -333,7 +333,7 @@
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
   ((TEMP    _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
-  ((GLOBAL  expr)		(if-at-expand feature/redefinable-functions-in-target
+  ((GLOBAL  expr)		(if-at-expand (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
                                   (print "	"$reg1" = ")
                                   (emit/header->payload $1)
@@ -609,7 +609,7 @@
              ;; type: 7). i couldn't yet extract a reproducer.
 
              ;;(canary-value (slave-value +canary-value+))
-             (canary-emitter	(if (slave-value feature/object-canary)
+             (canary-emitter	(if (feature object-canary)
                                     (lambda () (print ", %word "(slave-value +canary-value+)))
                                   (lambda ()))))
          (lambda (type-id)
@@ -619,12 +619,12 @@
 
   (set emit-object/<target-function>
        (let ((type-id		(slave-value (<type>-slave-id <target-function>)))
-             (name-factory	(when (slave-value feature/track-expr-names)
+             (name-factory	(when (feature track-expr-names)
                                   (lambda (name -c-)
                                     (if name
                                         (compile-object (symbol->string name) -c-)
                                       "null"))))
-             (profiler?		(slave-value feature/profiler)))
+             (profiler?		(feature profiler)))
          (lambda (expr name entry-label -c-)
            (let ((object-label	(if name
                                     (closure-object-label name)
@@ -788,7 +788,7 @@
     ()))
 
 (define-function compile-call-to-global-function (op arg-regs -c-)
-  (if feature/redefinable-functions-in-target
+  (if (feature redefinable-functions-in-target)
       (let ()
         (comp op)
         (compile-call-to-object arg-regs -c-))
@@ -1147,7 +1147,7 @@
       (print ", ")
       (emit-llvm-fn-type-for-expr self)
       (println "* "(closure-code-label name)))
-    (when feature/redefinable-functions-in-target
+    (when (feature redefinable-functions-in-target)
       ;; TODO? this here is an (emit DEFINE (GLOBAL ...) ...) inlined
       (print (GLOBAL name)" = global %oop ")
       (emit/header->payload/in-constants object-label))))
@@ -1185,8 +1185,7 @@
     (emit INLINE "%oop = type ptr\n")
     ;; TODO this should be done by a general emitter
     (emit INLINE (list "%\"<header>\" = type { %word, %word"
-                       (if (and (slave-value (defined? 'feature/object-canary))
-                                (slave-value feature/object-canary))
+                       (if (feature object-canary)
                            ", %word"
                          "")
                        " }\n"))
@@ -1209,9 +1208,9 @@
                 "%\"<string-h>\" = type { %\"<header>\", %\"<string>\" }\n"))
     (emit INLINE
           (list "%\"<target-function>\" = type { %oop "
-                (if (slave-value feature/track-expr-names)
+                (if (feature track-expr-names)
                     ", %oop" "")
-                (if (slave-value feature/profiler)
+                (if (feature profiler)
                     ", %oop" "")
                 "}\n"
                 "%\"<target-function-h>\" = type { %\"<header>\", %\"<target-function>\"}\n"))

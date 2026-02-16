@@ -1,12 +1,10 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define-constant feature/debug-output		(or () (<= 3 *safety*)))
-
 (define-form debug		prog ())
 (define-form debug/identities	prog ())
 (define-form gc/debug		prog ())
 
-(when-at-expand feature/debug-output
+(when-at-expand (feature debug-output)
   (define *debug-output-enabled?* false)
 
   (define-form debug		prog	`(when *debug-output-enabled?* ,@prog))

@@ -18,10 +18,24 @@
 (define-function set-current-globals (value)
   (set (<module>-globals (current-module)) value))
 
+;; slave-extras.l is too late for these
+(eval-in-slave
+ '(let ()
+   (define current-globals
+     (lambda ()
+       ;; KLUDGE the <module>-globals accessor in the host
+       (oop-at (current-module) 0)))
+
+   (define set-current-globals
+     (lambda (value)
+       ;; KLUDGE the <module>-globals accessor in the host
+       (set (oop-at (current-module) 0) value)))))
+
 ;; Make sure that the profiler is not compiled in when evolving. This
 ;; may only be necessary for maru.9 -> maru.10 because the profiler
-;; seems to be broken in maru.9.
-(define-constant feature/profiler false)
+;; seems to be broken in maru.9, and the --define interface is not
+;; compatible (maru.9 lacks the true/false recognition). (evolving)
+(define feature/profiler/build false)
 
 (define-function print-list (lst . etc)
   (let ((separator (or (pop etc) " "))

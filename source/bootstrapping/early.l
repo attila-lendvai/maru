@@ -2,5 +2,5 @@
 
 (switch-to-slave-env)
 
-;; TODO this should be done for all the needed features
-(define feature/profiler (eval-in-host 'feature/profiler))
+;; TODO? this should be done for all the needed features
+(define feature/profiler/build (eval-in-host 'feature/profiler/build))

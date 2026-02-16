@@ -118,18 +118,18 @@
       (string-append-all str "bar")
       (or (string= str "foobar") (fatal "string-append-all is broken"))))
 
-  (when-at-expand feature/backtrace
+  (when-at-expand (feature backtrace)
     (debug (platform/diag-print "initializing *call-stack*\n"))
     (gc/push-root (address-of *call-stack*))
     (set *call-stack* (array 32)))
 
-  (set *maru* (environment () 0 0))                            (when-at-expand feature/debug-info (set (<env>-name *maru*) "maru"))
+  (set *maru* (environment () 0 0))                            (when-at-expand (feature debug-info) (set (<env>-name *maru*) "maru"))
   (populate-env-with-maru-primitives *maru*)
   (environment-define *maru* (string->symbol "*maru*") *maru*)
   (debug (platform/diag-print "initialized *maru*\n"))
 
   (let ((maru-user (environment *maru* 0 0)))
-    (when-at-expand feature/debug-info
+    (when-at-expand (feature debug-info)
       (set (<env>-name maru-user) "maru-user"))
     (set *globals* maru-user))
 
@@ -156,7 +156,7 @@
   (verbosity 1
     (gc/collect)
     (gc/print-statistics))
-  (when-at-expand feature/profiler
+  (when-at-expand (feature profiler)
     (profiler/disable))
   (platform/flush-streams)
 

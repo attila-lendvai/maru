@@ -8,7 +8,7 @@
   (let ((value (eval value-form -ctx-)))
     (set (<variable>-value variable) value)
     ;; maybe set the <expr>'s name slot
-    (when-at-expand feature/track-expr-names
+    (when-at-expand (feature track-expr-names)
       (let ((tmp value))
         (when (is <form> tmp)
           (set tmp (<form>-function tmp)))
@@ -195,7 +195,7 @@
                              symbol/true)))))
 
 (define-vm-function (exit ()) ((exit-code <long> 0))
-  (when-at-expand feature/profiler
+  (when-at-expand (feature profiler)
     (profiler/disable))
   (platform/flush-streams)
   (platform/halt exit-code))
@@ -345,6 +345,6 @@
       (debug-print "call-x86-64-machine-code got back the control from "fn)
       result)))
 
-(when-at-expand feature/debug-output
+(when-at-expand (feature debug-output)
   (define-vm-function enable-debug-output	() (set *debug-output-enabled?* true))
   (define-vm-function disable-debug-output	() (set *debug-output-enabled?* false)))

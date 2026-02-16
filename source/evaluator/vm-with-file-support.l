@@ -107,9 +107,9 @@
                (set (global-variable-value *maru* symbol/*verbosity*) tmp))
 
               ((string= "-d" arg)
-               (if-at-expand feature/debug-output
+               (if-at-expand (feature debug-output)
                    (set *debug-output-enabled?* true)
-                 (platform/diag-print "WARNING: FEATURE/DEBUG-OUTPUT was not enabled while compiling this build, ignoring -d\n")))
+                 (platform/diag-print "WARNING: (feature debug-output) was not enabled while compiling this build, ignoring -d\n")))
 
               ;; -O
               ((string= "-O" arg)
@@ -122,7 +122,7 @@
 
               ;; -p
               ((string= "-p" arg)
-               (if-at-expand feature/profiler
+               (if-at-expand (feature profiler)
                    (let ((usecs 1000))
                      (install_profiler_handler
                       (<target-function>-program-code profiler/take-sample))

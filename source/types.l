@@ -254,7 +254,7 @@
   (let* ((type (eval type-name *env*))
          (slot-index (record/slot-index type slot-name)))
     `(oop-at
-      ,(if feature/typecheck-slot-access
+      ,(if (feature typecheck-slot-access)
            `(%accessor-typecheck ,(<type>-id type) ',slot-name ,object)
          object)
       ,slot-index)))
@@ -267,7 +267,7 @@
   (let* ((type (eval type-name *env*))
          (slot-index (record/slot-index type slot-name)))
     `(set-oop-at
-      ,(if feature/typecheck-slot-access
+      ,(if (feature typecheck-slot-access)
            `(%accessor-typecheck ,(<type>-id type) ',slot-name ,object)
          object)
       ,slot-index
@@ -493,12 +493,12 @@
 ;; TODO rename body to program-code, or maybe machine-code is better
 ;; TODO harmonize name with <target-function>, but how? <function> and <t/function>
 (define-record		<expr>			() (parameters body env ctx
-                                                     (when-at-expand feature/track-expr-names	name)
-                                                     (when-at-expand feature/profiler		profiler-counter)))
+                                                     (when-at-expand (feature track-expr-names)	name)
+                                                     (when-at-expand (feature profiler)		profiler-counter)))
 (define-record		<form>			() (function symbol))	; these are expander lambda's
 (define-record		<variable>		() (name value env index))
 (define-record		<env>			() (parent level offset bindings stable
-                                                     (when-at-expand feature/debug-info		name)))
+                                                     (when-at-expand (feature debug-info)		name)))
 (define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 

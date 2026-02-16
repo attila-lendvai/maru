@@ -255,7 +255,7 @@
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
           (gen LOAD (GLOBAL32 (EXTERNAL-LABEL (<C-variable>-name value)))))
-         ((and (not feature/redefinable-functions-in-target)
+         ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
          (else

@@ -57,7 +57,7 @@
         ((= type <expr>)
          (error-if-storing)
          ($put-all stream "Expr<")
-         (when-at-expand feature/track-expr-names
+         (when-at-expand (feature track-expr-names)
            (aif (<expr>-name obj)
                (do-print stream it storing?)
              ($put stream ?? ))
@@ -82,7 +82,7 @@
         ((= type <target-function>)
          (error-if-storing)
          ($put stream ?.)
-         ($put-all stream (if-at-expand feature/track-expr-names
+         ($put-all stream (if-at-expand (feature track-expr-names)
                               (<target-function>-name obj)
                             "target-fn")))
 
@@ -104,7 +104,7 @@
            (if (and level bindings offset)
                (let ()
                  ($put-all stream "Env<")
-                 (when-at-expand feature/debug-info
+                 (when-at-expand (feature debug-info)
                    (awhen (<env>-name obj)
                      (do-print stream it storing?)))
                  ($put-all stream " Lv")

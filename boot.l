@@ -193,18 +193,6 @@
 
 (define-constant false ()) ; just a convenience to facilitate code readability
 
-;;; configuration
-
-(unless (defined? 'feature/profiler)
-  ;; careful: due to the semantics of DEFINE it must be hidden behind an eval... hrm, is that maybe a FIXME?
-  (eval '(define feature/profiler false)))
-
-(define-constant feature/profiler/cumulative	true) ; walk the stack and increment everyone found
-(define-constant feature/debug-info		true)
-(define-constant feature/track-expr-names	(or feature/debug-info feature/profiler))
-(define-constant feature/typecheck-slot-access	(or (<= 3 *safety*)
-                                                    (and (<= 2 *safety*) (<= *optimised* 0))))
-
 (define-function compose (a b)
   (lambda args
     (b (apply a args))))
@@ -237,6 +225,27 @@
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
 
 (require "source/sequences-basic.l")
+
+;;; configuration
+
+(define-form feature (name)
+  (concat-symbol 'feature/ name))
+
+(define-form set-feature (name value-form)
+  (let ((var-name (concat-symbol 'feature/ name))
+        (value (eval value-form *env*)))
+    (assert (symbol? var-name))
+    ;; this is effectively a DEFINE-SYMBOL-FORM
+    `(environment-define *globals* ',var-name ,(form () (lambda _ value)))))
+
+(set (feature profiler)			(when (defined? 'feature/profiler/build)
+                                          (eval 'feature/profiler/build)))
+(set (feature profiler/cumulative)	true) ; walk the stack and increment everyone found
+(set (feature debug-info)		true)
+(set (feature track-expr-names)		(or (feature debug-info) (feature profiler)))
+(set (feature typecheck-slot-access)	(or (<= 3 *safety*)
+                                            (and (<= 2 *safety*) (<= *optimised* 0))))
+(set (feature debug-output)		(or () (<= 3 *safety*)))
 
 (require "source/types.l")
 

@@ -332,7 +332,7 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		--define target/os		"$(TARGET_OS)"			\
 		--define target/abi		"$(TARGET_ABI)"			\
 		--define target/platform	"$(PLATFORM)"			\
-		--define feature/profiler	"$(PROFILER_MARU)"		\
+		--define feature/profiler/build	"$(PROFILER_MARU)"		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -357,7 +357,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		--define target/os 		"$(TARGET_OS)"			\
 		--define target/abi 		"$(TARGET_ABI)"			\
 		--define target/platform	"$(PLATFORM)"			\
-		--define feature/profiler	"$(PROFILER_MARU)"		\
+		--define feature/profiler/build	"$(PROFILER_MARU)"		\
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
@@ -406,7 +406,7 @@ define compile-x86
 	--define target/os 		"$(TARGET_OS)"				\
 	--define target/abi 		"$(TARGET_ABI)"				\
 	--define target/platform	"$(PLATFORM)"				\
-	--define feature/profiler	"$(PROFILER_MARU)"			\
+	--define feature/profiler/build	"$(PROFILER_MARU)"			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
@@ -430,7 +430,7 @@ define compile-llvm
 	--define target/os 		"$(TARGET_OS)"				\
 	--define target/abi 		"$(TARGET_ABI)"				\
 	--define target/platform	"$(PLATFORM)"				\
-	--define feature/profiler	"$(PROFILER_MARU)"			\
+	--define feature/profiler/build	"$(PROFILER_MARU)"			\
 	source/bootstrapping/prepare.l						\
 	boot.l									\
 	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\

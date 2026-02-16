@@ -318,7 +318,7 @@
           ;; TODO dispatch on the type of the C-variable
           (gen LOAD ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL64)
                      (EXTERNAL-LABEL (<C-variable>-name value)))))
-         ((and (not feature/redefinable-functions-in-target)
+         ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
           (gen LOAD (LABEL self.name)))
          (else

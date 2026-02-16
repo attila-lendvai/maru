@@ -45,7 +45,7 @@
           (emit EXPORT external-label))
       (emit EXPORT code-label))
     (emit TYPE code-label "@function")
-    (when feature/redefinable-functions-in-target
+    (when (feature redefinable-functions-in-target)
       (let ((label (LABEL name)))
         (emit DATA)
         (emit DEFLABEL label)

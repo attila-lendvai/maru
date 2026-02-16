@@ -38,7 +38,7 @@
 
 (define-type-of)
 
-(when-at-expand feature/optimize-speed
+(when-at-expand (feature optimize-speed)
   (define-form is (type-name obj)
     (let ((type (eval type-name *env*)))
       (cond
@@ -81,12 +81,12 @@
     (cond
       ((is <boxed-type> type)
        (if (<boxed-type>-one-word? type)
-           `(oop-at ,(if feature/typecheck-slot-access
+           `(oop-at ,(if (feature typecheck-slot-access)
                          `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
                        obj)
                     0)
          ;; then we just return its address, the payload is right there inlined
-         (if feature/typecheck-slot-access
+         (if (feature typecheck-slot-access)
              `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
            obj)))
 
@@ -110,7 +110,7 @@
     (define unbox	,unbox)))
 
 ;; shorthands (and optimizations)
-(if-at-expand feature/optimize-space
+(if-at-expand (feature optimize-space)
     (let ()
       (define-function long?	(obj)	(is <long>	obj))
       (define-function pair?	(obj)	(is <pair>	obj))

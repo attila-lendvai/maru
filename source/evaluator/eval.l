@@ -89,7 +89,7 @@
     (body	body)
     (env	env)
     (ctx	ctx)
-    (when-at-expand feature/profiler
+    (when-at-expand (feature profiler)
       (profiler-counter (box <long> 0)))))
 
 (define-vm-function form (fn (sym () ()))
@@ -109,9 +109,9 @@
   (safety 2 (assert (and (is <target-pointer> code) (is <string> name))))
   (make <target-function>
     (program-code	code)
-    (when-at-expand feature/track-expr-names
+    (when-at-expand (feature track-expr-names)
       (name		name))
-    (when-at-expand feature/profiler
+    (when-at-expand (feature profiler)
       (profiler-counter	(box <long> 0)))))
 
 (define-vm-function variable ((name <symbol>) value (env <env>) (index <long>))
@@ -307,7 +307,7 @@
 (define-form with-new-call-frame (args . body)
   (let ((call-depth-check `(when (> (incr *call-stack-index*) +maximum-call-stack-depth+)
                              (fatal "infinite recursion guard triggered at call depth "*call-stack-index*))))
-    `(let ((__result__ ,(if feature/backtrace
+    `(let ((__result__ ,(if (feature backtrace)
                             `(let ((-call-frame- (%new-call-frame ,@args)))
                                ,call-depth-check
                                ,@body)
@@ -315,7 +315,7 @@
                              ,call-depth-check
                              ,@body))))
        (decr *call-stack-index*)
-       ,(when feature/backtrace
+       ,(when (feature backtrace)
           '(when (<= 0 *call-stack-index*)
             ;; gc optimization: clear the now unused call-frame
             (let ((frame (array-at *call-stack* *call-stack-index*)))
@@ -326,7 +326,7 @@
        ;;(debug (platform/print "with-new-call-frame returning with result: ") (println __result__))
        __result__)))
 
-(when-at-expand feature/backtrace
+(when-at-expand (feature backtrace)
   (define-function %new-call-frame (callee-designator callee args)
     (safety 3 (unless (gc/valid-maru-value? callee-designator)	(fatal "new-call-frame: encountered an untagged callee-designator")))
     (safety 3 (unless (gc/valid-maru-value? callee)		(fatal "new-call-frame: encountered an untagged callee")))
@@ -347,7 +347,7 @@
       (array-at *call-stack* (- *call-stack-index* 1)))))
 
 (define-function print-backtrace ()
-  (if-at-expand feature/backtrace
+  (if-at-expand (feature backtrace)
       (let ((out *debug-output*))
         (for (i 0 *call-stack-index*)
           (platform/flush-streams) ; seems like that in case of a sigsegv it doesn't get flushed
@@ -489,7 +489,7 @@
 (define-function expand/pair (exp env one-step? -call-frame-)
   (gc/let* ((head (expand (get/head exp) env one-step?)))
     (debug-print "expand/pair on head "head)
-    (when-at-expand feature/backtrace
+    (when-at-expand (feature backtrace)
       (unless (= head (get/head exp))
         (set (<call-frame>-callee		-call-frame-) head))
       (set (<call-frame>-arguments		-call-frame-) exp))
@@ -762,27 +762,27 @@
   (with-new-call-frame (() () ())
     (cond
       ((= type <pair>)
-       (when-at-expand feature/backtrace
+       (when-at-expand (feature backtrace)
          (set (<call-frame>-callee-designator	-call-frame-) (get/head exp))
          (set (<call-frame>-arguments		-call-frame-) (get/tail exp)))
        (gc/let* ((evaled-head (eval (get/head exp) ctx)))
          (debug-print "eval of pair, head eval'ed to "evaled-head)
-         (when-at-expand feature/backtrace
+         (when-at-expand (feature backtrace)
            (set (<call-frame>-callee -call-frame-) evaled-head))
 	 (if (is <fixed> evaled-head)
 	     (apply (<fixed>-function evaled-head) (get/tail exp) ctx)
 	   (gc/let* ((args (eval-all (get/tail exp) ctx)))
-             (when-at-expand feature/backtrace
+             (when-at-expand (feature backtrace)
                (set (<call-frame>-arguments -call-frame-) args))
              (apply evaled-head args ctx)))))
       (else
-       (when-at-expand feature/backtrace
+       (when-at-expand (feature backtrace)
          (set (<call-frame>-callee-designator -call-frame-) exp))
        (aif (and *evaluators-var*
                  (set it (maybe-object-in-variable *evaluators-var* <array>))
                  (array-at it type))
 	   (gc/let* ((args (cons exp ())))
-	     (when-at-expand feature/backtrace
+	     (when-at-expand (feature backtrace)
                (set (<call-frame>-callee -call-frame-) it)
                (set (<call-frame>-arguments -call-frame-) args))
 	     (apply it args ctx))
@@ -839,7 +839,7 @@
       (set res (expand-encode-eval form)))
     res))
 
-(when-at-expand feature/profiler
+(when-at-expand (feature profiler)
   ;; these are coming from profiler.c
   (define-C-function install_profiler_handler void install_profiler_handler (*))
   (define-C-function set_profiler_interval void set_profiler_interval (int))
@@ -861,7 +861,7 @@
   (define-function profiler/take-sample (_)
     (debug-print "profiler is taking a sample")
     (incr profiler/sample-counter)
-    (if-at-expand feature/profiler/cumulative
+    (if-at-expand (feature profiler/cumulative)
         (for (i 0 *call-stack-index*)
           (profiler/take-sample-at-frame (array-at *call-stack* i)))
       (awhen (current-call-frame)

@@ -24,11 +24,11 @@
 
 (let* ((type		(slave-value <target-function>))
        (type-id		(slave-value (<type>-slave-id <target-function>)))
-       (emit-name?	(slave-value feature/track-expr-names))
-       (profiler?	(slave-value feature/profiler)))
+       (emit-name?	(feature track-expr-names))
+       (profiler?	(feature profiler)))
   (define-function emit-object/<target-function> (name entry-label -c-)
     (let ((object-label	(if name
-                            (LABEL (if feature/redefinable-functions-in-target
+                            (LABEL (if (feature redefinable-functions-in-target)
                                        (concat-string (symbol->string name) "__obj")
                                      name))
                           (UNIQUE-LABEL "oclosure")))
@@ -97,7 +97,7 @@
 
 (let* ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
        (canary-value	(slave-value +canary-value+))
-       (canary-emitter	(when (slave-value feature/object-canary)
+       (canary-emitter	(when (feature object-canary)
                           (lambda (-c-)
                             (emit CELL canary-value)))))
   (define-function emit-object/header (type type-id -c-)

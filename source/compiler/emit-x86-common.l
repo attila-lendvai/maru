@@ -337,7 +337,7 @@
                                 (println "	mov	(%rcx), %al")))
 
 (define-instruction STORE-I8	(false 0 true)
-  ((TEMP32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP32 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
                                     ;; NOTE this works out just fine for a TEMP32, too, because we are little-endian.
                                     (let ()
                                       (println "	mov	"$1", %ecx")
@@ -349,7 +349,7 @@
                                   (println "	lea	(%eax, %ecx), %eax")
                                   (println "	movb	"$2", (%eax)")))
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
-                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                  (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
                                         (if (= 0 offset)
                                             (println "	mov	%eax, %ecx")
@@ -360,7 +360,7 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"offset"(%eax), %eax"))
                                     (println "	movb	"$2", (%eax)"))))
-  ((TEMP64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP64 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
 				    ;; NOTE this works out just fine for a TEMP64, too, because we are little-endian.
                                     (let ()
                                       (println "	mov	"$1", %rcx")
@@ -373,7 +373,7 @@
                                   (println "	lea	(%rax, %rcx), %rax")
                                   (println "	movb	"$2", (%rax)")))
   ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
-                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                  (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
                                         (if (= 0 offset)
                                             (println "	mov	%rax, %rcx")
@@ -404,7 +404,7 @@
                                     (println "	mov	(%rcx), %rax")))))
 
 (define-instruction STORE-OOP	(false 0 true)
-  ((TEMP32 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP32 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
                                     (let ()
                                       (println "	mov	"$1", %ecx")
                                       (println "	lea	(%eax, %ecx, 4), %ecx")
@@ -414,7 +414,7 @@
                                   (println "	lea	(%eax, %ecx, 4), %eax")
                                   (println "	mov	"$2", (%eax)")))
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
-                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                  (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
                                         (if (= 0 offset)
                                             (println "	mov	%eax, %ecx")
@@ -424,7 +424,7 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"(* 4 offset)"(%eax), %eax"))
                                     (println "	mov	"$2", (%eax)"))))
-  ((TEMP64 _)			(if-at-expand feature/strict-semantics-for-compiled-set
+  ((TEMP64 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
                                     (let ()
                                       (println "	mov	"$1", %rcx")
                                       (println "	lea	(%rax, %rcx, 8), %rcx")
@@ -434,7 +434,7 @@
                                   (println "	lea	(%rax, %rcx, 8), %rax")
                                   (println "	mov	"$2", (%rax)")))
   ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
-                                  (if-at-expand feature/strict-semantics-for-compiled-set
+                                  (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
                                         (if (= 0 offset)
                                             (println "	mov	%rax, %rcx")
@@ -602,7 +602,7 @@
     ()))
 
 (define-function compile-call-to-global-function (op arg-locs -c-)
-  (if feature/redefinable-functions-in-target
+  (if (feature redefinable-functions-in-target)
       (let ()
         (comp op)
         (compile-call-to-object arg-locs -c-))

@@ -78,8 +78,8 @@
 
 (define-print-method <fixed>	(print-all -stream- "<fixed "self.function">"))
 (define-print-method <selector>	(print-all -stream- "<selector "self.name">"))
-(define-print-method <expr>	(print-all -stream- "<expr "(or (when-at-expand feature/track-expr-names self.name) "?")" "self.parameters">"))
-(define-print-method <env>	(print-all -stream- "<env "(or (when-at-expand feature/debug-info self.name) "?")" Lv"self.level",Off"self.offset",#"(array-length self.bindings)">"))
+(define-print-method <expr>	(print-all -stream- "<expr "(or (when-at-expand (feature track-expr-names) self.name) "?")" "self.parameters">"))
+(define-print-method <env>	(print-all -stream- "<env "(or (when-at-expand (feature debug-info) self.name) "?")" Lv"self.level",Off"self.offset",#"(array-length self.bindings)">"))
 (define-print-method <type>	(print-all -stream- "<"(<type>-name self)" "(<type>-id self)">"))
 (define-print-method <pair>	(%print-list -stream- self " " false))
 

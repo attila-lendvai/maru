@@ -13,10 +13,6 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
-;; TODO shouldn't these be in the slave? or maybe even in the target (it's a form, i.e. not emitted)
-(define-constant feature/redefinable-functions-in-target ()) ; costs about 20-30% time increase in the bootstrap process
-(define-constant feature/strict-semantics-for-compiled-set true) ; compiled set-oop-at & co. also returns the value that was just set
-
 (define-selector compile-object)
 ;; TODO its default should be specified like this:
 ;; (define-selector compile (-c-)
