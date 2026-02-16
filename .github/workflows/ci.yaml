@@ -58,6 +58,8 @@ jobs:
 
       - run:  timeout 5m make test-evaluator
       - run:  timeout 5m make test-parser
+      - run:  timeout 5m make PLATFORM=libc  test-compiler
+      - run:  timeout 5m make PLATFORM=linux test-compiler
 
       - run:  timeout 5m make PLATFORM=posix test-elf
       - run:  timeout 5m make PLATFORM=linux test-elf
@@ -104,6 +106,8 @@ jobs:
 
       - run:  timeout 5m make test-evaluator
       - run:  timeout 5m make test-parser
+      - run:  timeout 5m make PLATFORM=libc  test-compiler-llvm
+      - run:  timeout 5m make PLATFORM=linux test-compiler-llvm
 
   build-darwin:
     name: "darwin aarch64 (errors ignored)"
@@ -198,6 +202,9 @@ jobs:
         continue-on-error: true      # TODO
 
       - run:  timeout 3m make test-parser
+        continue-on-error: true      # TODO
+
+      - run:  timeout 3m make test-compiler-llvm
         continue-on-error: true      # TODO
 
   build-linux-amd64-full-bootstrap:
