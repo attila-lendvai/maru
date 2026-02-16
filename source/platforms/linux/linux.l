@@ -29,8 +29,11 @@
 ;;; Platform API implementation when running on top of the Linux kernel.
 ;;;
 (define-function platform/flush-streams ()
-  (linux-syscall linux/SYS_fsync linux/STDOUT_FILENO)
-  (linux-syscall linux/SYS_fsync linux/STDERR_FILENO))
+  ;; there's no need to flush fd's on linux. fsync straight out
+  ;; returns an error when called on a terminal or pipe.
+  ;; (linux-syscall linux/SYS_fsync linux/STDOUT_FILENO)
+  ;; (linux-syscall linux/SYS_fsync linux/STDERR_FILENO)
+  )
 
 ;; NOTE copy means it may not overlap. move means they may overlap.
 
