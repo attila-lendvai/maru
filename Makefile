@@ -135,6 +135,8 @@ else ifeq ($(TARGET_ARCH),i686)
   CFLAGS_x86	+= -m32
   CFLAGS_llvm	+= -m32
 else ifeq ($(TARGET_ARCH),aarch64)
+else ifeq ($(TARGET_ARCH),arm)
+  TARGET_ABI	= gnueabihf
 else ifeq ($(TARGET_ARCH),arm64)
   # darwin uname -m returns arm64, but life is simpler withtout that anomaly.
   TARGET_ARCH=aarch64
