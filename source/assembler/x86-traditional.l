@@ -1,5 +1,9 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;;; This is a traditional assembler that processes a static list of
+;;; instructions, and emits them in multiple phases, until no labels
+;;; change value.
+
 (require "source/buffer.l")
 (require "source/types.l")
 

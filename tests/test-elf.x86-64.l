@@ -29,16 +29,17 @@
 ;;  - Use syscall (0x0f 0x05). Syscall numbers: write=1, exit=60.
 ;;  - Syscall args in rdi, rsi, rdx, r10, r8, r9 (we use rdi/rsi/rdx here).
 
-(require "source/assembler/x86.l")
+(require "source/assembler/x86-traditional.l")
 
 ;; ELF flags
 (define elf/PF_R	0x4)
 (define elf/PF_W	0x2)
 (define elf/PF_X	0x1)
 (define elf/page-size	0x1000)
+(define base-address	0x00400000)
 
 (assemble
-  '((.base	0x00400000) ; typical 64-bit default base
+  '((.base	base-address) ; typical 64-bit default base
 file-start
     (.i8	0x7f)			; ident[0]
     (.ascii	"ELF")
@@ -63,7 +64,7 @@ program-headers
     (.i32	1)			; p_type (PT_LOAD)
     (.i32	(+ elf/PF_R elf/PF_X))	; p_flags (read, exec)
     (.i64	0)			; p_offset (file offset)
-    (.i64	0x00400000)		; p_vaddr (virtual addr of segment) - base
+    (.i64	base-address)		; p_vaddr (virtual addr of segment) - base
     (.i64	0)			; p_paddr
     (.i64	code-segment-size)	; p_filesz
     (.i64	code-segment-size)	; p_memsz
