@@ -1,17 +1,22 @@
-(require "source/assembler/x86.l")
+(require "source/assembler/x86-single-pass.l")
 (require "tests/infra.l")
 
 (define-test jit/1 ()
-  (assemble '(
-	(MOVQir	1 _RAX)				; write (syscall #1)
-	(MOVQir	2 _RDI)				; stderr (fd 2)
-	(MOVQir	msg _RSI)			; buffer
-	(MOVQir	msglen _RDX)			; strlen(buffer)
-	(SYSCALL)
-	(MOVQir	42 _RAX)
-	(RET)
-msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
-	(.def	msglen (- $ msg))))
+  (begin-assembling)
+
+  (MOVQir	1 _RAX)         ; write (syscall #1)
+  (MOVQir	2 _RDI)         ; stderr (fd 2)
+  (MOVQir	0 _RSI)       ; buffer
+  (flabel .i64	'msg -8)
+  (MOVQir	0 _RDX)    ; strlen(buffer)
+  (flabel .i64	'msg-end -8 (- self (label 'msg)))
+  (SYSCALL)
+
+  (MOVQir	42 _RAX)
+  (RET)
+  (flabel!	'msg)
+  (.ascii	"*** Test output from running the dynamically compiled asm code\n")
+  (flabel!	'msg-end)
 
   ;; (let ((filename "./build/jit"))
   ;;   (println "writing runtime buffer to "filename)
