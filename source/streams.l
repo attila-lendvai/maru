@@ -113,7 +113,7 @@
     (srcpos	(cons path 1))))
 
 (define-method $at-end? <file-input-stream> ()
-  (= () ($peek self)))
+  (= +end+ ($peek self)))
 
 (define-method $peek <file-input-stream> ()
   (or self.pending
@@ -138,11 +138,20 @@
 (define-method $source-position <file-input-stream> ()
   self.srcpos)
 
-(define-function input-stream-up-to (self delimiter)
-  (let ((res (string)))
-    (until (= delimiter ($peek self))
-      (string-append res ($next self)))
-    res))
+(define-function input-stream-up-to (stream delimiter)
+  (let ((res (string))
+        (char ()))
+    (until (let ()
+             (set char ($peek stream))
+             (or (= char delimiter)
+                 (= char +end+)))
+      (string-append res ($next stream)))
+    (if (= char delimiter)
+        res
+      ;; char is +end+
+      (if (= 0 (string-length res))
+          +end+
+        res))))
 
 (define-function contents-of-file-named (name)
   (input-stream-up-to (file-input-stream (file-open-or-die name "r")
