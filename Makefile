@@ -110,7 +110,6 @@ GEN_EVAL	= $(BUILD_llvm)/eval1
 # can't really use any of these in the current setup, because the make
 # targets are generated based on the variables, so stuff like
 # $(BUILD)/llvm-posix will only work when PLATFORM=posix.
-GEN_EVAL	= $(BUILD_llvm)/eval1
 #GEN_EVAL	= $(BUILD)/llvm/i686-$(TARGET_VENDOR)-$(TARGET_OS)/eval1
 #GEN_EVAL	= $(BUILD)/llvm-posix/$(TARGET)/eval1
 #GEN_EVAL	= $(BUILD_x86)/eval1
@@ -182,8 +181,8 @@ else
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-x86-objects.l emit-i686.l emit-x86-64.l emit-late.l)
-EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-late.l)
+EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-x86-objects.l emit-i686.l emit-x86-64.l emit-late.l) source/platforms/run-compiler.l
+EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-llvm-objects.l emit-late.l) source/platforms/run-compiler.l
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
 

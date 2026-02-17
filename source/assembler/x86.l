@@ -34,8 +34,12 @@
   (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
 
 ;; TODO these should encode RIP relative offsets
-(define-function _D1 (value)	(_B value))
-(define-function _D4 (value)	(_L value))
+(define-function _D1 (value)
+  (print-all *debug-output* "**** TODO _D1: " value "\n")
+  (_B value))
+(define-function _D4 (value)
+  (print-all *debug-output* "**** TODO _D4: " value "\n")
+  (_L value))
 
 (require "build/generated/x86-instructions.l")
 

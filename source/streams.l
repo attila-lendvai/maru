@@ -2,6 +2,8 @@
 
 ;; NOTE currently the evaluator and the target stream worlds are separate
 
+;; FIXME decide on how to handle EOF and make it uniform
+
 (require "source/unit-test.l")
 (require "source/files.l")
 (require "source/streams-min.l")
@@ -132,7 +134,6 @@
 (define-method $next <file-input-stream> ()
   (let ((c ($peek self)))
     (set self.pending ())
-    ;; TODO delme (set (<file-input-stream>-pending self) ())
     c))
 
 (define-method $source-position <file-input-stream> ()
