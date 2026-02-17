@@ -124,10 +124,18 @@
     (env	env)
     (index	(box <long> index))))
 
-(define-vm-function environment ((parent <env>) (level <long> 0) (offset <long> (unbox <long> (<env>-offset parent))))
+(define-vm-function environment
+    ((parent () ())
+     (level <long> 0)
+     (offset <long> (if (is <env> parent)
+                        (unbox <long> (<env>-offset parent))
+                      0)))
+  (safety 2 (assert (or (is <env> parent) (is <undefined> parent))))
   (make <env>
     (parent	parent)
-    (level	(box <long> (if parent (+ (unbox <long> (<env>-level parent)) level) 0)))
+    (level	(box <long> (if (is <env> parent)
+                                (+ (unbox <long> (<env>-level parent)) level)
+                              0)))
     (offset	(box <long> offset))
     (bindings	(array 0))
     (stable	false))) ; using false here is fine because false = 0 = (), i.e. it's a valid Lisp object
