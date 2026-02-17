@@ -158,6 +158,33 @@
                                          name)
                       +end+))
 
+;;;
+;;; LoC counting
+;;;
+(define-function maru-comment-line? (str)
+  (let ((i 0)
+        (end (string-length str))
+        (whitespace? true))
+    (while (and (< i end)
+                whitespace?)
+      (unless (member? (string-at str i) '(?\n ?\r ?  ?\t))
+        (set whitespace? false))
+      (incr i))
+    (or whitespace?
+        (= (string-at str i) ?\; ))))
+
+(define-function count-maru-loc (path)
+  (let* ((file (file-open-or-die path "r"))
+         (stream (file-input-stream file path)))
+    (let ((loc 0)
+          (line ()))
+      (while (not (= +end+ (set line (input-stream-up-to stream ?\n))))
+        ($next stream) ; drop the \n
+        (unless (maru-comment-line? line)
+          (incr loc)))
+      (file-close file)
+      loc)))
+
 ;; (unit-test "<input-stream>"
 ;;   (let ((s (input-stream *input*))
 ;; 	(c 0)
