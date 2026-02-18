@@ -10,8 +10,12 @@
   (MOVQir	1 _RAX)         ; write (syscall #1)
   (MOVQir	2 _RDI)         ; stderr (fd 2)
   (LEAQmr	(flabelr 'msg) 0 0 0 _RSI) ; buffer
-  (MOVQir	(flabel 'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
+  (MOVQir32	(flabel 'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
   (SYSCALL)
+
+  ;; only to test the instruction emitter
+  (MOVQir	0x01234567 _RAX)
+  ;;(MOVQir	0x0123456789abcdef _RAX)
 
   (MOVQir	42 _RAX)
   (RET)
