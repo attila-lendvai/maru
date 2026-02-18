@@ -159,6 +159,7 @@
 #define _s0P(I)         (I == 0)
 #define _s1P(I)         ((I >= -128)   && (I <= 127))
 #define _s2P(I)         ((I >= -32768) && (I <= 32767))
+#define _s4P(I)         ((I >= -2147483648) && (I <= 2147483647))
 
 #define _s1(I)          (_s1P(I) ? (I) : ASMFAIL( "8-bit signed immediate required"))
 #define _s2(I)          (_s2P(I) ? (I) : ASMFAIL("16-bit signed immediate required"))
@@ -1178,6 +1179,10 @@
 
 #define	MOVQim(N,D,B,I,S)	(_REX(1,0,I,B), MOVLim(N,D,_r8(B),_r8(I),S))
 #define	MOVQir(I,R)		(_REX(1,0,0,R), _Or_Q(0xb8,_rN(_r8(R)),I))
+#define MOVQir32(I,R)           (_REX(1,0,0,R), _O_Mrm_L(0xC7, _b11, 0, _rN(_r8(R)), I))
+// FIXME this is broken due to the bool->int logic and:
+// (and (bool->int ...) ...) is clearly wrong on the lisp side
+//#define	MOVQir(I,R)		_s4P(I) ? MOVQir32(I,R) : MOVQir64(I,R)
 
 #define	MOVQrm(R,D,B,I,S)	(_REX(1,R,I,B), MOVLrm(_r8(R),D,_r8(B),_r8(I),S))
 #define	MOVQmr(D,B,I,S,R)	(_REX(1,R,I,B), MOVLmr(D,_r8(B),_r8(I),S,_r8(R)))
