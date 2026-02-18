@@ -50,11 +50,35 @@
     (set (buffer-at buffer position) value)
     (set (<assembler>-position *assembler*) (+ 1 position))))
 
-(define-function _W  (value)	(_B (bitwise-and 0xff value))   (_B (bitwise-and 0xff   (bitwise-shift value -8))))
-(define-function _L  (value)	(_W (bitwise-and 0xffff value)) (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-(define-function _Q  (value)
-  (_L (bitwise-and 0xffffffff value))
-  (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+(define-function _W (value)
+  (if (is <long> value)
+      (let ()
+        (_B (bitwise-and 0xff value))
+        (_B (bitwise-and 0xff   (bitwise-shift value -8))))
+    (value 'register _W)
+    ;; emit a hole
+    (_B 0)
+    (_B 0)))
+
+(define-function _L (value)
+  (if (is <long> value)
+      (let ()
+        (_W (bitwise-and 0xffff value))
+        (_W (bitwise-and 0xffff (bitwise-shift value -16))))
+    (value 'register _L)
+    ;; emit a hole
+    (_W 0)
+    (_W 0)))
+
+(define-function _Q (value)
+  (if (is <long> value)
+      (let ()
+        (_L (bitwise-and 0xffffffff value))
+        (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+    (value 'register _Q)
+    ;; emit a hole
+    (_L 0)
+    (_L 0)))
 
 ;; TODO these should encode RIP relative offsets
 (define-function _D1 (value)
@@ -102,38 +126,41 @@
     (assert (is <long> value))
     value))
 
-(define-function %forward-label (writer name value-future offset)
+(define-function %forward-label (name value-future)
   (assert (symbol? name))
-  (let* ((env	(<assembler>-env *assembler*))
-         (hole	(+ (<assembler>-position *assembler*) offset))
-         (emitters (variable-value env name ())))
-    (push emitters
-          (lambda (value) ; the address
-            (let ((saved-pos  (<assembler>-position *assembler*))
-                  (saved-addr (<assembler>-address *assembler*)))
-              (set (<assembler>-position *assembler*) hole)
-              (let ((final-value (value-future value)))
-                (writer final-value)
-                ;; register the final value at this label
-                (environment-define env name value))
-              (set (<assembler>-position *assembler*) saved-pos)
-              (set (<assembler>-address *assembler*)  saved-addr))))
-    (environment-define env name emitters))
-  ;; make space for the future value, but only if no offset was specified
-  (when (= 0 offset)
-    (writer 0)))
+  (let* ((env		(<assembler>-env *assembler*))
+         (hole		())
+         (writer	())
+         (emitters	(variable-value env name ()))
+         (emitter
+           (lambda (state value)
+             (case state
+               (register
+                (set hole (<assembler>-position *assembler*))
+                (set writer value))
+               (emit
+                (let ((saved-pos  (<assembler>-position *assembler*))
+                      (saved-addr (<assembler>-address *assembler*)))
+                  (set (<assembler>-position *assembler*) hole)
+                  (let ((final-value (value-future value)))
+                    (writer final-value)
+                    ;; register the final value at this label
+                    (environment-define env name value))
+                  (set (<assembler>-position *assembler*) saved-pos)
+                  (set (<assembler>-address *assembler*)  saved-addr)))
+               (else (error "unexpected state: "state))))))
+    (push emitters emitter)
+    (environment-define env name emitters)
+    emitter))
 
-(define-form flabel (writer name . args)
-  (let ((offset		(if (is <long> (first args))
-                            (pop args)
-                          0))
-        (value-form	(or (pop args)
+(define-form flabel (name . args)
+  (let ((value-form	(or (pop args)
                             'self)))
-    `(%forward-label ,writer ,name (lambda (self) ,value-form) ,offset)))
+    `(%forward-label ,name (lambda (self) ,value-form))))
 
 (define-function flabel! (name)
   (let* ((env	(<assembler>-env *assembler*))
          (emitters (variable-value env name))
          (address (<assembler>-address *assembler*)))
     (list-do emitter emitters
-      (emitter address))))
+      (emitter 'emit address))))
