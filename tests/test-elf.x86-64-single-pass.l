@@ -142,15 +142,18 @@
 (define-function memory-buffer1 ()
   (begin-assembling)
 
+  ;; let's test that the generated code is position independent
+  (.base 0xffff)
+
   (MOVQir	1 _RAX)         ; write (syscall #1)
   (MOVQir	2 _RDI)         ; stderr (fd 2)
-  (MOVQir	(flabel 'msg) _RSI)       ; buffer
+  (LEAQmr	(flabelr 'msg) 0 0 0 _RSI)
   (MOVQir	(flabel 'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
   (SYSCALL)
   (RET)
 
   (flabel!	'msg)
-  (.ascii	"*** Test output from running the dynamically compiled asm code\n")
+  (.ascii	"*** Test output from running the dynamically compiled asm code ***\n")
   (flabel!	'msg-end)
 
   (let ((filename "./build/runtime-buffer.x86-64-single-pass"))
@@ -166,18 +169,22 @@
 (define-function memory-buffer2 ()
   (begin-assembling)
 
+  ;; let's test that the generated code is position independent
+  (.base 0xffff)
+
   (MOVQir	1 _RAX)         ; write
   (MOVQir	1 _RDI)         ; stdout
-  (MOVQir	(flabel	'msg) _RSI)       ; buffer
+  (LEAQmr	(flabelr 'msg) 0 0 0 _RSI)       ; buffer
+  ;;(MOVQir	(flabel	'msg) _RSI)
   (MOVQir	(flabel	'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
   (SYSCALL)
 
   (MOVQir	60 _RAX)        ; exit
-  (MOVQir	0 _RDI)         ; status
+  (XORQrr	_RDI _RDI)      ; status
   (SYSCALL)
 
   (flabel!	'msg)
-  (.ascii	"*** You may run ./build/test-elf.x86-64-single-pass now for a friendly greeting\n")
+  (.ascii	"*** You may run ./build/test-elf.x86-64-single-pass now for a friendly greeting ***\n")
   (flabel!	'msg-end)
 
   (println "calling it, output should follow")

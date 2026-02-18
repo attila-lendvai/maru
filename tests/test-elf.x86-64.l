@@ -139,7 +139,7 @@ exit-code
 	(MOVQir	msglen _RDX)			; strlen(buffer)
 	(SYSCALL)
 	(RET)
-msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
+msg	(.ascii	"*** Test output from running the dynamically compiled asm code ***\n")
 	(.def	msglen (- $ msg))))
 
 (let ((filename "./build/runtime-buffer.x86-64"))
@@ -157,9 +157,9 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(MOVQir	msglen _RDX)			; strlen(buffer)
 	(SYSCALL)
 	(MOVQir	60 _RAX)			; exit
-	(MOVQir	0 _RDI)				; status
+	(XORQrr	_RDI _RDI)			; status
 	(SYSCALL)
-msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting\n")
+msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting ***\n")
 	(.def	msglen (- $ msg))))
 
 (println "calling it, output should follow")
