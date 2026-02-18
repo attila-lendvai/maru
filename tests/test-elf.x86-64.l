@@ -130,40 +130,5 @@ exit-code
 
 (let ((filename "./build/test-elf.x86-64"))
   (println "writing elf buffer to "filename)
-  (save-assembler-buffer *assembler* filename))
-
-(assemble '(
-	(MOVQir	1 _RAX)				; write (syscall #1)
-	(MOVQir	2 _RDI)				; stderr (fd 2)
-	(MOVQir	msg _RSI)			; buffer
-	(MOVQir	msglen _RDX)			; strlen(buffer)
-	(SYSCALL)
-	(RET)
-msg	(.ascii	"*** Test output from running the dynamically compiled asm code ***\n")
-	(.def	msglen (- $ msg))))
-
-(let ((filename "./build/runtime-buffer.x86-64"))
-  (println "writing runtime buffer to "filename)
-  (save-assembler-buffer *assembler* filename))
-
-(println "calling memory buffer, output should follow")
-
-(call-x86-64-machine-code (assembler->function *assembler*))
-
-(assemble '(
-	(MOVQir	1 _RAX)				; write
-	(MOVQir	1 _RDI)				; stdout
-	(MOVQir	msg _RSI)			; buffer
-	(MOVQir	msglen _RDX)			; strlen(buffer)
-	(SYSCALL)
-	(MOVQir	60 _RAX)			; exit
-	(XORQrr	_RDI _RDI)			; status
-	(SYSCALL)
-msg	(.ascii	"*** You may run ./build/test-elf.x86-64 now for a friendly greeting ***\n")
-	(.def	msglen (- $ msg))))
-
-(println "calling it, output should follow")
-
-(call-x86-64-machine-code (assembler->function *assembler*))
-
-(println "BUG: it shouldn't have returned!!!")
+  (save-assembler-buffer *assembler* filename)
+  (println (concat-strings "*** You may run "filename" now for a friendly greeting")))

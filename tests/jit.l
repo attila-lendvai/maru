@@ -4,9 +4,12 @@
 (define-test jit/1 ()
   (begin-assembling)
 
+  ;; let's test that the generated code is position independent
+  (.base 0xffff)
+
   (MOVQir	1 _RAX)         ; write (syscall #1)
   (MOVQir	2 _RDI)         ; stderr (fd 2)
-  (MOVQir	(flabel 'msg) _RSI)       ; buffer
+  (LEAQmr	(flabelr 'msg) 0 0 0 _RSI) ; buffer
   (MOVQir	(flabel 'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
   (SYSCALL)
 

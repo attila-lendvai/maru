@@ -41,7 +41,7 @@
 ;; its role is to encode the intention when an upcoming flabel will fill this hole
 (define hole 0)
 
-(define-function write-elf-file ()
+(define-function write-elf-file (filename)
   (begin-assembling)
 
   (.base	base-address)             ; typical 64-bit default base
@@ -133,64 +133,8 @@
   (.i64		42)
   (flabel!	'data-segment-end)
 
-  (let ((filename "./build/test-elf.x86-64-single-pass"))
-    (println "writing elf buffer to "filename)
-    (save-assembler-buffer *assembler* filename)))
+  (println "writing elf buffer to "filename)
+  (save-assembler-buffer *assembler* filename)
+  (println (concat-strings "*** You may run "filename" now for a friendly greeting")))
 
-(write-elf-file)
-
-(define-function memory-buffer1 ()
-  (begin-assembling)
-
-  ;; let's test that the generated code is position independent
-  (.base 0xffff)
-
-  (MOVQir	1 _RAX)         ; write (syscall #1)
-  (MOVQir	2 _RDI)         ; stderr (fd 2)
-  (LEAQmr	(flabelr 'msg) 0 0 0 _RSI)
-  (MOVQir	(flabel 'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
-  (SYSCALL)
-  (RET)
-
-  (flabel!	'msg)
-  (.ascii	"*** Test output from running the dynamically compiled asm code ***\n")
-  (flabel!	'msg-end)
-
-  (let ((filename "./build/runtime-buffer.x86-64-single-pass"))
-    (println "writing runtime buffer to "filename)
-    (save-assembler-buffer *assembler* filename))
-
-  (println "calling memory buffer, output should follow")
-
-  (call-x86-64-machine-code (assembler->function *assembler*)))
-
-(memory-buffer1)
-
-(define-function memory-buffer2 ()
-  (begin-assembling)
-
-  ;; let's test that the generated code is position independent
-  (.base 0xffff)
-
-  (MOVQir	1 _RAX)         ; write
-  (MOVQir	1 _RDI)         ; stdout
-  (LEAQmr	(flabelr 'msg) 0 0 0 _RSI)       ; buffer
-  ;;(MOVQir	(flabel	'msg) _RSI)
-  (MOVQir	(flabel	'msg-end (- self (label 'msg))) _RDX)    ; strlen(buffer)
-  (SYSCALL)
-
-  (MOVQir	60 _RAX)        ; exit
-  (XORQrr	_RDI _RDI)      ; status
-  (SYSCALL)
-
-  (flabel!	'msg)
-  (.ascii	"*** You may run ./build/test-elf.x86-64-single-pass now for a friendly greeting ***\n")
-  (flabel!	'msg-end)
-
-  (println "calling it, output should follow")
-
-  (call-x86-64-machine-code (assembler->function *assembler*)))
-
-(memory-buffer2)
-
-(println "BUG: it shouldn't have returned!!!")
+(write-elf-file "./build/test-elf.x86-64-single-pass")
