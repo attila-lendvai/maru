@@ -53,9 +53,10 @@
 (define-function _W (value)
   (if (is <long> value)
       (let ()
+        (assert (<= value 0xffff) "_W was called with value: "value)
         (_B (bitwise-and 0xff value))
         (_B (bitwise-and 0xff   (bitwise-shift value -8))))
-    (value 'register _W)
+    (value 'register _W 2)
     ;; emit a hole
     (_B 0)
     (_B 0)))
@@ -63,9 +64,10 @@
 (define-function _L (value)
   (if (is <long> value)
       (let ()
+        (assert (<= value 0xffffffff) "_L was called with value: "value)
         (_W (bitwise-and 0xffff value))
         (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-    (value 'register _L)
+    (value 'register _L 4)
     ;; emit a hole
     (_W 0)
     (_W 0)))
@@ -75,7 +77,7 @@
       (let ()
         (_L (bitwise-and 0xffffffff value))
         (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
-    (value 'register _Q)
+    (value 'register _Q 8)
     ;; emit a hole
     (_L 0)
     (_L 0)))
@@ -126,23 +128,30 @@
     (assert (is <long> value))
     value))
 
-(define-function %forward-label (name value-future)
+(define-function %forward-label (name value-future relative)
   (assert (symbol? name))
   (let* ((env		(<assembler>-env *assembler*))
-         (hole		())
+         (hole-pos	())
+         (hole-address	())
          (writer	())
+         (cell-size	())
          (emitters	(variable-value env name ()))
          (emitter
-           (lambda (state value)
+           (lambda (state . args)
              (case state
                (register
-                (set hole (<assembler>-position *assembler*))
-                (set writer value))
+                (set hole-pos (<assembler>-position *assembler*))
+                (set hole-address (<assembler>-address *assembler*))
+                (set writer (pop args))
+                (set cell-size (pop args)))
                (emit
-                (let ((saved-pos  (<assembler>-position *assembler*))
+                (let ((value (pop args))
+                      (saved-pos  (<assembler>-position *assembler*))
                       (saved-addr (<assembler>-address *assembler*)))
-                  (set (<assembler>-position *assembler*) hole)
+                  (set (<assembler>-position *assembler*) hole-pos)
                   (let ((final-value (value-future value)))
+                    (when relative
+                      (decr final-value (+ hole-address cell-size)))
                     (writer final-value)
                     ;; register the final value at this label
                     (environment-define env name value))
@@ -156,7 +165,12 @@
 (define-form flabel (name . args)
   (let ((value-form	(or (pop args)
                             'self)))
-    `(%forward-label ,name (lambda (self) ,value-form))))
+    `(%forward-label ,name (lambda (self) ,value-form) false)))
+
+(define-form flabelr (name . args)
+  (let ((value-form	(or (pop args)
+                            'self)))
+    `(%forward-label ,name (lambda (self) ,value-form) true)))
 
 (define-function flabel! (name)
   (let* ((env	(<assembler>-env *assembler*))
