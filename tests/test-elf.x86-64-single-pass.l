@@ -30,6 +30,8 @@
 ;;  - Syscall args in rdi, rsi, rdx, r10, r8, r9 (we use rdi/rsi/rdx here).
 
 (require "source/assembler/x86-single-pass.l")
+(require "source/c-groveller/cgrov.l")
+(require-cgrov "source/platforms/linux/linux")
 
 ;; ELF flags
 (define elf/PF_R	0x4)
@@ -50,6 +52,16 @@
   (.i64		(flabel end (- self (label start))))	; p_filesz
   (.i64		(flabel end (- self (label start))))	; p_memsz
   (.i64		alignment))			; p_align
+
+(define-form syscall (sys-number . args)
+  `(begin
+    (MOVQir32	,sys-number _RAX)
+    ,@(map (lambda (arg reg)
+             ;; this being a macro opens the possibility for automatic
+             ;; opcode selection based on the provided arg.
+             `(MOVQir	,arg ,reg))
+           args '(_RDI _RSI _RDX _R10 _R8 _R9))
+    (SYSCALL)))
 
 (define-function write-elf-file (filename)
   (begin-assembling)
@@ -98,24 +110,18 @@
 
   (flabel!	'code-segment-start)
 
-  ;; print message (syscall write)
-  ;; rax = syscall number (1), rdi = fd, rsi = buf, rdx = count
-  (MOVQir	1 _RAX)			; write (syscall #1)
-  (MOVQir	1 _RDI)			; fd, stdout
-  (MOVQir	(flabel 'msg) _RSI)
-  (MOVQir	(flabel 'msg-end (- self (label 'msg))) _RDX)
-  (SYSCALL)
+  ;; print message
+  (syscall linux/SYS_write linux/STDOUT_FILENO
+           (flabel 'msg) (flabel 'msg-end (- self (label 'msg))))
 
-  ;; write into the data segment: var = var - 42
-  (XORQrr	_RAX _RAX)
+  ;; test writing into the data segment: turn EXIT-CODE into 0
   (MOVQir	(flabel 'exit-code) _RBX)
-  (ADDQim	-42 0 _RBX _RAX 1)
+  (ADDQim	-2 0 _RBX 0 0) ; [rbx] += -2
+  (SUBQim	40 0 _RBX 0 0) ; [rbx] -= 40
 
-  ;; exit: rax = 60, rdi = status
-  (MOVQir	(flabel 'exit-code) _RDI)		; exit code into rdi
-  (MOVQmr	0 _RDI 0 0 _RDI)
-  (MOVQir	60 _RAX)		; exit syscall (60)
-  (SYSCALL)
+  (MOVQir	(flabel 'exit-code) _RDI) ; exit code address
+  (MOVQmr	0 _RDI 0 0 _RDI)          ; exit code into %rdi (syscall arg 2)
+  (syscall	linux/SYS_exit)
 
   (.align elf/page-size) ; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned
 

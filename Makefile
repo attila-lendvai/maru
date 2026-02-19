@@ -611,8 +611,8 @@ test-elf.IA-32: eval-x86 tests/test-elf.IA-32.l source/assembler/x86.l
 
 # make PLATFORM=linux test-elf.x86-64
 test-elf.x86-64: eval-llvm tests/test-elf.x86-64.l source/assembler/x86.l
-	./eval-llvm boot.l tests/test-elf.x86-64.l
-	./eval-llvm boot.l tests/test-elf.x86-64-single-pass.l
+	./eval-llvm boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.l
+	./eval-llvm boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64-single-pass.l
 #	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass
 
 	-readelf -el build/test-elf.x86-64
