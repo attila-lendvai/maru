@@ -307,7 +307,7 @@
   ((R32 GLOBAL32)		(println "	mov	"$1", "$2))
   ((R64 GLOBAL64)		(println "	lea	"$2"(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
-  ((R64 GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rbx")
+  ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
   ((R64 R64)			(println "	mov	"$1", ("$2")"))
   ((R64 TEMP64)			(println "	mov	"$1", "$2)))
