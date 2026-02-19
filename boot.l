@@ -233,7 +233,9 @@
 ;;; configuration
 
 (define-form feature (name)
-  (concat-symbol 'feature/ name))
+  ;; TODO make this nicer/simpler
+  (let ((feature-name (concat-symbol 'feature/ name)))
+    `(when (defined? ',feature-name) (eval ',feature-name))))
 
 (define-form set-feature (name value-form)
   (let ((var-name (concat-symbol 'feature/ name))

@@ -7,12 +7,18 @@
   '(eval-in-slave
     '(repl-stream *standard-input* *debug-output*)))
 
+;; replace FEATURE with a strict version that doesn't fall back to
+;; false on undefined features. this is to get early errors in case of
+;; loading issues.
+(define-form feature (name)
+  (concat-symbol 'feature/ name))
+
 (switch-to-host-env)
 
 (when-at-expand (feature debug-info)
   (assert (= "maru-user" (<env>-name *globals*)))
   (assert (= "slave" (<env>-name (slave-value *globals*)))))
 
+;; redirect to the slave env, and also be intolerant; see above
 (define-form feature (name)
-  ;; we deliberately avoid calling DEFINED? for now to trigger explicit errors
   `(eval-in-slave ',(concat-symbol 'feature/ name)))
