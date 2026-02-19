@@ -613,10 +613,15 @@ test-elf.IA-32: eval-x86 tests/test-elf.IA-32.l source/assembler/x86.l
 test-elf.x86-64: eval-llvm tests/test-elf.x86-64.l source/assembler/x86.l
 	./eval-llvm boot.l tests/test-elf.x86-64.l
 	./eval-llvm boot.l tests/test-elf.x86-64-single-pass.l
-	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass
-	@chmod +x build/test-elf.x86-64
+#	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass
+
 	-readelf -el build/test-elf.x86-64
+	@chmod +x build/test-elf.x86-64
 	./build/test-elf.x86-64
+
+	-readelf -el build/test-elf.x86-64-single-pass
+	@chmod +x build/test-elf.x86-64-single-pass
+	./build/test-elf.x86-64-single-pass
 
 # make PLATFORM=linux test-elf
 test-elf: test-elf.x86-64

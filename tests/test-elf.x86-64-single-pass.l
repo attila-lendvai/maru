@@ -41,11 +41,22 @@
 ;; its role is to encode the intention when an upcoming flabel will fill this hole
 (define hole 0)
 
+(define-function emit-program-header (flags start end alignment)
+  (.i32		1)				; p_type (PT_LOAD)
+  (.i32		flags)				; p_flags (read, exec)
+  (.i64		(flabel start (- self (label 'file-start))))	; p_offset (file offset)
+  (.i64		(flabel start))			; p_vaddr (virtual addr of segment) - base
+  (.i64		0)				; p_paddr
+  (.i64		(flabel end (- self (label start))))	; p_filesz
+  (.i64		(flabel end (- self (label start))))	; p_memsz
+  (.i64		alignment))			; p_align
+
 (define-function write-elf-file (filename)
   (begin-assembling)
 
   (.base	base-address)             ; typical 64-bit default base
   (label!	'file-start)
+
   (.i8		0x7f)			; ident[0]
   (.ascii	"ELF")
   (.i8		2 1 1 0) ; ELFCLASS64, ELFDATA2LSB, version, ELFOSABI_NONE
@@ -58,44 +69,32 @@
   (.i64		0)                ; e_shoff	Start of section headers
   (.i32		0)                ; e_flags
   (.i16		(flabel 'elf-header-end (- self (label 'file-start)))) ; e_ehsize	Size of this header (ELF64_Ehdr = 64)
-  (.i16		(flabel 'program-header-end (- self (label 'program-headers)))) ; e_phentsize	Size of program header entry (ELF64_Phdr = 56)
+  (.i16		56) ; e_phentsize	Size of program header entry (ELF64_Phdr = 56)
   (.i16		3)           ; e_phnum	Number of program headers
   (.i16		0)           ; e_shentsize	Size of section header
   (.i16		0)           ; e_shnum	Number of section headers
   (.i16		0) ; e_shstrndx	Section header string table index
   (flabel!	'elf-header-end)
+
+  ;; this doesn't seem to be needed
+  ;; (.align	elf/page-size)
+
   (flabel!	'program-headers)
 
-  ;; code segment (PT_LOAD)
-  (.i32		1)			; p_type (PT_LOAD)
-  (.i32		(+ elf/PF_R elf/PF_X))	; p_flags (read, exec)
-  (.i64		0)			; p_offset (file offset)
-  (.i64		base-address) ; p_vaddr (virtual addr of segment) - base
-  (.i64		0)          ; p_paddr
-  (.i64		(flabel 'code-segment-end (- self (label 'file-start))))	; p_filesz
-  (.i64		(flabel 'code-segment-end (- self (label 'file-start))))	; p_memsz
-  (.i64		elf/page-size)		; p_align
-  (flabel!	'program-header-end)
+  ;; code segment
+  (emit-program-header (+ elf/PF_R elf/PF_X)
+                       'code-segment-start 'code-segment-end
+                       elf/page-size)
 
   ;; read-only data segment
-  (.i32		1)			; p_type (PT_LOAD)
-  (.i32		elf/PF_R)		; p_flags (read)
-  (.i64		(flabel 'ro-data-segment-start (- self (label 'file-start)))) ; p_offset
-  (.i64		(flabel 'ro-data-segment-start))                ; p_vaddr
-  (.i64		0)                                    ; p_paddr
-  (.i64		(flabel 'ro-data-segment-end (- self (label 'ro-data-segment-start)))) ; p_filesz
-  (.i64		(flabel 'ro-data-segment-end (- self (label 'ro-data-segment-start)))) ; p_memsz
-  (.i64		4)                                    ; p_align
+  (emit-program-header elf/PF_R
+                       'ro-data-segment-start 'ro-data-segment-end
+                       4)
 
   ;; writable data segment
-  (.i32		1)			; p_type (PT_LOAD)
-  (.i32		(+ elf/PF_R elf/PF_W))	; p_flags (read, write)
-  (.i64		(flabel 'data-segment-start (- self (label 'file-start)))) ; p_offset
-  (.i64		(flabel 'data-segment-start))                ; p_vaddr
-  (.i64		0)                                 ; p_paddr
-  (.i64 	(flabel 'data-segment-end (- self (label 'data-segment-start)))) ; p_filesz
-  (.i64		(flabel 'data-segment-end (- self (label 'data-segment-start)))) ; p_memsz
-  (.i64		4)                                 ; p_align
+  (emit-program-header (+ elf/PF_R elf/PF_W)
+                       'data-segment-start 'data-segment-end
+                       4)
 
   (flabel!	'code-segment-start)
 
@@ -124,7 +123,7 @@
 
   (flabel!	'ro-data-segment-start)
   (flabel!	'msg)
-  (.ascii	"Hello, world! From an ELF64 binary!\n")
+  (.ascii	"Hello, world! From an ELF64 binary generated in a single pass!\n")
   (flabel!	'msg-end)
   (flabel!	'ro-data-segment-end)
 
