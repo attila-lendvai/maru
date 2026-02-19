@@ -1126,10 +1126,10 @@
 // are true
 
 #define _REX(W,R,X,B)							\
-    ((void)( (!((W)|_rXP(R)|_rXP(X)|_rXP(B)))				\
+    ((void)( (!((W) || _rXP(R) || _rXP(X) || _rXP(B)))			\
 	     ? 0							\
 	     : _B(0x40 + ((W) << 3) +					\
-		  (_rXP(R) << 2) + (_rXP(X) << 1) + (_rXP(B) << 0)) ) )
+		  (_rXP(R) ? 4 : 0) + (_rXP(X) ? 2 : 0) + (_rXP(B) ? 1 : 0)) ) )
 
 /* +++ fully-qualified intrinsic instructions - STILL VERY INCOMPLETE */
 
