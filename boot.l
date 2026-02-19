@@ -170,6 +170,10 @@
       `(let (,(car bindings)) (let* ,(cdr bindings) ,@body))
     `(let () ,@body)))
 
+(define-form begin body
+  `(let ()
+     ,@body))
+
 (define-form != (a b)
   `(not (= ,a ,b)))
 
