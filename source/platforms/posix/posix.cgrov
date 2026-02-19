@@ -15,3 +15,7 @@ integer P_ALL P_PID
 integer MAP_FAILED MAP_PRIVATE MAP_ANONYMOUS PROT_READ PROT_WRITE PROT_EXEC
 
 sizes	pid_t
+
+header	dlfcn.h
+
+integer RTLD_DEFAULT RTLD_NEXT
