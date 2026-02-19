@@ -1,5 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; these must remain here becuase they are also used by the llvm backend
 (define-constant +linux/syscall/argument-registers/IA-32+
     `(quote ,(map symbol->string '(eax ebx ecx edx esi edi ebp))))
 

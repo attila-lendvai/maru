@@ -1173,9 +1173,16 @@
 #define	MOVQim(N,D,B,I,S)	(_REX(1,0,I,B), MOVLim(N,D,_r8(B),_r8(I),S))
 #define	MOVQir(I,R)		(_REX(1,0,0,R), _Or_Q(0xb8,_rN(_r8(R)),I))
 #define MOVQir32(I,R)           (_REX(1,0,0,R), _O_Mrm_L(0xC7, _b11, 0, _rN(_r8(R)), I))
-// FIXME this is broken due to the bool->int logic and:
-// (and (bool->int ...) ...) is clearly wrong on the lisp side
+// TODO we could do this:
+//
 //#define	MOVQir(I,R)		_s4P(I) ? MOVQir32(I,R) : MOVQir64(I,R)
+//
+// but the assembler passes closures as immediate values where an flabel is used.
+// possible solution: the c->lisp conversion could introduce type-guarded
+// integer comparisons, but i don't like that much, and the added complexity
+// is not worth it anyway. this should be dealth with in the same unit of work
+// when the generated assembler is optimized, probably to use forms instead of
+// functions.
 
 #define	MOVQrm(R,D,B,I,S)	(_REX(1,R,I,B), MOVLrm(_r8(R),D,_r8(B),_r8(I),S))
 #define	MOVQmr(D,B,I,S,R)	(_REX(1,R,I,B), MOVLmr(D,_r8(B),_r8(I),S,_r8(R)))

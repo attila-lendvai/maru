@@ -73,7 +73,7 @@
 (define-operand TEMP32 TEMP	()	self.offset"(%esp)")
 
 (define-operand GLOBAL64 GLOBAL-CELL)
-(define-operand GOT64 GLOBAL-CELL)     ; some Darwin indirection thing...
+(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
 (define-operand LI64 LITERAL)
 (define-operand R64 REGISTER ())
 (define-operand TEMP64 TEMP	()	self.offset"(%rsp)")
@@ -301,7 +301,7 @@
 				(println "	mov	(%rax), %rax"))
   ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
 				(println "	mov	(%rax), %rax")))
-
+;; $1 what, $2 where
 (define-instruction STORE	(true 0 false)
   ((R32 TEMP32)			(println "	mov	"$1", "$2))
   ((R32 GLOBAL32)		(println "	mov	"$1", "$2))

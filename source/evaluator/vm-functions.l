@@ -247,7 +247,8 @@
 
 (define-vm-function (set-byte-at ()) (base (index <long>) (value <long>))
   ;; TODO check bounds
-  (safety 2 (assert (and (<= value 256) (<= 0 value)) "set-byte-at: value is out of range: "(box <long> value)))
+  ;; TODO think through negative numbers and the value range check...
+  (safety 2 (assert (and (<= value 255) (<= -128 value)) "set-byte-at: value is out of range: "(box <long> value)))
   (box <long> (set-byte-at base index value)))
 
 ;; NOTE used by the assembler proof-of-concept in test-elf.l
