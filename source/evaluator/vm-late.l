@@ -145,9 +145,12 @@
              (box <long> gc/collection-count)" GC runs\n"
              ))
 
-(define-function main/common (argc argv stdin stdout stderr)
+(define-function main/common (argc argv stdin stdout stderr init-hook)
   (initialize-vm)
   (initialize-streams stdin stdout stderr)
+
+  (when init-hook
+    (init-hook))
 
   (process-command-line-arguments argc argv)
 

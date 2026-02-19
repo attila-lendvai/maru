@@ -35,6 +35,11 @@
 (load "source/evaluator/vm-with-file-support.l")
 
 (define-function main (argc argv)
-  (main/common argc argv libc/stdin libc/stdout libc/stderr))
+  (main/common argc argv
+               libc/stdin libc/stdout libc/stderr
+               (lambda ()
+                 (environment-define *maru*
+                                     (string->symbol "feature/platform/libc")
+                                     symbol/true))))
 
 (load "source/evaluator/vm-late.l")

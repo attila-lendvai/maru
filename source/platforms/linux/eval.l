@@ -57,6 +57,11 @@
          (argc (oop-at sp 0))
          (argv (+ sp (words-to-bytes 1))))
     (linux-syscall linux/SYS_exit
-     (main/common argc argv linux/STDIN_FILENO linux/STDOUT_FILENO linux/STDERR_FILENO))))
+     (main/common argc argv
+                  linux/STDIN_FILENO linux/STDOUT_FILENO linux/STDERR_FILENO
+                  (lambda ()
+                    (environment-define *maru*
+                                        (string->symbol "feature/platform/linux")
+                                        symbol/true))))))
 
 (load "source/evaluator/vm-late.l")
