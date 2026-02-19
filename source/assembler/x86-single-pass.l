@@ -82,13 +82,23 @@
     (_L 0)
     (_L 0)))
 
-;; TODO these should encode RIP relative offsets
+;; rel8
 (define-function _D1 (value)
-  (print-all *debug-output* "**** TODO _D1: " value "\n")
-  (_B value))
+  (if (is <long> value)
+      (begin
+       (assert (and (<= -0x80 value) (<= value 0x7f)) "_D1 was called with offset larger than rel8: "value)
+       (_B value))
+    (value 'register _D1 1)
+    (_B 0)))
+
+;; rel32
 (define-function _D4 (value)
-  (print-all *debug-output* "**** TODO _D4: " value "\n")
-  (_L value))
+  (if (is <long> value)
+      (begin
+       (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
+       (_L value))
+    (value 'register _D4 1)
+    (_L 0)))
 
 (require "build/generated/x86-instructions.l")
 
