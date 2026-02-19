@@ -603,16 +603,16 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
 # make PLATFORM=linux test-elf.IA-32
-test-elf.IA-32: eval-x86 tests/test-elf.IA-32.l source/assembler/x86.l
-	./eval-x86 boot.l tests/test-elf.IA-32.l
+test-elf.IA-32: $(TEST_EVAL) tests/test-elf.IA-32.l source/assembler/x86.l
+	$(TEST_EVAL) boot.l tests/test-elf.IA-32.l
 	@chmod +x build/test-elf.IA-32
 	-readelf -el build/test-elf.IA-32
 	./build/test-elf.IA-32
 
 # make PLATFORM=linux test-elf.x86-64
-test-elf.x86-64: eval-llvm tests/test-elf.x86-64.l source/assembler/x86.l
-	./eval-llvm boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.l
-	./eval-llvm boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64-single-pass.l
+test-elf.x86-64: $(TEST_EVAL) tests/test-elf.x86-64.l source/assembler/x86.l
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.l
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64-single-pass.l
 #	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass
 
 	-readelf -el build/test-elf.x86-64
@@ -627,8 +627,8 @@ test-elf.x86-64: eval-llvm tests/test-elf.x86-64.l source/assembler/x86.l
 test-elf: test-elf.x86-64
 
 # make PLATFORM=linux test-jit
-test-jit: eval-llvm tests/jit.l source/assembler/x86.l
-	./eval-llvm boot.l tests/jit.l
+test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86.l
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/jit.l
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l
