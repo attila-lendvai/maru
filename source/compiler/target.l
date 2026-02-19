@@ -48,19 +48,6 @@
 (set (feature optimize-space)		true)
 (set (feature optimize-speed)		(and (not (feature optimize-space)) (<= *safety* 2)))
 
-;; a heap object with a function pointer, and optionally a name.
-(define-record <target-function> ()
-  (program-code
-   (when-at-expand (feature track-expr-names)	name)
-   (when-at-expand (feature profiler)		profiler-counter)))
-
-;; (define-method do-pretty <target-function> (port col)
-;;   (port-write port "<target-function>"))
-
-;; a pointer into the level-shifted realm, boxed, so that it can be
-;; stored in the maru heap
-(define-boxed-word <target-pointer>)
-
 ;; FIXME these would be too much trouble to define above because nested quasiquote doesn't work
 (define-form bytes-to-words (value)
   (if (long? value)

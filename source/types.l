@@ -502,6 +502,19 @@
 (define-record		<context>		() (home env bindings callee))
 (define-record		<pair>			() (head tail))
 
+;; a heap object with a function pointer, and optionally a name.
+(define-record <target-function> ()
+  (program-code
+   (when-at-expand (feature track-expr-names)	name)
+   (when-at-expand (feature profiler)		profiler-counter)))
+
+;; (define-method do-pretty <target-function> (port col)
+;;   (port-write port "<target-function>"))
+
+;; a pointer into the level-shifted realm, boxed, so that it can be
+;; stored in the maru heap
+(define-boxed-word <target-pointer>)
+
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
