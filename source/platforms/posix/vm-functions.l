@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(load (concat-strings "source/platforms/libc/vm-functions.l"))
+
 (define-vm-function fork ((flags <long> posix/SIGCHLD))
   (let ((pid (posix/fork)))
     (if (<= 0 pid)
