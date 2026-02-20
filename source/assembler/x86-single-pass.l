@@ -51,54 +51,43 @@
     (set (<assembler>-position *assembler*) (+ 1 position))))
 
 (define-function _W (value)
-  (if (is <long> value)
-      (let ()
-        (assert (<= value 0xffff) "_W was called with value: "value)
-        (_B (bitwise-and 0xff value))
-        (_B (bitwise-and 0xff   (bitwise-shift value -8))))
-    (value 'register _W 2)
-    ;; emit a hole
-    (_B 0)
-    (_B 0)))
+  (unless (is <long> value)
+    (set value (value 'state/emit _W 2)))
+
+  (assert (<= value 0xffff) "_W was called with value: "value)
+  (_B (bitwise-and 0xff value))
+  (_B (bitwise-and 0xff (bitwise-shift value -8))))
 
 (define-function _L (value)
-  (if (is <long> value)
-      (let ()
-        (assert (<= value 0xffffffff) "_L was called with value: "value)
-        (_W (bitwise-and 0xffff value))
-        (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-    (value 'register _L 4)
-    ;; emit a hole
-    (_W 0)
-    (_W 0)))
+  (unless (is <long> value)
+    (set value (value 'state/emit _L 4)))
+
+  (assert (<= value 0xffffffff) "_L was called with value: "value)
+  (_W (bitwise-and 0xffff value))
+  (_W (bitwise-and 0xffff (bitwise-shift value -16))))
 
 (define-function _Q (value)
-  (if (is <long> value)
-      (let ()
-        (_L (bitwise-and 0xffffffff value))
-        (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
-    (value 'register _Q 8)
-    ;; emit a hole
-    (_L 0)
-    (_L 0)))
+  (unless (is <long> value)
+    (set value (value 'state/emit _Q 8)))
 
-;; rel8
+  (_L (bitwise-and 0xffffffff value))
+  (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+
+;; rel8 offset
 (define-function _D1 (value)
-  (if (is <long> value)
-      (begin
-       (assert (and (<= -0x80 value) (<= value 0x7f)) "_D1 was called with offset larger than rel8: "value)
-       (_B value))
-    (value 'register _D1 1)
-    (_B 0)))
+  (unless (is <long> value)
+    (set value (value 'state/emit _D1 1)))
 
-;; rel32
+  (assert (and (<= -0x80 value) (<= value 0x7f)) "_D1 was called with offset larger than rel8: "value)
+  (_B value))
+
+;; rel32 offset
 (define-function _D4 (value)
-  (if (is <long> value)
-      (begin
-       (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
-       (_L value))
-    (value 'register _D4 1)
-    (_L 0)))
+  (unless (is <long> value)
+    (set value (value 'state/emit _D4 4)))
+
+  (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
+  (_L value))
 
 (require "build/generated/x86-instructions.l")
 
@@ -138,6 +127,21 @@
     (assert (is <long> value))
     value))
 
+(define-function %labelr (label-name state args)
+  (assert (= state 'state/emit))
+  (pop args)                            ; writer; we don't need it
+  (let* ((env (<assembler>-env *assembler*))
+         (value (variable-value env label-name))
+         (cell-size (pop args)))
+    ;; (println "labelr triggered at address: "(<assembler>-address *assembler*), " value: " value)
+    (- value
+       (<assembler>-address *assembler*)
+       cell-size)))
+
+(define-form labelr (name)
+  `(lambda (state . args)
+     (%labelr ,name state args)))
+
 (define-function %forward-label (name value-future relative)
   (assert (symbol? name))
   (let* ((env		(<assembler>-env *assembler*))
@@ -149,21 +153,27 @@
          (emitter
            (lambda (state . args)
              (case state
-               (register
+               (state/emit
+                ;; (println "%forward-label at address: "(<assembler>-address *assembler*)", pos: "(<assembler>-position *assembler*))
                 (set hole-pos (<assembler>-position *assembler*))
                 (set hole-address (<assembler>-address *assembler*))
                 (set writer (pop args))
                 (set cell-size (pop args)))
-               (emit
+               (state/set
                 (let ((value (pop args))
                       (saved-pos  (<assembler>-position *assembler*))
                       (saved-addr (<assembler>-address *assembler*)))
                   (set (<assembler>-position *assembler*) hole-pos)
+                  ;; it's a forward label, so the form that calculates
+                  ;; the final value must be delayed into a future (a
+                  ;; closure). but now is the time to force it.
                   (let ((final-value (value-future value)))
                     (when relative
                       (decr final-value (+ hole-address cell-size)))
                     (writer final-value)
-                    ;; register the final value at this label
+                    ;; save the final value under this label's name,
+                    ;; so that later the non-future LABEL accessor can
+                    ;; be used to read it.
                     (environment-define env name value))
                   (set (<assembler>-position *assembler*) saved-pos)
                   (set (<assembler>-address *assembler*)  saved-addr)))
@@ -187,4 +197,4 @@
          (emitters (variable-value env name))
          (address (<assembler>-address *assembler*)))
     (list-do emitter emitters
-      (emitter 'emit address))))
+      (emitter 'state/set address))))
