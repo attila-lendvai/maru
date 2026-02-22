@@ -474,7 +474,7 @@
 				(println "	"$reg2" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$2)
 				(println "	"$reg4" = load %oop, %oop* "$reg2)))
 
-;; args: baseptr, index, value
+;; args: baseptr, byteindex, value
 (define-instruction STORE-I8	(true 6 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")

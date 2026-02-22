@@ -6,6 +6,7 @@
 ;;;
 ;;; GC header
 ;;;
+;; TODO merge flags and the type id into one cell
 (define-record <header> ()
   (next size flags type (when-at-expand (feature object-canary) canary))
   raw-slot-access)

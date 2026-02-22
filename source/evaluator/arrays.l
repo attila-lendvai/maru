@@ -99,7 +99,7 @@
     (<long>
      (set (lower/array-at array idx) (unbox <long> value)))
     (<target-pointer>
-     ;; ensure the array is large enough
+     ;; ensure the array has enough capacity
      (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
      (set (oop-at (slot-value <lower/array> elements array) idx)
           (unbox <target-pointer> value)))

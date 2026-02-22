@@ -217,6 +217,10 @@
 (define-vm-function set-cdr ((pair <pair>) value)
   (set (<pair>-tail pair) value))
 
+;; TODO change this to a with-forms with-range-check, and
+;; then implement the setter so that it unboxes <target-pointer> values.
+;; probably the getter should also box its return value into it.
+;; FIXME is this oop-at or a raw cell-at? rename/cleanup
 (define-form define-oop-at-primfn (name args)
   `(define-vm-function (,name ()) (base (wordindex <long>) ,@args)
      (safety 2

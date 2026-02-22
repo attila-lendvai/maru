@@ -1,5 +1,7 @@
 (require "port.l")
 
+;; NOTE: this file is currently not loaded, and is also bitrotten
+
 (define pretty-on) ;; forward
 
 (define-selector do-pretty (self p col)
@@ -9,7 +11,6 @@
 	(port-write p (symbol->string n))
       (port-write p "<type="(number->string t)">"))))
 
-(define-method do-pretty <long>		(port col)	(port-write port (symbol->string self)))
 (define-method do-pretty <undefined>	(port col)	(port-write port "()"))
 (define-method do-pretty <long>		(port col)	(port-write port (number->string self)))
 (define-method do-pretty <double>	(port col)	(port-write port (double->string self)))

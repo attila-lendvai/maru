@@ -488,7 +488,7 @@
 ;;(define-boxed		<symbol>)				; a cstr is inline into the object's body
 (define-record		<symbol>		() (name))
 
-(define-record		<array>			() (size elements))
+(define-record		<array>			() (size elements)) ; an array of oop's
 (define-record		<lower/array>		() (size elements)) ; an array of raw bytes
 (define-record		<string>		() (size elements))
 ;; TODO rename body to program-code, or maybe machine-code is better
@@ -509,11 +509,9 @@
    (when-at-expand (feature track-expr-names)	name)
    (when-at-expand (feature profiler)		profiler-counter)))
 
-;; (define-method do-pretty <target-function> (port col)
-;;   (port-write port "<target-function>"))
-
 ;; a pointer into the level-shifted realm, boxed, so that it can be
 ;; stored in the maru heap
+;; TODO rename to <lower/cell>
 (define-boxed-word <target-pointer>)
 
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!

@@ -190,7 +190,7 @@ GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions
 # universally available in each platform.
 EVALUATOR_FILES	= $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l vm-functions.l) \
  $(addprefix source/platforms/,load-platform.l platform-c-based.l platform-common.l) \
- $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l types.l) \
+ $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l vm-with-file-support.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
 
 # for some optional C files, e.g. profiler.c

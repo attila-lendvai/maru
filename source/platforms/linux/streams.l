@@ -27,6 +27,7 @@
                            420          ; "rw-r--r--"
                            )))
     (when (<= 0 fd)
+      (debug (platform/format "file-open will box fd " (long fd) "\n"))
       ;; TODO use <target-word> for boxing and unboxing
       (box <target-pointer> fd))))
 

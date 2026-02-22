@@ -37,6 +37,14 @@
 
   ;; Stack layout, High memory
   ;; +---------------------+
+  ;; | auxv[0].a_type = 0  | ; some AT_NULL nonsense, #defined as 0
+  ;; | auxv[0].a_val = 0   |
+  ;; +---------------------+
+  ;; | ...                 |
+  ;; +---------------------+
+  ;; | auxv[0].a_type      |
+  ;; | auxv[0].a_val       |
+  ;; +---------------------+
   ;; | NULL                |
   ;; +---------------------+
   ;; | ...                 |
@@ -53,6 +61,7 @@
   ;; +---------------------+
   ;; Lower memory
 
+  ;; TODO parse AT_PAGESZ (the page size)
   (let* ((sp (stack-pointer-on-entry))
          (argc (oop-at sp 0))
          (argv (+ sp (words-to-bytes 1))))
