@@ -24,7 +24,7 @@
 (define-function def-strings  (i)	(list-do x i (array-append *program*  (list do-string  x  ))))
 (define-function def-sizes    (i)	(list-do x i (array-append *program*  (list do-size    x  ))))
 
-(require "source/c-groveller/cgrov.g.l")
+(require "source/c/cgrov.g.l")
 
 (define-function cgrov (stream name)
   (let ((self (new <cgrov>)))

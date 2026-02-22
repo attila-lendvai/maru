@@ -427,12 +427,11 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 # compile *.cgrov files into *.cgrov.l
-#
 # TODO evolving: if we want to use the groveler in the bootstrap, then
 # this rule must use $(HOST_DIR)/eval $(HOST_DIR)/boot.l but that is
 # currently broken with maru.9
-%.cgrov.l: %.cgrov $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/c-groveller/cgrov.g.l
-	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
+%.cgrov.l: %.cgrov $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/c/cgrov.g.l
+	$(GEN_EVAL) boot.l source/c/compile-cgrov.l $< > $<.c
 	$(CLANG) -o $<.exe $<.c
 	./$<.exe > $@.new
 	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
