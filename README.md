@@ -13,11 +13,38 @@ slave/target isolation, then I just opened a new stage.
 
 ## Assorted changes
 
+ - The compiler can now emit full heap objects into the read-only
+   segment. The GC ignores them, and writing to them results in a
+   `sigsegv`. See `emit-object/<string>` and friends.
+
+   The reason for this is that when we construct heap objects, it's a
+   headache if some of their slots are themselves not valid heap
+   objects (e.g. just a pointer to a null terminated C string without
+   any GC header prefixing it).
+
+   This also introduces a possibility for more runtime type checks,
+   and decreases the boxing/unboxing friction between the upper (Maru)
+   and the lower VM; e.g. the lower can call the pretty-printing
+   infrastructure of the upper, including using streams to print to
+   e.g. the `*debug-output*`.
+
+   Without this feature, we would need a way to specify which slot of
+   heap objects are to be walked by the GC and which should be ignored
+   (as opposed to the current machinery of marking an entire heap
+   object opaque for the GC). Let alone Maru code messing around with
+   those slots.
+
+   The price we pay is +1 (partial) GC header for each literal object
+   emitted this way (i.e. the ones that have a non-tagged-immediate
+   representation). Currently this means +2 words: `flags` and `type`;
+   the rest of the GC header slots (`next` and `chunk-size`) are not
+   emitted/needed.
+
  - [Switch](commit/7b4c52e730d5a7f0054e827097c9707b57fac1d6) compiled
    literal string representation to full objects: they used to be
    compiled into zero terminated cstrings, but now they are just like
-   full heap <string>'s, except that they are emitted into the
-   read-only segment, and the GC leaves them alone. This greatly
+   full heap `<string>`'s, except that they are emitted into the
+   read-only segment, and the GC leaves them alone.
 
  - Rework the [slave-target
    isolation](commit/6b486df42e9bc7975049e84ea16f5029133879f7) so that
@@ -36,10 +63,6 @@ slave/target isolation, then I just opened a new stage.
  - Fix build thinko: the host's `boot.l` `require`'d the slave's files
    because of the previously missing/ignored concept of the *working
    directory*.
-
- - The compiler can now emit full heap objects into the read-only
-   segment. The GC ignores them, and writing them results in a
-   `sigsegv`. See `emit-object/<string>` and friends.
 
 ## Stats
 
