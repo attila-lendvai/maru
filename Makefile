@@ -471,7 +471,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 # compile *.cgrov files into *.cgrov.l
 # Must use the host eval if we want to use its output while building this stage.
 %.cgrov.$(TARGET).l: %.cgrov $(HOST_DIR)/eval
-	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c-groveller/cgrov.g.l && ./eval boot.l source/c-groveller/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
+	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
 	./$<.exe > $@.new
 	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
@@ -479,8 +479,8 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	rm -f $<.exe $<.c
 
 # a debug version of the above that uses our stage to run the cgrov
-# %.cgrov.l: %.cgrov $(GEN_EVAL) source/c-groveller/cgrov.g.l source/c-groveller/compile-cgrov.l
-# 	$(GEN_EVAL) boot.l source/c-groveller/compile-cgrov.l $< > $<.c
+# %.cgrov.l: %.cgrov $(GEN_EVAL) source/c/cgrov.g.l source/c/compile-cgrov.l
+# 	$(GEN_EVAL) boot.l source/c/compile-cgrov.l $< > $<.c
 # 	$(CC) -o $<.exe $<.c
 # 	./$<.exe > $@.new
 # 	mv $@.new $@
