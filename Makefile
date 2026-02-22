@@ -610,7 +610,9 @@ test-elf.IA-32: $(TEST_EVAL) tests/test-elf.IA-32.l source/assembler/x86.l
 	./build/test-elf.IA-32
 
 # make PLATFORM=linux test-elf.x86-64
-test-elf.x86-64: $(TEST_EVAL) tests/test-elf.x86-64.l source/assembler/x86.l
+test-elf.x86-64: $(TEST_EVAL) tests/test-elf.x86-64.l source/assembler/x86.l \
+		source/platforms/linux/linux.cgrov.$(TARGET).l \
+		source/platforms/linux/elf.cgrov.$(TARGET).l
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.l
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64-single-pass.l
 #	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass

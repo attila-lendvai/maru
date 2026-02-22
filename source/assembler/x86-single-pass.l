@@ -4,10 +4,7 @@
 ;;; runs in a single pass. Because of that forward labels are a bit
 ;;; more complex to use.
 
-(require "source/buffer.l")
-(require "source/types.l")
-
-;; TODO add as a primitive?
+;; TODO add/merge as a primitive? what about the parent env chain?
 (define-function variable-value (env name . default)
   (let ((var (defined? name env)))
     (cond
@@ -25,21 +22,22 @@
    ))
 
 (define-function save-assembler-buffer (a filename)
-  (buffer-save (<assembler>-buffer a) filename))
+  (lower/array-save (<assembler>-buffer a) filename))
 
 (define-function assembler->function (a)
-  (pointer->target-function (<buffer>-elements (<assembler>-buffer a))))
+  (lower/array->lower/function (<assembler>-buffer a)))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
 (define-function begin-assembling ()
-  (let ((buffer (buffer 4096)))
+  (let ((buffer (lower/array 4096)))
     (set *assembler*
          (make <assembler>
            (buffer	buffer)
            (env		(environment))
            ;; make it call'able right in the buffer
-           (address	(address-of (<buffer>-elements buffer)))
+           ;; TODO
+           ;;(address	(address-of (<buffer>-elements buffer)))
            (position	0)
            ))))
 
@@ -47,7 +45,7 @@
   (let ((buffer   (<assembler>-buffer *assembler*))
         (position (<assembler>-position *assembler*)))
     (incr (<assembler>-address *assembler*))
-    (set (buffer-at buffer position) value)
+    (set (lower/array-at buffer position) value)
     (set (<assembler>-position *assembler*) (+ 1 position))))
 
 (define-function _W (value)
@@ -59,19 +57,30 @@
   (_B (bitwise-and 0xff (bitwise-shift value -8))))
 
 (define-function _L (value)
-  (unless (is <long> value)
-    (set value (value 'state/emit _L 4)))
-
-  (assert (<= value 0xffffffff) "_L was called with value: "value)
-  (_W (bitwise-and 0xffff value))
-  (_W (bitwise-and 0xffff (bitwise-shift value -16))))
+  (typecase value
+    (<long>
+     (assert (<= value 0xffffffff) "_L was called with value: "value)
+     (_W (bitwise-and 0xffff value))
+     (_W (bitwise-and 0xffff (bitwise-shift value -16))))
+    ;; (<lower-cell> ???) to support 32 bit mode
+    (else
+     (_L (value 'state/emit _L 4)))))
 
 (define-function _Q (value)
-  (unless (is <long> value)
-    (set value (value 'state/emit _Q 8)))
-
-  (_L (bitwise-and 0xffffffff value))
-  (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+  (typecase value
+    (<long>
+     (_L (bitwise-and 0xffffffff value))
+     (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+    (<lower-cell>
+     ;; (print-all *debug-output* "_Q is storing a <lower-cell>: "value
+     ;;            ", at position: "(<assembler>-position *assembler*)"\n")
+     (set (lower/array-at (<assembler>-buffer *assembler*)
+                          (<assembler>-position *assembler*))
+          value)
+     (incr (<assembler>-position *assembler*) 8)
+     (incr (<assembler>-address *assembler*)  8))
+    (else
+     (_Q (value 'state/emit _Q 8)))))
 
 ;; rel8 offset
 (define-function _D1 (value)
@@ -110,12 +119,13 @@
 (define-function .base (address)
   (set (<assembler>-address *assembler*) address))
 
-(define-function .align (bytes)
+(define-function .align (alignment . filler)
   (let* ((position (<assembler>-position *assembler*))
-         (remainder (bitwise-and position (- bytes 1))))
+         (remainder (bitwise-and position (- alignment 1)))
+         (filler (if filler (car filler) 0)))
     (when (< 0 remainder)
-      (times-do (- bytes remainder)
-        (_B 0)))))
+      (times-do (- alignment remainder)
+        (_B filler)))))
 
 (define-function label! (name)
   (let ((env (<assembler>-env *assembler*)))

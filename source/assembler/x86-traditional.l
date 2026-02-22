@@ -4,12 +4,15 @@
 ;;; instructions, and emits them in multiple phases, until no labels
 ;;; change value.
 
-(require "source/buffer.l")
-(require "source/types.l")
-
-;; TODO add as a primitive?
-(define-function variable-value (env name)
-  (<variable>-value (defined? name env)))
+;; TODO add/merge as a primitive? what about the parent env chain?
+(define-function variable-value (env name . default)
+  (let ((var (defined? name env)))
+    (cond
+      (var
+       (<variable>-value var))
+      (default
+       (first default))
+      (error "variable-value: '"name "' is not defined in env " env))))
 
 (define-record <assembler> ()
   (buffer     ; the output, a binary buffer
@@ -17,16 +20,18 @@
    ))
 
 (define-function save-assembler-buffer (a filename)
-  (buffer-save (<assembler>-buffer a) filename))
+  (lower/array-save (<assembler>-buffer a) filename))
 
 (define-function assembler->function (a)
-  (pointer->target-function (<buffer>-elements (<assembler>-buffer a))))
+  (lower/array->lower/function (<assembler>-buffer a)))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
 ;; Output buffer writers used by the generated assembler instructions.
 (define-function _B  (value)
-  (buffer-append (<assembler>-buffer *assembler*) value)
+  (let ((buf (<assembler>-buffer *assembler*)))
+    (set (lower/array-at buf (lower/array-length buf))
+         value))
   (let* ((env (<assembler>-env *assembler*))
          (current (variable-value env '$)))
     (environment-define env '$ (+ 1 current))))
@@ -57,7 +62,7 @@
 
 (define-function assemble (program)
   (let* ((env		(environment *globals*))
-         (buffer	(buffer 4096))
+         (buffer	())
          (a		(make <assembler>
                           (buffer	buffer)
                           (env		env)))
@@ -81,10 +86,13 @@
       (incr phase-counter)
       ;;(println "Running phase "phase-counter)
       (set phased false)
-      (buffer-reset buffer)
-      (let ((addr (address-of (<buffer>-elements buffer))))
-        (environment-define env '$ addr)
-        (environment-define env '$$ addr))
+      ;; reset/clear the buffer
+      (set buffer (lower/array 4096))
+      (set (<assembler>-buffer a) buffer)
+      ;; TODO ?
+      ;; (let ((addr (address-of (<buffer>-elements buffer))))
+      ;;   (environment-define env '$ addr)
+      ;;   (environment-define env '$$ addr))
       (list-do instr program
         ;;(println "Instruction: "instr)
         (typecase instr
@@ -129,5 +137,5 @@
               (eval instr env))))
           (else
            (error "unexpected asm instruction "instr)))))
-    (println "assembled "(buffer-length buffer)" bytes in "phase-counter" phases")
+    (println "assembled "(lower/array-length buffer)" bytes in "phase-counter" phases")
     a))

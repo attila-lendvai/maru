@@ -30,13 +30,10 @@
 ;;  - Syscall args in rdi, rsi, rdx, r10, r8, r9 (we use rdi/rsi/rdx here).
 
 (require "source/assembler/x86-single-pass.l")
-(require "source/c-groveller/cgrov.l")
+(require "source/c/cgrov.l")
 (require-cgrov "source/platforms/linux/linux")
+(require-cgrov "source/platforms/linux/elf")
 
-;; ELF flags
-(define elf/PF_R	0x4)
-(define elf/PF_W	0x2)
-(define elf/PF_X	0x1)
 (define elf/page-size	0x1000)
 (define base-address	0x00400000)
 
