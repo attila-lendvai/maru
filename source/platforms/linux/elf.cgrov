@@ -1,0 +1,5 @@
+prefix elf/
+
+header elf.h
+
+integer PF_R PF_W PF_X
