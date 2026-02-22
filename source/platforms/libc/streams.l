@@ -10,11 +10,8 @@
   (awhen (libc/fopen (string->C-string path) (string->C-string mode))
     (box <target-pointer> it)))
 
-(define-vm-function file-close ((handle <target-pointer> _ nounbox))
-  ;; NOUNBOX because it is called from many places from inside the
-  ;; target, i.e. they all would need to box it, because the auto
-  ;; unboxing is only added to the /EVALUATOR-STUB.
-  (when (= 0 (libc/fclose (unbox <target-pointer> handle)))
+(define-vm-function file-close ((handle <target-pointer>))
+  (when (= 0 (libc/fclose handle))
     symbol/true))
 
 (define-vm-function file-read-character ((stream <target-pointer>))

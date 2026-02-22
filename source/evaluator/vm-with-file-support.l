@@ -64,7 +64,7 @@
                (__file-handle	(file-open-or-die __file-name "r"))
                (,var		(file-stream __file-handle))
                (__result	,@body))
-       (file-close __file-handle)
+       (file-close (unbox <target-pointer> __file-handle))
        __result)))
 
 (define-vm-function (load ()) ((path <string>))
