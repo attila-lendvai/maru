@@ -71,7 +71,41 @@
          obj))))
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
+(define-vector-accessors <lower/array>	lower/array-	()	byte-at		copy-bytes	platform/move-bytes	1)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
+
+;; NOTE: lower/array is only used by the assembler and jit experiments
+
+;; TODO decide where the DEFINE-VM-FUNCTION should be and make it uniform
+;; TODO conditionalize this on a feature?
+(define-vm-function lower/array ((capacity <long> 0))
+  (make <lower/array>
+    (size	(box <long> 0))
+    (elements	(when (> capacity 0)
+                  (allocate-data capacity)))))
+
+(define-vm-function lower/array->lower/function ((array <lower/array>))
+  (make <target-function>
+    (program-code	(slot-value <lower/array> elements array))))
+
+(define-vm-function (lower/array-length ()) ((array <lower/array>))
+  (box <long> (lower/array-length array)))
+
+(define-vm-function (lower/array-at ()) ((array <lower/array>) (idx <long>))
+  (box <long> (lower/array-at array idx)))
+
+(define-vm-function (set-lower/array-at ()) ((array <lower/array>) (idx <long>) value)
+  (typecase value
+    (<long>
+     (set (lower/array-at array idx) (unbox <long> value)))
+    (<target-pointer>
+     ;; ensure the array is large enough
+     (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
+     (set (oop-at (slot-value <lower/array> elements array) idx)
+          (unbox <target-pointer> value)))
+    (else
+     (error "set-lower/array-at doesn't know how to handle value: "value)))
+  value)
 
 (define-vm-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))
   (string-do char insertion

@@ -234,31 +234,6 @@
 ;;   (error "copy-oops: who called me in interpreted code?! TODO i need proper bounds checking added.")
 ;;   (copy-oops from to wordcount))
 
-;; bytes stuff is used by buffer.l, which is in turn is used by test-elf.l
-;; TODO this should better be done by some magic that automatically exports
-;; a kernel buffer.l implementation with types and functions into the evaluator
-(define-vm-function (copy-bytes ()) (from to (count <long>))
-  ;; TODO check bounds
-  (copy-bytes from to count))
-
-(define-vm-function (byte-at ()) (base (index <long>))
-  ;; TODO check bounds
-  (box <long> (byte-at base index)))
-
-(define-vm-function (set-byte-at ()) (base (index <long>) (value <long>))
-  ;; TODO check bounds
-  ;; TODO think through negative numbers and the value range check...
-  (safety 2 (assert (and (<= value 255) (<= -128 value)) "set-byte-at: value is out of range: "(box <long> value)))
-  (box <long> (set-byte-at base index value)))
-
-;; NOTE used by the assembler proof-of-concept in test-elf.l
-(define-vm-function (address-of ()) (thing)
-  ;; KLUDGE when <long> is a tagged immediate then the address may get truncated.
-  ;; add an assert?
-  ;; or return a <target-pointer> here and define arithmetics on them?
-  ;; or implement various boxed data types and return a boxed word-sized integer here?
-  (box <long> thing))
-
 (define-vm-function (array-length ()) ((arg <array>))
   (<array>-size arg))
 

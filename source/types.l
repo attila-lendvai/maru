@@ -489,6 +489,7 @@
 (define-record		<symbol>		() (name))
 
 (define-record		<array>			() (size elements))
+(define-record		<lower/array>		() (size elements)) ; an array of raw bytes
 (define-record		<string>		() (size elements))
 ;; TODO rename body to program-code, or maybe machine-code is better
 ;; TODO harmonize name with <target-function>, but how? <function> and <t/function>
