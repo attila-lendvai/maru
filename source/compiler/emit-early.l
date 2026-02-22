@@ -1,7 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/conversion.l")
-(require "source/compiler/c-ffi.l")
+(require "source/c/cffi.l")
 
 ;; FIXME only works at 1 and below. comments need to be escaped:
 ;; there's only single-line comment syntax in llvm and gas. escape
