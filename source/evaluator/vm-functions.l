@@ -234,6 +234,40 @@
 (define-oop-at-primfn oop-at		())
 (define-oop-at-primfn set-oop-at	(value))
 
+(with-forms
+    ((with-bounds-checking
+         (body
+          `(begin
+            (safety 2 (let ((header (gc/header-of base)))
+                        (assert (and (gc/valid-header-canary? header)
+                                     (<= 0 byteindex)
+                                     (<= (+ byteindex +word-size-in-bytes+) (<header>-size header)))
+                                "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
+            ,@body))))
+
+  (define-vm-function (cell-at ()) (base (byteindex <long>))
+    (with-bounds-checking
+      (box <lower-cell> (cell-at base byteindex))))
+
+  (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
+    (with-bounds-checking
+      (set (cell-at base byteindex)
+           (typecase value
+             (<lower-cell>	(unbox <lower-cell> value))
+             ;; FIXME should it allow <long> at all?
+             (<long>		(unbox <long> value))
+             (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
+
+(define-vm-function lower-cell->long ((value <lower-cell>))
+  ;; this is potentially a lossy conversion, depending on the chosen
+  ;; representation of <long>. when <long> is a tagged immediate, then
+  ;; this loses some bits of precision from the high end, typically
+  ;; just one bit, though.
+  (box <long> value))
+
+(define-vm-function long->lower-cell ((value <long>))
+  (box <lower-cell> value))
+
 ;; (define-vm-function (copy-oops ()) (from to (wordcount <long>))
 ;;   (error "copy-oops: who called me in interpreted code?! TODO i need proper bounds checking added.")
 ;;   (copy-oops from to wordcount))

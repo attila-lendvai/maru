@@ -386,6 +386,23 @@
                                       (println "	lea	"offset"(%rax), %rax"))
                                     (println "	movb	"$2", (%rax)")))))
 
+;; TODO these two are the same as the -OOP versions, except the lea's multiplier
+(define-instruction LOAD-CELL	(false 0 true)
+  ((TEMP64)			(println "	mov	"$1", %rcx")
+				(println "	lea	(%rax, %rcx, 1), %rcx")
+				(println "	mov	(%rcx), %rax")))
+
+(define-instruction STORE-CELL	(false 0 true)
+  ((TEMP64 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (let ()
+                                      (println "	mov	"$1", %rcx")
+                                      (println "	lea	(%rax, %rcx, 1), %rcx")
+                                      (println "	mov	"$2", %rax")
+                                      (println "	mov	%rax, (%rcx)"))
+                                  (println "	mov	"$1", %rcx")
+                                  (println "	lea	(%rax, %rcx, 1), %rax")
+                                  (println "	mov	"$2", (%rax)"))))
+
 (define-instruction LOAD-OOP	(false 0 true)
   ((TEMP32)			(println "	mov	"$1", %ecx")
                                 (println "	lea	(%eax, %ecx, 4), %ecx")
@@ -490,11 +507,15 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
-              (oop-at		,LOAD-OOP))
+              (cell-at		,LOAD-CELL)
+              (oop-at		,LOAD-OOP)
+             )
              ;; ternary
              ((set-char-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              (set-oop-at	,STORE-OOP)))))
+              (set-cell-at	,STORE-CELL)
+              (set-oop-at	,STORE-OOP)
+             ))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)

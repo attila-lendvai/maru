@@ -464,7 +464,14 @@
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
-;; args: baseptr, index
+;; args: baseptr, byteindex
+(define-instruction LOAD-CELL	(true 4 true)
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
+				(println "	"$reg4" = load %oop, %oop* "$reg3)))
+
+;; args: baseptr, cellindex
 (define-instruction LOAD-OOP	(true 4 true)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -484,6 +491,15 @@
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
 				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
 
+;; args: baseptr, byteindex, value
+(define-instruction STORE-CELL	(true 4 true)
+  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
+				(println "	store %oop "$3", %oop* "$reg3)
+				(println "	"$reg4" = bitcast %oop "$3" to %oop")))
+
+;; args: baseptr, cellindex, value
 (define-instruction STORE-OOP	(true 4 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -947,11 +963,15 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
-              (oop-at		,LOAD-OOP))
+              (cell-at		,LOAD-CELL)
+              (oop-at		,LOAD-OOP)
+             )
              ;; ternary
              ((set-char-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              (set-oop-at	,STORE-OOP)))))
+              (set-cell-at	,STORE-CELL)
+              (set-oop-at	,STORE-OOP)
+             ))))
       (list->array
        (map (lambda (arity-line)
               (map (lambda (entry)

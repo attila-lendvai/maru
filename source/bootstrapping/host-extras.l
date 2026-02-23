@@ -42,3 +42,22 @@
         (stream    (or (pop etc) *standard-output*)))
     ;; PUNT: we ignore the supplied separator
     (%print-list stream lst false)))
+
+(define-function lower-cell->long (value)
+  (error "lower-cell->long stub called"))
+
+(define-function long->lower-cell (value)
+  (error "long->lower-cell stub called"))
+
+;; slave-extras.l is too late
+(eval-in-slave
+ '(let ()
+   (define lower-cell->long
+    (lambda (value)
+      (warn "lower-cell->long stub called")
+      (exit -1)))
+
+   (define long->lower-cell
+    (lambda (value)
+      (warn "long->lower-cell stub called")
+      (exit -1)))))

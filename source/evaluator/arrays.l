@@ -101,7 +101,7 @@
     (<lower-cell>
      ;; ensure the array has enough capacity
      (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
-     (set (oop-at (slot-value <lower/array> elements array) idx)
+     (set (cell-at (slot-value <lower/array> elements array) idx)
           (unbox <lower-cell> value)))
     (else
      (error "set-lower/array-at doesn't know how to handle value: "value)))
