@@ -64,8 +64,8 @@ jobs:
       - run:  timeout 5m make PLATFORM=posix test-elf
       - run:  timeout 5m make PLATFORM=linux test-elf
 
-      - run:  timeout 5m make PLATFORM=posix test-jit
       - run:  timeout 5m make PLATFORM=linux test-jit
+      - run:  timeout 5m make PLATFORM=posix test-jit
 
   build-linux-arm64:
     name: "linux aarch64"
