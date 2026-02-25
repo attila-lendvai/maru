@@ -8,23 +8,23 @@
 
 (define-vm-function file-open ((path <string>) (mode <string>))
   (awhen (libc/fopen (string->C-string path) (string->C-string mode))
-    (box <target-pointer> it)))
+    (box <lower-cell> it)))
 
-(define-vm-function file-close ((handle <target-pointer>))
+(define-vm-function file-close ((handle <lower-cell>))
   (when (= 0 (libc/fclose handle))
     symbol/true))
 
-(define-vm-function file-read-character ((stream <target-pointer>))
+(define-vm-function file-read-character ((stream <lower-cell>))
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
         ()
       (box <long> c))))
 
-(define-vm-function file-write-character ((char <long>) (stream <target-pointer>))
+(define-vm-function file-write-character ((char <long>) (stream <lower-cell>))
   (when (not (= libc/EOF (libc/fputc char stream)))
     symbol/true))
 
-;; (define-vm-function file-flush ((stream <target-pointer>))
+;; (define-vm-function file-flush ((stream <lower-cell>))
 ;;   (unless (= 0 (libc/fflush stream))
 ;;     (error "file-flush: libc/fflush returned an error")))
 
@@ -34,9 +34,9 @@
 
 (define-record <libc-stream> <stream> (handle))
 
-(define-vm-function file-stream ((handle <target-pointer> _ nounbox))
+(define-vm-function file-stream ((handle <lower-cell> _ nounbox))
   (make/opaque <libc-stream>
-    (handle	(unbox <target-pointer> handle))))
+    (handle	(unbox <lower-cell> handle))))
 
 (define-method $at-end? <libc-stream> ()
   (libc/feof self.handle))

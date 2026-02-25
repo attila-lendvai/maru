@@ -56,7 +56,7 @@
  (define *vm-function-type-accessors*
      '((<long>			(long?)				(unbox <long>))
        (<string>		(string?))
-       (<target-pointer>	(is <target-pointer>)		(unbox <target-pointer>))
+       (<lower-cell>		(is <lower-cell>)		(unbox <lower-cell>))
        (<symbol>		(symbol?))
        (<pair>			(pair?))
        (<array>			(array?)))))

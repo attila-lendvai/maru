@@ -3,10 +3,10 @@
 (load (concat-strings "source/platforms/libc/vm-functions.l"))
 
 (define-vm-function posix/dlsym (handle (name <string>))
-  (assert (or (is <target-pointer> handle) (is <long> handle)))
+  (assert (or (is <lower-cell> handle) (is <long> handle)))
   (let* ((lower/handle (typecase handle
-                         (<long>			(unbox <long> handle))
-                         (<target-pointer>	(unbox <target-pointer> handle))
+                         (<long>	(unbox <long> handle))
+                         (<lower-cell>	(unbox <lower-cell> handle))
                          (else (error "unexpected type for posix/dlsym: "handle))))
          (ptr (lower/posix/dlsym lower/handle (string->C-string name))))
     (when ptr

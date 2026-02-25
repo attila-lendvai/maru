@@ -110,7 +110,7 @@
 ;; to a machine code block in the lower realm; i.e. a fitting
 ;; instrument to represent a vm-function.
 (define-function vm-function (code name)
-  (safety 2 (assert (and (is <target-pointer> code) (is <string> name))))
+  (safety 2 (assert (and (is <lower-cell> code) (is <string> name))))
   (make <target-function>
     (program-code	code)
     (when-at-expand (feature track-expr-names)
@@ -433,7 +433,7 @@
          (apply/expr fun arguments ctx))
 
         ((= type <target-function>)
-         (let* ((code	(unbox <target-pointer> (<target-function>-program-code fun)))
+         (let* ((code	(unbox <lower-cell> (<target-function>-program-code fun)))
                 (result	(code arguments ctx)))
            (safety 3 (or (gc/valid-maru-value? result)
                          (error "<target-function> "fun" returned with something unboxed")))

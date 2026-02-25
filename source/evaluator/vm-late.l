@@ -12,7 +12,7 @@
   ;; <symbols>'s as their name because they are held as gc roots by
   ;; the *symbols* array.
   (debug (platform/format "%instantiate-vm-function "(pointer imp)"\n"))
-  (gc/let* ((boxed-imp (box <target-pointer> imp))
+  (gc/let* ((boxed-imp (box <lower-cell> imp))
             (tmp (vm-function boxed-imp name)))
     (when fixed?
       (set tmp (fixed tmp)))

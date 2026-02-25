@@ -13,7 +13,7 @@
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
   `(gc/let* (tmp)
      (debug (platform/format "initializing " (string ,(symbol->string our-name)) "\n"))
-     (set tmp (box <target-pointer> ,target-name))
+     (set tmp (box <lower-cell> ,target-name))
      (set tmp (file-stream tmp))
      (set ,our-name tmp)
      ;; the maru-user env was create earlier, let's set it there, too.
@@ -39,7 +39,7 @@
   ;; This won't work as-is now that we have a linux platform where
   ;; there's no fscanf and the streams are not of type <libc-stream>...
   ;; (unless interactive?
-  ;;   (let ((libc-handle (unbox <target-pointer> (<libc-stream>-handle input))))
+  ;;   (let ((libc-handle (unbox <lower-cell> (<libc-stream>-handle input))))
   ;;     (libc/fscanf libc-handle "#!%*[^\x0a\x0d]"))) ; drop the possible #!./eval first line of the file
   (gc/let* (res)
     (while (let ()
@@ -58,7 +58,7 @@
     res))
 
 (define-vm-function lower/array-save ((array <lower/array>) (path <string>))
-  (let ((fd (unbox <target-pointer> (file-open-or-die path "w")))
+  (let ((fd (unbox <lower-cell> (file-open-or-die path "w")))
         (elements (slot-value <lower/array> elements array)))
     (debug (platform/format "lower/array-save will write " (long (lower/array-length array)) " bytes into file " (long fd) "\n"))
     (for (i 0 (lower/array-length array))
@@ -75,7 +75,7 @@
                (__file-handle	(file-open-or-die __file-name "r"))
                (,var		(file-stream __file-handle))
                (__result	,@body))
-       (file-close (unbox <target-pointer> __file-handle))
+       (file-close (unbox <lower-cell> __file-handle))
        __result)))
 
 (define-vm-function (load ()) ((path <string>))

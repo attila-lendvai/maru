@@ -28,15 +28,13 @@
                            )))
     (when (<= 0 fd)
       (debug (platform/format "file-open will box fd " (long fd) "\n"))
-      ;; TODO use <target-word> for boxing and unboxing
-      (box <target-pointer> fd))))
+      (box <lower-cell> fd))))
 
-(define-vm-function file-close ((fd <target-pointer>))
-  ;; FIXME exmplain why this is NOUNBOX, and investigate why things break if i delete it
+(define-vm-function file-close ((fd <lower-cell>))
   (when (= 0 (linux-syscall linux/SYS_close fd))
     symbol/true))
 
-(define-vm-function file-read-character ((fd <target-pointer>))
+(define-vm-function file-read-character ((fd <lower-cell>))
   (let ((char 0))
     (if (= 1 (linux-syscall linux/SYS_read fd (address-of char) 1))
         ;; TODO endianness, EAGAIN and stuff
@@ -44,12 +42,12 @@
       ;;(error "file-read-character: syscall returned with error")
       ())))
 
-(define-vm-function file-write-character ((char <long>) (fd <target-pointer>))
+(define-vm-function file-write-character ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
   (when (= 1 (linux-syscall linux/SYS_write fd (address-of char) 1))
     symbol/true))
 
-;; (define-vm-function file-flush ((fd <target-pointer>))
+;; (define-vm-function file-flush ((fd <lower-cell>))
 ;;   (unless (= 0 (linux-syscall linux/SYS_fsync fd))
 ;;     (error "file-flush: linux/SYS_fsync returned an error")))
 
@@ -61,11 +59,12 @@
   (fd
    peeked-value))
 
-(define-vm-function file-stream ((fd <target-pointer> _ nounbox))
-  (assert (is <target-pointer> fd))
+(define-vm-function file-stream ((fd <lower-cell>))
+  ;; when the entire object is an opaque, then we can freely store
+  ;; unboxed values in it. not sure if this is ideologically the right
+  ;; way, but it works.
   (make/opaque <fd-stream>
-    ;; TODO boxing...
-    (fd			(unbox <target-pointer> fd))
+    (fd			(unbox <lower-cell> fd))
     (peeked-value	-1)))
 
 (define-function %ensure-peeked (stream)

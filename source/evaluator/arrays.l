@@ -98,11 +98,11 @@
   (typecase value
     (<long>
      (set (lower/array-at array idx) (unbox <long> value)))
-    (<target-pointer>
+    (<lower-cell>
      ;; ensure the array has enough capacity
      (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
      (set (oop-at (slot-value <lower/array> elements array) idx)
-          (unbox <target-pointer> value)))
+          (unbox <lower-cell> value)))
     (else
      (error "set-lower/array-at doesn't know how to handle value: "value)))
   value)
