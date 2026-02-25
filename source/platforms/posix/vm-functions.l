@@ -10,11 +10,7 @@
                          (else (error "unexpected type for posix/dlsym: "handle))))
          (ptr (lower/posix/dlsym lower/handle (string->C-string name))))
     (when ptr
-      (make <target-function>
-        (program-code	ptr)
-        (when-at-expand (feature track-expr-names)
-          ;; TODO include the name here
-          (name "a posix fn found using dlsym"))))))
+      (box <lower-cell> ptr))))
 
 (define-vm-function posix/fork ((flags <long> posix/SIGCHLD))
   (let ((pid (lower/posix/fork)))

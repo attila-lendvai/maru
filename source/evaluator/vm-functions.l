@@ -191,6 +191,9 @@
       (<string>		(and (string? rhs)
                              (= 0 (string-compare lhs rhs))
                              symbol/true))
+      (<lower-cell>	(and (is <lower-cell> rhs)
+                             (= (unbox <lower-cell> lhs)
+                                (unbox <lower-cell> rhs))))
       (else		(and (= lhs rhs)
                              symbol/true)))))
 

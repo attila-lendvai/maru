@@ -82,6 +82,7 @@
 (define-print-method <env>	(print-all -stream- "<env "(or (when-at-expand (feature debug-info) self.name) "?")" Lv"self.level",Off"self.offset",#"(array-length self.bindings)">"))
 (define-print-method <type>	(print-all -stream- "<"(<type>-name self)" "(<type>-id self)">"))
 (define-print-method <pair>	(%print-list -stream- self " " false))
+(define-print-method <lower-cell> (print-all -stream- "0x"(number->string (lower-cell->long self) 16)))
 
 (define-method do-dump <pair> (stream)
   (%print-list stream self " " true))

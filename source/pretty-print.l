@@ -13,6 +13,7 @@
 
 (define-method do-pretty <undefined>	(port col)	(port-write port "()"))
 (define-method do-pretty <long>		(port col)	(port-write port (number->string self)))
+(define-method do-pretty <lower-cell>	(port col)	(port-write port "0x"(number->string (lower-cell->long self) 16)))
 (define-method do-pretty <double>	(port col)	(port-write port (double->string self)))
 (define-method do-pretty <string>	(port col)	(port-write port "\""self"\""))
 (define-method do-pretty <symbol>	(port col)	(port-write port (symbol->string self)))
