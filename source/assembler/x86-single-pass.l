@@ -120,8 +120,8 @@
   (set (<assembler>-address *assembler*) address))
 
 (define-function .align (alignment . filler)
-  (let* ((position (<assembler>-position *assembler*))
-         (remainder (bitwise-and position (- alignment 1)))
+  (let* ((address (current-address))
+         (remainder (bitwise-and address (- alignment 1)))
          (filler (if filler (car filler) 0)))
     (when (< 0 remainder)
       (times-do (- alignment remainder)
@@ -135,6 +135,9 @@
 ;;;  - f prefix: forward label
 ;;;  - r suffix: relative offset
 ;;;  - ! suffix: define this label (as opposed to reading its address)
+;;;  - p prefix: physical address, i.e. the buffer positiion of
+;;;      the assembler. paddress vs laddress (which is unmarked in
+;;;      the API: pself vs self)
 ;;;
 ;;; Once a forward label is defined, it is replaced with the resolved
 ;;; address. After that non-forward LABEL variants can be used to read
@@ -142,22 +145,31 @@
 
 (define-function label! (name)
   (let ((env (<assembler>-env *assembler*)))
-    (environment-define env name (current-address))))
+    (environment-define env name (cons (current-position) (current-address)))))
+
+(define-function %label-value (name)
+  (variable-value (<assembler>-env *assembler*) name))
+
+(define-function %label-value-or-die (name)
+  (let ((entry (variable-value (<assembler>-env *assembler*) name)))
+    (assert (is <long> (car entry)))
+    (assert (is <long> (cdr entry)))
+    entry))
+
+(define-function plabel (name)
+  (car (%label-value-or-die name)))
 
 (define-function label (name)
-  (let* ((env (<assembler>-env *assembler*))
-         (value (variable-value env name)))
-    (assert (is <long> value))
-    value))
+  (cdr (%label-value-or-die name)))
 
 (define-function %labelr (label-name state args)
   (assert (= state 'state/emit))
   (pop args)                            ; writer; we don't need it
   (let* ((env (<assembler>-env *assembler*))
-         (value (variable-value env label-name))
+         (laddress (cdr (variable-value env label-name)))
          (cell-size (pop args)))
-    ;; (println "labelr triggered at address: "(<assembler>-address *assembler*), " value: " value)
-    (- value
+    ;; (println "labelr triggered at address: "(<assembler>-address *assembler*), " value: " laddress)
+    (- laddress
        (current-address)
        cell-size)))
 
@@ -183,21 +195,22 @@
                 (set writer (pop args))
                 (set cell-size (pop args)))
                (state/set
-                (let ((value (pop args))
-                      (saved-pos  (<assembler>-position *assembler*))
-                      (saved-addr (<assembler>-address *assembler*)))
+                (let ((paddress (pop args))
+                      (laddress (pop args))
+                      (saved-pos  (current-position))
+                      (saved-addr (current-address)))
                   (set (<assembler>-position *assembler*) hole-pos)
                   ;; it's a forward label, so the form that calculates
                   ;; the final value must be delayed into a future (a
                   ;; closure). but now is the time to force it.
-                  (let ((final-value (value-future value)))
+                  (let ((final-laddress (value-future paddress laddress)))
                     (when relative
-                      (decr final-value (+ hole-address cell-size)))
-                    (writer final-value)
+                      (decr final-laddress (+ hole-address cell-size)))
+                    (writer final-laddress)
                     ;; save the final value under this label's name,
                     ;; so that later the non-future LABEL accessor can
                     ;; be used to read it.
-                    (environment-define env name value))
+                    (environment-define env name (cons paddress laddress)))
                   (set (<assembler>-position *assembler*) saved-pos)
                   (set (<assembler>-address *assembler*)  saved-addr)))
                (else (error "unexpected state: "state))))))
@@ -208,16 +221,17 @@
 (define-form flabel (name . args)
   (let ((value-form	(or (pop args)
                             'self)))
-    `(%forward-label ,name (lambda (self) ,value-form) false)))
+    `(%forward-label ,name (lambda (pself self) ,value-form) false)))
 
 (define-form flabelr (name . args)
   (let ((value-form	(or (pop args)
                             'self)))
-    `(%forward-label ,name (lambda (self) ,value-form) true)))
+    `(%forward-label ,name (lambda (pself self) ,value-form) true)))
 
 (define-function flabel! (name)
   (let* ((env	(<assembler>-env *assembler*))
          (emitters (variable-value env name))
+         (position (current-position))
          (address  (current-address)))
     (list-do emitter emitters
-      (emitter 'state/set address))))
+      (emitter 'state/set position address))))
