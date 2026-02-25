@@ -224,18 +224,24 @@
 ;; then implement the setter so that it unboxes <lower-cell> values.
 ;; probably the getter should also box its return value into it.
 ;; FIXME is this oop-at or a raw cell-at? rename/cleanup
-(define-form define-oop-at-primfn (name args)
-  `(define-vm-function (,name ()) (base (wordindex <long>) ,@args)
-     (safety 2
-       (let ((header (gc/header-of base)))
-         (assert (and (gc/valid-header-canary? header)
-                      (<= 0 wordindex)
-                      (<= (words-to-bytes (+ 1 wordindex)) (<header>-size header)))
-                 ,(concat-string (symbol->string name) ": trying to access beyond the gc chunk boundaries"))))
-     (,name base wordindex ,@args)))
+(with-forms
+    ((with-bounds-checking
+         (body
+          `(begin
+            (safety 2 (let ((header (gc/header-of base)))
+                        (assert (and (gc/valid-header-canary? header)
+                                     (<= 0 cellindex)
+                                     (<= (words-to-bytes (+ 1 cellindex)) (<header>-size header)))
+                                "[set-]oop-at: trying to access beyond the gc chunk boundaries")))
+            ,@body))))
 
-(define-oop-at-primfn oop-at		())
-(define-oop-at-primfn set-oop-at	(value))
+  (define-vm-function (oop-at ()) (base (cellindex <long>))
+    (with-bounds-checking
+      (oop-at base cellindex)))
+
+  (define-vm-function (set-oop-at ()) (base (cellindex <long>) value)
+    (with-bounds-checking
+      (set (oop-at base cellindex) value))))
 
 (with-forms
     ((with-bounds-checking
