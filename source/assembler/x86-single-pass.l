@@ -158,7 +158,7 @@
          (cell-size (pop args)))
     ;; (println "labelr triggered at address: "(<assembler>-address *assembler*), " value: " value)
     (- value
-       (<assembler>-address *assembler*)
+       (current-address)
        cell-size)))
 
 (define-form labelr (name)
@@ -178,8 +178,8 @@
              (case state
                (state/emit
                 ;; (println "%forward-label at address: "(<assembler>-address *assembler*)", pos: "(<assembler>-position *assembler*))
-                (set hole-pos (<assembler>-position *assembler*))
-                (set hole-address (<assembler>-address *assembler*))
+                (set hole-pos (current-position))
+                (set hole-address (current-address))
                 (set writer (pop args))
                 (set cell-size (pop args)))
                (state/set
@@ -218,6 +218,6 @@
 (define-function flabel! (name)
   (let* ((env	(<assembler>-env *assembler*))
          (emitters (variable-value env name))
-         (address (<assembler>-address *assembler*)))
+         (address  (current-address)))
     (list-do emitter emitters
       (emitter 'state/set address))))
