@@ -127,6 +127,19 @@
       (times-do (- alignment remainder)
         (_B filler)))))
 
+;;;
+;;; Labels
+;;;
+;;;
+;;; Glossary:
+;;;  - f prefix: forward label
+;;;  - r suffix: relative offset
+;;;  - ! suffix: define this label (as opposed to reading its address)
+;;;
+;;; Once a forward label is defined, it is replaced with the resolved
+;;; address. After that non-forward LABEL variants can be used to read
+;;; its value.
+
 (define-function label! (name)
   (let ((env (<assembler>-env *assembler*)))
     (environment-define env name (current-address))))
