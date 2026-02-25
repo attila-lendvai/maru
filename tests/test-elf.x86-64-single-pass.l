@@ -34,8 +34,7 @@
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")
 
-(define elf/page-size	0x1000)
-(define base-address	0x00400000)
+(define elf/page-size	0x1000) ; is this the system page-size?
 
 ;; its role is to encode the intention when an upcoming flabel will fill this hole
 (define hole 0)
@@ -43,11 +42,11 @@
 (define-function emit-program-header (flags start end alignment)
   (.i32		1)				; p_type (PT_LOAD)
   (.i32		flags)				; p_flags (read, exec)
-  (.i64		(flabel start (- self (label 'file-start))))	; p_offset (file offset)
+  (.i64		(flabel start (- pself (plabel 'file-start))))	; p_offset (file offset)
   (.i64		(flabel start))			; p_vaddr (virtual addr of segment) - base
   (.i64		0)				; p_paddr
-  (.i64		(flabel end (- self (label start))))	; p_filesz
-  (.i64		(flabel end (- self (label start))))	; p_memsz
+  (.i64		(flabel end (- pself (plabel start))))	; p_filesz
+  (.i64		(flabel end (- pself (plabel start))))	; p_memsz
   (.i64		alignment))			; p_align
 
 (define-form syscall (sys-number . args)
@@ -63,9 +62,12 @@
 (define-function write-elf-file (filename)
   (begin-assembling)
 
-  (.base	base-address)             ; typical 64-bit default base
+  (.base	0x00400000)             ; typical 64-bit default base
   (label!	'file-start)
 
+  ;;;
+  ;;; ELF header
+  ;;;
   (.i8		0x7f)			; ident[0]
   (.ascii	"ELF")
   (.i8		2 1 1 0) ; ELFCLASS64, ELFDATA2LSB, version, ELFOSABI_NONE
@@ -85,9 +87,9 @@
   (.i16		0) ; e_shstrndx	Section header string table index
   (flabel!	'elf-header-end)
 
-  ;; this doesn't seem to be needed
-  ;; (.align	elf/page-size)
-
+  ;;;
+  ;;; Program headers (segment layout)
+  ;;;
   (flabel!	'program-headers)
 
   ;; code segment
@@ -105,6 +107,17 @@
                        'data-segment-start 'data-segment-end
                        4)
 
+  ;;;
+  ;;; Code Segment
+  ;;;
+  (when false
+    ;; It's also possible to set a new .base, but then we must ensure
+    ;; that this ELF invariant holds: `p_offset % p_align == p_vaddr %
+    ;; p_align`, i.e. that mmap can be used to map from the file to
+    ;; the memory.
+    (.align	elf/page-size)
+    (.base	0x00500000))
+
   (flabel!	'code-segment-start)
 
   ;; print message
@@ -112,24 +125,32 @@
            (flabel 'msg) (flabel 'msg-end (- self (label 'msg))))
 
   ;; test writing into the data segment: turn EXIT-CODE into 0
+  ;;(LEAQmr	(flabelr 'exit-code) 0 0 0 _RBX)
   (MOVQir	(flabel 'exit-code) _RBX)
   (ADDQim	-2 0 _RBX 0 0) ; [rbx] += -2
   (SUBQim	40 0 _RBX 0 0) ; [rbx] -= 40
 
-  (MOVQir	(flabel 'exit-code) _RDI) ; exit code address
+  (LEAQmr	(flabelr 'exit-code) 0 0 0 _RDI) ; exit code address
+  ;;(MOVQir	(flabel 'exit-code) _RDI) ; exit code address
   (MOVQmr	0 _RDI 0 0 _RDI)          ; exit code into %rdi (syscall arg 2)
   (syscall	linux/SYS_exit)
 
-  (.align elf/page-size) ; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned
+  (.align	elf/page-size) ; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned
 
   (flabel!	'code-segment-end)
 
+  ;;;
+  ;;; Data Segment -- Read Only
+  ;;;
   (flabel!	'ro-data-segment-start)
   (flabel!	'msg)
   (.ascii	"Hello, world! From an ELF64 binary generated in a single pass!\n")
   (flabel!	'msg-end)
   (flabel!	'ro-data-segment-end)
 
+  ;;;
+  ;;; Data Segment
+  ;;;
   (flabel!	'data-segment-start)
   (flabel!	'exit-code)
   (.i64		42)
