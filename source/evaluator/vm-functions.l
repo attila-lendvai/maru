@@ -243,29 +243,30 @@
     (with-bounds-checking
       (set (oop-at base cellindex) value))))
 
-(with-forms
-    ((with-bounds-checking
-         (body
-          `(begin
-            (safety 2 (let ((header (gc/header-of base)))
-                        (assert (and (gc/valid-header-canary? header)
-                                     (<= 0 byteindex)
-                                     (<= (+ byteindex +word-size-in-bytes+) (<header>-size header)))
-                                "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
-            ,@body))))
+(when-at-expand (feature lower/array)
+  (with-forms
+      ((with-bounds-checking
+           (body
+            `(begin
+              (safety 2 (let ((header (gc/header-of base)))
+                          (assert (and (gc/valid-header-canary? header)
+                                       (<= 0 byteindex)
+                                       (<= (+ byteindex +word-size-in-bytes+) (<header>-size header)))
+                                  "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
+              ,@body))))
 
-  (define-vm-function (cell-at ()) (base (byteindex <long>))
-    (with-bounds-checking
-      (box <lower-cell> (cell-at base byteindex))))
+    (define-vm-function (cell-at ()) (base (byteindex <long>))
+      (with-bounds-checking
+          (box <lower-cell> (cell-at base byteindex))))
 
-  (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
-    (with-bounds-checking
-      (set (cell-at base byteindex)
-           (typecase value
-             (<lower-cell>	(unbox <lower-cell> value))
-             ;; FIXME should it allow <long> at all?
-             (<long>		(unbox <long> value))
-             (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
+    (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
+      (with-bounds-checking
+          (set (cell-at base byteindex)
+               (typecase value
+                 (<lower-cell>	(unbox <lower-cell> value))
+                 ;; FIXME should it allow <long> at all?
+                 (<long>		(unbox <long> value))
+                 (else (error "set-cell-at called with an unexpected type: "(type-of value)))))))))
 
 (define-vm-function lower-cell->long ((value <lower-cell>))
   ;; this is potentially a lossy conversion, depending on the chosen

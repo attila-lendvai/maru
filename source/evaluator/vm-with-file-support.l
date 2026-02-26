@@ -57,16 +57,17 @@
       ($put-all output "\nmorituri te salutant\n"))
     res))
 
-(define-vm-function lower/array-save ((array <lower/array>) (path <string>))
-  (let ((fd (unbox <lower-cell> (file-open-or-die path "w")))
-        (elements (slot-value <lower/array> elements array)))
-    (debug (platform/format "lower/array-save will write " (long (lower/array-length array)) " bytes into file " (long fd) "\n"))
-    (for (i 0 (lower/array-length array))
-      (debug (platform/format "writing byte " (long (byte-at elements i)) "\n"))
-      ;; TODO file-write-byte?
-      (file-write-character-or-die (byte-at elements i) fd))
-    (debug (platform/format "lower/array-save is closing the file " (long fd) "\n"))
-    (file-close-or-die fd)))
+(when-at-expand (feature lower/array)
+  (define-vm-function lower/array-save ((array <lower/array>) (path <string>))
+    (let ((fd (unbox <lower-cell> (file-open-or-die path "w")))
+          (elements (slot-value <lower/array> elements array)))
+      (debug (platform/format "lower/array-save will write " (long (lower/array-length array)) " bytes into file " (long fd) "\n"))
+      (for (i 0 (lower/array-length array))
+        (debug (platform/format "writing byte " (long (byte-at elements i)) "\n"))
+        ;; TODO file-write-byte?
+        (file-write-character-or-die (byte-at elements i) fd))
+      (debug (platform/format "lower/array-save is closing the file " (long fd) "\n"))
+      (file-close-or-die fd))))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
