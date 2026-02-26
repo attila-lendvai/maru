@@ -1,5 +1,13 @@
+// less $(guix build linux-libre-headers)/include/linux/elf.h
+
 prefix elf/
 
 header elf.h
 
 integer PF_R PF_W PF_X
+
+integer ELFCLASS64 ELFDATA2LSB ELFOSABI_NONE
+
+integer ET_EXEC EM_X86_64
+
+sizes Elf64_Ehdr Elf64_Phdr

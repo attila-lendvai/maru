@@ -1,3 +1,7 @@
+;;;
+;;; NOTE: this is mostly obsolete, look at the single-pass version instead
+;;;
+
 ;; ELF stuff:
 ;; stack, argc, argv, envs: https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; https://github.com/tonyg/pi-nothing/blob/4b2b59d42babd72cfd007cb71ed295dcdbf53d4a/nothingc/elf.rkt

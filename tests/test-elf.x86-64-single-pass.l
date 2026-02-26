@@ -22,11 +22,7 @@
 ;; readelf -a ./build/test-elf
 
 ;; Notes:
-;;  - ELFCLASS64 (EI_CLASS = 2), EM_X86_64 = 62
 ;;  - ELF64 header size = 64, program header size = 56
-;;  - Program header layout for ELF64: p_type(4), p_flags(4), p_offset(8),
-;;    p_vaddr(8), p_paddr(8), p_filesz(8), p_memsz(8), p_align(8)
-;;  - Use syscall (0x0f 0x05). Syscall numbers: write=1, exit=60.
 ;;  - Syscall args in rdi, rsi, rdx, r10, r8, r9 (we use rdi/rsi/rdx here).
 
 (require "source/assembler/x86-single-pass.l")
@@ -35,6 +31,10 @@
 (require-cgrov "source/platforms/linux/elf")
 
 (define elf/page-size	0x1000) ; is this the system page-size?
+(define ideal-cache-line-alignment 64)
+
+(assert (= elf/sizeof-Elf64_Ehdr 64))
+(assert (= elf/sizeof-Elf64_Phdr 56))
 
 ;; its role is to encode the intention when an upcoming flabel will fill this hole
 (define hole 0)
@@ -70,21 +70,21 @@
   ;;;
   (.i8		0x7f)			; ident[0]
   (.ascii	"ELF")
-  (.i8		2 1 1 0) ; ELFCLASS64, ELFDATA2LSB, version, ELFOSABI_NONE
+  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		2)               ; e_type (ET_EXEC = 2)
-  (.i16		62)              ; e_machine (EM_X86_64 = 62)
+  (.i16		elf/ET_EXEC)     ; e_type
+  (.i16		elf/EM_X86_64)   ; e_machine
   (.i32		1)               ; e_version
   (.i64		(flabel 'code-segment-start))                  ; e_entry (entry point)
   (.i64		(flabel	'program-headers (- self (label 'file-start)))) ; e_phoff	Start of program headers (file offset)
   (.i64		0)                ; e_shoff	Start of section headers
   (.i32		0)                ; e_flags
-  (.i16		(flabel 'elf-header-end (- self (label 'file-start)))) ; e_ehsize	Size of this header (ELF64_Ehdr = 64)
-  (.i16		56) ; e_phentsize	Size of program header entry (ELF64_Phdr = 56)
+  (.i16		(flabel 'elf-header-end (- self (label 'file-start)))) ; e_ehsize	Size of this header
+  (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
   (.i16		3)           ; e_phnum	Number of program headers
   (.i16		0)           ; e_shentsize	Size of section header
   (.i16		0)           ; e_shnum	Number of section headers
-  (.i16		0) ; e_shstrndx	Section header string table index
+  (.i16		0)           ; e_shstrndx	Section header string table index
   (flabel!	'elf-header-end)
 
   ;;;
@@ -100,12 +100,12 @@
   ;; read-only data segment
   (emit-program-header elf/PF_R
                        'ro-data-segment-start 'ro-data-segment-end
-                       4)
+                       ideal-cache-line-alignment)
 
   ;; writable data segment
   (emit-program-header (+ elf/PF_R elf/PF_W)
                        'data-segment-start 'data-segment-end
-                       4)
+                       ideal-cache-line-alignment)
 
   ;;;
   ;;; Code Segment
