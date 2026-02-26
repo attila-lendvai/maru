@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/platforms/linux/syscall-x86.l")
+(require "source/platforms/linux/syscall-i686.l")
 
 ;; redefine the 32 bit version
 (define-instruction LINUX-SYSCALL (false 0 true)
