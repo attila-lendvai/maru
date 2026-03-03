@@ -261,7 +261,7 @@
     (<symbol>	(_D4 (%ensure-label value)))
     (else	(error "_D4: called with unexpected value: "value))))
 
-(define _out_rip_disp32 _D4)
+(define emit_rip_disp32 _D4)
 
 (require "build/generated/x86-instructions.l")
 
