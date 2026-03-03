@@ -16,33 +16,77 @@
 
 (when-at-expand (feature platform/posix)
 
+  (define +fputs-msg+ "*** dlsym lookup of fputs(char *, FILE *) seems to be able to emit this ***\n\000")
+
   (define-test jit/posix/1 ()
     (begin-assembling)
 
-    (let ((fputs (posix/dlsym posix/RTLD_DEFAULT "fputs"))
-          (fflush (posix/dlsym posix/RTLD_DEFAULT "fflush"))
-          (stderr (posix/dlsym posix/RTLD_DEFAULT "stderr")))
+    (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
+          (fflush	(posix/dlsym posix/RTLD_DEFAULT "fflush"))
+          (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
       ;; let's test that the generated code is position independent
       (.base	0xffff)
 
-      (JMPSm	(flabelr 'code) 0 0 0)
+      (let ((l/code (flabel)))
+        (JMPSm	l/code 0 0 0)
 
-      (label! 'msg)
-      (.ascii	"*** dlsym lookup of fputs(char *, FILE *) seems to be able to emit this ***\n\000")
+       (let ((l/msg (label)))
+         (.ascii	+fputs-msg+)
 
-      (.align	16 0x90) ; NOP's to help the disassemler resync after the data
-      (flabel! 'code)
-      (LEAQmr	(labelr 'msg) 0 0 0 _RDI)
-      (MOVQir	stderr _RSI)
-      (MOVQmr	0 _RSI 0 0 _RSI)
-      (call	fputs)
+         (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
-      (MOVQir	stderr _RDI)
-      (MOVQmr	0 _RDI 0 0 _RDI)
-      (call	fflush)
+         (label		l/code)
+         (LEAQmr	l/msg 0 0 0 _RDI)
+         (MOVQir	stderr _RSI)
+         (MOVQmr	0 _RSI 0 0 _RSI)
+         (call	fputs)
 
-      (XORQrr	_RAX _RAX)
-      (RET))
+         (MOVQir	stderr _RDI)
+         (MOVQmr	0 _RDI 0 0 _RDI)
+         (call	fflush)
+
+         (XORQrr	_RAX _RAX)
+         (label		'foo)
+         (RET))))
+
+    ;; (let ((filename "./build/jit"))
+    ;;   (println "\nwriting runtime buffer to "filename)
+    ;;   (save-assembler-buffer *assembler* filename))
+
+    (test-assert
+     (= 0 (call-asm-buf))))
+
+  (define-test jit/posix/2 ()
+    (begin-assembling)
+
+    (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
+          (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
+      ;; let's test that the generated code is position independent
+      (.base	0xffff)
+
+      (let ((l/code (flabel)))
+        (JMPSm	l/code 0 0 0)
+
+        (LEAQmr	'msg 0 0 0 _RDI) ; a forward reference
+        (NOP)
+        (NOP)
+        (NOP)
+
+        (let ((l/msg (label 'msg))) ; test mixed name/local-var referencing
+          (.ascii	+fputs-msg+)
+
+          (.align	16 0x90) ; NOP's to help the disassemler resync after the data
+
+          (label	l/code)
+          (LEAQmr	l/msg 0 0 0 _RDI)
+          (MOVQir	stderr _RSI)
+          (MOVQmr	0 _RSI 0 0 _RSI)
+          (call		fputs)
+
+          (LEAQmr	'msg 0 0 0 _RAX)  ; both should work and
+          (LEAQmr	l/msg 0 0 0 _RBX) ; load the same address.
+          (SUBQrr	_RBX _RAX) ; therefore it should return 0 in _RAX
+          (RET))))
 
     (let ((filename "./build/jit"))
       (println "\nwriting runtime buffer to "filename)
@@ -65,28 +109,28 @@
     ;; print using forward labels
     (MOVQir32	linux/SYS_write _RAX)
     (MOVQir32	linux/STDERR_FILENO _RDI)
-    (LEAQmr	(flabelr 'msg) 0 0 0 _RSI)                    ; buffer
-    (MOVQir32	(flabel 'msg-end (- self (label 'msg))) _RDX) ; strlen(buffer)
+    (LEAQmr	'msg 0 0 0 _RSI)                    ; buffer
+    (MOVQir32	(flabel 'msg-end (- self (laddress 'msg))) _RDX) ; strlen(buffer)
     (SYSCALL)
 
     ;; only to test the instruction emitter
     (MOVQir	0x01234567 _RAX)
     ;;(MOVQir	0x0123456789abcdef _RAX)
-    (JMPSm	(flabelr 'skip-text) 0 0 0)
+    (JMPSm	'skip-text 0 0 0)
 
-    (flabel!	'msg)
+    (label	'msg)
     (.ascii	"*** linux syscall test output from the dynamically compiled code ***\n")
     ;;(.ascii	"alma")
-    (flabel!	'msg-end)
+    (label	'msg-end)
 
     ;; print using the already assigned values of the forward labels
     (.align	16)
-    (flabel!	'skip-text)
+    (label	'skip-text)
 
     (MOVQir32	linux/SYS_write _RAX)
     (MOVQir32	linux/STDERR_FILENO _RDI)
-    (LEAQmr	(labelr 'msg) 0 0 0 _RSI)
-    (MOVQir32	(- (label 'msg-end) (label 'msg)) _RDX)
+    (LEAQmr	'msg 0 0 0 _RSI)
+    (MOVQir32	(- (laddress 'msg-end) (laddress 'msg)) _RDX)
     (SYSCALL)
 
     (MOVQir32	42 _RAX)
