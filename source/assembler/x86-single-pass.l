@@ -5,14 +5,14 @@
 ;;; more complex to use.
 
 ;; TODO add/merge as a primitive? what about the parent env chain?
-(define-function variable-value (env name . default)
+(define-function variable-value (name env . default)
   (let ((var (defined? name env)))
     (cond
       (var
        (<variable>-value var))
       (default
        (first default))
-      (error "variable-value: '"name "' is not defined in env " env))))
+      (else (error "variable-value: '"name "' is not defined in env " env)))))
 
 (define-record <assembler> ()
   (buffer     ; the output, a binary buffer
