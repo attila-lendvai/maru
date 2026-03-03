@@ -9,6 +9,7 @@
     (set list (cdr list)))
   (car list))
 
+;; TODO ? usually push is (push element list), i.e. the opposite order
 (define-form push (list element)
   `(set ,list (cons ,element ,list)))
 

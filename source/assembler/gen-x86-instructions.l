@@ -188,7 +188,23 @@
                          (((S)==4) ? _b10 : \
                          (((S)==8) ? _b11 : ASMFAIL("illegal scale: " #S))))))
 
-/* memory subformats */
+/* memory subformats
+
+R: dest reg
+D: displacement
+B: base reg
+I: index reg
+S: scale
+
+_r_...:	reg + memory operand
+_r_D:	rip + disp32; note: there's no mod=01/disp8 version of RIP-relative
+_r_0B:	base only, no displacement
+_r_1B:	base + 8-bit displacement
+_r_4B:	base + 32-bit displacement
+_r_DB:	Chooses automatically between _0B, _1B, _4B
+_r_0BIS: base + index + scale, no displacement
+_r_0DIS:
+*/
 
 #define _r_D(   R, D      )           (_Mrm(_b00,_rN(R),_b101 )                            ,emit_rip_disp32(D))
 #define _r_0B(  R,   B    )           (_Mrm(_b00,_rN(R),_r4(B))                                      )
