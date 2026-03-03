@@ -10,4 +10,6 @@ integer ELFCLASS64 ELFDATA2LSB ELFOSABI_NONE
 
 integer ET_EXEC EM_X86_64
 
+integer PT_LOAD
+
 sizes Elf64_Ehdr Elf64_Phdr

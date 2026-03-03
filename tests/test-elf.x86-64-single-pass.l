@@ -40,14 +40,14 @@
 (define hole 0)
 
 (define-function emit-program-header (flags start end alignment)
-  (.i32		1)				; p_type (PT_LOAD)
-  (.i32		flags)				; p_flags (read, exec)
-  (.i64		(flabel start (- pself (paddress 'file-start))))	; p_offset (file offset)
-  (.i64		(flabel start))			; p_vaddr (virtual addr of segment) - base
-  (.i64		0)				; p_paddr
-  (.i64		(flabel end (- pself (paddress start))))	; p_filesz
-  (.i64		(flabel end (- pself (paddress start))))	; p_memsz
-  (.i64		alignment))			; p_align
+  (.i32		elf/PT_LOAD)		; p_type
+  (.i32		flags)			; p_flags
+  (.i64		(flabel start (- pself (paddress 'file-start)))) ; p_offset - File offset
+  (.i64		(flabel start))		; p_vaddr (virtual addr of segment) - Virtual address
+  (.i64		0)			; p_paddr - ignored
+  (.i64		(flabel end (- pself (paddress start)))) ; p_filesz - Size in file
+  (.i64		(flabel end (- pself (paddress start)))) ; p_memsz - Size in memory
+  (.i64		alignment))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
 (define-form syscall (sys-number . args)
   `(begin

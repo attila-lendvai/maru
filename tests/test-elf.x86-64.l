@@ -63,7 +63,7 @@ file-start
     (.def	elf-header-size (- $ file-start))
 program-headers
     ;; code segment (PT_LOAD)
-    (.i32	1)			; p_type (PT_LOAD)
+    (.i32	elf/PT_LOAD)		; p_type
     (.i32	(+ elf/PF_R elf/PF_X))	; p_flags (read, exec)
     (.i64	0)			; p_offset (file offset)
     (.i64	base-address)		; p_vaddr (virtual addr of segment) - base
@@ -74,7 +74,7 @@ program-headers
     (.def	program-header-size (- $ program-headers))
 
     ;; read-only data segment
-    (.i32	1)			; p_type (PT_LOAD)
+    (.i32	elf/PT_LOAD)		; p_type
     (.i32	elf/PF_R)		; p_flags (read)
     (.i64	(- ro-data-segment-start file-start))	; p_offset
     (.i64	ro-data-segment-start)	; p_vaddr
@@ -84,7 +84,7 @@ program-headers
     (.i64	4)			; p_align
 
     ;; writable data segment
-    (.i32	1)			; p_type (PT_LOAD)
+    (.i32	elf/PT_LOAD)		; p_type
     (.i32	(+ elf/PF_R elf/PF_W))	; p_flags (read, write)
     (.i64	(- data-segment-start file-start))	; p_offset
     (.i64	data-segment-start)	; p_vaddr
