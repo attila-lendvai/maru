@@ -190,7 +190,7 @@
 
 /* memory subformats */
 
-#define _r_D(   R, D      )           (_Mrm(_b00,_rN(R),_b101 )                              ,_L(D))
+#define _r_D(   R, D      )           (_Mrm(_b00,_rN(R),_b101 )                            ,_out_rip_disp32(D))
 #define _r_0B(  R,   B    )           (_Mrm(_b00,_rN(R),_r4(B))                                      )
 #define _r_0BIS(R,   B,I,S)           (_Mrm(_b00,_rN(R),_b100 ),_SIB(_SCL(S),_r4(I),_r4(B))        )
 #define _r_0DIS(R, D,  I,S)           (_Mrm(_b00,_rN(R),_b100 ),_SIB(_SCL(S),_r4(I),    5 ),_L(D))

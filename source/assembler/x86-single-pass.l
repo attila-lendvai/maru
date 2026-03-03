@@ -97,6 +97,7 @@
 
   (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
   (_L value))
+(define _out_rip_disp32 _D4)
 
 (require "build/generated/x86-instructions.l")
 
