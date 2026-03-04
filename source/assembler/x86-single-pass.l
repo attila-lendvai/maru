@@ -233,9 +233,8 @@
 
 (define-function emit-future-label (label writer size offset)
   (if (resolved-label? label)
-      (writer (- (<label>-laddress label)
-                 (current-laddress)
-                 size))
+      (writer (+ (<label>-laddress label)
+                 (or offset 0)))
     (let ((emitter (or (<label>-primed-emitter label)
                        (begin
                         (%forward-label label (lambda (pself self) self))
