@@ -203,6 +203,11 @@
         (paddress (<segment>-paddress segment))
         (laddress (<segment>-laddress segment))))))
 
+(define-form with-new-label body
+  `(let ((__label__ (label)))
+     ,@body
+     __label__))
+
 (define-function paddress (name) (<label>-paddress (%get-resolved-label name)))
 (define-function laddress (name) (<label>-laddress (%get-resolved-label name)))
 
