@@ -49,25 +49,24 @@
            args '(_RDI _RSI _RDX _R10 _R8 _R9))
     (SYSCALL)))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
-(define +n-segments+ 3)
+(define +n-segments+ 4)
 (define +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                              (* +n-segments+
                                 elf/sizeof-Elf64_Phdr)))
 (define +code-segment-address+		0x00400000)
 (define +ro-data-segment-address+	0x00500000)
 (define +data-segment-address+		0x00600000)
+(define +bss-segment-address+	0x00700000)
 
-(define-function emit-program-header (file-offset size flags start alignment)
+(define-function emit-program-header (file-offset file-size mem-size flags
+                                                  start alignment)
   (.i32	elf/PT_LOAD)                    ; p_type
   (.i32	flags)                          ; p_flags
-  ;;(.i64	(flabel start (- pself (paddress 'file-start)))) ; p_offset - File offset
   (.i64	file-offset)                    ; p_offset - File offset
   (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
   (.i64	0)       ; p_paddr - ignored
-  ;;(.i64	(flabel end (- pself (paddress start)))) ; p_filesz - Size in file
-  (.i64	size)                           ; p_filesz - Size in file
-  ;;(.i64	(flabel end (- pself (paddress start)))) ; p_memsz - Size in memory
-  (.i64	size)                           ; p_memsz - Size in memory
+  (.i64	file-size)                      ; p_filesz - Size in file
+  (.i64	mem-size)                       ; p_memsz - Size in memory
   (.i64	alignment))
 
 (define-function write-elf-file (filename)
@@ -100,7 +99,7 @@
   (.i32		0)                  ; e_flags
   (.i16		(flabel 'elf-header-end (- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
   (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		3)           ; e_phnum	Number of program headers
+  (.i16		+n-segments+)          ; e_phnum	Number of program headers
   (.i16		0)           ; e_shentsize	Size of section header
   (.i16		0)           ; e_shnum	Number of section headers
   (.i16		0)      ; e_shstrndx	Section header string table index
@@ -111,37 +110,43 @@
 ;;;
 ;;; Program headers (segment layout)
 ;;;
-  (label	'program-headers)
+  (label 'program-headers)
 
   ;; code segment
-  (let* ((code-size	(segment-length 'code))
-         (ro-data-size	(segment-length 'ro-data))
-         (data-size	(segment-length 'data))
-         (file-position	0))
+  (let ((file-position	0))
 
-    (let ((size (+ code-size +elf-prefix-size+)))
+    (let ((size (+ (segment-length 'code) +elf-prefix-size+)))
       (emit-program-header file-position
-                           size
+                           size size
                            (+ elf/PF_R elf/PF_X)
                            +code-segment-address+
                            elf/page-size)
       (incr file-position size))
 
     ;; read-only data segment
-    (emit-program-header file-position ;(+ +elf-prefix-size+ code-size)
-                         ro-data-size
-                         elf/PF_R
-                         +ro-data-segment-address+
-                         ideal-cache-line-alignment)
-    (incr file-position ro-data-size)
+    (let ((ro-data-size (segment-length 'ro-data)))
+      (emit-program-header file-position
+                           ro-data-size ro-data-size
+                           elf/PF_R
+                           +ro-data-segment-address+
+                           ideal-cache-line-alignment)
+      (incr file-position ro-data-size))
 
     ;; writable data segment
-    (emit-program-header file-position ;(+ +elf-prefix-size+ code-size ro-data-size)
-                         data-size
+    (let ((data-size (segment-length 'data)))
+      (emit-program-header file-position
+                           data-size data-size
+                           (+ elf/PF_R elf/PF_W)
+                           +data-segment-address+
+                           ideal-cache-line-alignment)
+      (incr file-position data-size))
+
+    ;; BSS, aka zero-initialized data
+    (emit-program-header file-position
+                         0 (segment-length 'bss)
                          (+ elf/PF_R elf/PF_W)
-                         +data-segment-address+
-                         ideal-cache-line-alignment)
-    (incr file-position data-size))
+                         +bss-segment-address+
+                         ideal-cache-line-alignment))
 
   (label 'elf-prefix-end)
 
@@ -168,18 +173,22 @@
                msg (- (laddress msg-end)
                       (laddress msg))))))
 
-(define-function emit-global-variable (init)
-  (with-current-segment 'data
-    (let ((l (label)))
-      (.i64 init)
-      l)))
+(define-function emit-global-variable args
+  (if args
+      (with-current-segment 'data
+        (with-new-label
+          (.i64 (first args))))
+    (with-current-segment 'bss
+      (with-new-label
+        (.i64 0)))))
 
 (define-function elf-test (filename)
   (println "assembling the code")
   (with-assembling (((code	(+ +code-segment-address+
                                    +elf-prefix-size+))
                      (ro-data	+ro-data-segment-address+)
-                     (data	+data-segment-address+)))
+                     (data	+data-segment-address+)
+                     (bss	+bss-segment-address+)))
 
     (label	'code-segment-start)
 
@@ -196,6 +205,10 @@
       (LEAQmr	l/exit-code 0 0 0 _RDI)
       ;;(MOVQir	l/exit-code _RDI)
       (MOVQmr	0 _RDI 0 0 _RDI) ; load exit code into %rdi (syscall arg 2)
+
+      (let ((l/uninitialized (emit-global-variable)))
+        (LEAQmr	l/uninitialized 0 0 0 _RAX) ; should be a zero var
+        (SUBQmr	0 _RAX 0 0 _RDI)) ; so, this shouldn't change rdi
       (syscall	linux/SYS_exit))
 
     (.align	elf/page-size)
