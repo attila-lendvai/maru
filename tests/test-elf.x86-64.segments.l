@@ -53,7 +53,9 @@
 (define +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                              (* +n-segments+
                                 elf/sizeof-Elf64_Phdr)))
-(define +base-address+ 0x00400000)
+(define +code-segment-address+		0x00400000)
+(define +ro-data-segment-address+	0x00500000)
+(define +data-segment-address+		0x00600000)
 
 (define-function emit-program-header (file-offset size flags start alignment)
   (.i32	elf/PT_LOAD)                    ; p_type
@@ -71,9 +73,15 @@
 (define-function write-elf-file (filename)
   (println "assembling the elf header")
 
+  (.segment 'data)
+  (.align	elf/page-size)
+
+  (.segment 'ro-data)
+  (.align	elf/page-size)
+
   (create-segment 'elf-prefix)
   (.segment 'elf-prefix)
-  (.base 0) ; without this the laddress is random, which screws up .align
+  (.base 0) ; without this the laddress is random, which disrupts .align
 
 ;;;
 ;;; ELF header
@@ -115,7 +123,7 @@
       (emit-program-header file-position
                            size
                            (+ elf/PF_R elf/PF_X)
-                           +base-address+
+                           +code-segment-address+
                            elf/page-size)
       (incr file-position size))
 
@@ -123,7 +131,7 @@
     (emit-program-header file-position ;(+ +elf-prefix-size+ code-size)
                          ro-data-size
                          elf/PF_R
-                         'ro-data-segment-start
+                         +ro-data-segment-address+
                          ideal-cache-line-alignment)
     (incr file-position ro-data-size)
 
@@ -131,7 +139,7 @@
     (emit-program-header file-position ;(+ +elf-prefix-size+ code-size ro-data-size)
                          data-size
                          (+ elf/PF_R elf/PF_W)
-                         'data-segment-start
+                         +data-segment-address+
                          ideal-cache-line-alignment)
     (incr file-position data-size))
 
@@ -146,57 +154,52 @@
 
   (println (concat-strings "*** You may run "filename" now for a friendly greeting")))
 
+(define-function emit-print (text)
+  ;; emit the text into the data segment, and emit machine code into
+  ;; the code segment that prints it.
+  (with-current-segment 'ro-data
+    (let ((msg (label))
+          msg-end)
+      (.ascii text)
+      (set msg-end (label))
+
+      (.segment 'code)
+      (syscall linux/SYS_write linux/STDOUT_FILENO
+               msg (- (laddress msg-end)
+                      (laddress msg))))))
+
+(define-function emit-global-variable (init)
+  (with-current-segment 'data
+    (let ((l (label)))
+      (.i64 init)
+      l)))
+
 (define-function elf-test (filename)
   (println "assembling the code")
-  (with-assembling ((code ro-data data))
-    (.segment	'code)
-    (.base	(+ +base-address+
-                   +elf-prefix-size+))
+  (with-assembling (((code	(+ +code-segment-address+
+                                   +elf-prefix-size+))
+                     (ro-data	+ro-data-segment-address+)
+                     (data	+data-segment-address+)))
 
     (label	'code-segment-start)
 
-    ;; print message
-    (syscall linux/SYS_write linux/STDOUT_FILENO
-             (flabel 'msg) (flabel 'msg-end (- self (laddress 'msg))))
+    (emit-print "Hello, world! From an ELF64 binary generated using multiple segments!\n")
+    (emit-print "Just another emit-print entry for good measure\n")
 
     ;; test writing into the data segment: turn EXIT-CODE into 0
-    ;;(LEAQmr	(flabelr 'exit-code) 0 0 0 _RBX)
-    (MOVQir	'exit-code _RBX)
-    (ADDQim	-2 0 _RBX 0 0)          ; [rbx] += -2
-    (SUBQim	40 0 _RBX 0 0)          ; [rbx] -= 40
+    (let ((l/exit-code (emit-global-variable 42)))
+      ;;(LEAQmr	l/exit-code 0 0 0 _RBX) ; PIC version
+      (MOVQir	l/exit-code _RBX)       ; non-PIC version
+      (ADDQim	-2 0 _RBX 0 0)          ; [rbx] += -2
+      (SUBQim	40 0 _RBX 0 0)          ; [rbx] -= 40
 
-    (LEAQmr	'exit-code 0 0 0 _RDI)  ; exit code address
-    ;;(MOVQir	(flabel 'exit-code) _RDI) ; exit code address
-    (MOVQmr	0 _RDI 0 0 _RDI) ; exit code into %rdi (syscall arg 2)
-    (syscall	linux/SYS_exit)
+      (LEAQmr	l/exit-code 0 0 0 _RDI)
+      ;;(MOVQir	l/exit-code _RDI)
+      (MOVQmr	0 _RDI 0 0 _RDI) ; load exit code into %rdi (syscall arg 2)
+      (syscall	linux/SYS_exit))
 
     (.align	elf/page-size)
     (label	'code-segment-end)
-
-;;;
-;;; Data Segment -- Read Only
-;;;
-    (.segment	'ro-data)
-    (.base	0x00500000)
-
-    (label	'ro-data-segment-start)
-    (label	'msg)
-    (.ascii	"Hello, world! From an ELF64 binary generated using multiple segments!\n")
-    (label	'msg-end)
-    (.align	elf/page-size)
-    (label	'ro-data-segment-end)
-
-;;;
-;;; Data Segment
-;;;
-    (.segment	'data)
-    (.base	0x00600000)
-
-    (label	'data-segment-start)
-    (label	'exit-code)
-    (.i64	42)
-    (.align	elf/page-size)
-    (label	'data-segment-end)
 
     (write-elf-file filename)))
 
