@@ -75,6 +75,13 @@
     (assert (is <segment> segment))
     segment))
 
+(define-form with-current-segment (new-segment . body)
+  `(let ((__previous-segment__ (current-segment)))
+     (.segment ,new-segment)
+     (let ((__result__ (begin ,@body)))
+       (.segment __previous-segment__)
+       __result__)))
+
 (define-function get-segment (desig)
   (typecase desig
     (<symbol> (let ((segment (variable-value desig (<assembler>-env *assembler*))))
