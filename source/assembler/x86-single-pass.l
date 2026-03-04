@@ -332,10 +332,15 @@
 (define-function .base (address)
   (set (<segment>-laddress (current-segment)) address))
 
-(define-function .align (alignment . filler)
-  (let* ((address (current-laddress))
-         (remainder (bitwise-and address (- alignment 1)))
-         (filler (if filler (car filler) 0)))
+(define-function %align (address alignment filler)
+  (let ((remainder (bitwise-and address (- alignment 1)))
+        (filler (if filler (car filler) 0)))
     (when (< 0 remainder)
       (times-do (- alignment remainder)
         (_B filler)))))
+
+(define-function .align (alignment . filler)
+  (%align (current-laddress) alignment filler))
+
+(define-function .palign (alignment . filler)
+  (%align (current-paddress) alignment filler))
