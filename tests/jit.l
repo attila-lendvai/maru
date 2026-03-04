@@ -51,7 +51,7 @@
 
     ;; (let ((filename "./build/jit"))
     ;;   (println "\nwriting runtime buffer to "filename)
-    ;;   (save-assembler-buffer *assembler* filename))
+    ;;   (write-current-segment-to-file filename))
 
     (test-assert
      (= 0 (call-asm-buf))))
@@ -90,7 +90,7 @@
 
     (let ((filename "./build/jit"))
       (println "\nwriting runtime buffer to "filename)
-      (save-assembler-buffer *assembler* filename))
+      (write-current-segment-to-file filename))
 
     (test-assert
      (= 0 (call-asm-buf)))))
@@ -138,7 +138,7 @@
 
     (let ((filename "./build/jit"))
       (println "writing runtime buffer to "filename)
-      (save-assembler-buffer *assembler* filename))
+      (write-current-segment-to-file filename))
 
     (test-assert
      (= 42 (call-asm-buf)))))

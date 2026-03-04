@@ -14,38 +14,78 @@
        (first default))
       (else (error "variable-value: '"name "' is not defined in env " env)))))
 
-(define-record <assembler> ()
+(define-record <segment> ()
   (buffer     ; the output, a binary buffer
-   env        ; a lexical env where the asm instructions are evaluated
    laddress   ; logical address
    paddress   ; physical address; i.e. current offset in the buffer
    ))
 
-(define-function save-assembler-buffer (a filename)
-  (lower/array-save (<assembler>-buffer a) filename))
-
-(define-function assembler->function (a)
-  (lower/array->lower/function (<assembler>-buffer a)))
+(define-record <assembler> ()
+  (env        ; a lexical env where the asm instructions are evaluated
+   current-segment ; the <segment> we are emitting into
+   ))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
+(define-function segment (name)
+  (let ((segment
+          (make <segment>
+            (buffer	(lower/array 4096))
+            ;; TODO for a working address-of upper function we either need
+            ;; full-cell <long>, or more generally use <lower-cell> and
+            ;; introduce arithmetic for that in the interpreter. for
+            ;; now we just settle for generating position independent
+            ;; code for any JIT-like scenario, and when we output ELF
+            ;; files, we can just set the base explicitly.
+            ;;
+            ;; to make non-PIC code call'able right in the emit buffer
+            ;; (laddress	(address-of (<buffer>-elements buffer)))
+            (paddress	0)
+            ))
+        (env (<assembler>-env *assembler*)))
+    (assert (not (defined? name env)))
+    (environment-define env name segment)
+    segment))
+
 (define-function begin-assembling ()
-  (let ((buffer (lower/array 4096)))
-    (set *assembler*
-         (make <assembler>
-           (buffer	buffer)
-           (env		(environment))
-           ;; TODO for a working address-of vm-function we either need
-           ;; full-cell <long>, or more generally use <lower-cell> and
-           ;; introduce arithmetic for that in the interpreter. for
-           ;; now we just settle for generating position independent
-           ;; code for any JIT-like scenario, and when we output ELF
-           ;; files, we can just set the base explicitly.
-           ;;
-           ;; make it call'able right in the buffer
-           ;; (laddress	(address-of (<buffer>-elements buffer)))
-           (paddress	0)
-           ))))
+  (set *assembler*
+       (make <assembler>
+         (env		(environment))
+         ))
+  (set (<assembler>-current-segment *assembler*)
+       (segment 'toplevel-code-segment))
+  ())
+
+(define-function current-segment ()
+  (let ((segment (<assembler>-current-segment *assembler*)))
+    (assert (is <segment> segment))
+    segment))
+
+(define-function get-segment (desig)
+  (typecase desig
+    (<symbol> (let ((segment (variable-value desig (<assembler>-env *assembler*))))
+                (assert (is <segment> segment))
+                segment))
+    (<segment> desig)
+    (else (error "get-segment: not a valid segment designator: "desig))))
+
+(define-function .segment (desig)
+  (typecase desig
+    (<segment> (set (<assembler>-current-segment *assembler*) desig))
+    (<symbol>  (.segment (get-segment desig)))
+    (else (error ".segment: not a valid segment designator: "desig))))
+
+(define-function write-segment-to-file (desig filename)
+  (lower/array-save (<segment>-buffer (get-segment desig)) filename))
+
+(define-function write-current-segment-to-file (filename)
+  (write-segment-to-file (current-segment) filename))
+
+(define-function segment->function (segment)
+  (lower/array->lower/function (<segment>-buffer segment)))
+
+(define-function assembler->function (a)
+  (segment->function (<assembler>-current-segment a)))
 
 ;;;
 ;;; Labels
@@ -68,25 +108,29 @@
 ;;;  - l prefix: logical address, i.e. where the code will run
 
 (define-function current-paddress ()
-  (<assembler>-paddress *assembler*))
+  (<segment>-paddress (current-segment)))
 
 (define-function current-laddress ()
-  (<assembler>-laddress *assembler*))
+  (<segment>-laddress (current-segment)))
 
 (define-record <label> ()
-  (paddress
+  (segment
+   paddress
    laddress
    primed-emitter
    emitters))
 
 (define-function %ensure-label (name)
+  ;; create a label if needed, with its addresses unset (i.e. it can
+  ;; be a future label)
   (let ((label (typecase name
                  (<label>	name)
                  (<symbol>	(variable-value name (<assembler>-env *assembler*) ()))
                  ;;(else (error "%ensure-label: not a label designator: " name))
                  )))
     (unless label
-      (set label (make <label>))
+      (set label (make <label>
+                   (segment	(current-segment))))
       (when (is <symbol> name)
         (environment-define (<assembler>-env *assembler*) name label)))
     label))
@@ -126,9 +170,11 @@
           (list-do emitter (<label>-emitters label)
             (emitter 'state/set paddress laddress))
           label))
-    (make <label>
-      (paddress (current-paddress))
-      (laddress (current-laddress)))))
+    (let ((segment (current-segment)))
+      (make <label>
+        (segment  segment)
+        (paddress (<segment>-paddress segment))
+        (laddress (<segment>-laddress segment))))))
 
 (define-function paddress (name) (<label>-paddress (%get-resolved-label name)))
 (define-function laddress (name) (<label>-laddress (%get-resolved-label name)))
@@ -154,11 +200,13 @@
                 (set writer (pop args))
                 (set offset (pop args)))
                (state/set
-                (let ((paddress (pop args))
-                      (laddress (pop args))
-                      (saved-paddress (current-paddress))
-                      (saved-laddress (current-laddress)))
-                  (set (<assembler>-paddress *assembler*) hole-paddress)
+                (let* ((paddress (pop args))
+                       (laddress (pop args))
+                       (saved-segment	(current-segment))
+                       (segment		(.segment (<label>-segment label)))
+                       (saved-paddress	(<segment>-paddress segment))
+                       (saved-laddress	(<segment>-laddress segment)))
+                  (set (<segment>-paddress segment) hole-paddress)
                   ;; it's a forward label, so the form that calculates
                   ;; the final value must be delayed into a future (a
                   ;; closure). but now is the time to force it.
@@ -166,8 +214,9 @@
                     (when offset
                       (incr final-laddress offset))
                     (writer final-laddress)
-                    (set (<assembler>-paddress *assembler*) saved-paddress)
-                    (set (<assembler>-laddress *assembler*) saved-laddress)))
+                    (set (<segment>-paddress segment) saved-paddress)
+                    (set (<segment>-laddress segment) saved-laddress)
+                    (.segment saved-segment)))
                 ())
                (else (error "unexpected state: "state))))))
     (assert (not (<label>-primed-emitter label)))
@@ -194,11 +243,12 @@
   label)
 
 (define-function _B  (value)
-  (let ((buffer   (<assembler>-buffer *assembler*))
-        (position (<assembler>-paddress *assembler*)))
-    (incr (<assembler>-laddress *assembler*))
+  (let* ((segment	(current-segment))
+         (buffer	(<segment>-buffer segment))
+         (position	(<segment>-paddress segment)))
+    (incr (<segment>-laddress segment))
     (set (lower/array-at buffer position) value)
-    (set (<assembler>-paddress *assembler*) (+ 1 position))))
+    (set (<segment>-paddress segment) (+ 1 position))))
 
 (define-function _W (value)
   (typecase value
@@ -230,11 +280,12 @@
     (<lower-cell>
      ;; (print-all *debug-output* "_Q is storing a <lower-cell>: "value
      ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
-     (set (lower/array-at (<assembler>-buffer *assembler*)
-                          (<assembler>-paddress *assembler*))
-          value)
-     (incr (<assembler>-paddress *assembler*) 8)
-     (incr (<assembler>-laddress *assembler*) 8))
+     (let ((segment (current-segment)))
+       (set (lower/array-at (<segment>-buffer segment)
+                            (<segment>-paddress segment))
+            value)
+       (incr (<segment>-paddress segment) 8)
+       (incr (<segment>-laddress segment) 8)))
     (<label>	(emit-future-label value _Q 8 ()))
     (<symbol>	(_Q (%ensure-label value)))
     (else	(error "_Q: called with unexpected value: "value))))
@@ -276,7 +327,7 @@
       (_B char))))
 
 (define-function .base (address)
-  (set (<assembler>-laddress *assembler*) address))
+  (set (<segment>-laddress (current-segment)) address))
 
 (define-function .align (alignment . filler)
   (let* ((address (current-laddress))

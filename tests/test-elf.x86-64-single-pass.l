@@ -157,7 +157,7 @@
   (label	'data-segment-end)
 
   (println "writing elf buffer to "filename)
-  (save-assembler-buffer *assembler* filename)
+  (write-current-segment-to-file filename)
   (println (concat-strings "*** You may run "filename" now for a friendly greeting")))
 
 (write-elf-file "./build/test-elf.x86-64-single-pass")
