@@ -130,7 +130,7 @@ exit-code
     (.i64	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(let ((filename "./build/test-elf.x86-64"))
+(let ((filename "./build/test-elf.x86-64.traditional"))
   (println "writing elf buffer to "filename)
   (save-assembler-buffer *assembler* filename)
   (println (concat-strings "*** You may run "filename" now for a friendly greeting")))

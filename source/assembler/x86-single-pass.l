@@ -29,7 +29,7 @@
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
-(define-function segment (name)
+(define-function create-segment (name)
   (let ((segment
           (make <segment>
             (buffer	(lower/array 4096))
@@ -42,21 +42,28 @@
             ;;
             ;; to make non-PIC code call'able right in the emit buffer
             ;; (laddress	(address-of (<buffer>-elements buffer)))
+            (laddress	0xdeadbeef)
             (paddress	0)
             ))
         (env (<assembler>-env *assembler*)))
     (assert (not (defined? name env)))
     (environment-define env name segment)
+    ;; the first segment created becomes the current-segment
+    (unless (<assembler>-current-segment *assembler*)
+      (set (<assembler>-current-segment *assembler*) segment))
     segment))
 
-(define-function begin-assembling ()
-  (set *assembler*
-       (make <assembler>
-         (env		(environment))
-         ))
-  (set (<assembler>-current-segment *assembler*)
-       (segment 'toplevel-code-segment))
-  ())
+(define-form with-assembling (args . body)
+  (let ((segment-names (pop args)))
+    `(begin
+      (set *assembler*
+           (make <assembler>
+             (env		(environment))
+             ))
+      ,@(map (lambda (segment-name)
+               `(create-segment ',segment-name))
+             segment-names)
+      ,@body)))
 
 (define-function current-segment ()
   (let ((segment (<assembler>-current-segment *assembler*)))
@@ -71,6 +78,9 @@
     (<segment> desig)
     (else (error "get-segment: not a valid segment designator: "desig))))
 
+(define-function segment-length (desig)
+  (lower/array-length (<segment>-buffer (get-segment desig))))
+
 (define-function .segment (desig)
   (typecase desig
     (<segment> (set (<assembler>-current-segment *assembler*) desig))
@@ -78,6 +88,7 @@
     (else (error ".segment: not a valid segment designator: "desig))))
 
 (define-function write-segment-to-stream (desig file)
+  ;;(println "writing segment: "desig", size: "(segment-length desig))
   (lower/array-write-to-stream (<segment>-buffer (get-segment desig)) file))
 
 (define-function save-current-segment-to-file (filename)
@@ -228,7 +239,7 @@
     label))
 
 ;;;
-;;; Hooks for interfacing with the intruction emitters
+;;; Hooks for interfacing with the instruction emitters
 ;;;
 
 (define-function emit-future-label (label writer size offset)

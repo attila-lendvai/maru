@@ -610,26 +610,40 @@ test-elf.IA-32: $(TEST_EVAL) tests/test-elf.IA-32.l source/assembler/x86.l
 	./build/test-elf.IA-32
 
 # make PLATFORM=linux test-elf.x86-64
-test-elf.x86-64: $(TEST_EVAL) tests/test-elf.x86-64.l source/assembler/x86.l \
+test-elf.x86-64: $(TEST_EVAL) \
+		tests/test-elf.x86-64.traditional.l \
+		tests/test-elf.x86-64.single-pass.l \
+		tests/test-elf.x86-64.segments.l \
+		source/assembler/x86.l \
 		source/platforms/linux/linux.cgrov.$(TARGET).l \
 		source/platforms/linux/elf.cgrov.$(TARGET).l
-	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.l
-	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64-single-pass.l
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.traditional.l
 #	cmp build/test-elf.x86-64 build/test-elf.x86-64-single-pass
 
-	-readelf -el build/test-elf.x86-64
-	@chmod +x build/test-elf.x86-64
-	./build/test-elf.x86-64
+	-readelf -el build/test-elf.x86-64.traditional
+	@chmod +x build/test-elf.x86-64.traditional
+	./build/test-elf.x86-64.traditional
+	@$(call print_file_size,./build/test-elf.x86-64.traditional)
 
-	-readelf -el build/test-elf.x86-64-single-pass
-	@chmod +x build/test-elf.x86-64-single-pass
-	./build/test-elf.x86-64-single-pass
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.single-pass.l
+	-readelf -el build/test-elf.x86-64.single-pass
+	@chmod +x build/test-elf.x86-64.single-pass
+	./build/test-elf.x86-64.single-pass
+	@$(call print_file_size,./build/test-elf.x86-64.single-pass)
+
+	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.segments.l
+	-readelf -el build/test-elf.x86-64.segments
+	@chmod +x build/test-elf.x86-64.segments
+	./build/test-elf.x86-64.segments
+	@$(call print_file_size,./build/test-elf.x86-64.segments)
 
 # make PLATFORM=linux test-elf
 test-elf: test-elf.x86-64
 
 # make PLATFORM=linux test-jit
 test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86.l
+	@mkdir -p $(BUILD)/jit
+	rm -f $(BUILD)/jit/*
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/jit.l
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*

@@ -14,18 +14,28 @@
 (when-at-expand (feature platform/posix)
   (require-cgrov "source/platforms/posix/posix"))
 
+(define-form define-jit-test (name . body)
+  `(define-test ,name ()
+     (with-assembling ((code))
+       ,@body
+
+       (let ((filename ,(concat-string "./build/jit/" (symbol->string name))))
+         ;; (println "\nwriting jit buffer to "filename)
+         (save-current-segment-to-file filename))
+
+       (test-assert
+        (= 0 (call-asm-buf))))))
+
 (when-at-expand (feature platform/posix)
 
   (define +fputs-msg+ "*** dlsym lookup of fputs(char *, FILE *) seems to be able to emit this ***\n\000")
 
-  (define-test jit/posix/1 ()
-    (begin-assembling)
-
+  (define-jit-test jit-posix-1
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
           (fflush	(posix/dlsym posix/RTLD_DEFAULT "fflush"))
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
       ;; let's test that the generated code is position independent
-      (.base	0xffff)
+      (.base	0xdeadbeef)
 
       (let ((l/code (flabel)))
         (JMPSm	l/code 0 0 0)
@@ -47,22 +57,13 @@
 
          (XORQrr	_RAX _RAX)
          (label		'foo)
-         (RET))))
+         (RET)))))
 
-    ;; (let ((filename "./build/jit"))
-    ;;   (println "\nwriting runtime buffer to "filename)
-    ;;   (save-current-segment-to-file filename))
-
-    (test-assert
-     (= 0 (call-asm-buf))))
-
-  (define-test jit/posix/2 ()
-    (begin-assembling)
-
+  (define-jit-test jit-posix-2
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
       ;; let's test that the generated code is position independent
-      (.base	0xffff)
+      (.base	0xdeadbeef)
 
       (let ((l/code (flabel)))
         (JMPSm	l/code 0 0 0)
@@ -86,25 +87,45 @@
           (LEAQmr	'msg 0 0 0 _RAX)  ; both should work and
           (LEAQmr	l/msg 0 0 0 _RBX) ; load the same address.
           (SUBQrr	_RBX _RAX) ; therefore it should return 0 in _RAX
-          (RET))))
+          (RET)))))
 
-    (let ((filename "./build/jit"))
-      (println "\nwriting runtime buffer to "filename)
-      (save-current-segment-to-file filename))
+  (define-jit-test jit-posix-3
+    (let ()
+      ;; let's test that the generated code is position independent
+      (.base	0xdeadbeef)
 
-    (test-assert
-     (= 0 (call-asm-buf)))))
+      (JMPSm	'skip-1 0 0 0)
+
+      (label	'data-1)
+      (.i64	'skip-1) ; future label reference
+
+      (label	'skip-1)
+      (JMPSm	'skip-2 0 0 0)
+
+      (label	'data-2)
+      (.i64	'skip-1) ; realized label reference
+      (NOP)
+      (NOP)
+      (NOP)
+      (NOP)
+      (NOP)
+
+      (label	'skip-2)
+      (LEAQmr	'data-1 0 0 0 _RAX)
+      (MOVQmr	0 _RAX 0 0 _RAX)        ; data-1 in rax
+      (LEAQmr	'data-2 0 0 0 _RBX)
+      (MOVQmr	0 _RBX 0 0 _RBX)        ; data-2 in rbx
+      (SUBQrr	_RBX _RAX)              ; should be zero
+      (RET))))
 
 ;; TODO investigate why this must be a separate toplevel form
 (when-at-expand (feature platform/linux)
   (require-cgrov "source/platforms/linux/linux"))
 
 (when-at-expand (feature platform/linux)
-  (define-test jit/linux/1 ()
-    (begin-assembling)
-
+  (define-jit-test jit-linux-1 ()
     ;; let's test that the generated code is position independent
-    (.base 10000)
+    (.base	0xdeadbeef)
 
     ;; print using forward labels
     (MOVQir32	linux/SYS_write _RAX)
@@ -114,8 +135,8 @@
     (SYSCALL)
 
     ;; only to test the instruction emitter
-    (MOVQir	0x01234567 _RAX)
-    ;;(MOVQir	0x0123456789abcdef _RAX)
+    (MOVQir	0x12345678 _RAX)
+    ;;(MOVQir	0x123456789abcdef0 _RAX)
     (JMPSm	'skip-text 0 0 0)
 
     (label	'msg)
@@ -133,14 +154,7 @@
     (MOVQir32	(- (laddress 'msg-end) (laddress 'msg)) _RDX)
     (SYSCALL)
 
-    (MOVQir32	42 _RAX)
-    (RET)
-
-    (let ((filename "./build/jit"))
-      (println "writing runtime buffer to "filename)
-      (save-current-segment-to-file filename))
-
-    (test-assert
-     (= 42 (call-asm-buf)))))
+    (MOVQir32	0 _RAX)
+    (RET)))
 
 (run-tests)
