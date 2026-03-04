@@ -60,8 +60,13 @@
            (make <assembler>
              (env		(environment))
              ))
-      ,@(map (lambda (segment-name)
-               `(create-segment ',segment-name))
+      ,@(map (lambda (el)
+               (let ((name (first (ensure-list el)))
+                     (base (second (ensure-list el))))
+                 (if base
+                     `(set (<segment>-laddress (create-segment ',name))
+                           ,base)
+                   `(create-segment ',name))))
              segment-names)
       ,@body)))
 
