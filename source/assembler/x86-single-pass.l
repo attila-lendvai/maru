@@ -4,6 +4,8 @@
 ;;; runs in a single pass. Because of that forward labels are a bit
 ;;; more complex to use.
 
+(require "source/streams-min-late.l")
+
 ;; TODO add/merge as a primitive? what about the parent env chain?
 (define-function variable-value (name env . default)
   (let ((var (defined? name env)))
@@ -75,11 +77,13 @@
     (<symbol>  (.segment (get-segment desig)))
     (else (error ".segment: not a valid segment designator: "desig))))
 
-(define-function write-segment-to-file (desig filename)
-  (lower/array-save (<segment>-buffer (get-segment desig)) filename))
+(define-function write-segment-to-stream (desig file)
+  (lower/array-write-to-stream (<segment>-buffer (get-segment desig)) file))
 
-(define-function write-current-segment-to-file (filename)
-  (write-segment-to-file (current-segment) filename))
+(define-function save-current-segment-to-file (filename)
+  (let ((file (file-open-or-die filename "w")))
+    (write-segment-to-stream (current-segment) file)
+    (file-close-or-die file)))
 
 (define-function segment->function (segment)
   (lower/array->lower/function (<segment>-buffer segment)))

@@ -4,6 +4,8 @@
 ;;; instructions, and emits them in multiple phases, until no labels
 ;;; change value.
 
+(require "source/streams-min-late.l")
+
 ;; TODO add/merge as a primitive? what about the parent env chain?
 (define-function variable-value (name env . default)
   (let ((var (defined? name env)))
@@ -20,7 +22,9 @@
    ))
 
 (define-function save-assembler-buffer (a filename)
-  (lower/array-save (<assembler>-buffer a) filename))
+  (let ((file (file-open-or-die filename "w")))
+    (lower/array-write-to-stream (<assembler>-buffer a) file)
+    (file-close-or-die file)))
 
 (define-function assembler->function (a)
   (lower/array->lower/function (<assembler>-buffer a)))
