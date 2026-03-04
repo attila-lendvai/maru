@@ -49,6 +49,12 @@
            args '(_RDI _RSI _RDX _R10 _R8 _R9))
     (SYSCALL)))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
+(define +n-segments+ 3)
+(define +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
+                             (* +n-segments+
+                                elf/sizeof-Elf64_Phdr)))
+(define +base-address+ 0x00400000)
+
 (define-function emit-program-header (file-offset size flags start alignment)
   (.i32	elf/PT_LOAD)                    ; p_type
   (.i32	flags)                          ; p_flags
@@ -100,33 +106,35 @@
   (label	'program-headers)
 
   ;; code segment
-  (let* ((segment-count	3)
-         (elf-prefix-size elf/page-size)
-         (code-size	(segment-length 'code))
+  (let* ((code-size	(segment-length 'code))
          (ro-data-size	(segment-length 'ro-data))
-         (data-size	(segment-length 'data)))
+         (data-size	(segment-length 'data))
+         (file-position	0))
 
-    (emit-program-header elf-prefix-size
-                         code-size
-                         (+ elf/PF_R elf/PF_X)
-                         'code-segment-start
-                         elf/page-size)
+    (let ((size (+ code-size +elf-prefix-size+)))
+      (emit-program-header file-position
+                           size
+                           (+ elf/PF_R elf/PF_X)
+                           +base-address+
+                           elf/page-size)
+      (incr file-position size))
 
     ;; read-only data segment
-    (emit-program-header (+ elf-prefix-size code-size)
+    (emit-program-header file-position ;(+ +elf-prefix-size+ code-size)
                          ro-data-size
                          elf/PF_R
                          'ro-data-segment-start
                          ideal-cache-line-alignment)
+    (incr file-position ro-data-size)
 
     ;; writable data segment
-    (emit-program-header (+ elf-prefix-size code-size ro-data-size)
+    (emit-program-header file-position ;(+ +elf-prefix-size+ code-size ro-data-size)
                          data-size
                          (+ elf/PF_R elf/PF_W)
                          'data-segment-start
-                         ideal-cache-line-alignment))
+                         ideal-cache-line-alignment)
+    (incr file-position data-size))
 
-  (.align elf/page-size)
   (label 'elf-prefix-end)
 
   (let ((file (file-open-or-die filename "w")))
@@ -142,7 +150,8 @@
   (println "assembling the code")
   (with-assembling ((code ro-data data))
     (.segment	'code)
-    (.base	0x00400000)             ; typical 64-bit default base
+    (.base	(+ +base-address+
+                   +elf-prefix-size+))
 
     (label	'code-segment-start)
 
