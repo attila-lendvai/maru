@@ -26,7 +26,7 @@
 
 (define-function compile-env (env -c-)
   (verbosity 1
-    (warn "begin compiling\n\n")
+    (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
          '(+operating-system+ +architecture+ +little-endian?+
