@@ -257,16 +257,16 @@
 
     (define-vm-function (cell-at ()) (base (byteindex <long>))
       (with-bounds-checking
-          (box <lower-cell> (cell-at base byteindex))))
+        (box <lower-cell> (cell-at base byteindex))))
 
     (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
       (with-bounds-checking
-          (set (cell-at base byteindex)
-               (typecase value
-                 (<lower-cell>	(unbox <lower-cell> value))
-                 ;; FIXME should it allow <long> at all?
-                 (<long>		(unbox <long> value))
-                 (else (error "set-cell-at called with an unexpected type: "(type-of value)))))))))
+        (set (cell-at base byteindex)
+             (typecase value
+               (<lower-cell>	(unbox <lower-cell> value))
+               ;; FIXME should it allow <long> at all?
+               (<long>		(unbox <long> value))
+               (else (error "set-cell-at called with an unexpected type: "(type-of value)))))))))
 
 (define-vm-function lower-cell->long ((value <lower-cell>))
   ;; this is potentially a lossy conversion, depending on the chosen

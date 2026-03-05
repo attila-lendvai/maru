@@ -36,9 +36,10 @@
 
 (define-vm-function file-read-byte ((fd <lower-cell>))
   (let ((char 0))
+    ;; man 2 read
     (if (= 1 (linux-syscall linux/SYS_read fd (address-of char) 1))
         (box <long> char)
-      ;; TODO EAGAIN, EWOULDBLOCK and stuff
+      ;; TODO EAGAIN=EWOULDBLOCK, EINTR and stuff
       ;;(error "file-read-byte: syscall returned with error")
       ())))
 
@@ -52,7 +53,8 @@
 ;;     (error "file-flush: linux/SYS_fsync returned an error")))
 
 ;;;
-;;; <fd-stream>
+;;; <fd-stream> used in the lower (i.e. only the vm-function's need to
+;;; box return values, the rest is called within the lower)
 ;;;
 
 (define-record <fd-stream> <stream>
@@ -62,7 +64,8 @@
 (define-vm-function file-stream ((fd <lower-cell>))
   ;; when the entire object is an opaque, then we can freely store
   ;; unboxed values in it. not sure if this is ideologically the right
-  ;; way, but it works.
+  ;; way, because the upper can get hold of unboxed values using the
+  ;; accessors.
   (make/opaque <fd-stream>
     (fd			(unbox <lower-cell> fd))
     (peeked-value	-1)))
@@ -74,7 +77,7 @@
              (rc	(linux-syscall linux/SYS_read fd (address-of char) 1)))
         (set (<fd-stream>-peeked-value stream)
              (if (= 1 rc)
-                 char ; FIXME needs to be boxed, no?
+                 char
                -1)))))
 
 (define-method $at-end? <fd-stream> ()

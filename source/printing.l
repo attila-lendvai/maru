@@ -4,6 +4,7 @@
   (print-all stream "["(type-name-of self)" "(type-id-of self)"]"))
 
 (define-selector do-dump (self stream)
+  ;; FIXME this seems recursive
   (dump-all stream self))
 
 (define-form define-print-method (type . body)

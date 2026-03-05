@@ -17,6 +17,8 @@
 (define-vm-function file-read-byte ((stream <lower-cell>))
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
+        ;; TODO use false here. it should be 0, which should be the
+        ;; <undefined> value in the upper
         ()
       (box <long> c))))
 
@@ -55,8 +57,6 @@
       result)))
 
 (define-method $put <libc-stream> (char)
-  ;; can't add an (assert (is <long> char)) because this is lowered
-  ;; into the target domain where the values are not boxed/tagged.
   (let ((result (libc/fputc char self.handle)))
     (when (= result libc/EOF)
       (error "<libc-stream> $put: fputc returned with error"))

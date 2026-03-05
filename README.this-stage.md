@@ -12,8 +12,8 @@ the `--define` command line argument.
 ## Assorted changes
 
  - Deleted the *module* abstraction. It was a mistake to introduce it
-   because what i used them for can be done using env's chained the
-   right way.
+   because what I used them for can be done with simple environments
+   (key-value stores), and a single, global symbol registry.
 
  - Revived the C groveller (formerly known as osdefs).
 
