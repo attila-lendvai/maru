@@ -35,17 +35,32 @@
     symbol/true))
 
 (define-vm-function file-read-byte ((fd <lower-cell>))
-  (let ((char 0))
+  (let ((char 0)
+        result)
     ;; man 2 read
-    (if (= 1 (linux-syscall linux/SYS_read fd (address-of char) 1))
+    (while (begin
+             (set result (linux-syscall linux/SYS_read fd (address-of char) 1))
+             (= result (- linux/EINTR)))
+      ;; then try again
+      )
+    (if (= 1 result)
         (box <long> char)
       ;; TODO EAGAIN=EWOULDBLOCK, EINTR and stuff
       ;;(error "file-read-byte: syscall returned with error")
       ())))
 
+(define-vm-function %file-write (fd buf length)
+  (let (result)
+    (while (begin
+            (set result (linux-syscall linux/SYS_write fd buf length))
+            (= result (- linux/EINTR)))
+      ;; then try again
+      )
+    result))
+
 (define-vm-function file-write-byte ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
-  (when (= 1 (linux-syscall linux/SYS_write fd (address-of char) 1))
+  (when (= 1 (%file-write fd (address-of char) 1))
     symbol/true))
 
 ;; (define-vm-function file-flush ((fd <lower-cell>))
@@ -99,9 +114,8 @@
     +end+))
 
 (define-method $put <fd-stream> (u/char)
-  ;; FIXME endianness
-  (unless (= 1 (linux-syscall linux/SYS_write self.fd (address-of u/char) 1))
-    ;; TODO deal with EAGAIN and stuff...
+  ;; TODO endianness? think this through...
+  (unless (= 1 (%file-write self.fd (address-of u/char) 1))
     (error "<fd-stream> $put: write failed"))
   u/char)
 
@@ -111,7 +125,7 @@
     (<string>
      (let ((buf		(string->C-string elements))
            (size	(string-length elements)))
-       (unless (= size (linux-syscall linux/SYS_write self.fd buf size))
+       (unless (= size (%file-write self.fd buf size))
          ;; TODO deal with EAGAIN and stuff...
          (error "<fd-stream> $put-all: write failed"))))
     (else
