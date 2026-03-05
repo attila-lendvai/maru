@@ -34,15 +34,15 @@
   (when (= 0 (linux-syscall linux/SYS_close fd))
     symbol/true))
 
-(define-vm-function file-read-character ((fd <lower-cell>))
+(define-vm-function file-read-byte ((fd <lower-cell>))
   (let ((char 0))
     (if (= 1 (linux-syscall linux/SYS_read fd (address-of char) 1))
-        ;; TODO endianness, EAGAIN and stuff
         (box <long> char)
-      ;;(error "file-read-character: syscall returned with error")
+      ;; TODO EAGAIN, EWOULDBLOCK and stuff
+      ;;(error "file-read-byte: syscall returned with error")
       ())))
 
-(define-vm-function file-write-character ((char <long>) (fd <lower-cell>))
+(define-vm-function file-write-byte ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
   (when (= 1 (linux-syscall linux/SYS_write fd (address-of char) 1))
     symbol/true))

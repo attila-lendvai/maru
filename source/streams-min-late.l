@@ -8,6 +8,6 @@
   (or (file-close handle)
       (error "file-close failed for handle "handle)))
 
-(define-function file-write-character-or-die (char stream)
-  (or (file-write-character char stream)
-      (error "file-write-character failed for stream "stream", char "char)))
+(define-function file-write-byte-or-die (char stream)
+  (or (file-write-byte char stream)
+      (error "file-write-byte failed for stream "stream", char "char)))

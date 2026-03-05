@@ -65,8 +65,7 @@
       (debug (platform/format "lower/array-save will write " (long (lower/array-length array)) " bytes into file " (long fd) "\n"))
       (for (i 0 length)
         (debug (platform/format "writing byte " (long (byte-at elements i)) "\n"))
-        ;; TODO file-write-byte?
-        (file-write-character-or-die (byte-at elements i) fd))
+        (file-write-byte-or-die (byte-at elements i) fd))
       (box <long> length))))
 
 (define-form with-input-from-file (args . body)

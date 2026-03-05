@@ -120,7 +120,7 @@
 (define-method $peek <file-input-stream> ()
   (or self.pending
       (if self.file
-	  (let ((c (file-read-character self.file)))
+	  (let ((c (file-read-byte self.file)))
 	    (if c
 		(let ()
 		  (when (= ?\n c)

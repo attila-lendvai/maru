@@ -14,13 +14,13 @@
   (when (= 0 (libc/fclose handle))
     symbol/true))
 
-(define-vm-function file-read-character ((stream <lower-cell>))
+(define-vm-function file-read-byte ((stream <lower-cell>))
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
         ()
       (box <long> c))))
 
-(define-vm-function file-write-character ((char <long>) (stream <lower-cell>))
+(define-vm-function file-write-byte ((char <long>) (stream <lower-cell>))
   (when (not (= libc/EOF (libc/fputc char stream)))
     symbol/true))
 
