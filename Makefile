@@ -396,12 +396,11 @@ $(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(BUILD_llvm)/eval1 boot.l $(EMIT_FILE
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
 # a "function" to compile a maru .l file with a compiler backend
-# TODO backend duplication: they only differ in $(backend). the solution may involve .SECONDEXPANSION: and foreach. see also the other occurrances of 'backend duplication'.
-define compile-x86
+define compile
   $(EVAL_WRAPPER) $(2) $(PROFILER_ARG) -O $(VERBOSITY)				\
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
-	--define *compiler-backend* 	"x86"					\
+	--define *compiler-backend* 	"$(3)"					\
 	--define target/arch 		"$(TARGET_ARCH)"			\
 	--define target/vendor 		"$(TARGET_VENDOR)"			\
 	--define target/os 		"$(TARGET_OS)"				\
@@ -415,35 +414,19 @@ define compile-x86
 	boot.l									\
 	source/bootstrapping/late.l						\
 	source/platforms/load-platform.l					\
-	$(3)									\
+	$(4)									\
 	source/platforms/run-compiler.l						\
-	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
+	>$(5) && $(call print_file_size,$(5)) || { $(BACKDATE_FILE) $(5); exit 42; }
 endef
-#	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
+#	>$(5) 2> >(tee $(5).build-log >&2) || { $(BACKDATE_FILE) $(5); exit 42; }
+
+define compile-x86
+  $(call compile,$(1),$(2),x86,$(3),$(4))
+endef
 
 define compile-llvm
-  $(EVAL_WRAPPER) $(2) $(PROFILER_ARG) -O $(VERBOSITY)				\
-	--define *host-directory* 	"$(1)"					\
-	--define *slave-directory* 	"$(SLAVE_DIR)"				\
-	--define *compiler-backend* 	"llvm"					\
-	--define target/arch 		"$(TARGET_ARCH)"			\
-	--define target/vendor 		"$(TARGET_VENDOR)"			\
-	--define target/os 		"$(TARGET_OS)"				\
-	--define target/abi 		"$(TARGET_ABI)"				\
-	--define target/platform	"$(PLATFORM)"				\
-	--define feature/profiler/build	"$(PROFILER_MARU)"			\
-	source/bootstrapping/prepare.l						\
-	boot.l									\
-	$(SLAVE_DIR)/source/bootstrapping/host-ready.l				\
-	source/bootstrapping/early.l						\
-	boot.l									\
-	source/bootstrapping/late.l						\
-	source/platforms/load-platform.l					\
-	$(3)									\
-	source/platforms/run-compiler.l						\
-	>$(4) && $(call print_file_size,$(4)) || { $(BACKDATE_FILE) $(4); exit 42; }
+  $(call compile,$(1),$(2),llvm,$(3),$(4))
 endef
-#	>$(4) 2> >(tee $(4).build-log >&2) || { $(BACKDATE_FILE) $(4); exit 42; }
 
 # This "function" is useful when you need an eval executable, but you don't want to
 # have it rebuilt each time when you are working on e.g. the compiler.
