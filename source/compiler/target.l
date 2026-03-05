@@ -39,7 +39,7 @@
 (set (feature strict-semantics-for-compiled-set) true) ; compiled set-oop-at & co. also returns the value that was just set
 (set (feature backtrace)		(or true (feature profiler) (< 0 *safety*)))
 (set (feature object-canary)		(or () (<= 3 *safety*)))
-(set (feature emit-with-object-headers)	true)
+(set (feature emit-with-object-headers)	false)
 (set (feature platform/libc)		false)
 (set (feature platform/posix)		false)
 (set (feature platform/linux)		false)
