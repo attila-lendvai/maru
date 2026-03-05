@@ -567,6 +567,16 @@ test-compiler: $(foreach backend,${BACKENDS},test-compiler-$(backend))
 test-compiler-x86: $(BUILD_x86)/compiler-test
 	$(BUILD_x86)/compiler-test
 
+test-compiler-elf: $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_x86) $(EMIT_FILES_x86) \
+		tests/test-elf.x86-64.single-pass.l \
+		source/assembler/x86-single-pass.l \
+		source/platforms/linux/linux.cgrov.$(TARGET).l \
+		source/platforms/linux/elf.cgrov.$(TARGET).l
+	@mkdir -p $(BUILD)
+	$(call compile,$(EVAL0_DIR),$(EVAL0),x86-64-elf,tests/compiler-test.l,$(BUILD)/compiler-test)
+	chmod +x $(BUILD)/compiler-test
+	$(BUILD)/compiler-test a b c
+
 test-compiler-llvm: $(BUILD_llvm)/compiler-test
 	$(BUILD_llvm)/compiler-test
 
