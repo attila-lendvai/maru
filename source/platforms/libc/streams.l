@@ -18,7 +18,7 @@
   (let ((c (libc/fgetc stream)))
     (if (= libc/EOF c)
         ;; TODO use false here. it should be 0, which should be the
-        ;; <undefined> value in the upper
+        ;; <undefined> value in the upper. same for linux.
         ()
       (box <long> c))))
 

@@ -102,6 +102,9 @@
   (level
    temp-counter
    temp-limit
+   ;; TODO rename to free-temps. this is *NOT* all the allocated
+   ;; temps! only those that have been free-temp'd, which was not true
+   ;; for the temps for spilling the params.
    temps
    gen-buffer
    current-value              ; the output of the previous-instruction
@@ -237,10 +240,8 @@
 
 (define-function emit-gen-buffer (-c-)
   (array-do entry (<compiler>-gen-buffer -c-)
-    (let* ((instr (first entry))
-           (args (rest entry)))
-      ;; TODO commented out due to load order headache...
-      ;; (emit-comment 2 "EMIT-INSTRUCTION of "instr", args: "args)
-      (apply emit-instruction (cons -c- (cons instr args))))))
+    ;; TODO commented out due to load order headache...
+    ;; (emit-comment 2 "EMIT-INSTRUCTION of "instr", args: "args)
+    (apply emit-instruction (cons -c- entry))))
 
 (load "source/compiler/target.l")

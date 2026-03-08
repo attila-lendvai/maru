@@ -84,6 +84,7 @@
   (TEMP64 (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
+  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
   (when (is <TEMP64> obj)
     (push (<compiler>-temps -c-) obj)))
 
@@ -160,7 +161,6 @@
     (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
     (emit-comment 3 ", code: "(<expr>-body self))
     ;; Unconditionally spill the params to the stack.
-    (emit-comment 1 "spilling "(list-length param-locs)" params to the stack")
     (map (lambda (param-loc var)
            (when (is <R64> param-loc)
              (let ((spilled-loc (<variable>-value var)))
@@ -202,6 +202,7 @@
                     "), arg-size: " arg-size  "("(/ arg-size   +word-size-in-bytes+)
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
+      (emit-comment 1 "emitting gen buffer of "self)
       (emit-gen-buffer -c-)
       (awhen (<x86-compiler>-fn-epilogue-label -c-)
         (emit DEFLABEL it))

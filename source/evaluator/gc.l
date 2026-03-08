@@ -152,8 +152,8 @@
           (set nfree (+ nfree (<header>-size ptr)))
           (set (<header>-flags ptr) 0)
           (set (<header>-type ptr) 0)))
-      (when (= gc/memory-base
-               (set ptr (<header>-next ptr)))
+      (set ptr (<header>-next ptr))
+      (when (= ptr gc/memory-base)
         (set ptr 0)))
     (set gc/objects-live nobjs)
     (set gc/bytes-used nused)
@@ -280,7 +280,9 @@
     (set gc/roots new-roots)))
 
 (define-function gc/push-root (ptr)
-  (gc/debug (platform/print-diag-fmt "gc/push-root %ld at %p" gc/root-count ptr))
+  ;; register a pointer to a place that will hold a root
+  ;; object. gc/let* uses this.
+  (gc/debug (platform/print-diag-fmt "gc/push-root %ld, place %p" gc/root-count ptr))
   (set (oop-at gc/roots gc/root-count) ptr)
   (incr gc/root-count)
   ;; make sure that there's always space for the next root because otherwise our call to gc/allocate

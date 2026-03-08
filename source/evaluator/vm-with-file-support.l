@@ -99,6 +99,8 @@
 
     (debug-print "*command-line-arguments* is initialized to: " (<variable>-value cla-var))
 
+    ;; TODO shouldn't the processing be moved into the upper? into boot.l?
+
     ;; process *cla*
     (let (cla)
       (gc/let* (arg
