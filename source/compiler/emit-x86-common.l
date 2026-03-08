@@ -281,6 +281,7 @@
   ((TEMP32 TEMP32)			(println "	mov	"$1", %ecx")
 				(println "	mov	%ecx, "$2))
   ((LI32 TEMP32)			(println "	movl	"$1", "$2))
+  ((LI64 TEMP64)			(println "	movq	"$1", "$2))
   ((TEMP64 TEMP64)			(println "	mov	"$1", %rcx")
                                 (println "	mov	%rcx, "$2))
   ((R64 _)			(println "	movq	"$1", "$2))

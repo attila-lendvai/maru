@@ -155,7 +155,7 @@
                       (let ((offset (<x86-compiler>-param-offset -c-)))
                         (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
                         ;; this extends the stack frame size as needed
-                        (TEMP64 offset))))
+                        (set (<variable>-value var) (TEMP64 offset)))))
                   (<expr>-parameters self)))))
     (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
     (emit-comment 3 ", code: "(<expr>-body self))
