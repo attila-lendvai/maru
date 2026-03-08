@@ -36,9 +36,9 @@
 
 (define-record <libc-stream> <stream> (handle))
 
-(define-vm-function file-stream ((handle <lower-cell> _ nounbox))
+(define-vm-function file-stream ((handle <lower-cell>))
   (make/opaque <libc-stream>
-    (handle	(unbox <lower-cell> handle))))
+    (handle	handle)))
 
 (define-method $at-end? <libc-stream> ()
   (libc/feof self.handle))

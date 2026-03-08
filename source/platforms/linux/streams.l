@@ -82,7 +82,7 @@
   ;; way, because the upper can get hold of unboxed values using the
   ;; accessors.
   (make/opaque <fd-stream>
-    (fd			(unbox <lower-cell> fd))
+    (fd			fd)
     (peeked-value	-1)))
 
 (define-function %ensure-peeked (stream)

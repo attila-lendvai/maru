@@ -11,15 +11,13 @@
 
 (define-form initialize-stream (target-name our-name)
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
-  `(gc/let* (tmp)
+  `(gc/let* ((stream (file-stream ,target-name)))
      (debug (platform/format "initializing " (string ,(symbol->string our-name)) "\n"))
-     (set tmp (box <lower-cell> ,target-name))
-     (set tmp (file-stream tmp))
-     (set ,our-name tmp)
+     (set ,our-name stream)
      ;; the maru-user env was create earlier, let's set it there, too.
      ;; TODO clarify: why in maru-user?
      (set (global-variable-value *maru* ,(concat-symbol 'symbol/ our-name))
-          tmp)))
+          stream)))
 
 (define-function initialize-streams (in-handle out-handle err-handle)
   ;; NOTE: a WITH-FORMS is tempting here, but the body of WITH-FORMS'
@@ -71,12 +69,12 @@
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
         (file-name	(second args)))
-    `(gc/let* ((__file-name	,file-name)
-               (__file-handle	(file-open-or-die __file-name "r"))
-               (,var		(file-stream __file-handle))
-               (__result	,@body))
-       (file-close (unbox <lower-cell> __file-handle))
-       __result)))
+    ;; file-open is a vm-function, we need to unbox its return value
+    `(let ((__file-handle	(unbox <lower-cell> (file-open-or-die ,file-name "r"))))
+       (gc/let* ((,var		(file-stream __file-handle)))
+         (let ((__result	,@body))
+           (file-close __file-handle)
+           __result)))))
 
 (define-vm-function (load ()) ((path <string>))
   (with-input-from-file (stream path)
