@@ -142,6 +142,7 @@
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
   (let* ((body	(<expr>-body self))
          (-c-	(x86-64-compiler (+ 1 (<compiler>-level parent-comp))))
+         (spill-locs ())
          (param-locs
            (let ((param-regs +param-registers+))
              (map (lambda (var)
@@ -152,6 +153,7 @@
                         (let ((spill-loc (new-temp -c-)))
                           ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
                           (set (<variable>-value var) spill-loc)
+                          (push spill-locs spill-loc)
                           (R64 it))
                       (let ((offset (<x86-compiler>-param-offset -c-)))
                         (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
@@ -184,9 +186,10 @@
            (frame-body-size (- frame-size (* 2 +word-size-in-bytes+))))
       ;; Now that we know the frame size, fix up the offsets of the
       ;; temps allocated on the stack.
-      (map (lambda (el)
-             (incr (<TEMP>-offset el) arg-size))
-           (<compiler>-temps -c-))
+      (let ((fixup (lambda (el)
+                     (incr (<TEMP>-offset el) arg-size))))
+        (map fixup (<compiler>-temps -c-))
+        (map fixup spill-locs))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
       ;; the frame size and use %esp through simple TEMP64.
