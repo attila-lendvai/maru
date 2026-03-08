@@ -31,8 +31,8 @@
       (box <lower-cell> fd))))
 
 (define-vm-function file-close ((fd <lower-cell>))
-  (when (= 0 (linux-syscall linux/SYS_close fd))
-    symbol/true))
+  (to-upper-boolean
+   (= 0 (linux-syscall linux/SYS_close fd))))
 
 (define-vm-function file-read-byte ((fd <lower-cell>))
   (let ((char 0)
@@ -60,8 +60,8 @@
 
 (define-vm-function file-write-byte ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
-  (when (= 1 (%file-write fd (address-of char) 1))
-    symbol/true))
+  (to-upper-boolean
+   (= 1 (%file-write fd (address-of char) 1))))
 
 ;; (define-vm-function file-flush ((fd <lower-cell>))
 ;;   (unless (= 0 (linux-syscall linux/SYS_fsync fd))

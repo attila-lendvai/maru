@@ -11,8 +11,8 @@
     (box <lower-cell> it)))
 
 (define-vm-function file-close ((handle <lower-cell>))
-  (when (= 0 (libc/fclose handle))
-    symbol/true))
+  (to-upper-boolean
+   (= 0 (libc/fclose handle))))
 
 (define-vm-function file-read-byte ((stream <lower-cell>))
   (let ((c (libc/fgetc stream)))
@@ -23,8 +23,8 @@
       (box <long> c))))
 
 (define-vm-function file-write-byte ((char <long>) (stream <lower-cell>))
-  (when (not (= libc/EOF (libc/fputc char stream)))
-    symbol/true))
+  (to-upper-boolean
+   (not (= libc/EOF (libc/fputc char stream)))))
 
 ;; (define-vm-function file-flush ((stream <lower-cell>))
 ;;   (unless (= 0 (libc/fflush stream))
