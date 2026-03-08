@@ -470,6 +470,14 @@
     (set-second-to-first 33 99)
   99)
 
+(define-function many-args (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
+  ;; TODO operators with 2+ arguments
+  (+ (+ x1 x10) x16))
+
+(define-test compile/arguments/bug/1
+    (many-args 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
+  27)
+
 ;; this should error, explicitly noting that the lambda is capturing
 ;; cariables, which is currently not supported. (the LLVM IR type
 ;; system actually catched this bug when we used to miscompiled it.)
