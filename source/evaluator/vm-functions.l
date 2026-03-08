@@ -232,7 +232,9 @@
                         (assert (and (gc/valid-header-canary? header)
                                      (<= 0 cellindex)
                                      (<= (words-to-bytes (+ 1 cellindex)) (<header>-size header)))
-                                "[set-]oop-at: trying to access beyond the gc chunk boundaries")))
+                                "[set-]oop-at: trying to access beyond the gc chunk boundaries")
+                        (assert (not (bitwise-and (<header>-flags header) <header>-flags/opaque))
+                                "[set-]oop-at: trying to access an opaque object")))
             ,@body))))
 
   (define-vm-function (oop-at ()) (base (cellindex <long>))
