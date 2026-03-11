@@ -84,8 +84,7 @@
   (debug-print "start processing argv")
 
   ;; *command-line-arguments*
-  ;; TODO maybe *cla* should go into maru-user instead of *maru*?
-  (let ((cla-var (environment-define *maru* (string->symbol "*command-line-arguments*") ())))
+  (let ((cla-var (environment-define *globals* (string->symbol "*command-line-arguments*") ())))
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
