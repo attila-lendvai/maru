@@ -119,17 +119,23 @@
     (error "<fd-stream> $put: write failed"))
   u/char)
 
+(define-function %put-all (fd buf size)
+  (let ((rc (%file-write fd buf size)))
+    (unless (= rc size)
+      (debug (platform/format "<fd-stream> $put-all: write returned with "(long rc)"\n"))
+      ;; TODO deal with EAGAIN and stuff...
+      (error "<fd-stream> $put-all: write failed"))))
+
 ;; TODO implemenet inheritance on compiled selectors
-(define-method $put-all <fd-stream> (elements)
-  (typecase elements
+(define-method $put-all <fd-stream> (obj)
+  (typecase obj
     (<string>
-     (let ((buf		(string->C-string elements))
-           (size	(string-length elements)))
-       (unless (= size (%file-write self.fd buf size))
-         ;; TODO deal with EAGAIN and stuff...
-         (error "<fd-stream> $put-all: write failed"))))
+     (%put-all self.fd (string->C-string obj) (string-length obj)))
+    (when-at-expand (feature lower/array)
+      (<lower/array>
+       (%put-all self.fd (slot-value <lower/array> elements obj) (lower/array-length obj))))
     (else
-     (error "<fd-stream> $put-all: unexpected elements: " elements)))
-  elements)
+     (error "<fd-stream> $put-all: unexpected elements: " obj)))
+  obj)
 
 (require "source/streams-min-late.l")

@@ -62,12 +62,23 @@
       (error "<libc-stream> $put: fputc returned with error"))
     char))
 
+(define-function %put-all (handle buf size)
+  (unless (= 0 size)
+    (let ((rc (libc/fwrite buf size 1 handle)))
+      (unless (= 1 rc)
+        (debug (platform/format "<libc-stream> $put-all: libc/fwrite returned with "(long rc)", ferror "(long (libc/ferror handle))"\n"))
+        (error "<libc-stream> $put-all: libc/fwrite returned with "(box <long> rc)", ferror " (box <long> (libc/ferror handle)))))))
+
 ;; TODO implemenet inheritance on compiled selectors
-(define-method $put-all <libc-stream> (elements)
-  (typecase elements
-    (<string>		(when (= libc/EOF (libc/fwrite (string->C-string elements) (string-length elements) 1 self.handle))
-                          (error "<libc-stream> $put-all: libc/fputs returned with error")))
-    (else		(error "<libc-stream> $put-all: unexpected elements: " elements)))
-  elements)
+(define-method $put-all <libc-stream> (obj)
+  (typecase obj
+    (<string>
+     (%put-all self.handle (string->C-string obj) (string-length obj)))
+    (when-at-expand (feature lower/array)
+      (<lower/array>
+       (%put-all self.handle (slot-value <lower/array> elements obj) (lower/array-length obj))))
+    (else
+     (error "<libc-stream> $put-all: unexpected value to write: " obj)))
+  obj)
 
 (require "source/streams-min-late.l")
