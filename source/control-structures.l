@@ -92,9 +92,9 @@
   `(let ((__value__ ,value))
      ,(%case clauses)))
 
-(define-function %typecase (clauses)
+(define-function %typecase (clauses env)
   (when (pair? clauses)
-    (let* ((clause	(car clauses))
+    (let* ((clause	(expand (car clauses) env))
            (type	(car clause))
            (body	(cdr clause)))
       (if (= 'else type)
@@ -102,8 +102,8 @@
         `(if (is ,type __value__)
              (let ()
                ,@body)
-           ,(%typecase (cdr clauses)))))))
+           ,(%typecase (cdr clauses) env))))))
 
 (define-form typecase (value . clauses)
   `(let ((__value__ ,value))
-     ,(%typecase clauses)))
+     ,(%typecase clauses *env*)))
