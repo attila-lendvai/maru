@@ -55,16 +55,10 @@
       ($put-all output "\nmorituri te salutant\n"))
     res))
 
+;; TODO delme; instead somehow export $put-all as a selector into the upper
 (when-at-expand (feature lower/array)
-  (define-vm-function lower/array-write-to-stream ((array <lower/array>)
-                                                   (fd <lower-cell>))
-    (let ((elements (slot-value <lower/array> elements array))
-          (length (lower/array-length array)))
-      (debug (platform/format "lower/array-save will write " (long (lower/array-length array)) " bytes into file " (long fd) "\n"))
-      (for (i 0 length)
-        (debug (platform/format "writing byte " (long (byte-at elements i)) "\n"))
-        (file-write-byte-or-die (byte-at elements i) fd))
-      (box <long> length))))
+  (define-vm-function lower/array-write-to-stream ((array <lower/array>) stream)
+    ($put-all stream array)))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))

@@ -99,13 +99,13 @@
     (<symbol>  (.segment (get-segment desig)))
     (else (error ".segment: not a valid segment designator: "desig))))
 
-(define-function write-segment-to-stream (desig file)
+(define-function write-segment-to-stream (desig stream)
   ;;(println "writing segment: "desig", size: "(segment-length desig))
-  (lower/array-write-to-stream (<segment>-buffer (get-segment desig)) file))
+  (lower/array-write-to-stream (<segment>-buffer (get-segment desig)) stream))
 
 (define-function save-current-segment-to-file (filename)
   (let ((file (file-open-or-die filename "w")))
-    (write-segment-to-stream (current-segment) file)
+    (write-segment-to-stream (current-segment) (file-stream file))
     (file-close-or-die file)))
 
 (define-function segment->function (segment)

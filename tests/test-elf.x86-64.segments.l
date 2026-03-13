@@ -69,7 +69,7 @@
   (.i64	mem-size)                       ; p_memsz - Size in memory
   (.i64	alignment))
 
-(define-function write-elf-file (filename)
+(define-function write-elf-to-stream (stream)
   (println "assembling the elf header")
 
   (.segment 'data)
@@ -150,14 +150,10 @@
 
   (label 'elf-prefix-end)
 
-  (let ((file (file-open-or-die filename "w")))
-    (write-segment-to-stream 'elf-prefix file)
-    (write-segment-to-stream 'code file)
-    (write-segment-to-stream 'ro-data file)
-    (write-segment-to-stream 'data file)
-    (file-close-or-die file))
-
-  (println (concat-strings "*** You may run "filename" now for a friendly greeting")))
+  (write-segment-to-stream 'elf-prefix stream)
+  (write-segment-to-stream 'code stream)
+  (write-segment-to-stream 'ro-data stream)
+  (write-segment-to-stream 'data stream))
 
 (define-function emit-print (text)
   ;; emit the text into the data segment, and emit machine code into
@@ -214,6 +210,10 @@
     (.align	elf/page-size)
     (label	'code-segment-end)
 
-    (write-elf-file filename)))
+    (let ((file (file-open-or-die filename "w")))
+      (write-elf-to-stream (file-stream file))
+      (file-close-or-die file))
+
+    (println (concat-strings "*** You may run "filename" now for a friendly greeting"))))
 
 (elf-test "./build/test-elf.x86-64.segments")

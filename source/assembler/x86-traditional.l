@@ -23,7 +23,7 @@
 
 (define-function save-assembler-buffer (a filename)
   (let ((file (file-open-or-die filename "w")))
-    (lower/array-write-to-stream (<assembler>-buffer a) file)
+    (lower/array-write-to-stream (<assembler>-buffer a) (file-stream file))
     (file-close-or-die file)))
 
 (define-function assembler->function (a)
