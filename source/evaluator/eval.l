@@ -886,6 +886,8 @@
     (set_profiler_interval 0)
     (when (< 0 profiler/sample-counter)
       (print-all *debug-output* "Profiler took "(box <long> profiler/sample-counter)" samples:\n")
+      (gc/collect) ; make some room for the walk
+      ;; FIXME the GC should be disabled while walking the heap
       ;; Walk the entire heap and print the profiler counters for
       ;; whichever functions we can find.
       (let ((obj (gc/first-object)))
