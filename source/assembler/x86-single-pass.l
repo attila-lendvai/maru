@@ -351,10 +351,42 @@
 
 (require "build/generated/x86-instructions.l")
 
+;; some aliases
 (define-function .i8  vals (map _B vals))
 (define-function .i16 vals (map _W vals))
 (define-function .i32 vals (map _L vals))
 (define-function .i64 vals (map _Q vals))
+
+(define AL _AL)
+(define CL _CL)
+(define DL _DL)
+(define BL _BL)
+
+(define EAX _EAX)
+(define ECX _ECX)
+(define EDX _EDX)
+(define EBX _EBX)
+(define ESP _ESP)
+(define EBP _EBP)
+(define ESI _ESI)
+(define EDI _EDI)
+
+(define RAX _RAX)
+(define RCX _RCX)
+(define RDX _RDX)
+(define RBX _RBX)
+(define RSP _RSP)
+(define RBP _RBP)
+(define RSI _RSI)
+(define RDI _RDI)
+(define R8  _R8)
+(define R9  _R9)
+(define R10 _R10)
+(define R11 _R11)
+(define R12 _R12)
+(define R13 _R13)
+(define R14 _R14)
+(define R15 _R15)
 
 (define-function .ascii strs
   (list-do str strs
