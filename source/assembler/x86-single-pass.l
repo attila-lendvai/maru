@@ -110,7 +110,7 @@
 
 (define-function write-segment-to-stream (desig stream)
   ;;(println "writing segment: "desig", size: "(segment-length desig))
-  (lower/array-write-to-stream (<segment>-buffer (get-segment desig)) stream))
+  (lower/$put-all stream (<segment>-buffer (get-segment desig))))
 
 (define-function save-current-segment-to-file (filename)
   (let ((file (file-open-or-die filename "w")))

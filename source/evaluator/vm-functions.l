@@ -351,6 +351,10 @@
       (error "string->integer: failed for "str))
     (box <long> res)))
 
+;; TODO delme; instead somehow export $put-all as a selector into the upper
+(define-vm-function lower/$put-all (stream thing)
+  ($put-all stream thing))
+
 (define-vm-function pointer->target-function (ptr)
   (make <target-function>
     (program-code ptr)))

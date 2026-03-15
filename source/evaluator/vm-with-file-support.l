@@ -55,11 +55,6 @@
       ($put-all output "\nmorituri te salutant\n"))
     res))
 
-;; TODO delme; instead somehow export $put-all as a selector into the upper
-(when-at-expand (feature lower/array)
-  (define-vm-function lower/array-write-to-stream ((array <lower/array>) stream)
-    ($put-all stream array)))
-
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
         (file-name	(second args)))
