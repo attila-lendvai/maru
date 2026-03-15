@@ -49,18 +49,23 @@
            args '(_RDI _RSI _RDX _R10 _R8 _R9))
     (SYSCALL)))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
+;; FIXME broken when enabled, the loader segfaults
+(define *dynamic?* true)
+
 (define +n-segments+ 4)
+(define +n-program-headers+ (+ +n-segments+
+                               (if *dynamic?* 2 0)))
 (define +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
-                             (* +n-segments+
+                             (* +n-program-headers+
                                 elf/sizeof-Elf64_Phdr)))
 (define +code-segment-address+		0x00400000)
 (define +ro-data-segment-address+	0x00500000)
 (define +data-segment-address+		0x00600000)
 (define +bss-segment-address+	0x00700000)
 
-(define-function emit-program-header (file-offset file-size mem-size flags
+(define-function emit-program-header (type file-offset file-size mem-size flags
                                                   start alignment)
-  (.i32	elf/PT_LOAD)                    ; p_type
+  (.i32	type)                    ; p_type
   (.i32	flags)                          ; p_flags
   (.i64	file-offset)                    ; p_offset - File offset
   (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
@@ -69,8 +74,32 @@
   (.i64	mem-size)                       ; p_memsz - Size in memory
   (.i64	alignment))
 
+(define-function emit-program-header/segment (file-offset file-size mem-size flags
+                                                          start alignment)
+  (emit-program-header elf/PT_LOAD file-offset file-size mem-size flags
+                       start alignment))
+
 (define-function write-elf-to-stream (stream)
   (println "assembling the elf header")
+
+  (when *dynamic?*
+    (.segment 'ro-data)
+    (label 'elf/interpreter-start)
+    ;;(.ascii "/gnu/store/py9r4p4jp2pa1jaagbcvw35d79j5kcg5-glibc-2.41/lib/ld-linux-x86-64.so.2")
+    ;; debug build
+    (.ascii "/gnu/store/f6xyfq0p74xs0324n754c5jcadfdcx3a-glibc-2.41/lib/ld-linux-x86-64.so.2")
+    (.i8 0)
+    (label 'elf/interpreter-end)
+
+    (let ((empty-string (label)))
+      (.i8 0)
+      (.segment 'ro-data)
+      (.align 8)
+      (label 'elf/dynamic-table-start)
+      (.i64 elf/DT_STRTAB empty-string)
+      (.i64 elf/DT_SYMTAB 0)
+      (.i64 elf/DT_NULL 0)
+      (label 'elf/dynamic-table-end)))
 
   (.segment 'data)
   (.align	elf/page-size)
@@ -99,7 +128,7 @@
   (.i32		0)                  ; e_flags
   (.i16		(flabel 'elf-header-end (- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
   (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-segments+)          ; e_phnum	Number of program headers
+  (.i16		+n-program-headers+)          ; e_phnum	Number of program headers
   (.i16		0)           ; e_shentsize	Size of section header
   (.i16		0)           ; e_shnum	Number of section headers
   (.i16		0)      ; e_shstrndx	Section header string table index
@@ -116,44 +145,64 @@
   (let ((file-position	0))
 
     (let ((size (+ (segment-length 'code) +elf-prefix-size+)))
-      (emit-program-header file-position
-                           size size
-                           (+ elf/PF_R elf/PF_X)
-                           +code-segment-address+
-                           elf/page-size)
+      (emit-program-header/segment file-position
+                                   size size
+                                   (+ elf/PF_R elf/PF_X)
+                                   +code-segment-address+
+                                   elf/page-size)
       (incr file-position size))
 
     ;; read-only data segment
-    (let ((ro-data-size (segment-length 'ro-data)))
-      (emit-program-header file-position
-                           ro-data-size ro-data-size
-                           elf/PF_R
-                           +ro-data-segment-address+
-                           ideal-cache-line-alignment)
-      (incr file-position ro-data-size))
+    (let ((ro-data-segment-file-pos file-position))
+      (let ((ro-data-size (segment-length 'ro-data)))
+        (emit-program-header/segment file-position
+                                     ro-data-size ro-data-size
+                                     elf/PF_R
+                                     +ro-data-segment-address+
+                                     ideal-cache-line-alignment)
+        (incr file-position ro-data-size))
 
-    ;; writable data segment
-    (let ((data-size (segment-length 'data)))
-      (emit-program-header file-position
-                           data-size data-size
-                           (+ elf/PF_R elf/PF_W)
-                           +data-segment-address+
-                           ideal-cache-line-alignment)
-      (incr file-position data-size))
+     ;; writable data segment
+     (let ((data-size (segment-length 'data)))
+       (emit-program-header/segment file-position
+                                    data-size data-size
+                                    (+ elf/PF_R elf/PF_W)
+                                    +data-segment-address+
+                                    ideal-cache-line-alignment)
+       (incr file-position data-size))
 
-    ;; BSS, aka zero-initialized data
-    (emit-program-header file-position
-                         0 (segment-length 'bss)
-                         (+ elf/PF_R elf/PF_W)
-                         +bss-segment-address+
-                         ideal-cache-line-alignment))
+     ;; BSS, aka zero-initialized data
+     (emit-program-header/segment file-position
+                                  0 (segment-length 'bss)
+                                  (+ elf/PF_R elf/PF_W)
+                                  +bss-segment-address+
+                                  ideal-cache-line-alignment)
 
-  (label 'elf-prefix-end)
+     (when *dynamic?*
+       (let ((len (- (laddress 'elf/interpreter-end)
+                     (laddress 'elf/interpreter-start))))
+         (emit-program-header elf/PT_INTERP
+                              (+ ro-data-segment-file-pos
+                                 (paddress 'elf/interpreter-start))
+                              len len
+                              elf/PF_R
+                              (laddress 'elf/interpreter-start) 1)
+         (incr file-position len))
 
-  (write-segment-to-stream 'elf-prefix stream)
-  (write-segment-to-stream 'code stream)
-  (write-segment-to-stream 'ro-data stream)
-  (write-segment-to-stream 'data stream))
+       (let ((len (- (laddress 'elf/dynamic-table-end)
+                     (laddress 'elf/dynamic-table-start))))
+         ;; must point into a valid PT_LOAD area
+         (emit-program-header elf/PT_DYNAMIC
+                              (+ ro-data-segment-file-pos
+                                 (paddress 'elf/dynamic-table-start))
+                              len len
+                              elf/PF_R
+                              (laddress 'elf/dynamic-table-start) 1))))
+
+    (write-segment-to-stream 'elf-prefix stream)
+    (write-segment-to-stream 'code stream)
+    (write-segment-to-stream 'ro-data stream)
+    (write-segment-to-stream 'data stream)))
 
 (define-function emit-print (text)
   ;; emit the text into the data segment, and emit machine code into
@@ -182,7 +231,8 @@
                                    +elf-prefix-size+))
                      (ro-data	+ro-data-segment-address+)
                      (data	+data-segment-address+)
-                     (bss	+bss-segment-address+)))
+                     (bss	+bss-segment-address+)
+                     interpreter))
 
     (label	'code-segment-start)
 
