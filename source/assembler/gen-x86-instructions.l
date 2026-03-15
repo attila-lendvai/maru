@@ -1171,7 +1171,7 @@ _r_0DIS:
 #define	CMPQrm(R,D,B,I,S)	(_REX(1,R,I,B), CMPLrm(_r8(R),D,_r8(B),_r8(I),S))
 #define	CMPQmr(D,B,I,S,R)	(_REX(1,R,I,B), CMPLmr(D,_r8(B),_r8(I),S,_r8(R)))
 
-#define INCQr(R)		(_REX(1,0,0,R), _O_Mrm(0xff,_b11,_b000,_r8(R)))
+#define INCQr(R)		(_REX(1,0,0,R), _O_Mrm(0xff,_b11,_b000,_rN(_r8(R))))
 
 #define JMPQr(R)		(_REX(0,R,0,0),	JMPr(_r8(R)))
 #define JMPQm(D,B,I,S)		(_REX(0,0,I,B),	JMPm(D,_r8(B),_r8(I),S))
