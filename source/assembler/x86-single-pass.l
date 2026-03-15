@@ -82,6 +82,15 @@
        (.segment __previous-segment__)
        __result__)))
 
+(define-form with-new-label (segment . body)
+  (let ((result `(let ((__label__ (label)))
+                   ,@body
+                   __label__)))
+    (if segment
+        `(with-current-segment ,segment
+           ,result)
+      result)))
+
 (define-function get-segment (desig)
   (typecase desig
     (<symbol> (let ((segment (variable-value desig (<assembler>-env *assembler*))))
@@ -202,11 +211,6 @@
         (segment  segment)
         (paddress (<segment>-paddress segment))
         (laddress (<segment>-laddress segment))))))
-
-(define-form with-new-label body
-  `(let ((__label__ (label)))
-     ,@body
-     __label__))
 
 (define-function paddress (name) (<label>-paddress (%get-resolved-label name)))
 (define-function laddress (name) (<label>-laddress (%get-resolved-label name)))

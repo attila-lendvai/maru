@@ -171,12 +171,10 @@
 
 (define-function emit-global-variable args
   (if args
-      (with-current-segment 'data
-        (with-new-label
-          (.i64 (first args))))
-    (with-current-segment 'bss
-      (with-new-label
-        (.i64 0)))))
+      (with-new-label 'data
+        (.i64 (first args)))
+    (with-new-label 'bss
+      (.i64 0))))
 
 (define-function elf-test (filename)
   (println "assembling the code")
