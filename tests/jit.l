@@ -8,8 +8,8 @@
   (call-x86-64-machine-code (assembler->function *assembler*)))
 
 (define-function call (lower-fn)
-  (MOVQir	lower-fn _RAX)
-  (CALLQr	_RAX))
+  (MOVQir	lower-fn RAX)
+  (CALLQr	RAX))
 
 (when-at-expand (feature platform/posix)
   (require-cgrov "source/platforms/posix/posix"))
@@ -46,16 +46,16 @@
          (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
          (label		l/code)
-         (LEAQmr	l/msg 0 0 0 _RDI)
-         (MOVQir	stderr _RSI)
-         (MOVQmr	0 _RSI 0 0 _RSI)
+         (LEAQmr	l/msg 0 0 0 RDI)
+         (MOVQir	stderr RSI)
+         (MOVQmr	0 RSI 0 0 RSI)
          (call	fputs)
 
-         (MOVQir	stderr _RDI)
-         (MOVQmr	0 _RDI 0 0 _RDI)
+         (MOVQir	stderr RDI)
+         (MOVQmr	0 RDI 0 0 RDI)
          (call	fflush)
 
-         (XORQrr	_RAX _RAX)
+         (XORQrr	RAX RAX)
          (label		'foo)
          (RET)))))
 
@@ -68,7 +68,7 @@
       (let ((l/code (flabel)))
         (JMPSm	l/code 0 0 0)
 
-        (LEAQmr	'msg 0 0 0 _RDI) ; a forward reference
+        (LEAQmr	'msg 0 0 0 RDI) ; a forward reference
         (NOP)
         (NOP)
         (NOP)
@@ -79,14 +79,14 @@
           (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
           (label	l/code)
-          (LEAQmr	l/msg 0 0 0 _RDI)
-          (MOVQir	stderr _RSI)
-          (MOVQmr	0 _RSI 0 0 _RSI)
+          (LEAQmr	l/msg 0 0 0 RDI)
+          (MOVQir	stderr RSI)
+          (MOVQmr	0 RSI 0 0 RSI)
           (call		fputs)
 
-          (LEAQmr	'msg 0 0 0 _RAX)  ; both should work and
-          (LEAQmr	l/msg 0 0 0 _RBX) ; load the same address.
-          (SUBQrr	_RBX _RAX) ; therefore it should return 0 in _RAX
+          (LEAQmr	'msg 0 0 0 RAX)  ; both should work and
+          (LEAQmr	l/msg 0 0 0 RBX) ; load the same address.
+          (SUBQrr	RBX RAX) ; therefore it should return 0 in RAX
           (RET)))))
 
   (define-jit-test jit-posix-3
@@ -111,11 +111,11 @@
       (NOP)
 
       (label	'skip-2)
-      (LEAQmr	'data-1 0 0 0 _RAX)
-      (MOVQmr	0 _RAX 0 0 _RAX)        ; data-1 in rax
-      (LEAQmr	'data-2 0 0 0 _RBX)
-      (MOVQmr	0 _RBX 0 0 _RBX)        ; data-2 in rbx
-      (SUBQrr	_RBX _RAX)              ; should be zero
+      (LEAQmr	'data-1 0 0 0 RAX)
+      (MOVQmr	0 RAX 0 0 RAX)        ; data-1 in rax
+      (LEAQmr	'data-2 0 0 0 RBX)
+      (MOVQmr	0 RBX 0 0 RBX)        ; data-2 in rbx
+      (SUBQrr	RBX RAX)              ; should be zero
       (RET))))
 
 ;; TODO investigate why this must be a separate toplevel form
@@ -128,15 +128,15 @@
     (.base	0xdeadbeef)
 
     ;; print using forward labels
-    (MOVQir32	linux/SYS_write _RAX)
-    (MOVQir32	linux/STDERR_FILENO _RDI)
-    (LEAQmr	'msg 0 0 0 _RSI)                    ; buffer
-    (MOVQir32	(flabel 'msg-end (- self (laddress 'msg))) _RDX) ; strlen(buffer)
+    (MOVQir32	linux/SYS_write RAX)
+    (MOVQir32	linux/STDERR_FILENO RDI)
+    (LEAQmr	'msg 0 0 0 RSI)                    ; buffer
+    (MOVQir32	(flabel 'msg-end (- self (laddress 'msg))) RDX) ; strlen(buffer)
     (SYSCALL)
 
     ;; only to test the instruction emitter
-    (MOVQir	0x12345678 _RAX)
-    ;;(MOVQir	0x123456789abcdef0 _RAX)
+    (MOVQir	0x12345678 RAX)
+    ;;(MOVQir	0x123456789abcdef0 RAX)
     (JMPSm	'skip-text 0 0 0)
 
     (label	'msg)
@@ -148,13 +148,13 @@
     (.align	16)
     (label	'skip-text)
 
-    (MOVQir32	linux/SYS_write _RAX)
-    (MOVQir32	linux/STDERR_FILENO _RDI)
-    (LEAQmr	'msg 0 0 0 _RSI)
-    (MOVQir32	(- (laddress 'msg-end) (laddress 'msg)) _RDX)
+    (MOVQir32	linux/SYS_write RAX)
+    (MOVQir32	linux/STDERR_FILENO RDI)
+    (LEAQmr	'msg 0 0 0 RSI)
+    (MOVQir32	(- (laddress 'msg-end) (laddress 'msg)) RDX)
     (SYSCALL)
 
-    (MOVQir32	0 _RAX)
+    (MOVQir32	0 RAX)
     (RET)))
 
 (run-tests)
