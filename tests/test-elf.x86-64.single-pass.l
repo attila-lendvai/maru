@@ -42,11 +42,11 @@
 (define-function emit-program-header (flags start end alignment)
   (.i32		elf/PT_LOAD)		; p_type
   (.i32		flags)			; p_flags
-  (.i64		(flabel start (- pself (paddress 'file-start)))) ; p_offset - File offset
-  (.i64		(flabel start))		; p_vaddr (virtual addr of segment) - Virtual address
+  (.i64		(label start (- pself (paddress 'file-start)))) ; p_offset - File offset
+  (.i64		(label start))		; p_vaddr (virtual addr of segment) - Virtual address
   (.i64		0)			; p_paddr - ignored
-  (.i64		(flabel end (- pself (paddress start)))) ; p_filesz - Size in file
-  (.i64		(flabel end (- pself (paddress start)))) ; p_memsz - Size in memory
+  (.i64		(label end (- pself (paddress start)))) ; p_filesz - Size in file
+  (.i64		(label end (- pself (paddress start)))) ; p_memsz - Size in memory
   (.i64		alignment))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
 (define-form syscall (sys-number . args)
@@ -63,7 +63,7 @@
   (with-assembling ((code))
 
     (.base	0x00400000)             ; typical 64-bit default base
-    (label	'file-start)
+    (label!	'file-start)
 
 ;;;
 ;;; ELF header
@@ -75,22 +75,22 @@
     (.i16	elf/ET_EXEC)     ; e_type
     (.i16	elf/EM_X86_64)   ; e_machine
     (.i32	1)               ; e_version
-    (.i64	(flabel 'code-segment-start)) ; e_entry (entry point)
-    (.i64	(flabel	'program-headers (- pself (paddress 'file-start)))) ; e_phoff	Start of program headers (file offset)
+    (.i64	(label 'code-segment-start)) ; e_entry (entry point)
+    (.i64	(label	'program-headers (- pself (paddress 'file-start)))) ; e_phoff	Start of program headers (file offset)
     (.i64	0)    ; e_shoff	Start of section headers
     (.i32	0)    ; e_flags
-    (.i16	(flabel 'elf-header-end (- pself (paddress 'file-start)))) ; e_ehsize	Size of this header
+    (.i16	(label 'elf-header-end (- pself (paddress 'file-start)))) ; e_ehsize	Size of this header
     (.i16	elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
     (.i16	3)   ; e_phnum	Number of program headers
     (.i16	0)   ; e_shentsize	Size of section header
     (.i16	0)   ; e_shnum	Number of section headers
     (.i16	0) ; e_shstrndx	Section header string table index
-    (label	'elf-header-end)
+    (label!	'elf-header-end)
 
 ;;;
 ;;; Program headers (segment layout)
 ;;;
-    (label	'program-headers)
+    (label!	'program-headers)
 
     ;; code segment
     (emit-program-header (+ elf/PF_R elf/PF_X)
@@ -118,43 +118,43 @@
       (.align	elf/page-size)
       (.base	0x00500000))
 
-    (label	'code-segment-start)
+    (label!	'code-segment-start)
 
     ;; print message
     (syscall linux/SYS_write linux/STDOUT_FILENO
-             (flabel 'msg) (flabel 'msg-end (- self (laddress 'msg))))
+             (label 'msg) (label 'msg-end (- self (laddress 'msg))))
 
     ;; test writing into the data segment: turn EXIT-CODE into 0
-    ;;(LEAQmr	(flabelr 'exit-code) 0 0 0 _RBX)
+    ;;(LEAQmr	(label 'exit-code) 0 0 0 _RBX)
     (MOVQir	'exit-code _RBX)
     (ADDQim	-2 0 _RBX 0 0)          ; [rbx] += -2
     (SUBQim	40 0 _RBX 0 0)          ; [rbx] -= 40
 
     (LEAQmr	'exit-code 0 0 0 _RDI)  ; exit code address
-    ;;(MOVQir	(flabel 'exit-code) _RDI) ; exit code address
+    ;;(MOVQir	(label 'exit-code) _RDI) ; exit code address
     (MOVQmr	0 _RDI 0 0 _RDI) ; exit code into %rdi (syscall arg 2)
     (syscall	linux/SYS_exit)
 
     (.align	elf/page-size) ; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned
 
-    (label	'code-segment-end)
+    (label!	'code-segment-end)
 
 ;;;
 ;;; Data Segment -- Read Only
 ;;;
-    (label	'ro-data-segment-start)
-    (label	'msg)
+    (label!	'ro-data-segment-start)
+    (label!	'msg)
     (.ascii	"Hello, world! From an ELF64 binary generated in a single pass!\n")
-    (label	'msg-end)
-    (label	'ro-data-segment-end)
+    (label!	'msg-end)
+    (label!	'ro-data-segment-end)
 
 ;;;
 ;;; Data Segment
 ;;;
-    (label	'data-segment-start)
-    (label	'exit-code)
-    (.i64		42)
-    (label	'data-segment-end)
+    (label!	'data-segment-start)
+    (label!	'exit-code)
+    (.i64	42)
+    (label!	'data-segment-end)
 
     (println "writing elf buffer to "filename)
     (save-current-segment-to-file filename)

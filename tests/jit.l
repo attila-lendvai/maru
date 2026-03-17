@@ -37,26 +37,25 @@
       ;; let's test that the generated code is position independent
       (.base	0xdeadbeef)
 
-      (let ((l/code (flabel)))
+      (let ((l/code (label)))
         (JMPSm	l/code 0 0 0)
 
-       (let ((l/msg (label)))
+       (let ((l/msg (label!)))
          (.ascii	+fputs-msg+)
 
          (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
-         (label		l/code)
+         (label!	l/code)
          (LEAQmr	l/msg 0 0 0 RDI)
          (MOVQir	stderr RSI)
          (MOVQmr	0 RSI 0 0 RSI)
-         (call	fputs)
+         (call		fputs)
 
          (MOVQir	stderr RDI)
          (MOVQmr	0 RDI 0 0 RDI)
-         (call	fflush)
+         (call		fflush)
 
          (XORQrr	RAX RAX)
-         (label		'foo)
          (RET)))))
 
   (define-jit-test jit-posix-2
@@ -65,7 +64,7 @@
       ;; let's test that the generated code is position independent
       (.base	0xdeadbeef)
 
-      (let ((l/code (flabel)))
+      (let ((l/code (label)))
         (JMPSm	l/code 0 0 0)
 
         (LEAQmr	'msg 0 0 0 RDI) ; a forward reference
@@ -73,12 +72,12 @@
         (NOP)
         (NOP)
 
-        (let ((l/msg (label 'msg))) ; test mixed name/local-var referencing
+        (let ((l/msg (label! 'msg))) ; test mixed name/local-var referencing
           (.ascii	+fputs-msg+)
 
           (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
-          (label	l/code)
+          (label!	l/code)
           (LEAQmr	l/msg 0 0 0 RDI)
           (MOVQir	stderr RSI)
           (MOVQmr	0 RSI 0 0 RSI)
@@ -96,13 +95,13 @@
 
       (JMPSm	'skip-1 0 0 0)
 
-      (label	'data-1)
+      (label!	'data-1)
       (.i64	'skip-1) ; future label reference
 
-      (label	'skip-1)
+      (label!	'skip-1)
       (JMPSm	'skip-2 0 0 0)
 
-      (label	'data-2)
+      (label!	'data-2)
       (.i64	'skip-1) ; realized label reference
       (NOP)
       (NOP)
@@ -110,7 +109,7 @@
       (NOP)
       (NOP)
 
-      (label	'skip-2)
+      (label!	'skip-2)
       (LEAQmr	'data-1 0 0 0 RAX)
       (MOVQmr	0 RAX 0 0 RAX)        ; data-1 in rax
       (LEAQmr	'data-2 0 0 0 RBX)
@@ -131,7 +130,7 @@
     (MOVQir32	linux/SYS_write RAX)
     (MOVQir32	linux/STDERR_FILENO RDI)
     (LEAQmr	'msg 0 0 0 RSI)                    ; buffer
-    (MOVQir32	(flabel 'msg-end (- self (laddress 'msg))) RDX) ; strlen(buffer)
+    (MOVQir32	(label 'msg-end (- self (laddress 'msg))) RDX) ; strlen(buffer)
     (SYSCALL)
 
     ;; only to test the instruction emitter
@@ -139,14 +138,14 @@
     ;;(MOVQir	0x123456789abcdef0 RAX)
     (JMPSm	'skip-text 0 0 0)
 
-    (label	'msg)
+    (label!	'msg)
     (.ascii	"*** linux syscall test output from the dynamically compiled code ***\n")
     ;;(.ascii	"alma")
-    (label	'msg-end)
+    (label!	'msg-end)
 
     ;; print using the already assigned values of the forward labels
     (.align	16)
-    (label	'skip-text)
+    (label!	'skip-text)
 
     (MOVQir32	linux/SYS_write RAX)
     (MOVQir32	linux/STDERR_FILENO RDI)
