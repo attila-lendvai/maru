@@ -83,9 +83,9 @@
        __result__)))
 
 (define-form with-new-label (segment . body)
-  (let ((result `(let ((__label__ (label)))
+  (let ((result `(let ((-label- (label!)))
                    ,@body
-                   __label__)))
+                   -label-)))
     (if segment
         `(with-current-segment ,segment
            ,result)
@@ -161,19 +161,19 @@
    primed-emitter
    emitters))
 
-(define-function %ensure-label (name)
+(define-function %ensure-label (desig)
   ;; create a label if needed, with its addresses unset (i.e. it can
   ;; be a future label)
-  (let ((label (typecase name
-                 (<label>	name)
-                 (<symbol>	(variable-value name (<assembler>-env *assembler*) ()))
-                 ;;(else (error "%ensure-label: not a label designator: " name))
+  (let ((label (typecase desig
+                 (<label>	desig)
+                 (<symbol>	(variable-value desig (<assembler>-env *assembler*) ()))
+                 ;;(else (error "%ensure-label: not a label designator: " desig))
                  )))
     (unless label
       (set label (make <label>
                    (segment	(current-segment))))
-      (when (is <symbol> name)
-        (environment-define (<assembler>-env *assembler*) name label)))
+      (when (is <symbol> desig)
+        (environment-define (<assembler>-env *assembler*) desig label)))
     label))
 
 (define-function resolved-label? (label)
@@ -196,13 +196,12 @@
     (assert (resolved-label? label))
     label))
 
-(define-function label args
-  (if args
-      (let ((desig (pop args)))
-        (assert (not args))
-        (let ((label	(%ensure-label desig))
-              (paddress	(current-paddress))
-              (laddress	(current-laddress)))
+(define-function label! args
+  (let ((desig		(first args))
+        (paddress	(current-paddress))
+        (laddress	(current-laddress)))
+    (if desig
+        (let ((label (%ensure-label desig)))
           (when (or (<label>-paddress label)
                     (<label>-laddress label))
             (error "trying to define an already defined label: "desig))
@@ -210,23 +209,32 @@
           (set (<label>-laddress label) laddress)
           (list-do emitter (<label>-emitters label)
             (emitter 'state/set paddress laddress))
-          label))
-    (let ((segment (current-segment)))
+          label)
       (make <label>
-        (segment  segment)
-        (paddress (<segment>-paddress segment))
-        (laddress (<segment>-laddress segment))))))
+        (segment	(current-segment))
+        (paddress	paddress)
+        (laddress	laddress)))))
 
 (define-function paddress (name) (<label>-paddress (%get-resolved-label name)))
 (define-function laddress (name) (<label>-laddress (%get-resolved-label name)))
 
-(define-form flabel args
-  (let ((name		(pop args))
-        (value-form	(or (pop args)
-                            'self)))
-    `(%forward-label (%ensure-label ,name) (lambda (pself self) ,value-form))))
+(define-function %label args
+  (if args
+      (let ((desig (pop args)))
+        (assert (not args))
+        (%ensure-label desig))
+    (make <label>
+      (segment (current-segment)))))
 
-(define-function %forward-label (desig value-future)
+(define-form label args
+  (if (second args)
+      (let ((desig (pop args))
+            (value-form (pop args)))
+        (assert (not args))
+        `(%prime-label (%ensure-label ,desig) (lambda (pself self) ,value-form)))
+    `(%label ,@args)))
+
+(define-function %prime-label (desig value-future)
   (let* ((label		(%ensure-label desig))
          (env		(<assembler>-env *assembler*))
          (hole-paddress	())
@@ -236,7 +244,7 @@
            (lambda (state . args)
              (case state
                (state/emit
-                ;; (println "%forward-label at address: "(current-laddress)", pos: "(current-paddress))
+                ;; (println "%prime-label at address: "(current-laddress)", pos: "(current-paddress))
                 (set hole-paddress (current-paddress))
                 (set writer (pop args))
                 (set offset (pop args)))
@@ -269,15 +277,24 @@
 ;;;
 
 (define-function emit-label (label writer size offset)
+  ;; this is only called from the writers of the instructions, so the
+  ;; current segment is the right segment.
   (if (resolved-label? label)
-      (writer (+ (<label>-laddress label)
-                 (or offset 0)))
+      (begin
+       (assert (not (<label>-primed-emitter label)))
+       ;; if there's no primed emitter, then there's no calculation
+       ;; specified, so we just write out the laddress without
+       ;; instantiating closures and doing some extra dance that is
+       ;; only needed for future labels.
+       ;; this might be a FIXME... but will we ever need that use-case?
+       (writer (+ (<label>-laddress label)
+                  (or offset 0))))
     (let ((emitter (or (<label>-primed-emitter label)
                        (begin
                         ;; there's no requested calculation in a
                         ;; primed emitter, so we define a default one
                         ;; that just takes the laddress.
-                        (%forward-label label (lambda (paddress laddress) laddress))
+                        (%prime-label label (lambda (paddress laddress) laddress))
                         (<label>-primed-emitter label)))))
       (emitter 'state/emit writer offset)
       (push (<label>-emitters label) emitter)
