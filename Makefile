@@ -625,6 +625,7 @@ test-elf: test-elf.x86-64
 
 # make PLATFORM=linux test-jit
 test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86.l
+	@rm -rf $(BUILD)/jit/*
 	@mkdir -p $(BUILD)/jit
 	rm -f $(BUILD)/jit/*
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/jit.l

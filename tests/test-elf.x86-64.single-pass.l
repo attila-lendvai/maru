@@ -36,7 +36,7 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-;; its role is to encode the intention when an upcoming flabel will fill this hole
+;; its role is to encode the intention when an upcoming future label will fill this hole
 (define hole 0)
 
 (define-function emit-program-header (flags start end alignment)

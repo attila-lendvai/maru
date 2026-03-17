@@ -65,12 +65,12 @@
        (compile/bug/push-root/helper/2 20))
   42)
 
-(define printf 10)
-(define word 10)
+(define escaping/global1 10)
+(define escaping/global2 10)
 
 (define-test compile/escaping/1
     (let ((ptr 22))
-      (+ word (+ printf ptr)))
+      (+ escaping/global2 (+ escaping/global1 ptr)))
   42)
 
 (define-test compile/if/1

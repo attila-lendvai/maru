@@ -25,7 +25,7 @@
 ;; 0: asserts disabled
 ;; 1: add some checks that are cheap
 ;; 2: non-trivial runtime costs
-;; 3: catch my bug no matter what!
+;; 3: catch my bug no matter what! (enables typecheck for slot accessors)
 ;; 4: run a gc before every allocation
 ;; NOTE re `make SAFETY=2 target`: defining *safety* from the Makefile
 ;; is not obvious... are we interested in the host or the slave value?

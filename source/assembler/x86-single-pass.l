@@ -126,16 +126,16 @@
 ;;;
 ;;; Labels
 ;;;
-;;; Labels are objects that can be used two ways:
+;;; Labels are objects that can be used in two ways:
 ;;;
 ;;;   1) anonymously as objects in local variables while generating
 ;;;      code
 ;;;
-;;;   2) or they can be defined into and environment that the
-;;;      assembler holds for "full-program" labels referenced as
-;;;      symbols and defined into this env.
+;;;   2) or they can be "entire-program" labels referenced as
+;;;      symbols. they get defined into an environment that the
+;;;      assembler holds.
 ;;;
-;;; The API should accept both at any position and do the
+;;; The API should accept both interchangably and do the necessary
 ;;; lookup/define as needed.
 ;;;
 ;;; Glossary:
@@ -153,6 +153,11 @@
   (segment
    paddress
    laddress
+   ;; primed-emitter is needed so that we can write something like
+   ;; this: (MOVQir32 (label 'msg-end (- self (laddress 'msg))) RDX)
+   ;; i.e. a LABEL that sets an emitter that encodes the requested
+   ;; calculation, and the instruction emitter eventually picks up the
+   ;; label emitter and calls the future to calculate the offset.
    primed-emitter
    emitters))
 
@@ -263,13 +268,16 @@
 ;;; Hooks for interfacing with the instruction emitters
 ;;;
 
-(define-function emit-future-label (label writer size offset)
+(define-function emit-label (label writer size offset)
   (if (resolved-label? label)
       (writer (+ (<label>-laddress label)
                  (or offset 0)))
     (let ((emitter (or (<label>-primed-emitter label)
                        (begin
-                        (%forward-label label (lambda (pself self) self))
+                        ;; there's no requested calculation in a
+                        ;; primed emitter, so we define a default one
+                        ;; that just takes the laddress.
+                        (%forward-label label (lambda (paddress laddress) laddress))
                         (<label>-primed-emitter label)))))
       (emitter 'state/emit writer offset)
       (push (<label>-emitters label) emitter)
@@ -291,7 +299,7 @@
      (assert (<= value 0xffff) "_W was called with value: "value)
      (_B (bitwise-and 0xff value))
      (_B (bitwise-and 0xff (bitwise-shift value -8))))
-    (<label>	(emit-future-label value _W 2 ()))
+    (<label>	(emit-label value _W 2 ()))
     (else	(error "_W: called with unexpected value: "value))))
 
 (define-function _L (value)
@@ -301,13 +309,13 @@
      (assert (<= value 0xffffffff) "_L was called with value: "value)
      (_W (bitwise-and 0xffff value))
      (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-    (<label>	(emit-future-label value _L 4 ()))
+    (<label>	(emit-label value _L 4 ()))
     (<symbol>	(_L (%ensure-label value)))
     ;; (<lower-cell> TODO) needed to support 32 bit mode
     (else	(error "_L: called with unexpected value: "value))))
 
 (define-function _Q (value)
-  ;;(println "_Q, value: "value)
+  ;;(println "_Q, value: "value", at laddress: " (current-laddress))
   (typecase value
     (<long>
      (_L (bitwise-and 0xffffffff value))
@@ -321,7 +329,7 @@
             value)
        (incr (<segment>-paddress segment) 8)
        (incr (<segment>-laddress segment) 8)))
-    (<label>	(emit-future-label value _Q 8 ()))
+    (<label>	(emit-label value _Q 8 ()))
     (<symbol>	(_Q (%ensure-label value)))
     (else	(error "_Q: called with unexpected value: "value))))
 
@@ -332,7 +340,7 @@
     (<long>
      (assert (and (<= -0x80 value) (<= value 0x7f)) "_D1 was called with offset larger than rel8: "value)
      (_B value))
-    (<label>	(emit-future-label value _D1 1 (- 0 (current-laddress) 1)))
+    (<label>	(emit-label value _D1 1 (- 0 (current-laddress) 1)))
     (<symbol>	(_D1 (%ensure-label value)))
     (else	(error "_D1: called with unexpected value: "value))))
 
@@ -343,7 +351,7 @@
     (<long>
      (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
      (_L value))
-    (<label>	(emit-future-label value _D4 4 (- 0 (current-laddress) 4)))
+    (<label>	(emit-label value _D4 4 (- 0 (current-laddress) 4)))
     (<symbol>	(_D4 (%ensure-label value)))
     (else	(error "_D4: called with unexpected value: "value))))
 

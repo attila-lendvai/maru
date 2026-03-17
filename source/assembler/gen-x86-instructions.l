@@ -81,6 +81,17 @@
   definition*
 }
 
+/*
+
+Variable names:
+ - L literal
+ - D displacement
+ - B base register
+ - I index register
+ - S scale
+
+*/
+
 #define _b00            0
 #define _b01            1
 #define _b10            2
@@ -124,8 +135,8 @@
 #define _ESI            0x46
 #define _EDI            0x47
 
-#define _rS(R)          ((R)>>4)
-#define _rN(R)          ((R)&0x7)
+#define _rS(R)          ((R)>>4)  // the 5+ bits of a reg
+#define _rN(R)          ((R)&0x7) // lower 4 bits of a reg; i.e. reg name
 
 #define _r0P(R)         ((R)==0)
 #define _rLP(R)         (((R)>=_AL)&&((R)<=_BL))
@@ -1105,6 +1116,11 @@ _r_0DIS:
 #define _R15		0x8F
 
 // indexed addressing can use r12 (REX.X + _ESP) as an index register
+//
+// KLUDGE redefine _r_X so that it doesn't error for SIB index field 100b
+// the proper fix would be for this to be conditional on the presence
+// of a REX byte, or maybe the assembler keeping track of the mode
+// (32/64) it is targeting.
 
 #define _r_X(R,D,B,I,S)				\
     (_r0P(I)					\
