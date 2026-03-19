@@ -220,6 +220,10 @@
 
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
+(define-instruction COMMENT	()
+  ;; just a default that can be redefined
+  ((pair)			(print "; ") (apply println $1)))
+
 ;; this is faster than (emit COMMENT ...) by skipping the evaluation early
 (define-form emit-comment (level . args)
   `(when (<= ,level *compiler-verbosity*)
@@ -240,8 +244,7 @@
 
 (define-function emit-gen-buffer (-c-)
   (array-do entry (<compiler>-gen-buffer -c-)
-    ;; TODO commented out due to load order headache...
-    ;; (emit-comment 2 "EMIT-INSTRUCTION of "instr", args: "args)
+    (emit-comment 2 "EMIT-INSTRUCTION of "(first entry)", args: "(rest entry))
     (apply emit-instruction (cons -c- entry))))
 
 (load "source/compiler/target.l")

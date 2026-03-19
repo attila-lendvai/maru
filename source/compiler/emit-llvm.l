@@ -280,10 +280,6 @@
 (define-function emit/header->payload/in-constants (input)
   (print "getelementptr (%\"<header>\", %\"<header>\"* "input", i32 1)"))
 
-(define-instruction COMMENT	()
-  ;;((string)			(print "; ") (println $1))
-  ((pair)			(print "; ") (apply println $1)))
-
 (define-instruction INLINE	()
   ((string)			(print $1))
   ((pair)			(apply print $1)))

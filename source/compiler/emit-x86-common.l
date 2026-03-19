@@ -81,7 +81,7 @@
 ;;;
 ;;; INSTRUCTIONS
 ;;;
-(define-instruction COMMENT	()
+(define-instruction/emit-forms COMMENT 0
   ((pair)			(print "# ") (apply println $1)))
 
 (define-instruction INLINE	()
