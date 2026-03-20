@@ -313,7 +313,7 @@
                                 (println "	mov	"$1", (%rbx)"))
   ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
-  ((R64 R64)			(println "	mov	"$1", ("$2")"))
+  ((R64 R64)			(println "	mov	"$1", "$2"")) ; e.g. when dest is an arg reg in a function call
   ((R64 TEMP64)			(println "	mov	"$1", "$2)))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
