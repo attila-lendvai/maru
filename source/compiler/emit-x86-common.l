@@ -558,6 +558,7 @@
 ;;; Compiling lambdas
 ;;;
 
+;; TODO rename to compile/expressions (?)
 (define-function compile/prog-into-temp (prog -c-)
   (assert (pair? prog) "compile/prog-into-temp: prog is empty") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   ;; NOTE it's tempting here to check for single-element prog's, and turning them into a compile/expr-into-temp-or-literal
@@ -569,6 +570,8 @@
     (gen STORE temp)
     temp))
 
+;; FIXME very unfortunate name: expr is lambdas in current maru parlance.
+;; rename to compile/expression (?)
 (define-function compile/expr-into-temp-or-literal (expr -c-)
   (cond
     ((long? expr)
@@ -591,6 +594,11 @@
                           ;; its evaluation, i.e. a simple LOAD, to the
                           ;; final, COMPILE-CALL-TO step.
                           (compile/expr-into-temp-or-literal op -c-)))
+        ;; NOTE we *must* store the arg values into temps on the stack
+        ;; (as opposed to storing them straight into the arg
+        ;; locations) because the arg expression can be of any
+        ;; complexity; i.e. they may call other functions, which would
+        ;; overwrite the arg registers...
         (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
         (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
     ;; set up the stack for the call

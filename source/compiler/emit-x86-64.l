@@ -138,6 +138,9 @@
 ;;                (gen MOVE reg temp)))))
 ;;        (<expr>-parameters expr)))
 
+;; this implements the System V AMD64 ABI. this way we can call into C
+;; code without differenciating between calling the internal and the C
+;; world.
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
   (let* ((body	(<expr>-body self))
@@ -325,6 +328,6 @@
          (else
           (gen LOAD (GLOBAL64 (LABEL self.name))))))
       (else
-       (error "compile of <variable> failed for " self ", holding the value " value)))))
+       (error "compile of <variable> failed for "self", holding the value: "value", type: "(type-of value))))))
 
 (require "source/compiler/emit-x86-late.l")
