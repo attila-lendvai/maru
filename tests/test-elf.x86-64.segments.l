@@ -82,7 +82,7 @@
 (define-function write-elf-to-stream (stream)
   (println "assembling the elf header")
 
-  (assert (string? +ld.so-path+))
+  (assert (and (string? +ld.so-path+) (< 0 (string-length +ld.so-path+))))
 
   (when *dynamic?*
     (.segment 'ro-data)
