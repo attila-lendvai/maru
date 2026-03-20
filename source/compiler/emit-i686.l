@@ -79,7 +79,7 @@
 
 (define-function %free-temp (-c- obj)
   (when (is <TEMP32> obj)
-    (push (<compiler>-temps -c-) obj)))
+    (push (<compiler>-free-temps -c-) obj)))
 
 ;; parameters are what functions have
 (define-function new-param (c)
@@ -135,7 +135,7 @@
       ;; temps allocated on the stack.
       (map (lambda (el)
              (incr (<TEMP>-offset el) arg-size))
-           (<compiler>-temps -c-))
+           (<compiler>-free-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
       ;; the frame size and use %esp through simple TEMP32.

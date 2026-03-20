@@ -86,7 +86,7 @@
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
   (when (is <TEMP64> obj)
-    (push (<compiler>-temps -c-) obj)))
+    (push (<compiler>-free-temps -c-) obj)))
 
 ;; (define-function new-param (c)
 ;;   (with-instance-accessors c <x86-64-compiler>
@@ -189,7 +189,7 @@
       ;; temps allocated on the stack.
       (let ((fixup (lambda (el)
                      (incr (<TEMP>-offset el) arg-size))))
-        (map fixup (<compiler>-temps -c-))
+        (map fixup (<compiler>-free-temps -c-))
         (map fixup spill-locs))
       ;; actual emitting begins
       (emit TEXT)

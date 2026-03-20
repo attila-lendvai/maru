@@ -209,7 +209,7 @@
 
 (define-function %free-temp (-c- obj)
   (when (is <TEMP> obj)
-    (push (<compiler>-temps -c-) obj)))
+    (push (<compiler>-free-temps -c-) obj)))
 
 ;;;
 ;;; LLVM IR Instructions
@@ -619,7 +619,7 @@
     ;; all temps must be free-temp'ed properly at this point.
     (map (lambda (tmp)
            (emit ALLOCA tmp))
-         (<compiler>-temps -c-))
+         (<compiler>-free-temps -c-))
 
     ;; store the parameters in the temps
     (unless +function-parameters-are-read-only+

@@ -102,10 +102,7 @@
   (level
    temp-counter
    temp-limit
-   ;; TODO rename to free-temps. this is *NOT* all the allocated
-   ;; temps! only those that have been free-temp'd, which was not true
-   ;; for the temps for spilling the params.
-   temps
+   free-temps
    gen-buffer
    current-value              ; the output of the previous-instruction
    ))
@@ -119,7 +116,7 @@
       i)))
 
 (define-function alloc-temp (-c-)
-  (or (pop (<compiler>-temps -c-))
+  (or (pop (<compiler>-free-temps -c-))
       (new-temp -c-)))
 
 (define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
