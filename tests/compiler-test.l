@@ -65,6 +65,21 @@
        (compile/bug/push-root/helper/2 20))
   42)
 
+(define-test compile/call-of-closure
+    ((lambda (a b)
+       (+ a b)) 40 2)
+  42)
+
+(define-function compile/call-with-closure/helper (a c1 c2 b)
+  (+ (c1 10) (c2 1)))
+
+(define-test compile/call-with-closure
+    (compile/call-with-closure/helper 9999
+                                      (lambda (x) (* 4 x))
+                                      (lambda (x) (* 2 x))
+                                      9999)
+  42)
+
 (define escaping/global1 10)
 (define escaping/global2 10)
 
@@ -474,6 +489,9 @@
   ;; TODO operators with 2+ arguments
   (+ (+ x1 x5) x10))
 
+(define-function many-args10/return-last (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10)
+  x10)
+
 (define-function many-args16 (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
   ;; this call was overwriting our spilled params because the spill
   ;; locations were not part of the temp list (i.e. never
@@ -485,6 +503,14 @@
 
 (define-test compile/arguments/bug/1
     (many-args16 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
+  42)
+
+;; this makes sure that i won't try again to directly store the
+;; arguments into the ABI param registers, because there can be
+;; expressions with any complexity for arguments, which can overwrite
+;; the registers.
+(define-test compile/arguments/bug/2
+    (sum-of-three 10 (many-args10/return-last 1 2 3 4 5 6 7 8 9 20) 12)
   42)
 
 ;; this should error, explicitly noting that the lambda is capturing
