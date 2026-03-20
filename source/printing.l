@@ -84,6 +84,8 @@
 (define-print-method <type>	(print-all -stream- "<"(<type>-name self)" "(<type>-id self)">"))
 (define-print-method <pair>	(%print-list -stream- self " " false))
 (define-print-method <lower-cell> (print-all -stream- "0x"(number->string (lower-cell->long self) 16)))
+(when-at-expand (feature track-expr-names)
+  (define-print-method <target-function> (print-all -stream- "<target-function "self.name">")))
 
 (define-method do-dump <pair> (stream)
   (%print-list stream self " " true))
