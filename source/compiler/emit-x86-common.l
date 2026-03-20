@@ -78,6 +78,8 @@
 (define-operand R64 REGISTER ())
 (define-operand TEMP64 TEMP	()	self.offset"(%rsp)")
 
+(define-operand PARAM64 TEMP	()	self.offset"(%rbp)")
+
 ;;;
 ;;; INSTRUCTIONS
 ;;;
@@ -297,6 +299,7 @@
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
   ((TEMP64)			(println "	mov	"$1", %rax"))
+  ((PARAM64)			(println "	mov	"$1", %rax"))
   ((R64)			(println "	mov	"$1", %rax"))
   ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax")
 				(println "	mov	(%rax), %rax"))

@@ -69,7 +69,7 @@
     (temp-limit			0)
     (gen-buffer			(array))
 
-    (param-offset		0)
+    (param-offset		(* 2 +word-size-in-bytes+)) ; the pushed RBP and the return address
     (arg-offset			0)
     (arg-limit			0)
     (asm-cell-type		".8byte")
@@ -156,9 +156,10 @@
                           (push spill-locs spill-loc)
                           (R64 it))
                       (let ((offset (<x86-compiler>-param-offset -c-)))
-                        (incr (<x86-compiler>-param-offset -c-) +word-size-in-bytes+)
-                        ;; this extends the stack frame size as needed
-                        (set (<variable>-value var) (TEMP64 offset)))))
+                        (set (<variable>-value var) (PARAM64 offset))
+                        (set (<x86-compiler>-param-offset -c-)
+                             (+ offset
+                                +word-size-in-bytes+)))))
                   (<expr>-parameters self)))))
     (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
     (emit-comment 3 ", code: "(<expr>-body self))
@@ -190,13 +191,6 @@
                      (incr (<TEMP>-offset el) arg-size))))
         (map fixup (<compiler>-temps -c-))
         (map fixup spill-locs))
-      ;; Params could also be accessed through %ebp, but for that we
-      ;; would need another operand class. Let's just offset them by
-      ;; the frame size and use %esp through simple TEMP64.
-      (map (lambda (loc)
-             (when (is <TEMP64> loc) ; the first few loc's are in registers
-               (incr (<TEMP>-offset loc) frame-size)))
-           param-locs)
       ;; actual emitting begins
       (emit TEXT)
       (emit DEFLABEL entry-point-label)
@@ -310,7 +304,8 @@
     (cond
       ((or (is <R64> value)
            (is <LI64> value)
-           (is <TEMP64> value))
+           (is <TEMP64> value)
+           (is <PARAM64> value))
        (gen LOAD value))
       ((global-variable? self)
        (cond
