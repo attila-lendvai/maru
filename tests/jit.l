@@ -17,6 +17,9 @@
 (define-form define-jit-test (name . body)
   `(define-test ,name ()
      (with-assembling ((code))
+       ;; let's test that the generated code is position independent
+       (.base	0xdeadbeef)
+
        ,@body
 
        (let ((filename ,(concat-string "./build/jit/" (symbol->string name))))
@@ -34,8 +37,6 @@
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
           (fflush	(posix/dlsym posix/RTLD_DEFAULT "fflush"))
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
-      ;; let's test that the generated code is position independent
-      (.base	0xdeadbeef)
 
       (let ((l/code (label)))
         (JMPSm	l/code 0 0 0)
@@ -61,8 +62,6 @@
   (define-jit-test jit-posix-2
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
-      ;; let's test that the generated code is position independent
-      (.base	0xdeadbeef)
 
       (let ((l/code (label)))
         (JMPSm	l/code 0 0 0)
@@ -90,8 +89,6 @@
 
   (define-jit-test jit-posix-3
     (let ()
-      ;; let's test that the generated code is position independent
-      (.base	0xdeadbeef)
 
       (JMPSm	'skip-1 0 0 0)
 
@@ -115,7 +112,23 @@
       (LEAQmr	'data-2 0 0 0 RBX)
       (MOVQmr	0 RBX 0 0 RBX)        ; data-2 in rbx
       (SUBQrr	RBX RAX)              ; should be zero
-      (RET))))
+      (RET)))
+
+  (define-jit-test jit-posix-4
+
+    ;; (LEAQmr 0 RAX RCX 1 RCX)
+    ;; (MOVBmr 0 ECX 0 1 AL)
+    ;; (MOVBmr 0 RCX 0 1 AL)
+    (MOVQir	21 RAX)
+    (MOVQir	2  RBX)
+    (MULQrr	RBX RAX)
+    (MOVQir	42  RBX)
+    (DIVQrr	RBX RAX)
+    (SUBQrm	RAX 'exit-code 0 0 0)
+    (MOVQmr	'exit-code 0 0 0 RAX)
+    (RET)
+    (label! 'exit-code)
+    (.i64	1)))
 
 ;; TODO investigate why this must be a separate toplevel form
 (when-at-expand (feature platform/linux)
@@ -123,8 +136,6 @@
 
 (when-at-expand (feature platform/linux)
   (define-jit-test jit-linux-1 ()
-    ;; let's test that the generated code is position independent
-    (.base	0xdeadbeef)
 
     ;; print using forward labels
     (MOVQir32	linux/SYS_write RAX)
