@@ -1239,10 +1239,24 @@ _r_0DIS:
 
 #define RETQ()					RET()
 
-#define	SUBQim(N,D,B,I,S)	(_REX(1,0,I,B), SUBLim(N,D,_r8(B),_r8(I),S))
-#define	SUBQir(I,R)		(_REX(1,0,0,R), SUBLir(I,_r8(R)))
-#define	SUBQmr(D,B,I,S,R)	(_REX(1,R,I,B), SUBLmr(D,_r8(B),_r8(I),S,_r8(R)))
-#define	SUBQrr(S,D)		(_REX(1,S,0,D),	SUBLrr(_r8(S),_r8(D)))
+// quirks:
+//  - the source register is fixed to CL, no _r8() wrapping around those
+//  - there's no Xmr version, only rm
+#define SALQir(L,R)		(_REX(1,0,0,R), SALLir(L,_r8(R)))
+#define SALQrr(S,D)		(_REX(1,S,0,D), SALLrr(S,_r8(D)))
+#define SALQim(L,D,B,I,S)	(_REX(1,0,I,B), SALLim(L,D,_r8(B),_r8(I),S))
+#define SALQrm(R,D,B,I,S)	(_REX(1,R,I,B), SALLrm(R,D,_r8(B),_r8(I),S))
+
+#define SARQir(L,R)		(_REX(1,0,0,R), SARLir(L,_r8(R)))
+#define SARQrr(S,D)		(_REX(1,S,0,D), SARLrr(S,_r8(D)))
+#define SARQim(L,D,B,I,S)	(_REX(1,0,I,B), SARLim(L,D,_r8(B),_r8(I),S))
+#define SARQrm(R,D,B,I,S)	(_REX(1,R,I,B), SARLrm(R,D,_r8(B),_r8(I),S))
+
+#define SUBQir(I,R)		(_REX(1,0,0,R), SUBLir(I,_r8(R)))
+#define SUBQrr(S,D)		(_REX(1,S,0,D),	SUBLrr(_r8(S),_r8(D)))
+#define SUBQim(N,D,B,I,S)	(_REX(1,0,I,B), SUBLim(N,D,_r8(B),_r8(I),S))
+#define SUBQrm(RS,D,B,I,S)	(_REX(1,RS,I,B),SUBLrm(_r8(RS),D,_r8(B),_r8(I),S))
+#define SUBQmr(D,B,I,S,RD)	(_REX(1,RD,I,B),SUBLmr(D,_r8(B),_r8(I),S,_r8(RD)))
 
 #define TESTQrr(S,D)		(_REX(1,S,0,D), TESTLrr(_r8(S),_r8(D)))
 
