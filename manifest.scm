@@ -72,5 +72,6 @@
       "man-pages"
       "less"
       "gdb"
+      "cutter"
       ;; "intel-xed" ; for authoritative disassembling
       )))))

@@ -573,6 +573,9 @@
   (unless (cdr binding)
     (set binding (list (car binding) ())))
   (let ((var (car binding))
+        ;; NOTE ADDRESS-OF can only operate on stack-cells, not temp
+        ;; regs. if we were to use regs for temps then we must somehow
+        ;; force ADDRESS-OF operands to the stack.
         (tmp (compile/expressions-into-temp (cdr binding) comp)))
     (assert (= (type-of var) <variable>) "compile/let-binding: encountered a non-variable: " var)
     (set (<variable>-value var) tmp)))

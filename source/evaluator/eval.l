@@ -448,6 +448,8 @@
            (error "cannot apply: "fun" of type: "(box <long> type)", *globals*: "*globals*", *applicators* is: "
                   (and *applicators-var* (<variable>-value *applicators-var*)))))))))
 
+;; TODO (fn . args) and then concat-list the fixed ones to the last element
+;; IOW support (apply fun arg1 arg2 rest-arg-list)
 (define-vm-function (apply ()) (fn args)
   (apply fn args -ctx-))
 

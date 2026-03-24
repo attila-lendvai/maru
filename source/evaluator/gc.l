@@ -215,7 +215,7 @@
 (define-function gc/allocate (type requested-size)
   (gc/debug (platform/print-diag-fmt "gc/allocate type %ld %ld" type requested-size))
   (safety 2 (assert type "gc/allocate: type is 0"))
-  (set requested-size (oop/align requested-size)) ; KLUDGE this really only aligns the size, not the returned pointer. works for now.
+  (set requested-size (oop/align requested-size)) ; only allow cell-sized allocation
   (and (= gc/alloc-count gc/allocations-until-gc)
        (gc/collect))
   (let* ((first (<header>-next gc/memory-last))

@@ -17,6 +17,9 @@
 
 (define-form failure (format . args)
   `(let ()
+     ;; FIXME clean up the platform/print-diag-fmt situation, it's a
+     ;; NOP in the linux platform.
+     (platform/diag-print "FIXME !!! failing !!!")
      (platform/print-diag-fmt ,(concat-strings "\n\n\033[1;31m*** FAILURE\033[0m " format) ,@args)
      (set *exit-code* -1)))
 
