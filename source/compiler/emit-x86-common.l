@@ -587,23 +587,58 @@
   (safety 2 (assert (or (pair? op) (variable? op))))
   ;; NOTE this implements a left-to-right evaluation order, including the operator.
   ;; i.e. moving this op-tmp means changing the evaluation order!
-  (let ((op-tmp		(when (pair? op)
+  (let* ((op-tmp	(when (pair? op)
                           ;; optimization:
                           ;; we can spare a STORE/LOAD when we know that op
                           ;; doesn't evaluate anything; i.e. we can delay
                           ;; its evaluation, i.e. a simple LOAD, to the
                           ;; final, COMPILE-CALL-TO step.
                           (compile/expr-into-temp-or-literal op -c-)))
-        ;; NOTE we *must* store the arg values into temps on the stack
-        ;; (as opposed to storing them straight into the arg
-        ;; locations) because the arg expression can be of any
-        ;; complexity; i.e. they may call other functions, which would
-        ;; overwrite the arg registers...
-        (arg-tmps	(map-with compile/expr-into-temp-or-literal args -c-))
-        (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
+         (tmps-to-free	())
+         ;; NOTE here we *must* store the arg values calculated by
+         ;; expression into temps (as opposed to storing them straight
+         ;; into the arg locations, i.e. into registers) because the
+         ;; arg expression can be of any complexity; i.e. they may
+         ;; call other functions, which would overwrite the arg
+         ;; registers...
+         (arg-tmps
+           ;; FIXME this is a copy of compile/expr-into-temp-or-literal
+           (map (lambda (expr)
+                  (cond
+                    ((and (variable? expr)
+                          ;; TODO we should handle global variables,
+                          ;; too. for that we probably need to
+                          ;; introduce a new protocol to split compile
+                          ;; and compile-to-operand (i.e. the
+                          ;; define-method compile <variable> into the
+                          ;; OPERAND and LOAD part)
+                          (let ((x (<variable>-value expr)))
+                            (or (is <TEMP64>	x)
+                                (is <LI64>	x)
+                                (is <TEMP32>	x)
+                                (is <LI32>	x))))
+                     ;; (let ((value (<variable>-value expr)))
+                     ;;   (print-all *debug-output* "*** matched: "expr"="value", type:" (type-of value) "\n")
+                     ;;   value)
+                     (<variable>-value expr))
+                    ((long? expr)
+                     (LITERAL expr))
+                    (else
+                     ;; (when (variable? expr)
+                     ;;   (let ((value (<variable>-value expr)))
+                     ;;     (assert (global-variable? expr))
+                     ;;     (print-all *debug-output* "*** matched: "expr"="value", type:" (type-of value) "\n")
+                     ;;     value))
+                     (comp expr)
+                     (let ((temp (alloc-temp -c-)))
+                       (push tmps-to-free temp)
+                       (gen STORE temp)
+                       temp))))
+                args))
+         (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
     ;; set up the stack for the call
     (map (lambda (a b) (gen MOVE a b)) arg-tmps arg-locs)
-    (free-temps arg-tmps)
+    (free-temps tmps-to-free)
 
     (let* ((op-value	(or op-tmp
                             (if (variable? op)
