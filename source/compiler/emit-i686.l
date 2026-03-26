@@ -218,7 +218,6 @@
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
   (cons (target-value C-string)		compile/C-string)
-  ;;(cons (target-value C-call)		(lambda (expr -c-) (compile-call-form (second expr) (cddr expr) true -c-)))
   (cons (target-value stack-pointer-on-entry)
         (lambda (expr -c-)
           ;; the function prologue we also employ is like this:

@@ -582,8 +582,8 @@
         (gen STORE temp)
         temp))))
 
-(define-function compile-call-form (op args raw? -c-)
-  (emit-comment 2 "compile-call: "op", args: "args", raw?: "raw?)
+(define-function compile-call-form (op args -c-)
+  (emit-comment 2 "compile-call: "op", args: "args)
   (safety 2 (assert (or (pair? op) (variable? op))))
   ;; NOTE this implements a left-to-right evaluation order, including the operator.
   ;; i.e. moving this op-tmp means changing the evaluation order!
@@ -643,14 +643,9 @@
     (let* ((op-value	(or op-tmp
                             (if (variable? op)
                                 (<variable>-value op)
-                              op)))
-           (n-params	(if raw?
-                            (let ()
-                              (gen LOAD op-value)
-                              (gen CALLPTR arg-locs)
-                              ())
-                          (emit-comment 2 "compile-call-to: "op-value)
-                          (compile-call-to op-value op arg-locs -c-)))
+                                op)))
+           (n-params	 (emit-comment 2 "compile-call-to: "op-value)
+                         (compile-call-to op-value op arg-locs -c-))
            (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
@@ -822,4 +817,4 @@
          (or handler (error "No handler for fixed form: " self))
          (handler self -c-)))
       (else
-       (compile-call-form op args false -c-)))))
+       (compile-call-form op args -c-)))))
