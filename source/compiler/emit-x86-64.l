@@ -37,6 +37,8 @@
 ;; way to achieve this.
 (define LITERAL LI64)
 
+(define-print-method <STACK-CELL> (print-all -stream- self.offset"(%rsp)"))
+
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
@@ -53,6 +55,76 @@
 
 (define-instruction/emit-forms LOAD 0
   ((LABEL)			(println "	lea	"$1"(%rip), %rax")))
+
+(define-instruction/emit-forms MUL 0
+  ((STACK-CELL)			(println "	mulq	"$1)))
+
+(define-instruction/emit-forms DIV 0
+  ((STACK-CELL)			(println "	xor	%rdx, %rdx")
+                                (println "	divq	"$1)))
+
+(define-instruction/emit-forms ADDR 0
+  ((STACK-CELL)			(println "	lea	"$1", %rax")))
+
+(define-instruction/emit-forms MOVE 0
+  ((STACK-CELL STACK-CELL)	(println "	mov	"$1", %rbx")
+                                (println "	mov	%rbx, "$2)))
+
+(define-instruction/emit-forms LOAD 0
+  ((STACK-CELL)			(println "	mov	"$1", %rax")))
+
+(define-instruction/emit-forms LOAD-I8 0
+  ((STACK-CELL)			(println "	mov	"$1", %rbx")
+                                (println "	lea	(%rax, %rbx), %rbx")
+                                (println "	xor	%rax, %rax")
+                                (println "	mov	(%rbx), %al")))
+
+(define-instruction/emit-forms STORE-I8 0
+  ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+				    ;; NOTE this works out just fine for a STACK-CELL, too, because we are little-endian.
+                                    (let ()
+                                      (println "	mov	"$1", %rbx")
+                                      (println "	lea	(%rax, %rbx), %rbx")
+                                      (println "	xor	%rax, %rax")
+                                      (println "	movb	"$2", %al")
+                                      (println "	movb	%al, (%rbx)"))
+                                  (println "	lea	"$1"(%rip), %rbx")
+                                  (println "	lea	(%rax, %rbx), %rax")
+                                  (println "	movb	"$2", (%rax)"))))
+
+(when-at-expand (feature lower/array)
+  ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
+  (define-instruction/emit-forms LOAD-CELL 0
+    ((STACK-CELL)		(println "	mov	"$1", %rbx")
+				(println "	lea	(%rax, %rbx, 1), %rbx")
+				(println "	mov	(%rbx), %rax")))
+
+  (define-instruction/emit-forms STORE-CELL 0
+    ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (let ()
+                                      (println "	mov	"$1", %rbx")
+                                      (println "	lea	(%rax, %rbx, 1), %rbx")
+                                      (println "	mov	"$2", %rax")
+                                      (println "	mov	%rax, (%rbx)"))
+                                  (println "	mov	"$1", %rbx")
+                                  (println "	lea	(%rax, %rbx, 1), %rax")
+                                  (println "	mov	"$2", (%rax)")))))
+
+(define-instruction/emit-forms LOAD-OOP 0
+  ((STACK-CELL)			(println "	mov	"$1", %rbx")
+				(println "	lea	(%rax, %rbx, 8), %rbx")
+				(println "	mov	(%rbx), %rax")))
+
+(define-instruction/emit-forms STORE-OOP 0
+  ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (let ()
+                                      (println "	mov	"$1", %rbx")
+                                      (println "	lea	(%rax, %rbx, 8), %rbx")
+                                      (println "	mov	"$2", %rax")
+                                      (println "	mov	%rax, (%rbx)"))
+                                  (println "	mov	"$1", %rbx")
+                                  (println "	lea	(%rax, %rbx, 8), %rax")
+                                  (println "	mov	"$2", (%rax)"))))
 
 ;;;
 ;;; Compiler Infrastructure
@@ -81,11 +153,11 @@
   (compile-env env (x86-64-compiler 1)))
 
 (define-function new-temp (-c-)
-  (STACK-CELL64 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
-  (when (is <STACK-CELL64> obj)
+  (when (is <STACK-CELL> obj)
     (push (<compiler>-free-temps -c-) obj)))
 
 ;; (define-function new-param (c)
@@ -97,7 +169,7 @@
 ;;             (R64 reg))
 ;;         (let ((offset	c.param-offset))
 ;;           (set c.param-offset (+ offset +word-size-in-bytes+))
-;;           (STACK-CELL64 offset))))))
+;;           (STACK-CELL offset))))))
 
 (define-function new-arg (c)
   (with-instance-accessors c <x86-64-compiler>
@@ -108,7 +180,7 @@
             (R64 reg))
         (let ((offset	c.arg-offset))
           (set c.arg-offset (+ offset +word-size-in-bytes+))
-          (STACK-CELL64 offset))))))
+          (STACK-CELL offset))))))
 
 (define-function free-args (c args)
   (with-instance-accessors c <x86-64-compiler>
@@ -129,7 +201,7 @@
 ;;   (emit-comment 1 "spilling "(list-length (<expr>-parameters expr))" params to the stack")
 ;;   (map (lambda (var)
 ;;          (let ((loc (<variable>-value var)))
-;;            (unless (is <STACK-CELL64> loc)
+;;            (unless (is <STACK-CELL> loc)
 ;;              (let ((reg (<variable>-value var))
 ;;                    (temp (pop (<x86-64-compiler>-param-spill-locs -c-))))
 ;;                (assert temp)
@@ -213,7 +285,7 @@
 ;;; Compiling calls
 ;;;
 
-(define-method compile-call-to <STACK-CELL64> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-<target-function> arg-locs -c-))
 
@@ -242,7 +314,7 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (cond
-      ((or (is <STACK-CELL64> value)
+      ((or (is <STACK-CELL> value)
            (is <R64> value))
        (gen STORE value))
       ((is <C-variable> value)
@@ -259,7 +331,7 @@
       (cond
         ((global-variable? var)
          (gen ADDR (GLOBAL64 (LABEL (<variable>-name var)))))
-        ((is <STACK-CELL64> val)
+        ((is <STACK-CELL> val)
          (gen ADDR val))
         ;; ((is <R64> val)
         ;;  (maybe-spill-params -c-)
@@ -306,7 +378,7 @@
     (cond
       ((or (is <R64> value)
            (is <LI64> value)
-           (is <STACK-CELL64> value)
+           (is <STACK-CELL> value)
            (is <PARAM64> value))
        (gen LOAD value))
       ((global-variable? self)

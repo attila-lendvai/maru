@@ -37,6 +37,8 @@
 ;; way to achieve this.
 (define LITERAL LI32)
 
+(define-print-method <STACK-CELL> (print-all -stream- self.offset"(%esp)"))
+
 ;;;
 ;;; IA-32 -- INSTRUCTIONS
 ;;;
@@ -50,6 +52,58 @@
 
 (define-instruction/emit-forms LOAD 0
   ((LABEL)			(println "	mov	$"$1", %eax")))
+
+(define-instruction/emit-forms MUL 0
+  ((STACK-CELL)			(println "	mull	"$1)))
+
+(define-instruction/emit-forms DIV 0
+  ((STACK-CELL)			(println "	xor	%edx, %edx")
+                                (println "	divl	"$1)))
+
+(define-instruction/emit-forms ADDR 0
+  ((STACK-CELL)			(println "	lea	"$1", %eax")))
+
+(define-instruction/emit-forms MOVE 0
+  ((STACK-CELL STACK-CELL)	(println "	mov	"$1", %ebx")
+				(println "	mov	%ebx, "$2)))
+
+(define-instruction/emit-forms LOAD 0
+  ((STACK-CELL)			(println "	mov	"$1", %eax")))
+
+(define-instruction/emit-forms LOAD-I8 0
+  ((STACK-CELL)			(println "	mov	"$1", %ebx")
+				(println "	lea	(%eax, %ebx), %ebx")
+				(println "	xor	%eax, %eax")
+				(println "	movb	(%ebx), %al")))
+
+(define-instruction/emit-forms STORE-I8 0
+  ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    ;; NOTE this works out just fine for a STACK-CELL, too, because we are little-endian.
+                                    (let ()
+                                      (println "	mov	"$1", %ebx")
+                                      (println "	lea	(%eax, %ebx), %ebx")
+                                      (println "	xor	%eax, %eax")
+                                      (println "	mov	"$2", %al")
+                                      (println "	mov	%al, (%ebx)"))
+                                  (println "	mov	"$1", %ebx")
+                                  (println "	lea	(%eax, %ebx), %eax")
+                                  (println "	movb	"$2", (%eax)"))))
+
+(define-instruction/emit-forms LOAD-OOP 0
+  ((STACK-CELL)			(println "	mov	"$1", %ebx")
+                                (println "	lea	(%eax, %ebx, 4), %ebx")
+                                (println "	mov	(%ebx), %eax")))
+
+(define-instruction/emit-forms STORE-OOP 0
+  ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (let ()
+                                      (println "	mov	"$1", %ebx")
+                                      (println "	lea	(%eax, %ebx, 4), %ebx")
+                                      (println "	mov	"$2", %eax")
+                                      (println "	mov	%eax, (%ebx)"))
+                                  (println "	mov	"$1", %ebx")
+                                  (println "	lea	(%eax, %ebx, 4), %eax")
+                                  (println "	mov	"$2", (%eax)"))))
 
 ;;;
 ;;; Compiler Infrastructure
@@ -75,16 +129,16 @@
   (compile-env env (x86-32-compiler 1)))
 
 (define-function new-temp (-c-)
-  (STACK-CELL32 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <STACK-CELL32> obj)
+  (when (is <STACK-CELL> obj)
     (push (<compiler>-free-temps -c-) obj)))
 
 ;; parameters are what functions have
 (define-function new-param (c)
   (with-instance-accessors c <x86-32-compiler>
-    (let ((temp	(STACK-CELL32 c.param-offset)))
+    (let ((temp	(STACK-CELL c.param-offset)))
       (incr c.param-offset +word-size-in-bytes+)
       temp)))
 
@@ -92,7 +146,7 @@
 (define-function new-arg (c)
   (with-instance-accessors c <x86-32-compiler>
     (let* ((offset	c.arg-offset)
-           (temp	(STACK-CELL32 offset)))
+           (temp	(STACK-CELL offset)))
       (set c.arg-offset (+ offset +word-size-in-bytes+))
       temp)))
 
@@ -138,7 +192,7 @@
            (<compiler>-free-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
-      ;; the frame size and use %esp through simple STACK-CELL32.
+      ;; the frame size and use %esp through simple STACK-CELL.
       (map (lambda (el)
              (incr (<STACK-CELL>-offset el) frame-size))
            param-locs)
@@ -160,7 +214,7 @@
 ;;; Compiling calls
 ;;;
 
-(define-method compile-call-to <STACK-CELL32> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-<target-function> arg-locs -c-))
 
@@ -184,7 +238,7 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (typecase value
-      (<STACK-CELL32>
+      (<STACK-CELL>
        (gen STORE value))
       (<C-variable>
        ;; TODO dispatch on the type of the C-variable
@@ -199,7 +253,7 @@
       (cond
         ((global-variable? var)
          (gen ADDR (GLOBAL32 (LABEL (<variable>-name var)))))
-        ((is <STACK-CELL32> val)
+        ((is <STACK-CELL> val)
          (gen ADDR val))
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
@@ -241,7 +295,7 @@
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
-      ((or (is <STACK-CELL32> value)
+      ((or (is <STACK-CELL> value)
            (is <LI32> value))
        (gen LOAD value))
       ((global-variable? self)

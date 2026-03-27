@@ -70,13 +70,11 @@
 (define-operand GLOBAL32 GLOBAL-CELL)
 (define-operand LI32 LITERAL)
 (define-operand R32 REGISTER)
-(define-operand STACK-CELL32 STACK-CELL	()	self.offset"(%esp)")
 
 (define-operand GLOBAL64 GLOBAL-CELL)
 (define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
 (define-operand LI64 LITERAL)
 (define-operand R64 REGISTER ())
-(define-operand STACK-CELL64 STACK-CELL	()	self.offset"(%rsp)")
 
 (define-operand PARAM64 STACK-CELL	()	self.offset"(%rbp)")
 
@@ -157,32 +155,30 @@
   ((REGISTER _)			(println "	call	*"$1)))
 
 (define-instruction ADD		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	add	"$2","$1))
+  ((R32 STACK-CELL)		(println "	add	"$2","$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	add	"$2","$1)))
-  ((R64 STACK-CELL64)		(println "	add	"$2","$1))
+  ((R64 STACK-CELL)		(println "	add	"$2","$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	add	"$2","$1))))
 
 (define-instruction SUB		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	sub	"$2", "$1))
+  ((R32 STACK-CELL)		(println "	sub	"$2", "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sub	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	sub	"$2", "$1))
+  ((R64 STACK-CELL)		(println "	sub	"$2", "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sub	"$2", "$1))))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
 ;; into the instruction. same applies to div.
 (define-instruction MUL		()
-  ((STACK-CELL32)		(println "	mull	"$1))
   ((LI32)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
                                   (else
                                    (println "	mov	"$1", %ecx")
                                    (println "	mul	%ecx"))))
-  ((STACK-CELL64)		(println "	mulq	"$1))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
@@ -192,8 +188,6 @@
 
 ;; the x86 div instruction is unsigned division
 (define-instruction DIV		()
-  ((STACK-CELL32)		(println "	xor	%edx, %edx")
-                                (println "	divl	"$1))
   ((LI32)			(cond
                                   ((= 1 (<LITERAL>-value $1))
                                    ;; remainder is zero, %eax is unchanged
@@ -203,8 +197,6 @@
                                    (println "	xor	%edx, %edx") ; the upper side of 64 bit operand
                                    (println "	mov	"$1", %ecx") ; divisor
                                    (println "	div	%ecx"))))
-  ((STACK-CELL64)		(println "	xor	%rdx, %rdx")
-                                (println "	divq	"$1))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))
                                    ;; remainder is zero, %rax is unchanged
@@ -216,27 +208,27 @@
                                    (println "	div	%rcx")))))
 
 (define-instruction AND		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	and	"$2", "$1))
+  ((R32 STACK-CELL)		(println "	and	"$2", "$1))
   ((R32 LI32)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	and	"$2", "$1))
+  ((R64 STACK-CELL)		(println "	and	"$2", "$1))
   ((R64 LI64)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1))))
 
 (define-instruction OR		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	or	"$2", "$1))
+  ((R32 STACK-CELL)		(println "	or	"$2", "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	or	"$2", "$1))
+  ((R64 STACK-CELL)		(println "	or	"$2", "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1))))
 
 ;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	xor	"$2", "$1))
+  ((R32 STACK-CELL)		(println "	xor	"$2", "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	xor	"$2", "$1))
+  ((R64 STACK-CELL)		(println "	xor	"$2", "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1))))
 
@@ -254,38 +246,32 @@
 ;; TODO should use reg1 and allocate a reg instead of directly using
 ;; ecx. same applies to asr.
 (define-instruction ASL		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	mov	"$2", %ecx")
+  ((R32 STACK-CELL)		(println "	mov	"$2", %ecx")
 				(println "	sal	%cl, "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	shl	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	mov	"$2", %rcx")
+  ((R64 STACK-CELL)		(println "	mov	"$2", %rcx")
 		                (println "	sal	%cl, "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	shl	"$2", "$1))))
 
 (define-instruction ASR		(true 0 true)
-  ((R32 STACK-CELL32)		(println "	mov	"$2", %ecx")
+  ((R32 STACK-CELL)		(println "	mov	"$2", %ecx")
 				(println "	sar	%cl, "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sar	"$2", "$1)))
-  ((R64 STACK-CELL64)		(println "	mov	"$2", %rcx")
+  ((R64 STACK-CELL)		(println "	mov	"$2", %rcx")
 		                (println "	sar	%cl, "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	sar	"$2", "$1))))
 
 (define-instruction ADDR	(false 0 true)
   ((GLOBAL32)			(println "	mov	$"$1", %eax"))
-  ((STACK-CELL32)		(println "	lea	"$1", %eax"))
-  ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax"))
-  ((STACK-CELL64)		(println "	lea	"$1", %rax")))
+  ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax")))
 
 (define-instruction MOVE	(false 0 false)
-  ((STACK-CELL32 STACK-CELL32)	(println "	mov	"$1", %ecx")
-				(println "	mov	%ecx, "$2))
-  ((LI32 STACK-CELL32)		(println "	movl	"$1", "$2))
-  ((LI64 STACK-CELL64)		(println "	movq	"$1", "$2))
-  ((STACK-CELL64 STACK-CELL64)	(println "	mov	"$1", %rcx")
-                                (println "	mov	%rcx, "$2))
+  ((LI32 STACK-CELL)		(println "	movl	"$1", "$2))
+  ((LI64 STACK-CELL)		(println "	movq	"$1", "$2))
   ((R64 _)			(println "	movq	"$1", "$2))
   ((_ R64)			(println "	movq	"$1", "$2)))
 
@@ -294,11 +280,9 @@
 				    (println "	xor	%eax, %eax")
 				  (println "	mov	"$1", %eax")))
   ((GLOBAL32)			(println "	mov	"$1", %eax"))
-  ((STACK-CELL32)		(println "	mov	"$1", %eax"))
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
-  ((STACK-CELL64)		(println "	mov	"$1", %rax"))
   ((PARAM64)			(println "	mov	"$1", %rax"))
   ((R64)			(println "	mov	"$1", %rax"))
   ((GLOBAL64)			(println "	lea	"$1"(%rip), %rax")
@@ -307,33 +291,31 @@
 				(println "	mov	(%rax), %rax")))
 ;; $1 what, $2 where
 (define-instruction STORE	(true 0 false)
-  ((R32 STACK-CELL32)		(println "	mov	"$1", "$2))
+  ((R32 STACK-CELL)		(println "	mov	"$1", "$2))
   ((R32 GLOBAL32)		(println "	mov	"$1", "$2))
   ((R64 GLOBAL64)		(println "	lea	"$2"(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
   ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
                                 (println "	mov	"$1", (%rbx)"))
   ((R64 R64)			(println "	mov	"$1", "$2"")) ; e.g. when dest is an arg reg in a function call
-  ((R64 STACK-CELL64)		(println "	mov	"$1", "$2)))
+  ((R64 STACK-CELL)		(println "	mov	"$1", "$2)))
+
+(when-at-expand (feature lower/array)
+  ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
+  (define-instruction LOAD-CELL	(false 0 true))
+
+  (define-instruction STORE-CELL (false 0 true)))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
 (define-instruction LOAD-I8	(false 0 true)
-  ((STACK-CELL32)		(println "	mov	"$1", %ecx")
-				(println "	lea	(%eax, %ecx), %ecx")
-				(println "	xor	%eax, %eax")
-				(println "	movb	(%ecx), %al"))
   ((LI32)			(let ((offset (<LITERAL>-value $1)))
 				  (if (= 0 offset)
 				      (println "	movl	%eax, %ecx")
 				    (println "	lea	"offset"(%eax), %ecx")))
 				(println "	xor	%eax, %eax")
 				(println "	movb	(%ecx), %al"))
-  ((STACK-CELL64)		(println "	mov	"$1", %rcx")
-                                (println "	lea	(%rax, %rcx), %rcx")
-                                (println "	xor	%rax, %rax")
-                                (println "	mov	(%rcx), %al"))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	%rax, %rcx")
@@ -342,17 +324,6 @@
                                 (println "	mov	(%rcx), %al")))
 
 (define-instruction STORE-I8	(false 0 true)
-  ((STACK-CELL32 _)		(if-at-expand (feature strict-semantics-for-compiled-set)
-                                    ;; NOTE this works out just fine for a STACK-CELL32, too, because we are little-endian.
-                                    (let ()
-                                      (println "	mov	"$1", %ecx")
-                                      (println "	lea	(%eax, %ecx), %ecx")
-                                      (println "	xor	%eax, %eax")
-                                      (println "	mov	"$2", %al")
-                                      (println "	mov	%al, (%ecx)"))
-                                  (println "	mov	"$1", %ecx")
-                                  (println "	lea	(%eax, %ecx), %eax")
-                                  (println "	movb	"$2", (%eax)")))
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
@@ -365,18 +336,6 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"offset"(%eax), %eax"))
                                     (println "	movb	"$2", (%eax)"))))
-  ((STACK-CELL64 _)		(if-at-expand (feature strict-semantics-for-compiled-set)
-				    ;; NOTE this works out just fine for a STACK-CELL64, too, because we are little-endian.
-                                    (let ()
-                                      (println "	mov	"$1", %rcx")
-                                      (println "	lea	(%rax, %rcx), %rcx")
-                                      (println "	xor	%rax, %rax")
-                                      (println "	movb	"$2", %al")
-                                      (println "	movb	%al, (%rcx)"))
-                                  ;;                                                  (println "	mov	"$1", %rcx")
-                                  (println "	lea	"$1"(%rip), %rcx")
-                                  (println "	lea	(%rax, %rcx), %rax")
-                                  (println "	movb	"$2", (%rax)")))
   ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
@@ -390,36 +349,12 @@
                                       (println "	lea	"offset"(%rax), %rax"))
                                     (println "	movb	"$2", (%rax)")))))
 
-(when-at-expand (feature lower/array)
-  ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
-  (define-instruction LOAD-CELL	(false 0 true)
-    ((STACK-CELL64)		(println "	mov	"$1", %rcx")
-				(println "	lea	(%rax, %rcx, 1), %rcx")
-				(println "	mov	(%rcx), %rax")))
-
-  (define-instruction STORE-CELL	(false 0 true)
-    ((STACK-CELL64 _)		(if-at-expand (feature strict-semantics-for-compiled-set)
-                                    (let ()
-                                      (println "	mov	"$1", %rcx")
-                                      (println "	lea	(%rax, %rcx, 1), %rcx")
-                                      (println "	mov	"$2", %rax")
-                                      (println "	mov	%rax, (%rcx)"))
-                                  (println "	mov	"$1", %rcx")
-                                  (println "	lea	(%rax, %rcx, 1), %rax")
-                                  (println "	mov	"$2", (%rax)")))))
-
 (define-instruction LOAD-OOP	(false 0 true)
-  ((STACK-CELL32)		(println "	mov	"$1", %ecx")
-                                (println "	lea	(%eax, %ecx, 4), %ecx")
-                                (println "	mov	(%ecx), %eax"))
   ((LI32)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	(%eax), %eax")
                                     (println "	lea	"(* 4 offset)"(%eax), %ecx")
                                     (println "	mov	(%ecx), %eax"))))
-  ((STACK-CELL64)		(println "	mov	"$1", %rcx")
-				(println "	lea	(%rax, %rcx, 8), %rcx")
-				(println "	mov	(%rcx), %rax"))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
                                       (println "	mov	(%rax), %rax")
@@ -427,15 +362,6 @@
                                     (println "	mov	(%rcx), %rax")))))
 
 (define-instruction STORE-OOP	(false 0 true)
-  ((STACK-CELL32 _)		(if-at-expand (feature strict-semantics-for-compiled-set)
-                                    (let ()
-                                      (println "	mov	"$1", %ecx")
-                                      (println "	lea	(%eax, %ecx, 4), %ecx")
-                                      (println "	mov	"$2", %eax")
-                                      (println "	mov	%eax, (%ecx)"))
-                                  (println "	mov	"$1", %ecx")
-                                  (println "	lea	(%eax, %ecx, 4), %eax")
-                                  (println "	mov	"$2", (%eax)")))
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
@@ -447,15 +373,6 @@
                                     (unless (= 0 offset)
                                       (println "	lea	"(* 4 offset)"(%eax), %eax"))
                                     (println "	mov	"$2", (%eax)"))))
-  ((STACK-CELL64 _)		(if-at-expand (feature strict-semantics-for-compiled-set)
-                                    (let ()
-                                      (println "	mov	"$1", %rcx")
-                                      (println "	lea	(%rax, %rcx, 8), %rcx")
-                                      (println "	mov	"$2", %rax")
-                                      (println "	mov	%rax, (%rcx)"))
-                                  (println "	mov	"$1", %rcx")
-                                  (println "	lea	(%rax, %rcx, 8), %rax")
-                                  (println "	mov	"$2", (%rax)")))
   ((LI64 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand (feature strict-semantics-for-compiled-set)
                                       (let ()
@@ -470,7 +387,7 @@
 
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
-     ((R32 STACK-CELL32)
+     ((R32 STACK-CELL)
       (println "	cmp	"$2", "$1)
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, %eax"))
@@ -480,7 +397,7 @@
         (println "	cmp	"$2", "$1))
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, %eax"))
-     ((R64 STACK-CELL64)
+     ((R64 STACK-CELL)
       (println "	cmp	"$2", "$1)
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, "$1))
@@ -563,9 +480,8 @@
     ((and (variable? expr)
           ;; TODO we should handle global variables, too.
           (let ((x (<variable>-value expr)))
-            (or (is <STACK-CELL64>	x)
+            (or (is <STACK-CELL>	x)
                 (is <LI64>		x)
-                (is <STACK-CELL32>	x)
                 (is <LI32>		x))))
      ;; (let ((value (<variable>-value expr)))
      ;;   (print-all *debug-output* "*** matched: "expr"="value", type:" (type-of value) "\n")
