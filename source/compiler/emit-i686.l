@@ -217,6 +217,50 @@
 ;;; Compiling calls
 ;;;
 
+(define-function compile-call-form (op args -c-)
+  (emit-comment 2 "compile-call: "op", args: "args)
+  (safety 2 (assert (or (pair? op) (variable? op))))
+  ;; NOTE this implements a left-to-right evaluation order, including the operator.
+  ;; i.e. moving this op-tmp means changing the evaluation order!
+  (let* ((tmps-to-free	())
+         (maybe-store	(lambda (operand)
+                          ;; TODO cleanup
+                          (if (or (is <R64> operand)
+                                  (is <R32> operand))
+                              (let ((temp (alloc-temp -c-)))
+                                (push tmps-to-free temp)
+                                (gen STORE temp)
+                                temp)
+                            operand)))
+         (arg-operands	(map (lambda (expr)
+                               (maybe-store (compile/expression-to-operand expr -c-)))
+                             args))
+         (op-value	(if (variable? op)
+                            ;; get the value for dispatch purposes
+                            (<variable>-value op)
+                          ;; compile to a temp or a literal
+                          (maybe-store (compile/expression-to-operand op -c-))))
+         ;; NOTE here we *must* store the arg values calculated by
+         ;; expression into temps (as opposed to storing them straight
+         ;; into the arg locations, i.e. first 6 into registers)
+         ;; because the arg expression can be of any complexity;
+         ;; i.e. they may call other functions, which would overwrite
+         ;; the arg registers...
+         (arg-locs	(map (lambda (_) (new-arg -c-)) args)))
+
+    ;; set up the arg stack/regs for the call
+    (map (lambda (a b) (gen MOVE a b)) arg-operands arg-locs)
+
+    (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
+                         (compile-call-to op-value op arg-locs -c-))
+           (arity	(list-length args)))
+      (when (and n-params
+                 (not (= n-params arity)))
+        (error "compile: calling "op" with the wrong number of arguments: "
+               args", while expecting "n-params)))
+    (free-temps tmps-to-free)
+    (free-args -c- arg-locs)))
+
 (define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-<target-function> arg-locs -c-))

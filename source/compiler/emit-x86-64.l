@@ -137,7 +137,7 @@
 (define-constant +param-registers+ ''("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
 
 (define-record <x86-64-compiler> <x86-compiler>
-  (arg-registers))
+  ())
 
 (define-function x86-64-compiler (level)
   (make <x86-64-compiler>
@@ -150,8 +150,6 @@
     (arg-offset			0)
     (arg-limit			0)
     (asm-cell-type		".8byte")
-
-    (arg-registers		+param-registers+)
     ))
 
 (define-function run-compiler (env)
@@ -178,21 +176,15 @@
 
 (define-function new-arg (c)
   (with-instance-accessors c <x86-64-compiler>
-    (let ((reg (pop c.arg-registers)))
-      (if reg
-          (let ()
-            (assert (string? reg))
-            (R64 reg))
-        (let ((offset	c.arg-offset))
-          (set c.arg-offset (+ offset +word-size-in-bytes+))
-          (STACK-CELL offset))))))
+    (let ((offset	c.arg-offset))
+      (set c.arg-offset (+ offset +word-size-in-bytes+))
+      (STACK-CELL offset))))
 
 (define-function free-args (c args)
   (with-instance-accessors c <x86-64-compiler>
     (when (< c.arg-limit c.arg-offset)
       (set c.arg-limit c.arg-offset))
-    (set c.arg-offset 0)
-    (set c.arg-registers +param-registers+)))
+    (set c.arg-offset 0)))
 
 ;;;
 ;;; Compiling lambdas
@@ -289,6 +281,54 @@
 ;;;
 ;;; Compiling calls
 ;;;
+
+(define-function compile-call-form (op args -c-)
+  (emit-comment 2 "compile-call: "op", args: "args)
+  (safety 2 (assert (or (pair? op) (variable? op))))
+  ;; NOTE this implements a left-to-right evaluation order, including the operator.
+  ;; i.e. moving this op-tmp means changing the evaluation order!
+  (let* ((tmps-to-free	())
+         (maybe-store	(lambda (operand)
+                          ;; TODO cleanup
+                          (if (or (is <R64> operand)
+                                  (is <R32> operand))
+                              (let ((temp (alloc-temp -c-)))
+                                (push tmps-to-free temp)
+                                (gen STORE temp)
+                                temp)
+                            operand)))
+         (arg-operands	(map (lambda (expr)
+                               (maybe-store (compile/expression-to-operand expr -c-)))
+                             args))
+         (op-value	(if (variable? op)
+                            ;; get the value for dispatch purposes
+                            (<variable>-value op)
+                          ;; compile to a temp or a literal
+                          (maybe-store (compile/expression-to-operand op -c-))))
+         ;; NOTE here we *must* store the arg values calculated by
+         ;; expression into temps (as opposed to storing them straight
+         ;; into the arg locations, i.e. first 6 into registers)
+         ;; because the arg expression can be of any complexity;
+         ;; i.e. they may call other functions, which would overwrite
+         ;; the arg registers...
+         (arg-locs	())
+         (arg-regs	(map R64 +param-registers+)))
+
+    ;; set up the arg stack/regs for the call
+    (map (lambda (op)
+           (gen MOVE op (or (pop arg-regs)
+                            (push arg-locs (new-arg -c-)))))
+         arg-operands)
+
+    (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
+                         (compile-call-to op-value op arg-locs -c-))
+           (arity	(list-length args)))
+      (when (and n-params
+                 (not (= n-params arity)))
+        (error "compile: calling "op" with the wrong number of arguments: "
+               args", while expecting "n-params)))
+    (free-temps tmps-to-free)
+    (free-args -c- arg-locs)))
 
 (define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
   (gen LOAD self)
