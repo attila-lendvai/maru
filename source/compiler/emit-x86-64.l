@@ -63,7 +63,8 @@
   ((STACK-CELL)			(println "	xor	%rdx, %rdx")
                                 (println "	divq	"$1)))
 
-(define-instruction/emit-forms ADDR 0
+(define-instruction ADDR	(false 0 true)
+  ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax"))
   ((STACK-CELL)			(println "	lea	"$1", %rax")))
 
 (define-instruction/emit-forms MOVE 0
@@ -71,6 +72,8 @@
                                 (println "	mov	%rbx, "$2)))
 
 (define-instruction/emit-forms LOAD 0
+  ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax")
+				(println "	mov	(%rax), %rax"))
   ((STACK-CELL)			(println "	mov	"$1", %rax")))
 
 (define-instruction/emit-forms LOAD-I8 0
@@ -319,10 +322,10 @@
        (gen STORE value))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL64)
+       (gen STORE ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
                    (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GLOBAL64 (LABEL (<variable>-name var))))))))
+       (gen STORE (GLOBAL-CELL (LABEL (<variable>-name var))))))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -330,7 +333,7 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (gen ADDR (GLOBAL64 (LABEL (<variable>-name var)))))
+         (gen ADDR (GLOBAL-CELL (LABEL (<variable>-name var)))))
         ((is <STACK-CELL> val)
          (gen ADDR val))
         ;; ((is <R64> val)
@@ -391,13 +394,13 @@
           (gen LOAD (EXTERNAL-LABEL (<C-function>-name value))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL64)
+          (gen LOAD ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
                      (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
           (gen LOAD (LABEL self.name)))
          (else
-          (gen LOAD (GLOBAL64 (LABEL self.name))))))
+          (gen LOAD (GLOBAL-CELL (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for "self", holding the value: "value", type: "(type-of value))))))
 

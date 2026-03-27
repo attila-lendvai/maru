@@ -60,7 +60,8 @@
   ((STACK-CELL)			(println "	xor	%edx, %edx")
                                 (println "	divl	"$1)))
 
-(define-instruction/emit-forms ADDR 0
+(define-instruction ADDR	(false 0 true)
+  ((GLOBAL-CELL)		(println "	mov	$"$1", %eax"))
   ((STACK-CELL)			(println "	lea	"$1", %eax")))
 
 (define-instruction/emit-forms MOVE 0
@@ -68,6 +69,7 @@
 				(println "	mov	%ebx, "$2)))
 
 (define-instruction/emit-forms LOAD 0
+  ((GLOBAL-CELL)		(println "	mov	"$1", %eax"))
   ((STACK-CELL)			(println "	mov	"$1", %eax")))
 
 (define-instruction/emit-forms LOAD-I8 0
@@ -242,9 +244,9 @@
        (gen STORE value))
       (<C-variable>
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GLOBAL32 (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE (GLOBAL-CELL (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GLOBAL32 (LABEL (<variable>-name var))))))))
+       (gen STORE (GLOBAL-CELL (LABEL (<variable>-name var))))))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -252,7 +254,7 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (gen ADDR (GLOBAL32 (LABEL (<variable>-name var)))))
+         (gen ADDR (GLOBAL-CELL (LABEL (<variable>-name var)))))
         ((is <STACK-CELL> val)
          (gen ADDR val))
         (else
@@ -308,12 +310,12 @@
           (gen LOAD (LI32 (EXTERNAL-LABEL (<C-function>-name value)))))
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
-          (gen LOAD (GLOBAL32 (EXTERNAL-LABEL (<C-variable>-name value)))))
+          (gen LOAD (GLOBAL-CELL (EXTERNAL-LABEL (<C-variable>-name value)))))
          ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
           (gen LOAD (LI32 (LABEL self.name))))
          (else
-          (gen LOAD (GLOBAL32 (LABEL self.name))))))
+          (gen LOAD (GLOBAL-CELL (LABEL self.name))))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
 
