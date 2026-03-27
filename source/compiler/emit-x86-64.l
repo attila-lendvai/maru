@@ -81,11 +81,11 @@
   (compile-env env (x86-64-compiler 1)))
 
 (define-function new-temp (-c-)
-  (TEMP64 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (STACK-CELL64 (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
-  (when (is <TEMP64> obj)
+  (when (is <STACK-CELL64> obj)
     (push (<compiler>-free-temps -c-) obj)))
 
 ;; (define-function new-param (c)
@@ -97,7 +97,7 @@
 ;;             (R64 reg))
 ;;         (let ((offset	c.param-offset))
 ;;           (set c.param-offset (+ offset +word-size-in-bytes+))
-;;           (TEMP64 offset))))))
+;;           (STACK-CELL64 offset))))))
 
 (define-function new-arg (c)
   (with-instance-accessors c <x86-64-compiler>
@@ -108,7 +108,7 @@
             (R64 reg))
         (let ((offset	c.arg-offset))
           (set c.arg-offset (+ offset +word-size-in-bytes+))
-          (TEMP64 offset))))))
+          (STACK-CELL64 offset))))))
 
 (define-function free-args (c args)
   (with-instance-accessors c <x86-64-compiler>
@@ -129,7 +129,7 @@
 ;;   (emit-comment 1 "spilling "(list-length (<expr>-parameters expr))" params to the stack")
 ;;   (map (lambda (var)
 ;;          (let ((loc (<variable>-value var)))
-;;            (unless (is <TEMP64> loc)
+;;            (unless (is <STACK-CELL64> loc)
 ;;              (let ((reg (<variable>-value var))
 ;;                    (temp (pop (<x86-64-compiler>-param-spill-locs -c-))))
 ;;                (assert temp)
@@ -191,7 +191,7 @@
       ;; Now that we know the frame size, fix up the offsets of the
       ;; temps allocated on the stack.
       (let ((fixup (lambda (el)
-                     (incr (<TEMP>-offset el) arg-size))))
+                     (incr (<STACK-CELL>-offset el) arg-size))))
         (map fixup (<compiler>-free-temps -c-))
         (map fixup spill-locs))
       ;; actual emitting begins
@@ -213,7 +213,7 @@
 ;;; Compiling calls
 ;;;
 
-(define-method compile-call-to <TEMP64> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL64> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-<target-function> arg-locs -c-))
 
@@ -242,7 +242,7 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (cond
-      ((or (is <TEMP64> value)
+      ((or (is <STACK-CELL64> value)
            (is <R64> value))
        (gen STORE value))
       ((is <C-variable> value)
@@ -259,7 +259,7 @@
       (cond
         ((global-variable? var)
          (gen ADDR (GLOBAL64 (LABEL (<variable>-name var)))))
-        ((is <TEMP64> val)
+        ((is <STACK-CELL64> val)
          (gen ADDR val))
         ;; ((is <R64> val)
         ;;  (maybe-spill-params -c-)
@@ -306,7 +306,7 @@
     (cond
       ((or (is <R64> value)
            (is <LI64> value)
-           (is <TEMP64> value)
+           (is <STACK-CELL64> value)
            (is <PARAM64> value))
        (gen LOAD value))
       ((global-variable? self)

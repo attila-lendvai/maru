@@ -75,16 +75,16 @@
   (compile-env env (x86-32-compiler 1)))
 
 (define-function new-temp (-c-)
-  (TEMP32 (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (STACK-CELL32 (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <TEMP32> obj)
+  (when (is <STACK-CELL32> obj)
     (push (<compiler>-free-temps -c-) obj)))
 
 ;; parameters are what functions have
 (define-function new-param (c)
   (with-instance-accessors c <x86-32-compiler>
-    (let ((temp	(TEMP32 c.param-offset)))
+    (let ((temp	(STACK-CELL32 c.param-offset)))
       (incr c.param-offset +word-size-in-bytes+)
       temp)))
 
@@ -92,7 +92,7 @@
 (define-function new-arg (c)
   (with-instance-accessors c <x86-32-compiler>
     (let* ((offset	c.arg-offset)
-           (temp	(TEMP32 offset)))
+           (temp	(STACK-CELL32 offset)))
       (set c.arg-offset (+ offset +word-size-in-bytes+))
       temp)))
 
@@ -134,13 +134,13 @@
       ;; Now that we know the frame size, fix up the offsets of the
       ;; temps allocated on the stack.
       (map (lambda (el)
-             (incr (<TEMP>-offset el) arg-size))
+             (incr (<STACK-CELL>-offset el) arg-size))
            (<compiler>-free-temps -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
-      ;; the frame size and use %esp through simple TEMP32.
+      ;; the frame size and use %esp through simple STACK-CELL32.
       (map (lambda (el)
-             (incr (<TEMP>-offset el) frame-size))
+             (incr (<STACK-CELL>-offset el) frame-size))
            param-locs)
       ;; actual emitting begins
       (emit TEXT)
@@ -160,7 +160,7 @@
 ;;; Compiling calls
 ;;;
 
-(define-method compile-call-to <TEMP32> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL32> (op arg-locs -c-)
   (gen LOAD self)
   (compile-call-to-<target-function> arg-locs -c-))
 
@@ -184,7 +184,7 @@
     (accessible-variable-or-die var -c-)
     (comp (third expr))
     (typecase value
-      (<TEMP32>
+      (<STACK-CELL32>
        (gen STORE value))
       (<C-variable>
        ;; TODO dispatch on the type of the C-variable
@@ -199,7 +199,7 @@
       (cond
         ((global-variable? var)
          (gen ADDR (GLOBAL32 (LABEL (<variable>-name var)))))
-        ((is <TEMP32> val)
+        ((is <STACK-CELL32> val)
          (gen ADDR val))
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
@@ -241,7 +241,7 @@
   (accessible-variable-or-die self -c-)
   (let ((value self.value))
     (cond
-      ((or (is <TEMP32> value)
+      ((or (is <STACK-CELL32> value)
            (is <LI32> value))
        (gen LOAD value))
       ((global-variable? self)
