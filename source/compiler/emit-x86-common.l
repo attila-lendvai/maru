@@ -74,7 +74,8 @@
 (define-operand LI64 LITERAL)
 (define-operand R64 REGISTER ())
 
-(define-operand PARAM64 STACK-CELL	()	self.offset"(%rbp)")
+;; TODO this is not yet used in the 32 bit backend
+(define-operand STACK-PARAM STACK-CELL	()	self.offset"(%rbp)")
 
 ;;;
 ;;; INSTRUCTIONS
@@ -276,7 +277,6 @@
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
-  ((PARAM64)			(println "	mov	"$1", %rax"))
   ((R64)			(println "	mov	"$1", %rax"))
   ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
 				(println "	mov	(%rax), %rax")))

@@ -74,7 +74,9 @@
 (define-instruction/emit-forms LOAD 0
   ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax")
 				(println "	mov	(%rax), %rax"))
-  ((STACK-CELL)			(println "	mov	"$1", %rax")))
+  ((STACK-CELL)			(println "	mov	"$1", %rax"))
+  ;; TODO working inheritance would make this superfluous
+  ((STACK-PARAM)		(println "	mov	"$1", %rax")))
 
 (define-instruction/emit-forms LOAD-I8 0
   ((STACK-CELL)			(println "	mov	"$1", %rbx")
@@ -234,7 +236,7 @@
                           (push spill-locs spill-loc)
                           (R64 it))
                       (let ((offset (<x86-compiler>-param-offset -c-)))
-                        (set (<variable>-value var) (PARAM64 offset))
+                        (set (<variable>-value var) (STACK-PARAM offset))
                         (set (<x86-compiler>-param-offset -c-)
                              (+ offset
                                 +word-size-in-bytes+)))))
@@ -382,7 +384,7 @@
       ((or (is <R64> value)
            (is <LI64> value)
            (is <STACK-CELL> value)
-           (is <PARAM64> value))
+           (is <STACK-PARAM> value))
        (gen LOAD value))
       ((global-variable? self)
        (cond
