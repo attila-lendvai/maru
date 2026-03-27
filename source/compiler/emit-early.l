@@ -27,7 +27,7 @@
 (define compile-env)
 (define new-arg)
 (define free-args)
-(define new-temp)
+(define new-stack-cell)
 (define %free-temp)
 
 ;;;
@@ -117,7 +117,7 @@
 
 (define-function alloc-temp (-c-)
   (or (pop (<compiler>-free-stack-cells -c-))
-      (new-temp -c-)))
+      (new-stack-cell -c-)))
 
 (define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
 (define-form free-temp (temp)			`(%free-temp -c- ,temp))

@@ -166,7 +166,7 @@
 (define-operand		LITERAL		() (value)		self.value)
 ;; TODO delete the value slot
 (define-operand		CONSTANT	() (name value)		self.name)
-(define-operand		TEMP		() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string self.id))))
+(define-operand		STACK-CELL	() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string self.id))))
 (define-operand		LABEL		() (name)		(llvm/escape-local-identifier self.name))
 
 (define-form UNIQUE-LABEL ()
@@ -176,7 +176,7 @@
   (= <LOCAL> (type-of obj)))
 
 (define-function temp? (obj)
-  (= <TEMP> (type-of obj)))
+  (= <STACK-CELL> (type-of obj)))
 
 (define-function closure-object-label (name)
   (GLOBAL (if (feature redefinable-functions-in-target)
@@ -204,11 +204,11 @@
 (define-function run-compiler (env)
   (compile-env env (llvm-compiler 1)))
 
-(define-function new-temp (-c-)
-  (TEMP (new-temp-index -c-)))
+(define-function new-stack-cell (-c-)
+  (STACK-CELL (new-temp-index -c-)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <TEMP> obj)
+  (when (is <STACK-CELL> obj)
     (push (<compiler>-free-stack-cells -c-) obj)))
 
 ;;;
@@ -300,7 +300,7 @@
                                 (println " global "(C-type->llvm-type (<C-variable>-type $1)))))
 
 (define-instruction ALLOCA	()
-  ((TEMP)			(println "	"$1" = alloca %oop")))
+  ((STACK-CELL)			(println "	"$1" = alloca %oop")))
 
 (define-instruction SEXT	(true 1 true)
   ((LOCAL _ _)			(println "	"$reg1" = sext "$2" "$1" to "$3)))
@@ -318,14 +318,14 @@
 (define-instruction RET		(false 1 false)
   ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %oop")
                                 (println "	ret %oop "$reg1))
-  ;; ((TEMP)			(println "	"$reg1" = load %oop, %oop* "$1)
+  ;; ((STACK-CELL)			(println "	"$reg1" = load %oop, %oop* "$1)
   ;;       			(println "	ret %oop "$reg1))
   ((LOCAL)			(println "	ret %oop "$1)))
 
 (define-instruction LOAD	(false 1 true)
   ;; args: ptr type (for method dispatch)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
-  ((TEMP    _)			(println "	"$reg1" = load %oop, %oop* "$1))
+  ((STACK-CELL _)		(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL  expr)		(if-at-expand (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
@@ -698,7 +698,7 @@
   (compile-call-to-<target-function> arg-regs -c-)
   ())
 
-(define-method compile-call-to <TEMP> (op arg-regs -c-)
+(define-method compile-call-to <STACK-CELL> (op arg-regs -c-)
   (comp op)
   (compile-call-to-<target-function> arg-regs -c-)
   ())

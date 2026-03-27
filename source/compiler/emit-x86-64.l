@@ -157,7 +157,7 @@
 (define-function run-compiler (env)
   (compile-env env (x86-64-compiler 1)))
 
-(define-function new-temp (-c-)
+(define-function new-stack-cell (-c-)
   (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
@@ -230,7 +230,7 @@
                     ;; location of this param on the stack) into the source
                     ;; code.
                     (aif (pop param-regs)
-                        (let ((spill-loc (new-temp -c-)))
+                        (let ((spill-loc (new-stack-cell -c-)))
                           ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
                           (set (<variable>-value var) spill-loc)
                           (push spill-locs spill-loc)

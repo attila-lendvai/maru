@@ -130,7 +130,7 @@
 (define-function run-compiler (env)
   (compile-env env (x86-32-compiler 1)))
 
-(define-function new-temp (-c-)
+(define-function new-stack-cell (-c-)
   (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
