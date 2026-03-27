@@ -377,6 +377,9 @@
                                       (println "	lea	"(* 8 offset)"(%rax), %rax"))
                                     (println "	mov	"$2", (%rax)")))))
 
+(define-instruction PUSH	(false 0 false)
+  ((_)				(println "	pushq	"$1)))
+
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
      ((R32 STACK-CELL)

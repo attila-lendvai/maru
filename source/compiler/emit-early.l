@@ -25,8 +25,6 @@
 ;; forwards
 (define compile-expr)
 (define compile-env)
-(define new-arg)
-(define free-args)
 (define new-stack-cell)
 (define %free-temp)
 

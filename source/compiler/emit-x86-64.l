@@ -135,6 +135,7 @@
 ;;; Compiler Infrastructure
 ;;;
 (define-constant +param-registers+ ''("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
+(define-constant +n-param-registers+ 6)
 
 (define-record <x86-64-compiler> <x86-compiler>
   ())
@@ -146,7 +147,6 @@
     (temp-limit			0)
     (gen-buffer			(array))
 
-    (param-offset		(* 2 +word-size-in-bytes+)) ; the pushed RBP and the return address
     (arg-offset			0)
     (arg-limit			0)
     (asm-cell-type		".8byte")
@@ -162,29 +162,6 @@
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
   (typecase obj
     (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
-
-;; (define-function new-param (c)
-;;   (with-instance-accessors c <x86-64-compiler>
-;;     (let ((reg (pop c.param-registers)))
-;;       (if reg
-;;           (let ()
-;;             (assert (string? reg))
-;;             (R64 reg))
-;;         (let ((offset	c.param-offset))
-;;           (set c.param-offset (+ offset +word-size-in-bytes+))
-;;           (STACK-CELL offset))))))
-
-(define-function new-arg (c)
-  (with-instance-accessors c <x86-64-compiler>
-    (let ((offset	c.arg-offset))
-      (set c.arg-offset (+ offset +word-size-in-bytes+))
-      (STACK-CELL offset))))
-
-(define-function free-args (c args)
-  (with-instance-accessors c <x86-64-compiler>
-    (when (< c.arg-limit c.arg-offset)
-      (set c.arg-limit c.arg-offset))
-    (set c.arg-offset 0)))
 
 ;;;
 ;;; Compiling lambdas
@@ -212,35 +189,33 @@
 ;; world.
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
-  (let* ((body	(<expr>-body self))
-         (-c-	(x86-64-compiler (+ 1 (<compiler>-level parent-comp))))
-         (spill-locs ())
-         (param-locs
-           (let ((param-regs +param-registers+))
-             (map (lambda (var)
-                    ;; KLUDGE this writes some internal compiler state (the
-                    ;; location of this param on the stack) into the source
-                    ;; code.
-                    (aif (pop param-regs)
-                        (let ((spill-loc (new-stack-cell -c-)))
-                          ;; preallocate spill locations; used by MAYBE-SPILL-PARAMS
-                          (set (<variable>-value var) spill-loc)
-                          (push spill-locs spill-loc)
-                          (R64 it))
-                      (let ((offset (<x86-compiler>-param-offset -c-)))
-                        (set (<variable>-value var) (STACK-PARAM offset))
-                        (set (<x86-compiler>-param-offset -c-)
-                             (+ offset
-                                +word-size-in-bytes+)))))
-                  (<expr>-parameters self)))))
+  (let* ((body		(<expr>-body self))
+         (-c-		(x86-64-compiler (+ 1 (<compiler>-level parent-comp))))
+         (spill-locs	())
+         (params	(<expr>-parameters self))
+         (param-count	(list-length params)))
+
+    ;; allocate stack-cells for spilling the reg params
+    (times-do (min param-count +n-param-registers+)
+      (let ((spill-loc	(new-stack-cell -c-))
+            (var	(pop params)))
+        (set (<variable>-value var) spill-loc)
+        (push spill-locs spill-loc)))
+
+    ;; assign the stack locations to the params passed on the stack
+    (let ((i 2)) ; 2 is the pushed RBP and the return address
+      (list-do var params
+        (let ((offset (* i +word-size-in-bytes+)))
+          (set (<variable>-value var) (STACK-PARAM offset)))
+        (incr i)))
+
     (emit-comment 1 "emitting "self", at level: "(<compiler>-level parent-comp))
     (emit-comment 3 ", code: "(<expr>-body self))
     ;; Unconditionally spill the params to the stack.
-    (map (lambda (param-loc var)
-           (when (is <R64> param-loc)
-             (let ((spilled-loc (<variable>-value var)))
-               (gen MOVE param-loc spilled-loc))))
-         param-locs (<expr>-parameters self))
+    (let ((regs		+param-registers+)
+          (stack-cells	(list-reverse! spill-locs)))
+      (times-do (min param-count +n-param-registers+)
+        (gen MOVE (R64 (pop regs)) (pop stack-cells))))
 
     ;; Compile the fn body first into the gen buffer (COMP is a form,
     ;; we cannot map it).
@@ -248,27 +223,18 @@
       (comp el))
 
     ;; Calculate the frame and emit the entire fn
-    (let* ((arg-size	(<x86-compiler>-arg-limit -c-))
-           (temp-size	(+ arg-size
-                           (* (<compiler>-temp-limit -c-)
-                              +word-size-in-bytes+)))
+    (let* ((temp-size	(* (<compiler>-temp-limit -c-)
+                           +word-size-in-bytes+))
            (frame-size	(align +call-frame-alignmet+
-                               ;; the pushed %ebp and the return address (?)
                                (+ temp-size
+                                  ;; the pushed %ebp and the return address
                                   (* 2 +word-size-in-bytes+))))
            (frame-body-size (- frame-size (* 2 +word-size-in-bytes+))))
-      ;; Now that we know the frame size, fix up the offsets of the
-      ;; temps allocated on the stack.
-      (let ((fixup (lambda (el)
-                     (incr (<STACK-CELL>-offset el) arg-size))))
-        (map fixup (<compiler>-free-stack-cells -c-))
-        (map fixup spill-locs))
       ;; actual emitting begins
       (emit TEXT)
       (emit DEFLABEL entry-point-label)
       (emit-comment 1 "params: "(list-length (<expr>-parameters self))
                     ", frame-size: "frame-size"("(/ frame-size +word-size-in-bytes+)
-                    "), arg-size: " arg-size  "("(/ arg-size   +word-size-in-bytes+)
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
       (emit-comment 1 "emitting gen buffer of "self)
@@ -300,6 +266,7 @@
          (arg-operands	(map (lambda (expr)
                                (maybe-store (compile/expression-to-operand expr -c-)))
                              args))
+         (arg-count	(list-length args))
          (op-value	(if (variable? op)
                             ;; get the value for dispatch purposes
                             (<variable>-value op)
@@ -311,24 +278,33 @@
          ;; because the arg expression can be of any complexity;
          ;; i.e. they may call other functions, which would overwrite
          ;; the arg registers...
-         (arg-locs	())
+         (arg-stack-cell-count	(max 0 (- arg-count +n-param-registers+)))
          (arg-regs	(map R64 +param-registers+)))
 
-    ;; set up the arg stack/regs for the call
-    (map (lambda (op)
-           (gen MOVE op (or (pop arg-regs)
-                            (push arg-locs (new-arg -c-)))))
-         arg-operands)
+    ;; move the reg passed operands into the regs
+    (times-do (min arg-count +n-param-registers+)
+      (gen MOVE (pop arg-operands) (pop arg-regs)))
+
+    ;; push the remaining (i.e. stack-passed) arguments in reverse order
+    (list-do op (list-reverse! arg-operands)
+      (gen PUSH op))
 
     (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
-                         (compile-call-to op-value op arg-locs -c-))
+                         ;; FIXME delete unused arg-locs
+                         (compile-call-to op-value op 424242 -c-))
            (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))
-    (free-temps tmps-to-free)
-    (free-args -c- arg-locs)))
+    ;;(gen SUB (R64 "%rsp") (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+    (when (< 0 arg-stack-cell-count)
+      (gen INLINE (concat-strings "	add	$"
+                                  (number->string
+                                   (* arg-stack-cell-count
+                                      +word-size-in-bytes+))
+                                  ", %rsp")))
+    (free-temps tmps-to-free)))
 
 (define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
   (gen LOAD self)
