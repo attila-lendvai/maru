@@ -134,8 +134,9 @@
   (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function %free-temp (-c- obj)
-  (when (is <STACK-CELL> obj)
-    (push (<compiler>-free-temps -c-) obj)))
+  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
+  (typecase obj
+    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
 
 ;; parameters are what functions have
 (define-function new-param (c)
@@ -191,7 +192,7 @@
       ;; temps allocated on the stack.
       (map (lambda (el)
              (incr (<STACK-CELL>-offset el) arg-size))
-           (<compiler>-free-temps -c-))
+           (<compiler>-free-stack-cells -c-))
       ;; Params could also be accessed through %ebp, but for that we
       ;; would need another operand class. Let's just offset them by
       ;; the frame size and use %esp through simple STACK-CELL.

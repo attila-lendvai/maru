@@ -102,7 +102,7 @@
   (level
    temp-counter
    temp-limit
-   free-temps
+   free-stack-cells
    gen-buffer
    current-value              ; the output of the previous-instruction
    ))
@@ -116,7 +116,7 @@
       i)))
 
 (define-function alloc-temp (-c-)
-  (or (pop (<compiler>-free-temps -c-))
+  (or (pop (<compiler>-free-stack-cells -c-))
       (new-temp -c-)))
 
 (define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))

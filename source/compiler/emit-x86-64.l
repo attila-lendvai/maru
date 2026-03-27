@@ -162,8 +162,8 @@
 
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
-  (when (is <STACK-CELL> obj)
-    (push (<compiler>-free-temps -c-) obj)))
+  (typecase obj
+    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
 
 ;; (define-function new-param (c)
 ;;   (with-instance-accessors c <x86-64-compiler>
@@ -269,7 +269,7 @@
       ;; temps allocated on the stack.
       (let ((fixup (lambda (el)
                      (incr (<STACK-CELL>-offset el) arg-size))))
-        (map fixup (<compiler>-free-temps -c-))
+        (map fixup (<compiler>-free-stack-cells -c-))
         (map fixup spill-locs))
       ;; actual emitting begins
       (emit TEXT)
