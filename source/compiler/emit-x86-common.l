@@ -515,7 +515,7 @@
      (LITERAL expr))
     (else
       (comp expr)
-      (let ((temp (alloc-temp -c-)))
+      (let ((temp (alloc-stack-temp -c-)))
         (gen STORE temp)
         temp))))
 
@@ -560,7 +560,7 @@
   (while (pair? prog)
     (comp (car prog))
     (set prog (cdr prog)))
-  (let ((temp (alloc-temp -c-)))
+  (let ((temp (alloc-stack-temp -c-)))
     (gen STORE temp)
     temp))
 

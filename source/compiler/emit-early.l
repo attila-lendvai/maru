@@ -113,7 +113,7 @@
         (set c.temp-limit c.temp-counter))
       i)))
 
-(define-function alloc-temp (-c-)
+(define-function alloc-stack-temp (-c-)
   (or (pop (<compiler>-free-stack-cells -c-))
       (new-stack-cell -c-)))
 

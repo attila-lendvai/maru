@@ -241,7 +241,7 @@
                           ;; TODO cleanup
                           (if (or (is <R64> operand)
                                   (is <R32> operand))
-                              (let ((temp (alloc-temp -c-)))
+                              (let ((temp (alloc-stack-temp -c-)))
                                 (push tmps-to-free temp)
                                 (gen STORE temp)
                                 temp)

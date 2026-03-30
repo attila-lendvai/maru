@@ -573,7 +573,7 @@
   (while (pair? prog)
     (comp (car prog))
     (set prog (cdr prog)))
-  (let ((temp (alloc-temp -c-)))
+  (let ((temp (alloc-stack-temp -c-)))
     (gen STORE temp)
     temp))
 
@@ -602,7 +602,7 @@
                           (set (<variable>-value var)
                                (if +function-parameters-are-read-only+
                                    (LOCAL (<variable>-name var))
-                                 (alloc-temp -c-)))))
+                                 (alloc-stack-temp -c-)))))
          (param-locs	(map init-param parameters))
          (param-decls	(map (lambda (var)
                                (LOCAL (<variable>-name var)))
@@ -770,7 +770,7 @@
 
 (define-function %compile/and-or (op expr -c-)
   (let ((lend	(UNIQUE-LABEL))
-        (retval	(alloc-temp -c-)))
+        (retval	(alloc-stack-temp -c-)))
     (gen LOAD (LITERAL (case op
                          (and (target-value true))
                          (or  (target-value false))))
@@ -801,7 +801,7 @@
   (let ((ltrue	(UNIQUE-LABEL))
         (lfalse	(UNIQUE-LABEL))
         (lend	(UNIQUE-LABEL))
-        (retval	(alloc-temp -c-)))
+        (retval	(alloc-stack-temp -c-)))
     (comp (second expr))                ; condition
     (gen BRIF ltrue lfalse)
 
