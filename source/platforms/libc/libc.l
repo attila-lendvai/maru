@@ -12,7 +12,8 @@
 
 (define-C-functions libc/
   (void abort ()) (void exit (int))
-  (* malloc (size_t)) (void free (*)) (* realloc (* size_t)) (* memset (* int size_t)) (* memcpy (* * size_t)) (* memmove (* * size_t)) (int memcmp (* * size_t))
+  (* malloc (size_t)) (void free (*)) (* realloc (* size_t))
+  (* memset (* int size_t)) (* memcpy (* * size_t)) (* memmove (* * size_t)) (int memcmp (* * size_t)) (void bzero (* size_t))
   (int printf (* ...)) (int fprintf (* * ...)) (int sprintf (* * ...)) (int snprintf (* size_t * ...))
   (int puts (*)) (int fputs (* *)) (int fputc (* *)) (int fgetc (*)) (int ungetc (int *)) (* fopen (* *))
   (int fclose (*)) (int fflush (*)) (int fscanf (* * ...)) (int feof (*)) (void setbuf (* *))
@@ -70,8 +71,8 @@
 (define-form platform/move-bytes (from to count)
   `(libc/memmove ,to ,from ,count))
 
-(define-form platform/clear-bytes (from count)
-  `(libc/memset ,from 0 ,count))
+(define-form platform/clear-cells (from cell-count)
+  `(libc/bzero ,from (* ,cell-count +word-size-in-bytes+)))
 
 (define-form platform/diag-print (str)
   `(libc/fputs (string->C-string ,str) libc/stderr))

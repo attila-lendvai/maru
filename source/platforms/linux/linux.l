@@ -70,9 +70,12 @@
        (set (byte-at to   i)
             (byte-at from i))))))
 
-(define-function platform/clear-bytes (from count)
-  (for (i 0 count)
-    (set (byte-at from i) 0)))
+(define-function platform/clear-cells (from cell-count)
+;; TODO this is still rather high in the profiler. maybe introduce
+;; backend specific compiler macros, and then add an x86 asm
+;; impelmentation?
+  (for (i 0 cell-count)
+    (set (oop-at from i) 0)))
 
 (begin-for-syntax
  (define-function string+length (str)
