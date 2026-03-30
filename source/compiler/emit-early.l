@@ -235,7 +235,11 @@
      (<compiler>-current-value -c-)))
 
 (define-form gen (instr-name . args)
-  `(%gen -c- ,instr-name (list ,@args)))
+  `(%gen -c- ,instr-name (list ,@(map (lambda (arg)
+                                        (if (= '$ arg)
+                                            '(<compiler>-current-value -c-)
+                                          arg))
+                                      args))))
 
 (define-function emit-gen-buffer (-c-)
   (array-do entry (<compiler>-gen-buffer -c-)

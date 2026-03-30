@@ -152,6 +152,7 @@
     (free-temp-regs		+callee-saved-registers+)
     (clobbered-temp-regs	(array +n-callee-saved-registers+))
     (gen-buffer			(array))
+    (current-value		op/rax)
 
     (arg-offset			0)
     (arg-limit			0)
@@ -282,7 +283,7 @@
                                   (is <R32> operand))
                               (let ((temp (alloc-reg-temp -c-)))
                                 (push tmps-to-free temp)
-                                (gen STORE temp)
+                                (gen STORE $ temp)
                                 temp)
                             operand)))
          (arg-operands	(map (lambda (expr)
@@ -319,13 +320,7 @@
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))
-    ;;(gen SUB (R64 "%rsp") (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
-    (when (< 0 arg-stack-cell-count)
-      (gen INLINE (concat-strings "	add	$"
-                                  (number->string
-                                   (* arg-stack-cell-count
-                                      +word-size-in-bytes+))
-                                  ", %rsp")))
+    (gen ADD op/rsp (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
     (free-temps tmps-to-free)))
 
 (define-method compile-call-to <STACK-CELL> (op -c-)
@@ -359,13 +354,13 @@
     (cond
       ((or (is <STACK-CELL> value)
            (is <R64> value))
-       (gen STORE value))
+       (gen STORE $ value))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
-                   (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE $ ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
+                     (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GLOBAL-CELL (LABEL (<variable>-name var))))))))
+       (gen STORE $ (GLOBAL-CELL (LABEL (<variable>-name var))))))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))

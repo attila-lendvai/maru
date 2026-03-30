@@ -130,7 +130,7 @@
       ;; feature is disabled then it's just a raw function pointer to
       ;; be called.
       (gen LOAD-OOP (LITERAL program-code-offset)))
-    (gen CALLPTR)
+    (gen CALLPTR $)
     ()))
 
 ;; TODO should this also go through the COMPILE-OBJECT selector? but

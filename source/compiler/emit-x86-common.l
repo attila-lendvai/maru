@@ -499,15 +499,7 @@
   ;; TODO it feels wasteful/unnecessary to allocate an instr instance here...
   ;; at least until we start storing something in the instances
   (let ((instr (factory ())))
-    (when (<instruction>-has-input? instr)
-      (push args (<compiler>-current-value -c-)))
     (emit-comment 2 "GEN of "instr", args: " args)
-    (when (<instruction>-produces-output? instr)
-      ;; KLUDGE
-      (set (<compiler>-current-value -c-)
-           (if (= 4 +word-size-in-bytes+)
-               op/eax
-             op/rax)))
     ;; save into the gen buffer
     (array-append (<compiler>-gen-buffer -c-) (cons instr args))
     ()))
@@ -549,7 +541,7 @@
     (else
       (comp expr)
       (let ((temp (alloc-stack-temp -c-)))
-        (gen STORE temp)
+        (gen STORE $ temp)
         temp))))
 
 (define-function compile-call-to-global-function (op -c-)
@@ -594,7 +586,7 @@
     (comp (car prog))
     (set prog (cdr prog)))
   (let ((temp (alloc-stack-temp -c-)))
-    (gen STORE temp)
+    (gen STORE $ temp)
     temp))
 
 (define-function compile/let-binding (binding comp)
@@ -625,7 +617,7 @@
     (while expr
       (comp (car expr))
       (when (set expr (cdr expr))
-        (gen BF done)))
+        (gen BF $ done)))
     (gen DEFLABEL done)))
 
 (define-function compile/or (expr -c-)
@@ -634,14 +626,14 @@
     (while expr
       (comp (car expr))
       (when (set expr (cdr expr))
-        (gen BT done)))
+        (gen BT $ done)))
     (gen DEFLABEL done)))
 
 (define-function compile/if (expr -c-)
   (let ((l/false (UNIQUE-LABEL))
         (else-prog (cdddr expr)))
     (comp (second expr))
-    (gen BF l/false)
+    (gen BF $ l/false)
     (comp (third expr))
     (let ((l/end (UNIQUE-LABEL)))
       (when else-prog
@@ -661,7 +653,7 @@
       (and stmt (comp stmt)))
     (gen DEFLABEL l/cond)
     (comp (second expr))
-    (gen BT l/body)))
+    (gen BT $ l/body)))
 
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
@@ -691,7 +683,11 @@
 
 (define-function compile/unary-operator (op args -c-)
   (comp (car args))
-  (gen op))
+  ;; FIXME we shouldn't need to instantiate the instructions here...
+  (let ((instr (op ())))
+    (if (<instruction>-has-input? instr)
+        (gen op $)
+      (gen op))))
 
 ;; FIXME? these implement a right-to-left evaluation order, while
 ;; function calls implement the opposite. note that this is entangled
@@ -701,7 +697,10 @@
   (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
     (comp (car args))
     (free-temp tmp)
-    (gen op tmp)))
+    (let ((instr (op ())))
+      (if (<instruction>-has-input? instr)
+          (gen op $ tmp)
+        (gen op tmp)))))
 
 (define-function compile/ternary-operator (op args -c-)
   (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
@@ -709,7 +708,10 @@
     (comp (car args))
     (free-temp tmp1)
     (free-temp tmp2)
-    (gen op tmp1 tmp2)))
+    (let ((instr (op ())))
+      (if (<instruction>-has-input? instr)
+          (gen op $ tmp1 tmp2)
+        (gen op tmp1 tmp2)))))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 

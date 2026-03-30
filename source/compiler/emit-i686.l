@@ -119,7 +119,7 @@
     (temp-counter		0)
     (temp-limit			0)
     (gen-buffer			(array))
-
+    (current-value		op/eax)
 
     (param-offset		0)
     (arg-offset			0)
@@ -229,7 +229,7 @@
                                   (is <R32> operand))
                               (let ((temp (alloc-stack-temp -c-)))
                                 (push tmps-to-free temp)
-                                (gen STORE temp)
+                                (gen STORE $ temp)
                                 temp)
                             operand)))
          (arg-operands	(map (lambda (expr)
@@ -286,12 +286,12 @@
     (comp (third expr))
     (typecase value
       (<STACK-CELL>
-       (gen STORE value))
+       (gen STORE $ value))
       (<C-variable>
        ;; TODO dispatch on the type of the C-variable
-       (gen STORE (GLOBAL-CELL (EXTERNAL-LABEL (<C-variable>-name value)))))
+       (gen STORE $ (GLOBAL-CELL (EXTERNAL-LABEL (<C-variable>-name value)))))
       (else
-       (gen STORE (GLOBAL-CELL (LABEL (<variable>-name var))))))))
+       (gen STORE $ (GLOBAL-CELL (LABEL (<variable>-name var))))))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
