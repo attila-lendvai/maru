@@ -606,15 +606,18 @@
 
 (define-function compile/if (expr -c-)
   (let ((l/false (UNIQUE-LABEL))
-        (l/end (UNIQUE-LABEL)))
+        (else-prog (cdddr expr)))
     (comp (second expr))
     (gen BF l/false)
     (comp (third expr))
-    (gen BR l/end)
-    (gen DEFLABEL l/false)
-    (list-do stmt (cdddr expr)
-      (comp stmt))
-    (gen DEFLABEL l/end)))
+    (let ((l/end (UNIQUE-LABEL)))
+      (when else-prog
+        (gen BR l/end))
+      (gen DEFLABEL l/false)
+      (list-do stmt else-prog
+        (comp stmt))
+      (when else-prog
+        (gen DEFLABEL l/end)))))
 
 (define-function compile/while (expr -c-)
   (let ((l/body	(UNIQUE-LABEL))
