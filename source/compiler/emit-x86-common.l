@@ -63,7 +63,7 @@
   (LABEL (unique-name (or (first args) "L"))))
 
 ;; Naming convention: global, literal, temp, general register
-(define-operand REGISTER ()	(name)		self.name)
+(define-operand REGISTER ()	(name index)	self.name)
 (define-operand LITERAL ()	(value)		"$"self.value)
 (define-operand GLOBAL-CELL ()	(name)		self.name)
 (define-operand STACK-CELL ()	(offset))
@@ -73,10 +73,24 @@
 
 (define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
 (define-operand LI64 LITERAL)
-(define-operand R64 REGISTER ())
+(define-operand R64 REGISTER)
 
 ;; TODO this is not yet used in the 32 bit backend
 (define-operand STACK-PARAM STACK-CELL	()	self.offset"(%rbp)")
+
+(with-forms
+    ((x ((ctor . registers)
+         (let ((index -1))
+           `(begin
+             ,@(map (lambda (reg)
+                      (incr index)
+                      ;; the op/ prefix stands for operand
+                      `(define ,(concat-symbol 'op/ reg)
+                         (,ctor ,(concat-string "%" (symbol->string reg))
+                                ,index)))
+                    registers))))))
+  (x R32 eax ebx ecx edx esp ebp esi edi)
+  (x R64 rax rbx rcx rdx rsp rbp rsi rdi r8 r9 r10 r11 r12 r13 r14 r15))
 
 ;;;
 ;;; INSTRUCTIONS
@@ -459,8 +473,8 @@
       ;; KLUDGE
       (set (<compiler>-current-value -c-)
            (if (= 4 +word-size-in-bytes+)
-               (R32 "%eax")
-             (R64 "%rax"))))
+               op/eax
+             op/rax)))
     ;; save into the gen buffer
     (array-append (<compiler>-gen-buffer -c-) (cons instr args))
     ()))

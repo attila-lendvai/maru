@@ -134,8 +134,8 @@
 ;;;
 ;;; Compiler Infrastructure
 ;;;
-(define-constant +param-registers+ ''("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
-(define-constant +n-param-registers+ 6)
+(define-constant +param-registers+   `(quote ,(list op/rdi op/rsi op/rdx op/rcx op/r8 op/r9)))
+(define-constant +n-param-registers+ (list-length +param-registers+))
 
 (define-record <x86-64-compiler> <x86-compiler>
   ())
@@ -198,7 +198,7 @@
     (let ((regs		+param-registers+)
           (stack-cells	(list-reverse! spill-locs)))
       (times-do (min param-count +n-param-registers+)
-        (gen MOVE (R64 (pop regs)) (pop stack-cells))))
+        (gen MOVE (pop regs) (pop stack-cells))))
 
     ;; Compile the fn body first into the gen buffer (COMP is a form,
     ;; we cannot map it).
@@ -262,7 +262,7 @@
          ;; i.e. they may call other functions, which would overwrite
          ;; the arg registers...
          (arg-stack-cell-count	(max 0 (- arg-count +n-param-registers+)))
-         (arg-regs	(map R64 +param-registers+)))
+         (arg-regs	+param-registers+))
 
     ;; move the reg passed operands into the regs
     (times-do (min arg-count +n-param-registers+)
@@ -303,7 +303,7 @@
   (case (<C-function>-return-type self)
     ;; TODO introduce a proper infrastructure for this
     (int
-     (gen SEXT (R32 "%eax") (R64 "%rax")))
+     (gen SEXT op/eax op/rax))
     (short
      (error "TODO sign-extend a short to 64 bits")))
   (unless (<C-function>-vararg? self)
@@ -369,7 +369,7 @@
           ;; so, the 8(%rbp) is to undo the push %rbp, so that we
           ;; regain the %rsp value at the entry point to the function.
           (gen INLINE "	lea	8(%rbp), %rax")
-          (set (<compiler>-current-value -c-) (R64 "%rax"))))
+          (set (<compiler>-current-value -c-) op/rax)))
   ))
 
 ;;;
