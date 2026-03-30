@@ -37,7 +37,7 @@
 ;; way to achieve this.
 (define LITERAL LI64)
 
-(define-print-method <STACK-CELL> (print-all -stream- self.offset"(%rsp)"))
+(define-print-method <STACK-CELL> (print-all -stream- self.offset"(%rbp)"))
 
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
@@ -156,7 +156,7 @@
   (compile-env env (x86-64-compiler 1)))
 
 (define-function new-stack-cell (-c-)
-  (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
+  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
 
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
