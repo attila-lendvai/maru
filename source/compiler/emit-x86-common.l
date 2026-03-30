@@ -173,7 +173,8 @@
 				  (println "	add	"$2","$1)))
   ((R64 STACK-CELL)		(println "	add	"$2","$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	add	"$2","$1))))
+                                  (println "	add	"$2","$1)))
+  ((R64 R64)			(println "	add	"$2","$1)))
 
 (define-instruction SUB		(true 0 true)
   ((R32 STACK-CELL)		(println "	sub	"$2", "$1))
@@ -181,7 +182,8 @@
 				  (println "	sub	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	sub	"$2", "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	sub	"$2", "$1))))
+                                  (println "	sub	"$2", "$1)))
+  ((R64 R64)			(println "	sub	"$2","$1)))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
 ;; into the instruction. same applies to div.
@@ -192,6 +194,7 @@
                                   (else
                                    (println "	mov	"$1", %ecx")
                                    (println "	mul	%ecx"))))
+  ((R64)			(println "	mulq	"$1))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   ;; TODO emit shifts when possible
@@ -266,7 +269,8 @@
   ((R64 STACK-CELL)		(println "	mov	"$2", %rcx")
 		                (println "	sal	%cl, "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	shl	"$2", "$1))))
+                                  (println "	shl	"$2", "$1)))
+  ((R64 R64)			(println "	shl	"$2", "$1)))
 
 (define-instruction ASR		(true 0 true)
   ((R32 STACK-CELL)		(println "	mov	"$2", %ecx")
@@ -276,7 +280,8 @@
   ((R64 STACK-CELL)		(println "	mov	"$2", %rcx")
 		                (println "	sar	%cl, "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	sar	"$2", "$1))))
+                                  (println "	sar	"$2", "$1)))
+  ((R64 R64)			(println "	sar	"$2", "$1)))
 
 (define-instruction MOVE	(false 0 false)
   ((LI32 STACK-CELL)		(println "	movl	"$1", "$2))
@@ -298,10 +303,10 @@
 (define-instruction STORE	(true 0 false)
   ((R32 STACK-CELL)		(println "	mov	"$1", "$2))
   ((R32 GLOBAL-CELL)		(println "	mov	"$1", "$2))
-  ((R64 GLOBAL-CELL)		(println "	lea	"$2"(%rip), %rbx")
-                                (println "	mov	"$1", (%rbx)"))
-  ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
-                                (println "	mov	"$1", (%rbx)"))
+  ((R64 GLOBAL-CELL)		(println "	lea	"$2"(%rip), %rcx")
+                                (println "	mov	"$1", (%rcx)"))
+  ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rcx")
+                                (println "	mov	"$1", (%rcx)"))
   ((R64 R64)			(println "	mov	"$1", "$2"")) ; e.g. when dest is an arg reg in a function call
   ((R64 STACK-CELL)		(println "	mov	"$1", "$2)))
 
@@ -325,6 +330,9 @@
                                   (if (= 0 offset)
                                       (println "	mov	%rax, %rcx")
                                     (println "	lea	"offset"(%rax), %rcx")))
+                                (println "	xor	%rax, %rax")
+                                (println "	mov	(%rcx), %al"))
+  ((R64)			(println "	lea	(%rax, "$1"), %rcx")
                                 (println "	xor	%rax, %rax")
                                 (println "	mov	(%rcx), %al")))
 
@@ -352,7 +360,15 @@
                                         (println "	mov	%al, (%rcx)"))
                                     (unless (= 0 offset)
                                       (println "	lea	"offset"(%rax), %rax"))
-                                    (println "	movb	"$2", (%rax)")))))
+                                    (println "	movb	"$2", (%rax)"))))
+  ((R64 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (begin
+                                     (println "	lea	(%rax, "$1"), %rcx")
+                                     (println "	xor	%rax, %rax")
+                                     (println "	mov	"$2", %al") ; this also leaves it as return value in %rax
+                                     (println "	mov	%al, (%rcx)"))
+                                  (println "	lea	(%rax, "$1"), %rax")
+                                  (println "	movb	"$2", (%rax)"))))
 
 (define-instruction LOAD-OOP	(false 0 true)
   ((LI32)			(let ((offset (<LITERAL>-value $1)))
@@ -364,7 +380,9 @@
                                   (if (= 0 offset)
                                       (println "	mov	(%rax), %rax")
                                     (println "	lea	"(* 8 offset)"(%rax), %rcx")
-                                    (println "	mov	(%rcx), %rax")))))
+                                    (println "	mov	(%rcx), %rax"))))
+  ((R64)			(println "	lea	(%rax, "$1", 8), %rcx")
+                                (println "	mov	(%rcx), %rax")))
 
 (define-instruction STORE-OOP	(false 0 true)
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
@@ -388,10 +406,21 @@
                                         (println "	mov	%rax, (%rcx)"))
                                     (unless (= 0 offset)
                                       (println "	lea	"(* 8 offset)"(%rax), %rax"))
-                                    (println "	mov	"$2", (%rax)")))))
+                                    (println "	mov	"$2", (%rax)"))))
+  ((R64 _)			(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (begin
+                                     (println "	lea	(%rax, "$1", 8), %rcx")
+                                     (println "	mov	"$2", %rax") ; this also leaves it as return value in %rax
+                                     (println "	mov	%rax, (%rcx)"))
+                                  (println "	lea	(%rax, "$1", 8), %rax")
+                                  (println "	mov	"$2", (%rax)"))))
 
 (define-instruction PUSH	(false 0 false)
-  ((_)				(println "	pushq	"$1)))
+  ((LI64)			(println "	pushq	"$1))
+  ((R64)			(println "	push	"$1)))
+
+(define-instruction POP		(false 0 false)
+  ((R64)			(println "	pop	"$1)))
 
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
@@ -413,6 +442,10 @@
       (if (= 0 (<LITERAL>-value $2))
           (println "	test	"$1", "$1)
         (println "	cmp	"$2", "$1))
+      (println "	" ,x86-name "	%al")
+      (println "	movzb	%al, "$1))
+     ((R64 R64)
+      (println "	cmp	"$2", "$1)
       (println "	" ,x86-name "	%al")
       (println "	movzb	%al, "$1))))
 

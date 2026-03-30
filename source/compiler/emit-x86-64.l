@@ -68,8 +68,8 @@
   ((STACK-CELL)			(println "	lea	"$1", %rax")))
 
 (define-instruction/emit-forms MOVE 0
-  ((STACK-CELL STACK-CELL)	(println "	mov	"$1", %rbx")
-                                (println "	mov	%rbx, "$2)))
+  ((STACK-CELL STACK-CELL)	(println "	mov	"$1", %rcx")
+                                (println "	mov	%rcx, "$2)))
 
 (define-instruction/emit-forms LOAD 0
   ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax")
@@ -79,56 +79,56 @@
   ((STACK-PARAM)		(println "	mov	"$1", %rax")))
 
 (define-instruction/emit-forms LOAD-I8 0
-  ((STACK-CELL)			(println "	mov	"$1", %rbx")
-                                (println "	lea	(%rax, %rbx), %rbx")
+  ((STACK-CELL)			(println "	mov	"$1", %rcx")
+                                (println "	lea	(%rax, %rcx), %rcx")
                                 (println "	xor	%rax, %rax")
-                                (println "	mov	(%rbx), %al")))
+                                (println "	mov	(%rcx), %al")))
 
 (define-instruction/emit-forms STORE-I8 0
   ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
 				    ;; NOTE this works out just fine for a STACK-CELL, too, because we are little-endian.
                                     (let ()
-                                      (println "	mov	"$1", %rbx")
-                                      (println "	lea	(%rax, %rbx), %rbx")
+                                      (println "	mov	"$1", %rcx")
+                                      (println "	lea	(%rax, %rcx), %rcx")
                                       (println "	xor	%rax, %rax")
                                       (println "	movb	"$2", %al")
-                                      (println "	movb	%al, (%rbx)"))
-                                  (println "	lea	"$1"(%rip), %rbx")
-                                  (println "	lea	(%rax, %rbx), %rax")
+                                      (println "	movb	%al, (%rcx)"))
+                                  (println "	lea	"$1"(%rip), %rcx")
+                                  (println "	lea	(%rax, %rcx), %rax")
                                   (println "	movb	"$2", (%rax)"))))
 
 (when-at-expand (feature lower/array)
   ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
   (define-instruction/emit-forms LOAD-CELL 0
-    ((STACK-CELL)		(println "	mov	"$1", %rbx")
-				(println "	lea	(%rax, %rbx, 1), %rbx")
-				(println "	mov	(%rbx), %rax")))
+    ((STACK-CELL)		(println "	mov	"$1", %rcx")
+				(println "	lea	(%rax, %rcx, 1), %rcx")
+				(println "	mov	(%rcx), %rax")))
 
   (define-instruction/emit-forms STORE-CELL 0
     ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
                                     (let ()
-                                      (println "	mov	"$1", %rbx")
-                                      (println "	lea	(%rax, %rbx, 1), %rbx")
+                                      (println "	mov	"$1", %rcx")
+                                      (println "	lea	(%rax, %rcx, 1), %rcx")
                                       (println "	mov	"$2", %rax")
-                                      (println "	mov	%rax, (%rbx)"))
-                                  (println "	mov	"$1", %rbx")
-                                  (println "	lea	(%rax, %rbx, 1), %rax")
+                                      (println "	mov	%rax, (%rcx)"))
+                                  (println "	mov	"$1", %rcx")
+                                  (println "	lea	(%rax, %rcx, 1), %rax")
                                   (println "	mov	"$2", (%rax)")))))
 
 (define-instruction/emit-forms LOAD-OOP 0
-  ((STACK-CELL)			(println "	mov	"$1", %rbx")
-				(println "	lea	(%rax, %rbx, 8), %rbx")
-				(println "	mov	(%rbx), %rax")))
+  ((STACK-CELL)			(println "	mov	"$1", %rcx")
+				(println "	lea	(%rax, %rcx, 8), %rcx")
+				(println "	mov	(%rcx), %rax")))
 
 (define-instruction/emit-forms STORE-OOP 0
   ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
                                     (let ()
-                                      (println "	mov	"$1", %rbx")
-                                      (println "	lea	(%rax, %rbx, 8), %rbx")
+                                      (println "	mov	"$1", %rcx")
+                                      (println "	lea	(%rax, %rcx, 8), %rcx")
                                       (println "	mov	"$2", %rax")
-                                      (println "	mov	%rax, (%rbx)"))
-                                  (println "	mov	"$1", %rbx")
-                                  (println "	lea	(%rax, %rbx, 8), %rax")
+                                      (println "	mov	%rax, (%rcx)"))
+                                  (println "	mov	"$1", %rcx")
+                                  (println "	lea	(%rax, %rcx, 8), %rax")
                                   (println "	mov	"$2", (%rax)"))))
 
 ;;;
@@ -137,14 +137,20 @@
 (define-constant +param-registers+   `(quote ,(list op/rdi op/rsi op/rdx op/rcx op/r8 op/r9)))
 (define-constant +n-param-registers+ (list-length +param-registers+))
 
+(define-constant +callee-saved-registers+   `(quote ,(list op/rbx op/r12 op/r13 op/r14 op/r15)))
+(define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
+
 (define-record <x86-64-compiler> <x86-compiler>
-  ())
+  (free-temp-regs
+   clobbered-temp-regs))
 
 (define-function x86-64-compiler (level)
   (make <x86-64-compiler>
     (level			level)
     (temp-counter		0)
     (temp-limit			0)
+    (free-temp-regs		+callee-saved-registers+)
+    (clobbered-temp-regs	(array +n-callee-saved-registers+))
     (gen-buffer			(array))
 
     (arg-offset			0)
@@ -158,9 +164,19 @@
 (define-function new-stack-cell (-c-)
   (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
 
+(define-function alloc-reg-temp (self)
+  (with-instance-accessors self <x86-64-compiler>
+    (if self.free-temp-regs
+        (let ((reg (pop self.free-temp-regs)))
+          (set (array-at self.clobbered-temp-regs (<REGISTER>-index reg)) reg)
+          reg)
+      (or (pop (<compiler>-free-stack-cells self))
+          (new-stack-cell self)))))
+
 (define-function %free-temp (-c- obj)
   ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
   (typecase obj
+    (<R64>		(push (<x86-64-compiler>-free-temp-regs -c-) obj))
     (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
 
 ;;;
@@ -220,10 +236,33 @@
                     ", frame-size: "frame-size"("(/ frame-size +word-size-in-bytes+)
                     "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
       (emit ENTER frame-body-size)
-      (emit-comment 1 "emitting gen buffer of "self)
-      (emit-gen-buffer -c-)
-      (awhen (<x86-compiler>-fn-epilogue-label -c-)
-        (emit DEFLABEL it))
+      (let ((clobbered-regs (<x86-64-compiler>-clobbered-temp-regs -c-))
+            (clobbered-stack-space 0))
+
+        (array-do clobbered-reg clobbered-regs
+          (when clobbered-reg
+            (emit PUSH clobbered-reg)
+            (incr clobbered-stack-space +word-size-in-bytes+)))
+
+        (let* ((aligned-stack-space (align +call-frame-alignmet+ clobbered-stack-space))
+               (alignment (- aligned-stack-space clobbered-stack-space)))
+
+          ;; in this ABI the stack must be aligned before a CALL
+          (emit SUB op/rsp (LI64 alignment))
+
+          (emit-comment 1 "emitting gen buffer of "self)
+          (emit-gen-buffer -c-)
+          (awhen (<x86-compiler>-fn-epilogue-label -c-)
+            (emit DEFLABEL it))
+
+          ;; undo alignment
+          (emit ADD op/rsp (LI64 alignment)))
+
+        ;; restore the clobbered temp reg backups, in reverse order
+        (for (i (array-length clobbered-regs) 0 -1)
+          (let ((clobbered-reg (array-at clobbered-regs i)))
+            (when clobbered-reg
+              (emit POP clobbered-reg)))))
       (emit LEAVE frame-body-size)))
   entry-point-label)
 
@@ -241,7 +280,7 @@
                           ;; TODO cleanup
                           (if (or (is <R64> operand)
                                   (is <R32> operand))
-                              (let ((temp (alloc-stack-temp -c-)))
+                              (let ((temp (alloc-reg-temp -c-)))
                                 (push tmps-to-free temp)
                                 (gen STORE temp)
                                 temp)
@@ -293,10 +332,10 @@
   (gen LOAD self)
   (compile-call-to-<target-function> -c-))
 
-;; currently not used anywhere
-;; (define-method compile-call-to <R64> (op -c-)
-;;   (gen LOAD self)
-;;   (compile-call-to-<target-function> -c-))
+(define-method compile-call-to <R64> (op -c-)
+  (unless (= "%rax" (<REGISTER>-name self))
+    (gen MOVE self op/rax))
+  (compile-call-to-<target-function> -c-))
 
 (define-method compile-call-to <C-function> (op -c-)
   (gen CALL (EXTERNAL-LABEL (<C-function>-name self)))
