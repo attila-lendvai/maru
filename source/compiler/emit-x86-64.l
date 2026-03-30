@@ -167,26 +167,9 @@
 ;;; Compiling lambdas
 ;;;
 
-;; When a function calls another function then it will need to
-;; overwrite the registers where it has received its own params. A
-;; simple solution is to spill the params to the stack when we
-;; encounter the first function call.
-;; (define-function spill-params (expr -c-)
-;;   (emit-comment 1 "spilling "(list-length (<expr>-parameters expr))" params to the stack")
-;;   (map (lambda (var)
-;;          (let ((loc (<variable>-value var)))
-;;            (unless (is <STACK-CELL> loc)
-;;              (let ((reg (<variable>-value var))
-;;                    (temp (pop (<x86-64-compiler>-param-spill-locs -c-))))
-;;                (assert temp)
-;;                (assert (is <R64> reg))
-;;                (set (<variable>-value var) temp)
-;;                (gen MOVE reg temp)))))
-;;        (<expr>-parameters expr)))
-
-;; this implements the System V AMD64 ABI. this way we can call into C
-;; code without differenciating between calling the internal and the C
-;; world.
+;; this implements the System V AMD64 ABI, i.e. we can call into C
+;; code without differenciating between calling into the internal and
+;; the C world.
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
   (let* ((body		(<expr>-body self))

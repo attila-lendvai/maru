@@ -29,7 +29,10 @@
              (actual ,form))
          (if (not (= actual expected))
            ;; TODO ',form cannot be compiled yet
-           (failure "%s, expected: %ld, actual: %ld" ,name-as-string expected actual)))
+           (let ()
+             ;; FIXME delme once the linux backend also prints something at a failure
+             (platform/diag-print "!!! failing\n")
+             (failure "%s, expected: %ld, actual: %ld" ,name-as-string expected actual))))
        ())))
 
 (define-form run-tests ()
@@ -492,6 +495,9 @@
 (define-function many-args10/return-last (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10)
   x10)
 
+(define-function many-args10/return-seventh (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10)
+  x7)
+
 (define-function many-args16 (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
   ;; this call was overwriting our spilled params because the spill
   ;; locations were not part of the temp list (i.e. never
@@ -500,6 +506,14 @@
   ;; TODO operators with 2+ arguments
   (+ (many-args10 1 2 3 4 5 6 7 8 9 10)
      (+ (+ x1 x10) x15)))
+
+(define-test compile/arguments/0
+    (many-args10/return-seventh 1 2 3 4 5 6 42 8 9 10)
+  42)
+
+(define-test compile/arguments/1
+    (many-args10/return-last 1 2 3 4 5 6 7 8 9 42)
+  42)
 
 (define-test compile/arguments/bug/1
     (many-args16 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
