@@ -147,12 +147,11 @@
   ((REGISTER LABEL)		(println "	test	"$1", "$1)
 				(println "	jne	"$2)))
 
-;; TODO arg2 is arg-locs. what for? for the arity? delme?
 (define-instruction CALL	(false 0 true)
-  ((LABEL _)			(println "	call	"$1)))
+  ((LABEL)			(println "	call	"$1)))
 
 (define-instruction CALLPTR	(true 0 false)
-  ((REGISTER _)			(println "	call	*"$1)))
+  ((REGISTER)			(println "	call	*"$1)))
 
 (define-instruction ADD		(true 0 true)
   ((R32 STACK-CELL)		(println "	add	"$2","$1))
@@ -506,31 +505,31 @@
         (gen STORE temp)
         temp))))
 
-(define-function compile-call-to-global-function (op arg-locs -c-)
+(define-function compile-call-to-global-function (op -c-)
   (if (feature redefinable-functions-in-target)
       (let ()
         (comp op)
-        (compile-call-to-<target-function> arg-locs -c-))
-    (gen CALL (closure-code-label (<variable>-name op)) arg-locs))
+        (compile-call-to-<target-function> -c-))
+    (gen CALL (closure-code-label (<variable>-name op))))
   ())
 
-(define-method compile-call-to (slave-value <target-function>) (op arg-locs -c-)
+(define-method compile-call-to (slave-value <target-function>) (op -c-)
   (comp op)
-  (compile-call-to-<target-function> arg-locs -c-))
+  (compile-call-to-<target-function> -c-))
 
 ;; this case is handled early in compile-call
-;; (define-method compile-call-to <pair> (op arg-locs -c-)
+;; (define-method compile-call-to <pair> (op -c-)
 ;;   (comp op)
-;;   (compile-call-to-<target-function> arg-locs -c-))
+;;   (compile-call-to-<target-function> -c-))
 
-(define-method compile-call-to <expr> (op arg-locs -c-)
+(define-method compile-call-to <expr> (op -c-)
   ;; NOTE the fact that a literal <expr> is found in a variable's
   ;; value slot at compile time implies that it's a global definition.
-  (compile-call-to-global-function op arg-locs -c-)
+  (compile-call-to-global-function op -c-)
   (expr-n-required-parameters self))
 
-(define-method compile-call-to (slave-value <selector>) (op arg-locs -c-)
-  (compile-call-to-global-function op arg-locs -c-)
+(define-method compile-call-to (slave-value <selector>) (op -c-)
+  (compile-call-to-global-function op -c-)
   ;; TODO extract and return n-params
   ())
 

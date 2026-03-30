@@ -274,7 +274,7 @@
 
     (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
                          ;; FIXME delete unused arg-locs
-                         (compile-call-to op-value op 424242 -c-))
+                         (compile-call-to op-value op -c-))
            (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
@@ -289,17 +289,17 @@
                                   ", %rsp")))
     (free-temps tmps-to-free)))
 
-(define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL> (op -c-)
   (gen LOAD self)
-  (compile-call-to-<target-function> arg-locs -c-))
+  (compile-call-to-<target-function> -c-))
 
 ;; currently not used anywhere
-;; (define-method compile-call-to <R64> (op arg-locs -c-)
+;; (define-method compile-call-to <R64> (op -c-)
 ;;   (gen LOAD self)
-;;   (compile-call-to-<target-function> arg-locs -c-))
+;;   (compile-call-to-<target-function> -c-))
 
-(define-method compile-call-to <C-function> (op arg-locs -c-)
-  (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)
+(define-method compile-call-to <C-function> (op -c-)
+  (gen CALL (EXTERNAL-LABEL (<C-function>-name self)))
   (case (<C-function>-return-type self)
     ;; TODO introduce a proper infrastructure for this
     (int

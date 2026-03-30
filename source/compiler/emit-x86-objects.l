@@ -122,7 +122,7 @@
 ;;; here.
 
 (let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
-  (define-function compile-call-to-<target-function> (arg-locs -c-)
+  (define-function compile-call-to-<target-function> (-c-)
     ;; TODO assert the type to be <target-function>
     ;; TODO assert nr of args = params
     (when (feature emit-with-object-headers)
@@ -130,7 +130,7 @@
       ;; feature is disabled then it's just a raw function pointer to
       ;; be called.
       (gen LOAD-OOP (LITERAL program-code-offset)))
-    (gen CALLPTR arg-locs)
+    (gen CALLPTR)
     ()))
 
 ;; TODO should this also go through the COMPILE-OBJECT selector? but

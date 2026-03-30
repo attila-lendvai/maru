@@ -252,7 +252,7 @@
     (map (lambda (a b) (gen MOVE a b)) arg-operands arg-locs)
 
     (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
-                         (compile-call-to op-value op arg-locs -c-))
+                         (compile-call-to op-value op -c-))
            (arity	(list-length args)))
       (when (and n-params
                  (not (= n-params arity)))
@@ -261,17 +261,17 @@
     (free-temps tmps-to-free)
     (free-args -c- arg-locs)))
 
-(define-method compile-call-to <STACK-CELL> (op arg-locs -c-)
+(define-method compile-call-to <STACK-CELL> (op -c-)
   (gen LOAD self)
-  (compile-call-to-<target-function> arg-locs -c-))
+  (compile-call-to-<target-function> -c-))
 
 ;; this case is handled early in compile-call
-;; (define-method compile-call-to <pair> (op arg-locs -c-)
+;; (define-method compile-call-to <pair> (op -c-)
 ;;   (comp op)
-;;   (compile-call-to-<target-function> arg-locs -c-))
+;;   (compile-call-to-<target-function> -c-))
 
-(define-method compile-call-to <C-function> (op arg-locs -c-)
-  (gen CALL (EXTERNAL-LABEL (<C-function>-name self)) arg-locs)
+(define-method compile-call-to <C-function> (op -c-)
+  (gen CALL (EXTERNAL-LABEL (<C-function>-name self)))
   (unless (<C-function>-vararg? self)
     (list-length (<C-function>-parameter-types self))))
 
