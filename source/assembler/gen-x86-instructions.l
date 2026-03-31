@@ -229,12 +229,20 @@ _r_0DIS:
 #define _r_DB(  R, D,B    )           ((_s0P(D) ? _r_0B  (R,  B    ) : (_s1P(D) ? _r_1B(  R,D,B    ) : _r_4B(  R,D,B    ))))
 #define _r_DBIS(R, D,B,I,S)           ((_s0P(D) ? _r_0BIS(R,  B,I,S) : (_s1P(D) ? _r_1BIS(R,D,B,I,S) : _r_4BIS(R,D,B,I,S))))
 
-#define _r_X( R, D,B,I,S)             (_r0P(I)  ? (_r0P(B)   ? _r_D   (R,D            )   : \
-                                                    (_ESP==(B) ? _r_DBIS(R,D,_ESP,_ESP,1)   : \
-                                                                 _r_DB  (R,D,   B       ))) : \
-                                         ((_r0P(B) ?             _r_0DIS(R,D,        I,S)   : \
-                                          (((I)!=_ESP)         ? _r_DBIS(R,D,   B,   I,S)   : \
-                                                                 ASMFAIL("illegal index register: %esp")))))
+// NOTE: this is redefined later to accommodate the x86_64 part
+#define _r_X(R,D,B,I,S)					\
+    (_r0P(I)						\
+     ? (_r0P(B)						\
+        ? _r_D(R,D)					\
+        : (_ESP==(B)					\
+           ? _r_DBIS(R,D,_ESP,_ESP,1)			\
+           : _r_DB  (R,D,B)))				\
+     :							\
+     ((_r0P(B)						\
+       ? _r_0DIS(R,D,I,S)				\
+       : (((I)!=_ESP)					\
+         ? _r_DBIS(R,D,B,I,S)				\
+         : ASMFAIL("illegal index register: %esp")))))
 
 /* instruction formats */
 
@@ -1172,10 +1180,10 @@ _r_0DIS:
 // most quad instructions are just long instructions with a prefix
 
 #define	ADDQir(I,R)		(_REX(1,0,0,R),	ADDLir(I,_r8(R)))
-#define	ADDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ADDLmr(D,_r8(B),_r8(I),S,_r8(R)))
 #define	ADDQrr(S,D)		(_REX(1,S,0,D),	ADDLrr(_r8(S),_r8(D)))
 #define	ADDQim(N,D,B,I,S)	(_REX(1,0,I,B), ADDLim(N,D,_r8(B),_r8(I),S))
 #define	ADDQrm(R,D,B,I,S)	(_REX(1,R,I,B), ADDLrm(_r8(R),D,_r8(B),_r8(I),S))
+#define	ADDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ADDLmr(D,_r8(B),_r8(I),S,_r8(R)))
 
 #define CALLQr(R)		(_REX(0,R,0,0),	CALLr(_r8(R)))
 #define CALLQm(D,B,I,S)		(_REX(0,0,I,B),	CALLm(D,_r8(B),_r8(I),S))
