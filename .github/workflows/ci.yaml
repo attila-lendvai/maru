@@ -59,6 +59,7 @@ jobs:
       - run:  timeout 5m make test-evaluator
       - run:  timeout 5m make test-parser
       - run:  timeout 5m make PLATFORM=libc  test-compiler
+      - run:  timeout 5m make PLATFORM=posix test-compiler
       - run:  timeout 5m make PLATFORM=linux test-compiler
 
       - run:  timeout 5m make PLATFORM=posix test-elf
