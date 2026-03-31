@@ -1244,11 +1244,11 @@ _r_0DIS:
 #define MOVZBQrr(S,D)		(_REX(1,S,0,D), MOVZBLrr((S),_r8(D)))
 #define MOVZBQmr(D,B,I,S,R)	(_REX(1,S,0,D), MOVZBLmr(D,_r8(B),_r8(I),S,_r8(R)))
 
-#define MULQrr(S,D)             (_REX(1,S,0,D), MULLrr(_r8(S),_r8(D)))
-#define MULQmr(D,B,I,S,D)       (_REX(1,S,0,D), MULLmr((D),_r8(B),_r8(I),(S),_r8(D)))
+#define MULQrr(S,D)		(_REX(1,S,0,D), MULLrr(_r8(S),_r8(D)))
+#define MULQmr(D,B,I,S,RD)	(_REX(1,S,0,RD),MULLmr((D),_r8(B),_r8(I),(S),_r8(RD)))
 
-#define DIVQrr(S,D)             (_REX(1,S,0,D), DIVLrr(_r8(S),_r8(D)))
-#define DIVQmr(D,B,I,S,D)       (_REX(1,S,0,D), DIVLmr((D),_r8(B),_r8(I),(S),_r8(D)))
+#define DIVQrr(S,D)		(_REX(1,S,0,D),  DIVLrr(_r8(S),_r8(D)))
+#define DIVQmr(D,B,I,S,RD)	(_REX(1,S,0,RD), DIVLmr((D),_r8(B),_r8(I),(S),_r8(RD)))
 
 #define NEGQr(R)		(_REX(0,0,0,R), NEGLr(_r8(R)))
 
