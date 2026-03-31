@@ -245,8 +245,12 @@ _r_0DIS:
 #define   _Or(       OP,R                       )  (                _B((OP)|_r(R))                               )
 #define  _OO(        OP                         )  ( _B((OP)>>8), _B((OP)      )                               )
 #define  _OOr(       OP,R                       )  ( _B((OP)>>8), _B((OP)|_r(R))                               )
+// Opcode | b10, when literal fits signed byte
 #define   _Os(       OP,B                       )  (     _s1P(B) ?  _B((OP)|_b10 ) : _B(OP)                    )
+// TODO rename these two
+// Write signed imm8 if fits, imm16 otherwise
 #define     _sW(                             W  )  (                                      _s1P(W) ? _B(W):_W(W))
+// Write signed imm8 if fits, imm32 otherwise
 #define     _sL(                             L  )  (                                      _s1P(L) ? _B(L):_L(L))
 #define   _O_W(      OP                     ,W  )  (         _O        (OP  )                            ,_W(W))
 #define   _O_D1(     OP                     ,D  )  (         _O        (OP  )                           ,_D1(D))

@@ -330,6 +330,7 @@
           ;;
           ;; so, the 4(%ebp) is to undo the pushl %ebp, so that we
           ;; regain the %rsp value at the entry point to the function.
+          ;; KLUDGE
           (gen INLINE "	lea	4(%ebp), %eax")
           (set (<compiler>-current-value -c-) op/eax)))
   ))

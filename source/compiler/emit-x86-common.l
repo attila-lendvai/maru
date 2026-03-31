@@ -283,7 +283,7 @@
                                   (println "	sar	"$2", "$1)))
   ((R64 R64)			(println "	sar	"$2", "$1)))
 
-(define-instruction MOVE	(false 0 false)
+(define-instruction MOVE	()
   ((LI32 STACK-CELL)		(println "	movl	"$1", "$2))
   ((LI64 STACK-CELL)		(println "	movq	"$1", "$2))
   ((R64 _)			(println "	movq	"$1", "$2))
@@ -415,11 +415,11 @@
                                   (println "	lea	(%rax, "$1", 8), %rax")
                                   (println "	mov	"$2", (%rax)"))))
 
-(define-instruction PUSH	(false 0 false)
+(define-instruction PUSH	()
   ((LI64)			(println "	pushq	"$1))
   ((R64)			(println "	push	"$1)))
 
-(define-instruction POP		(false 0 false)
+(define-instruction POP		()
   ((R64)			(println "	pop	"$1)))
 
 (define-form define-instruction/comparator (maru-name x86-name)

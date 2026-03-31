@@ -407,6 +407,7 @@
           ;;
           ;; so, the 8(%rbp) is to undo the push %rbp, so that we
           ;; regain the %rsp value at the entry point to the function.
+          ;; KLUDGE
           (gen INLINE "	lea	8(%rbp), %rax")
           (set (<compiler>-current-value -c-) op/rax)))
   ))

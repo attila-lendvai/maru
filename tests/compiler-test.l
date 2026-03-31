@@ -6,6 +6,7 @@
 ;;;
 
 (eval-in-slave '(set (feature emit-with-object-headers) false))
+;;(eval-in-host  '(set *compiler-verbosity* 10))
 
 (define-form assert (test . args)
   `(or ,test (failure ,@(or args (list "an assert failed")))))
