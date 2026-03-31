@@ -1252,6 +1252,15 @@ _r_0DIS:
 
 #define NEGQr(R)		(_REX(0,0,0,R), NEGLr(_r8(R)))
 
+#define NOTQr(R)		(_REX(0,0,0,R), NOTLr(_r8(R)))
+#define NOTQm(D,B,I,S)		(_REX(1,S,0,0), NOTLm((D),_r8(B),_r8(I),(S)))
+
+#define ORQir(L,R)		(_REX(1,0,0,R),	ORLir(L,_r8(R)))
+#define ORQrr(S,D)		(_REX(1,S,0,D),	ORLrr(_r8(S),_r8(D)))
+#define ORQim(L,D,B,I,S)	(_REX(1,0,I,B), ORLim(L,D,_r8(B),_r8(I),S))
+#define ORQrm(R,D,B,I,S)	(_REX(1,R,I,B), ORLrm(_r8(R),D,_r8(B),_r8(I),S))
+#define ORQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ORLmr(D,_r8(B),_r8(I),S,_r8(R)))
+
 #define POPQr(R)		(_REX(0,0,0,R), POPLr(_r8(R)))
 #define PUSHQr(R)		(_REX(0,0,0,R), PUSHLr(_r8(R)))
 // there's only imm8 and imm32 variant for PUSH; REX.W requests to
