@@ -27,10 +27,10 @@
 ;; malloc doesn't return page-aligned memory, so we round down the
 ;; returned address, and round up the end address. this should work,
 ;; but using mmap would probably be the right way.
-;; TODO move this to posix
-(define-form platform/acquire-memory (size)
-  `(let* ((page-size	(lower/posix/sysconf posix/_SC_PAGESIZE))
+(define-form platform/acquire-memory (in-size)
+  `(let* ((size		,in-size)
           (buf		(libc/malloc size))
+          (page-size	(lower/posix/sysconf posix/_SC_PAGESIZE))
           ;; the page-size-alined boundaries encompassing the returned block
           (addr-start	(align-address-down buf page-size))
           (addr-size	(- (align-address-up (+ buf size) page-size)
@@ -43,7 +43,7 @@
      (unless (= 0 (lower/posix/mprotect addr-start addr-size
                                         ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
                                             posix/PROT_EXEC)))
-       (platform/format "mprotect failed")
+       (platform/diag-print "mprotect failed")
        ;;(platform/format "mprotect returned with "(long libc/errno))
        (platform/halt))
      buf))
