@@ -1185,6 +1185,12 @@ _r_0DIS:
 #define	ADDQrm(R,D,B,I,S)	(_REX(1,R,I,B), ADDLrm(_r8(R),D,_r8(B),_r8(I),S))
 #define	ADDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ADDLmr(D,_r8(B),_r8(I),S,_r8(R)))
 
+#define ANDQir(L,R)		(_REX(1,0,0,R),	ANDLir(L,_r8(R)))
+#define ANDQrr(S,D)		(_REX(1,S,0,D),	ANDLrr(_r8(S),_r8(D)))
+#define ANDQim(L,D,B,I,S)	(_REX(1,0,I,B), ANDLim(L,D,_r8(B),_r8(I),S))
+#define ANDQrm(R,D,B,I,S)	(_REX(1,R,I,B), ANDLrm(_r8(R),D,_r8(B),_r8(I),S))
+#define ANDQmr(D,B,I,S,R)	(_REX(1,R,I,B),	ANDLmr(D,_r8(B),_r8(I),S,_r8(R)))
+
 #define CALLQr(R)		(_REX(0,R,0,0),	CALLr(_r8(R)))
 #define CALLQm(D,B,I,S)		(_REX(0,0,I,B),	CALLm(D,_r8(B),_r8(I),S))
 
