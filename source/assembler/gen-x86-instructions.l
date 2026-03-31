@@ -1240,6 +1240,9 @@ _r_0DIS:
 
 #define POPQr(R)		(_REX(0,0,0,R), POPLr(_r8(R)))
 #define PUSHQr(R)		(_REX(0,0,0,R), PUSHLr(_r8(R)))
+// there's only imm8 and imm32 variant for PUSH; REX.W requests to
+// sign-extend it to 64 bits.
+#define PUSHQi(L)		(_REX(1,0,0,0), PUSHLi(L))
 
 #define RETQ()					RET()
 
