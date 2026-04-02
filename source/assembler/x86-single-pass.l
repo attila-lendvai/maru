@@ -197,9 +197,9 @@
     label))
 
 (define-function label! args
-  (let ((desig		(first args))
-        (paddress	(current-paddress))
-        (laddress	(current-laddress)))
+  (let ((desig		(pop args))
+        (laddress	(or (pop args) (current-laddress)))
+        (paddress	(or (pop args) (current-paddress))))
     (if desig
         (let ((label (%ensure-label desig)))
           (when (or (<label>-paddress label)
