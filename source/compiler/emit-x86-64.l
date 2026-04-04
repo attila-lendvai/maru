@@ -53,9 +53,6 @@
 (define-instruction SEXT	()
   ((R32 R64)			(println "	movslq	"$1", "$2)))
 
-(define-instruction/emit-forms LOAD 0
-  ((LABEL)			(println "	lea	"$1"(%rip), %rax")))
-
 (define-instruction/emit-forms MUL 0
   ((STACK-CELL)			(println "	mulq	"$1)))
 
@@ -72,6 +69,7 @@
                                 (println "	mov	%rcx, "$2)))
 
 (define-instruction/emit-forms LOAD 0
+  ((LABEL)			(println "	lea	"$1"(%rip), %rax"))
   ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax")
 				(println "	mov	(%rax), %rax"))
   ((STACK-CELL)			(println "	mov	"$1", %rax"))

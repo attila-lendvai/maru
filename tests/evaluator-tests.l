@@ -266,6 +266,15 @@
     (test-assert (= str "ajxd")) ; "axxd" if SET-ACCESSOR-FOR-SET-TEST is not picked up by EXPAND
     ))
 
+;; TODO should this work? i think it should...
+;; (define-form eval/expand/bug/4-helper (base-name)
+;;   (with-forms ((name ((suffix) (concat-symbol base-name suffix))))
+;;     `(begin ,(name bar))))
+
+;; (define-test eval/expand/bug/4 ()
+;;   (let ((foobar 42))
+;;     (test-assert (= 42 (eval/expand/bug/4-helper foo)))))
+
 (define *a-global-holding-42* 42)
 
 (define-test eval/let/hiding-a-global ()
