@@ -100,7 +100,8 @@
         (string-append buf ($next stream)))
       ;; a 0x prefix?
       (when (and (= ?x c)
-                 (= 1 (string-length buf)))
+                 (= 1 (string-length buf))
+                 (= ?0 (string-at buf 0)))
         ($next stream)
         (set base 16)
         (set (<string>-size buf) (box <long> 0)) ; TODO introduce API for this
