@@ -56,7 +56,19 @@
          (MOVQmr	0 RDI 0 0 RDI)
          (call		fflush)
 
-         (XORQrr	RAX RAX)
+         (MOVQir	42 RAX)
+         (let ((future-value (label)))
+           (SUBQir	42 RAX)
+           ;; TODO add support for this to the instruction emitters
+           ;; _s1P and _Os (and others in general) need to handle
+           ;; non-integer values and safely fall back.
+           ;; TODO split the implementation of SUBQim to SUBQim8
+           ;; and SUBQim32 so that it's possible to pick one when
+           ;; using such future-value setups
+           ;; (SUBQir	future-value RAX)
+           ;; (label!	future-value 42)
+           )
+
          (RET)))))
 
   (define-jit-test jit-posix-2
