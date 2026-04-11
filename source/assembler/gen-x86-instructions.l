@@ -177,23 +177,23 @@ Variable names:
 /*** ASSEMBLER ***/
 
 /* #if (_ASM_SAFETY==0)
-# define _M(M)		(M)
-# define _r(R)		(R)
-# define _m(M)		(M)
-# define _s(S)		(S)
-# define _i(I)		(I)
-# define _b(B)		(B)
+# define _mod(M)	(M)
+# define _reg(R)	(R)
+# define _rm(M)		(M)
+# define _scale(S)	(S)
+# define _index(I)	(I)
+# define _base(B)	(B)
 #else */
-# define _M(M)		(((M)>3) ? ASMFAIL("internal error: mod = " #M) : (M))
-# define _r(R)		(((R)>7) ? ASMFAIL("internal error: reg = " #R) : (R))
-# define _m(M)		(((M)>7) ? ASMFAIL("internal error: r/m = " #M) : (M))
-# define _s(S)		(((S)>3) ? ASMFAIL("internal error: memory scale = " #S) : (S))
-# define _i(I)		(((I)>7) ? ASMFAIL("internal error: memory index = " #I) : (I))
-# define _b(B)		(((B)>7) ? ASMFAIL("internal error: memory base = "  #B) : (B))
+# define _mod(M)	(((M)>3) ? ASMFAIL("internal error: mod = " #M) : (M))
+# define _reg(R)	(((R)>7) ? ASMFAIL("internal error: reg = " #R) : (R))
+# define _rm(M)		(((M)>7) ? ASMFAIL("internal error: r/m = " #M) : (M))
+# define _scale(S)	(((S)>3) ? ASMFAIL("internal error: memory scale = " #S) : (S))
+# define _index(I)	(((I)>7) ? ASMFAIL("internal error: memory index = " #I) : (I))
+# define _base(B)	(((B)>7) ? ASMFAIL("internal error: memory base = "  #B) : (B))
 /* #endif */
 
-#define _Mrm(Md,R,M)  _B((_M(Md)<<6)|(_r(R)<<3)|_m(M))
-#define _SIB(Sc,I, B) _B((_s(Sc)<<6)|(_i(I)<<3)|_b(B))
+#define _Mrm(Md,R,M)  _B((_mod(Md)<<6)|(_reg(R)<<3)|_rm(M))
+#define _SIB(Sc,I, B) _B((_scale(Sc)<<6)|(_index(I)<<3)|_base(B))
 
 #define _SCL(S)         ((((S)==1) ? _b00 : \
                          (((S)==2) ? _b01 : \
@@ -247,13 +247,28 @@ _r_0DIS:
 
 /* instruction formats */
 
+/*
+
+Naming Convention
+
+O		 8 bit opcode
+OO      	16 bit opcode
+Os		opcode + b10 when imm fits short (imm8)
+Or		opcode + register
+sW, sL		try short (imm8), revert to imm16 or imm32
+X		dispatch on register, displ, base, index, scale and emit appropriate
+imm		immediate value, usually postfixed with its size in bits
+w prefix	emit with the 0x66 prefix; i.e. 16 bit operand size
+
+*/
+
 /*       _format                                                     Opcd         ModR/M dN(rB,rI,Sc)     imm... */
 
 #define  _d16(                                  )  (                _B(0x66      )                               )
 #define   _O(        OP                         )  (                _B((OP)      )                               )
-#define   _Or(       OP,R                       )  (                _B((OP)|_r(R))                               )
+#define   _Or(       OP,R                       )  (                _B((OP)|_reg(R))                             )
 #define  _OO(        OP                         )  ( _B((OP)>>8), _B((OP)      )                               )
-#define  _OOr(       OP,R                       )  ( _B((OP)>>8), _B((OP)|_r(R))                               )
+#define  _OOr(       OP,R                       )  ( _B((OP)>>8), _B((OP)|_reg(R))                             )
 // Opcode | b10, when literal fits signed byte
 #define   _Os(       OP,B                       )  (     _s1P(B) ?  _B((OP)|_b10 ) : _B(OP)                    )
 // TODO rename these two
@@ -1166,12 +1181,11 @@ _r_0DIS:
 
 // prefix to convert 32-bit instruction into the corresponding 64-bit instruction
 //
-// can be omitted if none of
+// can be omitted if none of these are true:
 //	W = override when long-mode default is still 32-bit
 //	R = source register operand is r8..r15
 //	X = index register operand is r8..r15
 //	B = base or destination register operand is r8..r15
-// are true
 
 #define _REX(W,R,X,B)							\
     ((void)( (!((W) || _rXP(R) || _rXP(X) || _rXP(B)))			\
