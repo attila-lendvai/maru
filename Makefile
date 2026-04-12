@@ -472,8 +472,6 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 ###
 ### x86 assembler
 ###
-source/assembler/x86.l: $(BUILD)/generated/x86-instructions.l
-
 $(BUILD)/generated/x86-instructions.l: $(GEN_EVAL) source/assembler/gen-x86-instructions.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
 	@mkdir -p $(BUILD)/generated
 # KLUDGE, gc/mark-and-sweep is not tailcall for now, so we need more stack space
@@ -586,7 +584,7 @@ test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
 
 # make PLATFORM=linux test-elf.IA-32
-test-elf.IA-32: $(TEST_EVAL) tests/test-elf.IA-32.l source/assembler/x86.l
+test-elf.IA-32: $(TEST_EVAL) tests/test-elf.IA-32.l source/assembler/x86-instructions.l
 	$(TEST_EVAL) boot.l tests/test-elf.IA-32.l
 	@chmod +x build/test-elf.IA-32
 	-readelf -el build/test-elf.IA-32
@@ -597,7 +595,7 @@ test-elf.x86-64: $(TEST_EVAL) \
 		tests/test-elf.x86-64.traditional.l \
 		tests/test-elf.x86-64.single-pass.l \
 		tests/test-elf.x86-64.segments.l \
-		source/assembler/x86.l \
+		source/assembler/x86-instructions.l \
 		source/platforms/linux/linux.cgrov.$(TARGET).l \
 		source/platforms/linux/elf.cgrov.$(TARGET).l
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.traditional.l
@@ -624,7 +622,7 @@ test-elf.x86-64: $(TEST_EVAL) \
 test-elf: test-elf.x86-64
 
 # make PLATFORM=linux test-jit
-test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86.l
+test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86-instructions.l
 	@rm -rf $(BUILD)/jit/*
 	@mkdir -p $(BUILD)/jit
 	rm -f $(BUILD)/jit/*

@@ -56,7 +56,7 @@
 
 (define emit_rip_disp32 _D4)
 
-(require "build/generated/x86-instructions.l")
+(require "source/assembler/x86-instructions.l")
 
 (define-function .align (bytes)
   (let* ((env (<assembler>-env *assembler*))
