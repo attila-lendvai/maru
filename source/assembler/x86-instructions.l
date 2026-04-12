@@ -180,11 +180,13 @@
        (<= -128 I) (<= I 127)))
 
 (define-function _s2P (I)
-  (and (<= -32768 I)
-       (<= I 32767)))
+  (and (long? I)
+       (<= -0x8000 I)  ; -32768
+       (<= I 0x7fff))) ;  32767
 
 (define-function _s4P (I)
-  (and (>= I -0x80000000)   ; -2147483648
+  (and (long? I)
+       (>= I -0x80000000)   ; -2147483648
        (<= I  0x7fffffff))) ;  2147483647
 
 (define-function _s1 (I)
@@ -452,6 +454,31 @@
 (define-alu-instruction XOR 0x30 _b110)
 (define-alu-instruction CMP 0x38 _b111)
 
+(define-function MOVBrr (RS RD)		(_O_Mrm 128 _b11 (_r1 RS) (_r1 RD)))
+(define-function MOVBir (IM R)		(_Or_B 176 (_r1 R) (_s1 IM)))
+(define-function MOVBmr32 (D B I S RD)	(_O_r_X 138 (_r1 RD) D B I S))
+(define-function MOVBrm32 (RS D B I S)	(_O_r_X 136 (_r1 RS) D B I S))
+(define-function MOVBim32 (L D B I S)	(_O_X_B 198 D B I S (_s1 L)))
+(define-function MOVBmr (D B I S R)	(_p67mr D B I S R MOVBmr32))
+(define-function MOVBrm (R D B I S)	(_p67rm R D B I S MOVBrm32))
+(define-function MOVBim (L D B I S)	(_p67im L D B I S MOVBim32))
+
+(define-function MOVLrr (RS RD)			(_O_Mrm 0x89 _b11 (_r4 RS) (_r4 RD)))
+(define-function MOVLmr (D B I S RD)		(_O_r_X 0x8b (_r4 RD) D B I S))
+(define-function MOVLrm (RS D B I S)		(_O_r_X 0x89 (_r4 RS) D B I S))
+(define-function MOVLir (L R)			(_Or_L  0xb8 (_r4 R) L))
+(define-function MOVLim (L D B I S)		(_O_X_L 0xc7 D B I S L))
+
+;; TODO ? MOVABSQir emits the same as MOVQir
+;;(define-function MOVABSQir (I R)	(_REX 1 0 0 R) (MOVLir I (_r8 R)) (_L (bitwise-shift I -32)))
+(define-function MOVQrr (S D)		(_REX 1 S 0 D) (MOVLrr (_r8 S) (_r8 D)))
+(define-function MOVQmr (D B I S R)	(_REX 1 R I B) (MOVLmr D (_r8 B) (_r8 I) S (_r8 R)))
+(define-function MOVQrm (R D B I S)	(_REX 1 R I B) (MOVLrm (_r8 R) D (_r8 B) (_r8 I) S))
+(define-function MOVQi32r (L R)		(_REX 1 0 0 R) (_O_Mrm_L	0xc7 _b11 0 (_rN (_r8 R)) L))
+(define-function MOVQi64r (L R)		(_REX 1 0 0 R) (_Or_Q		0xb8 (_rN (_r8 R)) L))
+(define-function MOVQir (L R)		(if (_s4P L) (MOVQi32r L R) (MOVQi64r L R)))
+(define-function MOVQim (L D B I S)	(_REX 1 0 I B) (MOVLim L D (_r8 B) (_r8 I) S))
+
 (define-function BSWAPLr (R) (_OOr 4040 (_r4 R)))
 (define-function BTWir (IM RD) (_wOO_Mrm_B 4026 _b11 _b100 (_r2 RD) (_u1 IM)))
 (define-function BTWim (IM MD MB MI MS) (_wOO_r_X_B 4026 _b100 MD MB MI MS (_u1 IM)))
@@ -635,21 +662,11 @@
 (define-function LOOPZm (MD MB MI MS) (if (and (_r0P MB) (_r0P MI)) (_O_D1 225 MD) (ASMFAIL "illegal mode in loopz")))
 (define-function LOOPNEm (MD MB MI MS) (if (and (_r0P MB) (_r0P MI)) (_O_D1 224 MD) (ASMFAIL "illegal mode in loopne")))
 (define-function LOOPNZm (MD MB MI MS) (if (and (_r0P MB) (_r0P MI)) (_O_D1 224 MD) (ASMFAIL "illegal mode in loopnz")))
-(define-function MOVBrr (RS RD) (_O_Mrm 128 _b11 (_r1 RS) (_r1 RD)))
-(define-function MOVBir (IM R) (_Or_B 176 (_r1 R) (_s1 IM)))
-(define-function MOVBmr32 (D B I S RD) (_O_r_X 138 (_r1 RD) D B I S))
-(define-function MOVBrm32 (RS D B I S) (_O_r_X 136 (_r1 RS) D B I S))
-(define-function MOVBim32 (L D B I S) (_O_X_B 198 D B I S (_s1 L)))
 (define-function MOVWrr (RS RD) (_wO_Mrm 137 _b11 (_r2 RS) (_r2 RD)))
 (define-function MOVWmr (MD MB MI MS RD) (_wO_r_X 139 (_r2 RD) MD MB MI MS))
 (define-function MOVWrm (RS MD MB MI MS) (_wO_r_X 137 (_r2 RS) MD MB MI MS))
 (define-function MOVWir (IM R) (_wOr_W 184 (_r2 R) (_s2 IM)))
 (define-function MOVWim (IM MD MB MI MS) (_wO_X_W 199 MD MB MI MS (_s2 IM)))
-(define-function MOVLrr (RS RD) (_O_Mrm 137 _b11 (_r4 RS) (_r4 RD)))
-(define-function MOVLmr (MD MB MI MS RD) (_O_r_X 139 (_r4 RD) MD MB MI MS))
-(define-function MOVLrm (RS MD MB MI MS) (_O_r_X 137 (_r4 RS) MD MB MI MS))
-(define-function MOVLir (IM R) (_Or_L 184 (_r4 R) IM))
-(define-function MOVLim (IM MD MB MI MS) (_O_X_L 199 MD MB MI MS IM))
 (define-function MOVSBLrr (RS RD) (_OO_Mrm 4030 _b11 (_r4 RD) (_r1 RS)))
 (define-function MOVSBLmr (MD MB MI MS RD) (_OO_r_X 4030 (_r4 RD) MD MB MI MS))
 (define-function MOVZBLmr (MD MB MI MS RD) (_OO_r_X 4022 (_r4 RD) MD MB MI MS))
@@ -868,16 +885,6 @@
 (define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (_r8 B) (_r8 I) S (_r8 R))))
 (define-function LEAVEQ () (LEAVE))
 
-(define-function MOVABSQir (I R) (let () (_REX 1 0 0 R) (MOVLir I (_r8 R)) (_L (bitwise-shift I -32))))
-(define-function MOVBmr (D B I S R) (_p67mr D B I S R MOVBmr32))
-(define-function MOVBrm (R D B I S) (_p67rm R D B I S MOVBrm32))
-(define-function MOVBim (L D B I S) (_p67im L D B I S MOVBim32))
-(define-function MOVQim (N D B I S) (let () (_REX 1 0 I B) (MOVLim N D (_r8 B) (_r8 I) S)))
-(define-function MOVQir (I R) (let () (_REX 1 0 0 R) (_Or_Q 184 (_rN (_r8 R)) I)))
-(define-function MOVQir32 (I R) (let () (_REX 1 0 0 R) (_O_Mrm_L 199 _b11 0 (_rN (_r8 R)) I)))
-(define-function MOVQrm (R D B I S) (let () (_REX 1 R I B) (MOVLrm (_r8 R) D (_r8 B) (_r8 I) S)))
-(define-function MOVQmr (D B I S R) (let () (_REX 1 R I B) (MOVLmr D (_r8 B) (_r8 I) S (_r8 R))))
-(define-function MOVQrr (S D) (let () (_REX 1 S 0 D) (MOVLrr (_r8 S) (_r8 D))))
 (define-function MOVSBQrr (S D) (let () (_REX 1 S 0 D) (MOVSBLrr S (_r8 D))))
 (define-function MOVSBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVSBLmr D (_r8 B) (_r8 I) S (_r8 R))))
 (define-function MOVZBQrr (S D) (let () (_REX 1 S 0 D) (MOVZBLrr S (_r8 D))))
