@@ -303,12 +303,16 @@
   label)
 
 (define-function _B  (value)
-  (let* ((segment	(current-segment))
-         (buffer	(<segment>-buffer segment))
-         (position	(<segment>-paddress segment)))
-    (incr (<segment>-laddress segment))
-    (set (lower/array-at buffer position) value)
-    (set (<segment>-paddress segment) (+ 1 position))))
+  (typecase value
+    (<long>
+     (let* ((segment	(current-segment))
+            (buffer	(<segment>-buffer segment))
+            (position	(<segment>-paddress segment)))
+       (incr (<segment>-laddress segment))
+       (set (lower/array-at buffer position) value)
+       (set (<segment>-paddress segment) (+ 1 position))))
+    (<label>	(emit-label value _B 1 ()))
+    (else	(error "_B: called with unexpected value: "value))))
 
 (define-function _W (value)
   (typecase value
