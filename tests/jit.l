@@ -56,18 +56,15 @@
          (MOVQmr	0 RDI 0 0 RDI)
          (call		fflush)
 
-         (MOVQir	42 RAX)
+         ;; NOTE libc only picks up EAX, not the entire RAX as return
+         ;; value, so this doesn't test an actual bug where NEGQ was
+         ;; wrongly emitting a NEGL.
+         (MOVQir	-42 RAX)
+         (NEGQr		RAX)
          (let ((future-value (label)))
-           (SUBQir	42 RAX)
-           ;; TODO add support for this to the instruction emitters
-           ;; _s1P and _Os (and others in general) need to handle
-           ;; non-integer values and safely fall back.
-           ;; TODO split the implementation of SUBQim to SUBQim8
-           ;; and SUBQim32 so that it's possible to pick one when
-           ;; using such future-value setups
-           ;; (SUBQir	future-value RAX)
-           ;; (label!	future-value 42)
-           )
+           (SUBQir8	future-value RAX)
+           (NOP)
+           (label!	future-value 42))
 
          (RET)))))
 
@@ -118,6 +115,15 @@
       (NOP)
       (NOP)
 
+      ;; some unexecuted instructions to test the instruction emitters
+      (ADDBrr	AL BL)
+      (ADDBmr	8 0 0 0 BL)
+      (ADDQir	8 RAX)
+      (ADDQir	9 RBX)
+      (ADDQir	0x11223344 RCX)
+      (LEAQmr	3 RAX RBX 8 RCX)
+      (NOP)
+
       (label!	'skip-2)
       (LEAQmr	'data-1 0 0 0 RAX)
       (MOVQmr	0 RAX 0 0 RAX)        ; data-1 in rax
@@ -138,6 +144,12 @@
     (DIVQrr	RBX RAX)
     (SUBQrm	RAX 'exit-code 0 0 0)
     (MOVQmr	'exit-code 0 0 0 RAX)
+    ;; de facto NOPs to test the instruction emitters
+    (ANDQir	0xff RAX)
+    (ORQir	0 RAX)
+    (XORQir	0 RAX)
+    (ADDQir	3 RAX)
+    (SUBQir32	3 RAX)
     (RET)
     (label! 'exit-code)
     (.i64	1)))
