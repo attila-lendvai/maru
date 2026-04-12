@@ -62,7 +62,7 @@
          (MOVQir	-42 RAX)
          (NEGQr		RAX)
          (let ((future-value (label)))
-           (SUBQir8	future-value RAX)
+           (SUBQi8r	future-value RAX)
            (NOP)
            (label!	future-value 42))
 
@@ -149,7 +149,7 @@
     (ORQir	0 RAX)
     (XORQir	0 RAX)
     (ADDQir	3 RAX)
-    (SUBQir32	3 RAX)
+    (SUBQi32r	3 RAX)
     (RET)
     (label! 'exit-code)
     (.i64	1)))
@@ -162,10 +162,10 @@
   (define-jit-test jit-linux-1 ()
 
     ;; print using forward labels
-    (MOVQir32	linux/SYS_write RAX)
-    (MOVQir32	linux/STDERR_FILENO RDI)
+    (MOVQi32r	linux/SYS_write RAX)
+    (MOVQi32r	linux/STDERR_FILENO RDI)
     (LEAQmr	'msg 0 0 0 RSI)                    ; buffer
-    (MOVQir32	(label 'msg-end (- self (laddress 'msg))) RDX) ; strlen(buffer)
+    (MOVQi32r	(label 'msg-end (- self (laddress 'msg))) RDX) ; strlen(buffer)
     (SYSCALL)
 
     ;; only to test the instruction emitter
@@ -182,13 +182,13 @@
     (.align	16)
     (label!	'skip-text)
 
-    (MOVQir32	linux/SYS_write RAX)
-    (MOVQir32	linux/STDERR_FILENO RDI)
+    (MOVQi32r	linux/SYS_write RAX)
+    (MOVQi32r	linux/STDERR_FILENO RDI)
     (LEAQmr	'msg 0 0 0 RSI)
-    (MOVQir32	(- (laddress 'msg-end) (laddress 'msg)) RDX)
+    (MOVQi32r	(- (laddress 'msg-end) (laddress 'msg)) RDX)
     (SYSCALL)
 
-    (MOVQir32	0 RAX)
+    (MOVQi32r	0 RAX)
     (RET)))
 
 (run-tests)

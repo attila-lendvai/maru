@@ -51,7 +51,7 @@
 
 (define-form syscall (sys-number . args)
   `(begin
-    (MOVQir32	,sys-number _RAX)
+    (MOVQi32r	,sys-number _RAX)
     ,@(map (lambda (arg reg)
              ;; this being a macro opens the possibility for automatic
              ;; opcode selection based on the provided arg.

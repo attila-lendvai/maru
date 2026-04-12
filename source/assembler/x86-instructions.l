@@ -386,6 +386,23 @@
 (define-function _wO_r_X_W (OP R MD MB MI MS W) (let () (_d16) (_O_r_X_W OP R MD MB MI MS W)))
 (define-function _wOs_r_X_sW (OP R MD MB MI MS W) (let () (_d16) (_Os_r_X_sW OP R MD MB MI MS W)))
 
+(define-function _to_r4 (R)
+  (+ 0x40 (_rN R)))
+
+(define-function _p67mr (D B I S R INST)
+  (unless (or (_r8P B) (_r8P I))
+    (_B 0x67))
+  (INST D (_to_r4 B) (_to_r4 I) S R))
+
+(define-function _p67rm (R D B I S INST)
+  (unless (or (_r8P B) (_r8P I))
+    (_B 0x67))
+  (INST R D (_to_r4 B) (_to_r4 I) S))
+
+(define-function _p67im (L D B I S INST)
+  (unless (or (_r8P B) (_r8P I))
+    (_B 0x67))
+  (INST L D (_to_r4 B) (_to_r4 I) S))
 
 ;; ALU “Group 1” (the most regular class)
 
@@ -411,17 +428,17 @@
       (define-function ,(name Lmr)	(MD MB MI MS RD)	(_O_r_X		,(+ op 3)	(_r4 RD)		MD MB MI MS			))
       (define-function ,(name Lrm)	(RS MD MB MI MS)	(_O_r_X		,(+ op 1)	(_r4 RS)		MD MB MI MS			))
       ;; TODO wrap IM in some assert for the range? keep in mind that it may be a label...
-      (define-function ,(name Lir8)	(IM RD)			(_O_Mrm_B	0x83		_b11 ,reg (_r4 RD)			IM		))
-      (define-function ,(name Lir32)	(IM RD)			(_O_Mrm_L	0x81		_b11 ,reg (_r4 RD)			IM		))
-      (define-function ,(name Lir)	(IM RD)			((if (_s1P IM) ,(name Lir8) ,(name Lir32)) IM RD))
+      (define-function ,(name Li8r)	(IM RD)			(_O_Mrm_B	0x83		_b11 ,reg (_r4 RD)			IM		))
+      (define-function ,(name Li32r)	(IM RD)			(_O_Mrm_L	0x81		_b11 ,reg (_r4 RD)			IM		))
+      (define-function ,(name Lir)	(IM RD)			((if (_s1P IM) ,(name Li8r) ,(name Li32r)) IM RD))
       (define-function ,(name Lim)	(IM MD MB MI MS)	(_Os_r_X_sL	0x81		,reg			MD MB MI MS	IM		))
 
       ;; 64 bit is just REX prefixed 32 bit
       (define-function ,(name Qrr)	(RS RD)			(_REX 1 RS 0 RD)	(,(name Lrr)	(_r8 RS) (_r8 RD)))
       (define-function ,(name Qmr)	(D B I S RD)		(_REX 1 RD I B)		(,(name Lmr)	D (_r8 B) (_r8 I) S (_r8 RD)))
       (define-function ,(name Qrm)	(RS D B I S)		(_REX 1 RS I B)		(,(name Lrm)	(_r8 RS) D (_r8 B) (_r8 I) S))
-      (define-function ,(name Qir8)	(L RD)			(_REX 1 0 0 RD)		(,(name Lir8)	L (_r8 RD)))
-      (define-function ,(name Qir32)	(L RD)			(_REX 1 0 0 RD)		(,(name Lir32)	L (_r8 RD)))
+      (define-function ,(name Qi8r)	(L RD)			(_REX 1 0 0 RD)		(,(name Li8r)	L (_r8 RD)))
+      (define-function ,(name Qi32r)	(L RD)			(_REX 1 0 0 RD)		(,(name Li32r)	L (_r8 RD)))
       (define-function ,(name Qir)	(L RD)			(_REX 1 0 0 RD)		(,(name Lir)	L (_r8 RD)))
       (define-function ,(name Qim)	(L D B I S)		(_REX 1 0 I B)		(,(name Lim)	L D (_r8 B) (_r8 I) S))
       )))
@@ -850,10 +867,7 @@
 (define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (_r8 B) (_r8 I) S)))
 (define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (_r8 B) (_r8 I) S (_r8 R))))
 (define-function LEAVEQ () (LEAVE))
-(define-function _to_r4 (R) (+ 64 (_rN R)))
-(define-function _p67mr (D B I S R INST) (let () (if (or (_r8P B) (_r8P I)) 1 (_B 103)) (INST D (_to_r4 B) (_to_r4 I) S R)))
-(define-function _p67rm (R D B I S INST) (let () (if (or (_r8P B) (_r8P I)) 1 (_B 103)) (INST R D (_to_r4 B) (_to_r4 I) S)))
-(define-function _p67im (L D B I S INST) (let () (if (or (_r8P B) (_r8P I)) 1 (_B 103)) (INST L D (_to_r4 B) (_to_r4 I) S)))
+
 (define-function MOVABSQir (I R) (let () (_REX 1 0 0 R) (MOVLir I (_r8 R)) (_L (bitwise-shift I -32))))
 (define-function MOVBmr (D B I S R) (_p67mr D B I S R MOVBmr32))
 (define-function MOVBrm (R D B I S) (_p67rm R D B I S MOVBrm32))
