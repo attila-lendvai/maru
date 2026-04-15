@@ -190,51 +190,51 @@
        (<= I  0x7fffffff))) ;  2147483647
 
 (define-function _s1 (I)
-  (assert (_s1P I) "out of range for 8-bit signed immediate: " I)
+  (assert (_s1P I) "out of range for 8-bit signed immediate: "I)
   I)
 
 (define-function _s2 (I)
-  (assert (_s2P I) "out of range for 16-bit signed immediate: " I)
+  (assert (_s2P I) "out of range for 16-bit signed immediate: "I)
   I)
 
 (define-function _s4 (I)
-  (assert (_s4P I) "out of range for 32-bit signed immediate: " I)
+  (assert (_s4P I) "out of range for 32-bit signed immediate: "I)
   I)
 
 (define-function _u1 (I)
-  (assert (_u1P I) "out of range for 8-bit unsigned immediate:" I)
+  (assert (_u1P I) "out of range for 8-bit unsigned immediate: "I)
   I)
 
 (define-function _u2 (I)
-  (assert (_u2P I) "out of range for 16-bit unsigned immediate: " I)
+  (assert (_u2P I) "out of range for 16-bit unsigned immediate: "I)
   I)
 
 (define-function _d1 (I)
-  (assert (_s1P I) "8-bit displacement out of range")
+  (assert (_s1P I) "8-bit displacement out of range: "I)
   I)
 
 (define-function _mod (M)
-  (assert (<= M 3) "internal error: mod = " M)
+  (assert (<= M 3) "illegal mod: "M)
   M)
 
 (define-function _reg (R)
-  (assert (<= R 7) "internal error: reg = " R)
+  (assert (<= R 7) "illegal reg: "R)
   R)
 
 (define-function _rm (M)
-  (assert (<= M 7) "internal error: r/m = " M)
+  (assert (<= M 7) "illegal r/m: "M)
   M)
 
 (define-function _scale (S)
-  (assert (<= S 3) "internal error: memory scale = " S)
+  (assert (<= S 3) "illegal memory scale: "S)
   S)
 
 (define-function _index (I)
-  (assert (<= I 7) "internal error: memory index = " I)
+  (assert (<= I 7) "illegal memory index: "I)
   I)
 
 (define-function _base (B)
-  (assert (<= B 7) "internal error: memory base = " B)
+  (assert (<= B 7) "illegal memory base: "B)
   B)
 
 (define-function _Mrm (mod reg rm)
@@ -251,7 +251,7 @@
     ((= S 2) _b01)
     ((= S 4) _b10)
     ((= S 8) _b11)
-    (else (ASMFAIL "illegal scale: " S))))
+    (else (ASMFAIL "illegal scale: "S))))
 
 ;;;
 ;;; memory subformats
@@ -276,15 +276,47 @@
   (_Mrm _b00 (_rN R) _b101)
   (emit_rip_disp32 D))
 
-(define-function _r_0B (R B) (_Mrm _b00 (_rN R) (_r4 B)))
-(define-function _r_0BIS (R B I S) (let () (_Mrm _b00 (_rN R) _b100) (_SIB (_SCL S) (_r4 I) (_r4 B))))
-(define-function _r_0DIS (R D I S) (let () (_Mrm _b00 (_rN R) _b100) (_SIB (_SCL S) (_r4 I) 5) (_L D)))
-(define-function _r_1B (R D B) (let () (_Mrm _b01 (_rN R) (_r4 B)) (_B D)))
-(define-function _r_1BIS (R D B I S) (let () (_Mrm _b01 (_rN R) _b100) (_SIB (_SCL S) (_r4 I) (_r4 B)) (_B D)))
-(define-function _r_4B (R D B) (let () (_Mrm _b10 (_rN R) (_r4 B)) (_L D)))
-(define-function _r_4BIS (R D B I S) (let () (_Mrm _b10 (_rN R) _b100) (_SIB (_SCL S) (_r4 I) (_r4 B)) (_L D)))
-(define-function _r_DB (R D B) (if (_s0P D) (_r_0B R B) (if (_s1P D) (_r_1B R D B) (_r_4B R D B))))
-(define-function _r_DBIS (R D B I S) (if (_s0P D) (_r_0BIS R B I S) (if (_s1P D) (_r_1BIS R D B I S) (_r_4BIS R D B I S))))
+(define-function _r_0B (R B)
+  (_Mrm _b00 (_rN R) (_r4 B)))
+
+(define-function _r_0BIS (R B I S)
+  (_Mrm _b00 (_rN R) _b100)
+  (_SIB (_SCL S) (_r4 I) (_r4 B)))
+
+(define-function _r_0DIS (R D I S)
+  (_Mrm _b00 (_rN R) _b100)
+  (_SIB (_SCL S) (_r4 I) 5)
+  (_L D))
+
+(define-function _r_1B (R D B)
+  (_Mrm _b01 (_rN R) (_r4 B))
+  (_B D))
+
+(define-function _r_1BIS (R D B I S)
+  (_Mrm _b01 (_rN R) _b100)
+  (_SIB (_SCL S) (_r4 I) (_r4 B))
+  (_B D))
+
+(define-function _r_4B (R D B)
+  (_Mrm _b10 (_rN R) (_r4 B))
+  (_L D))
+
+(define-function _r_4BIS (R D B I S)
+  (_Mrm _b10 (_rN R) _b100)
+  (_SIB (_SCL S) (_r4 I) (_r4 B))
+  (_L D))
+
+(define-function _r_DB (R D B)
+  (cond
+    ((_s0P D)	(_r_0B R B))
+    ((_s1P D)	(_r_1B R D B))
+    (else	(_r_4B R D B))))
+
+(define-function _r_DBIS (R D B I S)
+  (cond
+    ((_s0P D)	(_r_0BIS R B I S))
+    ((_s1P D)	(_r_1BIS R D B I S))
+    (else	(_r_4BIS R D B I S))))
 
 ;; 32 bit version
 ;; (define-function _r_X (R D B I S)
@@ -302,20 +334,44 @@
 
 ;; 64 bit version
 (define-function _r_X (R D B I S)
-  (if (_r0P I)
-      (if (_r0P B)
-          (_r_D R D)
-        (if (= _ESP B)
-            (_r_DBIS R D _ESP _ESP 1)
-          (_r_DB R D B)))
-    (if (_r0P B)
-        (_r_0DIS R D I S)
-      (_r_DBIS R D B I S))))
+  (cond
+    ((_r0P I)	(cond
+                  ((_r0P B)	(_r_D R D))
+                  ((= _ESP B)	(_r_DBIS R D _ESP _ESP 1))
+                  (else		(_r_DB R D B))))
+    ((_r0P B)	(_r_0DIS R D I S))
+    (else	(_r_DBIS R D B I S))))
 
 (define-function _rXP (R) (>= (bitwise-and R 15) 8))
+
 (define-function _r8P (R) (= (_rS R) 8))
-(define-function _r8 (R) (if (_r0P R) 0 (if (_r8P R) (+ 64 (_rN R)) (ASMFAIL "64-bit register required"))))
-(define-function _REX (W R X B) (if (= 0 (or W (or (_rXP R) (or (_rXP X) (_rXP B))))) 0 (_B (+ 64 (+ (bitwise-shift W 3) (+ (if (_rXP R) 4 0) (+ (if (_rXP X) 2 0) (if (_rXP B) 1 0))))))))
+
+(define-function _r8 (R)
+  (if (_r0P R)
+      0
+    (if (_r8P R)
+        (+ 64 (_rN R))
+      (ASMFAIL "64-bit register required"))))
+
+(define-function _REX (W R X B)
+  ;; TODO test and use this
+  ;; (let ((value (+ (if (_rXP R) 4 0)
+  ;;                 (if (_rXP X) 2 0)
+  ;;                 (if (_rXP B) 1 0))))
+  ;;   (unless (= 0 value)
+  ;;     (_B (+ 0x40
+  ;;            value
+  ;;            (bitwise-shift W 3)))))
+  (if (= 0 (or W
+               (_rXP R)
+               (_rXP X)
+               (_rXP B)))
+      0
+    (_B (+ 64
+           (bitwise-shift W 3)
+           (if (_rXP R) 4 0)
+           (if (_rXP X) 2 0)
+           (if (_rXP B) 1 0)))))
 
 ;;;
 ;;; instruction formats
