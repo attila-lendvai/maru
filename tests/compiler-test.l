@@ -337,6 +337,14 @@
     (bitwise-not -1)
   0)
 
+(define-test compile/bitwise-not/2
+    (bitwise-not 0xffff)
+  -0x10000)
+
+(define-test compile/bitwise-not/2
+    (bitwise-not 0xffffffff)
+  -0x100000000)
+
 (define-test compile/bitwise-shift-left/1
     (bitwise-shift 0x0f 4)
   0xf0)
@@ -356,6 +364,10 @@
 (define-test compile/bitwise-shift-right/3
     (bitwise-shift 0xffffff0 -1000)
   0)
+
+(define-test compile/bitwise-shift-right/4
+    (bitwise-shift -1 -10)
+  -1)
 
 (define-test compile/bitwise-shift/literal/1
     (bitwise-shift 0x0f 4)

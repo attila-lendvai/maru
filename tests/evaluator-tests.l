@@ -39,6 +39,16 @@
   (test-assert (= -24  (* 1 -2 3 4)))
   )
 
+(define-test eval/arithmetic/logic ()
+  (test-assert (= 42		(bitwise-or 42)))
+  (test-assert (= 3		(bitwise-or 1 2 3)))
+  (test-assert (= 42		(bitwise-and 42)))
+  (test-assert (= 0x01234567	(bitwise-and 0x01234567 0x0fffffff)))
+  (test-assert (= 0xa		(bitwise-and 0x2a 0xff 0xf)))
+  (test-assert (= 0xff		(bitwise-xor 0xff)))
+  (test-assert (= 0xef		(bitwise-xor 0xff 0x11 0x1)))
+  )
+
 (define-test eval/arithmetic/shift ()
   (test-assert (= 0xffffff	(bitwise-shift 0xffffff0 -4)))
   (test-assert (= 1		(bitwise-shift 0xfffffff -27)))

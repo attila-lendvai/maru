@@ -241,14 +241,14 @@
     (INCQr	RAX)
     (MOVQmr	0 RSP RAX 8 RCX)
     (TESTQrr	RCX RCX)
-    (JNESm	lp 0 0 0))
+    (JNES	lp))
   ;; we reached at the aux vector
   (let ((lp (label!))
         (good (label)))
     (INCQr	RAX)
     (MOVQmr	0 RSP RAX 8 RCX)        ; a_type
     (TESTQrr	RCX RCX)
-    (JNZSm	good 0 0 0)
+    (JNZS	good)
 
     (MOVQir	1 RDI)
     (syscall	linux/SYS_exit)
@@ -256,7 +256,7 @@
     (label!	good)
     (INCQr	RAX)                    ; skip the a_type
     (CMPQir	linux/AT_BASE RCX)
-    (JNESm	lp 0 0 0)
+    (JNES	lp)
     (MOVQmr	0 RSP RAX 8 RCX)        ; the ld.so ELF address
 
     ;; TODO and now what? we would need to parse the ELF of the loader
