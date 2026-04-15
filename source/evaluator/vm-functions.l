@@ -112,56 +112,49 @@
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 (define-vm-function (- ()) _
-  (or (pair? -args-) (error "operator '-' called with zero arguments"))
-  (let ((result	(unbox <long> (get/head -args-)))
-        (rest	(get/tail -args-)))
-    (if (pair? rest)
-        (while (let ()
-                 (set result (- result (unbox <long> (get/head rest))))
-                 (pair? (set rest (get/tail rest)))))
-      (set result (- result)))
-    (box <long> result)))
+  (if (pair? -args-)
+      (let ((value	(if (pair? (get/tail -args-))
+                            ;; 2+ args
+                            (unbox <long> (pop -args-))
+                          ;; 1 arg
+                          0)))
+        (while (pair? -args-)
+          (set value (- value (unbox <long> (pop -args-)))))
+        (box <long> value))
+    ;; 0 args
+    (box <long> 0)))
 
 (define-vm-function (+ ()) _
-  (let ((result	0)
-        (rest	()))
-    (when (pair? -args-)
-      (set result (unbox <long> (get/head -args-)))
-      (set rest   (get/tail -args-)))
-    (while (pair? rest)
-      (set result (+ result (unbox <long> (get/head rest))))
-      (set rest (get/tail rest)))
-    (box <long> result)))
+  (let ((value	0))
+    (while -args-
+      (set value (+ value (unbox <long> (pop -args-)))))
+    (box <long> value)))
 
 (define-vm-function (/ ()) _
-  (or (pair? -args-) (error "operator '/' called with zero arguments"))
-  (let ((result	(unbox <long> (get/head -args-)))
-        (rest	(get/tail -args-)))
-    (if (pair? rest)
-        (while (let ()
-                 (set result (/ result (unbox <long> (get/head rest))))
-                 (pair? (set rest (get/tail rest)))))
-      (set result (/ 1 result)))
-    (box <long> result)))
+  (if (pair? -args-)
+      (let ((value	(unbox <long> (pop -args-))))
+        (while (pair? -args-)
+          (set value (/ value (unbox <long> (pop -args-)))))
+        (box <long> value))
+    (error "operator '/' needs at least one argument")))
 
 (define-vm-function (* ()) _
-  (let ((result	1)
-        (rest	()))
-    (when (pair? -args-)
-      (set result (unbox <long> (get/head -args-)))
-      (set rest   (get/tail -args-)))
-    (while (pair? rest)
-      (set result (* result (unbox <long> (get/head rest))))
-      (set rest (get/tail rest)))
-    (box <long> result)))
+  (let ((value	1))
+    (while -args-
+      (set value (* value (unbox <long> (pop -args-)))))
+    (box <long> value)))
 
-(define-form define-binary-operator (op)
-  `(define-vm-function (,op ()) ((lhs <long>) (rhs <long>))
-     (box <long> (,op lhs rhs))))
+(define-form define-bitwise-operator (op)
+  `(define-vm-function (,op ()) _
+     (or (pair? -args-) (error ,(concat-strings "operator '"(symbol->string op)"': called with zero arguments")))
+     (let ((value (unbox <long> (pop -args-))))
+       (while -args-
+         (set value (,op value (unbox <long> (pop -args-)))))
+       (box <long> value))))
 
-(define-binary-operator bitwise-and)
-(define-binary-operator bitwise-or)
-(define-binary-operator bitwise-xor)
+(define-bitwise-operator bitwise-and)
+(define-bitwise-operator bitwise-or)
+(define-bitwise-operator bitwise-xor)
 
 (define-vm-function (bitwise-not ()) ((value <long>))
   (box <long> (bitwise-not value)))
