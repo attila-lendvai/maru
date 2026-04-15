@@ -163,9 +163,20 @@
   (box <long> (bitwise-shift value shift)))
 
 (define-form define-relation (op)
-  `(define-vm-function (,op ()) ((lhs <long>) (rhs <long>))
-     (and (,op lhs rhs)
-          symbol/true)))
+  `(define-vm-function (,op ()) _
+     (unless (pair? -args-)
+       (return symbol/true))
+     (let ((current	(unbox <long> (pop -args-)))
+           next)
+       (while (pair? -args-)
+         ;; TODO this could use (set current (unbox <long> (pop
+         ;; -args-))) but that heavily relies on the specifics of
+         ;; compiler semantics (and doesn't work currently)
+         (let ((next (unbox <long> (pop -args-))))
+           (unless (,op current next)
+             (return false))
+           (set current next)))
+       symbol/true)))
 
 (define-relation <)
 (define-relation <=)
