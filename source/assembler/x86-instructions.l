@@ -390,7 +390,7 @@
 
 (define-function _OO (OP)
   (_B (bitwise-shift OP -8))
-  (_B OP))
+  (_B (bitwise-and OP 0xff)))
 
 (define-function _OOr (OP R)
   (_B (bitwise-shift OP -8))

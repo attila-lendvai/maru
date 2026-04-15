@@ -305,6 +305,7 @@
 (define-function _B  (value)
   (typecase value
     (<long>
+     (assert (if (<= 0 value) (<= value 0xff) (<= -0x80 value 0x7f)) "_B was called with value: "value)
      (let* ((segment	(current-segment))
             (buffer	(<segment>-buffer segment))
             (position	(<segment>-paddress segment)))
@@ -317,7 +318,7 @@
 (define-function _W (value)
   (typecase value
     (<long>
-     (assert (<= value 0xffff) "_W was called with value: "value)
+     (assert (if (<= 0 value) (<= value 0xffff) (<= -0x8000 value 0x7fff)) "_W was called with value: "value)
      (_B (bitwise-and 0xff value))
      (_B (bitwise-and 0xff (bitwise-shift value -8))))
     (<label>	(emit-label value _W 2 ()))
@@ -327,7 +328,7 @@
   ;;(println "_L, value: "value)
   (typecase value
     (<long>
-     (assert (<= value 0xffffffff) "_L was called with value: "value)
+     (assert (if (<= 0 value) (<= value 0xffffffff) (<= -0x80000000 value 0x7fffffff)) "_L was called with value: "value)
      (_W (bitwise-and 0xffff value))
      (_W (bitwise-and 0xffff (bitwise-shift value -16))))
     (<label>	(emit-label value _L 4 ()))
@@ -370,7 +371,7 @@
   ;;(println "_D4, value: "value)
   (typecase value
     (<long>
-     (assert (and (<= -0x80000000 value) (<= value 0x7f000000)) "_D4 was called with offset larger than rel32: "value)
+     (assert (and (<= -0x80000000 value) (<= value 0x7fffffff)) "_D4 was called with offset larger than rel32: "value)
      (_L value))
     (<label>	(emit-label value _D4 4 (- 0 (current-laddress) 4)))
     (<symbol>	(_D4 (%ensure-label value)))
