@@ -66,6 +66,7 @@
 (define-operand REGISTER ()	(name index)	self.name)
 (define-operand LITERAL ()	(value)		"$"self.value)
 (define-operand GLOBAL-CELL ()	(name)		self.name)
+(define-operand GLOBAL-ADDR ()	(name)		self.name)
 (define-operand STACK-CELL ()	(offset))
 
 (define-operand LI32 LITERAL)
@@ -297,6 +298,9 @@
                                     (println "	xor	%rax, %rax")
                                   (println "	mov	"$1", %rax")))
   ((R64)			(println "	mov	"$1", %rax"))
+  ((GLOBAL-ADDR)		(if (= +word-size-in-bytes+ 4)
+                                    (println "	lea	"$1", %eax")
+                                  (println "	lea	"$1"(%rip), %rax")))
   ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
 				(println "	mov	(%rax), %rax")))
 ;; $1 what, $2 where

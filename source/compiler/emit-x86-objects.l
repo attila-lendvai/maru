@@ -165,4 +165,6 @@
                            (LABEL name)
                          (UNIQUE-LABEL "code"))))
       (emit-expr-code self entry-point -c-)
-      entry-point)))
+      (if (feature redefinable-functions-in-target)
+          (GLOBAL-CELL entry-point)
+        (GLOBAL-ADDR entry-point)))))
