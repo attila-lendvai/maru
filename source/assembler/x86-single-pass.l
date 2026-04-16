@@ -392,6 +392,11 @@
 (define DL _DL)
 (define BL _BL)
 
+(define AX _AX)
+(define CX _CX)
+(define DX _DX)
+(define BX _BX)
+
 (define EAX _EAX)
 (define ECX _ECX)
 (define EDX _EDX)
