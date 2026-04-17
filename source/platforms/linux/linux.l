@@ -83,11 +83,15 @@
      (assert (< 0 len))
      `((string->C-string ,str) ,len))))
 
-(define-form platform/diag-print (str)
-  (if (is <string> str)
-      `(linux-syscall linux/SYS_write linux/STDERR_FILENO ,@(string+length str))
-    `(let ((cstr (string->C-string ,str)))
-       (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr)))))
+(if-at-expand (feature emit-with-object-headers)
+    (define-form platform/diag-print (str)
+      (if (is <string> str)
+          `(linux-syscall linux/SYS_write linux/STDERR_FILENO ,@(string+length str))
+        `(let ((cstr (string->C-string ,str)))
+           (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr)))))
+
+  (define-function platform/diag-print (str)
+    (linux-syscall linux/SYS_write linux/STDERR_FILENO str (C-string-length str))))
 
 (define-function platform/diag-print-char (char)
   ;; TODO endianness?
