@@ -37,6 +37,10 @@
 ;; compatible (maru.9 lacks the true/false recognition). (evolving)
 (define feature/profiler/build false)
 
+(define-form begin body
+  `(let ()
+     ,@body))
+
 (define-function print-list (lst . etc)
   (let ((separator (or (pop etc) " "))
         (stream    (or (pop etc) *standard-output*)))
