@@ -309,7 +309,7 @@
   ((LOCAL _)			(println "	"$reg1" = inttoptr "$2" "$1" to %oop")))
 
 (define-instruction BITCAST	(true 1 true)
-  ((LOCAL _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
+  ((_ _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
 (define-instruction GEP		(true 1 true)
   ;; args: ptr type index1 index2
@@ -1009,8 +1009,11 @@
 (define-method compile <string> (-c-)
   (set (<compiler>-current-value -c-)
        (compile-object self -c-))
-  (gen GEP (LOCAL '<string-h>) 0 1) ; 1 means skip the header
-  (gen BITCAST "%word*" "%oop"))
+  (if (feature emit-with-object-headers)
+      (begin
+       (gen GEP (LOCAL '<string-h>) 0 1) ; 1 means skip the header
+       (gen BITCAST "%word*" "%oop"))
+    (gen BITCAST "ptr" "%oop")))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
