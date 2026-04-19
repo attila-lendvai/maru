@@ -619,8 +619,8 @@
 ;;         (incr result (- char ?0))))
 ;;   (+ 3 5))
 
-(define-function main/common (argc argv)
-  (platform/print-diag-fmt "Printing test command line args:\n")
+(define-function main (argc argv)
+  (platform/diag-print "Printing test command line args:\n")
   (for (i 0 argc)
     (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
 
@@ -645,13 +645,3 @@
   (platform/diag-print "\n\e[32mFinished running the compiled tests\e[m\n")
 
   (return *exit-code*))
-
-(if-at-expand (feature platform/linux)
-    (define-function _start ()
-      (let* ((sp (stack-pointer-on-entry))
-             (argc (oop-at sp 0))
-             (argv (+ sp (words-to-bytes 1))))
-        (linux-syscall linux/SYS_exit (main/common argc argv))))
-
-  (define-function main (argc argv)
-    (main/common argc argv)))
