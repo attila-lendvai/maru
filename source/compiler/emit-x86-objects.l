@@ -143,7 +143,7 @@
         (LABEL (concat-string (symbol->string name) "__code")))
 
       (define-function compile-expr (self name -c-)
-        (emit-comment 1 "compiling fn "name", "self)
+        (emit-comment 1 "compiling fn "(or name "/unnamed/")", "self)
         (let ((entry-point (if name
                                (closure-code-label name)
                              (UNIQUE-LABEL "code"))))

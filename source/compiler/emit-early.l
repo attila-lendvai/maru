@@ -140,18 +140,6 @@
    produces-output?
    ))
 
-(define-generic emit-instruction)
-
-(define-form emit (instr-name . args)
-  `(%emit -c- ,instr-name (list ,@args)))
-
-(define-function %emit (-c- factory args)
-  (let* ((instr (factory ())))
-    (when (<= 3 *compiler-verbosity*)
-      ;; TODO move this into emit-instruction?
-      (println "; EMIT of "instr", args: " args))
-    (apply emit-instruction (cons -c- (cons instr args)))))
-
 (define-function %emit-form/mm-params (index types)
   (when (pair? types)
     (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
@@ -215,6 +203,15 @@
 
        ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
 
+;;;
+;;; Emission
+;;;
+
+(define-generic emit-instruction)
+
+(define-form emit (instr-name . args)
+  `(%emit -c- ,instr-name (list ,@args)))
+
 (define-instruction COMMENT	()
   ;; just a default that can be redefined
   ((pair)			(print "; ") (apply println $1)))
@@ -224,9 +221,13 @@
   `(when (<= ,level *compiler-verbosity*)
      (emit COMMENT (list ,@args))))
 
-;;;
-;;; Compiler
-;;;
+(define-function %emit (-c- factory args)
+  (let* ((instr (factory ())))
+    (when (and (<= 3 *compiler-verbosity*)
+               (not (is <COMMENT> instr)))
+      ;; TODO move this into emit-instruction?
+      (print-all *debug-output* "; EMIT of "instr", args: "args"\n"))
+    (apply emit-instruction (cons -c- (cons instr args)))))
 
 (define-form comp (obj)
   `(let ((__obj__ ,obj))
@@ -243,7 +244,8 @@
 
 (define-function emit-gen-buffer (-c-)
   (array-do entry (<compiler>-gen-buffer -c-)
-    (emit-comment 2 "EMIT-INSTRUCTION of "(first entry)", args: "(rest entry))
+    ;; GENE = GEN Emit
+    (emit-comment 3 "GENE of "(first entry)", args: "(rest entry))
     (apply emit-instruction (cons -c- entry))))
 
 (load "source/compiler/target.l")
