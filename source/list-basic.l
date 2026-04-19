@@ -10,8 +10,9 @@
   (car list))
 
 ;; TODO ? usually push is (push element list), i.e. the opposite order
-(define-form push (list element)
-  `(set ,list (cons ,element ,list)))
+;; but this way it could support an &rest API
+(define-form push (place element)
+  `(set ,place (cons ,element ,place)))
 
 (define-form pop (list)
   `(let* ((_list_ ,list)

@@ -5,7 +5,9 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
-(eval-in-slave '(set (feature emit-with-object-headers) false))
+(eval-in-slave '(begin
+                 (set (feature emit-with-object-headers) false)
+                 (set (feature redefinable-functions-in-target) false)))
 ;;(eval-in-host  '(set *compiler-verbosity* 10))
 
 (define-form assert (test . args)
@@ -43,18 +45,15 @@
   (let ((tests *tests*)
         (test)
         (forms ()))
-    (while (set test (first tests))
+    (while (set test (pop tests))
       (push forms '(platform/flush-streams))
-      (push forms `(,test))
-      (set tests (rest tests)))
+      (push forms `(,test)))
     `(let ()
        ,@forms)))
 
 (define uninitialized-global)
 (define global42 42)
 (define globaltmp)
-
-(define-function identity (x) x)
 
 (define-function sum-of-three (x y z) (+ (+ x y) z))
 
@@ -622,7 +621,10 @@
 (define-function main (argc argv)
   (platform/diag-print "Printing test command line args:\n")
   (for (i 0 argc)
-    (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i)))
+    (platform/diag-print (oop-at argv i))
+    (platform/diag-print-char ?\n)
+    ;; TODO (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i))
+    )
 
   (let ((idx argc))
     (while (< 0 (set idx (- idx 1)))
@@ -644,4 +646,4 @@
   (run-tests)
   (platform/diag-print "\n\e[32mFinished running the compiled tests\e[m\n")
 
-  (return *exit-code*))
+  *exit-code*)

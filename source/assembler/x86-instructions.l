@@ -196,6 +196,9 @@
 (define-function _s0P (I)
   (= I 0))
 
+;; TODO audit why this is needed. maybe this assert should be in _B?
+;; but _B doesn't know whether it's signed or not. if _s1P is to stay
+;; then consider adding _s4P and inserting it where needed.
 (define-function _s1P (I)
   (and (long? I)
        ;; -128 127

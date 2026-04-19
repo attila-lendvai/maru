@@ -456,8 +456,8 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 %.cgrov.$(TARGET).l: %.cgrov $(HOST_DIR)/eval
 	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
-	./$<.exe > $@.new
-	echo ";; target triple: $$($(CC) -dumpmachine)" >> $@.new
+	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
+	./$<.exe >> $@.new
 	mv $@.new $@
 	rm -f $<.exe $<.c
 

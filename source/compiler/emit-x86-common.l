@@ -388,6 +388,7 @@
   ((R64)			(println "	lea	(%rax, "$1", 8), %rcx")
                                 (println "	mov	(%rcx), %rax")))
 
+;; object is in RAX; args: offset, value
 (define-instruction STORE-OOP	(false 0 true)
   ((LI32 _)			(let ((offset (<LITERAL>-value $1)))
                                   (if-at-expand (feature strict-semantics-for-compiled-set)
@@ -686,7 +687,7 @@
 ;;;
 
 (define-function compile/unary-operator (op args -c-)
-  (comp (car args))
+  (comp (first args))
   ;; FIXME we shouldn't need to instantiate the instructions here...
   (let ((instr (op ())))
     (if (<instruction>-has-input? instr)
@@ -698,7 +699,7 @@
 ;; with e.g. the LOAD/STORE instructions above, as they expect arg0 to
 ;; be loaded in %rax.
 (define-function compile/binary-operator (op args -c-)
-  (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
+  (let ((tmp (compile/expr-into-temp-or-literal (second args) -c-)))
     (comp (car args))
     (free-temp tmp)
     (let ((instr (op ())))
@@ -707,8 +708,8 @@
         (gen op tmp)))))
 
 (define-function compile/ternary-operator (op args -c-)
-  (let ((tmp2 (compile/expr-into-temp-or-literal (caddr args) -c-))
-        (tmp1 (compile/expr-into-temp-or-literal (cadr  args) -c-)))
+  (let ((tmp2 (compile/expr-into-temp-or-literal (third  args) -c-))
+        (tmp1 (compile/expr-into-temp-or-literal (second args) -c-)))
     (comp (car args))
     (free-temp tmp1)
     (free-temp tmp2)

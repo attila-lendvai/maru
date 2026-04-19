@@ -73,5 +73,5 @@
       "less"
       "gdb"
       "cutter"
-      ;; "intel-xed" ; for authoritative disassembling
+      "intel-xed" ; for authoritative disassembling
       )))))
