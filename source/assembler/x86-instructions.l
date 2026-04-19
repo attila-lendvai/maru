@@ -682,6 +682,89 @@
 (define-alu-instruction CMP 0x38 _b111)
 
 ;;;
+;;; Group 3 (unary)
+;;;
+
+;; The /n field selects the operation:
+;; /0	TEST (imm)	test r/m with immediate
+;; /1	undefined
+;; /2	NOT	bitwise NOT
+;; /3	NEG	two’s complement
+;; /4	MUL	unsigned multiply (implicit regs)
+;; /5	IMUL	signed multiply (implicit regs)
+;; /6	DIV	unsigned divide
+;; /7	IDIV	signed divide
+
+;; TODO finish formatting, identify patterns, then macroify the entire group
+
+(define-function NEGBr (R)		(_O_Mrm  0xf6 _b11	_b011	(_r1 R)))
+(define-function NEGBm (D B I S)	(_O_r_X  0xf6 		_b011	D B I S))
+(define-function NEGWr (R)		(_wO_Mrm 0xf7 _b11	_b011	(_r2 R)))
+(define-function NEGWm (D B I S)	(_wO_r_X 0xf7		_b011	D B I S))
+(define-function NEGLr (R)		(_O_Mrm  0xf7 _b11	_b011	(_r4 R)))
+(define-function NEGLm (D B I S)	(_O_r_X  0xf7		_b011	D B I S))
+(define-function NEGQr (R)		(_REX 1 0 0 R) (NEGLr (_r8 R)))
+(define-function NEGQm (D B I S)	(_REX 1 S I B) (NEGLm D (_to_r4 B) (_to_r4 I) S))
+
+(define-function NOTBr (R)		(_O_Mrm  0xf6 _b11	_b010	(_r1 R)))
+(define-function NOTBm (D B I S)	(_O_r_X  0xf6		_b010	D B I S))
+(define-function NOTWr (R)		(_wO_Mrm 0xf7 _b11	_b010	(_r2 R)))
+(define-function NOTWm (D B I S)	(_wO_r_X 0xf7		_b010	D B I S))
+(define-function NOTLr (R)		(_O_Mrm  0xf7 _b11	_b010	(_r4 R)))
+(define-function NOTLm (D B I S)	(_O_r_X  0xf7		_b010	D B I S))
+(define-function NOTQr (R)		(_REX 1 0 0 R) (NOTLr (_to_r4 R)))
+(define-function NOTQm (D B I S)	(_REX 1 S I B) (NOTLm D (_to_r4 B) (_to_r4 I) S))
+
+(define-function DIVBrr (RS RD)		(_rAL RD)	(_O_Mrm  0xf6 _b11	_b110	(_r1 RS)))
+(define-function DIVBmr (D B I S R)	(_rAL R)	(_O_r_X  0xf6		_b110	D B I S))
+(define-function DIVWrr (RS RD)		(_rAX RD)	(_wO_Mrm 0xf7 _b11	_b110	(_r2 RS)))
+(define-function DIVWmr (D B I S R)	(_rAX R)	(_wO_r_X 0xf7		_b110	D B I S))
+(define-function DIVLrr (RS RD)		(_rEAX RD)	(_O_Mrm  0xf7 _b11	_b110	(_r4 RS)))
+(define-function DIVLmr (D B I S R)	(_rEAX R)	(_O_r_X  0xf7		_b110	D B I S))
+(define-function DIVQrr (RS RD)		(_REX 1 RS 0 RD)(DIVLrr (_to_r4 RS) (_to_r4 RD)))
+(define-function DIVQmr (D B I S R)	(_REX 1 S 0 R)	(DIVLmr D (_to_r4 B) (_to_r4 I) S (_to_r4 R)))
+
+(define-function IDIVBrr (RS RD)		(_rAL RD)	(_O_Mrm 0xf6 _b11	_b111	(_r1 RS)))
+(define-function IDIVBmr (D B I S R)		(_rAL R)	(_O_r_X 0xf6		_b111	D B I S))
+(define-function IDIVWrr (RS RD)		(_rAX RD)	(_wO_Mrm 0xf7 _b11	_b111	(_r2 RS)))
+(define-function IDIVWmr (D B I S R)		(_rAX R)	(_wO_r_X 0xf7		_b111	D B I S))
+(define-function IDIVLrr (RS RD)		(_rEAX RD)	(_O_Mrm 0xf7 _b11	_b111	(_r4 RS)))
+(define-function IDIVLmr (D B I S R)		(_rEAX R)	(_O_r_X 0xf7		_b111	D B I S))
+
+(define-function MULBrr (RS RD)			(_rAL RD)	(_O_Mrm  0xf6 _b11 _b100	(_r1 RS)))
+(define-function MULBmr (D B I S R)		(_rAL R)	(_O_r_X  0xf6 _b100		D B I S))
+(define-function MULWrr (RS RD)			(_rAX RD)	(_wO_Mrm 0xf7 _b11 _b100	(_r2 RS)))
+(define-function MULWmr (D B I S R)		(_rAX R)	(_wO_r_X 0xf7 _b100		D B I S))
+(define-function MULLrr (RS RD)			(_rEAX RD)	(_O_Mrm  0xf7 _b11 _b100	(_r4 RS)))
+(define-function MULLmr (D B I S R)		(_rEAX R)	(_O_r_X  0xf7 _b100		D B I S))
+(define-function MULQrr (S D)			(_REX 1 S 0 D)	(MULLrr (_to_r4 S) (_to_r4 D)))
+(define-function MULQmr (D B I S R)		(_REX 1 S 0 R)	(MULLmr D (_to_r4 B) (_to_r4 I) S (_to_r4 R)))
+
+(define-function IMULWrr  (RS RD)		(_wOO_Mrm    0xfaf _b11	(_r2 RS) (_r2 RD)))
+(define-function IMULWmr  (D B I S R)		(_wOO_r_X    0xfaf	(_r2 R) D B I S))
+(define-function IMULWirr (L RS RD)		(_wOs_Mrm_sW 0x69  _b11	(_r2 RS) (_r2 RD) L))
+(define-function IMULWimr (L D B I S R)		(_wOs_r_X_sW 0x69	(_r2 R) D B I S L))
+(define-function IMULLrr  (RS RD)		(_OO_Mrm     0xfaf _b11	(_r4 RD) (_r4 RS)))
+(define-function IMULLmr  (D B I S R)		(_OO_r_X     0xfaf	(_r4 R) D B I S))
+(define-function IMULLirr (L RS RD)		(_Os_Mrm_sL  0x69  _b11	(_r4 RS) (_r4 RD) L))
+(define-function IMULLimr (L D B I S R)		(_Os_r_X_sL  0x69	(_r4 R) D B I S L))
+
+(define-function TESTBrr (RS RD)	(_O_Mrm    0x84 _b11		(_r1 RS) (_r1 RD)))
+(define-function TESTBrm (R D B I S)	(_O_r_X    0x84			(_r1 R) D B I S))
+(define-function TESTBir (L R)		(_O_Mrm_B  0xf6 _b11	_b000	(_r1 R) (_u1 L)))
+(define-function TESTBim (L D B I S)	(_O_r_X_B  0xf6		_b000	D B I S (_u1 L)))
+(define-function TESTWrr (RS RD)	(_wO_Mrm   0x85 _b11		(_r2 RS) (_r2 RD)))
+(define-function TESTWrm (R D B I S)	(_wO_r_X   0x85			(_r2 S) D B I S))
+(define-function TESTWir (L R)		(_wO_Mrm_W 0xf7 _b11	_b000	(_r2 R) (_u2 L)))
+(define-function TESTWim (L D B I S)	(_wO_r_X_W 0xf7		_b000	D B I S (_u2 L)))
+(define-function TESTLrr (RS RD)	(_O_Mrm    0x85 _b11		(_r4 RS) (_r4 RD)))
+(define-function TESTLrm (R D B I S)	(_O_r_X    0x85			(_r4 R) D B I S))
+(define-function TESTLir (L R)		(_O_Mrm_L  0xf7 _b11	_b000	(_r4 R) L))
+(define-function TESTLim (L D B I S)	(_O_r_X_L  0xf7		_b000	D B I S L))
+(define-function TESTQrr (S D)		(_REX 1 S 0 D) (TESTLrr (_r8 S) (_r8 D)))
+;; TODO missing Q variants
+
+;;;
 ;;; MOV
 ;;;
 
@@ -762,27 +845,9 @@
 (define-function DECWm (MD MB MI MS)		(_wO_r_X 255 _b001 MD MB MI MS))
 (define-function DECLr (RD)			(_Or 72 (_r4 RD)))
 (define-function DECLm (MD MB MI MS)		(_O_r_X 255 _b001 MD MB MI MS))
-(define-function DIVBrr (RS RD)			(+ (_rAL RD) (_O_Mrm 246 _b11 _b110 (_r1 RS))))
-(define-function DIVBmr (MD MB MI MS RD)	(+ (_rAL RD) (_O_r_X 246 _b110 MD MB MI MS)))
-(define-function DIVWrr (RS RD)			(+ (_rAX RD) (_wO_Mrm 247 _b11 _b110 (_r2 RS))))
-(define-function DIVWmr (MD MB MI MS RD)	(+ (_rAX RD) (_wO_r_X 247 _b110 MD MB MI MS)))
-(define-function DIVLrr (RS RD)			(+ (_rEAX RD) (_O_Mrm 247 _b11 _b110 (_r4 RS))))
-(define-function DIVLmr (MD MB MI MS RD)	(+ (_rEAX RD) (_O_r_X 247 _b110 MD MB MI MS)))
+
 (define-function ENTERii (W B)			(_O_W_B 200 (_s2 W) (_s1 B)))
-(define-function IDIVBrr (RS RD)		(+ (_rAL RD) (_O_Mrm 246 _b11 _b111 (_r1 RS))))
-(define-function IDIVBmr (MD MB MI MS RD)	(+ (_rAL RD) (_O_r_X 246 _b111 MD MB MI MS)))
-(define-function IDIVWrr (RS RD)		(+ (_rAX RD) (_wO_Mrm 247 _b11 _b111 (_r2 RS))))
-(define-function IDIVWmr (MD MB MI MS RD)	(+ (_rAX RD) (_wO_r_X 247 _b111 MD MB MI MS)))
-(define-function IDIVLrr (RS RD)		(+ (_rEAX RD) (_O_Mrm 247 _b11 _b111 (_r4 RS))))
-(define-function IDIVLmr (MD MB MI MS RD)	(+ (_rEAX RD) (_O_r_X 247 _b111 MD MB MI MS)))
-(define-function IMULWrr (RS RD)		(_wOO_Mrm 4015 _b11 (_r2 RS) (_r2 RD)))
-(define-function IMULWmr (MD MB MI MS RD)	(_wOO_r_X 4015 (_r2 RD) MD MB MI MS))
-(define-function IMULWirr (IM RS RD)		(_wOs_Mrm_sW 105 _b11 (_r2 RS) (_r2 RD) IM))
-(define-function IMULWimr (IM MD MB MI MS RD)	(_wOs_r_X_sW 105 (_r2 RD) MD MB MI MS IM))
-(define-function IMULLrr (RS RD)		(_OO_Mrm 4015 _b11 (_r4 RD) (_r4 RS)))
-(define-function IMULLmr (MD MB MI MS RD)	(_OO_r_X 4015 (_r4 RD) MD MB MI MS))
-(define-function IMULLirr (IM RS RD)		(_Os_Mrm_sL 105 _b11 (_r4 RS) (_r4 RD) IM))
-(define-function IMULLimr (IM MD MB MI MS RD)	(_Os_r_X_sL 105 (_r4 RD) MD MB MI MS IM))
+
 (define-function INCBr (RD)			(_O_Mrm 254 _b11 _b000 (_r1 RD)))
 (define-function INCBm (MD MB MI MS)		(_O_r_X 254 _b000 MD MB MI MS))
 (define-function INCWr (RD)			(_wOr 64 (_r2 RD)))
@@ -808,25 +873,7 @@
 (define-function MOVSBLmr (MD MB MI MS RD) (_OO_r_X 4030 (_r4 RD) MD MB MI MS))
 (define-function MOVZBLmr (MD MB MI MS RD) (_OO_r_X 4022 (_r4 RD) MD MB MI MS))
 (define-function MOVZBLrr (RS RD) (_OO_Mrm 4022 _b11 (_r4 RD) (_r1 RS)))
-(define-function MULBrr (RS RD) (+ (_rAL RD) (_O_Mrm 246 _b11 _b100 (_r1 RS))))
-(define-function MULBmr (MD MB MI MS RD) (+ (_rAL RD) (_O_r_X 246 _b100 MD MB MI MS)))
-(define-function MULWrr (RS RD) (+ (_rAX RD) (_wO_Mrm 247 _b11 _b100 (_r2 RS))))
-(define-function MULWmr (MD MB MI MS RD) (+ (_rAX RD) (_wO_r_X 247 _b100 MD MB MI MS)))
-(define-function MULLrr (RS RD) (+ (_rEAX RD) (_O_Mrm 247 _b11 _b100 (_r4 RS))))
-(define-function MULLmr (MD MB MI MS RD) (+ (_rEAX RD) (_O_r_X 247 _b100 MD MB MI MS)))
-(define-function NEGBr (RD) (_O_Mrm 246 _b11 _b011 (_r1 RD)))
-(define-function NEGBm (MD MB MI MS) (_O_r_X 246 _b011 MD MB MI MS))
-(define-function NEGWr (RD) (_wO_Mrm 247 _b11 _b011 (_r2 RD)))
-(define-function NEGWm (MD MB MI MS) (_wO_r_X 247 _b011 MD MB MI MS))
-(define-function NEGLr (RD) (_O_Mrm 247 _b11 _b011 (_r4 RD)))
-(define-function NEGLm (MD MB MI MS) (_O_r_X 247 _b011 MD MB MI MS))
 (define-function NOP () (_O 144))
-(define-function NOTBr (RD) (_O_Mrm 246 _b11 _b010 (_r1 RD)))
-(define-function NOTBm (MD MB MI MS) (_O_r_X 246 _b010 MD MB MI MS))
-(define-function NOTWr (RD) (_wO_Mrm 247 _b11 _b010 (_r2 RD)))
-(define-function NOTWm (MD MB MI MS) (_wO_r_X 247 _b010 MD MB MI MS))
-(define-function NOTLr (RD) (_O_Mrm 247 _b11 _b010 (_r4 RD)))
-(define-function NOTLm (MD MB MI MS) (_O_r_X 247 _b010 MD MB MI MS))
 
 (define-function POPWr (RD) (_wOr 88 (_r2 RD)))
 (define-function POPWm (MD MB MI MS) (_wO_r_X 143 _b000 MD MB MI MS))
@@ -970,18 +1017,6 @@
 (define-function SHRLrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 211 _b101 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function STC () (_O 249))
 
-(define-function TESTBrr (RS RD) (_O_Mrm 132 _b11 (_r1 RS) (_r1 RD)))
-(define-function TESTBrm (RS MD MB MI MS) (_O_r_X 132 (_r1 RS) MD MB MI MS))
-(define-function TESTBir (IM RD) (_O_Mrm_B 246 _b11 _b000 (_r1 RD) (_u1 IM)))
-(define-function TESTBim (IM MD MB MI MS) (_O_r_X_B 246 _b000 MD MB MI MS (_u1 IM)))
-(define-function TESTWrr (RS RD) (_wO_Mrm 133 _b11 (_r2 RS) (_r2 RD)))
-(define-function TESTWrm (RS MD MB MI MS) (_wO_r_X 133 (_r2 RS) MD MB MI MS))
-(define-function TESTWir (IM RD) (_wO_Mrm_W 247 _b11 _b000 (_r2 RD) (_u2 IM)))
-(define-function TESTWim (IM MD MB MI MS) (_wO_r_X_W 247 _b000 MD MB MI MS (_u2 IM)))
-(define-function TESTLrr (RS RD) (_O_Mrm 133 _b11 (_r4 RS) (_r4 RD)))
-(define-function TESTLrm (RS MD MB MI MS) (_O_r_X 133 (_r4 RS) MD MB MI MS))
-(define-function TESTLir (IM RD) (_O_Mrm_L 247 _b11 _b000 (_r4 RD) IM))
-(define-function TESTLim (IM MD MB MI MS) (_O_r_X_L 247 _b000 MD MB MI MS IM))
 (define-function XADDBrr (RS RD) (_OO_Mrm 4032 _b11 (_r1 RS) (_r1 RD)))
 (define-function XADDBrm (RS MD MB MI MS) (_OO_r_X 4032 (_r1 RS) MD MB MI MS))
 (define-function XADDWrr (RS RD) (_wOO_Mrm 4033 _b11 (_r2 RS) (_r2 RD)))
@@ -1023,13 +1058,6 @@
 (define-function MOVSBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVSBLmr D (_r8 B) (_r8 I) S (_r8 R))))
 (define-function MOVZBQrr (S D) (let () (_REX 1 S 0 D) (MOVZBLrr S (_r8 D))))
 (define-function MOVZBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVZBLmr D (_r8 B) (_r8 I) S (_r8 R))))
-(define-function MULQrr (S D) (let () (_REX 1 S 0 D) (MULLrr (_r8 S) (_r8 D))))
-(define-function MULQmr (D B I S RD) (let () (_REX 1 S 0 RD) (MULLmr D (_r8 B) (_r8 I) S (_r8 RD))))
-(define-function DIVQrr (S D) (let () (_REX 1 S 0 D) (DIVLrr (_r8 S) (_r8 D))))
-(define-function DIVQmr (D B I S RD) (let () (_REX 1 S 0 RD) (DIVLmr D (_r8 B) (_r8 I) S (_r8 RD))))
-(define-function NEGQr (R) (let () (_REX 0 0 0 R) (NEGLr (_r8 R))))
-(define-function NOTQr (R) (let () (_REX 0 0 0 R) (NOTLr (_r8 R))))
-(define-function NOTQm (D B I S) (let () (_REX 1 S 0 0) (NOTLm D (_r8 B) (_r8 I) S)))
 (define-function POPQr (R) (let () (_REX 0 0 0 R) (POPLr (_r8 R))))
 (define-function PUSHQr (R) (let () (_REX 0 0 0 R) (PUSHLr (_r8 R))))
 (define-function PUSHQi (L) (let () (_REX 1 0 0 0) (PUSHLi L)))
@@ -1042,7 +1070,6 @@
 (define-function SARQrr (S D) (let () (_REX 1 S 0 D) (SARLrr S (_r8 D))))
 (define-function SARQim (L D B I S) (let () (_REX 1 0 I B) (SARLim L D (_r8 B) (_r8 I) S)))
 (define-function SARQrm (R D B I S) (let () (_REX 1 R I B) (SARLrm R D (_r8 B) (_r8 I) S)))
-(define-function TESTQrr (S D) (let () (_REX 1 S 0 D) (TESTLrr (_r8 S) (_r8 D))))
 
 (define-function INVD ()		(_OO 0x0f08))
 (define-function SYSCALL ()		(_OO 0x0f05))
