@@ -1,9 +1,9 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define *special-forms*) ; forward
-(define compile-call-form) ; forward
-(define compile-call-to-<target-function>) ; forward
-(define closure-code-label) ; forward
+;; These will be defined by the i686 or x86-64 backend
+(define *special-forms*)
+(define compile-call-form)
+(define emit-expr-code)
 
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
@@ -513,6 +513,19 @@
 ;;; Compiling lambdas
 ;;;
 
+(define-function closure-code-label (name)
+  (LABEL name))
+
+(define-function compile-expr (self name -c-)
+  (emit-comment 1 "compiling fn "(or name "/unnamed/")", "self)
+  (let ((entry-point (if name
+                         (LABEL name)
+                       (UNIQUE-LABEL "code"))))
+    (emit-expr-code self entry-point -c-)
+    (if (feature redefinable-functions-in-target)
+        (GLOBAL-CELL entry-point)
+      (GLOBAL-ADDR entry-point))))
+
 (define-function compile/expression-to-operand (expr -c-)
   (cond
     ((and (variable? expr)
@@ -548,6 +561,18 @@
       (let ((temp (alloc-stack-temp -c-)))
         (gen STORE $ temp)
         temp))))
+
+(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
+  (define-function compile-call-to-<target-function> (-c-)
+    ;; TODO assert the type to be <target-function>
+    ;; TODO assert nr of args = params
+    (when (feature emit-with-object-headers)
+      ;; i.e. this is a full <target-function> object. when the
+      ;; feature is disabled then it's just a raw function pointer to
+      ;; be called.
+      (gen LOAD-OOP (LITERAL program-code-offset)))
+    (gen CALLPTR $)
+    ()))
 
 (define-function compile-call-to-global-function (op -c-)
   (if (feature redefinable-functions-in-target)
@@ -677,6 +702,12 @@
   (assert (= (list-length expr) 2))
   (let ((label (emit-object/C-string (second expr) -c-)))
     (gen LOAD label)))
+
+(define-method compile-object <string> (-c-)
+  (emit-object/C-string self -c-))
+
+(define-method compile-object <undefined> (-c-)
+  (LITERAL (target-value false)))
 
 (define-function compile/lambda (form -c-)
   (let ((expr (eval form)))

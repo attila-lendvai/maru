@@ -13,15 +13,6 @@
 (define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
 (define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
-(define-selector compile-object)
-;; TODO its default should be specified like this:
-;; (define-selector compile (-c-)
-;;   (gen LOAD (compile-object self -c-)))
-;; but due to load order headaches we set the default in emit-x86-objects.l
-(define-selector compile)
-(define-selector compile-definition)
-(define-selector compile-call-to)
-(define-selector emit-prelude _) ; default is NOP
 ;; forwards
 (define compile-expr)
 (define compile-env)
@@ -55,19 +46,6 @@
       (else
        (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
     n-params))
-
-;; this, and the whole emit-object business is kinda KLUDGEy
-(define-function compile-array (self -c-)
-  (let ((compiled (array (array-length self))))
-    (for (i 0 (array-length self))
-      (let ((obj (array-at self i)))
-        (set (array-at compiled i)
-             (typecase obj
-               (<long>		(compile-object obj -c-))
-               (<expr>		(compile-expr   obj () -c-))
-               (<undefined>	(compile-object obj -c-))
-               (else (error "compile-array: don't know how to compile: "obj))))))
-    compiled))
 
 ;;;
 ;;; Operands
@@ -247,5 +225,28 @@
     ;; GENE = GEN Emit
     (emit-comment 3 "GENE of "(first entry)", args: "(rest entry))
     (apply emit-instruction (cons -c- entry))))
+
+;; TODO maybe rename to compile-literal?
+(define-selector compile-object)
+(define %gen) ; forward
+(define LOAD) ; forward
+(define-selector compile (self -c-)
+  (gen LOAD (compile-object self -c-)))
+(define-selector compile-definition)
+(define-selector compile-call-to)
+(define-selector emit-prelude _) ; default is NOP
+
+;; this, and the whole emit-object business is kinda KLUDGEy
+(define-function compile-array (self -c-)
+  (let ((compiled (array (array-length self))))
+    (for (i 0 (array-length self))
+      (let ((obj (array-at self i)))
+        (set (array-at compiled i)
+             (typecase obj
+               (<long>		(compile-object obj -c-))
+               (<expr>		(compile-expr   obj () -c-))
+               (<undefined>	(compile-object obj -c-))
+               (else (error "compile-array: don't know how to compile: "obj))))))
+    compiled))
 
 (load "source/compiler/target.l")

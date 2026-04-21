@@ -31,7 +31,6 @@
 
 (require "source/compiler/emit-early.l")
 
-(define compile-call-to-<target-function>) ; forward
 (define closure-code-label) ; forward
 
 ;; Shall we map function params directly to LLVM IR function params?
@@ -564,6 +563,12 @@
     (emit DEFINE const self)
     const))
 
+(define-method compile-object <undefined> (-c-)
+  (LITERAL (target-value false)))
+
+(define-method compile-object <string> (-c-)
+    (emit-object/C-string self -c-))
+
 ;;;
 ;;; Compiling lambdas
 ;;;
@@ -637,6 +642,15 @@
 
     (emit/function-epilogue)))
 
+(define-function closure-code-label (name)
+  (GLOBAL name))
+
+(define-function compile-expr (self name -c-)
+  (emit-comment 1 "compiling fn "name", "self)
+  (let ((entry-point-label (GLOBAL (or name (unique-name "fn")))))
+    (emit-expr-code self entry-point-label -c-)
+    entry-point-label))
+
 ;;;
 ;;; Compiling calls
 ;;;
@@ -684,6 +698,19 @@
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))))
+
+(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
+  (define-function compile-call-to-<target-function> (arg-regs -c-)
+    ;; TODO assert the type to be <target-function>
+    ;; TODO assert nr of args = params
+    (when (feature emit-with-object-headers)
+      ;; i.e. this is a full <target-function> object. when the
+      ;; feature is disabled then it's just a raw function pointer to
+      ;; be called.
+      (gen BITCAST '%oop "%\"<target-function>\"*")
+      (gen LOAD-OOP (LITERAL program-code-offset)))
+    (gen CALLPTR arg-regs)
+    ()))
 
 (define-function compile-call-to-global-function (op arg-regs -c-)
   (if (feature redefinable-functions-in-target)

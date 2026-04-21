@@ -6,63 +6,51 @@
 ;;; FIXME? most of this shouldn't be done by hand, but automated based
 ;;; on the type meta-data.
 
-;; KLUDGE due to load order headaches we set the default like this
-;; instead of at the DEFINE-SELECTOR.
-(set (<selector>-default compile)
-     (lambda (self -c-)
-       (gen LOAD (compile-object self -c-))))
-
 ;;;
 ;;; Emitting objects
 ;;;
+(let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
+      ;; TODO FIXME if this let is a let*, and the canary-value
+      ;; binding is also uncommented, then it results in
+      ;; confused bindings and/or closure capturing that
+      ;; crashes while compiling (ERROR: cannot apply: 13 of
+      ;; type: 7). i couldn't yet extract a reproducer.
 
-(when-at-expand (feature emit-with-object-headers)
-
-  (let ((flags		(slave-value (+ <header>-flags/used <header>-flags/opaque)))
-        ;; TODO FIXME if this let is a let*, and the canary-value
-        ;; binding is also uncommented, then it results in
-        ;; confused bindings and/or closure capturing that
-        ;; crashes while compiling (ERROR: cannot apply: 13 of
-        ;; type: 7). i couldn't yet extract a reproducer.
-
-        ;;(canary-value (slave-value +canary-value+))
-        (canary-emitter	(if (feature object-canary)
+      ;;(canary-value (slave-value +canary-value+))
+      (canary-emitter	(if (feature object-canary)
                             (lambda () (print ", %word "(slave-value +canary-value+)))
                           (lambda ()))))
-    (define-function emit-object/header (type-id)
-      (print "%\"<header>\" { %word "flags", %word "type-id)
-      (canary-emitter)
-      (print "}")))
+  (define-function emit-object/header (type-id)
+    (print "%\"<header>\" { %word "flags", %word "type-id)
+    (canary-emitter)
+    (print "}")))
 
-  (let ((type-id		(slave-value (<type>-slave-id <target-function>)))
-        (name-factory	(when (feature track-expr-names)
+(let ((type-id		(slave-value (<type>-slave-id <target-function>)))
+      (name-factory	(when (feature track-expr-names)
                           (lambda (name -c-)
                             (if name
                                 (compile-object (symbol->string name) -c-)
                               "null"))))
-        (profiler?		(feature profiler)))
-    (define-function emit-object/<target-function> (expr name entry-label -c-)
-      (let ((object-label	(if name
-                                    (closure-object-label name)
-                                  (GLOBAL (unique-name "oclosure"))))
-            (name-object	(when name-factory (name-factory name -c-)))
-            (counter	(when profiler? (compile-object 0 -c-))))
-        ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-        (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
-        (emit-object/header type-id)
-        (print ", %\"<target-function>\" { %oop bitcast (")
-        (emit-llvm-fn-type-for-expr expr)
-        (print "* "entry-label" to %oop)")
-        (when name-object
-          (print ", %\"<string-h>\"* "name-object))
-        (when counter
-          (print ", %oop ")
-          (emit/header->payload/in-constants name-object))
-        (print " }}\n")
-        (CONSTANT object-label expr)))))
-
-(define-method compile-object <undefined> (-c-)
-  (LITERAL (target-value false)))
+      (profiler?		(feature profiler)))
+  (define-function emit-object/<target-function> (expr name entry-label -c-)
+    (let ((object-label	(if name
+                            (closure-object-label name)
+                          (GLOBAL (unique-name "oclosure"))))
+          (name-object	(when name-factory (name-factory name -c-)))
+          (counter	(when profiler? (compile-object 0 -c-))))
+      ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+      (print object-label" = private unnamed_addr constant %\"<target-function-h>\" { ")
+      (emit-object/header type-id)
+      (print ", %\"<target-function>\" { %oop bitcast (")
+      (emit-llvm-fn-type-for-expr expr)
+      (print "* "entry-label" to %oop)")
+      (when name-object
+        (print ", %\"<string-h>\"* "name-object))
+      (when counter
+        (print ", %oop ")
+        (emit/header->payload/in-constants name-object))
+      (print " }}\n")
+      (CONSTANT object-label expr))))
 
 (cond
   ((slave-value (is <immediate-type> <long>))
@@ -86,27 +74,23 @@
 
   (else (error "compile-object: unexpected slave representation for <long>")))
 
-(if-at-expand (feature emit-with-object-headers)
-    (let ((type-id (slave-value (<type>-slave-id <string>)))
-          (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
-                                    "%word" "%oop")))
-
-      (define-method compile-object <string> (-c-)
-        ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-        (let ((elements	(emit-object/C-string self -c-))
-              (object-label	(GLOBAL (unique-name "ostr")))
-              (size		(compile-object (string-length self) -c-)))
-          ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
-          (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
-          (emit-object/header type-id)
-          ;; FIXME this assumes that <long> is a tagged immediate
-          (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
-          (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
-                 elements" to ptr) }}\n")
-          object-label)))
+(let ((type-id (slave-value (<type>-slave-id <string>)))
+      (llvm-type-for-<long> (if (slave-value (is <immediate-type> <long>))
+                                "%word" "%oop")))
 
   (define-method compile-object <string> (-c-)
-    (emit-object/C-string self -c-)))
+    ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+    (let ((elements	(emit-object/C-string self -c-))
+          (object-label	(GLOBAL (unique-name "ostr")))
+          (size		(compile-object (string-length self) -c-)))
+      ;; TODO? this here is an (emit DEFINE (CONSTANT ...) ...) inlined
+      (print object-label" = private unnamed_addr constant %\"<string-h>\" { ")
+      (emit-object/header type-id)
+      ;; FIXME this assumes that <long> is a tagged immediate
+      (print ", %\"<string>\" { "llvm-type-for-<long>" "size)
+      (print ", ptr bitcast (["(+ 1 (string-length self))" x i8]* "
+             elements" to ptr) }}\n")
+      object-label)))
 
 ;;;
 ;;; Function calls
@@ -114,43 +98,17 @@
 ;;; They depend on (feature emit-with-object-headers), hence they are
 ;;; here.
 
-(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
-  (define-function compile-call-to-<target-function> (arg-regs -c-)
-    ;; TODO assert the type to be <target-function>
-    ;; TODO assert nr of args = params
-    (when (feature emit-with-object-headers)
-      ;; i.e. this is a full <target-function> object. when the
-      ;; feature is disabled then it's just a raw function pointer to
-      ;; be called.
-      (gen BITCAST '%oop "%\"<target-function>\"*")
-      (gen LOAD-OOP (LITERAL program-code-offset)))
-    (gen CALLPTR arg-regs)
-    ()))
-
 ;; TODO should this also go through the COMPILE-OBJECT selector? but
 ;; what about the NAME arg then?
-(if-at-expand (feature emit-with-object-headers)
-    (let ()
-      (define-function closure-code-label (name)
-        ;; KLUDGE object "names" (i.e. addresses) should be tied together
-        ;; explicitly, not through giving them the "right" name
-        (GLOBAL (concat-string (symbol->string name) ".code")))
+(define-function closure-code-label (name)
+  ;; KLUDGE object "names" (i.e. addresses) should be tied together
+  ;; explicitly, not through giving them the "right" name
+  (GLOBAL (concat-string (symbol->string name) ".code")))
 
-      (define-function compile-expr (self name -c-)
-        (emit-comment 1 "compiling fn "name", "self)
-        (let ((entry-point-label (if name
-                                     (closure-code-label name)
-                                   (GLOBAL (unique-name "fn")))))
-          (emit-expr-code self entry-point-label -c-)
-          (emit-object/<target-function> self name entry-point-label -c-))))
-
-;;; else not (feature emit-with-object-headers)
-
-  (define-function closure-code-label (name)
-    (GLOBAL name))
-
-  (define-function compile-expr (self name -c-)
-    (emit-comment 1 "compiling fn "name", "self)
-    (let ((entry-point-label (GLOBAL (or name (unique-name "fn")))))
-      (emit-expr-code self entry-point-label -c-)
-      entry-point-label)))
+(define-function compile-expr (self name -c-)
+  (emit-comment 1 "compiling fn "name", "self)
+  (let ((entry-point-label (if name
+                               (closure-code-label name)
+                             (GLOBAL (unique-name "fn")))))
+    (emit-expr-code self entry-point-label -c-)
+    (emit-object/<target-function> self name entry-point-label -c-)))
