@@ -108,14 +108,5 @@
   ;; explicitly, not through giving them the "right" name
   (LABEL (concat-string (symbol->string name) "__code")))
 
-(define-function compile-expr (self name -c-)
-  (emit-comment 1 "compiling fn "(or name "/unnamed/")", "self)
-  (let ((entry-point (if name
-                         (closure-code-label name)
-                       (UNIQUE-LABEL "code"))))
-    (emit-expr-code self entry-point -c-)
-    ;; we emit a full expr object to keep the rest of the code more
-    ;; uniform. FIXME: write a better reasoning why this is done this
-    ;; way. it should have to do something with funcall'ing random
-    ;; closures, of which compiled functions are just one kind.
-    (emit-object/<target-function> name entry-point -c-)))
+(define-function compiled-expr-wrapper (name entry-point -c-)
+  (emit-object/<target-function> name entry-point -c-))

@@ -516,12 +516,19 @@
 (define-function closure-code-label (name)
   (LABEL name))
 
+(define-function compiled-expr-wrapper (name entry-point -c-)
+  entry-point)
+
 (define-function compile-expr (self name -c-)
   (emit-comment 1 "compiling fn "(or name "/unnamed/")", "self)
   (let ((entry-point (if name
-                         (LABEL name)
+                         (closure-code-label name)
                        (UNIQUE-LABEL "code"))))
     (emit-expr-code self entry-point -c-)
+
+    ;; TODO this cries for a cleanup...
+    (set entry-point (compiled-expr-wrapper name entry-point -c-))
+
     (if (feature redefinable-functions-in-target)
         (GLOBAL-CELL entry-point)
       (GLOBAL-ADDR entry-point))))
