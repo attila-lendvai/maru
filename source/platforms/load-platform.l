@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/compiler/emit-early.l")
+(load "source/compiler/target.l")
 
 (when (equal "x86" *compiler-backend*)
   (case (slave-value +word-size-in-bits+)

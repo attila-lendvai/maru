@@ -248,5 +248,3 @@
                (<undefined>	(compile-object obj -c-))
                (else (error "compile-array: don't know how to compile: "obj))))))
     compiled))
-
-(load "source/compiler/target.l")
