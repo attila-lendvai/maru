@@ -8,9 +8,9 @@
   (eval-in-host
    '(case *compiler-backend*
      (("i686" "x86-64")
-      (load "source/compiler/emit-x86-objects.l"))
-     ("llvm"
-      (load "source/compiler/emit-llvm-objects.l")))))
+      (load "source/compiler/emit-objects-x86.l"))
+     (else
+      (load (concat-strings "source/compiler/emit-objects-"*compiler-backend*".l"))))))
 
 (eval-in-host
  `(run-compiler ,*target-env*))
