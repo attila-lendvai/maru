@@ -5,6 +5,8 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
+(require "source/ansiterm.l")
+
 (eval-in-slave '(begin
                  (set (feature emit-with-object-headers) false)
                  (set (feature redefinable-functions-in-target) false)))
@@ -22,7 +24,7 @@
   `(let ()
      ;; FIXME clean up the platform/print-diag-fmt situation, it's a
      ;; NOP in the linux platform.
-     (platform/diag-print "FIXME !!! failing !!!")
+     (platform/diag-print ,(concat-strings term/FG-RED"FIXME !!! failing !!!"term/RESET))
      (platform/print-diag-fmt ,(concat-strings "\n\n\033[1;31m*** FAILURE\033[0m " format) ,@args)
      (set *exit-code* -1)))
 
@@ -37,7 +39,7 @@
            ;; TODO ',form cannot be compiled yet
            (let ()
              ;; FIXME delme once the linux backend also prints something at a failure
-             (platform/diag-print "!!! failing\n")
+             (platform/diag-print ,(concat-strings term/FG-RED"!!! failing\n"term/RESET))
              (failure "%s, expected: %ld, actual: %ld" ,name-as-string expected actual))))
        ())))
 
@@ -76,14 +78,17 @@
        (+ a b)) 40 2)
   42)
 
-(define-function compile/call-with-closure/helper (a c1 c2 b)
-  (+ (c1 10) (c2 1)))
+(define-function compile/call-with-closure/helper (a fn1 fn2 b)
+  (+ (fn1 10)
+     (fn2 1)))
 
 (define-test compile/call-with-closure
-    (compile/call-with-closure/helper 9999
-                                      (lambda (x) (* 4 x))
-                                      (lambda (x) (* 2 x))
-                                      9999)
+    (let ((foo 42))
+      (+ foo 42)
+      (compile/call-with-closure/helper 1000
+                                        (lambda (x) (sum-of-three x -10 40))
+                                        (lambda (x) (* 2 x))
+                                        9999))
   42)
 
 (define escaping/global1 10)
@@ -626,12 +631,12 @@
     ;; TODO (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i))
     )
 
-  (let ((idx argc))
-    (while (< 0 (set idx (- idx 1)))
-      (platform/print-diag-fmt "--%.2d %s\n" idx (oop-at argv idx))))
+  ;; (let ((idx argc))
+  ;;   (while (< 0 (set idx (- idx 1)))
+  ;;     (platform/print-diag-fmt "--%.2d %s\n" idx (oop-at argv idx))))
 
-  (while (< 0 (set argc (- argc 1)))
-    (platform/print-diag-fmt "++%.2d %s\n" argc (oop-at argv argc)))
+  ;; (while (< 0 (set argc (- argc 1)))
+  ;;   (platform/print-diag-fmt "++%.2d %s\n" argc (oop-at argv argc)))
 
   (when uninitialized-global
     (failure "uninitialized-global is %ld" uninitialized-global))
