@@ -221,8 +221,9 @@
           (when (or (<label>-paddress label)
                     (<label>-laddress label))
             (error "trying to define an already defined label: "desig))
-          (set (<label>-paddress label) paddress)
-          (set (<label>-laddress label) laddress)
+          (set (<label>-segment label)	(current-segment))
+          (set (<label>-paddress label)	paddress)
+          (set (<label>-laddress label)	laddress)
           (list-do emitter (<label>-emitters label)
             ;;(print-all *debug-output* "label! is calling an emitter\n")
             (emitter 'state/set paddress laddress))
@@ -252,41 +253,55 @@
     `(%label ,@args)))
 
 (define-function %prime-label (desig value-future)
-  (let* ((label		(%ensure-label desig))
-         (env		(<assembler>-env *assembler*))
-         (hole-paddress	())
-         (writer	())
-         (offset	false)
-         (emitter
-           (lambda (state . args)
-             (case state
-               (state/emit
-                ;; (println "%prime-label at address: "(current-laddress)", pos: "(current-paddress))
-                (set hole-paddress (current-paddress))
-                (set writer (pop args))
-                (set offset (pop args)))
-               (state/set
-                (let* ((paddress (pop args))
-                       (laddress (pop args))
-                       (saved-segment	(current-segment))
-                       (segment		(.segment (<label>-segment label)))
-                       (saved-paddress	(<segment>-paddress segment))
-                       (saved-laddress	(<segment>-laddress segment)))
-                  (set (<segment>-paddress segment) hole-paddress)
-                  ;; it's a forward label, so the form that calculates
-                  ;; the final value must be delayed into a future (a
-                  ;; closure). but now is the time to force it.
-                  (let ((final-laddress (value-future paddress laddress)))
-                    (when offset
-                      (incr final-laddress offset))
-                    (writer final-laddress)
-                    (set (<segment>-paddress segment) saved-paddress)
-                    (set (<segment>-laddress segment) saved-laddress)
-                    (.segment saved-segment)))
-                ())
-               (else (error "unexpected state: "state))))))
-    (assert (not (<label>-primed-emitter label)))
-    (set (<label>-primed-emitter label) emitter)
+  (let ((label		(%ensure-label desig))
+        (env		(<assembler>-env *assembler*))
+        (hole-paddress	())
+        (hole-segment	())
+        (writer		())
+        (offset		false))
+    (let ((emitter
+            (lambda (state . args)
+              (case state
+                (state/emit
+                 (set hole-paddress (current-paddress))
+                 (set hole-segment (current-segment))
+                 ;; (print-all *debug-output* "state/emit for label "label
+                 ;;              ", hole-paddress: 0x" (integer->string hole-paddress 16)
+                 ;;              ", hole-segment: "  hole-segment
+                 ;;              ", (current-segment): " (current-segment)
+                 ;;              "\n")
+                 (set writer (pop args))
+                 (set offset (pop args)))
+                (state/set
+                 (let* ((paddress (pop args))
+                        (laddress (pop args))
+                        (saved-segment (current-segment))
+                        (saved-paddress	(<segment>-paddress hole-segment))
+                        (saved-laddress	(<segment>-laddress hole-segment)))
+                   (.segment hole-segment) ; must set it, because the writers write into (current-segment)
+                   (set (<segment>-paddress hole-segment) hole-paddress)
+                   ;; it's a forward label, so the form that calculates
+                   ;; the final value must be delayed into a future (a
+                   ;; closure). but now is the time to force it.
+                   (let ((final-laddress (value-future paddress laddress)))
+                     (when offset
+                       (incr final-laddress offset))
+                     ;; (print-all *debug-output* "state/set of an emitter, laddress 0x"
+                     ;;            (integer->string laddress 16)
+                     ;;            ", paddress: 0x" (integer->string paddress 16)
+                     ;;            ", hole-paddress: 0x" (integer->string hole-paddress 16)
+                     ;;            ", hole-segment: "  hole-segment
+                     ;;            ", final-laddress: 0x"  (integer->string final-laddress 16)
+                     ;;            ", writer: " writer
+                     ;;            "\n")
+                     (writer final-laddress)
+                     (set (<segment>-paddress hole-segment) saved-paddress)
+                     (set (<segment>-laddress hole-segment) saved-laddress)
+                     (.segment saved-segment)))
+                 ())
+                (else (error "unexpected state: "state))))))
+      (assert (not (<label>-primed-emitter label)))
+      (set (<label>-primed-emitter label) emitter))
     label))
 
 ;;;
