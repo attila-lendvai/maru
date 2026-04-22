@@ -1,5 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-function integer->hex-string (i)
+  (integer->string i 16))
+
 (define-function array->string (arr)
   (let* ((ind 0)
          (lim (array-length arr))
