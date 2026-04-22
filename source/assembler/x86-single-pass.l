@@ -20,7 +20,10 @@
   (buffer     ; the output, a binary buffer
    laddress   ; logical address
    paddress   ; physical address; i.e. current offset in the buffer
+   %name      ; only for debugging
    ))
+
+(define-print-method <segment> (print-all -stream- "<segment "self.%name">"))
 
 (define-record <assembler> ()
   (env        ; a lexical env where the asm instructions are evaluated
@@ -33,6 +36,7 @@
   (let ((segment
           (make <segment>
             (buffer	(lower/array 4096))
+            (%name	name)
             ;; TODO for a working address-of upper function we either need
             ;; full-cell <long>, or more generally use <lower-cell> and
             ;; introduce arithmetic for that in the interpreter. for
@@ -109,9 +113,10 @@
     (else (error ".segment: not a valid segment designator: "desig))))
 
 (define-function write-segment-to-stream (desig stream)
-  ;;(println "writing segment: "desig", size: "(segment-length desig))
+  ;;(print-all *debug-output* "writing segment: "desig", size: "(segment-length desig)"\n")
   (lower/$put-all stream (<segment>-buffer (get-segment desig))))
 
+;; used by the tests
 (define-function save-current-segment-to-file (filename)
   (let ((file (file-open-or-die filename "w")))
     (write-segment-to-stream (current-segment) (file-stream file))
@@ -151,6 +156,7 @@
 
 (define-record <label> ()
   (segment
+   %name ; for debugging
    paddress
    laddress
    ;; primed-emitter is needed so that we can write something like
@@ -161,20 +167,25 @@
    primed-emitter
    emitters))
 
+(define-function %find-label (desig)
+  (typecase desig
+    (<label>	desig)
+    (<symbol>	(variable-value desig (<assembler>-env *assembler*) ()))
+    (else (error "%find-label: not a label designator: " desig))))
+
 (define-function %ensure-label (desig)
   ;; create a label if needed, with its addresses unset (i.e. it can
   ;; be a future label)
-  (let ((label (typecase desig
-                 (<label>	desig)
-                 (<symbol>	(variable-value desig (<assembler>-env *assembler*) ()))
-                 ;;(else (error "%ensure-label: not a label designator: " desig))
-                 )))
+  (let ((label (%find-label desig)))
     (unless label
       (set label (make <label>
-                   (segment	(current-segment))))
+                   (segment	(current-segment))
+                   (%name	desig)))
       (when (is <symbol> desig)
         (environment-define (<assembler>-env *assembler*) desig label)))
     label))
+
+(define-print-method <label> (print-all -stream- "<label "self.%name", "self.segment">"))
 
 (define-function resolved-label? (label)
   (and (is <long> (<label>-paddress label))
@@ -202,12 +213,18 @@
         (paddress	(or (pop args) (current-paddress))))
     (if desig
         (let ((label (%ensure-label desig)))
+          ;; (print-all *debug-output* "label! is defining label "label", at laddress 0x"
+          ;;            (integer->string laddress 16)
+          ;;            ", paddress: 0x" (integer->string paddress 16)
+          ;;            ", desig: " desig
+          ;;            "\n")
           (when (or (<label>-paddress label)
                     (<label>-laddress label))
             (error "trying to define an already defined label: "desig))
           (set (<label>-paddress label) paddress)
           (set (<label>-laddress label) laddress)
           (list-do emitter (<label>-emitters label)
+            ;;(print-all *debug-output* "label! is calling an emitter\n")
             (emitter 'state/set paddress laddress))
           label)
       (make <label>
@@ -287,6 +304,11 @@
        ;; instantiating closures and doing some extra dance that is
        ;; only needed for future labels.
        ;; this might be a FIXME... but will we ever need that use-case?
+       ;; (print-all *debug-output* "emit-label of a resolved label; laddress 0x"
+       ;;            (integer->string (or (<label>-laddress label) 0) 16)
+       ;;            ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
+       ;;            ", offset: " offset
+       ;;            "\n")
        (writer (+ (<label>-laddress label)
                   (or offset 0))))
     (let ((emitter (or (<label>-primed-emitter label)
@@ -296,6 +318,10 @@
                         ;; that just takes the laddress.
                         (%prime-label label (lambda (paddress laddress) laddress))
                         (<label>-primed-emitter label)))))
+      ;; (print-all *debug-output* "emit-label is calling the emitter with 'state/emit; laddress 0x"
+      ;;             (integer->string (or (<label>-laddress label) 0) 16)
+      ;;             ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
+      ;;             ", offset: " offset "\n")
       (emitter 'state/emit writer offset)
       (push (<label>-emitters label) emitter)
       (set (<label>-primed-emitter label) ())
@@ -309,6 +335,10 @@
      (let* ((segment	(current-segment))
             (buffer	(<segment>-buffer segment))
             (position	(<segment>-paddress segment)))
+       ;; (print-all *debug-output* "_B is storing 0x" (integer->hex-string value) " at 0x"(integer->hex-string position)
+       ;;            ", segment-length: 0x"(integer->hex-string (lower/array-length buffer))
+       ;;            ", laddress: 0x"(integer->hex-string (<segment>-laddress segment))
+       ;;            "\n")
        (incr (<segment>-laddress segment))
        (set (lower/array-at buffer position) value)
        (set (<segment>-paddress segment) (+ 1 position))))
@@ -432,11 +462,27 @@
   (set (<segment>-laddress (current-segment)) address))
 
 (define-function %align (address alignment filler)
+  ;; (print-all *debug-output* "segment-length before alignment: 0x"
+  ;;            (integer->string (segment-length (current-segment)) 16)
+  ;;            ", (current-paddress): 0x" (integer->string (current-paddress) 16)
+  ;;            ", (current-laddress): 0x" (integer->string (current-laddress) 16)
+  ;;            "\n")
   (let ((remainder (bitwise-and address (- alignment 1)))
         (filler (if filler (car filler) 0)))
+    ;; (print-all *debug-output* "aligning: 0x"(integer->string address 16)
+    ;;            ", to: 0x"(integer->string alignment 16)
+    ;;            ", remainder: 0x"(integer->string remainder 16)
+    ;;            ", padding: 0x"(integer->string (- alignment remainder) 16)
+    ;;            "\n")
     (when (< 0 remainder)
       (times-do (- alignment remainder)
-        (_B filler)))))
+        (_B filler)))
+    ;; (print-all *debug-output* "segment-length after alignment: 0x"
+    ;;            (integer->string (segment-length (current-segment)) 16)
+    ;;            ", (current-paddress): 0x" (integer->string (current-paddress) 16)
+    ;;            ", (current-laddress): 0x" (integer->string (current-laddress) 16)
+    ;;            "\n")
+    ))
 
 (define-function .align (alignment . filler)
   (%align (current-laddress) alignment filler))
