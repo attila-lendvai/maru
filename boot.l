@@ -243,6 +243,7 @@
 (define-function max (a . rest)	(list-do b rest (set a (if (> b a) b a))) a)
 (define-function min (a . rest)	(list-do b rest (set a (if (< b a) b a))) a)
 (define-function sum (a . rest)	(list-do b rest (incr a b)) a)
+(define-function zero? (val) (= 0 val))
 
 (require "source/sequences-basic.l")
 
