@@ -185,7 +185,7 @@ for some `git fetch` and `git rebase`.
 ### Maru's status
 
 There's the `piumarta` branch preserving the old state and
-accumulating some recent fixes.
+accumulating some fixes.
 
 There's the `maru.1` line of development that started from the
 [minimal version](https://www.piumarta.com/software/maru/) of Maru and
@@ -202,7 +202,7 @@ what's relevant for that stage.
 
 ### Critique of the current codebase
 
-IOW, it's sort of a high-level TODO:
+IOW, here's a sort of high-level TODO list:
 
 To accommodate the various experiments, I had to cut the lisp codebase
 into countless files. This tree of small files should/could be
@@ -210,15 +210,11 @@ simplified, and hopefully will be done once I will have rewritten the
 build in Maru.
 
 The accidental complexity in the Makefile is an abomination compared
-to the rest of the project. I'm looking forward to forgetting it for
-good.
+to the rest of the project. I'm looking forward to obsoleting it for
+good by rewriting the build in Maru.
 
 Many interesting experiments in the Piumarta branch are not yet
 revived.
-
-The compiler accidentally got intertwined with the VM implementation
-and it cannot currently compile a simple standalone sexp to the
-target.
 
 I'm not happy about how types are done currently. First, they are just
 runtime tags really, not types in the type-check sense. A simple
@@ -230,6 +226,11 @@ runtime tagged values.
 
 There are several Maru stages/branches now, introducing non-trivial
 new features. Some that are worth mentioning:
+
+  - An x86-64 backend that directly generates Elf binary files,
+    i.e. no external dependencies are needed for bootstrapping.
+
+  - An LLVM backend that emits .ll LLVM IR text files.
 
   - Introduction of [*platforms*](platforms.md), and notably the
     `linux` platform that compiles to a statically linked executable
@@ -253,13 +254,13 @@ new features. Some that are worth mentioning:
     verbatim into another instance of itself (as opposed to compiling it to
     machine code and giving it to a CPU to animate it).
 
-  - The addition of an LLVM backend.
-
 ### Notable features
 
   - A statistical profiler scanning the backtrace.
 
   - A bootstrapped PEG parser.
+
+  - An x86-64 backend that directly generates Elf binaries
 
   - A C groveller that uses a DSL implemented by a PEG grammar.
 
