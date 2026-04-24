@@ -1089,19 +1089,16 @@
 ;; this is used when emitting the literal dispatch tables of <selectors>
 ;; FIXME merge this somehow into the compile-object protocol?
 (define-method compile-definition <array> (name -c-)
-  (let ((compiled	(compile-array self -c-))
-        (array-label	(GLOBAL (unique-name "arr"))))
+  (let ((compiled	(compile-array self -c-)))
     (let ((first? true))
-      (print array-label" = private unnamed_addr constant ["(array-length compiled)" x %oop] [")
+      (print (GLOBAL name)" = private unnamed_addr constant ["(array-length compiled)" x %oop] [")
       (array-do el compiled
         (if first? (set first? false) (print ", "))
         (print "%oop ")
         (if el
             (emit/header->payload/in-constants el)
           (print "null")))
-      (println "]"))
-    (print (GLOBAL name)" = global %oop bitcast (["(array-length compiled)" x %oop]* "
-           array-label" to %oop)")))
+      (println "]"))))
 
 (define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet		(slave-value +target-triplet+))

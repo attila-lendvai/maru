@@ -67,7 +67,7 @@
   (let ((target-env		(slave-value *globals*))
         (methods		(eval-in-slave `(<selector>-methods ,self)))
         (target-methods		(array))
-        (dispatch-table-name	(concat-symbols name '-table))
+        (dispatch-table-name	(concat-symbols name '.method-table))
         (parameters		())
         (index-min		())
         (index-max		0))
@@ -102,6 +102,5 @@
                                      (<= type ,index-max))
                           ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
                           (error "selector '",(symbol->string name)"' has no method for type " (box <long> type))))
-                      ;; TODO eliminate the extra indirection from the global var to the dispatch array
-                      ((oop-at ,dispatch-table-name (- type ,index-min)) ,@parameters))))))
+                      ((oop-at (address-of ,dispatch-table-name) (- type ,index-min)) ,@parameters))))))
       (compile-definition stub name -c-))))

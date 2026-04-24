@@ -25,15 +25,15 @@
 ;; FIXME merge this somehow into the compile-object protocol?
 (define-method compile-definition <array> (name -c-)
   (let ((compiled (compile-array self -c-))
-        (array-label (UNIQUE-LABEL "arr")))
+        ;;(array-label (UNIQUE-LABEL "arr"))
+        )
     (emit DATA)
-    (emit DEFLABEL array-label)
+    (emit DEFLABEL (LABEL name))
+    ;; (emit DEFLABEL array-label)
     (array-do el compiled
       (emit CELL el))
-    ;; TODO comment on why an extra indirection is present here
-    ;; (probably to keep the harmony with other definitions).
-    (emit DEFLABEL (LABEL name))
-    (emit CELL array-label)))
+    ;;(emit CELL array-label)
+    ))
 
 (define-method compile-definition <expr> (name -c-)
   (assert name)
