@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; TODO this file is not loaded currently. delme?
+
 (define-form define-macro (name args . body)
   `(define-form ,name ,args (cons 'let (cons () (macro-expand (zip-assocs ',args (list ,@args)) ',body)))))
 

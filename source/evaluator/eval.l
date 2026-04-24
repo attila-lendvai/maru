@@ -358,6 +358,10 @@
     (when (< 0 *call-stack-index*)
       (array-at *call-stack* (- *call-stack-index* 1)))))
 
+;; TODO an adequate API should be added and this moved to the
+;; interpreter somehow. that way we would get a backtrace with much
+;; better print-object behavior.  or maybe somehow just invoke the
+;; interpreter for the printing of the interesting values?
 (define-function print-backtrace ()
   (if-at-expand (feature backtrace)
       (let ((out *debug-output*))

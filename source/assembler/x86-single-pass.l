@@ -173,7 +173,7 @@
   (typecase desig
     (<label>	desig)
     (<symbol>	(variable-value desig (<assembler>-env *assembler*) ()))
-    (else (error "%find-label: not a label designator: " desig))))
+    (else (error "%find-label: not a label designator: "desig", of type: "(type-of desig)))))
 
 (define-function %ensure-label (desig)
   ;; create a label if needed, with its addresses unset (i.e. it can
@@ -199,13 +199,13 @@
                   (assert (is <label> label))
                   label))
     (<label>	desig)
-    (else (error "%get-label: not a label designator: " desig))))
+    (else (error "%get-label: not a label designator: "desig", of type: "(type-of desig)))))
 
 (define-function %get-resolved-label (desig)
   (let ((label (typecase desig
                  (<symbol>	(%get-label desig))
                  (<label>	desig)
-                 (else (error "%get-resolved-label: not a label designator: " desig)))))
+                 (else (error "%get-resolved-label: not a label designator: "desig", of type: "(type-of desig))))))
     (assert (resolved-label? label))
     label))
 
@@ -360,7 +360,7 @@
        (set (lower/array-at buffer position) value)
        (set (<segment>-paddress segment) (+ 1 position))))
     (<label>	(emit-label value _B 1 ()))
-    (else	(error "_B: called with unexpected value: "value))))
+    (else	(error "_B: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function _W (value)
   (typecase value
@@ -369,7 +369,7 @@
      (_B (bitwise-and 0xff value))
      (_B (bitwise-and 0xff (bitwise-shift value -8))))
     (<label>	(emit-label value _W 2 ()))
-    (else	(error "_W: called with unexpected value: "value))))
+    (else	(error "_W: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function _L (value)
   ;;(println "_L, value: "value)
@@ -381,7 +381,7 @@
     (<label>	(emit-label value _L 4 ()))
     (<symbol>	(_L (%ensure-label value)))
     ;; (<lower-cell> TODO) needed to support 32 bit mode
-    (else	(error "_L: called with unexpected value: "value))))
+    (else	(error "_L: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function _Q (value)
   ;;(println "_Q, value: "value", at laddress: " (current-laddress))
@@ -400,7 +400,7 @@
        (incr (<segment>-laddress segment) 8)))
     (<label>	(emit-label value _Q 8 ()))
     (<symbol>	(_Q (%ensure-label value)))
-    (else	(error "_Q: called with unexpected value: "value))))
+    (else	(error "_Q: called with unexpected value: "value", type: "(type-of value)))))
 
 ;; rel8 offset
 (define-function _D1 (value)
@@ -411,7 +411,7 @@
      (_B value))
     (<label>	(emit-label value _D1 1 (- 0 (current-laddress) 1)))
     (<symbol>	(_D1 (%ensure-label value)))
-    (else	(error "_D1: called with unexpected value: "value))))
+    (else	(error "_D1: called with unexpected value: "value", type: "(type-of value)))))
 
 ;; rel32 offset
 (define-function _D4 (value)
@@ -422,7 +422,7 @@
      (_L value))
     (<label>	(emit-label value _D4 4 (- 0 (current-laddress) 4)))
     (<symbol>	(_D4 (%ensure-label value)))
-    (else	(error "_D4: called with unexpected value: "value))))
+    (else	(error "_D4: called with unexpected value: "value", type: "(type-of value)))))
 
 (define emit_rip_disp32 _D4)
 

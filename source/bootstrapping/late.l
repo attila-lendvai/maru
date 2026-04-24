@@ -15,10 +15,12 @@
 
 (switch-to-host-env)
 
-(when-at-expand (feature debug-info)
+(when-at-expand (feature debug-info) ; feature of the host
   (assert (= "maru-user" (<env>-name *globals*)))
   (assert (= "slave" (<env>-name (slave-value *globals*)))))
 
-;; redirect to the slave env, and also be intolerant; see above
+;; redirect to the slave env, so that the code in the compiler
+;; (running in the host) can easily query the features. also, be
+;; intolerant for typos or unset feature values; see above
 (define-form feature (name)
   `(eval-in-slave ',(concat-symbol 'feature/ name)))

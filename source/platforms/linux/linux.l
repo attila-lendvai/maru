@@ -196,7 +196,7 @@ exit:
 ;;   How programs get run: ELF binaries
 ;;   https://lwn.net/Articles/631631/
 (define-function _start ()
-  ;; (debug (platform/diag-print "_start is alive\n"))
+  ;; too early for this: (debug (platform/diag-print "_start is alive\n"))
 
   ;; Stack layout, High memory
   ;; +---------------------+

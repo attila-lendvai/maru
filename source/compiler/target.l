@@ -132,11 +132,11 @@
 ;; of CONS, i.e. the one that implements it).
 (define-form define-form (name args . body)
   (let* ((thunk	(eval-in-slave `(lambda (*env* ,@args) ,@body)))
-         (form	(form (lambda rtargs
+         (form	(form (lambda runtime-args
                         (let ((prev-globals *globals*)
                               (result ()))
                           (set *globals* *slave-env*)
-                          (set result (apply thunk rtargs))
+                          (set result (apply thunk runtime-args))
                           (set *globals* prev-globals)
                           result)))))
     ;; NOTE we define the form into the target env, because we want to
