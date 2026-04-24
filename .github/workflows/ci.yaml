@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - maru.10
+      - maru.11
       - staging
     paths-ignore:
       - '**.md'
@@ -12,6 +13,7 @@ on:
   pull_request:
     branches:
       - maru.10
+      - maru.11
     paths-ignore:
       - '**.md'
       - 'doc/**'
@@ -47,19 +49,19 @@ jobs:
 
       - run:  clang --version && cc --version
 
-      - run:  timeout 5m make PLATFORM=libc  test-bootstrap
-      - run:  timeout 5m make PLATFORM=posix test-bootstrap
+      - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
+      - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=linux test-bootstrap
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=libc  test-bootstrap
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=posix test-bootstrap
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=linux test-bootstrap
+      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=libc  test-bootstrap-llvm
+      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=posix test-bootstrap-llvm
+      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=linux test-bootstrap-llvm
 
-      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap
+      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
 
       - run:  timeout 5m make test-evaluator
       - run:  timeout 5m make test-parser
-      - run:  timeout 5m make PLATFORM=libc  test-compiler
-      - run:  timeout 5m make PLATFORM=posix test-compiler
+      - run:  timeout 5m make PLATFORM=libc  test-compiler-llvm
+      - run:  timeout 5m make PLATFORM=posix test-compiler-llvm
       - run:  timeout 5m make PLATFORM=linux test-compiler
 
       - run:  timeout 5m make PLATFORM=posix test-elf
