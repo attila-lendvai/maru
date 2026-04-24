@@ -50,8 +50,12 @@
   (cond
     ((is <string> obj)
      `(C-string ,obj))
-    ((feature emit-with-object-headers)
-     `(%string->C-string ,obj))
+    ;; FIXME WTF is going on here? can't use (feature
+    ;; emit-with-object-headers) directly, because it evaluates to
+    ;; false. but how? only the slave env should have that variable
+    ;; defined, and it's true while compiling eval.l
+    ((eval '(feature emit-with-object-headers))
+      `(%string->C-string ,obj))
     (else obj)))
 
 ;; NOTE libc.l may choose to replace this with libc/strlen

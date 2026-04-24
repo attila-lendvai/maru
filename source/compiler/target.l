@@ -151,6 +151,11 @@
 
 (assert (not (= define-form (eval-in-slave 'define-form))))
 
+;; FIXME what's going on here? true should be resolved to the variable in slave, not in target
+;; (define-form test123 ()
+;;   true)
+;; (assert (not (= 1 (test123))))
+
 ;; hide DEFINE-CONSTANT in the target env with one that defines the constant into the slave env.
 ;; this way constants will be available inside the form bodies, too.
 (define-form define-constant (name value-form)

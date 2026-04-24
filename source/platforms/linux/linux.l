@@ -85,7 +85,8 @@
      `(linux-syscall linux/SYS_write linux/STDERR_FILENO
                      (string->C-string ,str) ,(string-length str)))
     (else
-     `(let ((cstr ,(if (feature emit-with-object-headers)
+     ;; FIXME why do i need the eval?
+     `(let ((cstr ,(if (eval '(feature emit-with-object-headers))
                        `(string->C-string ,str)
                      str)))
         (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr))))))
