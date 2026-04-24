@@ -74,12 +74,8 @@
 (define-form platform/clear-cells (from cell-count)
   `(libc/bzero ,from (* ,cell-count +word-size-in-bytes+)))
 
-(if-at-expand (feature emit-with-object-headers)
-    (define-form platform/diag-print (str)
-      `(libc/fputs (string->C-string ,str) libc/stderr))
-
-  (define-function platform/diag-print (str)
-    (libc/fputs str libc/stderr)))
+(define-form platform/diag-print (str)
+  `(libc/fputs (string->C-string ,str) libc/stderr))
 
 (define-function platform/diag-print-char (char)
   ;; TODO endianness?

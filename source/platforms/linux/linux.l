@@ -79,21 +79,16 @@
   (for (i 0 cell-count)
     (set (oop-at from i) 0)))
 
-(begin-for-syntax
- (define-function string+length (str)
-   (let ((len (string-length str)))
-     (assert (< 0 len))
-     `((string->C-string ,str) ,len))))
-
-(if-at-expand (feature emit-with-object-headers)
-    (define-form platform/diag-print (str)
-      (if (is <string> str)
-          `(linux-syscall linux/SYS_write linux/STDERR_FILENO ,@(string+length str))
-        `(let ((cstr (string->C-string ,str)))
-           (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr)))))
-
-  (define-function platform/diag-print (str)
-    (linux-syscall linux/SYS_write linux/STDERR_FILENO str (C-string-length str))))
+(define-form platform/diag-print (str)
+  (typecase str
+    (<string> ; i.e. we can calculate the string length at expand time
+     `(linux-syscall linux/SYS_write linux/STDERR_FILENO
+                     (string->C-string ,str) ,(string-length str)))
+    (else
+     `(let ((cstr ,(if (feature emit-with-object-headers)
+                       `(string->C-string ,str)
+                     str)))
+        (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr))))))
 
 (define-function platform/diag-print-char (char)
   ;; TODO endianness?

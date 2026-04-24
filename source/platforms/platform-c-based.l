@@ -47,9 +47,12 @@
   ;; OPTIMIZATION: use the C-string compiler special form to emit cstrings when
   ;; literals are immediately passed to string->C-string. ideally it
   ;; should be done by some compiler macro like facility.
-  (if (is <string> obj)
-      `(C-string ,obj)
-    `(%string->C-string ,obj)))
+  (cond
+    ((is <string> obj)
+     `(C-string ,obj))
+    ((feature emit-with-object-headers)
+     `(%string->C-string ,obj))
+    (else obj)))
 
 ;; NOTE libc.l may choose to replace this with libc/strlen
 (define-function C-string-length (cstr)
