@@ -120,7 +120,7 @@ TEST_EVAL	= $(GEN_EVAL)
 ##
 ## internal variables
 ##
-PREVIOUS_STAGE	= maru.9
+PREVIOUS_STAGE	= maru.10
 #PREVIOUS_STAGE	= maru.10.c99
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
@@ -148,6 +148,7 @@ BACKDATE_FILE	= touch -t 200012312359
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
 DIFF		= diff --brief --ignore-all-space
+CMP		= cmp
 STRIP		= strip
 
 ASM_FILE_EXT_x86	= s
@@ -181,7 +182,8 @@ else
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-objects-x86.l emit-i686.l emit-x86-64.l emit-late.l) source/platforms/run-compiler.l
+EMIT_FILES_x86	= $(addprefix source/compiler/,emit-x86.l emit-objects-x86.l) source/platforms/run-compiler.l
+EMIT_FILES_x86	= $(addprefix source/platforms/,run-compiler.l linux/linux.cgrov.$(TARGET).l linux/elf.cgrov.$(TARGET).l)
 EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-objects-llvm.l emit-late.l) source/platforms/run-compiler.l
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
@@ -373,7 +375,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
-$(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval1: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
 	$(call ensure-built,$(EVAL0))
 	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
@@ -381,9 +383,8 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapp
 
 # eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
 # eval2 is just a test: its output should be the exact same files as eval1.*
-$(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BUILD_x86)/eval2: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
-	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
 $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
@@ -422,6 +423,7 @@ endef
 
 define compile-x86
   $(call compile,$(1),$(2),x86,$(3),$(4))
+  chmod +x $(4)
 endef
 
 define compile-llvm
@@ -552,8 +554,7 @@ test-bootstrap-recursively:
 
 # TODO backend duplication
 test-bootstrap-x86: $(BUILD_x86)/eval2
-	$(DIFF) $(BUILD_x86)/eval1.$(ASM_FILE_EXT_x86) $(BUILD_x86)/eval2.$(ASM_FILE_EXT_x86)
-	$(DIFF) $(BUILD_x86)/eval1.stripped $(BUILD_x86)/eval2.stripped
+	$(CMP) $(BUILD_x86)/eval1 $(BUILD_x86)/eval2
 	echo "(and (print () \"i'm alive!\") "") (exit 0)" | $(BUILD_x86)/eval1 boot.l -
 
 test-bootstrap-llvm: $(BUILD_llvm)/eval2
@@ -565,25 +566,15 @@ test-compiler: $(foreach backend,${BACKENDS},test-compiler-$(backend))
 
 # TODO backend duplication
 test-compiler-x86: $(BUILD_x86)/compiler-test
-	$(BUILD_x86)/compiler-test
-
-test-compiler-elf: $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_x86) $(EMIT_FILES_x86) \
-		tests/test-elf.x86-64.single-pass.l \
-		source/assembler/x86-single-pass.l \
-		source/platforms/linux/linux.cgrov.$(TARGET).l \
-		source/platforms/linux/elf.cgrov.$(TARGET).l
-	@mkdir -p $(BUILD)
-	$(call compile,$(EVAL0_DIR),$(EVAL0),x86-64-elf,tests/compiler-test.l,$(BUILD)/compiler-test)
-	chmod +x $(BUILD)/compiler-test
-	$(BUILD)/compiler-test a b c
+	$(BUILD_x86)/compiler-test a b c
 
 test-compiler-llvm: $(BUILD_llvm)/compiler-test
-	$(BUILD_llvm)/compiler-test
+	$(BUILD_llvm)/compiler-test a b c
 
 # TODO backend duplication
-$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86): $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_x86) $(EMIT_FILES_x86)
+$(BUILD_x86)/compiler-test: $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_x86) $(EMIT_FILES_x86)
 	@mkdir -p $(BUILD_x86)
-	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),tests/compiler-test.l,$(BUILD_x86)/compiler-test.$(ASM_FILE_EXT_x86))
+	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),tests/compiler-test.l,$(BUILD_x86)/compiler-test)
 
 $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_llvm) $(EMIT_FILES_llvm)
 	@mkdir -p $(BITCODE_DIR)

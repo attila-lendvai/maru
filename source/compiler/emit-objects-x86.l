@@ -17,25 +17,22 @@
                             (emit CELL (slave-value +canary-value+))))))
 
   (define-function emit-object/header (type type-id -c-)
-    (emit-comment 1 "object header")
-    ;; NOTE cannot use RODATA because the header and the object
-    ;; payload must be consequtive, but the payload values must
-    ;; be relocatable.
-    (emit DATA)
-    (emit ALIGN +word-size-in-bytes+)
+    (emit-comment 3 "emitting object header for type-id: "type-id)
 
-    ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
-    ;; but this here is the emission of read-only literals. the
-    ;; GC should never walk these objects, therefore we can
-    ;; skip emitting the first two words of the header.
+    (with-current-segment 'data
+      (.align +word-size-in-bytes+)
 
-    ;; next         ; not emitted
-    ;; chunk size   ; not emitted
-    (emit CELL flags)
-    (emit-comment 2 "type: "type)
-    (emit CELL type-id)
-    (when canary-emitter
-      (canary-emitter -c-))
+      ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
+      ;; but this here is the emission of read-only literals. the
+      ;; GC should never walk these objects, therefore we can
+      ;; skip emitting the first two words of the header.
+
+      ;; next         ; not emitted
+      ;; chunk size   ; not emitted
+      (emit CELL flags)
+      (emit CELL type-id)
+      (when canary-emitter
+        (canary-emitter -c-)))
     ;; the object pointer points here
     ))
 
@@ -44,25 +41,29 @@
        (emit-name?	(feature track-expr-names))
        (profiler?	(feature profiler)))
   (define-function emit-object/<target-function> (name entry-label -c-)
-    (let ((object-label	(if name
-                            (LABEL (if (feature redefinable-functions-in-target)
-                                       (concat-string (symbol->string name) "__obj")
-                                     name))
-                          (UNIQUE-LABEL "oclosure")))
-          (name		(when emit-name?
-                          (if name
-                              (compile-object (symbol->string name) -c-)
-                            (compile-object () -c-))))
-          (counter		(when profiler?
-                                  (compile-object 0 -c-))))
+    ;; TODO into data or ro-data? ideally, all literals should go into
+    ;; ro-data, but then e.g. the profiler counter will be read-only.
+    (let ((name-op	(when emit-name?
+                          (compile-object (if name (symbol->string name) ()) -c-)))
+          (counter	(when profiler?
+                          (compile-object 0 -c-))))
       (emit-object/header type type-id -c-)
-      (emit DEFLABEL object-label)
-      (emit CELL entry-label)
-      (when name
-        (emit CELL name))
-      (when counter
-        (emit CELL counter))
-      object-label)))
+      (with-new-label 'data
+        (when name
+          (emit-symtab-entry/variable name +.data-section-index+
+                                      (current-laddress)
+                                      +word-size-in-bytes+)
+          ;; we define the object's address into the assembler env
+          ;; (instead of the entry-point to the actual machine
+          ;; instructions). this is needed so that when a function is
+          ;; used as a variable, then the full object is loaded, not
+          ;; the address of the entry point.
+          (label! name))
+        (emit CELL (GLOBAL-ADDR entry-label))
+        (when name-op
+          (emit CELL name-op))
+        (when counter
+          (emit CELL counter))))))
 
 (cond
   ((slave-value (is <immediate-type> <long>))
@@ -77,36 +78,34 @@
 
          (define-method compile-object <long> (-c-)
            (emit-object/header <long> type-id -c-)
-           (let ((object-label (UNIQUE-LABEL "longo")))
-             (emit DEFLABEL object-label)
-             (emit CELL self)
-             object-label)))
+           (GLOBAL-ADDR
+            (with-new-label 'data
+              (emit CELL self)))))
      (error "Cannot emit boxed <long> when not emitting full objects")))
 
   (else (error "emit-object: unexpected slave representation for <long>")))
 
-(let ((type-id (slave-value (<type>-slave-id <string>))))
+(let ((type-id (slave-value (<type>-slave-id <string>)))
+      (counter 0))
   (define-method compile-object <string> (-c-)
+    (emit-comment 3 "emitting string object: "self)
     ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
     (let ((elements	(emit-object/C-string self -c-))
-          (size		(compile-object (string-length self) -c-))
-          (object-label	(UNIQUE-LABEL "ostr")))
+          (size		(compile-object (string-length self) -c-)))
       (emit-object/header <string> type-id -c-)
-      (emit DEFLABEL object-label)
-      (emit CELL size)
-      (emit CELL elements)
-      object-label)))
+      (GLOBAL-ADDR
+       (with-new-label 'data
+         (incr counter)
+         (emit-symtab-entry/variable (concat-string "str" (integer->string counter))
+                                     +.data-section-index+
+                                     (current-laddress)
+                                     +word-size-in-bytes+)
+         (emit CELL size)
+         (emit CELL elements))))))
 
 ;;;
 ;;; Function calls
 ;;;
-
-;; TODO should this also go through the COMPILE-OBJECT selector? but
-;; what about the NAME arg then?
-(define-function closure-code-label (name)
-  ;; KLUDGE object "names" (i.e. addresses) should be tied together
-  ;; explicitly, not through giving them the "right" name
-  (LABEL (concat-string (symbol->string name) "__code")))
 
 (define-function compiled-expr-wrapper (name entry-point -c-)
   (emit-object/<target-function> name entry-point -c-))
