@@ -59,7 +59,7 @@
 
 (define-form with-assembling (args . body)
   (let ((segment-names (pop args)))
-    `(begin
+    `(let ((__asm-backup__ *assembler*))
       (set *assembler*
            (make <assembler>
              (env		(environment))
@@ -72,7 +72,9 @@
                            ,base)
                    `(create-segment ',name))))
              segment-names)
-      ,@body)))
+      ,@body
+       (set *assembler* __asm-backup__)
+       ())))
 
 (define-function current-segment ()
   (let ((segment (<assembler>-current-segment *assembler*)))
