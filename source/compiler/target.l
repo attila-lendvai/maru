@@ -21,15 +21,19 @@
     (else
      (error "Couldn't identify architecture and word size from target/arch: "target/arch)))
 
+  ;; define in the host to be able to load cgrov.l
+  (define-constant +target-triple+		(concat-strings target/arch "-" target/vendor "-" target/os
+                                                                (if (equal "" target/abi)
+                                                                    ""
+                                                                  (concat-string "-" target/abi))))
+
   (eval-in-slave
    `(let ()
       (define-constant +architecture+		'',arch)
       (define-constant +operating-system+	'',(string->symbol target/os))
       (define-constant +little-endian?+		true) ; this is needed by the compiler tests
-      (define-constant +target-triple+		,(concat-strings target/arch "-" target/vendor "-" target/os
-                                                                 (if (equal "" target/abi)
-                                                                     ""
-                                                                   (concat-string "-" target/abi))))
+      ;; TODO why do i need that eval here? without this the value will be a FORM
+      (define-constant +target-triple+		,(eval '+target-triple+))
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 
