@@ -7,30 +7,6 @@ TODO doesn't work. but this is riddled with an impossible amount of
 accidental complexity that feels like a waste of time to grapple
 with...
 
-signals can’t work unless your process has:
- - A real stack pointer (RSP).
- - A proper instruction pointer (_start or thread context).
- - A “running thread” from the kernel’s perspective.
-
-.global _start
-_start:
-    # Set up a stack pointer
-    mov $stack_top, %rsp
-
-    # Call main
-    call main
-
-    # Exit syscall
-    mov $60, %rax    # SYS_exit
-    xor %rdi, %rdi   # exit code 0
-    syscall
-
-.section .bss
-    .align 16
-stack_bottom:
-    .skip 65536
-stack_top:
-
  */
 
 typedef unsigned long uint64_t;

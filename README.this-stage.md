@@ -7,9 +7,10 @@
 
 The new x86-64 backend, that directly generates Elf binaries, cannot
 easily be integrated into the current makefile-based build system
-(which is a mess, waiting to be rewritten in Maru). The new stage
-drops (temporarily?) the text-assembler based x86 backends, and
-switches to this new one.
+(which is a mess, waiting to be rewritten in Maru, hopefully in this
+stage). The new stage drops the text-assembler based x86 backends to
+move forward. They will be reinstated once we have a more reasonable
+build system.
 
 ## Assorted changes
 
