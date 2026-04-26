@@ -869,10 +869,12 @@
 
 (define-function compile/while (expr -c-)
   (let ((l/body	(label))
-        (l/cond	(label)))
-    (emit BR l/cond)
+        (l/cond	(label))
+        (body	(cddr expr)))
+    (when body ; only need to skip it at first if there's any at all
+      (emit BR l/cond))
     (label! l/body)
-    (list-do stmt (cddr expr)
+    (list-do stmt body
       (and stmt (comp stmt)))
     (label! l/cond)
     (comp (second expr))
