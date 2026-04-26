@@ -847,14 +847,23 @@
     (label! done)))
 
 (define-function compile/if (expr -c-)
-  (let ((l/false	(label))
+  (let ((condition	(second expr))
+        (then		(third expr))
+        (else		(cdddr expr))
+        (l/false	(label))
         (l/end		(label)))
-    (comp (second expr))
+    (comp condition)
+    ;; the current-value from the condition is false when we jump to
+    ;; the else branch, therefore we don't need to clear the
+    ;; current-value when the else branch is empty.
     (emit BF $ l/false)
-    (comp (third expr))
-    (emit BR l/end)
+    (comp then)
+    ;; therefore, we can just fall through with the return value of
+    ;; the true branch when the else branch is empty.
+    (when else
+      (emit BR l/end))
     (label! l/false)
-    (list-do stmt (cdddr expr)
+    (list-do stmt else
       (comp stmt))
     (label! l/end)))
 
