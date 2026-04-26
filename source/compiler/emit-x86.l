@@ -366,24 +366,12 @@
 ;;;
 ;;; OPERANDS
 ;;;
-;; TODO delme
-;;(define-operand LABEL () (name)		+maru-label-prefix+ self.name)
-(define-function LABEL (name)
-  (assert (symbol? name))
-  (label name))
-;; TODO delme
-;;(define-operand EXTERNAL-LABEL LABEL ()	+external-label-prefix+ self.name)			; a label in the global C namespace
-;; TODO delme
-(define-function UNIQUE-LABEL args
-  (label)
-  ;;(LABEL (unique-name (or (first args) "L")))
-  )
 
-;; Naming convention: global, literal, temp, general register
 (define-operand REGISTER ()	(name index))
 (define-operand LITERAL ()	(value)		"$"self.value)
-;; we must be able to differenciate when a pointer points to a value
-;; we need (GLOBAL-CELL), or we need the pointer itself (GLOBAL-ADDR).
+;; we must be able to differenciate when a pointer points to a CELL to
+;; be read (called GLOBAL-CELL), or when we need the pointer itself
+;; (called GLOBAL-ADDR).
 (define-operand GLOBAL-CELL ()	(address))
 (define-operand GLOBAL-ADDR ()	(address))
 (define-operand STACK-CELL ()	(offset))
@@ -884,7 +872,7 @@
   (list-do stmt (cdr expr)
     (comp stmt))
   (emit BR (or (<x86-compiler>-fn-epilogue-label -c-)
-              (set (<x86-compiler>-fn-epilogue-label -c-) (UNIQUE-LABEL)))))
+               (set (<x86-compiler>-fn-epilogue-label -c-) (label)))))
 
 (define-function emit-object/C-string (self -c-)
   (emit-comment 3 "emit-object/C-string for: "self)
@@ -1269,7 +1257,7 @@
        ;;             (EXTERNAL-LABEL (<C-variable>-name value))))
        )
       (else
-       (emit STORE $ (GLOBAL-CELL (LABEL (<variable>-name var))))))))
+       (emit STORE $ (GLOBAL-CELL (label (<variable>-name var))))))))
 
 (define-function compile/address-of (expr -c-)
   (let ((var (cadr expr)))
@@ -1277,7 +1265,7 @@
     (let ((val (<variable>-value var)))
       (cond
         ((global-variable? var)
-         (emit ADDR (GLOBAL-CELL (LABEL (<variable>-name var)))))
+         (emit ADDR (GLOBAL-CELL (label (<variable>-name var)))))
         ((is <STACK-CELL> val)
          (emit ADDR val))
         ;; ((is <R64> val)
@@ -1347,9 +1335,9 @@
           )
          ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
-          (emit LOAD (GLOBAL-ADDR (LABEL self.name))))
+          (emit LOAD (GLOBAL-ADDR (label self.name))))
          (else
-          (emit LOAD (GLOBAL-CELL (LABEL self.name))))))
+          (emit LOAD (GLOBAL-CELL (label self.name))))))
       (else
        (error "don't know how to compile <variable>: " self ", holding the value: "value", type: "(type-of value))))))
 
