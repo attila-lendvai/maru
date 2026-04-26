@@ -1,7 +1,7 @@
 # podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 -f Dockerfile.ci .
 # podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 -f Dockerfile.ci .
 
-# need to log in when run for the first time:
+# need to log in with a token generated at: https://github.com/settings/tokens
 # podman login ghcr.io -u attila-lendvai -p <personal-access-token>
 
 # podman push ghcr.io/attila-lendvai/maru-ci:amd64
@@ -29,6 +29,9 @@ RUN apt-get update && \
         libffi-dev \
         git \
         time \
+        lsb-release software-properties-common gnupg \
+        wget \
+        curl \
         ca-certificates \
     # Conditional packages for x86
     && if [ "$TARGETARCH" = "amd64" ]; then \
@@ -37,6 +40,9 @@ RUN apt-get update && \
         apt-get install -y --no-install-recommends libc6-dev-i386 gcc-multilib; \
     fi \
     && rm -rf /var/lib/apt/lists/*
+
+# if/when we need the latest llvm...
+# RUN curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh && chmod +x llvm.sh && ./llvm.sh 23
 
 # Ensure bash is the default shell
 # SHELL ["/bin/bash", "-c"]
