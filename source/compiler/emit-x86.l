@@ -146,9 +146,10 @@
 ;;; Early ELF stuff
 ;;;
 (define-constant +.text-section-index+		1)
-(define-constant +.data-section-index+		2)
-(define-constant +.bss-section-index+		3)
-(define-constant +.strtab-section-index+	5)
+(define-constant +.data-section-index+		3)
+(define-constant +.bss-section-index+		4)
+(define-constant +.strtab-section-index+	6)
+(define-constant +.shstrtab-section-index+	7)
 
 (define-function %emit-strtab-entry (segment-name str)
   (let (result)
@@ -1418,7 +1419,7 @@
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
 (define-constant +n-segments+ 4)
-(define-constant +n-sections+ 7)
+(define-constant +n-sections+ 8)
 (define-constant +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                                       (* +n-segments+
                                          elf/sizeof-Elf64_Phdr)
@@ -1486,10 +1487,10 @@
   (.i32		0)               ; e_flags
   (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
   (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-segments+)    ; e_phnum	Number of program headers
+  (.i16		+n-segments+)          ; e_phnum	Number of program headers
   (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize	Size of section header
   (.i16		+n-sections+)          ; e_shnum	Number of section headers
-  (.i16		4)               ; e_shstrndx	Section header string table index
+  (.i16		+.shstrtab-section-index+) ; e_shstrndx	Section header string table index
   (label!	'elf-header-end)
 
   (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr))
@@ -1504,6 +1505,8 @@
          (file-offset/text	file-position)
          ;; the elf header is included into the code segment as per convention
          (size/text		(+ (segment-length 'code) +elf-prefix-size+))
+         file-offset/ro-data
+         size/ro-data
          file-offset/data
          size/data
          size/bss)
@@ -1517,13 +1520,14 @@
     (incr file-position size/text)
 
     ;; ro-data segment (must be last, because this will also mmap the )
-    (let ((ro-data-size (segment-length 'ro-data)))
-      (emit-program-header file-position
-                           ro-data-size ro-data-size
-                           elf/PF_R
-                           +ro-data-segment-address+
-                           elf/page-size)
-      (incr file-position ro-data-size))
+    (set size/ro-data (segment-length 'ro-data))
+    (set file-offset/ro-data file-position)
+    (emit-program-header file-offset/ro-data
+                         size/ro-data size/ro-data
+                         elf/PF_R
+                         +ro-data-segment-address+
+                         elf/page-size)
+    (incr file-position size/ro-data)
 
     ;; data segment
     (set size/data (segment-length 'data))
@@ -1567,26 +1571,33 @@
                          0 0 16 0)
 
     ;; section #2
+    (emit-section-header (emit-shstrtab-entry ".rodata")
+                         elf/SHT_PROGBITS
+                         elf/SHF_ALLOC
+                         +ro-data-segment-address+
+                         file-offset/ro-data
+                         size/ro-data
+                         0 0 16 0)
+
+    ;; section #3
     (emit-section-header (emit-shstrtab-entry ".data")
                          elf/SHT_PROGBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          +data-segment-address+
                          file-offset/data
                          size/data
-                         ;; TODO is this alignment ok?
                          0 0 16 0)
 
-    ;; section #3
+    ;; section #4
     (emit-section-header (emit-shstrtab-entry ".bss")
                          elf/SHT_NOBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          +bss-segment-address+
                          0
                          size/bss
-                         ;; TODO is this alignment ok?
                          0 0 16 0)
 
-    ;; section #4
+    ;; section #5
     (let ((size/symtab (segment-length '.symtab)))
       (emit-section-header (emit-shstrtab-entry ".symtab")
                            elf/SHT_SYMTAB
@@ -1599,7 +1610,7 @@
                            elf/sizeof-Elf64_Sym)
       (incr file-position size/symtab))
 
-    ;; section #5
+    ;; section #6
     (let ((size/strtab (segment-length '.strtab)))
       (emit-section-header (emit-shstrtab-entry ".strtab")
                            elf/SHT_STRTAB 0 0
@@ -1607,7 +1618,7 @@
                            size/strtab 0 0 1 0)
       (incr file-position size/strtab))
 
-    ;; section #6
+    ;; section #7
     (let* ((name-offset		(emit-shstrtab-entry ".shstrtab"))
            ;; must emit prior to taking the segment-length...
            (size/shstrtab	(segment-length '.shstrtab)))
