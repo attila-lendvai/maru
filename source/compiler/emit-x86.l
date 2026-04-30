@@ -1417,7 +1417,7 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-(define-constant +n-segments+ 4)
+(define-constant +n-segments+ 5)
 (define-constant +n-sections+ 8)
 (define-constant +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                                       (* +n-segments+
@@ -1430,9 +1430,9 @@
 (define-constant +data-segment-address+		0x00600000)
 (define-constant +bss-segment-address+		0x00700000)
 
-(define-function emit-program-header (file-offset file-size mem-size flags
-                                                  start alignment)
-  (.i32	elf/PT_LOAD)                    ; p_type
+(define-function emit-program-header (type file-offset file-size mem-size flags
+                                           start alignment)
+  (.i32	type)                           ; p_type
   (.i32	flags)                          ; p_flags
   (.i64	file-offset)                    ; p_offset - File offset
   (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
@@ -1511,7 +1511,7 @@
          size/bss)
 
     ;; text segment
-    (emit-program-header file-offset/text
+    (emit-program-header elf/PT_LOAD file-offset/text
                          size/text size/text
                          (+ elf/PF_R elf/PF_X)
                          +code-segment-address+
@@ -1521,17 +1521,26 @@
     ;; ro-data segment (must be last, because this will also mmap the )
     (set size/ro-data (segment-length 'ro-data))
     (set file-offset/ro-data file-position)
-    (emit-program-header file-offset/ro-data
+    (emit-program-header elf/PT_LOAD file-offset/ro-data
                          size/ro-data size/ro-data
-                         elf/PF_R
+                         (+ elf/PF_R elf/PF_W)
                          +ro-data-segment-address+
                          elf/page-size)
     (incr file-position size/ro-data)
 
+    ;; mark the entire ro-data segment to become read-only after
+    ;; relocation is finished. note that it's possible to mark only a
+    ;; subset of it using this extra PT_GNU_RELRO program header.
+    (emit-program-header elf/PT_GNU_RELRO file-offset/ro-data
+                         size/ro-data size/ro-data
+                         elf/PF_R
+                         +ro-data-segment-address+
+                         elf/page-size)
+
     ;; data segment
     (set size/data (segment-length 'data))
     (set file-offset/data file-position)
-    (emit-program-header file-offset/data
+    (emit-program-header elf/PT_LOAD file-offset/data
                          size/data size/data
                          (+ elf/PF_R elf/PF_W)
                          +data-segment-address+
@@ -1544,7 +1553,7 @@
       ;; zero is illegal, and not emitting is more trouble than just
       ;; setting it to 1.
       (set size/bss 1))
-    (emit-program-header file-position
+    (emit-program-header elf/PT_LOAD file-position
                          0 size/bss
                          (+ elf/PF_R elf/PF_W)
                          +bss-segment-address+
