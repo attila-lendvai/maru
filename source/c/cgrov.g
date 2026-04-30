@@ -37,13 +37,13 @@ keyword		= !idpart _ ;
 
 prefix		= (idletter (idletter | digit | [./])*) @ $$ ;
 
-definition	= "header"  keyword header*:i				__	-> (def-headers  i)
+definition	= "header"  keyword header+:i				__	-> (def-headers  i)
 		| "prefix"  keyword prefix:i				__	-> (def-prefix i)
-		| "integer" keyword qualified_id*:i			__	-> (def-integers i)
-		| "float"   keyword qualified_id*:i			__	-> (def-floats   i)
-		| "string"  keyword qualified_id*:i			__	-> (def-strings  i)
+		| "integer" keyword qualified_id+:i			__	-> (def-integers i)
+		| "float"   keyword qualified_id+:i			__	-> (def-floats   i)
+		| "string"  keyword qualified_id+:i			__	-> (def-strings  i)
 		| "type"    keyword identifier:i _ (!eol .)*@$:t	__	-> (def-type   i t)
-		| "sizes"   keyword identifier*:i _ (!eol .)*@$:t	__	-> (def-sizes    i)
+		| "sizes"   keyword identifier+:i _ (!eol .)*@$:t	__	-> (def-sizes    i)
 		| "default" keyword identifier:i dnl:e			__	-> (def-alt    i e) ;
 
 file		= __ definition* (!. ~"'header', 'prefix', 'integer', 'float', 'string, 'type', 'sizes', 'default'") ;
