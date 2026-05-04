@@ -54,6 +54,7 @@
       "diffutils"
       ;;"clang-toolchain"
       "glibc"
+      "glibc:debug"
       ;; "libffi"
       "make"
       "time"
@@ -72,6 +73,7 @@
       "man-pages"
       "less"
       "gdb"
+      "cgdb"
       "cutter"
       "intel-xed" ; for authoritative disassembling
       )))))

@@ -393,6 +393,12 @@ that I know about and contain interesting code:
 
 A list of projects that are relevant in this context:
 
+  - [ribbit](https://github.com/udem-dlteam/ribbit) is a bootstrapped,
+    portable, very compact, and extensible Scheme implementation by
+    Mathis Laroche and Marc Feeley (of Gambit fame). Can compile to
+    dozens of languages, and has an FFI to the base languages. It has
+    flexible mechanisms to extend the VM with new primitives.
+
   - Robert van Engelen's
     [tinylisp](https://github.com/Robert-van-Engelen/tinylisp) (99
     lines of C with GC and a REPL), his

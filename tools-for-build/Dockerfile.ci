@@ -4,8 +4,8 @@
 # need to log in with a token generated at: https://github.com/settings/tokens
 # podman login ghcr.io -u attila-lendvai -p <personal-access-token>
 
-# podman push ghcr.io/attila-lendvai/maru-ci:amd64
-# podman push ghcr.io/attila-lendvai/maru-ci:arm64
+# podman push maru-ci ghcr.io/attila-lendvai/maru-ci:amd64
+# podman push maru-ci ghcr.io/attila-lendvai/maru-ci:arm64
 
 # for the first time go to:
 # https://github.com/attila-lendvai?tab=packages&ecosystem=container

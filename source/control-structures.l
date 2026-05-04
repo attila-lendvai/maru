@@ -72,6 +72,7 @@
   (if (pair? values)
       (let ((value (car values)))
         ;; we need to do this so that the expansion is simple enough for the compiler
+        ;; FIXME? this turns symbols into quoted, which is quite surprising on the reader's side
         (unless (self-evaluating-value? value)
           (set value `(quote ,value)))
         (cons `(= __value__ ,value)

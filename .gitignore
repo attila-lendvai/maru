@@ -4,8 +4,6 @@ eval
 eval-llvm
 eval-x86
 etc
-source/parsing/peg.g.l
-source/assembler/assembler.x86.l
 *.g.l
 playground
 perf-*

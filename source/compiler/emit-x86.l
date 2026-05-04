@@ -115,7 +115,6 @@
    temp-counter
    temp-limit
    free-stack-cells
-   gen-buffer
    current-value              ; the output of the previous-instruction
    ))
 
@@ -231,8 +230,6 @@
     (let* ((emit-form (first emit-forms))
            (args (first emit-form))
            (body (rest emit-form)))
-      ;; TODO what about dispatching on -c-?
-      ;; (cons `(define-multimethod emit-instruction ((<llvm-compiler> -c-) (,type-name self) ,@(%emit-form/mm-params 1 args))
       (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
                ;;(println "; emitting " self)
                (let ((__regs__ (<instruction>-regs self)))
@@ -358,7 +355,6 @@
   (param-offset
    arg-offset
    arg-limit
-   asm-cell-type
    fn-epilogue-label
    c-function-entries
    ))
@@ -1003,12 +999,10 @@
     (temp-limit			0)
     (free-temp-regs		+callee-saved-registers+)
     (clobbered-temp-regs	(array +n-callee-saved-registers+))
-    (gen-buffer			(array))
     (current-value		op/RAX)
 
     (arg-offset			0)
     (arg-limit			0)
-    ;; delme (asm-cell-type		".8byte")
     ))
 
 (define-function run-compiler (env)

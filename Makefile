@@ -58,6 +58,7 @@ ifeq ($(HOST_OS),Linux)
   # issues (but it's problematic in containers/CI).
   TIME		= time --format="\n$(GREEN)user time: %U$(RESET)"
   EVAL_WRAPPER	:= $(shell if setarch --addr-no-randomize true 2>/dev/null; then echo 'setarch --addr-no-randomize $(TIME)'; else echo 'command $(TIME)'; fi)
+  #EVAL_WRAPPER	:= command $(TIME)
   # This should be something that prints the file size, but otherwise
   # fails gracefully when something is not available.
   define print_file_size
