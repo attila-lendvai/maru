@@ -1,10 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; This is a compiler that emits IA-32 text, aka x86 assembly, that
-;;; needs to be fed to the gcc toolchain.
-;;;
-;;; Status: it should successfully compile eval.l into eval.s,
-;;; that in turn can be compiled by the gcc toolchain into an executable eval binary.
+;;; This is a compiler that emits x86-64 machine code directly into an
+;;; Elf64 executable.
 ;;;
 
 ;;; TODO
@@ -13,7 +10,7 @@
 ;;; It can compile a subset of Maru.
 ;;;
 ;;; Limitations and peculiarities:
-;;;   - no closures
+;;;   - lambda's cannot capture variables
 ;;;   - no variable number of args for functions
 ;;;   - some literal objects are emitted as valid objects that can participate
 ;;;     in the heap; see the EMIT-OBJECT methods for an up-to-date list.
@@ -23,12 +20,10 @@
 ;;;
 ;;; Naming:
 ;;;   - EMIT: emit instructions into the output stream
-;;;   - GEN:  like EMIT, but collect instructions into a buffer for later emission
+;;;   - COMPILE: something more involved than a simple emit
 ;;;   - -foo- is an implicit var in the lexenv
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
-
-;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/conversion.l")
 (require "source/c/cffi.l")
@@ -51,9 +46,6 @@
 
 ;; forwards
 (define compile-expr)
-(define compile-env)
-(define new-stack-cell)
-(define %free-temp)
 
 ;;;
 ;;; Utils
@@ -106,9 +98,46 @@
     (when rest
       `(define-print-method ,type-name (print-all -stream- ,@rest)))))
 
+(define-operand REGISTER ()	(name index))
+(define-operand LITERAL ()	(value)		"$"self.value)
+;; we must be able to differenciate when a pointer points to a CELL to
+;; be read (called GLOBAL-CELL), or when we need the pointer itself
+;; (called GLOBAL-ADDR).
+(define-operand GLOBAL-CELL ()	(address))
+(define-operand GLOBAL-ADDR ()	(address))
+(define-operand STACK-CELL ()	(offset))
+
+(define-operand LI32 LITERAL)
+(define-operand R32 REGISTER)
+
+(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
+(define-operand LI64 LITERAL)
+(define-operand R64 REGISTER)
+
+(define-operand STACK-PARAM STACK-CELL	()	self.offset"(%rbp)")
+
+(with-forms
+    ((x ((ctor . registers)
+         (let ((index -1))
+           `(begin
+             ,@(map (lambda (reg)
+                      (incr index)
+                      ;; the op/ prefix stands for operand
+                      `(define ,(concat-symbol 'op/ reg)
+                         (,ctor ,reg ,index)))
+                    registers))))))
+  (x R32 EAX EBX ECX EDX ESP EBP ESI EDI)
+  (x R64 RAX RBX RCX RDX RSP RBP RSI RDI R8 R9 R10 R11 R12 R13 R14 R15))
+
 ;;;
-;;; compiler infrastructure
+;;; Compiler Infrastructure
 ;;;
+
+(define-constant +param-registers+   `(quote ,(list op/RDI op/RSI op/RDX op/RCX op/R8 op/R9)))
+(define-constant +n-param-registers+ (list-length +param-registers+))
+
+(define-constant +callee-saved-registers+   `(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
+(define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
 
 (define-record <compiler> ()
   (level
@@ -116,7 +145,23 @@
    temp-limit
    free-stack-cells
    current-value              ; the output of the previous-instruction
+
+   fn-epilogue-label
+   c-function-entries
+
+   free-temp-regs
+   clobbered-temp-regs
    ))
+
+(define-function compiler (level)
+  (make <compiler>
+    (level			level)
+    (temp-counter		0)
+    (temp-limit			0)
+    (free-temp-regs		+callee-saved-registers+)
+    (clobbered-temp-regs	(array +n-callee-saved-registers+))
+    (current-value		op/RAX)
+    ))
 
 (define-function new-temp-index (c)
   (with-instance-accessors c <compiler>
@@ -126,6 +171,24 @@
         (set c.temp-limit c.temp-counter))
       i)))
 
+(define-function new-stack-cell (-c-)
+  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
+
+(define-function alloc-reg-temp (self)
+  (with-instance-accessors self <compiler>
+    (if false ;; TODO self.free-temp-regs
+        (let ((reg (pop self.free-temp-regs)))
+          (set (array-at self.clobbered-temp-regs (<REGISTER>-index reg)) reg)
+          reg)
+      (or (pop (<compiler>-free-stack-cells self))
+          (new-stack-cell self)))))
+
+(define-function %free-temp (-c- obj)
+  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
+  (typecase obj
+    (<R64>		(push (<compiler>-free-temp-regs -c-) obj))
+    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
+
 (define-function alloc-stack-temp (-c-)
   (or (pop (<compiler>-free-stack-cells -c-))
       (new-stack-cell -c-)))
@@ -134,6 +197,7 @@
 (define-form free-temp (temp)			`(%free-temp -c- ,temp))
 (define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
+;; FIXME this has been neutered by the expr-queue that flattens closure emission
 (define-function accessible-variable-or-die (var -c-)
   (or (global-variable? var)
       (let ((comp-level	(<compiler>-level -c-))
@@ -304,9 +368,6 @@
      (compile __obj__ -c-)
      (<compiler>-current-value -c-)))
 
-;; only to accommodate for a vanilla emit-objects.l
-(define gen emit)
-
 (define-selector compile-object)
 (define LOAD) ; forward
 (define-selector compile (self -c-)
@@ -314,19 +375,6 @@
 (define-selector compile-definition)
 (define-selector compile-call-to)
 (define-selector emit-prelude _) ; default is NOP
-
-;; this, and the whole emit-object business is kinda KLUDGEy
-(define-function compile-array (self -c-)
-  (let ((compiled (array (array-length self))))
-    (for (i 0 (array-length self))
-      (let ((obj (array-at self i)))
-        (set (array-at compiled i)
-             (typecase obj
-               (<long>		(compile-object obj -c-))
-               (<expr>		(compile-expr   obj () -c-))
-               (<undefined>	(compile-object obj -c-))
-               (else (error "compile-array: don't know how to compile: "obj))))))
-    compiled))
 
 (define *special-forms*) ; forward
 (define compile-call-form) ; forward
@@ -351,49 +399,6 @@
   (ptr-label
    stub-label))
 
-(define-record <x86-compiler> <compiler>
-  (param-offset
-   arg-offset
-   arg-limit
-   fn-epilogue-label
-   c-function-entries
-   ))
-
-;;;
-;;; OPERANDS
-;;;
-
-(define-operand REGISTER ()	(name index))
-(define-operand LITERAL ()	(value)		"$"self.value)
-;; we must be able to differenciate when a pointer points to a CELL to
-;; be read (called GLOBAL-CELL), or when we need the pointer itself
-;; (called GLOBAL-ADDR).
-(define-operand GLOBAL-CELL ()	(address))
-(define-operand GLOBAL-ADDR ()	(address))
-(define-operand STACK-CELL ()	(offset))
-
-(define-operand LI32 LITERAL)
-(define-operand R32 REGISTER)
-
-(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
-(define-operand LI64 LITERAL)
-(define-operand R64 REGISTER)
-
-(define-operand STACK-PARAM STACK-CELL	()	self.offset"(%rbp)")
-
-(with-forms
-    ((x ((ctor . registers)
-         (let ((index -1))
-           `(begin
-             ,@(map (lambda (reg)
-                      (incr index)
-                      ;; the op/ prefix stands for operand
-                      `(define ,(concat-symbol 'op/ reg)
-                         (,ctor ,reg ,index)))
-                    registers))))))
-  (x R32 EAX EBX ECX EDX ESP EBP ESI EDI)
-  (x R64 RAX RBX RCX RDX RSP RBP RSI RDI R8 R9 R10 R11 R12 R13 R14 R15))
-
 ;;;
 ;;; INSTRUCTIONS
 ;;;
@@ -408,7 +413,7 @@
 
 ;; The natural pointer/word size of the target.
 (define-instruction CELL	()
-  ((LITERAL)			(.i64 (<LITERAL>-value $1)))
+  ((LI64)			(.i64 (<LITERAL>-value $1)))
   ((GLOBAL-ADDR)		(.i64 (<GLOBAL-ADDR>-address $1)))
   ((long)			(.i64 $1))
   )
@@ -711,7 +716,7 @@
      (<variable>-value expr))
 
     ((long? expr)
-     (LITERAL expr))
+     (LI64 expr))
 
     (else
      ;; (when (variable? expr)
@@ -724,7 +729,7 @@
 (define-function compile/expr-into-temp-or-literal (expr -c-)
   (cond
     ((long? expr)
-     (LITERAL expr))
+     (LI64 expr))
     (else
       (comp expr)
       (let ((temp (alloc-stack-temp -c-)))
@@ -739,8 +744,8 @@
       ;; i.e. this is a full <target-function> object. when the
       ;; feature is disabled then it's just a raw function pointer to
       ;; be called.
-      (gen LOAD-OOP (LITERAL program-code-offset)))
-    (gen CALLPTR $)
+      (emit LOAD-OOP (LI64 program-code-offset)))
+    (emit CALLPTR $)
     ()))
 
 (define-function closure-code-label (name)
@@ -867,8 +872,8 @@
 (define-function compile/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (emit BR (or (<x86-compiler>-fn-epilogue-label -c-)
-               (set (<x86-compiler>-fn-epilogue-label -c-) (label)))))
+  (emit BR (or (<compiler>-fn-epilogue-label -c-)
+               (set (<compiler>-fn-epilogue-label -c-) (label)))))
 
 (define-function emit-object/C-string (self -c-)
   (emit-comment 3 "emit-object/C-string for: "self)
@@ -885,7 +890,7 @@
   (emit-object/C-string self -c-))
 
 (define-method compile-object <undefined> (-c-)
-  (LITERAL (target-value false)))
+  (LI64 (target-value false)))
 
 (define-function compile/lambda (form -c-)
   (let ((expr (eval form)))
@@ -953,14 +958,6 @@
       (else
        (compile-call-form op args -c-)))))
 
-
-
-;; KLUDGE replace the env binding for the base class. the reason is
-;; that this way we can use (LITERAL 42) in some parts of the code
-;; that is shared between 32 and 64 bits... but there must be a nice
-;; way to achieve this.
-(define LITERAL LI64)
-
 ;;;
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
@@ -980,53 +977,6 @@
   ((R32 R64)			(MOVSBQrr (<REGISTER>-name $1) (<REGISTER>-name $2))))
 
 ;;;
-;;; Compiler Infrastructure
-;;;
-(define-constant +param-registers+   `(quote ,(list op/RDI op/RSI op/RDX op/RCX op/R8 op/R9)))
-(define-constant +n-param-registers+ (list-length +param-registers+))
-
-(define-constant +callee-saved-registers+   `(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
-(define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
-
-(define-record <x86-64-compiler> <x86-compiler>
-  (free-temp-regs
-   clobbered-temp-regs))
-
-(define-function x86-64-compiler (level)
-  (make <x86-64-compiler>
-    (level			level)
-    (temp-counter		0)
-    (temp-limit			0)
-    (free-temp-regs		+callee-saved-registers+)
-    (clobbered-temp-regs	(array +n-callee-saved-registers+))
-    (current-value		op/RAX)
-
-    (arg-offset			0)
-    (arg-limit			0)
-    ))
-
-(define-function run-compiler (env)
-  (compile-env env (x86-64-compiler 1)))
-
-(define-function new-stack-cell (-c-)
-  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
-
-(define-function alloc-reg-temp (self)
-  (with-instance-accessors self <x86-64-compiler>
-    (if false ;; TODO self.free-temp-regs
-        (let ((reg (pop self.free-temp-regs)))
-          (set (array-at self.clobbered-temp-regs (<REGISTER>-index reg)) reg)
-          reg)
-      (or (pop (<compiler>-free-stack-cells self))
-          (new-stack-cell self)))))
-
-(define-function %free-temp (-c- obj)
-  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
-  (typecase obj
-    (<R64>		(push (<x86-64-compiler>-free-temp-regs -c-) obj))
-    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
-
-;;;
 ;;; Compiling lambdas
 ;;;
 
@@ -1036,7 +986,7 @@
   (.align +function-alignmet+ 0x90)
 
   (let* ((body		(<expr>-body self))
-         (-c-		(x86-64-compiler (+ 1 (<compiler>-level parent-comp))))
+         (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
          (params	(<expr>-parameters self))
          (param-count	(list-length params))
          (frame-body-size (label)))
@@ -1084,7 +1034,7 @@
 
         (label! frame-body-size (- frame-size (* 2 +word-size-in-bytes+)))
 
-        (awhen (<x86-compiler>-fn-epilogue-label -c-)
+        (awhen (<compiler>-fn-epilogue-label -c-)
           (label! it))
 
         (emit LEAVE-FRAME frame-body-size))))
@@ -1099,15 +1049,17 @@
                                      (laddress entry-point-label)))))
   (GLOBAL-ADDR entry-point-label))
 
-;; serious KLUDGE
+;; serious KLUDGE: use a global instead of a slot on <compiler> fixing
+;; it is not trivial because compiler objects get nested and at this
+;; point we are already nested, and we should push into the parent.
 (define expr-queue ())
 
 (define-function compiled-expr-wrapper (name entry-point -c-)
   entry-point)
 
 ;; even when emitting is deferred into the queue we still create,
-;; register, and return a label. it's set when the queue is eventually
-;; emitted.
+;; register, and return a label. it gets its value set when the queue
+;; is eventually emitted.
 (define-function compile-expr (self name -c-)
   (emit-comment 2 "0x" (integer->string (current-laddress) 16)
                 ": compiling fn "term/FG-GREEN (or name "/unnamed/") term/RESET", "self", level " (<compiler>-level -c-))
@@ -1130,7 +1082,7 @@
             (emit-comment 2 "compiling queued fn "expr", entry-point "entry-point)
             (emit-expr-code expr entry-point -c-)))))
 
-    ;; TODO this cries for a cleanup...
+    ;; TODO this compiled-expr-wrapper thing is calling for a cleanup...
     (GLOBAL-ADDR (compiled-expr-wrapper name entry-point -c-))))
 
 ;;;
@@ -1200,7 +1152,7 @@
 
 ;; TODO
 ;; (define-method compile-call-to <C-function> (op -c-)
-;;   (let* ((c-function-entries	(<x86-compiler>-c-function-entries -c-))
+;;   (let* ((c-function-entries	(<compiler>-c-function-entries -c-))
 ;;          (var			(defined? self.name c-function-entries))
 ;;          (c-function-entry	(if var
 ;;                                     (<variable>-value var)
@@ -1339,7 +1291,7 @@
   ;; FIXME: We can't call COMPILE-OBJECT here, because that would box
   ;; the value. But then why the lack of symmetry with <string> and
   ;; other literals in the code (they are emitted as full heap objects)?
-  (emit LOAD (LITERAL self)))
+  (emit LOAD (LI64 self)))
 
 ;;;
 ;;; COMPILE-DEFINITION
@@ -1362,6 +1314,19 @@
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
 ;; FIXME merge this somehow into the compile-object protocol?
+;; this, and the whole emit-object business is kinda KLUDGEy
+(define-function compile-array (self -c-)
+  (let ((compiled (array (array-length self))))
+    (for (i 0 (array-length self))
+      (let ((obj (array-at self i)))
+        (set (array-at compiled i)
+             (typecase obj
+               (<long>		(compile-object obj -c-))
+               (<expr>		(compile-expr   obj () -c-))
+               (<undefined>	(compile-object obj -c-))
+               (else (error "compile-array: don't know how to compile: "obj))))))
+    compiled))
+
 (define-method compile-definition <array> (name -c-)
   (let ((compiled (compile-array self -c-)))
     (with-current-segment 'data
@@ -1558,10 +1523,10 @@
     ;; section #0 must be NULL
     (emit-section-header 0 0 0 0 0 0 0 0 0 0)
 
-    ;;;
-    ;;; This is fragile for reordering, must be in sync with the
-    ;;; +.*-section-index+ constants.
-    ;;;
+;;;
+;;; This is fragile for reordering, must be in sync with the
+;;; +.*-section-index+ constants.
+;;;
 
     ;; section #1
     (emit-section-header (emit-shstrtab-entry ".text")
@@ -1758,3 +1723,6 @@
                           (error "selector '",(symbol->string name)"' has no method for type " (box <long> type))))
                       ((oop-at (address-of ,dispatch-table-name) (- type ,index-min)) ,@parameters))))))
       (compile-definition stub name -c-))))
+
+(define-function run-compiler (env)
+  (compile-env env (compiler 1)))

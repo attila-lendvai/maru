@@ -69,7 +69,7 @@
   ((slave-value (is <immediate-type> <long>))
 
    (define-method compile-object <long> (-c-)
-     (LITERAL (eval-in-slave `(box <long> ,self)))))
+     (LI64 (eval-in-slave `(box <long> ,self)))))
 
   ((slave-value (and (is <boxed-type> <long>)
                      (<boxed-type>-one-word? <long>)))
