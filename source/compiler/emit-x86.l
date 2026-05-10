@@ -206,13 +206,26 @@
           (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
 
 ;;;
+;;; Relocation tracking for ET_DYN
+;;;
+(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_X86_64_RELATIVE relocations
+
+(define-function register-rela (segment paddress value)
+  (push *rela-entries* (list segment paddress value)))
+
+;;;
 ;;; Early ELF stuff
 ;;;
 (define-constant +.text-section-index+		1)
+;;(define-constant +.rodata-section-index+	2)
 (define-constant +.data-section-index+		3)
 (define-constant +.bss-section-index+		4)
-(define-constant +.strtab-section-index+	6)
-(define-constant +.shstrtab-section-index+	7)
+;;(define-constant +.dynamic-section-index+	5)
+;;(define-constant +.rela.dyn-section-index+	6)
+(define-constant +.dynstr-section-index+	7)
+;;(define-constant +.symtab-section-index+	8)
+(define-constant +.strtab-section-index+	9)
+(define-constant +.shstrtab-section-index+	10)
 
 (define-function %emit-strtab-entry (segment-name str)
   (let (result)
@@ -414,7 +427,11 @@
 ;; The natural pointer/word size of the target.
 (define-instruction CELL	()
   ((LI64)			(.i64 (<LITERAL>-value $1)))
-  ((GLOBAL-ADDR)		(.i64 (<GLOBAL-ADDR>-address $1)))
+  ((GLOBAL-ADDR)		(let ((addr (<GLOBAL-ADDR>-address $1)))
+                                   (register-rela (current-segment)
+                                                  (current-paddress)
+                                                  addr)
+                                   (.i64 addr)))
   ((long)			(.i64 $1))
   )
 
@@ -1376,19 +1393,20 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-(define-constant +n-segments+ 5)
-(define-constant +n-sections+ 8)
+(define-constant +n-program-headers+ 8)
+(define-constant +n-section-headers+ 11)
 (define-constant +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
-                                      (* +n-segments+
+                                      (* +n-program-headers+
                                          elf/sizeof-Elf64_Phdr)
-                                      (* +n-sections+
+                                      (* +n-section-headers+
                                          elf/sizeof-Elf64_Shdr)))
 
-(define-constant +code-segment-address+		0x00400000)
-(define-constant +ro-data-segment-address+	0x00500000)
-(define-constant +data-segment-address+		0x00600000)
-(define-constant +bss-segment-address+		0x00700000)
+(define-constant +code-segment-address+		0x00000000)
+(define-constant +ro-data-segment-address+	0x00100000)
+(define-constant +data-segment-address+		0x00200000)
+(define-constant +bss-segment-address+		0x00300000)
 
+;; TODO this is neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
                                            start alignment)
   (.i32	type)                           ; p_type
@@ -1422,6 +1440,10 @@
   (.align	elf/page-size)
 
   (.segment	'ro-data)
+  (label!	'elf-interpreter-start)
+  (.ascii	+ld.so-path+)
+  (.i8		0)
+  (label!	'elf-interpreter-end)
   (.align	elf/page-size)
 
   (create-segment 'elf-prefix)
@@ -1436,7 +1458,7 @@
   (.ascii	"ELF")
   (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		elf/ET_EXEC)     ; e_type
+  (.i16		elf/ET_DYN)      ; e_type
   (.i16		elf/EM_X86_64)   ; e_machine
   (.i32		1)               ; e_version
   (.i64		(closure-code-label '_start)) ; e_entry (entry point)
@@ -1445,9 +1467,9 @@
   (.i32		0)               ; e_flags
   (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
   (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-segments+)          ; e_phnum	Number of program headers
+  (.i16		+n-program-headers+)   ; e_phnum	Number of program headers
   (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize	Size of section header
-  (.i16		+n-sections+)          ; e_shnum	Number of section headers
+  (.i16		+n-section-headers+)   ; e_shnum	Number of section headers
   (.i16		+.shstrtab-section-index+) ; e_shstrndx	Section header string table index
   (label!	'elf-header-end)
 
@@ -1467,10 +1489,26 @@
          size/ro-data
          file-offset/data
          size/data
-         size/bss)
+         size/bss
+         size/relocation-tables)
+
+    ;; PT_PHDR
+    (let ((size
+            ;; TODO FIXME? this yields different values for the two sizes emitted. but why?
+            ;; (label 'program-headers-end (- self (laddress 'program-headers)))
+            ;; (label 'program-headers-end (- (laddress 'program-headers-end) (laddress 'program-headers)))
+            (* +n-program-headers+
+               elf/sizeof-Elf64_Phdr)))
+      (emit-program-header elf/PT_PHDR
+                           (paddress 'program-headers)
+                           size size
+                           elf/PF_R
+                           (laddress 'program-headers)
+                           8))
 
     ;; text segment
-    (emit-program-header elf/PT_LOAD file-offset/text
+    (emit-program-header elf/PT_LOAD
+                         file-offset/text
                          size/text size/text
                          (+ elf/PF_R elf/PF_X)
                          +code-segment-address+
@@ -1480,7 +1518,8 @@
     ;; ro-data segment (must be last, because this will also mmap the )
     (set size/ro-data (segment-length 'ro-data))
     (set file-offset/ro-data file-position)
-    (emit-program-header elf/PT_LOAD file-offset/ro-data
+    (emit-program-header elf/PT_LOAD
+                         file-offset/ro-data
                          size/ro-data size/ro-data
                          (+ elf/PF_R elf/PF_W)
                          +ro-data-segment-address+
@@ -1499,7 +1538,8 @@
     ;; data segment
     (set size/data (segment-length 'data))
     (set file-offset/data file-position)
-    (emit-program-header elf/PT_LOAD file-offset/data
+    (emit-program-header elf/PT_LOAD
+                         file-offset/data
                          size/data size/data
                          (+ elf/PF_R elf/PF_W)
                          +data-segment-address+
@@ -1512,11 +1552,36 @@
       ;; zero is illegal, and not emitting is more trouble than just
       ;; setting it to 1.
       (set size/bss 1))
-    (emit-program-header elf/PT_LOAD file-position
+    (emit-program-header elf/PT_LOAD
+                         file-position
                          0 size/bss
                          (+ elf/PF_R elf/PF_W)
                          +bss-segment-address+
                          elf/page-size)
+
+    ;; PT_INTERP segment (dynamic linker path)
+    ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
+    (let ((interp-size (- (laddress 'elf-interpreter-end)
+                          (laddress 'elf-interpreter-start))))
+      (emit-program-header elf/PT_INTERP
+                           (+ file-offset/ro-data
+                              (paddress 'elf-interpreter-start))
+                           interp-size interp-size
+                           elf/PF_R
+                           (laddress 'elf-interpreter-start)
+                           1))
+
+    (set size/relocation-tables (- (laddress '.dynamic-end)
+                                   (laddress '.dynamic)))
+    (emit-program-header elf/PT_DYNAMIC
+                         (+ file-offset/ro-data
+                            (paddress '.dynamic))
+                         size/relocation-tables size/relocation-tables
+                         elf/PF_R
+                         (laddress '.dynamic)
+                         8)
+
+    (label! 'program-headers-end)
 
     (label! 'section-headers)
 
@@ -1564,12 +1629,45 @@
                          size/bss
                          0 0 16 0)
 
-    ;; section #5
-    (let ((size/symtab (segment-length '.symtab)))
+    ;; section #5: .dynamic
+    (emit-section-header (emit-shstrtab-entry ".dynamic")
+                         elf/SHT_DYNAMIC
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         (laddress '.dynamic)
+                         (+ file-offset/ro-data
+                            (paddress '.dynamic))
+                         size/relocation-tables
+                         +.dynstr-section-index+
+                         0 8 elf/sizeof-Elf64_Dyn)
+
+    ;; section #6: .rela.dyn
+    (emit-section-header (emit-shstrtab-entry ".rela.dyn")
+                         elf/SHT_RELA
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         (laddress '.rela.dyn)
+                         (+ file-offset/ro-data
+                            (paddress '.rela.dyn))
+                         (- (laddress '.rela.dyn-end)
+                            (laddress '.rela.dyn))
+                         0 0 8 elf/sizeof-Elf64_Rela)
+
+    ;; section #7: .dynstr
+    (let ((name-offset		(emit-shstrtab-entry ".dynstr")))
+      (emit-section-header name-offset
+                           elf/SHT_STRTAB 0 0
+                           (+ file-offset/ro-data
+                              (paddress '.dynstr))
+                           (- (laddress '.dynstr-end)
+                              (laddress '.dynstr))
+                           0 0 1 0))
+
+    ;; section #8: .symtab
+    (let ((size/symtab (segment-length '.symtab))
+          (symtab-offset file-position))
       (emit-section-header (emit-shstrtab-entry ".symtab")
                            elf/SHT_SYMTAB
                            0 0
-                           file-position
+                           symtab-offset
                            size/symtab
                            +.strtab-section-index+
                            (/ size/symtab elf/sizeof-Elf64_Sym)
@@ -1577,7 +1675,7 @@
                            elf/sizeof-Elf64_Sym)
       (incr file-position size/symtab))
 
-    ;; section #6
+    ;; section #9: .strtab
     (let ((size/strtab (segment-length '.strtab)))
       (emit-section-header (emit-shstrtab-entry ".strtab")
                            elf/SHT_STRTAB 0 0
@@ -1585,15 +1683,16 @@
                            size/strtab 0 0 1 0)
       (incr file-position size/strtab))
 
-    ;; section #7
+    ;; section #10: .shstrtab
     (let* ((name-offset		(emit-shstrtab-entry ".shstrtab"))
-           ;; must emit prior to taking the segment-length...
            (size/shstrtab	(segment-length '.shstrtab)))
       (emit-section-header name-offset
                            elf/SHT_STRTAB 0 0
                            file-position
                            size/shstrtab
-                           0 0 1 0)))
+                           0 0 1 0))
+
+    )
 
   ;; we can start writing the file. note that the order must be in
   ;; sync with the headers above.
@@ -1610,6 +1709,65 @@
              `(MOVQir	,arg ,reg))
            args '(RDI RSI RDX R10 R8 R9))
     (SYSCALL)))
+
+(define-function emit-relocation-tables ()
+  (with-current-segment 'ro-data
+    (.align elf/alignof-Elf64_Rela)
+    (label! '.rela.dyn)
+    (let ((rela-count 0))
+      (let ((code-segment		(get-segment 'code))
+            (data-segment		(get-segment 'data))
+            (ro-data-segment	(get-segment 'ro-data)))
+        (list-do entry (list-reverse *rela-entries*)
+          (let* ((segment	(first entry))
+                 (paddress	(second entry))
+                 (addend	(third entry))
+                 (segment-base
+                   ;; NOTE CASE would do something else for symbols... (they would get quoted due to self-evaluating-value?)
+                   ;; FIXME clean this up
+                   (cond
+                     ((= segment code-segment)	+code-segment-address+)
+                     ((= segment data-segment)	+data-segment-address+)
+                     ((= segment ro-data-segment)	+ro-data-segment-address+)
+                     (else (error "unexpected segment in .rela.dyn emission: "segment)))))
+            ;; Elf64_Rela entry (3 cells):
+            ;; 1. r_offset: byte offset in file where relocation applies (paddress + segment file offset)
+            (.i64 (+ segment-base paddress))
+            ;; 2. r_info: relocation type (R_X86_64_RELATIVE = 8, base-relative)
+            (.i64 elf/R_X86_64_RELATIVE)
+            ;; 3. r_addend: constant addend for relocation (0 for pure relative)
+            (.i64 addend
+                  ;;(+ segment-base paddress)
+                  ))
+          (incr rela-count)))
+      (label! '.rela.dyn-end)
+
+      (label! '.dynstr)
+      (.i8 0)
+      (label! '.dynstr-end)
+
+      (.align elf/alignof-Elf64_Sym)
+      (label! '.dynsym)
+      (.i64 0 0 0) ; TODO better express elf/sizeof-Elf64_Sym number of zero bytes
+
+      ;; (.align 8)
+      ;; (label! 'dt-hash)
+      ;; (.i32 1 1 0 0)
+
+      ;; Dynamic Linking Metadata Table
+      (label! '.dynamic)
+      ;; Elf64_Dyn struct entries, which really are just (name, tag) tuples
+      (.i64 elf/DT_RELA		(laddress '.rela.dyn))
+      (.i64 elf/DT_RELASZ	(* rela-count elf/sizeof-Elf64_Rela))
+      (.i64 elf/DT_RELAENT	elf/sizeof-Elf64_Rela)
+      (.i64 elf/DT_RELACOUNT	rela-count)
+      (.i64 elf/DT_STRTAB	(laddress '.dynstr))
+      (.i64 elf/DT_STRSZ	1)
+      (.i64 elf/DT_SYMTAB	(laddress '.dynsym))
+      (.i64 elf/DT_SYMENT	elf/sizeof-Elf64_Sym)
+      ;;(.i64 elf/DT_HASH		(laddress 'dt-hash))
+      (.i64 elf/DT_NULL		0))
+    (label! '.dynamic-end)))
 
 (define-function compile-env (env -c-)
   (verbosity 1
@@ -1659,6 +1817,8 @@
           ;; (emit-comment 1 "defn "name)
           (verbosity 1 (warn name ", "))
           (compile-definition value name -c-))))
+
+    (emit-relocation-tables)
 
     ;; write to *standard-output* to be compatible with the other backends
     (write-elf-to-stream *standard-output*)

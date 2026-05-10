@@ -53,6 +53,7 @@ ifeq ($(HOST_OS),Linux)
   TARGET_VENDOR	?= unknown
   TARGET_OS	?= linux
   TARGET_ABI	?= gnu
+  LD_LINUX	?= $$(ldd /usr/bin/env | awk '/ld-linux/ {print ($$3 ? $$3 : $$1)}')
   # `command time` forces bash to use the external time command
   # setarch --addr-no-randomize improves debuggability of lowlevel
   # issues (but it's problematic in containers/CI).
@@ -403,6 +404,7 @@ define compile
 	--define *host-directory* 	"$(1)"					\
 	--define *slave-directory* 	"$(SLAVE_DIR)"				\
 	--define *compiler-backend* 	"$(3)"					\
+	--define +ld.so-path+		"$(LD_LINUX)"				\
 	--define target/arch 		"$(TARGET_ARCH)"			\
 	--define target/vendor 		"$(TARGET_VENDOR)"			\
 	--define target/os 		"$(TARGET_OS)"				\
@@ -614,7 +616,7 @@ test-elf.x86-64: $(TEST_EVAL) \
 	./build/test-elf.x86-64.single-pass
 	@$(call print_file_size,./build/test-elf.x86-64.single-pass)
 
-	$(TEST_EVAL) boot.l --define +ld.so-path+ "$$(ldd /usr/bin/env | awk '/ld-linux/ {print ($$3 ? $$3 : $$1)}')" --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.segments.l
+	$(TEST_EVAL) boot.l --define +ld.so-path+ "$(LD_LINUX)" --define +target-triple+ "$(TARGET)" tests/test-elf.x86-64.segments.l
 	-readelf -el build/test-elf.x86-64.segments
 	@chmod +x build/test-elf.x86-64.segments
 	./build/test-elf.x86-64.segments
