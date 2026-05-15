@@ -79,7 +79,7 @@
   (for (i 0 cell-count)
     (set (oop-at from i) 0)))
 
-(define-form platform/diag-print (str)
+(define-form platform/diag-print-string (str)
   (typecase str
     (<string> ; i.e. we can calculate the string length at expand time
      `(linux-syscall linux/SYS_write linux/STDERR_FILENO
@@ -95,10 +95,6 @@
   ;; TODO endianness?
   (linux-syscall linux/SYS_write linux/STDERR_FILENO (address-of char) 1)
   char)
-
-;; TODO delme
-(define-form platform/print-diag-fmt (format . args)
-  ())
 
 ;; needs to be a form; the compiler doesn't yet support . rest args
 (define-form platform/halt args

@@ -66,7 +66,7 @@
   (unless (= 0 size)
     (let ((rc (libc/fwrite buf size 1 handle)))
       (unless (= 1 rc)
-        (debug (platform/format "<libc-stream> $put-all: libc/fwrite returned with "(long rc)", ferror "(long (libc/ferror handle))"\n"))
+        (debug (platform/diag-print "<libc-stream> $put-all: libc/fwrite returned with "(long rc)", ferror "(long (libc/ferror handle))"\n"))
         (error "<libc-stream> $put-all: libc/fwrite returned with "(box <long> rc)", ferror " (box <long> (libc/ferror handle)))))))
 
 ;; TODO implemenet inheritance on compiled selectors

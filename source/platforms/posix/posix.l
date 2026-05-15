@@ -44,7 +44,7 @@
                                         ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
                                             posix/PROT_EXEC)))
        (platform/diag-print "mprotect failed")
-       ;;(platform/format "mprotect returned with "(long libc/errno))
+       ;;(platform/diag-print "mprotect returned with "(long libc/errno))
        (platform/halt))
      buf))
 
@@ -63,7 +63,7 @@
 ;;                               posix/PROT_EXEC)
 ;;                           ,(+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
 ;;                           -1 0)))
-;;      ;;(platform/format "mmap returned with "(pointer buf)"\n")
+;;      ;;(platform/diag-print "mmap returned with "(pointer buf)"\n")
 ;;      (when (= buf posix/MAP_FAILED)
 ;;        (platform/diag-print "mmap returned with MAP_FAILED")
 ;;        (platform/halt))

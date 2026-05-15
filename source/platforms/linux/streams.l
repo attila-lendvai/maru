@@ -27,7 +27,7 @@
                            420          ; "rw-r--r--"
                            )))
     (when (<= 0 fd)
-      (debug (platform/format "file-open will box fd " (long fd) "\n"))
+      (debug (platform/diag-print "file-open will box fd "(long fd)"\n"))
       (box <lower-cell> fd))))
 
 (define-vm-function file-close ((fd <lower-cell>))
@@ -122,7 +122,7 @@
 (define-function %put-all (fd buf size)
   (let ((rc (%file-write fd buf size)))
     (unless (= rc size)
-      (debug (platform/format "<fd-stream> $put-all: write returned with "(long rc)"\n"))
+      (debug (platform/diag-print "<fd-stream> $put-all: write returned with "(long rc)"\n"))
       ;; TODO deal with EAGAIN and stuff...
       (error "<fd-stream> $put-all: write failed"))))
 

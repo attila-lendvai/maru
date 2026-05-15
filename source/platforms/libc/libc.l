@@ -74,7 +74,7 @@
 (define-form platform/clear-cells (from cell-count)
   `(libc/bzero ,from (* ,cell-count +word-size-in-bytes+)))
 
-(define-form platform/diag-print (str)
+(define-form platform/diag-print-string (str)
   `(libc/fputs (string->C-string ,str) libc/stderr))
 
 (define-function platform/diag-print-char (char)
@@ -82,12 +82,6 @@
   ;; NOTE this is lowlevel diag, we can't really do much if printing fails
   (libc/fputc char libc/stderr)
   char)
-
-;; TODO delme
-(define-form platform/print-diag-fmt (format . args)
-  `(let ()
-     (libc/fprintf libc/stderr (string->C-string ,format) ,@args)
-     (libc/fputc ?\n libc/stderr)))
 
 (define-form platform/halt args
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file

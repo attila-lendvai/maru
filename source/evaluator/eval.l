@@ -16,7 +16,7 @@
               `(define ,(concat-symbol 'symbol/ name)))
             symbols)
      (define-function initialize-symbol-cache ()
-       (debug (platform/format "initialize-symbol-cache begins\n"))
+       (debug (platform/diag-print "initialize-symbol-cache begins\n"))
        ,@(map (lambda (name)
                 `(set ,(concat-symbol 'symbol/ name)
                       (string->symbol ,(symbol->string name))))
@@ -224,7 +224,7 @@
                          ;; TODO do we want to make a copy of str here? because str may be mutable...
                          ;; TODO instantiate a read-only string as the name
                          (gc/let* ((sym		(symbol str)))
-                           (debug (platform/format "interning " (string str) "\n"))
+                           (debug (platform/diag-print "interning " (string str) "\n"))
                            (array-insert array index sym)
                            sym))))
 
@@ -266,7 +266,7 @@
     (if var
         (let ()
           ;;(print-all *debug-output* "warning: environment-define: variable "var" is already defined in env "env"\n")
-          ;;(platform/print-diag-fmt "warning: environment-define: variable %s is already defined in this env\n" (string->C-string (symbol->string name)))
+          ;;(platform/diag-print "warning: environment-define: variable "(string (string->C-string (symbol->string name)))" is already defined in this env\n")
           ;;(verbosity 1 (warn "environment-define: variable "var" is already defined in env "env"; overwriting/shadowing it"))
           )
       (set var (new-variable env name)))
