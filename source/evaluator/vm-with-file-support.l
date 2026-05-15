@@ -12,7 +12,7 @@
 (define-form initialize-stream (target-name our-name)
   (assert (symbol? our-name)) ; symbol macros should be expanded after the call form macros
   `(gc/let* ((stream (file-stream ,target-name)))
-     (debug (platform/format "initializing " (string ,(symbol->string our-name)) "\n"))
+     (debug (platform/diag-print "initializing " (string ,(symbol->string our-name)) "\n"))
      (set ,our-name stream)
      ;; the maru-user env was create earlier, let's set it there, too.
      ;; TODO clarify: why in maru-user?
@@ -126,7 +126,7 @@
                      (install_profiler_handler
                       (<target-function>-program-code profiler/take-sample))
                      (set_profiler_interval usecs)
-                     (platform/format "enabled profiling at every "usecs" uSec(s)"))
+                     (platform/diag-print "enabled profiling at every "usecs" uSec(s)"))
                  (platform/diag-print "WARNING: this build has no profiler, ignoring -p\n")))
 
               ;; -

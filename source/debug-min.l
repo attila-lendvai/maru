@@ -46,6 +46,5 @@
   ;; but it defaults to long, and recognizes string literals.
   `(let ()
      (fatal-prologue)
-     (platform/format ,@forms)
-     (platform/diag-print "\n")
+     (platform/diag-print ,@forms "\n")
      (platform/halt)))

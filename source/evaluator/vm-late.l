@@ -11,7 +11,7 @@
   ;; NOTE <target-function> is an opaque object, but it's ok to use
   ;; <symbols>'s as their name because they are held as gc roots by
   ;; the *symbols* array.
-  (debug (platform/format "%instantiate-vm-function "(pointer imp)"\n"))
+  (debug (platform/diag-print "%instantiate-vm-function "(pointer imp)"\n"))
   (gc/let* ((boxed-imp (box <lower-cell> imp))
             (tmp (vm-function boxed-imp name)))
     (when fixed?
