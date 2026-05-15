@@ -10,12 +10,18 @@
   `(bitwise-and ,var (- ,page-size)))
 
 (define-form platform/diag-print forms
-  ;; full syntax: (platform/diag-print "literal" (string form2) (pointer
-  ;; form3) (long form4) ...), but it defaults to long, and it
-  ;; recognizes string literals.
+  ;; print arguments as diagnotic output. argument expressions can be
+  ;; wrapped into STRING, POINTER, LONG, which is the default when omitted.
+  ;; e.g.: (platform/diag-print "literal" (string form2) (pointer form3)
+  ;; (long form4) form5 ...).
   `(let ()
      ,@(map (lambda (form)
               (cond
+                ;; maybe, eventually, evaluate DEFINE-CONSTANTs...
+                ;; ((and (symbol? form)
+                ;;       (defined? form *env*)
+                ;;       (is <form> (global-variable-value *env* form)))
+                ;;  `(platform/diag-print-string ,(eval form *env*) 10 platform/diag-print-char))
                 ((string? form)
                  `(platform/diag-print-string ,form))
                 ((and (pair? form)

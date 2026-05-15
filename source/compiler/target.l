@@ -130,7 +130,7 @@
   ;; (eval-in-host `(assert (find-local-variable *slave-env* '%im-a-test)))
   (eval-in-host `(assert (defined? '%im-a-test *slave-env*))))
 
-;; hide DEFINE-FORM in the target env with one that expand/encode/eval the body in the slave env.
+;; shadow DEFINE-FORM in the target env with one that expand/encode/eval the body in the slave env.
 ;; this way the body code can use everything that's available in the slave module,
 ;; even when it is redefined in the target (e.g. CONS in the form body vs. the target's definition
 ;; of CONS, i.e. the one that implements it).
