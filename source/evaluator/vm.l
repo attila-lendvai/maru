@@ -73,7 +73,7 @@
 ;;
 ;; TODO this is convoluted and needs better documentation
 (define-form define-vm-function (name-and-props args . body)
-  ;; NAME: optionally a list of (prim-name (or level-shifted-name null) . (properties: fixed))
+  ;; NAME: optionally a list of (upper-name (or level-shifted-name null) . (properties: fixed))
   ;; ARGS: may be _ to skip arg parsing
   ;;       otherwise a list of entries like:
   ;;         (arg-name (or arg-type null) (or default-value _) . (properties: nounbox))
@@ -85,7 +85,7 @@
   ;; the function in the target domain does not do any magic, it's
   ;; really just a plain ,@body.
   (set name-and-props (ensure-list name-and-props))
-  (let ((prim-name	(pop name-and-props))
+  (let ((upper-name	(pop name-and-props))
         impl-name
         impl-name?
         fixed?)
@@ -96,11 +96,11 @@
       (case prop
         (fixed	(set fixed? true))
         (else	(error "define-vm-function: unexpected property "prop))))
-    (let* ((stub-name		(concat-symbol prim-name '/evaluator-stub))
+    (let* ((stub-name		(concat-symbol upper-name '/evaluator-stub))
            (arg-names		())
            (binders		()))
       ;; TODO what about redefining a function? e.g. number->string in libc.l
-      (push *vm-function-registry* (list prim-name fixed?))
+      (push *vm-function-registry* (list upper-name fixed?))
       (let ((entries args))
         (while (pair? entries)
           (let* ((entry		(ensure-list (first entries)))
@@ -132,7 +132,7 @@
                                    (set ,arg-name (get/head __args))
                                    ,@(when type-checker
                                        ;; TODO this emits quite some redundancy
-                                       `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string prim-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
+                                       `((safety 1 (assert (,@type-checker ,arg-name) ,(symbol->string upper-name)": arg '",(symbol->string arg-name)"' is not of type ",(symbol->string type)))))
                                    ,@(when (and unbox?
                                                 unboxer)
                                        ;; qq is broken... `((set ,arg-name (,unboxer arg-name)))
@@ -140,20 +140,20 @@
                                    (set __args (get/tail __args)))
                                ,(if default-value?
                                     `(set ,arg-name ,default-value)
-                                  `(%not-enough-arguments ,(symbol->string prim-name) -args-))))))
+                                  `(%not-enough-arguments ,(symbol->string upper-name) -args-))))))
           (set entries (cdr entries)))
         ;; handle &rest arg
         (unless (= '_ entries)
           (push binders (if entries    ; i.e. it was in a cdr position
                             `(set ,entries __args)
-                          `(safety 1 (when __args (%too-many-arguments ,(symbol->string prim-name) -args-)))))
+                          `(safety 1 (when __args (%too-many-arguments ,(symbol->string upper-name) -args-)))))
           (when entries
             (push arg-names entries))))
       (set binders	(list-reverse! binders))
       (set arg-names	(list-reverse! arg-names))
       (let* ((effective-impl-name (if body
-                                      (if impl-name? impl-name prim-name)
-                                    prim-name))
+                                      (if impl-name? impl-name upper-name)
+                                    upper-name))
              (impl (when (and body
                               effective-impl-name)
                      `((define-function ,effective-impl-name ,arg-names
