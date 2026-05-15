@@ -202,6 +202,11 @@ ifneq (,$(filter $(PLATFORM),libc posix))
   EVAL_OBJ_llvm	+= $(BUILD_llvm)/compat-wrappers.o
 endif
 
+ifneq (,$(filter $(PLATFORM),posix))
+  EVAL_OBJ_x86	+= $(BUILD_x86)/posix.o
+  EVAL_OBJ_llvm	+= $(BUILD_llvm)/posix.o
+endif
+
 PROFILER ?= false
 
 ifneq ($(filter yes on true 1,$(PROFILER)),)
