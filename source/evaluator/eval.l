@@ -197,7 +197,7 @@
     (copy-bytes cstr (<string>-elements obj) len)
     obj))
 
-(require "source/conversion-min.l")
+(require "source/conversion-lower.l")
 
 ;; NOTE this is not exactly the same as the one in the VM: it lacks the slot-name
 ;; parameter, because the compiler cannot emit symbol literals yet.
