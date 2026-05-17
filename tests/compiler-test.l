@@ -5,28 +5,30 @@
 ;;; This file is compiled the same way as eval.l is compiled.
 ;;;
 
-(require "source/ansiterm.l")
-
 (eval-in-slave '(begin
                  (set (feature emit-with-object-headers) false)
                  (set (feature redefinable-functions-in-target) false)))
 ;;(eval-in-host  '(set *compiler-verbosity* 10))
 
-(define-form assert (test . args)
-  `(or ,test (failure ,@(or args (list "an assert failed")))))
+(require "source/ansiterm.l")
 
 (define *exit-code* 0)
 
+(define-form failure format
+  `(let ()
+     (platform/diag-print ,(concat-strings term/BOLD term/FG-RED
+                                           "\n\n*** FAILURE " term/RESET)
+                          ,@format "\n")
+     (set *exit-code* -1)))
+
+;; we can't compile quoted lists yet, so define a dumber version of assert
+(define-form assert (test . args)
+  `(or ,test (failure ,@(or args (list "an assert failed")))))
+
+(require "source/conversion-min.l")
+
 (begin-for-syntax
  (define *tests* ()))
-
-(define-form failure (format . args)
-  `(let ()
-     ;; FIXME clean up the platform/print-diag-fmt situation, it's a
-     ;; NOP in the linux platform.
-     (platform/diag-print ,(concat-strings term/FG-RED"FIXME !!! failing !!!"term/RESET))
-     (platform/print-diag-fmt ,(concat-strings "\n\n\033[1;31m*** FAILURE\033[0m " format) ,@args)
-     (set *exit-code* -1)))
 
 (define-form define-test (name form expected-value)
   (push *tests* name)
@@ -36,11 +38,8 @@
        (let ((expected ,expected-value)
              (actual ,form))
          (if (not (= actual expected))
-           ;; TODO ',form cannot be compiled yet
-           (let ()
-             ;; FIXME delme once the linux backend also prints something at a failure
-             (platform/diag-print ,(concat-strings term/FG-RED"!!! failing\n"term/RESET))
-             (failure "%s, expected: %ld, actual: %ld" ,name-as-string expected actual))))
+             ;; TODO ',form cannot be compiled yet
+             (failure (string  ,name-as-string)", expected: "(long expected)", actual: "(long actual))))
        ())))
 
 (define-form run-tests ()
@@ -626,29 +625,19 @@
 (define-function main (argc argv)
   (platform/diag-print "Printing test command line args:\n")
   (for (i 0 argc)
-    (platform/diag-print (oop-at argv i))
-    (platform/diag-print-char ?\n)
-    ;; TODO (platform/print-diag-fmt "  %.2d %s\n" i (oop-at argv i))
-    )
-
-  ;; (let ((idx argc))
-  ;;   (while (< 0 (set idx (- idx 1)))
-  ;;     (platform/print-diag-fmt "--%.2d %s\n" idx (oop-at argv idx))))
-
-  ;; (while (< 0 (set argc (- argc 1)))
-  ;;   (platform/print-diag-fmt "++%.2d %s\n" argc (oop-at argv argc)))
+    (platform/diag-print "  "i" "(string (oop-at argv i))"\n"))
 
   (when uninitialized-global
-    (failure "uninitialized-global is %ld" uninitialized-global))
+    (failure "uninitialized-global is "uninitialized-global))
   (unless (= global42 42)
-    (failure "global42 is %ld" global42))
+    (failure "global42 is "global42))
 
   ;; TODO stdout is a macro on darwin, therefore we wrap it in a
   ;; getter, therefore we can't set it as we did before
   ;; (set libc/stdout (libc/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
 
-  (platform/diag-print "\e[32mAbout to start running the compiled tests\e[m\n")
+  (platform/diag-print (string term/FG-GREEN)"About to start running the compiled tests\n"(string term/RESET))
   (run-tests)
-  (platform/diag-print "\n\e[32mFinished running the compiled tests\e[m\n")
+  (platform/diag-print (string term/FG-GREEN)"\nFinished running the compiled tests\n"(string term/RESET))
 
   *exit-code*)
