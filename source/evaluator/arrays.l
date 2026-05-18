@@ -81,36 +81,67 @@
   (define-vector-accessors <lower/array>	lower/array-	()	byte-at		copy-bytes	platform/move-bytes	1))
 
 (when-at-expand (feature lower/array)
-  ;; TODO decide where the DEFINE-VM-FUNCTION should be and make it uniform
-  ;; TODO conditionalize this on a feature?
-  (define-vm-function lower/array ((capacity <long> 0))
-    (make <lower/array>
-      (size	(box <long> 0))
-      (elements	(when (> capacity 0)
+
+;; TODO decide where the DEFINE-VM-FUNCTION should be and make it uniform
+;; TODO conditionalize this on a feature?
+(define-vm-function lower/array ((capacity <long> 0))
+  (make <lower/array>
+    (size	(box <long> 0))
+    (elements	(when (> capacity 0)
                   (allocate-data capacity)))))
 
-  (define-vm-function lower/array->lower/function ((array <lower/array>))
-    (make <target-function>
-      (program-code	(slot-value <lower/array> elements array))))
+(define-vm-function lower/array->lower/function ((array <lower/array>))
+  (make <target-function>
+    (program-code	(slot-value <lower/array> elements array))))
 
-  (define-vm-function (lower/array-length ()) ((array <lower/array>))
-    (box <long> (lower/array-length array)))
+(define-vm-function (lower/array-length ()) ((array <lower/array>))
+  (box <long> (lower/array-length array)))
 
-  (define-vm-function (lower/array-at ()) ((array <lower/array>) (idx <long>))
-    (box <long> (lower/array-at array idx)))
+;; lower/array-at accessor is byte sized
+(define-vm-function (lower/array-at ()) ((array <lower/array>) (idx <long>))
+  (box <long> (lower/array-at array idx)))
 
-  (define-vm-function (set-lower/array-at ()) ((array <lower/array>) (idx <long>) value)
-    (typecase value
-      (<long>
-       (set (lower/array-at array idx) (unbox <long> value)))
-      (<lower-cell>
-       ;; ensure the array has enough capacity
-       (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
-       (set (cell-at (slot-value <lower/array> elements array) idx)
-            (unbox <lower-cell> value)))
-      (else
-       (error "set-lower/array-at doesn't know how to handle value: "value)))
-    value))
+(define-vm-function (set-lower/array-at ()) ((array <lower/array>) (idx <long>) value)
+  (typecase value
+    (<long>
+     ;; TODO add error reporting? this only writes out the lowest
+     ;; byte of the value.
+     (set (lower/array-at array idx) (unbox <long> value)))
+    (<lower-cell>
+     ;; ensure the array has enough capacity
+     (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
+     (set (cell-at (<lower/array>-elements array) idx)
+          (unbox <lower-cell> value)))
+    (else
+     (error "set-lower/array-at doesn't know how to handle value: "value)))
+  value)
+
+;; cell-at accessor is target cell sized
+(with-forms
+    ((with-bounds-checking
+         (body
+          `(begin
+             (safety 2 (let ((header (gc/header-of base)))
+                         (assert (and (gc/valid-header-canary? header)
+                                      (<= 0 byteindex)
+                                      (<= (+ byteindex +word-size-in-bytes+) (<header>-size header)))
+                                 "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
+             ,@body))))
+
+  (define-vm-function (cell-at ()) (base (byteindex <long>))
+    (with-bounds-checking
+        (box <lower-cell> (cell-at base byteindex))))
+
+  (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
+    (with-bounds-checking
+        (set (cell-at base byteindex)
+             (typecase value
+               (<lower-cell>	(unbox <lower-cell> value))
+               ;; FIXME should it allow <long> at all?
+               (<long>		value)
+               (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
+
+) ; (feature lower/array)
 
 (define-vm-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))
   (string-do char insertion
