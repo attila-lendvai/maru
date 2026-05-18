@@ -1,30 +1,44 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define-function spawn-program (path argv envp)
-  ;; (debug (platform/diag-print "spawn-program is about to spawn '"(string path)"'\n"))
-  (let ((pid (linux-syscall linux/SYS_clone linux/SIGCHLD 0)))
+(define-form WIFEXITED   (status) `(= 0 (bitwise-and ,status 0x7f)))
+(define-form WEXITSTATUS (status) `(bitwise-and (bitwise-shift ,status -8) 0xff))
+(define-form WIFSIGNALED (status) `(>= (+ 1 (bitwise-and ,status 0x7f)) 2))
+(define-form WTERMSIG    (status) `(bitwise-and ,status 0x7f))
+
+;; NOTE these are here because BOX and other VM stuff is not yet
+;; available in linux.l
+(define-function platform/waitpid (pid options)
+  (let ((status 0)
+        result)
+    (while (= (- linux/EINTR)
+              (set result (syscall linux/SYS_wait4 pid (address-of status) options 0)))
+      ;; keep trying
+      )
+    (if (< result 0)
+        (fatal "waitpid returned with "result)
+      (cond
+        ((WIFEXITED status)	(WEXITSTATUS status))
+        ((WIFSIGNALED status)	(+ 128 (WTERMSIG status)))
+        (else			-1)))))
+
+(define-function platform/spawn-program (path argv envp stdout-fd stderr-fd)
+  ;; (debug (platform/diag-print "platform/spawn-program is about to spawn '"(string path)"'\n"))
+  (let ((pid (syscall linux/SYS_clone linux/SIGCHLD 0)))
     (if (= 0 pid)
-        (let ((rc (linux-syscall linux/SYS_execve path argv envp)))
-          ;; (platform/diag-print "execve error: "(long rc)"\n")
-          (linux-syscall linux/SYS_exit 127))
+        (begin
+          (when (< 0 stdout-fd)
+            (syscall* linux/SYS_dup2 stdout-fd linux/STDOUT_FILENO)
+            (syscall* linux/SYS_close stdout-fd))
+          (when (< 0 stderr-fd)
+            (syscall* linux/SYS_dup2 stderr-fd linux/STDERR_FILENO)
+            (syscall* linux/SYS_close stderr-fd))
+          (syscall* linux/SYS_execve path argv envp)
+          (syscall linux/SYS_exit 127))
       ;; (debug (platform/diag-print "child spawned\n"))
       pid)))
 
-(define-function run-program (path argv envp)
-  (let ((child-pid (spawn-program path argv envp))
-        (status 0))
-    (linux-syscall linux/SYS_wait4 child-pid (address-of status) 0 0)
-    (let ((termsig (bitwise-and status 0x7f))
-          (rc (bitwise-and (bitwise-shift status -8) 0xff)))
-      (if (= 0 termsig)
-          rc
-        (+ 128 termsig)))))
-
-(define-vm-function (spawn-program ()) ((path <string>))
-  (box <long> (spawn-program (string->C-string path) 0 0)))
-
-(define-vm-function (run-program ()) ((path <string>))
-  (box <long> (run-program (string->C-string path) 0 0)))
+(define-form platform/pipe (ptr)
+  `(syscall* linux/SYS_pipe ,ptr))
 
 (define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
@@ -48,25 +62,20 @@
 ;;               int *parent_tid, unsigned long tls,
 ;;               int *child_tid);
 
-(define-vm-function fork ((flags <long> linux/SIGCHLD))
-  (let ((pid (linux-syscall linux/SYS_clone flags 0 0 0 0 0)))
-    (if (<= 0 pid)
-        (box <long> pid)
-      (fatal "clone syscall returned with error "pid))))
+;; (define-vm-function fork ((flags <long> linux/SIGCHLD))
+;;   (box <long> (syscall* linux/SYS_clone flags 0 0 0 0 0)))
 
-(define-vm-function execve ((path <string>))
-  (let* ((argv 0)
-         (envp 0)
-         (result (linux-syscall linux/SYS_execve
-                                (<string>-elements path)
-                                (address-of argv)
-                                (address-of envp))))
-    ;; result is -errno
-    (fatal "execve returned with "result)))
+;; (define-vm-function execve ((path <string>))
+;;   (let* ((argv 0)
+;;          (envp 0)
+;;          (result (syscall linux/SYS_execve
+;;                                 (<string>-elements path)
+;;                                 (address-of argv)
+;;                                 (address-of envp))))
+;;     ;; result is -errno
+;;     (fatal "execve returned with "result)))
 
-(define-vm-function waitpid ((pid <long>))
-  (let* ((status 0)
-         (result (linux-syscall linux/SYS_wait4 pid (address-of status) 0 0)))
-    (if (<= result 0)
-        (fatal "wait4 syscall returned with "result)
-      (box <long> status))))
+;; (define-vm-function waitpid ((pid <long>))
+;;   (let (status)
+;;     (syscall* linux/SYS_wait4 pid (address-of status) 0 0)
+;;     (box <long> status)))

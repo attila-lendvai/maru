@@ -13,8 +13,9 @@
 
 (define-C-functions posix/
   ;;(* getcwd (* size_t))
-  ;; (int chdir (*)) we handle chdir in a libc wrapper; too precious to skip there
   (* fdopen (int *))
+  (ssize_t read (int * size_t))
+  (int close (int))
   (int mprotect (* size_t int))
   (* mmap (* size_t int int int off_t))
   (long sysconf (int))

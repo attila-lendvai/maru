@@ -142,6 +142,34 @@
                (<long>		value)
                (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
 
+(define-function lower/array-ensure-capacity/cell (array cell-index)
+  (set (lower/array-at array (- (* (+ cell-index 1) +word-size-in-bytes+)
+                                1))
+       0))
+
+(define-function to-lower-array (obj offset)
+  (let ((lower-array (lower/array 4))
+        (i offset))
+    (typecase obj
+      (<undefined>)
+      (<array>
+       (let ((limit (+ 1 (array-length obj))))
+         (while (< i limit)
+           (lower/array-ensure-capacity/cell lower-array i)
+           ;; NOTE: we can't cache the elements slot, because it's
+           ;; changing when the array grows.
+           (set (oop-at (<lower/array>-elements lower-array) i)
+                (string->C-string (array-at obj i)))
+           (incr i))))
+      (<pair>
+       (while (pair? obj)
+         (lower/array-ensure-capacity/cell lower-array i)
+         (set (oop-at (<lower/array>-elements lower-array) i)
+              (string->C-string (pop obj)))
+         (incr i)))
+      (else (error "to-lower-array: cannot handle passed obj of type "(type-of obj))))
+    lower-array))
+
 ) ; (feature lower/array)
 
 (define-vm-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))

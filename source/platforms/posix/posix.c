@@ -18,18 +18,31 @@ char* platform_envp()
 }
 
 /*
- * Spawn a program using fork + execve.
+ * Spawn a program using fork + execve with optional stdout/stderr redirection.
+ *
+ * Parameters:
+ *   stdout_fd - file descriptor to redirect stdout to, or -1 to leave unchanged
+ *   stderr_fd - file descriptor to redirect stderr to, or -1 to leave unchanged
  *
  * Returns:
  *   child PID on success
  *   -1 on failure
  */
-pid_t maru_spawn_program(const char *path, char *const argv[], char *const envp[])
+pid_t platform_spawn_program(const char *path, char *const argv[], char *const envp[], int stdout_fd, int stderr_fd)
 {
     pid_t pid = fork();
 
     if (pid == 0) {
         // Child
+        if (stdout_fd >= 0) {
+            dup2(stdout_fd, STDOUT_FILENO);
+            close(stdout_fd);
+        }
+        if (stderr_fd >= 0) {
+            dup2(stderr_fd, STDERR_FILENO);
+            close(stderr_fd);
+        }
+
         execve(path, argv, envp ? envp : environ);
 
         // execve only returns on failure
@@ -41,27 +54,12 @@ pid_t maru_spawn_program(const char *path, char *const argv[], char *const envp[
     return pid;
 }
 
-/*
- * Spawn a program and wait for it to finish.
- *
- * Returns:
- *   exit status of child          (0-255)
- *   128 + signal number           if killed by signal
- *   -1 on failure
- */
-int maru_run_program(const char *path, char *const argv[], char *const envp[])
+int platform_waitpid(pid_t pid, int options)
 {
-    pid_t pid = maru_spawn_program(path, argv, envp);
-
-    if (pid < 0) {
-        perror("maru_spawn_program failed");
-        return -1;
-    }
-
     int status;
 
     for (;;) {
-        pid_t r = waitpid(pid, &status, 0);
+        pid_t r = waitpid(pid, &status, options);
 
         if (r < 0) {
             if (errno == EINTR) {

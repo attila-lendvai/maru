@@ -5,6 +5,30 @@
 ;; TODO not sure whether this technique of (address-of char) is
 ;; digestable for LLVM. it's a KLUDGE anyway...
 
+(define-function platform/close-fd (fd)
+  (syscall* linux/SYS_close fd))
+
+(define-function platform/read-byte (fd)
+  (let ((byte 0)
+        rc)
+    ;; man 2 read
+    (while (= (- linux/EINTR)
+              (set rc (syscall linux/SYS_read fd (address-of byte) 1)))
+      ;; then try again
+      )
+    (case rc
+      (0	-1)
+      (1	byte)
+      (else	(- rc)))))
+
+(define-function linux/write (fd buf length)
+  (let (rc)
+    (while (= (- linux/EINTR)
+              (set rc (syscall linux/SYS_write fd buf length)))
+      ;; then try again
+      )
+    rc))
+
 ;;;
 ;;; files
 ;;;
@@ -49,19 +73,10 @@
       ;;(error "file-read-byte: syscall returned with error")
       ())))
 
-(define-vm-function %file-write (fd buf length)
-  (let (result)
-    (while (begin
-            (set result (syscall linux/SYS_write fd buf length))
-            (= result (- linux/EINTR)))
-      ;; then try again
-      )
-    result))
-
 (define-vm-function file-write-byte ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
   (to-upper-boolean
-   (= 1 (%file-write fd (address-of char) 1))))
+   (= 1 (linux/write fd (address-of char) 1))))
 
 ;; (define-vm-function file-flush ((fd <lower-cell>))
 ;;   (unless (= 0 (syscall linux/SYS_fsync fd))
@@ -115,12 +130,12 @@
 
 (define-method $put <fd-stream> (u/char)
   ;; TODO endianness? think this through...
-  (unless (= 1 (%file-write self.fd (address-of u/char) 1))
+  (unless (= 1 (linux/write self.fd (address-of u/char) 1))
     (error "<fd-stream> $put: write failed"))
   u/char)
 
 (define-function %put-all (fd buf size)
-  (let ((rc (%file-write fd buf size)))
+  (let ((rc (linux/write fd buf size)))
     (unless (= rc size)
       (debug (platform/diag-print "<fd-stream> $put-all: write returned with "(long rc)"\n"))
       ;; TODO deal with EAGAIN and stuff...
@@ -137,5 +152,8 @@
     (else
      (error "<fd-stream> $put-all: unexpected elements: " obj)))
   obj)
+
+;; (define-method $close <fd-stream> ()
+;;   (syscall* linux/SYS_close self.fd))
 
 (require "source/streams-min-late.l")

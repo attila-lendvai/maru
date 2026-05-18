@@ -358,9 +358,71 @@
   (define-vm-function enable-debug-output	() (set *debug-output-enabled?* true))
   (define-vm-function disable-debug-output	() (set *debug-output-enabled?* false)))
 
+;; FIXME when-at-expand body loses toplevelness, so it must be outside of it
+(define-form with-open-pipe (args . body)
+  `(let ((__pipe-val__ 0)
+         -read-fd-
+         -write-fd-)
+     (platform/pipe (address-of __pipe-val__))
+     (set -read-fd-  (bitwise-and   __pipe-val__ 0xFFFFFFFF))
+     (set -write-fd- (bitwise-shift __pipe-val__ -32))
+     ,@body))
+
 ;; FIXME: why do i need the HOST-VALUE here?! WHEN-AT-EXPAND should be
 ;; evaluating in the slave env, where the unwrapped DEFINED? should
 ;; just work. instead i get: form encountered in interpreted code with
 ;; args ((oop-at.0+29 obj.2+0 0) 1)
-;; (when-at-expand (host-value (defined? 'platform/spawn-program *target-env*))
-;;   )
+(when-at-expand (and (feature lower/array)
+                     (host-value (defined? 'platform/spawn-program *target-env*)))
+
+(define-vm-function spawn-program ((path <string>)
+                                   argv envp
+                                   (stdout-fd <long> -1) (stderr-fd <long> -1))
+  (safety 2 (or (not argv) (pair? argv) (is <array> argv) (error "spawn-program: argv is of type " (type-of argv))))
+  ;; TODO actually use envp
+  (let ((argv/lower (to-lower-array argv 1))
+        (path/lower (string->C-string path)))
+    ;; argv[0] is the path of the binary
+    (set (oop-at (<lower/array>-elements argv/lower) 0) path/lower)
+    ;; NULL terminated
+    (let ((i (bytes-to-words (lower/array-length argv/lower))))
+      (lower/array-ensure-capacity/cell argv/lower i)
+      (set (oop-at (<lower/array>-elements argv/lower) i) 0))
+
+    (box <long> (platform/spawn-program path/lower
+                                        (<lower/array>-elements argv/lower)
+                                        (platform/envp)
+                                        stdout-fd
+                                        stderr-fd))))
+
+(define-vm-function (run-program ()) _
+  (let* ((path (or (pop -args-)
+                   (error "run-program: path is mandatory")))
+         (argv (pop -args-))
+         ;; TODO (envp (pop -args-))
+         (child-pid (unbox <long> (spawn-program path argv 0 -1 -1))))
+    (box <long> (platform/waitpid child-pid 0))))
+
+(define-vm-function (run-program/stdout ()) _
+  (let* ((path (or (pop -args-)
+                   (error "run-program/capture: path is mandatory")))
+         (argv (pop -args-))
+         ;; TODO (envp (pop -args-))
+         )
+    (with-open-pipe ()
+      (let ((child-pid (unbox <long> (spawn-program path argv 0
+                                                    -write-fd- -1))))
+        (platform/close-fd -write-fd-)
+
+        (let ((result (string 16))
+              char)
+          (while (<= 0 (set char (platform/read-byte -read-fd-)))
+            (string-append result char))
+
+          (platform/close-fd -read-fd-)
+
+          (let ((exit-code (platform/waitpid child-pid 0)))
+            (unless (= 0 exit-code)
+              (error "spawn-program returned exit code: "exit-code)))
+          result)))))
+)
