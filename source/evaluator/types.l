@@ -123,6 +123,8 @@
   (define-form symbol?		(obj)	`(is <symbol>	,obj))
   (define-form array?		(obj)	`(is <array>	,obj)))
 
+;; TODO explain why these are needed, and how they are faster than the
+;; accessor... or just get rid of them.
 (define-form get/head		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'head))	`(<pair>-head ,obj)))
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(set (<pair>-head ,obj) ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(<pair>-tail ,obj)))

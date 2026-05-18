@@ -612,7 +612,7 @@
                                   (MOVBim	(<LITERAL>-value $2) 0 RAX RCX 1))))
 
 (when-at-expand (feature lower/array)
-  ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
+  ;; TODO these two are the same as the -OOP versions, except the MOV's scale
   (define-instruction LOAD-CELL	(false 0 true)
     ((STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
 				(MOVQmr 0 RAX RCX 1 RAX)))

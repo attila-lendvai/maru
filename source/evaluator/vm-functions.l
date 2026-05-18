@@ -188,6 +188,10 @@
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-))))
     (typecase lhs
+      ;; TODO dispatch on the meta-type and handle entire
+      ;; classes. there's no point in a separate <long> and
+      ;; <lower-cell> case when both can be covered by e.g. a boxed
+      ;; word branch.
       (<long>		(and (long? rhs)
                              (= (unbox <long> lhs)
                                 (unbox <long> rhs))
@@ -224,10 +228,6 @@
 (define-vm-function set-cdr ((pair <pair>) value)
   (set (<pair>-tail pair) value))
 
-;; TODO change this to a with-forms with-range-check, and
-;; then implement the setter so that it unboxes <lower-cell> values.
-;; probably the getter should also box its return value into it.
-;; FIXME is this oop-at or a raw cell-at? rename/cleanup
 (with-forms
     ((with-bounds-checking
          (body

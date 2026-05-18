@@ -100,6 +100,7 @@
         (set list (cdr list)))
       result)))
 
+;; TODO merge with the one in eval.l into list-min.l
 (define concat-list
   (lambda (x y)
     (if (pair? x)

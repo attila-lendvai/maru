@@ -403,10 +403,11 @@
   (define-test lower/array/1 ()
     (let ((x (lower/array 200)))
       (set (cell-at x 0) 0x1122334455667788)
-      (set (cell-at x 8) 0)
-      (test-assert (= (cell-at x 0) (long->lower-cell 0x1122334455667788)))
-      (test-assert (= (cell-at x 1) (long->lower-cell 0x0011223344556677)))
-      (test-assert (= (cell-at x 2) (long->lower-cell 0x0000112233445566)))
+      (set (cell-at x 7) 0)
+      ;; FIXME this assumes little endian
+      (test-assert (= (cell-at x 0) (long->lower-cell 0x0022334455667788)))
+      (test-assert (= (cell-at x 1) (long->lower-cell 0x0000223344556677)))
+      (test-assert (= (cell-at x 2) (long->lower-cell 0x0000002233445566)))
       ))
 
   (define-test lower/array/2 ()

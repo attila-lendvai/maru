@@ -63,8 +63,9 @@
          (,setter-name obj idx value))
 
        (define-function ,zeroed-name (obj)
+         (safety 2 (or (is ,type-name obj) (fatal (string ,(symbol->string zeroed-name)) ": called with object of type " (type-of obj))))
          (if (gc/read-only-object? obj)
-             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) "an ensure-zero-terminated function was called on a read-only object that is not zero terminated")))
+             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) ": an ensure-zero-terminated function was called on a read-only object that is not zero terminated")))
            (let ((size (,length-name obj)))
              (,setter-name obj size 0)
              (set (slot-value ,type-name size obj) (box <long> size))))
@@ -72,9 +73,6 @@
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
-
-;;; NOTE: lower/array is currently only used by the assembler and jit
-;;; experiments
 
 (when-at-expand (feature lower/array)
   ;; FIXME: if these two when-at-expand's are merged, then a set form

@@ -177,6 +177,7 @@
   (gc/let* ((tmp (list2 b c)))
     (cons a tmp)))
 
+;; TODO merge with the one in list-min.l
 (define-function concat-list (head tail)
   (if (pair? head)
       (gc/let* ((new-tail (concat-list (get/tail head) tail)))
