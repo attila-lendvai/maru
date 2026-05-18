@@ -68,6 +68,7 @@
              (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) ": an ensure-zero-terminated function was called on a read-only object that is not zero terminated")))
            (let ((size (,length-name obj)))
              (,setter-name obj size 0)
+             ;; reset back the length
              (set (slot-value ,type-name size obj) (box <long> size))))
          obj))))
 

@@ -34,6 +34,8 @@
 (define-form error args
   `(let ()
      (error-prologue)
+     ;; FIXME decide whether this can only be called with tagged or
+     ;; untagged, and then adapt accordingly
      ,@(map (lambda (arg)
               `(%error ,arg))
             args)

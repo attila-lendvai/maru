@@ -3,7 +3,6 @@
 (define-constant +linux/syscall/argument-registers/x86_64+
     `(quote ,(list RAX RDI RSI RDX R10 R8 R9)))
 
-;; redefine the 32 bit version
 (define-instruction LINUX-SYSCALL (false 0 true)
   ((pair)
    (let ((args $1)
