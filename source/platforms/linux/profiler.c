@@ -5,14 +5,15 @@
  *
  */
 
-#include <x86_64-linux-gnu/asm/unistd_64.h>
-#include <x86_64-linux-gnu/asm/signal.h>
 #include <linux/time.h>
 
-/* Kernel sigset: on x86_64 the rt_sigaction syscall expects 8 bytes (1 word) */
+#if defined(__x86_64__)
+
+#include <asm/unistd_64.h>
+#include <asm/signal.h>
+
 #define KERNEL_SIGSET_SIZE 8
 
-/* Kernel's sigaction structure layout for the rt_sigaction syscall */
 struct k_sigaction {
     void (*k_sa_handler)(int);
     unsigned long sa_flags;
@@ -20,18 +21,6 @@ struct k_sigaction {
     unsigned long sa_mask;
 };
 
-/* timeval / itimerval for setitimer syscall */
-struct timeval_k {
-    long tv_sec;
-    long tv_usec;
-};
-
-struct itimerval_k {
-    struct timeval_k it_interval;
-    struct timeval_k it_value;
-};
-
-/* Minimal syscall wrappers */
 static inline long syscall3(long n, long a1, long a2, long a3)
 {
     long ret;
@@ -57,27 +46,137 @@ static inline long syscall4(long n, long a1, long a2, long a3, long a4)
     return ret;
 }
 
-/* sigreturn trampoline: called by kernel after signal handler returns.
- * Must match glibc's __restore_rt which simply does: mov $15,%rax; syscall */
 __asm__ (
     ".text\n"
     ".globl __restore_rt\n"
     ".type __restore_rt, @function\n"
     "__restore_rt:\n"
-    "    mov $" "15" ", %rax\n"
+    "    mov $15, %rax\n"
     "    syscall\n"
 );
 
 extern void __restore_rt(void);
+
+#elif defined(__i386__)
+
+#include <asm/unistd_32.h>
+#include <asm/signal.h>
+
+#define KERNEL_SIGSET_SIZE 8
+
+struct k_sigaction {
+    void (*k_sa_handler)(int);
+    unsigned long sa_mask[2];
+    unsigned long sa_flags;
+    void (*sa_restorer)(void);
+};
+
+static inline long syscall3(long n, long a1, long a2, long a3)
+{
+    long ret;
+    __asm__ volatile (
+        "int $0x80"
+        : "=a"(ret)
+        : "a"(n), "b"(a1), "c"(a2), "d"(a3)
+        : "memory"
+    );
+    return ret;
+}
+
+static inline long syscall4(long n, long a1, long a2, long a3, long a4)
+{
+    long ret;
+    __asm__ volatile (
+        "push %%ebp\n\t"
+        "mov %5, %%ebp\n\t"
+        "int $0x80\n\t"
+        "pop %%ebp"
+        : "=a"(ret)
+        : "a"(n), "b"(a1), "c"(a2), "d"(a3), "g"(a4)
+        : "memory"
+    );
+    return ret;
+}
+
+__asm__ (
+    ".text\n"
+    ".globl __restore_rt\n"
+    ".type __restore_rt, @function\n"
+    "__restore_rt:\n"
+    "    mov $173, %eax\n"
+    "    int $0x80\n"
+);
+
+extern void __restore_rt(void);
+
+#elif defined(__aarch64__)
+
+#include <asm/unistd.h>
+#include <asm/signal.h>
+
+#define KERNEL_SIGSET_SIZE 8
+
+struct k_sigaction {
+    void (*k_sa_handler)(int);
+    unsigned long sa_flags;
+    unsigned long sa_mask;
+};
+
+static inline long syscall3(long n, long a1, long a2, long a3)
+{
+    register long x8 __asm__("x8") = n;
+    register long x0 __asm__("x0") = a1;
+    register long x1 __asm__("x1") = a2;
+    register long x2 __asm__("x2") = a3;
+    __asm__ volatile (
+        "svc 0"
+        : "+r"(x0)
+        : "r"(x1), "r"(x2), "r"(x8)
+        : "memory"
+    );
+    return x0;
+}
+
+static inline long syscall4(long n, long a1, long a2, long a3, long a4)
+{
+    register long x8 __asm__("x8") = n;
+    register long x0 __asm__("x0") = a1;
+    register long x1 __asm__("x1") = a2;
+    register long x2 __asm__("x2") = a3;
+    register long x3 __asm__("x3") = a4;
+    __asm__ volatile (
+        "svc 0"
+        : "+r"(x0)
+        : "r"(x1), "r"(x2), "r"(x3), "r"(x8)
+        : "memory"
+    );
+    return x0;
+}
+
+#else
+#error "Unsupported architecture"
+#endif
 
 /* Install a SIGVTALRM handler */
 extern void install_profiler_handler(void (*handler)(int))
 {
     struct k_sigaction kact;
     kact.k_sa_handler = handler;
+#if defined(__x86_64__)
     kact.sa_flags = SA_RESTORER;
     kact.sa_restorer = __restore_rt;
     kact.sa_mask = 0UL;
+#elif defined(__i386__)
+    kact.sa_flags = SA_RESTORER;
+    kact.sa_restorer = __restore_rt;
+    kact.sa_mask[0] = 0UL;
+    kact.sa_mask[1] = 0UL;
+#elif defined(__aarch64__)
+    kact.sa_flags = 0;
+    kact.sa_mask = 0UL;
+#else
+#error "Unsupported architecture"
+#endif
 
     long r = syscall4(__NR_rt_sigaction,
                       SIGVTALRM,
@@ -90,7 +189,7 @@ extern void install_profiler_handler(void (*handler)(int))
 /* Set the virtual timer interval (microseconds, 0 to disable) */
 extern void set_profiler_interval(int microseconds)
 {
-    struct itimerval_k kv;
+    struct itimerval kv;
 
     if (microseconds == 0) {
         kv.it_interval.tv_sec = 0;
