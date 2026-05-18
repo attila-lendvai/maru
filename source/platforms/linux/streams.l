@@ -12,20 +12,20 @@
 ;; TODO reaname these to file/open?
 (define-vm-function file-open ((path <string>) (mode <string>))
   (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD (string->C-string path)
-                           (cond
-                             ((or (not mode)
-                                  (string= mode "r"))
-                              linux/O_RDONLY)
-                             ((string= mode "rw")
-                              (bitwise-or linux/O_RDWR
-                                          linux/O_CREAT))
-                             ((string= mode "w")
-                              (bitwise-or linux/O_WRONLY
-                                          linux/O_CREAT))
-                             (else
-                              (error "file-open: unexpected mode "mode" while opening "path)))
-                           420          ; "rw-r--r--"
-                           )))
+                     (cond
+                       ((or (not mode)
+                            (string= mode "r"))
+                        linux/O_RDONLY)
+                       ((string= mode "rw")
+                        (bitwise-or linux/O_RDWR
+                                    linux/O_CREAT))
+                       ((string= mode "w")
+                        (bitwise-or linux/O_WRONLY
+                                    linux/O_CREAT))
+                       (else
+                        (error "file-open: unexpected mode "mode" while opening "path)))
+                     420                ; "rw-r--r--"
+                     )))
     (when (<= 0 fd)
       (debug (platform/diag-print "file-open will box fd "(long fd)"\n"))
       (box <lower-cell> fd))))

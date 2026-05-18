@@ -285,6 +285,21 @@
 ;;   (let ((foobar 42))
 ;;     (test-assert (= 42 (eval/expand/bug/4-helper foo)))))
 
+;; FIXME when it's wrapped into a when-at-expand, then the form is not
+;; visible at expansion time. IOW, losing toplevelness results in
+;; losing serial evaluation.
+;;
+;; (when-at-expand true
+;;   (define-form cond-expand-helper _
+;;     true)
+;;
+;;   (define-test eval/expand/form-at-cond-condition ()
+;;     (test-assert (cond
+;;                    (false 0)
+;;                    ((cond-expand-helper) 42)
+;;                    (else 0))
+;;                  42)))
+
 (define *a-global-holding-42* 42)
 
 (define-test eval/let/hiding-a-global ()

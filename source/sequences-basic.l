@@ -21,6 +21,7 @@
           (set (string-at res res-idx) (string-at y i))
           (incr i)
           (incr res-idx)))
+      ;; (assert (= (+ x-len y-len) (string-length res)))
       res)))
 
 (define-function concat-strings args
