@@ -271,7 +271,7 @@
              (typecase value
                (<lower-cell>	(unbox <lower-cell> value))
                ;; FIXME should it allow <long> at all?
-               (<long>		(unbox <long> value))
+               (<long>		value)
                (else (error "set-cell-at called with an unexpected type: "(type-of value)))))))))
 
 (define-vm-function lower-cell->long ((value <lower-cell>))
