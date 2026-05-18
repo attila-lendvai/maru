@@ -4,16 +4,34 @@
 
 ;; functions implemented in posix.c
 (define-C-functions ()
-  (pid_t maru_spawn_program (* * *))
-  (pid_t maru_run_program   (* * *))
+  (pid_t platform/spawn-program (* * * int int))
+  (pid_t platform/waitpid (pid_t int))
   (* platform/envp ())
   )
 
-(define-vm-function (spawn-program ()) ((path <string>))
-  (box <long> (maru_spawn_program (string->C-string path) 0 0)))
+;; TODO this doesn't work: (define platform/close-fd posix/close) it
+;; results in multiple (re)declarations in the llvm backend. the
+;; compiler needs to keep track of what has already been emitted and
+;; reuse them.
 
-(define-vm-function (run-program ()) ((path <string>))
-  (box <long> (maru_run_program (string->C-string path) 0 0)))
+(define-form platform/close-fd (fd)
+  `(posix/close ,fd))
+
+(define-function platform/read-byte (fd)
+  (let ((byte 0)
+        rc)
+    ;; man 2 read
+    (while (= (- posix/EINTR)
+              (set rc (posix/read fd (address-of byte) 1)))
+      ;; then try again
+      )
+    (case rc
+      (0	-1)
+      (1	byte)
+      (else	(- rc)))))
+
+(define-form platform/pipe (ptr)
+  `(posix/pipe ,ptr))
 
 (define-vm-function (posix/dlsym ()) (handle (name <string>))
   (let* ((lower/handle (typecase handle
@@ -24,26 +42,27 @@
     (when ptr
       (box <lower-cell> ptr))))
 
-(define-vm-function (fork ()) ()
-  (let ((pid (posix/fork)))
-    (if (<= 0 pid)
-        (box <long> pid)
-      (fatal "fork returned with error: "pid))))
-
-(define-vm-function (execve ()) ((path <string>) argv envp)
-  (let* ((result (posix/execve (string->C-string path)
-                               argv
-                               envp)))
-    ;; result is -errno
-    (fatal "execve returned with "result)))
-
-(define-vm-function (waitpid ()) ((pid <long>) (options <long> 0))
-  (let* ((status 0)
-         (result 0))
-    (while (= posix/EINTR
-              (set result (posix/waitpid pid (address-of status) options)))
-      ;; keep trying
-      )
-    (if (<= result 0)
-        (fatal "waitpid returned with "result)
-      (box <long> status))))
+;; (define-vm-function (fork ()) ()
+;;   (let ((pid (posix/fork)))
+;;     (if (<= 0 pid)
+;;         (box <long> pid)
+;;       (fatal "fork returned with error: "pid))))
+;;
+;; (define-vm-function (execve ()) ((path <string>) argv envp)
+;;   (let* ((result (posix/execve (string->C-string path)
+;;                                argv
+;;                                envp)))
+;;     ;; result is -errno
+;;     (fatal "execve returned with "result)))
+;;
+;; (define-vm-function (waitpid ()) ((pid <long>) (options <long> 0))
+;;   use lower_waitpid
+;;   (let* ((status 0)
+;;          (result 0))
+;;     (while (= posix/EINTR
+;;               (set result (posix/waitpid pid (address-of status) options)))
+;;       ;; keep trying
+;;       )
+;;     (if (<= result 0)
+;;         (fatal "waitpid returned with "result)
+;;       (box <long> status))))
