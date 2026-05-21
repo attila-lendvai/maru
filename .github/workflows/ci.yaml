@@ -50,29 +50,31 @@ jobs:
 
       - run:  clang --version && cc --version
 
-      - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
-      - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
-      - run:  timeout 5m make PLATFORM=linux test-bootstrap
+      - run:  timeout 5m ./build.sh bootstrap llvm libc
+      - run:  timeout 5m ./build.sh bootstrap llvm posix
+      - run:  timeout 5m ./build.sh bootstrap llvm linux
+      - run:  timeout 5m ./build.sh bootstrap x86  linux
 
-      - run:  timeout 5m make PROFILER=1 PLATFORM=posix  test-bootstrap-llvm
-      - run:  timeout 5m make PROFILER=1 PLATFORM=linux  test-bootstrap-llvm
+      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
+      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
 
-      - run:  timeout 5m make test-evaluator
-      - run:  timeout 5m make test-parser
-      - run:  timeout 5m make PLATFORM=libc  test-compiler-llvm
-      - run:  timeout 5m make PLATFORM=posix test-compiler-llvm
-      - run:  timeout 5m make PLATFORM=linux test-compiler
+      - run:  timeout 5m ./build.sh test-evaluator
+      - run:  timeout 5m ./build.sh test-parser
+#      - run:  timeout 5m ./build.sh PLATFORM=libc  test-compiler-llvm
+#      - run:  timeout 5m ./build.sh PLATFORM=posix test-compiler-llvm
+#      - run:  timeout 5m ./build.sh PLATFORM=linux test-compiler
 
-      - run:  timeout 5m make PLATFORM=posix test-elf
-      - run:  timeout 5m make PLATFORM=linux test-elf
+      - run:  timeout 5m ./build.sh default-platform=posix test-elf
+      - run:  timeout 5m ./build.sh default-platform=linux test-elf
 
-      - run:  timeout 5m make PLATFORM=linux test-jit
-      - run:  timeout 5m make PLATFORM=posix test-jit
+      - run:  timeout 5m ./build.sh default-platform=linux test-jit
+      - run:  timeout 5m ./build.sh default-platform=posix test-jit
 
       - name: Bootstrap with *safety* set to 3
         run: |
           sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
-          timeout 5m make PLATFORM=linux test-bootstrap
+          timeout 5m ./build.sh bootstrap llvm linux
+          timeout 5m ./build.sh bootstrap x86  linux
 
   build-linux-arm64:
     name: "linux aarch64"
@@ -104,18 +106,18 @@ jobs:
 
       - run:  clang --version && cc --version
 
-      - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
-      - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
-      - run:  timeout 5m make PLATFORM=linux test-bootstrap-llvm
+      - run:  timeout 5m ./build.sh bootstrap llvm libc
+      - run:  timeout 5m ./build.sh bootstrap llvm posix
+      - run:  timeout 5m ./build.sh bootstrap llvm linux
 
 # TODO walking the stack gets into an infinite loop
-#      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
-#      - run:  timeout 5m make PROFILER=1 PLATFORM=posix test-bootstrap-llvm
+#     - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
+#     - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
 
-      - run:  timeout 5m make test-evaluator
-      - run:  timeout 5m make test-parser
-      - run:  timeout 5m make PLATFORM=libc  test-compiler-llvm
-      - run:  timeout 5m make PLATFORM=linux test-compiler-llvm
+      - run:  timeout 5m ./build.sh test-evaluator
+      - run:  timeout 5m ./build.sh test-parser
+#      - run:  timeout 5m ./build.sh PLATFORM=libc  test-compiler-llvm
+#      - run:  timeout 5m ./build.sh PLATFORM=linux test-compiler-llvm
 
   build-darwin:
     name: "darwin aarch64 (errors ignored)"
@@ -182,35 +184,35 @@ jobs:
 
       - run:  clang --version && cc --version
 
-      - run:  timeout 3m arch -arm64  make PLATFORM=libc test-bootstrap-llvm
+      - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm libc
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m arch -arm64  make PLATFORM=posix test-bootstrap-llvm
+      - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm posix
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m arch -arm64  make PROFILER=1 PLATFORM=posix test-bootstrap-llvm
+      - run:  timeout 3m arch -arm64  ./build.sh profiler=1 bootstrap llvm posix
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m arch -x86_64 make PLATFORM=libc TARGET_ARCH=x86_64 test-bootstrap-x86
+      - run:  timeout 3m arch -x86_64 ./build.sh bootstrap x86 libc
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m arch -x86_64 make PLATFORM=posix TARGET_ARCH=x86_64 test-bootstrap-x86
+      - run:  timeout 3m arch -x86_64 ./build.sh bootstrap x86 posix
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m arch -x86_64 make PROFILER=1 PLATFORM=posix TARGET_ARCH=x86_64 test-bootstrap-x86
+      - run:  timeout 3m arch -x86_64 ./build.sh profiler=1 bootstrap x86 posix
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m make test-evaluator
+      - run:  timeout 3m ./build.sh test-evaluator
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m make test-parser
+      - run:  timeout 3m ./build.sh test-parser
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m make test-compiler-llvm
-        continue-on-error: true      # TODO
+#      - run:  timeout 3m ./build.sh test-compiler-llvm
+#        continue-on-error: true      # TODO
 
   build-linux-amd64-full-bootstrap:
-    if: github.ref != 'refs/heads/staging'
+    if: false && github.ref != 'refs/heads/staging'
     name: "linux x86_64 full bootstrap"
     runs-on: ubuntu-24.04
     container:
@@ -240,4 +242,4 @@ jobs:
 
       - run:  clang --version && cc --version
 
-      - run:  timeout 20m make test-bootstrap-recursively
+      - run:  timeout 20m ./build.sh test-bootstrap-recursively

@@ -1,0 +1,42 @@
+#!/usr/bin/env sh
+
+set -eu
+
+PREVIOUS_STAGE_BACKEND="-llvm"
+PREVIOUS_STAGE="maru.10"
+BUILD="build"
+HOST_DIR="$BUILD/$PREVIOUS_STAGE"
+
+ensure_host_binary() {
+    if [ ! -e "$HOST_DIR/eval" ]; then
+        echo "Building host..."
+
+        mkdir -p "$BUILD"
+
+        # After cloning, create the local branch ourselves.
+        # See: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
+        if ! git show-ref --verify --quiet "refs/heads/$PREVIOUS_STAGE"; then
+            git branch --quiet --track \
+                "$PREVIOUS_STAGE" \
+                "remotes/origin/$PREVIOUS_STAGE"
+        fi
+
+        if [ ! -d "$HOST_DIR" ]; then
+            git worktree add --detach --force \
+                "$HOST_DIR" \
+                "$PREVIOUS_STAGE"
+        fi
+
+        # Git checkout does not update file modification times, so touch
+        # everything checked in under build/.
+        if [ -d "$HOST_DIR/$BUILD" ]; then
+            find "$HOST_DIR/$BUILD" -type f -exec touch {} +
+        fi
+
+        make --directory="$HOST_DIR" PLATFORM=linux "eval${PREVIOUS_STAGE_BACKEND}"
+    fi
+}
+
+ensure_host_binary
+
+exec "$HOST_DIR/eval" boot.l build.l "$@"
