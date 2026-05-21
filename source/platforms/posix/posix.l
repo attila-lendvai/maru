@@ -22,6 +22,7 @@
   (pid_t execve (* * *))
   (pid_t waitpid (pid_t * int))
   (* dlsym (* *))
+  (int pipe (*))
   )
 
 ;; malloc doesn't return page-aligned memory, so we round down the

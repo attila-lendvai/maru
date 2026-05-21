@@ -13,7 +13,7 @@ header	sys/syscall.h sys/wait.h sys/mman.h unistd.h linux/sched.h fcntl.h
 
 integer STDIN_FILENO STDOUT_FILENO STDERR_FILENO
 
-integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4
+integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4 SYS_pipe SYS_dup2 SYS_dup3
 
 integer AT_FDCWD
 
