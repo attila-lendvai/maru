@@ -19,3 +19,9 @@
           (_head_ (car _list_)))
      (set ,list (cdr _list_))
      _head_))
+
+(define-function concat-lists args
+  (let ((result (pop args)))
+    (while (pair? args)
+      (set result (concat-list result (pop args))))
+    result))
