@@ -12,6 +12,11 @@
 
 extern char **environ;
 
+char* platform_envp()
+{
+    return environ;
+}
+
 /*
  * Spawn a program using fork + execve.
  *
