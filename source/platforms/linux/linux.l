@@ -22,9 +22,9 @@
 ;; a special-form later. theoretically, this could be any object
 ;; (including nil), but we leave a recognizable trace for better
 ;; potential error messages.
-(define linux-syscall
+(define syscall
   (fixed (lambda args
-           (print "linux-syscall encountered in interpreted code with args " args "\n")
+           (print "syscall encountered in interpreted code with args " args "\n")
            (abort))))
 
 ;;;
@@ -33,8 +33,8 @@
 (define-function platform/flush-streams ()
   ;; there's no need to flush fd's on linux. fsync straight out
   ;; returns an error when called on a terminal or pipe.
-  ;; (linux-syscall linux/SYS_fsync linux/STDOUT_FILENO)
-  ;; (linux-syscall linux/SYS_fsync linux/STDERR_FILENO)
+  ;; (syscall linux/SYS_fsync linux/STDOUT_FILENO)
+  ;; (syscall linux/SYS_fsync linux/STDERR_FILENO)
   )
 
 ;; NOTE copy means it may not overlap. move means they may overlap.
@@ -82,23 +82,23 @@
 (define-form platform/diag-print-string (str)
   (typecase str
     (<string> ; i.e. we can calculate the string length at expand time
-     `(linux-syscall linux/SYS_write linux/STDERR_FILENO
+     `(syscall linux/SYS_write linux/STDERR_FILENO
                      (string->C-string ,str) ,(string-length str)))
     (else
      ;; FIXME why do i need the eval?
      `(let ((cstr ,(if (eval '(feature emit-with-object-headers))
                        `(string->C-string ,str)
                      str)))
-        (linux-syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr))))))
+        (syscall linux/SYS_write linux/STDERR_FILENO cstr (C-string-length cstr))))))
 
 (define-function platform/diag-print-char (char)
   ;; TODO endianness?
-  (linux-syscall linux/SYS_write linux/STDERR_FILENO (address-of char) 1)
+  (syscall linux/SYS_write linux/STDERR_FILENO (address-of char) 1)
   char)
 
 ;; needs to be a form; the compiler doesn't yet support . rest args
 (define-form platform/halt args
-  `(linux-syscall linux/SYS_exit ,@(or args '(-42))))
+  `(syscall linux/SYS_exit ,@(or args '(-42))))
 
 (define *initial-break* 0)
 (define *current-break* 0)
@@ -106,20 +106,20 @@
 (define-function platform/acquire-memory (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
   (unless *initial-break*
-    (set *current-break* (set *initial-break* (linux-syscall linux/SYS_brk 0)))
+    (set *current-break* (set *initial-break* (syscall linux/SYS_brk 0)))
     ;; TODO too early, ASSERT and ERROR is not functional at this point
     ;;(assert (< 0 *current-break*))
     )
-  (let ((new-break	(linux-syscall linux/SYS_brk (+ *current-break* size)))
+  (let ((new-break	(syscall linux/SYS_brk (+ *current-break* size)))
         (result	*current-break*))
     ;;(assert (= size (- new-break *current-break*)))
     (set *current-break* new-break)
     ;; KLUDGE we make all allocated memory executable.
     ;; `make test-elf` generates machine code and wants to call it...
-    (linux-syscall linux/SYS_mprotect *initial-break*
-                   (- *current-break* *initial-break*)
-                   (+ (+ linux/PROT_READ linux/PROT_WRITE)
-                      linux/PROT_EXEC))
+    (syscall linux/SYS_mprotect *initial-break*
+             (- *current-break* *initial-break*)
+             (+ (+ linux/PROT_READ linux/PROT_WRITE)
+                linux/PROT_EXEC))
     result))
 
 (eval-in-host '(load "source/platforms/linux/syscall.l"))
@@ -234,4 +234,4 @@ exit:
          (argv (+ sp (words-to-bytes 1)))
          (envp (+ argv (words-to-bytes (+ argc 1)))))
     (set %envp envp)
-    (linux-syscall linux/SYS_exit (main argc argv))))
+    (syscall linux/SYS_exit (main argc argv))))

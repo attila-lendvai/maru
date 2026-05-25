@@ -15,7 +15,7 @@
 ;; TODO add a <target-function> for this? or add a macro whose
 ;; expansion contains a literal x86 asm LINUX-SYSCALL instruction that
 ;; is passed through all the way to emit?
-(define-function compile/linux-syscall (expr -c-)
+(define-function compile/syscall (expr -c-)
   (let ((args		(cdr expr))
         (arg-locs	()))
     (while args
@@ -26,5 +26,5 @@
 ;; let's not push it at the head of the assoc list, it's rarely used
 (set *special-forms*
      (concat-list *special-forms*
-                  (list (cons (target-value linux-syscall)
-                              compile/linux-syscall))))
+                  (list (cons (target-value syscall)
+                              compile/syscall))))

@@ -11,7 +11,7 @@
 
 ;; TODO reaname these to file/open?
 (define-vm-function file-open ((path <string>) (mode <string>))
-  (let ((fd (linux-syscall linux/SYS_openat linux/AT_FDCWD (string->C-string path)
+  (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD (string->C-string path)
                            (cond
                              ((or (not mode)
                                   (string= mode "r"))
@@ -32,14 +32,14 @@
 
 (define-vm-function file-close ((fd <lower-cell>))
   (to-upper-boolean
-   (= 0 (linux-syscall linux/SYS_close fd))))
+   (= 0 (syscall linux/SYS_close fd))))
 
 (define-vm-function file-read-byte ((fd <lower-cell>))
   (let ((char 0)
         result)
     ;; man 2 read
     (while (begin
-             (set result (linux-syscall linux/SYS_read fd (address-of char) 1))
+             (set result (syscall linux/SYS_read fd (address-of char) 1))
              (= result (- linux/EINTR)))
       ;; then try again
       )
@@ -52,7 +52,7 @@
 (define-vm-function %file-write (fd buf length)
   (let (result)
     (while (begin
-            (set result (linux-syscall linux/SYS_write fd buf length))
+            (set result (syscall linux/SYS_write fd buf length))
             (= result (- linux/EINTR)))
       ;; then try again
       )
@@ -64,7 +64,7 @@
    (= 1 (%file-write fd (address-of char) 1))))
 
 ;; (define-vm-function file-flush ((fd <lower-cell>))
-;;   (unless (= 0 (linux-syscall linux/SYS_fsync fd))
+;;   (unless (= 0 (syscall linux/SYS_fsync fd))
 ;;     (error "file-flush: linux/SYS_fsync returned an error")))
 
 ;;;
@@ -89,7 +89,7 @@
   (or (<= 0 (<fd-stream>-peeked-value stream))
       (let* ((fd	(<fd-stream>-fd stream))
              (char	0)
-             (rc	(linux-syscall linux/SYS_read fd (address-of char) 1)))
+             (rc	(syscall linux/SYS_read fd (address-of char) 1)))
         (set (<fd-stream>-peeked-value stream)
              (if (= 1 rc)
                  char
