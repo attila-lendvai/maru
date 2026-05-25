@@ -38,8 +38,8 @@
 (define-function platform/flush-streams ()
   ;; there's no need to flush fd's on linux. fsync straight out
   ;; returns an error when called on a terminal or pipe.
-  ;; (syscall linux/SYS_fsync linux/STDOUT_FILENO)
-  ;; (syscall linux/SYS_fsync linux/STDERR_FILENO)
+  ;; (syscall* linux/SYS_fsync linux/STDOUT_FILENO)
+  ;; (syscall* linux/SYS_fsync linux/STDERR_FILENO)
   )
 
 ;; NOTE copy means it may not overlap. move means they may overlap.
