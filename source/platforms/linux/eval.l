@@ -4,6 +4,11 @@
 (load "source/debug-min.l")
 (load "source/evaluator/vm.l")
 
+(define-function %syscall-rc-assert (syscall-number rc)
+  ;; FIXME this should call ERROR, but that expects tagged values
+  (or (<= 0 rc) (platform/diag-print "syscall*: "syscall-number" returned with: "rc"\n"))
+  rc)
+
 ;;;
 ;;; garbage collector
 ;;; ----------------------------------------------------------------

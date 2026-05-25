@@ -27,6 +27,11 @@
            (print "syscall encountered in interpreted code with args " args "\n")
            (abort))))
 
+;; NOTE: cannot be a function, because the syscall special form cannot be applied
+;; NOTE: the assert wrapper must be defined later when ERROR is set up
+(define-form syscall* args
+  `(%syscall-rc-assert ,(first args) (syscall ,@args)))
+
 ;;;
 ;;; Platform API implementation when running on top of the Linux kernel.
 ;;;
