@@ -179,6 +179,14 @@ exit:
 }
 "))
 
+;; aka `extern char **environ` in libc land
+(define %envp)
+
+;; the API we use
+(define-function platform/envp ()
+  %envp)
+
+
 ;; https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; http://www.dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html
 ;; https://0xax.gitbooks.io/linux-insides/content/Misc/linux-misc-4.html
@@ -223,5 +231,7 @@ exit:
   ;; TODO parse AT_PAGESZ (the page size)
   (let* ((sp (stack-pointer-on-entry))
          (argc (oop-at sp 0))
-         (argv (+ sp (words-to-bytes 1))))
+         (argv (+ sp (words-to-bytes 1)))
+         (envp (+ argv (words-to-bytes (+ argc 1)))))
+    (set %envp envp)
     (linux-syscall linux/SYS_exit (main argc argv))))

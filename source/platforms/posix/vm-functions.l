@@ -6,6 +6,7 @@
 (define-C-functions ()
   (pid_t maru_spawn_program (* * *))
   (pid_t maru_run_program   (* * *))
+  (* platform/envp ())
   )
 
 (define-vm-function (spawn-program ()) ((path <string>))
