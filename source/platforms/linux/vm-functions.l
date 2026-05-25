@@ -28,8 +28,7 @@
 
 (define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
-  (unless (= 0 (linux-syscall linux/SYS_chdir (string->C-string path)))
-    (error "set-working-directory: chdir syscall failed for: "path)))
+  (syscall* linux/SYS_chdir (string->C-string path)))
 
 ;;
 ;; !!!
