@@ -64,7 +64,7 @@
      (emit/comma-separated-%oops args)
      (println ")"))))
 
-(define-function compile/linux-syscall (expr -c-)
+(define-function compile/syscall (expr -c-)
   (let ((args		(cdr expr))
         (arg-locs	()))
     (while args
@@ -74,5 +74,5 @@
 
 (set *special-forms*
      (concat-list *special-forms*
-                  (list (cons (target-value linux-syscall)
-                              compile/linux-syscall))))
+                  (list (cons (target-value syscall)
+                              compile/syscall))))
