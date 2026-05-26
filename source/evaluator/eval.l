@@ -191,12 +191,14 @@
 (define-function %string->C-string (obj)
   (<string>-elements (string-ensure-zero-terminated obj)))
 
-(define-function C-string->string (cstr)
-  (let* ((len (C-string-length cstr))
-         (obj (string len)))
+(define-function C-string->string* (cstr len)
+  (let ((obj (string len)))
     (set (slot-value <string> size obj) (box <long> len))
     (copy-bytes cstr (<string>-elements obj) len)
     obj))
+
+(define-function C-string->string (cstr)
+  (C-string->string* cstr (C-string-length cstr)))
 
 (require "source/conversion-lower.l")
 
