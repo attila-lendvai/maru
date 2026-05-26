@@ -36,4 +36,8 @@ int maru_chdir(const char *path) {
     return chdir(path);
 }
 
+char *maru_getcwd(char *buffer, size_t size) {
+    return getcwd(buffer, size);
+}
+
 #endif

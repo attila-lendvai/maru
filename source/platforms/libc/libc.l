@@ -25,6 +25,7 @@
 ;; the compat wrappers we export from the C side
 (define-C-functions (libc/ maru_)
   (int chdir (*))
+  (* getcwd (* size_t))
   ;; TODO extend the cgrov to deal with such wrappings automatically
   (* get_stdin ()) (* get_stdout ()) (* get_stderr ())
   (int get_errno ())

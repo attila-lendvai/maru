@@ -23,3 +23,11 @@ default	RTLD_DEFAULT 0
 integer	RTLD_DEFAULT RTLD_NOW RTLD_GLOBAL
 
 integer EOF
+
+// these are not pure C things, but without cwd the libc platform
+// couldn't bootstrap, so... we cheat a little.
+
+header	limits.h	(!defined __WIN32__)
+header	direct.h	( defined __WIN32__)
+
+integer PATH_MAX

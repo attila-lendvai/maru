@@ -22,6 +22,14 @@
 ;;               (set size (* size 2))))))
 ;;       result)))
 
+;; NOTE: strictly speaking, the concept of cwd doesn't exist in the C
+;; standard, but that makes the libc platform unable to bootstrap, so
+;; we cheat and "introduce" it through a C wrapper function.
+(define-vm-function working-directory ()
+  (gc/let* ((buffer (allocate-data libc/PATH_MAX)))
+    (C-string->string (or (libc/getcwd buffer libc/PATH_MAX)
+                          (error "libc/getcwd failed")))))
+
 (define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
   (unless (= 0 (libc/chdir (string->C-string path)))

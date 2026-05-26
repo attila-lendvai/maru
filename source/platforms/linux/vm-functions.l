@@ -40,6 +40,12 @@
 (define-form platform/pipe (ptr)
   `(syscall* linux/SYS_pipe ,ptr))
 
+(define-vm-function working-directory ()
+  (gc/let* ((buffer (allocate-data linux/PATH_MAX)))
+    (let ((len (syscall* linux/SYS_getcwd buffer linux/PATH_MAX)))
+      ;; len contains the terminating zero byte
+      (C-string->string* buffer (- len 1)))))
+
 (define-vm-function set-working-directory ((path <string>))
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
   (syscall* linux/SYS_chdir (string->C-string path)))
