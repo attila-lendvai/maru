@@ -10,6 +10,22 @@
 ;; the code.
 (eval-in-slave '(require "source/c/cgrov.l"))
 
+(begin-for-syntax
+
+(define-function mangle-for-C (str)
+  (with-forms ((putnext ((c) `(string-append mangled ,c))))
+    (let* ((mangled (string))
+           (write-char (lambda (c)
+                         )))
+      (string-do c str
+        (if (or (= ?/ c)
+                (= ?- c))
+            (putnext ?_)
+          (putnext c)))
+      mangled)))
+
+) ; begin-for-syntax
+
 ;;;
 ;;; API visible in the target
 ;;;
@@ -26,15 +42,13 @@
         (foreign-prefix	(second (ensure-list prefixes))))
     `(let ()
        ,@(map (lambda (entry)
-                (let* ((return-type (first entry))
-                       (base-name   (second entry))
-                       (param-types (third entry))
-                       (foreign-name (if foreign-prefix
-                                         (concat-symbol foreign-prefix base-name)
-                                       base-name))
-                       (maru-name (if maru-prefix
-                                      (concat-symbol maru-prefix base-name)
-                                    base-name)))
+                (let* ((return-type		(first entry))
+                       (base-name		(second entry))
+                       (mangled-base-name	(mangle-for-C (symbol->string base-name)))
+                       (param-types		(third entry))
+                       (foreign-name		(concat-symbol (or foreign-prefix "")
+                                                               mangled-base-name))
+                       (maru-name		(concat-symbol (or maru-prefix "") base-name)))
                   `(define-C-function ,maru-name ,return-type ,foreign-name ,param-types)))
               entries))))
 
