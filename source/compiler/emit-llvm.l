@@ -55,6 +55,8 @@
           (long			i32)
           (unsigned-long	i32)
           (size_t		i32)
+          (ssize_t		i32)
+          (mode_t		i32)
           (off_t		i32)
           (pid_t		i32)))
        (64
@@ -62,6 +64,8 @@
           (long			i64)
           (unsigned-long	i64)
           (size_t		i64)
+          (ssize_t		i64)
+          (mode_t		i64)
           (off_t		i64)
           (pid_t		i32)))
        (else
