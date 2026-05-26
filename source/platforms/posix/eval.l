@@ -13,5 +13,3 @@
                  (environment-define *maru*
                                      (string->symbol "feature/platform/posix")
                                      symbol/true))))
-
-(load "source/platforms/posix/vm-functions.l")
