@@ -183,6 +183,11 @@
 (define-function string-append-all (str val)
   (string-insert-all str (string-length str) val))
 
+;; KLUDGE a quick hack to proceed with build.l
+(define-vm-function set-string-length ((obj <string>) (len <long>))
+  (set (slot-value <string> size obj)
+       (box <long> len)))
+
 ;; WARNING libc's strcmp, and maybe even memcmp, are not necessarily reliable for
 ;; sorting strings. see: https://stackoverflow.com/questions/36518931/what-does-strcmp-return-if-two-similar-strings-are-of-different-lengths
 
