@@ -12,7 +12,7 @@
 
 extern char **environ;
 
-char* platform_envp()
+char* posix_envp()
 {
     return environ;
 }
@@ -28,7 +28,7 @@ char* platform_envp()
  *   child PID on success
  *   -1 on failure
  */
-pid_t platform_spawn_program(const char *path, char *const argv[], char *const envp[], int stdout_fd, int stderr_fd)
+pid_t posix_spawn_program(const char *path, char *const argv[], char *const envp[], int stdout_fd, int stderr_fd)
 {
     pid_t pid = fork();
 
@@ -54,7 +54,7 @@ pid_t platform_spawn_program(const char *path, char *const argv[], char *const e
     return pid;
 }
 
-int platform_waitpid(pid_t pid, int options)
+int posix_waitpid(pid_t pid, int options)
 {
     int status;
 

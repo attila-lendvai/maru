@@ -1,6 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (set (feature platform/linux) true)
+(set (feature platform/posix) true)
 
 (require "source/platforms/platform-c-based.l")
 (require-cgrov "source/platforms/linux/linux")
@@ -188,7 +189,7 @@ exit:
 (define %envp)
 
 ;; the API we use
-(define-function platform/envp ()
+(define-function posix/envp ()
   %envp)
 
 

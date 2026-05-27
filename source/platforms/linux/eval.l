@@ -27,6 +27,9 @@
                (lambda ()
                  (environment-define *maru*
                                      (string->symbol "feature/platform/linux")
+                                     symbol/true)
+                 (environment-define *maru*
+                                     (string->symbol "feature/platform/posix")
                                      symbol/true))))
 
 (load "source/evaluator/vm-late.l")

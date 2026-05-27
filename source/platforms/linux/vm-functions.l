@@ -7,7 +7,7 @@
 
 ;; NOTE these are here because BOX and other VM stuff is not yet
 ;; available in linux.l
-(define-function platform/waitpid (pid options)
+(define-function posix/waitpid (pid options)
   (let ((status 0)
         result)
     (while (= (- linux/EINTR)
@@ -21,8 +21,8 @@
         ((WIFSIGNALED status)	(+ 128 (WTERMSIG status)))
         (else			-1)))))
 
-(define-function platform/spawn-program (path argv envp stdout-fd stderr-fd)
-  ;; (debug (platform/diag-print "platform/spawn-program is about to spawn '"(string path)"'\n"))
+(define-function posix/spawn-program (path argv envp stdout-fd stderr-fd)
+  ;; (debug (platform/diag-print "posix/spawn-program is about to spawn '"(string path)"'\n"))
   (let ((pid (syscall linux/SYS_clone linux/SIGCHLD 0)))
     (if (= 0 pid)
         (begin
@@ -37,7 +37,7 @@
       ;; (debug (platform/diag-print "child spawned\n"))
       pid)))
 
-(define-form platform/pipe (ptr)
+(define-form posix/pipe (ptr)
   `(syscall* linux/SYS_pipe ,ptr))
 
 (define-vm-function working-directory ()
