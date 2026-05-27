@@ -324,17 +324,71 @@
       (- (+ (/ (* (* x 2) 10) 20) 50) 10))
   42)
 
+;;;
+;;; AND
+;;;
+
 (define-test compile/bitwise-and/1
     (bitwise-and 0xef 0xf0)
   0xe0)
+
+(define-test compile/bitwise-and/2
+    (bitwise-and 0x12345678 0)
+  0)
+
+(define-test compile/bitwise-and/3
+    (bitwise-and 0x12345678 -1)
+  0x12345678)
+
+(define-test compile/bitwise-and/4
+    (let ((x 0x1122334455667788))
+      (bitwise-and x 0xffffffff))
+  0x55667788)
+
+;;;
+;;; OR
+;;;
 
 (define-test compile/bitwise-or/1
     (bitwise-or 0xe0 0x0f)
   0xef)
 
+(define-test compile/bitwise-or/2
+    (bitwise-or 0x12345678 0)
+  0x12345678)
+
+(define-test compile/bitwise-or/3
+    (bitwise-or 0x12345678 -1)
+  -1)
+
+(define-test compile/bitwise-or/4
+    (let ((x 0x1122334455667788))
+      (bitwise-or x 0xffffffff))
+  0x11223344ffffffff)
+
+;;;
+;;; XOR
+;;;
 (define-test compile/bitwise-xor/1
     (bitwise-xor 0xff 0xf0)
   0x0f)
+
+(define-test compile/bitwise-xor/2
+    (bitwise-xor 0x12345678 0)
+  0x12345678)
+
+(define-test compile/bitwise-xor/3
+    (bitwise-xor 0x12345678 -1)
+  -0x12345679)
+
+(define-test compile/bitwise-xor/4
+    (let ((x 0x1122334401010101))
+      (bitwise-xor x 0xffffffff))
+  0x11223344fefefefe)
+
+;;;
+;;; NOT
+;;;
 
 (define-test compile/bitwise-not/1
     (bitwise-not -1)
