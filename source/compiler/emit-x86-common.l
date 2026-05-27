@@ -173,8 +173,16 @@
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	add	"$2","$1)))
   ((R64 STACK-CELL)		(println "	add	"$2","$1))
-  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	add	"$2","$1)))
+  ((R64 LI64)			(let ((literal (<LITERAL>-value $2)))
+                                  (cond
+                                    ((< -0x80000000 literal 0x80000000)
+                                     (println "	add	"$2", "$1))
+                                    ((= 0 literal)
+                                     ;; NOP
+                                     )
+                                    (else
+                                     (println "	movq	"$2", %rbx")
+                                     (println "	add	%rbx, "$1)))))
   ((R64 R64)			(println "	add	"$2","$1)))
 
 (define-instruction SUB		(true 0 true)
@@ -182,8 +190,16 @@
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	sub	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	sub	"$2", "$1))
-  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	sub	"$2", "$1)))
+  ((R64 LI64)			(let ((literal (<LITERAL>-value $2)))
+                                  (cond
+                                    ((< -0x80000000 literal 0x80000000)
+                                     (println "	sub	"$2", "$1))
+                                    ((= 0 literal)
+                                     ;; NOP
+                                     )
+                                    (else
+                                     (println "	movq	"$2", %rbx")
+                                     (println "	sub	%rbx, "$1)))))
   ((R64 R64)			(println "	sub	"$2","$1)))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
@@ -229,16 +245,34 @@
   ((R32 LI32)			(unless (= -1 (<LITERAL>-value $2))
                                   (println "	and	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	and	"$2", "$1))
-  ((R64 LI64)			(unless (= -1 (<LITERAL>-value $2))
-                                  (println "	and	"$2", "$1))))
+  ((R64 LI64)			(let ((literal (<LITERAL>-value $2)))
+                                  (cond
+                                    ((< -0x80000000 literal 0x80000000)
+                                     (println "	and	"$2", "$1))
+                                    ((= -1 literal)
+                                     ;; NOP
+                                     )
+                                    (else
+                                     (println "	movq	"$2", %rbx")
+                                     (println "	and	%rbx, "$1))))))
 
 (define-instruction OR		(true 0 true)
   ((R32 STACK-CELL)		(println "	or	"$2", "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	or	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	or	"$2", "$1))
-  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	or	"$2", "$1))))
+  ((R64 LI64)			(let ((literal (<LITERAL>-value $2)))
+                                  (cond
+                                    ((< -0x80000000 literal 0x80000000)
+                                     (println "	or	"$2", "$1))
+                                    ((= 0 literal)
+                                     ;; NOP
+                                     )
+                                    ((= -1 literal)
+                                     (println "	movq	$-1, "$1))
+                                    (else
+                                     (println "	movq	"$2", %rbx")
+                                     (println "	or	%rbx, "$1))))))
 
 ;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
@@ -246,8 +280,18 @@
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	xor	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	xor	"$2", "$1))
-  ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
-                                  (println "	xor	"$2", "$1))))
+  ((R64 LI64)			(let ((literal (<LITERAL>-value $2)))
+                                  (cond
+                                    ((< -0x80000000 literal 0x80000000)
+                                     (println "	xor	"$2", "$1))
+                                    ((= 0 literal)
+                                     ;; NOP
+                                     )
+                                    ((= -1 literal)
+                                     (println "	not	"$1))
+                                    (else
+                                     (println "	movq	"$2", %rbx")
+                                     (println "	xor	%rbx, "$1))))))
 
 (define-instruction BITWISE-NOT	(true 0 true)
   ((REGISTER)			(println "	not	"$1)))
