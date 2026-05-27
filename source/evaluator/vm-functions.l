@@ -358,22 +358,24 @@
   (define-vm-function enable-debug-output	() (set *debug-output-enabled?* true))
   (define-vm-function disable-debug-output	() (set *debug-output-enabled?* false)))
 
-;; FIXME when-at-expand body loses toplevelness, so it must be outside of it
+;; FIXME WHEN-AT-EXPAND body loses toplevelness, so it must be outside of it
 (define-form with-open-pipe (args . body)
-  `(let ((__pipe-val__ 0)
-         -read-fd-
-         -write-fd-)
-     (platform/pipe (address-of __pipe-val__))
-     (set -read-fd-  (bitwise-and   __pipe-val__ 0xFFFFFFFF))
-     (set -write-fd- (bitwise-shift __pipe-val__ -32))
-     ,@body))
+  (let ((read-fd-name  (pop args))
+        (write-fd-name (pop args)))
+    `(let ((__pipe-val__ 0)
+           ,read-fd-name
+           ,write-fd-name)
+       (posix/pipe (address-of __pipe-val__))
+       (set ,read-fd-name  (bitwise-and   __pipe-val__ 0xFFFFFFFF))
+       (set ,write-fd-name (bitwise-shift __pipe-val__ -32))
+       ,@body)))
 
 ;; FIXME: why do i need the HOST-VALUE here?! WHEN-AT-EXPAND should be
 ;; evaluating in the slave env, where the unwrapped DEFINED? should
 ;; just work. instead i get: form encountered in interpreted code with
 ;; args ((oop-at.0+29 obj.2+0 0) 1)
 (when-at-expand (and (feature lower/array)
-                     (host-value (defined? 'platform/spawn-program *target-env*)))
+                     (host-value (defined? 'posix/spawn-program *target-env*)))
 
 (define-vm-function spawn-program ((path <string>)
                                    argv envp

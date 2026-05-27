@@ -4,20 +4,15 @@
 
 ;; functions implemented in posix.c
 (define-C-functions ()
-  (pid_t platform/spawn-program (* * * int int))
-  (pid_t platform/waitpid (pid_t int))
-  (* platform/envp ())
+  (pid_t posix/spawn-program (* * * int int))
+  (pid_t posix/waitpid (pid_t int))
+  (* posix/envp ())
   )
 
-;; TODO this doesn't work: (define platform/close-fd posix/close) it
-;; results in multiple (re)declarations in the llvm backend. the
-;; compiler needs to keep track of what has already been emitted and
-;; reuse them.
-
-(define-form platform/close-fd (fd)
+(define-form posix/close-fd (fd)
   `(posix/close ,fd))
 
-(define-function platform/read-byte (fd)
+(define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)
     ;; man 2 read
@@ -30,7 +25,7 @@
       (1	byte)
       (else	(- rc)))))
 
-(define-form platform/pipe (ptr)
+(define-form posix/pipe (ptr)
   `(posix/pipe ,ptr))
 
 (define-vm-function (posix/dlsym ()) (handle (name <string>))

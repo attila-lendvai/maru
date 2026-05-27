@@ -5,10 +5,10 @@
 ;; TODO not sure whether this technique of (address-of char) is
 ;; digestable for LLVM. it's a KLUDGE anyway...
 
-(define-function platform/close-fd (fd)
+(define-function posix/close-fd (fd)
   (syscall* linux/SYS_close fd))
 
-(define-function platform/read-byte (fd)
+(define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)
     ;; man 2 read
