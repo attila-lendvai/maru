@@ -9,9 +9,6 @@
   (* posix/envp ())
   )
 
-(define-form posix/close-fd (fd)
-  `(posix/close ,fd))
-
 (define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)
@@ -24,9 +21,6 @@
       (0	-1)
       (1	byte)
       (else	(- rc)))))
-
-(define-form posix/pipe (ptr)
-  `(posix/pipe ,ptr))
 
 (define-vm-function (posix/dlsym ()) (handle (name <string>))
   (let* ((lower/handle (typecase handle

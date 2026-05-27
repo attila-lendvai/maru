@@ -5,7 +5,17 @@
 ;; TODO not sure whether this technique of (address-of char) is
 ;; digestable for LLVM. it's a KLUDGE anyway...
 
-(define-function posix/close-fd (fd)
+(define-function posix/open (path flags mode)
+  (syscall linux/SYS_openat linux/AT_FDCWD path
+           flags mode))
+
+;; We define a posix API, so we need to export some constants. They
+;; are not guaranteed to be the same between the kernel and the libc
+;; (which is implementing posix), but these are.
+(define-constant posix/O_WRONLY linux/O_WRONLY)
+(define-constant posix/O_CREAT  linux/O_CREAT)
+
+(define-function posix/close (fd)
   (syscall* linux/SYS_close fd))
 
 (define-function posix/read-byte (fd)
@@ -21,7 +31,7 @@
       (1	byte)
       (else	(- rc)))))
 
-(define-function linux/write (fd buf length)
+(define-function posix/write (fd buf length)
   (let (rc)
     (while (= (- linux/EINTR)
               (set rc (syscall linux/SYS_write fd buf length)))
@@ -35,21 +45,20 @@
 
 ;; TODO reaname these to file/open?
 (define-vm-function file-open ((path <string>) (mode <string>))
-  (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD (string->C-string path)
-                     (cond
-                       ((or (not mode)
-                            (string= mode "r"))
-                        linux/O_RDONLY)
-                       ((string= mode "rw")
-                        (bitwise-or linux/O_RDWR
-                                    linux/O_CREAT))
-                       ((string= mode "w")
-                        (bitwise-or linux/O_WRONLY
-                                    linux/O_CREAT))
-                       (else
-                        (error "file-open: unexpected mode "mode" while opening "path)))
-                     420                ; "rw-r--r--"
-                     )))
+  (let ((fd (posix/open (string->C-string path)
+                        (cond
+                          ((or (not mode)
+                               (string= mode "r"))
+                           linux/O_RDONLY)
+                          ((string= mode "rw")
+                           (bitwise-or linux/O_RDWR
+                                       linux/O_CREAT))
+                          ((string= mode "w")
+                           (bitwise-or linux/O_WRONLY
+                                       linux/O_CREAT))
+                          (else
+                           (error "file-open: unexpected mode "mode" while opening "path)))
+                        posix/default-umask)))
     (when (<= 0 fd)
       (debug (platform/diag-print "file-open will box fd "(long fd)"\n"))
       (box <lower-cell> fd))))
@@ -76,7 +85,7 @@
 (define-vm-function file-write-byte ((char <long>) (fd <lower-cell>))
   ;; TODO endianness? think this through...
   (to-upper-boolean
-   (= 1 (linux/write fd (address-of char) 1))))
+   (= 1 (posix/write fd (address-of char) 1))))
 
 ;; (define-vm-function file-flush ((fd <lower-cell>))
 ;;   (unless (= 0 (syscall linux/SYS_fsync fd))
@@ -130,12 +139,12 @@
 
 (define-method $put <fd-stream> (u/char)
   ;; TODO endianness? think this through...
-  (unless (= 1 (linux/write self.fd (address-of u/char) 1))
+  (unless (= 1 (posix/write self.fd (address-of u/char) 1))
     (error "<fd-stream> $put: write failed"))
   u/char)
 
 (define-function %put-all (fd buf size)
-  (let ((rc (linux/write fd buf size)))
+  (let ((rc (posix/write fd buf size)))
     (unless (= rc size)
       (debug (platform/diag-print "<fd-stream> $put-all: write returned with "(long rc)"\n"))
       ;; TODO deal with EAGAIN and stuff...
