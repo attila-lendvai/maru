@@ -459,9 +459,17 @@
                                   (unless (= lit 0)
 				    (ADDLir lit (<REGISTER>-name $1)))))
   ((R64 STACK-CELL)		(ADDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (ADDQir lit (<REGISTER>-name $1))))))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
+                                  (cond
+                                    ((= 0 lit)
+                                     ;; NOP
+                                     )
+                                    ((< -0x80000000 lit 0x80000000)
+                                     (ADDQi32r lit reg))
+                                    (else
+                                     (MOVQi64r lit RBX)
+                                     (ADDQrr RBX reg))))))
 
 (define-instruction SUB		(true 0 true)
   ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) ESP 0 0 (<REGISTER>-name $1)))
@@ -471,9 +479,17 @@
 				    (SUBLir lit (<REGISTER>-name $1)))))
   ((R64 STACK-CELL)		(SUBQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
   ;; TODO wtf? the order...
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (SUBQir lit (<REGISTER>-name $1))))))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
+                                  (cond
+                                    ((= 0 lit)
+                                     ;; NOP
+                                     )
+                                    ((< -0x80000000 lit 0x80000000)
+                                     (SUBQi32r lit reg))
+                                    (else
+                                     (MOVQi64r lit RBX)
+                                     (SUBQrr RBX reg))))))
 
 ;; TODO x86 mul operates on eax, which somehow needs to be encoded
 ;; into the instruction. same applies to div.
@@ -502,22 +518,52 @@
 
 (define-instruction AND		(true 0 true)
   ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= -1 lit)
-                                    (ANDQir lit (<REGISTER>-name $1))))))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
+                                  (cond
+                                    ((= 0 lit)
+                                     (XORQrr reg reg))
+                                    ((= -1 lit)
+                                     ;; NOP
+                                     )
+                                    ((< -0x80000000 lit 0x80000000)
+                                     (ANDQi32r lit reg))
+                                    (else
+                                     (MOVQi64r lit RBX)
+                                     (ANDQrr RBX reg))))))
 
 (define-instruction OR		(true 0 true)
   ((R64 STACK-CELL)		(ORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= 0 lit)
-                                    (ORQir lit (<REGISTER>-name $1))))))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
+                                  (cond
+                                    ((= 0 lit)
+                                     ;; NOP
+                                     )
+                                    ((= -1 lit)
+                                     (MOVQi32r -1 reg))
+                                    ((< -0x80000000 lit 0x80000000)
+                                     (ORQi32r lit reg))
+                                    (else
+                                     (MOVQi64r lit RBX)
+                                     (ORQrr RBX reg))))))
 
 ;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
   ((R64 STACK-CELL)		(XORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= 0 lit)
-                                    (XORQir lit (<REGISTER>-name $1))))))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
+                                  (cond
+                                    ((= 0 lit)
+                                     ;; NOP
+                                     )
+                                    ((= -1 lit)
+                                     (NOTQr reg))
+                                    ((< -0x80000000 lit 0x80000000)
+                                     (XORQi32r lit reg))
+                                    (else
+                                     (MOVQi64r lit RBX)
+                                     (XORQrr RBX reg))))))
 
 (define-instruction BITWISE-NOT	(true 0 true)
   ((REGISTER)			(NOTQr (<REGISTER>-name $1))))
