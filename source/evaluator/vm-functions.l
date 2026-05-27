@@ -391,40 +391,61 @@
       (lower/array-ensure-capacity/cell argv/lower i)
       (set (oop-at (<lower/array>-elements argv/lower) i) 0))
 
-    (box <long> (platform/spawn-program path/lower
-                                        (<lower/array>-elements argv/lower)
-                                        (platform/envp)
-                                        stdout-fd
-                                        stderr-fd))))
+    (box <long> (posix/spawn-program path/lower
+                                     (<lower/array>-elements argv/lower)
+                                     (posix/envp)
+                                     stdout-fd
+                                     stderr-fd))))
+
+(define-function waitpid-or-die (child-pid)
+  (let ((exit-code (posix/waitpid child-pid 0)))
+    (unless (= 0 exit-code)
+      (error "spawn-program returned exit code: "(box <long> exit-code)))
+    exit-code))
+
+(define-function run-program/stdout/slurp (path argv envp)
+  (with-open-pipe (stdout-read-fd stdout-write-fd)
+    (let ((child-pid (unbox <long> (spawn-program path argv envp
+                                                  stdout-write-fd -1))))
+      (posix/close stdout-write-fd)
+
+      (let ((result (string 16))
+            char)
+        (while (<= 0 (set char (posix/read-byte stdout-read-fd)))
+          (string-append result char))
+
+        (posix/close stdout-read-fd)
+        (waitpid-or-die child-pid)
+        result))))
+
+(define-function run-program/stdout/file (path argv envp stdout-path)
+  (let* ((stdout-fd (posix/open stdout-path (bitwise-or posix/O_WRONLY
+                                                        posix/O_CREAT)
+                                posix/default-umask))
+         (child-pid (unbox <long> (spawn-program path argv envp
+                                                 stdout-fd -1))))
+    (posix/close stdout-fd)
+    (waitpid-or-die child-pid)))
 
 (define-vm-function (run-program ()) _
   (let* ((path (or (pop -args-)
-                   (error "run-program: path is mandatory")))
-         (argv (pop -args-))
-         ;; TODO (envp (pop -args-))
-         (child-pid (unbox <long> (spawn-program path argv 0 -1 -1))))
-    (box <long> (platform/waitpid child-pid 0))))
-
-(define-vm-function (run-program/stdout ()) _
-  (let* ((path (or (pop -args-)
                    (error "run-program/capture: path is mandatory")))
          (argv (pop -args-))
-         ;; TODO (envp (pop -args-))
+         (envp (pop -args-))
+         (stdin  (pop -args-))          ; TODO
+         (stdout (pop -args-))
+         (stderr (pop -args-))          ; TODO
          )
-    (with-open-pipe ()
-      (let ((child-pid (unbox <long> (spawn-program path argv 0
-                                                    -write-fd- -1))))
-        (platform/close-fd -write-fd-)
-
-        (let ((result (string 16))
-              char)
-          (while (<= 0 (set char (platform/read-byte -read-fd-)))
-            (string-append result char))
-
-          (platform/close-fd -read-fd-)
-
-          (let ((exit-code (platform/waitpid child-pid 0)))
-            (unless (= 0 exit-code)
-              (error "spawn-program returned exit code: "exit-code)))
-          result)))))
+    (set envp 0)            ; TODO
+    (cond
+      ((string? stdout)
+       (run-program/stdout/file path argv envp (string->C-string stdout)))
+      ;; TODO replace when we can emit symbols: (= 'string stdout)
+      ((and (symbol? stdout)
+            (string= "string" (symbol->string stdout)))
+       (run-program/stdout/slurp path argv envp))
+      ((= () stdout)
+       (waitpid-or-die
+        (unbox <long> (spawn-program path argv envp -1 -1))))
+      (else (error "run-program: unexpected stdout value: "stdout)))))
 )
