@@ -16,6 +16,11 @@ integer MAP_FAILED MAP_PRIVATE MAP_ANONYMOUS PROT_READ PROT_WRITE PROT_EXEC
 
 sizes	pid_t
 
+// less $(guix build glibc | tail -n 2 | head -n 1)/include/bits/fcntl-linux.h
+header	fcntl.h
+
+integer O_ACCMODE O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOCTTY O_TRUNC O_APPEND O_NONBLOCK O_NDELAY O_SYNC O_ASYNC
+
 header	dlfcn.h
 
 integer RTLD_DEFAULT RTLD_NEXT
