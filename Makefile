@@ -480,18 +480,6 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 # 	rm -f $<.exe $<.c
 
 ###
-### x86 assembler
-###
-$(BUILD)/generated/x86-instructions.l: $(GEN_EVAL) source/assembler/gen-x86-instructions.l source/repl.l source/parsing/parser.l source/parsing/peg-compile-forms.l source/parsing/peg.g.l
-	@mkdir -p $(BUILD)/generated
-# KLUDGE, gc/mark-and-sweep is not tailcall for now, so we need more stack space
-	ulimit -s unlimited
-#	$(call ensure-built,$(GEN_EVAL))
-	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/repl.l source/assembler/gen-x86-instructions.l >$@ \
-		|| { $(BACKDATE_FILE) $@; exit 42; }
-	cp $@ $@.$(shell date '+%Y%m%d.%H%M%S')
-
-###
 ### Pattern rules
 ###
 $(BUILD_x86)/%: $(BUILD_x86)/%.s
