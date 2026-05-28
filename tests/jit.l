@@ -4,6 +4,8 @@
 (require "source/c/cgrov.l")
 (require "source/c/cffi.l")
 
+(define +fputs-msg+ "*** dlsym lookup of fputs(char *, FILE *) seems to be able to emit this ***\n\000")
+
 (define-function call-asm-buf ()
   (call-x86-64-machine-code (assembler->function *assembler*)))
 
@@ -29,9 +31,8 @@
        (test-assert
         (= 0 (call-asm-buf))))))
 
-(when-at-expand (feature platform/posix)
-
-  (define +fputs-msg+ "*** dlsym lookup of fputs(char *, FILE *) seems to be able to emit this ***\n\000")
+(when-at-expand (and (feature platform/posix)
+                     (defined? 'posix/dlsym *globals*))
 
   (define-jit-test jit-posix-1
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
@@ -41,32 +42,32 @@
       (let ((l/code (label)))
         (JMPSm	l/code 0 0 0)
 
-       (let ((l/msg (label!)))
-         (.ascii	+fputs-msg+)
+        (let ((l/msg (label!)))
+          (.ascii	+fputs-msg+)
 
-         (.align	16 0x90) ; NOP's to help the disassemler resync after the data
+          (.align	16 0x90) ; NOP's to help the disassemler resync after the data
 
-         (label!	l/code)
-         (LEAQmr	l/msg 0 0 0 RDI)
-         (MOVQir	stderr RSI)
-         (MOVQmr	0 RSI 0 0 RSI)
-         (call		fputs)
+          (label!	l/code)
+          (LEAQmr	l/msg 0 0 0 RDI)
+          (MOVQir	stderr RSI)
+          (MOVQmr	0 RSI 0 0 RSI)
+          (call		fputs)
 
-         (MOVQir	stderr RDI)
-         (MOVQmr	0 RDI 0 0 RDI)
-         (call		fflush)
+          (MOVQir	stderr RDI)
+          (MOVQmr	0 RDI 0 0 RDI)
+          (call		fflush)
 
-         ;; NOTE libc only picks up EAX, not the entire RAX as return
-         ;; value, so this doesn't test an actual bug where NEGQ was
-         ;; wrongly emitting a NEGL.
-         (MOVQir	-42 RAX)
-         (NEGQr		RAX)
-         (let ((future-value (label)))
-           (SUBQi8r	future-value RAX)
-           (NOP)
-           (label!	future-value 42))
+          ;; NOTE libc only picks up EAX, not the entire RAX as return
+          ;; value, so this doesn't test an actual bug where NEGQ was
+          ;; wrongly emitting a NEGL.
+          (MOVQir	-42 RAX)
+          (NEGQr		RAX)
+          (let ((future-value (label)))
+            (SUBQi8r	future-value RAX)
+            (NOP)
+            (label!	future-value 42))
 
-         (RET)))))
+          (RET)))))
 
   (define-jit-test jit-posix-2
     (let ((fputs	(posix/dlsym posix/RTLD_DEFAULT "fputs"))
@@ -95,6 +96,9 @@
           (LEAQmr	l/msg 0 0 0 RBX) ; load the same address.
           (SUBQrr	RBX RAX) ; therefore it should return 0 in RAX
           (RET)))))
+) ; posix and dlsym
+
+(when-at-expand (feature platform/posix)
 
   (define-jit-test jit-posix-3
     (let ()
@@ -152,7 +156,9 @@
     (SUBQi32r	3 RAX)
     (RET)
     (label! 'exit-code)
-    (.i64	1)))
+    (.i64	1))
+
+) ; (feature platform/posix)
 
 ;; TODO investigate why this must be a separate toplevel form
 (when-at-expand (feature platform/linux)
@@ -189,6 +195,8 @@
     (SYSCALL)
 
     (MOVQi32r	0 RAX)
-    (RET)))
+    (RET))
+
+) ; (feature platform/linux)
 
 (run-tests)
