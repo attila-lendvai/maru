@@ -12,7 +12,7 @@
 
 extern char **environ;
 
-char* posix_envp()
+char** posix_envp()
 {
     return environ;
 }
