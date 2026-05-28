@@ -27,10 +27,10 @@
     (if (= 0 pid)
         (begin
           (when (< 0 stdout-fd)
-            (syscall* linux/SYS_dup2 stdout-fd linux/STDOUT_FILENO)
+            (syscall* linux/SYS_dup3 stdout-fd linux/STDOUT_FILENO 0)
             (syscall* linux/SYS_close stdout-fd))
           (when (< 0 stderr-fd)
-            (syscall* linux/SYS_dup2 stderr-fd linux/STDERR_FILENO)
+            (syscall* linux/SYS_dup3 stderr-fd linux/STDERR_FILENO 0)
             (syscall* linux/SYS_close stderr-fd))
           (syscall* linux/SYS_execve path argv envp)
           (syscall linux/SYS_exit 127))
@@ -38,7 +38,7 @@
       pid)))
 
 (define-form posix/pipe (ptr)
-  `(syscall* linux/SYS_pipe ,ptr))
+  `(syscall* linux/SYS_pipe2 ,ptr 0))
 
 (define-vm-function working-directory ()
   (gc/let* ((buffer (allocate-data linux/PATH_MAX)))
