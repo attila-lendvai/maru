@@ -99,7 +99,7 @@
 
     ;; and some of these are here to hide the host's primfns, otherwise those primfn's will be referenced by the
     ;; bodies of our impl functions below, leading to primfns reaching the compiler.
-    environment-define defined? global-variable-value set-global-variable-value
+    environment-define defined? variable-value set-variable-value
 
     ;; KLUDGE to ease load order constraints
     main/common
@@ -112,14 +112,14 @@
 ;; this installs symbol macros that get/set the value from/to the
 ;; interpreter's global state, namely the maru module's global
 ;; variables.
-(define-symbol-form *standard-input*  '(global-variable-value *maru* symbol/*standard-input*))
-(define-symbol-form *standard-output* '(global-variable-value *maru* symbol/*standard-output*))
-(define-symbol-form *error-output*    '(global-variable-value *maru* symbol/*error-output*))
-(define-symbol-form *debug-output*    '(global-variable-value *maru* symbol/*debug-output*))
+(define-symbol-form *standard-input*  '(variable-value *maru* symbol/*standard-input*))
+(define-symbol-form *standard-output* '(variable-value *maru* symbol/*standard-output*))
+(define-symbol-form *error-output*    '(variable-value *maru* symbol/*error-output*))
+(define-symbol-form *debug-output*    '(variable-value *maru* symbol/*debug-output*))
 
 ;; TODO this is dog slow, we cannot use it as-is to replace *verbosity*
-;; (define-symbol-form *verbosity*       '(global-variable-value *maru* symbol/*verbosity*))
-;; (define-symbol-form *optimised*       '(global-variable-value *maru* symbol/*optimised*))
+;; (define-symbol-form *verbosity*       '(variable-value *maru* symbol/*verbosity*))
+;; (define-symbol-form *optimised*       '(variable-value *maru* symbol/*optimised*))
 
 ;; TODO this is fast, but this way *verbosity* in the vm and in the target is not in sync automatically.
 ;; ideally, these variables could be in a super-module, and the codebase would't even have a global-variable?
