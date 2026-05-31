@@ -237,9 +237,9 @@
     ((symbol? symbol)		(<symbol>-name symbol))
     (else (error "symbol->string: illegal value: "symbol))))
 
-(require "source/env-min.l")
+(require "source/env-lower.l")
 
-;; TODO this is ready to be moved into env-min.l, but then it redefines the host's defined?
+;; TODO this is ready to be moved into env-lower.l, but then it redefines the host's defined?
 ;; and breaks something when it's loaded while not bootstrapping.
 ;; think this through: the host hands over to us <env>'s in e.g. <form>s
 ;; or as the module's env, and we need to access them, even while we load our own stuff
@@ -301,7 +301,7 @@
   (capture-well-known-globals)
   env)
 
-;; TODO move this also into env-min.l, but for that we need smart accessors in the
+;; TODO move this also into env-lower.l, but for that we need smart accessors in the
 ;; level-shifted code that automatically do the unboxing of slot values
 (define-function global-variable? (var)
   (let ((env (<variable>-env var)))

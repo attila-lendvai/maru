@@ -125,7 +125,7 @@
   (assert (= 42 ((eval-in-slave '(lambda () 42)))))
   (eval-in-slave '(define %im-a-test 42))
   (assert (defined? '%im-a-test))
-  ;; (eval-in-host `(load "source/env-min.l"))
+  ;; (eval-in-host `(load "source/env-lower.l"))
   ;; (eval-in-host `(assert (not (find-local-variable ,*globals* '%im-a-test))))
   ;; (eval-in-host `(assert (find-local-variable *slave-env* '%im-a-test)))
   (eval-in-host `(assert (defined? '%im-a-test *slave-env*))))
