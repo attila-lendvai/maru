@@ -31,6 +31,7 @@
      (_b110 6)
      (_b111 7)
 
+     ;; 32 bit mode regs
      (_AL 0x10)
      (_CL 0x11)
      (_DL 0x12)
@@ -59,6 +60,7 @@
      (_ESI 0x46)
      (_EDI 0x47))
 
+  ;; 64 bit mode regs
   (x (_SIL  0x14)
      (_DIL  0x15)
      (_SPL  0x16)
@@ -214,26 +216,6 @@
        ;; -2147483648 2147483647
        (<= -0x80000000 I 0x7fffffff)))
 
-(define-function i8 (I)
-  (assert (i8? I) "out of range for 8-bit signed immediate: "I)
-  I)
-
-(define-function i16 (I)
-  (assert (i16? I) "out of range for 16-bit signed immediate: "I)
-  I)
-
-;; (define-function i32 (I)
-;;   (assert (i32? I) "out of range for 32-bit signed immediate: "I)
-;;   I)
-
-(define-function u8 (I)
-  (assert (u8? I) "out of range for 8-bit unsigned immediate: "I)
-  I)
-
-(define-function u16 (I)
-  (assert (u16? I) "out of range for 16-bit unsigned immediate: "I)
-  I)
-
 (define-function _mod (M)
   (assert (<= M 3) "illegal mod: "M)
   M)
@@ -388,9 +370,9 @@
 ;;
 ;; O		 8 bit opcode
 ;; OO      	16 bit opcode
-;; Os		opcode + b10 when imm fits short (imm8)
+;; Os		opcode + b10 when imm fits imm8
 ;; Or		opcode + register
-;; sW, sL		try short (imm8), revert to imm16 or imm32
+;; sW, sL	try short (imm8), revert to imm16 or imm32
 ;; X		dispatch on register, displ, base, index, scale and emit appropriate
 ;; imm		immediate value, usually postfixed with its size in bits
 ;; w prefix	emit with the 0x66 prefix; i.e. 16 bit operand size
@@ -410,12 +392,12 @@
   (emit-u8 (bitwise-or OP (_reg R))))
 
 (define-function _OO (OP)
-  ;; NOTE emit-u16 is little endian, this here is big endian
+  ;; NOTE this is big endian
   (emit-u8 (bitwise-shift OP -8))
   (emit-u8 (bitwise-and OP 0xff)))
 
 (define-function _OOr (OP R)
-  ;; NOTE emit-u16 is little endian, this here is big endian
+  ;; NOTE this is big endian
   (emit-u8 (bitwise-shift OP -8))
   (emit-u8 (bitwise-or OP (_reg R))))
 
@@ -425,29 +407,27 @@
       (emit-u8 (bitwise-or OP _b10))
     (emit-u8 OP)))
 
+;; TODO? rename to emit-i8-or-i16
 (define-function _sW (W)
   (if (i8? W)
       (emit-i8 W)
     (emit-i16 W)))
 
+;; TODO? rename to emit-i8-or-i32
 (define-function _sL (L)
   (if (i8? L)
       (emit-i8 L)
     (emit-i32 L)))
 
-(define-function _O_W (OP W)
-  (_O OP)
-  (emit-i16 W))
-
-(define-function _O_D1 (OP D)
+(define-function _O_rel8 (OP D)
   (_O OP)
   (emit-rel8 D))
 
-(define-function _O_D4 (OP D)
+(define-function _O_rel32 (OP D)
   (_O OP)
   (emit-rel32 D))
 
-(define-function _OO_D4 (OP D)
+(define-function _OO_rel32 (OP D)
   (_OO OP)
   (emit-rel32 D))
 
@@ -459,15 +439,6 @@
   (_Os OP L)
   (_sL L))
 
-(define-function _O_W_B (OP W B)
-  (_O OP)
-  (emit-i16 W)
-  (emit-i8 B))
-
-(define-function _Or_B (OP R B)
-  (_Or OP R)
-  (emit-i8 B))
-
 (define-function _O_Mrm (OP MO R M)
   (_O OP)
   (_Mrm MO R M))
@@ -475,10 +446,6 @@
 (define-function _OO_Mrm (OP MO R M)
   (_OO OP)
   (_Mrm MO R M))
-
-(define-function _OO_Mrm_B (OP MO R M B)
-  (_OO_Mrm OP MO R M)
-  (emit-i8 B))
 
 (define-function _Os_Mrm_sW (OP MO R M W)
   (_Os OP W)
@@ -497,11 +464,6 @@
 (define-function _OO_r_X (OP R MD MB MI MS)
   (_OO OP)
   (_r_X R MD MB MI MS))
-
-(define-function _OO_r_X_B (OP R MD MB MI MS B)
-  (_OO OP)
-  (_r_X R MD MB MI MS)
-  (emit-i8 B))
 
 (define-function _Os_r_X_sW (OP R MD MB MI MS W)
   (_Os OP W)
@@ -522,11 +484,6 @@
 (define-function _wOr (OP R)
   (_d16)
   (_Or OP R))
-
-(define-function _wOr_W (OP R W)
-  (_d16)
-  (_Or OP R)
-  (emit-i16 W))
 
 (define-function _wOs_sW (OP W)
   (_d16)
@@ -551,20 +508,6 @@
 (define-function _wOO_r_X (OP R MD MB MI MS)
   (_d16)
   (_OO_r_X OP R MD MB MI MS))
-
-(define-function _wO_r_X_B (OP R MD MB MI MS B)
-  (_d16)
-  (_O_r_X OP R MD MB MI MS)
-  (emit-i8 B))
-
-(define-function _wOO_r_X_B (OP R MD MB MI MS B)
-  (_d16)
-  (_OO_r_X_B OP R MD MB MI MS B))
-
-(define-function _wO_r_X_W (OP R MD MB MI MS W)
-  (_d16)
-  (_O_r_X OP R MD MB MI MS)
-  (emit-i16 W))
 
 (define-function _wOs_r_X_sW (OP R MD MB MI MS W)
   (_d16)
@@ -706,7 +649,7 @@
 (define-function TESTWrr (RS RD)	(_wO_Mrm   0x85 _b11		(rindex/16 RS) (rindex/16 RD)))
 (define-function TESTWrm (R D B I S)	(_wO_r_X   0x85			(rindex/16 S) D B I S))
 (define-function TESTWir (L R)		(_wO_Mrm   0xf7 _b11	_b000	(rindex/16 R)) (emit-u16 L))
-(define-function TESTWim (L D B I S)	(_wO_r_X_W 0xf7		_b000	D B I S (u16 L)))
+(define-function TESTWim (L D B I S)	(_wO_r_X   0xf7		_b000	D B I S) (emit-u16 L))
 (define-function TESTLrr (RS RD)	(_O_Mrm    0x85 _b11		(rindex/32 RS) (rindex/32 RD)))
 (define-function TESTLrm (R D B I S)	(_O_r_X    0x85			(rindex/32 R) D B I S))
 (define-function TESTLir (L R)		(_O_Mrm    0xf7 _b11	_b000	(rindex/32 R)) (emit-i32 L))
@@ -748,41 +691,42 @@
       (MOVQi32r L R)
     (MOVQi64r L R)))
 
+(define-function BTWir (IM RD)			(_wOO_Mrm 4026 _b11 _b100 (rindex/16 RD))	(emit-u8 IM))
+(define-function BTWim (IM MD MB MI MS)		(_wOO_r_X 4026 _b100 MD MB MI MS)		(emit-u8 IM))
+(define-function BTWrr (RS RD)			(_wOO_Mrm 4003 _b11	(rindex/16 RS) (rindex/16 RD)))
+(define-function BTWrm (RS MD MB MI MS)		(_wOO_r_X 4003		(rindex/16 RS) MD MB MI MS))
+(define-function BTLir (IM RD)			(_OO_Mrm  4026 _b11 _b100 (rindex/32 RD))	(emit-u8 IM))
+(define-function BTLim (IM MD MB MI MS)		(_OO_r_X  4026 _b100 MD MB MI MS)		(emit-u8 IM))
+(define-function BTLrr (RS RD)			(_OO_Mrm  4003 _b11	(rindex/32 RS) (rindex/32 RD)))
+(define-function BTLrm (RS MD MB MI MS)		(_OO_r_X  4003		(rindex/32 RS) MD MB MI MS))
+(define-function BTCWir (IM RD)			(_wOO_Mrm 4026 _b11 _b111 (rindex/16 RD))	(emit-u8 IM))
+(define-function BTCWim (IM MD MB MI MS)	(_wOO_r_X 4026 _b111 MD MB MI MS) (emit-u8 IM))
+(define-function BTCWrr (RS RD)			(_wOO_Mrm 4027 _b11	(rindex/16 RS) (rindex/16 RD)))
+(define-function BTCWrm (RS MD MB MI MS)	(_wOO_r_X 4027		(rindex/16 RS) MD MB MI MS))
+(define-function BTCLir (IM RD)			(_OO_Mrm  4026 _b11 _b111 (rindex/32 RD))	(emit-u8 IM))
+(define-function BTCLim (IM MD MB MI MS)	(_OO_r_X  4026 _b111 MD MB MI MS)		(emit-u8 IM))
+(define-function BTCLrr (RS RD)			(_OO_Mrm  4027 _b11	(rindex/32 RS) (rindex/32 RD)))
+(define-function BTCLrm (RS MD MB MI MS)	(_OO_r_X  4027		(rindex/32 RS) MD MB MI MS))
+(define-function BTRWir (IM RD)			(_wOO_Mrm 4026 _b11 _b110 (rindex/16 RD))	(emit-u8 IM))
+(define-function BTRWim (IM MD MB MI MS)	(_wOO_r_X 4026 _b110 MD MB MI MS)		(emit-u8 IM))
+(define-function BTRWrr (RS RD)			(_wOO_Mrm 4019 _b11	(rindex/16 RS) (rindex/16 RD)))
+(define-function BTRWrm (RS MD MB MI MS)	(_wOO_r_X 4019		(rindex/16 RS) MD MB MI MS))
+(define-function BTRLir (IM RD)			(_OO_Mrm  4026 _b11 _b110 (rindex/32 RD))	(emit-u8 IM))
+(define-function BTRLim (IM MD MB MI MS)	(_OO_r_X  4026 _b110 MD MB MI MS)		(emit-u8 IM))
+(define-function BTRLrr (RS RD)			(_OO_Mrm  4019 _b11	(rindex/32 RS) (rindex/32 RD)))
+(define-function BTRLrm (RS MD MB MI MS)	(_OO_r_X  4019		(rindex/32 RS) MD MB MI MS))
+(define-function BTSWir (IM RD)			(_wOO_Mrm 4026 _b11 _b101 (rindex/16 RD))	(emit-u8 IM))
+(define-function BTSWim (IM MD MB MI MS)	(_wOO_r_X 4026 _b101 MD MB MI MS)		(emit-u8 IM))
+(define-function BTSWrr (RS RD)			(_wOO_Mrm 4011 _b11	(rindex/16 RS) (rindex/16 RD)))
+(define-function BTSWrm (RS MD MB MI MS)	(_wOO_r_X 4011		(rindex/16 RS) MD MB MI MS))
+(define-function BTSLir (IM RD)			(_OO_Mrm  4026 _b11 _b101 (rindex/32 RD))	(emit-u8 IM))
+(define-function BTSLim (IM MD MB MI MS)	(_OO_r_X  4026 _b101 MD MB MI MS)		(emit-u8 IM))
+(define-function BTSLrr (RS RD)			(_OO_Mrm  4011 _b11	(rindex/32 RS) (rindex/32 RD)))
+(define-function BTSLrm (RS MD MB MI MS)	(_OO_r_X  4011		(rindex/32 RS) MD MB MI MS))
+
 (define-function BSWAPLr (R)			(_OOr 0x0fc8 (rindex/32 R)))
-(define-function BTWir (IM RD)			(_wOO_Mrm 4026 _b11 _b100 (rindex/16 RD)) (emit-u8 IM))
-(define-function BTWim (IM MD MB MI MS)		(_wOO_r_X_B 4026 _b100 MD MB MI MS (u8 IM)))
-(define-function BTWrr (RS RD)			(_wOO_Mrm 4003 _b11 (rindex/16 RS) (rindex/16 RD)))
-(define-function BTWrm (RS MD MB MI MS)		(_wOO_r_X 4003 (rindex/16 RS) MD MB MI MS))
-(define-function BTLir (IM RD)			(_OO_Mrm_B 4026 _b11 _b100 (rindex/32 RD) (u8 IM)))
-(define-function BTLim (IM MD MB MI MS)		(_OO_r_X_B 4026 _b100 MD MB MI MS (u8 IM)))
-(define-function BTLrr (RS RD)			(_OO_Mrm 4003 _b11 (rindex/32 RS) (rindex/32 RD)))
-(define-function BTLrm (RS MD MB MI MS)		(_OO_r_X 4003 (rindex/32 RS) MD MB MI MS))
-(define-function BTCWir (IM RD)			(_wOO_Mrm 4026 _b11 _b111 (rindex/16 RD)) (emit-u8 IM))
-(define-function BTCWim (IM MD MB MI MS)	(_wOO_r_X_B 4026 _b111 MD MB MI MS (u8 IM)))
-(define-function BTCWrr (RS RD)			(_wOO_Mrm 4027 _b11 (rindex/16 RS) (rindex/16 RD)))
-(define-function BTCWrm (RS MD MB MI MS)	(_wOO_r_X 4027 (rindex/16 RS) MD MB MI MS))
-(define-function BTCLir (IM RD)			(_OO_Mrm_B 4026 _b11 _b111 (rindex/32 RD) (u8 IM)))
-(define-function BTCLim (IM MD MB MI MS)	(_OO_r_X_B 4026 _b111 MD MB MI MS (u8 IM)))
-(define-function BTCLrr (RS RD)			(_OO_Mrm 4027 _b11 (rindex/32 RS) (rindex/32 RD)))
-(define-function BTCLrm (RS MD MB MI MS)	(_OO_r_X 4027 (rindex/32 RS) MD MB MI MS))
-(define-function BTRWir (IM RD)			(_wOO_Mrm 4026 _b11 _b110 (rindex/16 RD)) (emit-u8 IM))
-(define-function BTRWim (IM MD MB MI MS)	(_wOO_r_X_B 4026 _b110 MD MB MI MS (u8 IM)))
-(define-function BTRWrr (RS RD)			(_wOO_Mrm 4019 _b11 (rindex/16 RS) (rindex/16 RD)))
-(define-function BTRWrm (RS MD MB MI MS)	(_wOO_r_X 4019 (rindex/16 RS) MD MB MI MS))
-(define-function BTRLir (IM RD)			(_OO_Mrm_B 4026 _b11 _b110 (rindex/32 RD) (u8 IM)))
-(define-function BTRLim (IM MD MB MI MS)	(_OO_r_X_B 4026 _b110 MD MB MI MS (u8 IM)))
-(define-function BTRLrr (RS RD)			(_OO_Mrm 4019 _b11 (rindex/32 RS) (rindex/32 RD)))
-(define-function BTRLrm (RS MD MB MI MS)	(_OO_r_X 4019 (rindex/32 RS) MD MB MI MS))
-(define-function BTSWir (IM RD)			(_wOO_Mrm 4026 _b11 _b101 (rindex/16 RD)) (emit-u8 IM))
-(define-function BTSWim (IM MD MB MI MS)	(_wOO_r_X_B 4026 _b101 MD MB MI MS (u8 IM)))
-(define-function BTSWrr (RS RD)			(_wOO_Mrm 4011 _b11 (rindex/16 RS) (rindex/16 RD)))
-(define-function BTSWrm (RS MD MB MI MS)	(_wOO_r_X 4011 (rindex/16 RS) MD MB MI MS))
-(define-function BTSLir (IM RD)			(_OO_Mrm_B 4026 _b11 _b101 (rindex/32 RD) (u8 IM)))
-(define-function BTSLim (IM MD MB MI MS)	(_OO_r_X_B 4026 _b101 MD MB MI MS (u8 IM)))
-(define-function BTSLrr (RS RD)			(_OO_Mrm 4011 _b11 (rindex/32 RS) (rindex/32 RD)))
-(define-function BTSLrm (RS MD MB MI MS)	(_OO_r_X 4011 (rindex/32 RS) MD MB MI MS))
 (define-function CALLr (RD)			(_O_Mrm 255 _b11 _b010 (rindex/32 RD)))
-(define-function CALLm (MD MB MI MS)		(if (undefined-registers? MB MI) (_O_D4 232 MD) (_O_r_X 255 _b010 MD MB MI MS)))
+(define-function CALLm (MD MB MI MS)		(if (undefined-registers? MB MI) (_O_rel32 232 MD) (_O_r_X 255 _b010 MD MB MI MS)))
 (define-function CMPXCHGBrr (RS RD)		(_OO_Mrm 4016 _b11 (rindex/8 RS) (rindex/8 RD)))
 (define-function CMPXCHGBrm (RS MD MB MI MS)	(_OO_r_X 4016 (rindex/8 RS) MD MB MI MS))
 (define-function CMPXCHGWrr (RS RD)		(_wOO_Mrm 4017 _b11 (rindex/16 RS) (rindex/16 RD)))
@@ -796,7 +740,7 @@
 (define-function DECLr (RD)			(_Or 72 (rindex/32 RD)))
 (define-function DECLm (MD MB MI MS)		(_O_r_X 255 _b001 MD MB MI MS))
 
-(define-function ENTERii (W B)			(_O_W_B 200 (i16 W) (i8 B)))
+(define-function ENTERii (W B)			(_O 200) (emit-i16 W) (emit-i8 B))
 
 (define-function INCBr (RD)			(_O_Mrm 254 _b11 _b000 (rindex/8 RD)))
 (define-function INCBm (MD MB MI MS)		(_O_r_X 254 _b000 MD MB MI MS))
@@ -806,19 +750,19 @@
 (define-function INCLm (MD MB MI MS)		(_O_r_X 255 _b000 MD MB MI MS))
 (define-function INVLPGm (MD MB MI MS)		(_OO_r_X 3841 _b111 MD MB MI MS))
 
-(define-function JMPSm (D B I S)		(if (undefined-registers? B I) (_O_D1 235 D) (ASMFAIL "illegal mode in short jump")))
-(define-function JMPm (D B I S)			(if (undefined-registers? B I) (_O_D4 233 D) (_O_r_X 255 _b100 D B I S)))
+(define-function JMPSm (D B I S)		(if (undefined-registers? B I) (_O_rel8  235 D) (ASMFAIL "illegal mode in short jump")))
+(define-function JMPm (D B I S)			(if (undefined-registers? B I) (_O_rel32 233 D) (_O_r_X 255 _b100 D B I S)))
 (define-function JMPr (R)			(_O_Mrm 255 _b11 _b100 (rindex/32 R)))
 (define-function LAHF () (_O 159))
 (define-function LEALmr (MD MB MI MS RD) (_O_r_X 141 (rindex/32 RD) MD MB MI MS))
 (define-function LEAVE () (_O 201))
 (define-function LMSWr (RS) (_OO_Mrm 3841 _b11 _b110 (rindex/32 RS)))
 (define-function LMSWm (MD MB MI MS) (_OO_r_X 3841 _b110 MD MB MI MS))
-(define-function LOOPm (MD MB MI MS)   (if (undefined-registers? MB MI) (_O_D1 226 MD) (ASMFAIL "illegal mode in loop")))
-(define-function LOOPEm (MD MB MI MS)  (if (undefined-registers? MB MI) (_O_D1 225 MD) (ASMFAIL "illegal mode in loope")))
-(define-function LOOPZm (MD MB MI MS)  (if (undefined-registers? MB MI) (_O_D1 225 MD) (ASMFAIL "illegal mode in loopz")))
-(define-function LOOPNEm (MD MB MI MS) (if (undefined-registers? MB MI) (_O_D1 224 MD) (ASMFAIL "illegal mode in loopne")))
-(define-function LOOPNZm (MD MB MI MS) (if (undefined-registers? MB MI) (_O_D1 224 MD) (ASMFAIL "illegal mode in loopnz")))
+(define-function LOOPm (MD MB MI MS)   (if (undefined-registers? MB MI) (_O_rel8 226 MD) (ASMFAIL "illegal mode in loop")))
+(define-function LOOPEm (MD MB MI MS)  (if (undefined-registers? MB MI) (_O_rel8 225 MD) (ASMFAIL "illegal mode in loope")))
+(define-function LOOPZm (MD MB MI MS)  (if (undefined-registers? MB MI) (_O_rel8 225 MD) (ASMFAIL "illegal mode in loopz")))
+(define-function LOOPNEm (MD MB MI MS) (if (undefined-registers? MB MI) (_O_rel8 224 MD) (ASMFAIL "illegal mode in loopne")))
+(define-function LOOPNZm (MD MB MI MS) (if (undefined-registers? MB MI) (_O_rel8 224 MD) (ASMFAIL "illegal mode in loopnz")))
 (define-function MOVSBLrr (RS RD) (_OO_Mrm 4030 _b11 (rindex/32 RD) (rindex/8 RS)))
 (define-function MOVSBLmr (MD MB MI MS RD) (_OO_r_X 4030 (rindex/32 RD) MD MB MI MS))
 (define-function MOVZBLmr (MD MB MI MS RD) (_OO_r_X 4022 (rindex/32 RD) MD MB MI MS))
@@ -844,13 +788,13 @@
 (define-function PUSHF () (_O 156))
 (define-function PUSHFD () (_wO 156))
 (define-function RET () (_O 195))
-(define-function RETi (IM) (_O_W 194 (i16 IM)))
+(define-function RETi (IM) (_O 194) (emit-i16 IM))
 (define-function ROLBir (IM RD) (if (= IM 1) (_O_Mrm 208 _b11 _b000 (rindex/8 RD)) (_O_Mrm 192 _b11 _b000 (rindex/8 RD)) (emit-u8 IM)))
 (define-function ROLBim (IM MD MB MS MI) (if (= IM 1) (_O_r_X 208 _b000 MD MB MI MS) (_O_r_X 192 _b000 MD MB MI MS) (emit-u8 IM)))
 (define-function ROLBrr (RS RD) (if (= RS _CL) (_O_Mrm 210 _b11 _b000 (rindex/8 RD)) (ASMFAIL "source register must be CL")))
 (define-function ROLBrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 210 _b000 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function ROLWir (IM RD) (if (= IM 1) (_wO_Mrm 209 _b11 _b000 (rindex/16 RD)) (_wO_Mrm 193 _b11 _b000 (rindex/16 RD)) (emit-u8 IM)))
-(define-function ROLWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b000 MD MB MI MS) (_wO_r_X_B 193 _b000 MD MB MI MS (u8 IM))))
+(define-function ROLWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b000 MD MB MI MS) (_wO_r_X 193 _b000 MD MB MI MS) (emit-u8 IM)))
 (define-function ROLWrr (RS RD) (if (= RS _CL) (_wO_Mrm 211 _b11 _b000 (rindex/16 RD)) (ASMFAIL "source register must be CL")))
 (define-function ROLWrm (RS MD MB MS MI) (if (= RS _CL) (_wO_r_X 211 _b000 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function ROLLir (IM RD) (if (= IM 1) (_O_Mrm 209 _b11 _b000 (rindex/32 RD)) (_O_Mrm 193 _b11 _b000 (rindex/32 RD)) (emit-u8 IM)))
@@ -862,7 +806,7 @@
 (define-function RORBrr (RS RD) (if (= RS _CL) (_O_Mrm 210 _b11 _b001 (rindex/8 RD)) (ASMFAIL "source register must be CL")))
 (define-function RORBrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 210 _b001 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function RORWir (IM RD) (if (= IM 1) (_wO_Mrm 209 _b11 _b001 (rindex/16 RD)) (_wO_Mrm 193 _b11 _b001 (rindex/16 RD)) (emit-u8 IM)))
-(define-function RORWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b001 MD MB MI MS) (_wO_r_X_B 193 _b001 MD MB MI MS (u8 IM))))
+(define-function RORWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b001 MD MB MI MS) (_wO_r_X 193 _b001 MD MB MI MS) (emit-u8 IM)))
 (define-function RORWrr (RS RD) (if (= RS _CL) (_wO_Mrm 211 _b11 _b001 (rindex/16 RD)) (ASMFAIL "source register must be CL")))
 (define-function RORWrm (RS MD MB MS MI) (if (= RS _CL) (_wO_r_X 211 _b001 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function RORLir (IM RD) (if (= IM 1) (_O_Mrm 209 _b11 _b001 (rindex/32 RD)) (_O_Mrm 193 _b11 _b001 (rindex/32 RD)) (emit-u8 IM)))
@@ -875,7 +819,7 @@
 (define-function SARBrr (RS RD) (if (= RS _CL) (_O_Mrm 210 _b11 _b111 (rindex/8 RD)) (ASMFAIL "source register must be CL")))
 (define-function SARBrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 210 _b111 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SARWir (IM RD) (if (= IM 1) (_wO_Mrm 209 _b11 _b111 (rindex/16 RD)) (_wO_Mrm 193 _b11 _b111 (rindex/16 RD)) (emit-u8 IM)))
-(define-function SARWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b111 MD MB MI MS) (_wO_r_X_B 193 _b111 MD MB MI MS (u8 IM))))
+(define-function SARWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b111 MD MB MI MS) (_wO_r_X 193 _b111 MD MB MI MS) (emit-u8 IM)))
 (define-function SARWrr (RS RD) (if (= RS _CL) (_wO_Mrm 211 _b11 _b111 (rindex/16 RD)) (ASMFAIL "source register must be CL")))
 (define-function SARWrm (RS MD MB MS MI) (if (= RS _CL) (_wO_r_X 211 _b111 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SARLir (IM RD) (if (= IM 1) (_O_Mrm 209 _b11 _b111 (rindex/32 RD)) (_O_Mrm 193 _b11 _b111 (rindex/32 RD)) (emit-u8 IM)))
@@ -946,7 +890,7 @@
 (define-function SHLBrr (RS RD) (if (= RS _CL) (_O_Mrm 210 _b11 _b100 (rindex/8 RD)) (ASMFAIL "source register must be CL")))
 (define-function SHLBrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 210 _b100 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SHLWir (IM RD) (if (= IM 1) (_wO_Mrm 209 _b11 _b100 (rindex/16 RD)) (_wO_Mrm 193 _b11 _b100 (rindex/16 RD)) (emit-u8 IM)))
-(define-function SHLWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b100 MD MB MI MS) (_wO_r_X_B 193 _b100 MD MB MI MS (u8 IM))))
+(define-function SHLWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b100 MD MB MI MS) (_wO_r_X 193 _b100 MD MB MI MS) (emit-u8 IM)))
 (define-function SHLWrr (RS RD) (if (= RS _CL) (_wO_Mrm 211 _b11 _b100 (rindex/16 RD)) (ASMFAIL "source register must be CL")))
 (define-function SHLWrm (RS MD MB MS MI) (if (= RS _CL) (_wO_r_X 211 _b100 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SHLLir (IM RD) (if (= IM 1) (_O_Mrm 209 _b11 _b100 (rindex/32 RD)) (_O_Mrm 193 _b11 _b100 (rindex/32 RD)) (emit-u8 IM)))
@@ -958,7 +902,7 @@
 (define-function SHRBrr (RS RD) (if (= RS _CL) (_O_Mrm 210 _b11 _b101 (rindex/8 RD)) (ASMFAIL "source register must be CL")))
 (define-function SHRBrm (RS MD MB MS MI) (if (= RS _CL) (_O_r_X 210 _b101 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SHRWir (IM RD) (if (= IM 1) (_wO_Mrm 209 _b11 _b101 (rindex/16 RD)) (_wO_Mrm 193 _b11 _b101 (rindex/16 RD)) (emit-u8 IM)))
-(define-function SHRWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b101 MD MB MI MS) (_wO_r_X_B 193 _b101 MD MB MI MS (u8 IM))))
+(define-function SHRWim (IM MD MB MS MI) (if (= IM 1) (_wO_r_X 209 _b101 MD MB MI MS) (_wO_r_X 193 _b101 MD MB MI MS) (emit-u8 IM)))
 (define-function SHRWrr (RS RD) (if (= RS _CL) (_wO_Mrm 211 _b11 _b101 (rindex/16 RD)) (ASMFAIL "source register must be CL")))
 (define-function SHRWrm (RS MD MB MS MI) (if (= RS _CL) (_wO_r_X 211 _b101 MD MB MI MS) (ASMFAIL "source register must be CL")))
 (define-function SHRLir (IM RD) (if (= IM 1) (_O_Mrm 209 _b11 _b101 (rindex/32 RD)) (_O_Mrm 193 _b11 _b101 (rindex/32 RD)) (emit-u8 IM)))
@@ -1077,12 +1021,12 @@
    ))
 
 ;; rel8 distance
-(define-function JCCrel8 (CC D)
-  (_O_D1 (bitwise-or 0x70 CC) D))
+(define-function %JCCrel8 (CC D)
+  (_O_rel8 (bitwise-or 0x70 CC) D))
 
 ;; rel32 distance
-(define-function JCCrel32 (CC D)
-  (_OO_D4 (bitwise-or 0x0f80 CC) D))
+(define-function %JCCrel32 (CC D)
+  (_OO_rel32 (bitwise-or 0x0f80 CC) D))
 
 (with-forms
     ((x (entries
@@ -1093,13 +1037,13 @@
                   (let ((base-name (concat-symbol 'J (first entry))))
                     `(begin
                       (define-function ,(concat-symbol base-name 'S) (D)
-                        (JCCrel8 ,(second entry) D))
+                        (%JCCrel8 ,(second entry) D))
                       (define-function ,(concat-symbols base-name (string->symbol "32")) (D)
-                        (JCCrel32 ,(second entry) D))
+                        (%JCCrel32 ,(second entry) D))
                       (define-function ,base-name (D)
                         (if (i8? D)
-                            (JCCrel8 ,(second entry) D)
-                          (JCCrel32 ,(second entry) D))))))
+                            (%JCCrel8 ,(second entry) D)
+                          (%JCCrel32 ,(second entry) D))))))
                 entries))))))
   (x
    (O		00)
