@@ -5,16 +5,7 @@
 ;;; more complex to use.
 
 (require "source/streams-min-late.l")
-
-;; TODO add/merge as a primitive? what about the parent env chain?
-(define-function variable-value (name env . default)
-  (let ((var (defined? name env)))
-    (cond
-      (var
-       (<variable>-value var))
-      (default
-       (first default))
-      (else (error "variable-value: '"name "' is not defined in env " env)))))
+(require "source/env-min.l")
 
 (define-record <segment> ()
   (buffer     ; the output, a binary buffer
@@ -99,7 +90,7 @@
 
 (define-function get-segment (desig)
   (typecase desig
-    (<symbol> (let ((segment (variable-value desig (<assembler>-env *assembler*))))
+    (<symbol> (let ((segment (variable-value (<assembler>-env *assembler*) desig)))
                 (assert (is <segment> segment))
                 segment))
     (<segment> desig)
@@ -172,7 +163,7 @@
 (define-function %find-label (desig)
   (typecase desig
     (<label>	desig)
-    (<symbol>	(variable-value desig (<assembler>-env *assembler*) ()))
+    (<symbol>	(maybe-variable-value (<assembler>-env *assembler*) desig))
     (else (error "%find-label: not a label designator: "desig", of type: "(type-of desig)))))
 
 (define-function %ensure-label (desig)
@@ -195,7 +186,7 @@
 
 (define-function %get-label (desig)
   (typecase desig
-    (<symbol>	(let ((label (variable-value desig (<assembler>-env *assembler*))))
+    (<symbol>	(let ((label (variable-value (<assembler>-env *assembler*) desig)))
                   (assert (is <label> label))
                   label))
     (<label>	desig)
