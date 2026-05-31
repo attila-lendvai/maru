@@ -5,16 +5,7 @@
 ;;; change value.
 
 (require "source/streams-min-late.l")
-
-;; TODO add/merge as a primitive? what about the parent env chain?
-(define-function variable-value (name env . default)
-  (let ((var (defined? name env)))
-    (cond
-      (var
-       (<variable>-value var))
-      (default
-       (first default))
-      (else (error "variable-value: '"name "' is not defined in env " env)))))
+(require "source/env-min.l")
 
 (define-record <assembler> ()
   (buffer     ; the output, a binary buffer
@@ -37,7 +28,7 @@
     (set (lower/array-at buf (lower/array-length buf))
          value))
   (let* ((env (<assembler>-env *assembler*))
-         (current (variable-value '$ env)))
+         (current (variable-value env '$)))
     (environment-define env '$ (+ 1 current))))
 
 (define-function _W  (value)	(_B (bitwise-and 0xff value))   (_B (bitwise-and 0xff   (bitwise-shift value -8))))
@@ -60,7 +51,7 @@
 
 (define-function .align (bytes)
   (let* ((env (<assembler>-env *assembler*))
-         (remainder (bitwise-and (variable-value '$ env)
+         (remainder (bitwise-and (variable-value env '$)
                                  (- bytes 1))))
     (when (< 0 remainder)
       (times-do (- bytes remainder)
@@ -104,8 +95,8 @@
         (typecase instr
           (<symbol>             ; a single symbol: treat it as a label
            (let ((label-name instr)
-                 (current-address (variable-value '$ env)))
-             (unless (= (variable-value label-name env) current-address)
+                 (current-address (variable-value env '$)))
+             (unless (= (variable-value env label-name) current-address)
                (environment-define env label-name current-address)
                (set phased true))))
           (<pair>
