@@ -23,7 +23,7 @@
                 ;; maybe, eventually, evaluate DEFINE-CONSTANTs...
                 ;; ((and (symbol? form)
                 ;;       (defined? form *env*)
-                ;;       (is <form> (global-variable-value *env* form)))
+                ;;       (is <form> (variable-value *env* form)))
                 ;;  `(platform/diag-print-string ,(eval form *env*) 10 platform/diag-print-char))
                 ((string? form)
                  `(platform/diag-print-string ,form))

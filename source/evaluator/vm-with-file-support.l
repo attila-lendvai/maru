@@ -16,7 +16,7 @@
      (set ,our-name stream)
      ;; the maru-user env was create earlier, let's set it there, too.
      ;; TODO clarify: why in maru-user?
-     (set (global-variable-value *maru* ,(concat-symbol 'symbol/ our-name))
+     (set (variable-value *maru* ,(concat-symbol 'symbol/ our-name))
           stream)))
 
 (define-function initialize-streams (in-handle out-handle err-handle)
@@ -103,7 +103,7 @@
                ;; the evaluator by hand. ideally this should be done
                ;; automatically.
                (set tmp (box <long> *verbosity*))
-               (set (global-variable-value *maru* symbol/*verbosity*) tmp))
+               (set (variable-value *maru* symbol/*verbosity*) tmp))
 
               ((string= "-d" arg)
                (if-at-expand (feature debug-output)
@@ -117,7 +117,7 @@
                ;; the evaluator by hand. ideally this should be done
                ;; automatically.
                (set tmp (box <long> *optimised*))
-               (set (global-variable-value *maru* symbol/*optimised*) tmp))
+               (set (variable-value *maru* symbol/*optimised*) tmp))
 
               ;; -p
               ((string= "-p" arg)
