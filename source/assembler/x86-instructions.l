@@ -164,7 +164,12 @@
       (rindex R)
     (ASMFAIL "32-bit register required")))
 
-(define-function to-register/32 (R)
+(define-function rindex/64 (R)
+  (if (register/64? R)
+      (rindex R)
+    (ASMFAIL "64-bit register required")))
+
+(define-function to-r32 (R)
   (if (undefined-register? R)
       0
     (if (register/64? R)
@@ -254,14 +259,16 @@
   B)
 
 (define-function _Mrm (mod reg rm)
-  (_B (bitwise-or (bitwise-shift (_mod mod) 6)
-                  (bitwise-shift (_reg reg) 3)
-                  (_rm rm))))
+  (emit-u8
+   (bitwise-or (bitwise-shift (_mod mod) 6)
+               (bitwise-shift (_reg reg) 3)
+               (_rm rm))))
 
 (define-function _SIB (Sc I B)
-  (_B (bitwise-or (bitwise-shift (_scale Sc) 6)
-                  (bitwise-shift (_index I) 3)
-                  (_base B))))
+  (emit-u8
+   (bitwise-or (bitwise-shift (_scale Sc) 6)
+               (bitwise-shift (_index I) 3)
+               (_base B))))
 
 (define-function _SCL (S)
   (cond
@@ -304,25 +311,25 @@
 (define-function _r_0DIS (R D I S)
   (_Mrm _b00 (rindex R) _b100)
   (_SIB (_SCL S) (rindex/32 I) 5)
-  (_L D))
+  (emit-i32 D))
 
 (define-function _r_1B (R D B)
   (_Mrm _b01 (rindex R) (rindex/32 B))
-  (_B D))
+  (emit-i8 D))
 
 (define-function _r_1BIS (R D B I S)
   (_Mrm _b01 (rindex R) _b100)
   (_SIB (_SCL S) (rindex/32 I) (rindex/32 B))
-  (_B D))
+  (emit-i8 D))
 
 (define-function _r_4B (R D B)
   (_Mrm _b10 (rindex R) (rindex/32 B))
-  (_L D))
+  (emit-i32 D))
 
 (define-function _r_4BIS (R D B I S)
   (_Mrm _b10 (rindex R) _b100)
   (_SIB (_SCL S) (rindex/32 I) (rindex/32 B))
-  (_L D))
+  (emit-i32 D))
 
 (define-function _r_DB (R D B)
   (cond
@@ -371,7 +378,7 @@
                   (if (_rXP B) 1 0)
                   (bitwise-shift W 3))))
     (unless (= 0 value)
-      (_B (+ 0x40 value)))))
+      (emit-u8 (+ 0x40 value)))))
 
 ;;;
 ;;; instruction formats
@@ -389,58 +396,60 @@
 ;; w prefix	emit with the 0x66 prefix; i.e. 16 bit operand size
 
 (define-function _d16 ()
-  (_B 0x66))
+  (emit-u8 0x66))
 
 (define-function _a32 (B I)
   (when (or (register/32? B)
             (register/32? I))
-    (_B 0x67)))
+    (emit-u8 0x67)))
 
 (define-function _O (OP)
-  (_B OP))
+  (emit-u8 OP))
 
 (define-function _Or (OP R)
-  (_B (bitwise-or OP (_reg R))))
+  (emit-u8 (bitwise-or OP (_reg R))))
 
 (define-function _OO (OP)
-  (_B (bitwise-shift OP -8))
-  (_B (bitwise-and OP 0xff)))
+  ;; NOTE emit-u16 is little endian, this here is big endian
+  (emit-u8 (bitwise-shift OP -8))
+  (emit-u8 (bitwise-and OP 0xff)))
 
 (define-function _OOr (OP R)
-  (_B (bitwise-shift OP -8))
-  (_B (bitwise-or OP (_reg R))))
+  ;; NOTE emit-u16 is little endian, this here is big endian
+  (emit-u8 (bitwise-shift OP -8))
+  (emit-u8 (bitwise-or OP (_reg R))))
 
-(define-function _Os (OP B)
-  (if (and (long? B)
-           (i8? B))
-      (_B (bitwise-or OP _b10))
-    (_B OP)))
+(define-function _Os (OP val)
+  (if (and (long? val)
+           (i8? val))
+      (emit-u8 (bitwise-or OP _b10))
+    (emit-u8 OP)))
 
 (define-function _sW (W)
   (if (i8? W)
-      (_B W)
-    (_W W)))
+      (emit-i8 W)
+    (emit-i16 W)))
 
 (define-function _sL (L)
   (if (i8? L)
-      (_B L)
-    (_L L)))
+      (emit-i8 L)
+    (emit-i32 L)))
 
 (define-function _O_W (OP W)
   (_O OP)
-  (_W W))
+  (emit-i16 W))
 
 (define-function _O_D1 (OP D)
   (_O OP)
-  (_D1 D))
+  (emit-rel8 D))
 
 (define-function _O_D4 (OP D)
   (_O OP)
-  (_D4 D))
+  (emit-rel32 D))
 
 (define-function _OO_D4 (OP D)
   (_OO OP)
-  (_D4 D))
+  (emit-rel32 D))
 
 (define-function _Os_sW (OP W)
   (_Os OP W)
@@ -452,24 +461,24 @@
 
 (define-function _O_W_B (OP W B)
   (_O OP)
-  (_W W)
-  (_B B))
+  (emit-i16 W)
+  (emit-i8 B))
 
 (define-function _Or_B (OP R B)
   (_Or OP R)
-  (_B B))
+  (emit-i8 B))
 
 (define-function _Or_W (OP R W)
   (_Or OP R)
-  (_W W))
+  (emit-i16 W))
 
 (define-function _Or_L (OP R L)
   (_Or OP R)
-  (_L L))
+  (emit-i32 L))
 
 (define-function _Or_Q (OP R Q)
   (_Or OP R)
-  (_Q Q))
+  (emit-i64 Q))
 
 (define-function _O_Mrm (OP MO R M)
   (_O OP)
@@ -480,24 +489,20 @@
   (_Mrm MO R M))
 
 (define-function _O_Mrm_B (OP MO R M B)
-  (_O OP)
-  (_Mrm MO R M)
-  (_B B))
+  (_O_Mrm OP MO R M)
+  (emit-i8 B))
 
 (define-function _O_Mrm_W (OP MO R M W)
-  (_O OP)
-  (_Mrm MO R M)
-  (_W W))
+  (_O_Mrm OP MO R M)
+  (emit-i16 W))
 
 (define-function _O_Mrm_L (OP MO R M L)
-  (_O OP)
-  (_Mrm MO R M)
-  (_L L))
+  (_O_Mrm OP MO R M)
+  (emit-i32 L))
 
 (define-function _OO_Mrm_B (OP MO R M B)
-  (_OO OP)
-  (_Mrm MO R M)
-  (_B B))
+  (_OO_Mrm OP MO R M)
+  (emit-i8 B))
 
 (define-function _Os_Mrm_sW (OP MO R M W)
   (_Os OP W)
@@ -520,22 +525,22 @@
 (define-function _O_r_X_B (OP R MD MB MI MS B)
   (_O OP)
   (_r_X R MD MB MI MS)
-  (_B B))
+  (emit-i8 B))
 
 (define-function _O_r_X_W (OP R MD MB MI MS W)
   (_O OP)
   (_r_X R MD MB MI MS)
-  (_W W))
+  (emit-i16 W))
 
 (define-function _O_r_X_L (OP R MD MB MI MS L)
   (_O OP)
   (_r_X R MD MB MI MS)
-  (_L L))
+  (emit-i32 L))
 
 (define-function _OO_r_X_B (OP R MD MB MI MS B)
   (_OO OP)
   (_r_X R MD MB MI MS)
-  (_B B))
+  (emit-i8 B))
 
 (define-function _Os_r_X_sW (OP R MD MB MI MS W)
   (_Os OP W)
@@ -627,43 +632,50 @@
 ;;;
 
 (define-form define-alu-instruction (base-name op reg)
-  (with-forms ((name ((suffix) `(concat-symbol base-name ',suffix))))
+  (with-forms ((name ((size suffix) `(concat-symbols base-name ',size ',suffix))))
     `(begin
       ;; 8 bit
-      (define-function ,(name Brr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,op		_b11 (rindex/8 S) (rindex/8 D)			))
-      (define-function ,(name Bir)	(L R)				(_REX 0 0 0 R)	(_O_Mrm_B	0x80		_b11 ,reg (rindex/8 R)				(i8 L)	))
-      (define-function ,(name Bmr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 2)	(rindex/8 R)	D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Brm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,op		(rindex/8 R)	D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Bim)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X_B	0x80		,reg			D (to-register/32 B) (to-register/32 I) S	(i8 L)	))
+      (define-function ,(name B rr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,op		_b11 (rindex/8 S) (rindex/8 D))					)
+      (define-function ,(name B ir)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x80		_b11 ,reg (rindex/8 R))				(emit-i8 L)	)
+
+      (define-function ,(name B mr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 2)	(rindex/8 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name B rm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,op		(rindex/8 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name B im)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x80		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
 
       ;; 16 bit
-      (define-function ,(name Wrr)	(S D)			  (_d16)(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/16 S) (rindex/16 D)						))
-      (define-function ,(name Wir)	(L R)			  (_d16)(_REX 0 0 0 R)	(_Os_Mrm_sW	0x81		_b11 ,reg (rindex/16 R)				(i16 L)	))
-      (define-function ,(name Wmr)	(D B I S R)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/16 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Wrm)	(R D B I S)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/16 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Wim)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_Os_r_X_sW	0x81		,reg			D (to-register/32 B) (to-register/32 I) S	(i16 L)	))
+      (define-function ,(name W rr)	(S D)			  (_d16)(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/16 S) (rindex/16 D))				)
+      (define-function ,(name W i8r)	(L R)			  (_d16)(_REX 0 0 0 R)	(_O_Mrm		0x83		_b11 ,reg (rindex/16 R))			(emit-i8 L)	)
+      (define-function ,(name W i16r)	(L R)			  (_d16)(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/16 R))			(emit-i16 L)	)
+      (define-function ,(name W mr)	(D B I S R)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/16 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name W rm)	(R D B I S)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/16 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name W i8m)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_O_r_X		0x83		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
+      (define-function ,(name W i16m)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i16 L)	)
 
       ;; 32 bit
-      (define-function ,(name Lrr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/32 S) (rindex/32 D)						))
-      (define-function ,(name Li8r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm_B	0x83		_b11 ,reg (rindex/32 R)					L	))
-      (define-function ,(name Li32r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm_L	0x81		_b11 ,reg (rindex/32 R)					L	))
-      (define-function ,(name Lmr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/32 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Lrm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/32 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Lim)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_Os_r_X_sL	0x81		,reg			D (to-register/32 B) (to-register/32 I) S	L	))
+      (define-function ,(name L rr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/32 S) (rindex/32 D))				)
+      (define-function ,(name L i8r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x83		_b11 ,reg (rindex/32 R))			(emit-i8 L)	)
+      (define-function ,(name L i32r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/32 R))			(emit-i32 L)	)
+      (define-function ,(name L mr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/32 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name L rm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/32 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name L i8m)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x83		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
+      (define-function ,(name L i32m)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i32 L)	)
 
-      (define-function ,(name Lir) (L R)
-        ((if (i8? L) ,(name Li8r) ,(name Li32r)) L R))
+      (define-function ,(name L ir) (L R)		((if (i8? L) ,(name L i8r) ,(name L i32r)) L R))
+      (define-function ,(name L im) (L D B I S)		((if (i8? L) ,(name L i8m) ,(name L i32m)) L D B I S))
 
-      ;; TODO 64 bit is just REX.W=1 prefixed 32 bit
-      (define-function ,(name Qrr)	(S D)				(_REX 1 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex (to-register/32 S)) (rindex (to-register/32 D))				))
-      (define-function ,(name Qi8r)	(L R)				(_REX 1 0 0 R)	(_O_Mrm_B	0x83		_b11 ,reg (rindex (to-register/32 R))					L	))
-      (define-function ,(name Qi32r)	(L R)				(_REX 1 0 0 R)	(_O_Mrm_L	0x81		_b11 ,reg (rindex (to-register/32 R))					L	))
-      (define-function ,(name Qmr)	(D B I S R)	(_a32 B I)	(_REX 1 R I B)	(_O_r_X		,(+ op 3)	(to-register/32 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Qrm)	(R D B I S)	(_a32 B I)	(_REX 1 R I B)	(_O_r_X		,(+ op 1)	(to-register/32 R)			D (to-register/32 B) (to-register/32 I) S		))
-      (define-function ,(name Qim)	(L D B I S)	(_a32 B I)	(_REX 1 0 I B)	(_Os_r_X_sL	0x81		,reg			D (to-register/32 B) (to-register/32 I) S	L	))
+      ;; TODO the 64 bit version is the same as the 32 bit one, except:
+      ;; - REX.W=1
+      ;; - for R S D registers: rindex/64 instead of rindex/32
+      (define-function ,(name Q rr)	(S D)				(_REX 1 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/64 S) (rindex/64 D))				)
+      (define-function ,(name Q i8r)	(L R)				(_REX 1 0 0 R)	(_O_Mrm		0x83		_b11 ,reg (rindex/64 R))			(emit-i8 L)	)
+      (define-function ,(name Q i32r)	(L R)				(_REX 1 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/64 R))			(emit-i32 L)	)
+      (define-function ,(name Q mr)	(D B I S R)	(_a32 B I)	(_REX 1 R I B)	(_O_r_X		,(+ op 3)	(rindex/64 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name Q rm)	(R D B I S)	(_a32 B I)	(_REX 1 R I B)	(_O_r_X		,(+ op 1)	(rindex/64 R)	D (to-r32 B) (to-r32 I) S)			)
+      (define-function ,(name Q i8m)	(L D B I S)	(_a32 B I)	(_REX 1 0 I B)	(_O_r_X		0x83		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
+      (define-function ,(name Q i32m)	(L D B I S)	(_a32 B I)	(_REX 1 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i32 L)	)
 
-      (define-function ,(name Qir) (L R)
-        ((if (i8? L) ,(name Qi8r) ,(name Qi32r)) L R))
+      (define-function ,(name Q ir) (L R)		((if (i8? L) ,(name Q i8r) ,(name Q i32r)) L R))
+      (define-function ,(name Q im) (L D B I S)		((if (i8? L) ,(name Q i8m) ,(name Q i32m)) L D B I S))
 
       )))
 
@@ -698,8 +710,8 @@
 (define-function NEGWm (D B I S)	(_wO_r_X 0xf7		_b011	D B I S))
 (define-function NEGLr (R)		(_O_Mrm  0xf7 _b11	_b011	(rindex/32 R)))
 (define-function NEGLm (D B I S)	(_O_r_X  0xf7		_b011	D B I S))
-(define-function NEGQr (R)		(_REX 1 0 0 R) (NEGLr (to-register/32 R)))
-(define-function NEGQm (D B I S)	(_REX 1 S I B) (NEGLm D (to-register/32 B) (to-register/32 I) S))
+(define-function NEGQr (R)		(_REX 1 0 0 R) (NEGLr (to-r32 R)))
+(define-function NEGQm (D B I S)	(_REX 1 S I B) (NEGLm D (to-r32 B) (to-r32 I) S))
 
 (define-function NOTBr (R)		(_O_Mrm  0xf6 _b11	_b010	(rindex/8 R)))
 (define-function NOTBm (D B I S)	(_O_r_X  0xf6		_b010	D B I S))
@@ -707,8 +719,8 @@
 (define-function NOTWm (D B I S)	(_wO_r_X 0xf7		_b010	D B I S))
 (define-function NOTLr (R)		(_O_Mrm  0xf7 _b11	_b010	(rindex/32 R)))
 (define-function NOTLm (D B I S)	(_O_r_X  0xf7		_b010	D B I S))
-(define-function NOTQr (R)		(_REX 1 0 0 R) (NOTLr (to-register/32 R)))
-(define-function NOTQm (D B I S)	(_REX 1 S I B) (NOTLm D (to-register/32 B) (to-register/32 I) S))
+(define-function NOTQr (R)		(_REX 1 0 0 R) (NOTLr (to-r32 R)))
+(define-function NOTQm (D B I S)	(_REX 1 S I B) (NOTLm D (to-r32 B) (to-r32 I) S))
 
 (define-function DIVBrr (RS RD)		(rindex/AL RD)	(_O_Mrm  0xf6 _b11	_b110	(rindex/8 RS)))
 (define-function DIVBmr (D B I S R)	(rindex/AL R)	(_O_r_X  0xf6		_b110	D B I S))
@@ -716,8 +728,8 @@
 (define-function DIVWmr (D B I S R)	(rindex/AX R)	(_wO_r_X 0xf7		_b110	D B I S))
 (define-function DIVLrr (RS RD)		(rindex/EAX RD)	(_O_Mrm  0xf7 _b11	_b110	(rindex/32 RS)))
 (define-function DIVLmr (D B I S R)	(rindex/EAX R)	(_O_r_X  0xf7		_b110	D B I S))
-(define-function DIVQrr (RS RD)		(_REX 1 RS 0 RD)(DIVLrr (to-register/32 RS) (to-register/32 RD)))
-(define-function DIVQmr (D B I S R)	(_REX 1 S 0 R)	(DIVLmr D (to-register/32 B) (to-register/32 I) S (to-register/32 R)))
+(define-function DIVQrr (RS RD)		(_REX 1 RS 0 RD)(DIVLrr (to-r32 RS) (to-r32 RD)))
+(define-function DIVQmr (D B I S R)	(_REX 1 S 0 R)	(DIVLmr D (to-r32 B) (to-r32 I) S (to-r32 R)))
 
 (define-function IDIVBrr (RS RD)		(rindex/AL RD)	(_O_Mrm 0xf6 _b11	_b111	(rindex/8 RS)))
 (define-function IDIVBmr (D B I S R)		(rindex/AL R)	(_O_r_X 0xf6		_b111	D B I S))
@@ -732,8 +744,8 @@
 (define-function MULWmr (D B I S R)		(rindex/AX R)	(_wO_r_X 0xf7 _b100		D B I S))
 (define-function MULLrr (RS RD)			(rindex/EAX RD)	(_O_Mrm  0xf7 _b11 _b100	(rindex/32 RS)))
 (define-function MULLmr (D B I S R)		(rindex/EAX R)	(_O_r_X  0xf7 _b100		D B I S))
-(define-function MULQrr (S D)			(_REX 1 S 0 D)	(MULLrr (to-register/32 S) (to-register/32 D)))
-(define-function MULQmr (D B I S R)		(_REX 1 S 0 R)	(MULLmr D (to-register/32 B) (to-register/32 I) S (to-register/32 R)))
+(define-function MULQrr (S D)			(_REX 1 S 0 D)	(MULLrr (to-r32 S) (to-r32 D)))
+(define-function MULQmr (D B I S R)		(_REX 1 S 0 R)	(MULLmr D (to-r32 B) (to-r32 I) S (to-r32 R)))
 
 (define-function IMULWrr  (RS RD)		(_wOO_Mrm    0xfaf _b11	(rindex/16 RS) (rindex/16 RD)))
 (define-function IMULWmr  (D B I S R)		(_wOO_r_X    0xfaf	(rindex/16 R) D B I S))
@@ -756,7 +768,7 @@
 (define-function TESTLrm (R D B I S)	(_O_r_X    0x85			(rindex/32 R) D B I S))
 (define-function TESTLir (L R)		(_O_Mrm_L  0xf7 _b11	_b000	(rindex/32 R) L))
 (define-function TESTLim (L D B I S)	(_O_r_X_L  0xf7		_b000	D B I S L))
-(define-function TESTQrr (S D)		(_REX 1 S 0 D) (TESTLrr (to-register/32 S) (to-register/32 D)))
+(define-function TESTQrr (S D)		(_REX 1 S 0 D) (TESTLrr (to-r32 S) (to-r32 D)))
 ;; TODO missing Q variants
 
 ;;;
@@ -765,28 +777,28 @@
 
 (define-function MOVBrr (S D)					(_REX 0 S 0 D)	(_O_Mrm 0x88 _b11 (rindex/8 S) (rindex/8 D)))
 (define-function MOVBir (L R)					(_REX 0 0 0 R)	(_Or_B  0xb0 (rindex/8 R)					(i8 L)))
-(define-function MOVBmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8a (rindex/8 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVBrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x88 (rindex/8 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVBim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_X_B 0xc6		D (to-register/32 B) (to-register/32 I) S	(i8 L)))
+(define-function MOVBmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8a (rindex/8 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVBrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x88 (rindex/8 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVBim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_X_B 0xc6		D (to-r32 B) (to-r32 I) S	(i8 L)))
 
 (define-function MOVWrr (S D)				(_d16)	(_REX 0 S 0 D)	(_O_Mrm 0x89 _b11 (rindex/16 S) (rindex/16 D)))
 (define-function MOVWir (L R)				(_d16)	(_REX 0 0 0 R)	(_Or_W  0xb8 (rindex/16 R)					(i16 L)))
-(define-function MOVWmr (D B I S R)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x8b (rindex/16 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVWrm (R D B I S)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x89 (rindex/16 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVWim (L D B I S)	(_a32 B I)	(_d16)	(_REX 0 0 I B)	(_O_X_W 0xc7		D (to-register/32 B) (to-register/32 I) S	(i16 L)))
+(define-function MOVWmr (D B I S R)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x8b (rindex/16 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVWrm (R D B I S)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x89 (rindex/16 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVWim (L D B I S)	(_a32 B I)	(_d16)	(_REX 0 0 I B)	(_O_X_W 0xc7		D (to-r32 B) (to-r32 I) S	(i16 L)))
 
 (define-function MOVLrr (S D)					(_REX 0 S 0 D)	(_O_Mrm 0x89 _b11 (rindex/32 S) (rindex/32 D)))
 (define-function MOVLir (L R)					(_REX 0 0 0 R)	(_Or_L  0xb8 (rindex/32 R)					L))
-(define-function MOVLmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8b (rindex/32 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVLrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x89 (rindex/32 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVLim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_X_L 0xc7		D (to-register/32 B) (to-register/32 I) S	L))
+(define-function MOVLmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8b (rindex/32 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVLrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x89 (rindex/32 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVLim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_X_L 0xc7		D (to-r32 B) (to-r32 I) S	L))
 
-(define-function MOVQrr (S D)					(_REX 1 S 0 D) (MOVLrr (to-register/32 S) (to-register/32 D)))
-(define-function MOVQi32r (L R)					(_REX 1 0 0 R) (_O_Mrm_L	0xc7 _b11 0 (rindex (to-register/32 R))		L))
-(define-function MOVQi64r (L R)					(_REX 1 0 0 R) (_Or_Q		0xb8 (rindex (to-register/32 R)) L))
-(define-function MOVQmr (D B I S R)	(_a32 B I)		(_REX 1 R I B) (_O_r_X 0x8b (to-register/32 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVQrm (R D B I S)	(_a32 B I)		(_REX 1 R I B) (_O_r_X 0x89 (to-register/32 R)	D (to-register/32 B) (to-register/32 I) S))
-(define-function MOVQim (L D B I S)	(_a32 B I)		(_REX 1 0 I B) (_O_X_L 0xc7		D (to-register/32 B) (to-register/32 I) S	L))
+(define-function MOVQrr (S D)					(_REX 1 S 0 D) (MOVLrr (to-r32 S) (to-r32 D)))
+(define-function MOVQi32r (L R)					(_REX 1 0 0 R) (_O_Mrm_L	0xc7 _b11 0 (rindex (to-r32 R))		L))
+(define-function MOVQi64r (L R)					(_REX 1 0 0 R) (_Or_Q		0xb8 (rindex (to-r32 R)) L))
+(define-function MOVQmr (D B I S R)	(_a32 B I)		(_REX 1 R I B) (_O_r_X 0x8b (to-r32 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVQrm (R D B I S)	(_a32 B I)		(_REX 1 R I B) (_O_r_X 0x89 (to-r32 R)	D (to-r32 B) (to-r32 I) S))
+(define-function MOVQim (L D B I S)	(_a32 B I)		(_REX 1 0 I B) (_O_X_L 0xc7		D (to-r32 B) (to-r32 I) S	L))
 
 (define-function MOVQir (L R)
   (if (i32? L)
@@ -1041,30 +1053,30 @@
 (define-function PUSHr (R) (if (register/32? R) (PUSHLr R) (if (register/16? R) (PUSHWr R) (ASMFAIL "illegal register size"))))
 (define-function POPr  (R) (if (register/32? R) (POPLr R)  (if (register/16? R) (POPWr R)  (ASMFAIL "illegal register size"))))
 
-(define-function CALLQr (R) (let () (_REX 0 R 0 0) (CALLr (to-register/32 R))))
-(define-function CALLQm (D B I S) (let () (_REX 0 0 I B) (CALLm D (to-register/32 B) (to-register/32 I) S)))
-(define-function INCQr (R) (let () (_REX 1 0 0 R) (_O_Mrm 255 _b11 _b000 (rindex (to-register/32 R)))))
-(define-function JMPQr (R) (let () (_REX 0 R 0 0) (JMPr (to-register/32 R))))
-(define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (to-register/32 B) (to-register/32 I) S)))
-(define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (to-register/32 B) (to-register/32 I) S (to-register/32 R))))
+(define-function CALLQr (R) (let () (_REX 0 R 0 0) (CALLr (to-r32 R))))
+(define-function CALLQm (D B I S) (let () (_REX 0 0 I B) (CALLm D (to-r32 B) (to-r32 I) S)))
+(define-function INCQr (R) (let () (_REX 1 0 0 R) (_O_Mrm 255 _b11 _b000 (rindex (to-r32 R)))))
+(define-function JMPQr (R) (let () (_REX 0 R 0 0) (JMPr (to-r32 R))))
+(define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (to-r32 B) (to-r32 I) S)))
+(define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
 (define-function LEAVEQ () (LEAVE))
 
-(define-function MOVSBQrr (S D) (let () (_REX 1 S 0 D) (MOVSBLrr S (to-register/32 D))))
-(define-function MOVSBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVSBLmr D (to-register/32 B) (to-register/32 I) S (to-register/32 R))))
-(define-function MOVZBQrr (S D) (let () (_REX 1 S 0 D) (MOVZBLrr S (to-register/32 D))))
-(define-function MOVZBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVZBLmr D (to-register/32 B) (to-register/32 I) S (to-register/32 R))))
-(define-function POPQr (R) (let () (_REX 0 0 0 R) (POPLr (to-register/32 R))))
-(define-function PUSHQr (R) (let () (_REX 0 0 0 R) (PUSHLr (to-register/32 R))))
+(define-function MOVSBQrr (S D) (let () (_REX 1 S 0 D) (MOVSBLrr S (to-r32 D))))
+(define-function MOVSBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVSBLmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
+(define-function MOVZBQrr (S D) (let () (_REX 1 S 0 D) (MOVZBLrr S (to-r32 D))))
+(define-function MOVZBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVZBLmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
+(define-function POPQr (R) (let () (_REX 0 0 0 R) (POPLr (to-r32 R))))
+(define-function PUSHQr (R) (let () (_REX 0 0 0 R) (PUSHLr (to-r32 R))))
 (define-function PUSHQi (L) (let () (_REX 1 0 0 0) (PUSHLi L)))
 (define-function RETQ () (RET))
-(define-function SALQir (L R) (let () (_REX 1 0 0 R) (SALLir L (to-register/32 R))))
-(define-function SALQrr (S D) (let () (_REX 1 S 0 D) (SALLrr S (to-register/32 D))))
-(define-function SALQim (L D B I S) (let () (_REX 1 0 I B) (SALLim L D (to-register/32 B) (to-register/32 I) S)))
-(define-function SALQrm (R D B I S) (let () (_REX 1 R I B) (SALLrm R D (to-register/32 B) (to-register/32 I) S)))
-(define-function SARQir (L R) (let () (_REX 1 0 0 R) (SARLir L (to-register/32 R))))
-(define-function SARQrr (S D) (let () (_REX 1 S 0 D) (SARLrr S (to-register/32 D))))
-(define-function SARQim (L D B I S) (let () (_REX 1 0 I B) (SARLim L D (to-register/32 B) (to-register/32 I) S)))
-(define-function SARQrm (R D B I S) (let () (_REX 1 R I B) (SARLrm R D (to-register/32 B) (to-register/32 I) S)))
+(define-function SALQir (L R) (let () (_REX 1 0 0 R) (SALLir L (to-r32 R))))
+(define-function SALQrr (S D) (let () (_REX 1 S 0 D) (SALLrr S (to-r32 D))))
+(define-function SALQim (L D B I S) (let () (_REX 1 0 I B) (SALLim L D (to-r32 B) (to-r32 I) S)))
+(define-function SALQrm (R D B I S) (let () (_REX 1 R I B) (SALLrm R D (to-r32 B) (to-r32 I) S)))
+(define-function SARQir (L R) (let () (_REX 1 0 0 R) (SARLir L (to-r32 R))))
+(define-function SARQrr (S D) (let () (_REX 1 S 0 D) (SARLrr S (to-r32 D))))
+(define-function SARQim (L D B I S) (let () (_REX 1 0 I B) (SARLim L D (to-r32 B) (to-r32 I) S)))
+(define-function SARQrm (R D B I S) (let () (_REX 1 R I B) (SARLrm R D (to-r32 B) (to-r32 I) S)))
 
 (define-function INVD ()		(_OO 0x0f08))
 (define-function SYSCALL ()		(_OO 0x0f05))
@@ -1078,7 +1090,7 @@
 (define-function HLT ()			(_O 0xf4))
 
 (define-function CMOVCCLirr (CC RS RD)	(_OO_Mrm (bitwise-or 0x0f40 CC) _b11 (rindex/32 RD) (rindex/32 RS)))
-(define-function CMOVCCQirr (CC S D)	(_REX 1 S 0 D) (CMOVCCLirr CC (to-register/32 S) (to-register/32 D)))
+(define-function CMOVCCQirr (CC S D)	(_REX 1 S 0 D) (CMOVCCLirr CC (to-r32 S) (to-r32 D)))
 (define-function CMOVEQrr (S D)		(CMOVCCQirr 4 S D))
 (define-function CMOVZQrr (S D)		(CMOVCCQirr 4 S D))
 

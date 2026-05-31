@@ -344,52 +344,77 @@
       (writer 0)))
   label)
 
-(define-function _B  (value)
+(define-function emit-u8 (value)
   (typecase value
     (<long>
-     (assert (if (<= 0 value) (<= value 0xff) (<= -0x80 value 0x7f)) "_B was called with value: "value)
+     (assert (<= 0 value 0xff) "emit-u8: out of range: "value)
      (let* ((segment	(current-segment))
             (buffer	(<segment>-buffer segment))
             (position	(<segment>-paddress segment)))
-       ;; (print-all *debug-output* "_B is storing 0x" (integer->hex-string value) " at 0x"(integer->hex-string position)
+       ;; (print-all *debug-output* "emit-u8 is storing 0x" (integer->hex-string value) " at 0x"(integer->hex-string position)
        ;;            ", segment-length: 0x"(integer->hex-string (lower/array-length buffer))
        ;;            ", laddress: 0x"(integer->hex-string (<segment>-laddress segment))
        ;;            "\n")
        (incr (<segment>-laddress segment))
        (set (lower/array-at buffer position) value)
        (set (<segment>-paddress segment) (+ 1 position))))
-    (<label>	(emit-label value _B 1 ()))
-    (else	(error "_B: called with unexpected value: "value", type: "(type-of value)))))
+    (else	(error "emit-u8: called with unexpected value: "value", type: "(type-of value)))))
 
-(define-function _W (value)
+(define-function emit-i8 (value)
   (typecase value
     (<long>
-     (assert (if (<= 0 value) (<= value 0xffff) (<= -0x8000 value 0x7fff)) "_W was called with value: "value)
-     (_B (bitwise-and 0xff value))
-     (_B (bitwise-and 0xff (bitwise-shift value -8))))
-    (<label>	(emit-label value _W 2 ()))
-    (else	(error "_W: called with unexpected value: "value", type: "(type-of value)))))
+     (assert (if (<= 0 value) (<= value 0xff) (<= -0x80 value)) "emit-i8: out of range: "value)
+     (emit-u8 (bitwise-and value 0xff)))
+    (<label>	(emit-label value emit-i8 1 ()))
+    (<symbol>	(emit-i8 (%ensure-label value)))
+    (else	(error "emit-i8: called with unexpected value: "value", type: "(type-of value)))))
 
-(define-function _L (value)
-  ;;(println "_L, value: "value)
+(define-function emit-u16 (value)
   (typecase value
     (<long>
-     (assert (if (<= 0 value) (<= value 0xffffffff) (<= -0x80000000 value 0x7fffffff)) "_L was called with value: "value)
-     (_W (bitwise-and 0xffff value))
-     (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-    (<label>	(emit-label value _L 4 ()))
-    (<symbol>	(_L (%ensure-label value)))
+     (assert (<= 0 value 0xffff) "emit-u16: out of range: "value)
+     (emit-u8 (bitwise-and 0xff value))
+     (emit-u8 (bitwise-and 0xff (bitwise-shift value -8))))
+    (else	(error "emit-u16: called with unexpected value: "value", type: "(type-of value)))))
+
+(define-function emit-i16 (value)
+  (typecase value
+    (<long>
+     (assert (<= -0x80 value 0x7f) "emit-i16: out of range: "value)
+     (emit-u16 (bitwise-and value 0xffff)))
+    (<label>	(emit-label value emit-i16 2 ()))
+    (<symbol>	(emit-i16 (%ensure-label value)))
+    (else	(error "emit-i16: called with unexpected value: "value", type: "(type-of value)))))
+
+(define-function emit-u32 (value)
+  (typecase value
+    (<long>
+     (assert (<= 0 value 0xffffffff) "emit-u32: out of range: "value)
+     (emit-u16 (bitwise-and 0xffff value))
+     (emit-u16 (bitwise-and 0xffff (bitwise-shift value -16))))
     ;; (<lower-cell> TODO) needed to support 32 bit mode
-    (else	(error "_L: called with unexpected value: "value", type: "(type-of value)))))
+    (else	(error "emit-u32: called with unexpected value: "value", type: "(type-of value)))))
 
-(define-function _Q (value)
-  ;;(println "_Q, value: "value", at laddress: " (current-laddress))
+(define-function emit-i32 (value)
+  ;;(println "emit-i32, value: "value)
   (typecase value
     (<long>
-     (_L (bitwise-and 0xffffffff value))
-     (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+     ;; TODO only works on 64 bit hosts
+     (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
+     (emit-u32 (bitwise-and value 0xffffffff)))
+    (<label>	(emit-label value emit-i32 4 ()))
+    (<symbol>	(emit-i32 (%ensure-label value)))
+    ;; (<lower-cell> TODO) needed to support 32 bit mode
+    (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
+
+(define-function emit-u64 (value)
+  ;;(println "emit-u64, value: "value", at laddress: " (current-laddress))
+  (typecase value
+    (<long>
+     (emit-u32 (bitwise-and 0xffffffff value))
+     (emit-u32 (bitwise-and 0xffffffff (bitwise-shift value -32))))
     (<lower-cell>
-     ;; (print-all *debug-output* "_Q is storing a <lower-cell>: "value
+     ;; (print-all *debug-output* "emit-u64 is storing a <lower-cell>: "value
      ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
      (let ((segment (current-segment)))
        (set (lower/array-at (<segment>-buffer segment)
@@ -397,41 +422,42 @@
             value)
        (incr (<segment>-paddress segment) 8)
        (incr (<segment>-laddress segment) 8)))
-    (<label>	(emit-label value _Q 8 ()))
-    (<symbol>	(_Q (%ensure-label value)))
-    (else	(error "_Q: called with unexpected value: "value", type: "(type-of value)))))
+    (else	(error "emit-u64: called with unexpected value: "value", type: "(type-of value)))))
 
-;; rel8 offset
-(define-function _D1 (value)
-  ;;(println "_D1, value: "value)
+(define-function emit-i64 (value)
+  ;;(println "emit-i64, value: "value", at laddress: " (current-laddress))
   (typecase value
-    (<long>
-     (assert (and (<= -0x80 value) (<= value 0x7f)) "_D1 was called with offset larger than rel8: "value)
-     (_B value))
-    (<label>	(emit-label value _D1 1 (- 0 (current-laddress) 1)))
-    (<symbol>	(_D1 (%ensure-label value)))
-    (else	(error "_D1: called with unexpected value: "value", type: "(type-of value)))))
+    (<long>	(emit-u64 value)) ; always in range on 64 bit hosts
+    (<lower-cell> (emit-u64 value))
+    (<label>	(emit-label value emit-i64 8 ()))
+    (<symbol>	(emit-i64 (%ensure-label value)))
+    (else	(error "emit-i64: called with unexpected value: "value", type: "(type-of value)))))
 
-;; rel32 offset
-(define-function _D4 (value)
-  ;;(println "_D4, value: "value)
+(define-function emit-rel8 (value)
+  ;;(println "emit-rel8, value: "value)
   (typecase value
-    (<long>
-     (assert (and (<= -0x80000000 value) (<= value 0x7fffffff)) "_D4 was called with offset larger than rel32: "value)
-     (_L value))
-    (<label>	(emit-label value _D4 4 (- 0 (current-laddress) 4)))
-    (<symbol>	(_D4 (%ensure-label value)))
-    (else	(error "_D4: called with unexpected value: "value", type: "(type-of value)))))
+    (<long>	(emit-i8 value))
+    (<label>	(emit-label value emit-rel8 1 (- 0 (current-laddress) 1)))
+    (<symbol>	(emit-rel8 (%ensure-label value)))
+    (else	(error "emit-rel8: called with unexpected value: "value", type: "(type-of value)))))
 
-(define emit_rip_disp32 _D4)
+(define-function emit-rel32 (value)
+  ;;(println "emit-rel32, value: "value)
+  (typecase value
+    (<long>	(emit-i32 value))
+    (<label>	(emit-label value emit-rel32 4 (- 0 (current-laddress) 4)))
+    (<symbol>	(emit-rel32 (%ensure-label value)))
+    (else	(error "emit-rel32: called with unexpected value: "value", type: "(type-of value)))))
+
+(define emit_rip_disp32 emit-rel32)
 
 (require "source/assembler/x86-instructions.l")
 
 ;; some aliases
-(define-function .i8  vals (map _B vals))
-(define-function .i16 vals (map _W vals))
-(define-function .i32 vals (map _L vals))
-(define-function .i64 vals (map _Q vals))
+(define-function .i8  vals (map emit-i8  vals))
+(define-function .i16 vals (map emit-i16 vals))
+(define-function .i32 vals (map emit-i32 vals))
+(define-function .i64 vals (map emit-i64 vals))
 
 (define AL _AL)
 (define CL _CL)
@@ -472,7 +498,7 @@
 (define-function .ascii strs
   (list-do str strs
     (string-do char str
-      (_B char))))
+      (emit-u8 char))))
 
 (define-function .base (address)
   (set (<segment>-laddress (current-segment)) address))
@@ -492,7 +518,7 @@
     ;;            "\n")
     (when (< 0 remainder)
       (times-do (- alignment remainder)
-        (_B filler)))
+        (emit-u8 filler)))
     ;; (print-all *debug-output* "segment-length after alignment: 0x"
     ;;            (integer->string (segment-length (current-segment)) 16)
     ;;            ", (current-paddress): 0x" (integer->string (current-paddress) 16)

@@ -31,30 +31,32 @@
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
-;; Output buffer writers used by the generated assembler instructions.
-(define-function _B  (value)
+;; Output buffer writers used by the assembler instructions.
+(define-function emit-i8  (value)
   (let ((buf (<assembler>-buffer *assembler*)))
-    (set (lower/array-at buf (lower/array-length buf))
-         value))
+    (set (lower/array-at buf (lower/array-length buf)) value))
   (let* ((env (<assembler>-env *assembler*))
          (current (variable-value '$ env)))
     (environment-define env '$ (+ 1 current))))
 
-(define-function _W  (value)	(_B (bitwise-and 0xff value))   (_B (bitwise-and 0xff   (bitwise-shift value -8))))
-(define-function _L  (value)	(_W (bitwise-and 0xffff value)) (_W (bitwise-and 0xffff (bitwise-shift value -16))))
-(define-function _Q  (value)
-  (_L (bitwise-and 0xffffffff value))
-  (_L (bitwise-and 0xffffffff (bitwise-shift value -32))))
+(define-function emit-i16  (value)	(emit-i8  (bitwise-and 0xff       value))	(emit-i8  (bitwise-and 0xff       (bitwise-shift value -8))))
+(define-function emit-i32  (value)	(emit-i16 (bitwise-and 0xffff     value))	(emit-i16 (bitwise-and 0xffff     (bitwise-shift value -16))))
+(define-function emit-i64  (value)	(emit-i32 (bitwise-and 0xffffffff value))	(emit-i32 (bitwise-and 0xffffffff (bitwise-shift value -32))))
+
+(define emit-u8  emit-i8)
+(define emit-u16 emit-i16)
+(define emit-u32 emit-i32)
+(define emit-u64 emit-i64)
 
 ;; TODO these should encode RIP relative offsets
-(define-function _D1 (value)
-  (print-all *debug-output* "**** TODO _D1: " value "\n")
-  (_B value))
-(define-function _D4 (value)
-  (print-all *debug-output* "**** TODO _D4: " value "\n")
-  (_L value))
+(define-function emit-rel8 (value)
+  (print-all *debug-output* "**** TODO emit-rel8: " value "\n")
+  (emit-i8 value))
+(define-function emit-rel32 (value)
+  (print-all *debug-output* "**** TODO emit-rel32: " value "\n")
+  (emit-i32 value))
 
-(define emit_rip_disp32 _D4)
+(define emit_rip_disp32 emit-rel32)
 
 (require "source/assembler/x86-instructions.l")
 
@@ -64,7 +66,7 @@
                                  (- bytes 1))))
     (when (< 0 remainder)
       (times-do (- bytes remainder)
-        (_B 0)))))
+        (emit-i8 0)))))
 
 (define-function assemble (program)
   (let* ((env		(environment *globals*))
@@ -120,25 +122,25 @@
                 (environment-define env '$ addr)))
              (.i8
               (list-do byte (rest instr)
-                (_B (eval byte env))))
+                (emit-i8 (eval byte env))))
              (.i16
               (list-do half (rest instr)
-                (_W (eval half env))))
+                (emit-i16 (eval half env))))
              (.i32
               (list-do long (rest instr)
-                (_L (eval long env))))
+                (emit-i32 (eval long env))))
              (.i64
               (list-do quad (rest instr)
-                (_Q (eval quad env))))
+                (emit-i64 (eval quad env))))
              (.ascii
               (list-do string (rest instr)
                 (string-do char string
-                  (_B char))))
+                  (emit-i8 char))))
              (.asciiz
               (list-do string (rest instr)
                 (string-do char string
-                  (_B char))
-                (_B 0)))
+                  (emit-i8 char))
+                (emit-i8 0)))
              (else
               (eval instr env))))
           (else
