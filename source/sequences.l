@@ -1,6 +1,11 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/sequences-basic.l")
+(require "source/selector.l")
+
+(define-selector to-string)
+
+(define-method to-string <string> () self)
 
 (define-function reverse-map (function list)
   (and list
