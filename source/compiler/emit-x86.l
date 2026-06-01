@@ -1815,7 +1815,7 @@
       (.i64 elf/DT_NULL		0))
     (label! '.dynamic-end)))
 
-(define-function compile-env (env -c-)
+(define-function compile-env (env -c- output-path)
   (verbosity 1
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
@@ -1866,8 +1866,10 @@
 
     (emit-relocation-tables)
 
-    ;; write to *standard-output* to be compatible with the other backends
-    (write-elf-to-stream *standard-output*)
+    (let* ((file (file-open-or-die output-path "w"))
+           (stream (file-stream file)))
+      (write-elf-to-stream stream)
+      (file-close-or-die file))
 
     (when (<= 1 *compiler-verbosity*)
       (array-do var (<env>-bindings (<assembler>-env *assembler*))
@@ -1930,5 +1932,5 @@
                       ((oop-at (address-of ,dispatch-table-name) (- type ,index-min)) ,@parameters))))))
       (compile-definition stub name -c-))))
 
-(define-function run-compiler (env)
-  (compile-env env (compiler 1)))
+(define-function run-compiler (env output-path)
+  (compile-env env (compiler 1) output-path))

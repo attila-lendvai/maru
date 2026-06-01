@@ -13,7 +13,7 @@
       (load (concat-strings "source/compiler/emit-objects-"*compiler-backend*".l"))))))
 
 (eval-in-host
- `(run-compiler ,*target-env*))
+ `(run-compiler ,*target-env* (pop *command-line-arguments*)))
 
 ;;;
 ;;; This prints LoC statistics

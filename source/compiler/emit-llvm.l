@@ -30,6 +30,7 @@
 ;;;   - *foo* is a global
 
 (require "source/compiler/emit-early.l")
+(require "source/streams-min-late.l")
 
 (define closure-code-label) ; forward
 
@@ -204,8 +205,14 @@
     (reg-counter		0)
     (label-counter		0)))
 
-(define-function run-compiler (env)
-  (compile-env env (llvm-compiler 1)))
+(define-function run-compiler (env output-path)
+  (let* ((file (file-open-or-die output-path "w"))
+         (stream (file-stream file))
+         (prev-stdout *standard-output*))
+    (set *standard-output* stream)
+    (compile-env env (llvm-compiler 1))
+    (set *standard-output* prev-stdout)
+    (file-close-or-die file)))
 
 (define-function new-stack-cell (-c-)
   (STACK-CELL (new-temp-index -c-)))

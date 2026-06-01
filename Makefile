@@ -354,7 +354,8 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
 		source/platforms/run-compiler.l					\
-			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
+		$@								\
+		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
@@ -379,7 +380,8 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
 		source/platforms/run-compiler.l					\
-			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
+		$@								\
+		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 # eval1 is the first version of us that gets built by our own compiler, from the latest sources.
 $(BUILD_x86)/eval1: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
@@ -425,7 +427,8 @@ define compile
 	source/platforms/load-platform.l					\
 	$(4)									\
 	source/platforms/run-compiler.l						\
-	>$(5) && $(call print_file_size,$(5)) || { $(BACKDATE_FILE) $(5); exit 42; }
+	$(5)									\
+	&& $(call print_file_size,$(5)) || { $(BACKDATE_FILE) $(5); exit 42; }
 endef
 #	>$(5) 2> >(tee $(5).build-log >&2) || { $(BACKDATE_FILE) $(5); exit 42; }
 
