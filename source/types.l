@@ -331,22 +331,26 @@
     (set (<record>-effective-slots	type) (record/compute-effective-slots type))
     type))
 
-(define-form define-record (name super slots . props)
-  (set slots (map-with expand slots *env*))
-  (set slots (list-remove () slots))
-  (let ((record-type		(new-<record> name (eval super) slots))
-        (raw-slot-access?	false))
-    (list-do prop props
-      (case prop
-        (raw-slot-access	(set raw-slot-access? true))
-        (else			(error "define-record: unexpected property "prop))))
-    ;; so that it's already available at expand time...
-    (eval `(define ,name ,record-type))
-    ;; ...and at runtime.
-    `(let ((type-obj ,record-type))
-       (define ,name type-obj)
-       ,@(%make-record-accessors record-type raw-slot-access?)
-       type-obj)))
+;; args: name super slots . props
+(define-form define-record (name . rest)
+  (let ((super (pop rest))
+        (slots (pop rest))
+        (props rest))
+    (set slots (map-with expand slots *env*))
+    (set slots (list-remove () slots))
+    (let ((record-type		(new-<record> name (eval super) slots))
+          (raw-slot-access?	false))
+      (list-do prop props
+        (case prop
+          (raw-slot-access	(set raw-slot-access? true))
+          (else			(error "define-record: unexpected property "prop))))
+      ;; so that it's already available at expand time...
+      (eval `(define ,name ,record-type))
+      ;; ...and at runtime.
+      `(let ((type-obj ,record-type))
+         (define ,name type-obj)
+         ,@(%make-record-accessors record-type raw-slot-access?)
+         type-obj))))
 
 ;;; immediate type (i.e. a word with some tag bits)
 
