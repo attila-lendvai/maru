@@ -185,6 +185,7 @@ else
 endif
 
 EMIT_FILES_x86	=  $(addprefix source/compiler/,emit-x86.l emit-objects-x86.l) source/platforms/run-compiler.l
+EMIT_FILES_x86	=  $(addprefix source/assembler/,x86-single-pass.l x86-instructions.l)
 EMIT_FILES_x86	+= $(addprefix source/platforms/,run-compiler.l linux/linux.cgrov.$(TARGET).l linux/elf.cgrov.$(TARGET).l)
 EMIT_FILES_llvm	=  $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-objects-llvm.l emit-late.l) source/platforms/run-compiler.l
 

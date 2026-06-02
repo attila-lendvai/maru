@@ -77,7 +77,8 @@
     ;; initialize *cla*
     (gc/let* ((tmp ()))
       (let ((idx argc))
-        (while (< 0 (decr idx)) ; skip the first, which is the name of the executable
+        ;; we skip the first, i.e. the name of the executable
+        (while (< 0 (decr idx))
           (set tmp (cons () tmp))
           (put/head tmp (C-string->string (oop-at argv idx)))
           (debug-print "processing argv "(box <long> idx)" = "(get/head tmp))))

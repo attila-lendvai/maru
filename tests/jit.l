@@ -88,6 +88,11 @@
 
           (label!	l/code)
           (LEAQmr	l/msg 0 0 0 RDI)
+
+          ;; NOP; just to test using high R64 regs
+          (MOVQir	stderr R15)
+          (MOVQmr	0 R15 0 0 R15)
+
           (MOVQir	stderr RSI)
           (MOVQmr	0 RSI 0 0 RSI)
           (call		fputs)
@@ -157,6 +162,13 @@
     (RET)
     (label! 'exit-code)
     (.i64	1))
+
+(define-jit-test jit-posix-5 ()
+
+  (MOVQir	0x1122334455667788 RAX)
+  (ANDQir	0x7fffffff RAX)
+  (SUBQir	0x55667788 RAX)
+  (RET))
 
 ) ; (feature platform/posix)
 

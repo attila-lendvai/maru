@@ -518,6 +518,7 @@
 (define-boxed-word <lower-cell>)
 
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
+;;(define-function undefined?	(obj)	(= <undefined>	(type-of obj)))
 (define-function long?		(obj)	(= <long>	(type-of obj)))
 (define-function expr?		(obj)	(= <expr>	(type-of obj)))
 (define-function variable?	(obj)	(= <variable>	(type-of obj)))
