@@ -175,15 +175,13 @@
         (= (string-at str i) ?\; ))))
 
 (define-function count-maru-loc (path)
-  (let* ((file (file-open-or-die path "r"))
-         (stream (file-input-stream file path)))
+  (with-open-stream (stream path "r")
     (let ((loc 0)
           (line ()))
       (while (not (= +end+ (set line (input-stream-up-to stream ?\n))))
         ($next stream) ; drop the \n
         (unless (maru-comment-line? line)
           (incr loc)))
-      (file-close file)
       loc)))
 
 ;; (unit-test "<input-stream>"

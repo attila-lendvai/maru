@@ -31,6 +31,7 @@
 
 (require "source/compiler/emit-early.l")
 (require "source/streams-min-late.l")
+(require "source/files.l")
 
 (define closure-code-label) ; forward
 
@@ -206,13 +207,11 @@
     (label-counter		0)))
 
 (define-function run-compiler (env output-path)
-  (let* ((file (file-open-or-die output-path "w"))
-         (stream (file-stream file))
-         (prev-stdout *standard-output*))
-    (set *standard-output* stream)
-    (compile-env env (llvm-compiler 1))
-    (set *standard-output* prev-stdout)
-    (file-close-or-die file)))
+  (with-open-stream (stream output-path "w")
+    (let ((prev-stdout *standard-output*))
+      (set *standard-output* stream)
+      (compile-env env (llvm-compiler 1))
+      (set *standard-output* prev-stdout))))
 
 (define-function new-stack-cell (-c-)
   (STACK-CELL (new-temp-index -c-)))

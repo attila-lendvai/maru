@@ -17,6 +17,7 @@
 (progress "loading dependencies")
 
 (require "source/conversion.l")
+(require "source/files.l")
 (require "source/unit-test.l")
 (require "source/parsing/parser.l")
 (require "source/parsing/peg-compile-forms.l")
@@ -368,17 +369,16 @@
 
 (define BEG)
 
-(let* ((p (new <begpeg>))
-       (handle (file-open-or-die +peg-grammar-path+ "r"))
-       (pstream (parser-stream (file-input-stream handle +peg-grammar-path+))))
-  (while ($definition p pstream)
-    ;;(println "\nBEG: " (<begpeg>-result p) " ")
-    (set BEG (cons (<begpeg>-result p) BEG)))
-  ;;(println)
-  ($space p pstream)                    ; parse any leading whitespace
-  (unless (= +end+ (parser-stream-peek pstream))
-    (error "syntax error in BEG near: "(parser-stream-context pstream)))
-  (file-close-or-die handle))
+(with-open-file (file +peg-grammar-path+ "r")
+  (let* ((p (new <begpeg>))
+         (pstream (parser-stream (file-input-stream file +peg-grammar-path+))))
+    (while ($definition p pstream)
+      ;;(println "\nBEG: " (<begpeg>-result p) " ")
+      (set BEG (cons (<begpeg>-result p) BEG)))
+    ;;(println)
+    ($space p pstream)                  ; parse any leading whitespace
+    (unless (= +end+ (parser-stream-peek pstream))
+      (error "syntax error in BEG near: "(parser-stream-context pstream)))))
 
 ;;(progress "generating compiled parser")
 

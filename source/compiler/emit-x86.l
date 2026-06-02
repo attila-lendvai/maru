@@ -28,6 +28,7 @@
 (require "source/conversion.l")
 (require "source/c/cffi.l")
 (require "source/ansiterm.l")
+(require "source/files.l")
 (require "source/assembler/x86-single-pass.l")
 
 (require "source/c/cgrov.l")
@@ -1868,10 +1869,8 @@
 
     (emit-relocation-tables)
 
-    (let* ((file (file-open-or-die output-path "w"))
-           (stream (file-stream file)))
-      (write-elf-to-stream stream)
-      (file-close-or-die file))
+    (with-open-file (file output-path "w")
+      (write-elf-to-stream (file-stream file)))
 
     (when (<= 1 *compiler-verbosity*)
       (array-do var (<env>-bindings (<assembler>-env *assembler*))
