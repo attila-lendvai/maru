@@ -13,28 +13,23 @@
 ;; (define-print-method <selector>
 ;;   (print-all -stream- "<selector:"self.name">"))
 
-(define-function selector/lookup-effective-method (methods type)
-  (when (subtype? (type-of type) <record>)
-    (let ((method ())
-          (probe  type))
-      (while (and (set probe (and (is <record> probe)
-                                  (<record>-super probe)))
-                  (not (set method (array-at methods (<type>-id probe))))))
-      ;; (and method (set (array-at methods type) method))	; copy down the method for performance
-      method)))
+(define-function selector/lookup-effective-method (methods self)
+  (let ((method ())
+        (probe  (type-of self)))
+    (while (and (not (set method (array-at methods (<type>-id probe))))
+                (set probe (and (is <record> probe)
+                                (<record>-super probe)))))
+    ;; we could do something like this for a simple method cache,
+    ;; but this would need some mechanism for invalidation
+    ;; when records get (re)defined.
+    ;; (when method
+    ;;   (set (array-at methods type) method))
+    method))
 
 (define-apply <selector> (self . arguments)
   (apply
-   (or (array-at (<selector>-methods self)
-                 ;; TODO implement the same for generics
-                 (if-at-expand (and bootstrapping?
-                                    (= 0 *optimised*))
-                     ;; the more correct version that considers the type mappings while bootstrapping (e.g. pretty printing works properly while bootstrapping).
-                     ;; this slows down the bootstrap by about 10% though.
-                     (<type>-id (type-of (car arguments)))
-                   (type-id-of (car arguments))))
-       (selector/lookup-effective-method (<selector>-methods self)
-                                         (type-of (car arguments)))
+   (or (selector/lookup-effective-method (<selector>-methods self)
+                                         (car arguments))
        (<selector>-default self))
    arguments))
 
