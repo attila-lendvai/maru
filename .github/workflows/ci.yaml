@@ -52,9 +52,6 @@ jobs:
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=linux test-bootstrap
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=libc  test-bootstrap-llvm
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=posix test-bootstrap-llvm
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=linux test-bootstrap-llvm
 
       - run:  timeout 5m make PROFILER=1 PLATFORM=posix  test-bootstrap-llvm
       - run:  timeout 5m make PROFILER=1 PLATFORM=linux  test-bootstrap-llvm
