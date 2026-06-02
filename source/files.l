@@ -1,8 +1,20 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO delme?
+(require "source/streams-min-late.l")
 
-;; (define *load-path* ())
+(define-form with-open-file (args . body)
+  (let ((var (pop args))
+        (path (pop args))
+        (mode (pop args)))
+    `(let ((,var (file-open-or-die ,path ,mode)))
+       (let ((result (begin ,@body)))
+         (file-close-or-die ,var)
+         result))))
+
+(define-form with-open-stream (args . body)
+  `(with-open-file (__file__ ,@(rest args))
+     (let ((,(first args) (file-stream __file__)))
+       ,@body)))
 
 ;; (when (= "-L" (car *command-line-arguments*))
 ;;   (pop *command-line-arguments*)
