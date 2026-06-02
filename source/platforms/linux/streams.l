@@ -52,10 +52,12 @@
                            linux/O_RDONLY)
                           ((string= mode "rw")
                            (bitwise-or linux/O_RDWR
-                                       linux/O_CREAT))
+                                       (bitwise-or linux/O_CREAT
+                                                   linux/O_TRUNC)))
                           ((string= mode "w")
                            (bitwise-or linux/O_WRONLY
-                                       linux/O_CREAT))
+                                       (bitwise-or linux/O_CREAT
+                                                   linux/O_TRUNC)))
                           (else
                            (error "file-open: unexpected mode "mode" while opening "path)))
                         posix/default-umask)))
