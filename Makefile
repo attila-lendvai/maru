@@ -203,8 +203,8 @@ EVAL_OBJ_x86	=
 EVAL_OBJ_llvm	=
 
 ifneq (,$(filter $(PLATFORM),libc posix))
-  EVAL_OBJ_x86	+= $(BUILD_x86)/compat-wrappers.o
-  EVAL_OBJ_llvm	+= $(BUILD_llvm)/compat-wrappers.o
+  EVAL_OBJ_x86	+= $(BUILD_x86)/libc.o
+  EVAL_OBJ_llvm	+= $(BUILD_llvm)/libc.o
 endif
 
 ifneq (,$(filter $(PLATFORM),posix))

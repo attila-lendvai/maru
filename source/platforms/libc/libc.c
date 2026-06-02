@@ -1,5 +1,10 @@
 /*
   Wrappers to extend compatibility.
+
+  Strictly speaking this file depends on more than just the pure C
+  standard, because that lacks crucial things like cwd and chdir. So,
+  this is mostly C, plus a little platform specific wrappers for
+  functionality that we cannot live without.
  */
 
 #include <stdio.h>
