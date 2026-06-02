@@ -91,6 +91,18 @@
 ;;   (unless (= 0 (syscall linux/SYS_fsync fd))
 ;;     (error "file-flush: linux/SYS_fsync returned an error")))
 
+;; FIXME groveler limitation
+(define-constant linux/sizeof-statx 256)
+
+(define-vm-function file-modification-time ((path <string>))
+  ;; TODO use stack allocation
+  (let ((st (allocate-data linux/sizeof-statx)))
+    (syscall* linux/SYS_statx linux/AT_FDCWD (string->C-string path) 0
+              linux/STATX_BASIC_STATS st)
+    ;; KLUDGE FIXME this should be groveled
+    ;; 0x70 is st.stx_mtime.tv_sec, the value is i64
+    (box <long> (cell-at st 0x70))))
+
 ;;;
 ;;; <fd-stream> used in the lower (i.e. only the vm-function's need to
 ;;; box return values, the rest is called within the lower)

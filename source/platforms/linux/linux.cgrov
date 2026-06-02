@@ -13,15 +13,23 @@ header	sys/syscall.h sys/wait.h sys/mman.h unistd.h linux/sched.h fcntl.h
 
 integer STDIN_FILENO STDOUT_FILENO STDERR_FILENO
 
-integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4 SYS_pipe2 SYS_dup3 SYS_getcwd
+integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4 SYS_pipe2 SYS_dup3 SYS_getcwd SYS_statx
 
 integer AT_FDCWD
 
 integer SIGCHLD CLONE_VM CLONE_VFORK WNOHANG WSTOPPED WEXITED WNOWAIT P_ALL P_PID
 
-integer O_RDONLY O_WRONLY O_RDWR O_CREAT SEEK_SET SEEK_CUR SEEK_END
+integer O_RDONLY O_WRONLY O_RDWR O_CREAT O_TRUNC SEEK_SET SEEK_CUR SEEK_END
 
 integer PROT_READ PROT_WRITE PROT_EXEC
+
+header linux/stat.h
+
+// FIXME statx is ambiguous on the C side, therefore we must use struct statx
+// but the groveler cannot deal with that.
+// sizes statx
+
+integer STATX_TYPE STATX_MODE STATX_NLINK STATX_UID STATX_GID STATX_ATIME STATX_MTIME STATX_CTIME STATX_INO STATX_SIZE STATX_BLOCKS STATX_BASIC_STATS STATX_BTIME STATX_MNT_ID STATX_DIOALIGN STATX_MNT_ID_UNIQUE
 
 header asm/errno.h
 
