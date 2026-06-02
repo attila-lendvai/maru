@@ -4,7 +4,7 @@
 ;;; runs in a single pass. Because of that forward labels are a bit
 ;;; more complex to use.
 
-(require "source/streams-min-late.l")
+(require "source/files.l")
 (require "source/env-min.l")
 
 (define-record <segment> ()
@@ -111,9 +111,8 @@
 
 ;; used by the tests
 (define-function save-current-segment-to-file (filename)
-  (let ((file (file-open-or-die filename "w")))
-    (write-segment-to-stream (current-segment) (file-stream file))
-    (file-close-or-die file)))
+  (with-open-stream (stream filename "w")
+    (write-segment-to-stream (current-segment) stream)))
 
 (define-function segment->function (segment)
   (lower/array->lower/function (<segment>-buffer segment)))

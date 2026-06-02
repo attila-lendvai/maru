@@ -4,7 +4,7 @@
 ;;; instructions, and emits them in multiple phases, until no labels
 ;;; change value.
 
-(require "source/streams-min-late.l")
+(require "source/files.l")
 (require "source/env-min.l")
 
 (define-record <assembler> ()
@@ -13,9 +13,8 @@
    ))
 
 (define-function save-assembler-buffer (a filename)
-  (let ((file (file-open-or-die filename "w")))
-    (lower/$put-all (file-stream file) (<assembler>-buffer a))
-    (file-close-or-die file)))
+  (with-open-stream (stream filename "w")
+    (lower/$put-all stream (<assembler>-buffer a))))
 
 (define-function assembler->function (a)
   (lower/array->lower/function (<assembler>-buffer a)))
