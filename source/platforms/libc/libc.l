@@ -29,6 +29,7 @@
   ;; TODO extend the cgrov to deal with such wrappings automatically
   (* get_stdin ()) (* get_stdout ()) (* get_stderr ())
   (int get_errno ())
+  (int file_modification_time (*))
   )
 
 ;; the only correct way to grovel some global variables like stdin and

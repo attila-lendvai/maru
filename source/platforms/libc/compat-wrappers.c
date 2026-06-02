@@ -41,3 +41,29 @@ char *maru_getcwd(char *buffer, size_t size) {
 }
 
 #endif
+
+/*
+ * stat
+ */
+
+#if defined(_WIN32)
+
+__time64_t maru_file_modification_time (const char *path) {
+    struct _stat64 st;
+    _stat64(path, &st);
+    return st.st_mtime;
+}
+
+#else
+
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+
+time_t maru_file_modification_time (const char *path) {
+    struct stat st;
+    stat(path, &st);
+    return st.st_mtime;
+}
+
+#endif

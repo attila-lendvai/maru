@@ -34,3 +34,6 @@
   (verbosity 1 (print-all *debug-output* "changing working directory to: "path"\n"))
   (unless (= 0 (libc/chdir (string->C-string path)))
     (error "set-working-directory: libc/chdir failed for: "path)))
+
+(define-vm-function file-modification-time ((path <string>))
+  (box <long> (libc/file_modification_time (string->C-string path))))
