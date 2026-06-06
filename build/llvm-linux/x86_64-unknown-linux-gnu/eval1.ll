@@ -25,6 +25,27 @@ store:
 exit:
   ret ptr %dst
 }
+
+define weak dso_local i64 @strlen(ptr %str) {
+entry:
+  br label %loop
+
+loop:
+  ; %cur starts as %str, then advances by 1 each iteration
+  %cur = phi ptr [ %str, %entry ], [ %next, %loop ]
+
+  %ch = load i8, ptr %cur
+  %zero = icmp eq i8 %ch, 0
+  %next = getelementptr i8, ptr %cur, i64 1
+  br i1 %zero, label %exit, label %loop
+
+exit:
+  %endptr = phi ptr [ %cur, %loop ]
+  %start = ptrtoint ptr %str to i64
+  %end   = ptrtoint ptr %endptr to i64
+  %len   = sub i64 %end, %start
+  ret i64 %len
+}
 @m_cstr1 = private unnamed_addr constant [55 x i8] c"encountered a <symbol> in eval. this shouldn't happen!\00"
 @m_ostr2 = private unnamed_addr constant %"<string>" { %"<header>" { %word 3, %word 13}, %word 109, %oop bitcast ([55 x i8]* @m_cstr1 to %oop) }
 define %oop @m_eval.code(%oop %exp, %oop %ctx) {
