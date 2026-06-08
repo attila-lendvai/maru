@@ -370,7 +370,7 @@
 (define-function emit-i16 (value)
   (typecase value
     (<long>
-     (assert (<= -0x80 value 0x7f) "emit-i16: out of range: "value)
+     (assert (<= -0x8000 value 0x7fff) "emit-i16: out of range: "value)
      (emit-u16 (bitwise-and value 0xffff)))
     (<label>	(emit-label value emit-i16 2 ()))
     (<symbol>	(emit-i16 (%ensure-label value)))
