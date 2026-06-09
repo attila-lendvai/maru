@@ -543,7 +543,7 @@ run-x86: $(BUILD_x86)/eval1
 run-llvm: $(BUILD_llvm)/eval1
 	rlwrap --no-warning $(BUILD_llvm)/eval1 boot.l -
 
-test: test-evaluator test-bootstrap test-parser test-elf
+test: test-evaluator test-bootstrap test-parser test-elf test-assembler
 
 test-bootstrap: $(foreach backend,${BACKENDS},test-bootstrap-$(backend)) test-evaluator
 
@@ -628,6 +628,16 @@ test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86-instructions.l
 	@mkdir -p $(BUILD)/jit
 	rm -f $(BUILD)/jit/*
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/jit.l
+
+test-assembler: test-assembler-x86 test-assembler-aarch64
+
+test-assembler-x86: $(TEST_EVAL) tests/test-assembler-x86.l source/assembler/x86-instructions.l source/assembler/x86-single-pass.l
+	@mkdir -p $(BUILD)
+	$(TEST_EVAL) boot.l tests/test-assembler-x86.l
+
+test-assembler-aarch64: $(TEST_EVAL) tests/test-assembler-aarch64.l source/assembler/arm-instructions.l
+	@mkdir -p $(BUILD)
+	$(TEST_EVAL) boot.l tests/test-assembler-aarch64.l
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l
