@@ -18,8 +18,6 @@
     (<symbol>	(emit-rel32 (%ensure-label value)))
     (else	(error "emit-rel32: called with unexpected value: "value", type: "(type-of value)))))
 
-(define emit_rip_disp32 emit-rel32)
-
 (require "source/assembler/x86-instructions.l")
 
 (define AL _AL)

@@ -281,7 +281,7 @@
 
 (define-function _r_D (R D)
   (_Mrm _b00 (rindex R) _b101)
-  (emit_rip_disp32 D))
+  (emit-rel32 D))
 
 (define-function _r_0B (R B)
   (_Mrm _b00 (rindex R) (rindex/32 B)))
