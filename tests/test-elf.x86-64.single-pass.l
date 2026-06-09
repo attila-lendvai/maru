@@ -51,12 +51,12 @@
 
 (define-form syscall (sys-number . args)
   `(begin
-    (MOVQi32r	,sys-number _RAX)
+    (MOVQi32r	,sys-number RAX)
     ,@(map (lambda (arg reg)
              ;; this being a macro opens the possibility for automatic
              ;; opcode selection based on the provided arg.
              `(MOVQir	,arg ,reg))
-           args '(_RDI _RSI _RDX _R10 _R8 _R9))
+           args '(RDI RSI RDX R10 R8 R9))
     (SYSCALL)))
 
 (define-function write-elf-file (filename)
@@ -126,13 +126,13 @@
 
     ;; test writing into the data segment: turn EXIT-CODE into 0
     ;;(LEAQmr	(label 'exit-code) 0 0 0 _RBX)
-    (MOVQir	'exit-code _RBX)
-    (ADDQim	-2 0 _RBX 0 0)          ; [rbx] += -2
-    (SUBQim	40 0 _RBX 0 0)          ; [rbx] -= 40
+    (MOVQir	'exit-code RBX)
+    (ADDQim	-2 0 RBX 0 0)          ; [rbx] += -2
+    (SUBQim	40 0 RBX 0 0)          ; [rbx] -= 40
 
-    (LEAQmr	'exit-code 0 0 0 _RDI)  ; exit code address
+    (LEAQmr	'exit-code 0 0 0 RDI)  ; exit code address
     ;;(MOVQir	(label 'exit-code) _RDI) ; exit code address
-    (MOVQmr	0 _RDI 0 0 _RDI) ; exit code into %rdi (syscall arg 2)
+    (MOVQmr	0 RDI 0 0 RDI) ; exit code into %rdi (syscall arg 2)
     (syscall	linux/SYS_exit)
 
     (.align	elf/page-size) ; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned

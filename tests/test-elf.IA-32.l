@@ -1,3 +1,7 @@
+;;;
+;;; This file is pretty much obsolete.
+;;;
+
 ;; ELF stuff:
 ;; stack, argc, argv, envs: https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; https://github.com/tonyg/pi-nothing/blob/4b2b59d42babd72cfd007cb71ed295dcdbf53d4a/nothingc/elf.rkt
@@ -19,9 +23,7 @@
 
 (require "source/assembler/x86.l")
 
-;; Define simplified variants that pass () as buffer for each
-;; generated instruction emitter, and writes directly into our global
-;; variable (asm-buffer) in the _B function above.
+;; Define simplified variants
 (define-function movlIR (src dst)	(MOVLir src dst))
 (define-function movlRM (src dst)	(MOVLrm src dst 0 0 0))
 (define-function movlMR (src dst)	(MOVLmr src 0 0 0 dst))
@@ -31,7 +33,7 @@
 (define-function addlIR (src dst)	(ADDLir src dst))
 (define-function addlRM (src dst)	(ADDLrm src dst 0 0 0))
 (define-function sublIR (src dst)	(SUBLir src dst))
-(define-function int (n)		(_B 0xCD) (_B n))
+(define-function int (n)		(emit-u8 0xCD) (emit-u8 n))
 
 (define elf/PF_R	0x4)
 (define elf/PF_W	0x2)

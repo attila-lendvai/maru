@@ -96,24 +96,24 @@ program-headers
 code-segment-start
     ;; print message (syscall write)
     ;; rax = syscall number (1), rdi = fd, rsi = buf, rdx = count
-    (MOVQir	1 _RAX)			; write (syscall #1)
-    (MOVQir	1 _RDI)			; fd, stdout
-    (MOVQir	msg _RSI)
-    (MOVQir	msglen _RDX)
+    (MOVQir	1 RAX)			; write (syscall #1)
+    (MOVQir	1 RDI)			; fd, stdout
+    (MOVQir	msg RSI)
+    (MOVQir	msglen RDX)
     (SYSCALL)
 
     ;; write into the data segment: var = var - 42
-    (XORQrr	_RAX _RAX)
-    (MOVQir	exit-code _RBX)
-    (ADDQim	-42 0 _RBX _RAX 1)
+    (XORQrr	RAX RAX)
+    (MOVQir	exit-code RBX)
+    (ADDQim	-42 0 RBX RAX 1)
     ;; (NOP)
     ;; (MOVQir -42 _RAX)
     ;; (ADDQrm _RAX exit-code 0 0 0)
 
     ;; exit: rax = 60, rdi = status
-    (MOVQir	exit-code _RDI)		; exit code into rdi
-    (MOVQmr	0 _RDI 0 0 _RDI)
-    (MOVQir	60 _RAX)		; exit syscall (60)
+    (MOVQir	exit-code RDI)		; exit code into rdi
+    (MOVQmr	0 RDI 0 0 RDI)
+    (MOVQir	60 RAX)		; exit syscall (60)
     (SYSCALL)
 
     (.align elf/page-size)		; 64 bit elf loader is more strict: it won't set the X bit if it's not aligned

@@ -41,12 +41,12 @@
 
 (define-form syscall (sys-number . args)
   `(begin
-    (MOVQi32r	,sys-number _RAX)
+    (MOVQi32r	,sys-number RAX)
     ,@(map (lambda (arg reg)
              ;; this being a macro opens the possibility for automatic
              ;; opcode selection based on the provided arg.
              `(MOVQir	,arg ,reg))
-           args '(_RDI _RSI _RDX _R10 _R8 _R9))
+           args '(RDI RSI RDX R10 R8 R9))
     (SYSCALL)))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
 ;; FIXME broken when enabled, the loader segfaults
