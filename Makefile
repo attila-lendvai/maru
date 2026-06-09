@@ -185,7 +185,7 @@ else
 endif
 
 EMIT_FILES_x86	=   $(addprefix source/compiler/,emit-x86.l emit-objects-x86.l) source/platforms/run-compiler.l
-EMIT_FILES_x86	+=  $(addprefix source/assembler/,x86-single-pass.l x86-instructions.l)
+EMIT_FILES_x86	+=  $(addprefix source/assembler/,single-pass-x86.l x86-instructions.l)
 EMIT_FILES_x86	+=  $(addprefix source/platforms/,run-compiler.l linux/linux.cgrov.$(TARGET).l linux/elf.cgrov.$(TARGET).l)
 EMIT_FILES_llvm	=  $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-objects-llvm.l emit-late.l) source/platforms/run-compiler.l
 
@@ -631,7 +631,7 @@ test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86-instructions.l
 
 test-assembler: test-assembler-x86 test-assembler-aarch64
 
-test-assembler-x86: $(TEST_EVAL) tests/test-assembler-x86.l source/assembler/x86-instructions.l source/assembler/x86-single-pass.l
+test-assembler-x86: $(TEST_EVAL) tests/test-assembler-x86.l source/assembler/x86-instructions.l source/assembler/single-pass-x86.l
 	@mkdir -p $(BUILD)
 	$(TEST_EVAL) boot.l tests/test-assembler-x86.l
 

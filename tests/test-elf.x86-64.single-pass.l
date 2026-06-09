@@ -25,7 +25,7 @@
 ;;  - ELF64 header size = 64, program header size = 56
 ;;  - Syscall args in rdi, rsi, rdx, r10, r8, r9 (we use rdi/rsi/rdx here).
 
-(require "source/assembler/x86-single-pass.l")
+(require "source/assembler/single-pass-x86.l")
 (require "source/c/cgrov.l")
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")

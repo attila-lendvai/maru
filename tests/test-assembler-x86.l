@@ -4,7 +4,7 @@
 ;;; Each test emits machine code, then compares it against a reference
 ;;; binary produced by clang assembling equivalent assembly source.
 
-(require "source/assembler/x86-single-pass.l")
+(require "source/assembler/single-pass-x86.l")
 (require "tests/assembler-infra.l")
 
 ;; ============================================================================

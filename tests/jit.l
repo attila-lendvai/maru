@@ -1,4 +1,4 @@
-(require "source/assembler/x86-single-pass.l")
+(require "source/assembler/single-pass-x86.l")
 (require "tests/infra.l")
 
 (require "source/c/cgrov.l")
