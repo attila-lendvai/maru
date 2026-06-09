@@ -399,7 +399,7 @@
 (define-function _OOr (OP R)
   ;; NOTE this is big endian
   (emit-u8 (bitwise-shift OP -8))
-  (emit-u8 (bitwise-or OP (_reg R))))
+  (emit-u8 (bitwise-or (bitwise-and OP 0xff) (_reg R))))
 
 (define-function _Os (OP val)
   (if (and (long? val)
@@ -737,7 +737,7 @@
 (define-function DECBm (MD MB MI MS)		(_O_r_X 254 _b001 MD MB MI MS))
 (define-function DECWr (RD)			(_wOr 72 (rindex/16 RD)))
 (define-function DECWm (MD MB MI MS)		(_wO_r_X 255 _b001 MD MB MI MS))
-(define-function DECLr (RD)			(_Or 72 (rindex/32 RD)))
+(define-function DECLr (RD)			(_O_Mrm 255 _b11 _b001 (rindex/32 RD)))
 (define-function DECLm (MD MB MI MS)		(_O_r_X 255 _b001 MD MB MI MS))
 
 (define-function ENTERii (W B)			(_O 200) (emit-i16 W) (emit-i8 B))
@@ -746,7 +746,7 @@
 (define-function INCBm (MD MB MI MS)		(_O_r_X 254 _b000 MD MB MI MS))
 (define-function INCWr (RD)			(_wOr 64 (rindex/16 RD)))
 (define-function INCWm (MD MB MI MS)		(_wO_r_X 255 _b000 MD MB MI MS))
-(define-function INCLr (RD)			(_Or 64 (rindex/32 RD)))
+(define-function INCLr (RD)			(_O_Mrm 255 _b11 _b000 (rindex/32 RD)))
 (define-function INCLm (MD MB MI MS)		(_O_r_X 255 _b000 MD MB MI MS))
 (define-function INVLPGm (MD MB MI MS)		(_OO_r_X 3841 _b111 MD MB MI MS))
 
@@ -973,11 +973,11 @@
 (define-function INVD ()		(_OO 0x0f08))
 (define-function SYSCALL ()		(_OO 0x0f05))
 
-(define-function CBW ()			(_O 0x98))
+(define-function CBW ()			(_wO 0x98))
 (define-function CLC ()			(_O 0xf8))
 (define-function CWD ()			(_O 0x99)) ; 16 bit mode
 (define-function CDQ ()			(_O 0x99)) ; 32 bit mode, aka CLTD
-(define-function CQO ()			(_O 0x99)) ; 64 bit mode
+(define-function CQO ()			(_REX 1 0 0 0) (_O 0x99)) ; 64 bit mode
 (define-function CMC ()			(_O 0xf5))
 (define-function HLT ()			(_O 0xf4))
 
