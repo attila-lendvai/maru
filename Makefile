@@ -635,7 +635,7 @@ test-assembler-x86: $(TEST_EVAL) tests/test-assembler-x86.l source/assembler/x86
 	@mkdir -p $(BUILD)
 	$(TEST_EVAL) boot.l tests/test-assembler-x86.l
 
-test-assembler-aarch64: $(TEST_EVAL) tests/test-assembler-aarch64.l source/assembler/arm-instructions.l
+test-assembler-aarch64: $(TEST_EVAL) tests/test-assembler-aarch64.l source/assembler/arm-instructions.l source/assembler/single-pass-arm.l
 	@mkdir -p $(BUILD)
 	$(TEST_EVAL) boot.l tests/test-assembler-aarch64.l
 

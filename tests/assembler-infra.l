@@ -44,3 +44,18 @@
     (let ((result (run-shell (concat-strings "cmp -s " bin-filename " " ref-filename " && echo match || echo mismatch"))))
       (test-assert (= result "match")
         "binary mismatch for " bin-filename))))
+
+(define-function generate-reference-aarch64 (asm-source ref-bin)
+  (let ((src-file (concat-string ref-bin ".s"))
+        (obj-file (concat-string ref-bin ".o")))
+    (write-file src-file asm-source)
+    (run-shell (concat-strings "clang -target aarch64 -c -o " obj-file " " src-file))
+    (run-shell (concat-strings "aarch64-linux-gnu-objcopy -j .text -O binary " obj-file " " ref-bin))))
+
+(define-function verify-encoding-aarch64 (bin-filename asm-source)
+  (save-current-segment-to-file bin-filename)
+  (let ((ref-filename (concat-string bin-filename ".ref")))
+    (generate-reference-aarch64 asm-source ref-filename)
+    (let ((result (run-shell (concat-strings "cmp -s " bin-filename " " ref-filename " && echo match || echo mismatch"))))
+      (test-assert (= result "match")
+        "binary mismatch for " bin-filename))))
