@@ -211,4 +211,392 @@
        "    ret\n"
        ))))
 
+;; ============================================================================
+;; ADDS/SUBS immediate
+;; ============================================================================
+
+(define-test adds-subs-immediate ()
+  (with-assembling ((code))
+    (ADDSWimm X0 X1 42)
+    (ADDSXimm X2 X3 42)
+    (SUBSWimm X4 X5 100)
+    (SUBSXimm X6 X7 255)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adds-subs-imm.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    adds w0, w1, #42\n"
+       "    adds x2, x3, #42\n"
+       "    subs w4, w5, #100\n"
+       "    subs x6, x7, #255\n"
+       ))))
+
+;; ============================================================================
+;; ADDS/SUBS register
+;; ============================================================================
+
+(define-test adds-subs-register ()
+  (with-assembling ((code))
+    (ADDSWreg X10 X11 X12)
+    (ADDSXreg X13 X14 X15)
+    (SUBSWreg X16 X17 X18)
+    (SUBSXreg X19 X20 X21)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adds-subs-reg.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    adds w10, w11, w12\n"
+       "    adds x13, x14, x15\n"
+       "    subs w16, w17, w18\n"
+       "    subs x19, x20, x21\n"
+       ))))
+
+;; ============================================================================
+;; CMP immediate and register
+;; ============================================================================
+
+(define-test cmp ()
+  (with-assembling ((code))
+    (CMPWimm X10 42)
+    (CMPXimm X11 100)
+    (CMPWreg X12 X13)
+    (CMPXreg X14 X15)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-cmp.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    cmp w10, #42\n"
+       "    cmp x11, #100\n"
+       "    cmp w12, w13\n"
+       "    cmp x14, x15\n"
+       ))))
+
+;; ============================================================================
+;; NEG
+;; ============================================================================
+
+(define-test neg ()
+  (with-assembling ((code))
+    (NEG X0 X1)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-neg.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    neg x0, x1\n"
+       ))))
+
+;; ============================================================================
+;; ORN, MOVreg, MVN
+;; ============================================================================
+
+(define-test orn ()
+  (with-assembling ((code))
+    (ORNXreg X0 X1 X2)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-orn.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    orn x0, x1, x2\n"
+       ))))
+
+(define-test mov-reg ()
+  (with-assembling ((code))
+    (MOVreg X3 X4)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-mov-reg.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    mov x3, x4\n"
+       ))))
+
+(define-test mvn ()
+  (with-assembling ((code))
+    (MVN X5 X6)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-mvn.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    mvn x5, x6\n"
+       ))))
+
+;; ============================================================================
+;; MUL, UDIV
+;; ============================================================================
+
+(define-test mul ()
+  (with-assembling ((code))
+    (MUL X0 X1 X2)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-mul.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    mul x0, x1, x2\n"
+       ))))
+
+(define-test udiv ()
+  (with-assembling ((code))
+    (UDIV X3 X4 X5)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-udiv.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    udiv x3, x4, x5\n"
+       ))))
+
+;; ============================================================================
+;; Variable shift: LSLV, LSRV, ASRV
+;; ============================================================================
+
+(define-test var-shift ()
+  (with-assembling ((code))
+    (LSLV X0 X1 X2)
+    (LSRV X3 X4 X5)
+    (ASRV X6 X7 X8)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-var-shift.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    lslv x0, x1, x2\n"
+       "    lsrv x3, x4, x5\n"
+       "    asrv x6, x7, x8\n"
+       ))))
+
+;; ============================================================================
+;; CSET: conditional set
+;; ============================================================================
+
+(define-test cset ()
+  (with-assembling ((code))
+    (CSET X0 0)    ; CSET X0, EQ
+    (CSET X1 1)    ; CSET X1, NE
+    (CSET X2 13)   ; CSET X2, LE
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-cset.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    cset x0, eq\n"
+       "    cset x1, ne\n"
+       "    cset x2, le\n"
+       ))))
+
+;; ============================================================================
+;; SXTW: sign-extend word
+;; ============================================================================
+
+(define-test sxtw ()
+  (with-assembling ((code))
+    (SXTW X0 X1)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-sxtw.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    sxtw x0, w1\n"
+       ))))
+
+;; ============================================================================
+;; ADR: PC-relative address
+;; ============================================================================
+
+(define-test adr ()
+  (with-assembling ((code))
+    (ADR X0 0x1000)
+    (ADR X1 -0x1000)
+    (ADR X2 0x4)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adr.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    adr x0, #0x1000\n"
+       "    adr x1, #-0x1000\n"
+       "    adr x2, #4\n"
+       ))))
+
+;; ============================================================================
+;; B/BL: PC-relative branch (immediate literal)
+;; ============================================================================
+
+(define-test b-bl ()
+  (with-assembling ((code))
+    (B   0x100)
+    (BL  -0x100)
+    (B   0x4)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-b-bl.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    b #0x100\n"
+       "    bl #-0x100\n"
+       "    b #4\n"
+       ))))
+
+;; ============================================================================
+;; BCOND / B.cond convenience wrappers
+;; ============================================================================
+
+(define-test bcond ()
+  (with-assembling ((code))
+    (BCOND 0x100 0)    ; B.EQ +0x100
+    (BCOND 0x100 1)    ; B.NE +0x100
+    (BCOND 0x100 10)   ; B.GE +0x100
+    (BCOND 0x100 11)   ; B.LT +0x100
+    (BCOND 0x100 12)   ; B.GT +0x100
+    (BCOND 0x100 13)   ; B.LE +0x100
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-bcond.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    b.eq #0x100\n"
+       "    b.ne #0x100\n"
+       "    b.ge #0x100\n"
+       "    b.lt #0x100\n"
+       "    b.gt #0x100\n"
+       "    b.le #0x100\n"
+       ))))
+
+(define-test bcond-wrappers ()
+  (with-assembling ((code))
+    (BEQ  0x100)
+    (BNE  0x100)
+    (BGE  0x100)
+    (BLT  0x100)
+    (BGT  0x100)
+    (BLE  0x100)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-bcond-wrap.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    b.eq #0x100\n"
+       "    b.ne #0x100\n"
+       "    b.ge #0x100\n"
+       "    b.lt #0x100\n"
+       "    b.gt #0x100\n"
+       "    b.le #0x100\n"
+       ))))
+
+;; ============================================================================
+;; Label-based B/BL/BCOND/ADR (forward and backward references)
+;; ============================================================================
+
+(define-test branch-forward ()
+  (with-assembling ((code))
+    (B 'skip)
+    (NOP)
+    (label! 'skip)
+    (NOP)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-branch-forward.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    b skip\n"
+       "    nop\n"
+       "skip:\n"
+       "    nop\n"
+       ))))
+
+(define-test branch-backward ()
+  (with-assembling ((code))
+    (label! 'loop)
+    (NOP)
+    (B 'loop)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-branch-backward.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "loop:\n"
+       "    nop\n"
+       "    b loop\n"
+       ))))
+
+(define-test branch-link-forward ()
+  (with-assembling ((code))
+    (BL 'func)
+    (NOP)
+    (label! 'func)
+    (RET)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-branch-link-forward.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    bl func\n"
+       "    nop\n"
+       "func:\n"
+       "    ret\n"
+       ))))
+
+(define-test bcond-forward ()
+  (with-assembling ((code))
+    (BCOND 'taken 0)   ; B.EQ forward
+    (NOP)
+    (NOP)
+    (NOP)
+    (label! 'taken)
+    (NOP)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-bcond-forward.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    b.eq taken\n"
+       "    nop\n"
+       "    nop\n"
+       "    nop\n"
+       "taken:\n"
+       "    nop\n"
+       ))))
+
+(define-test bcond-backward ()
+  (with-assembling ((code))
+    (label! 'loop)
+    (NOP)
+    (BEQ 'loop)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-bcond-backward.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "loop:\n"
+       "    nop\n"
+       "    beq loop\n"
+       ))))
+
+(define-test adr-data-label ()
+  (with-assembling ((code))
+    (ADR X0 'msg)
+    (B 'skip)
+    (label! 'msg)
+    (.i64 0xDEADBEEF)
+    (label! 'skip)
+    (NOP)
+    (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adr-data-label.bin")
+      (concat-strings
+       ".text\n"
+       ".globl _start\n"
+       "_start:\n"
+       "    adr x0, msg\n"
+       "    b skip\n"
+       "msg:\n"
+       "    .xword 0xDEADBEEF\n"
+       "skip:\n"
+       "    nop\n"
+       ))))
+
 (run-tests)

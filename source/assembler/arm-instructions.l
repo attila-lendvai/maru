@@ -99,57 +99,107 @@
 
 ;;;
 ;;; ADD/SUB immediate
-;;;   sf | 0 0 1 0 0 0 0 1 | sh | imm12 | Rn | Rd
+;;;   sf | op | S | 1 0 0 0 1 | sh | imm12 | Rn | Rd
+;;;   op=0 for ADD, op=1 for SUB; S=1 sets flags
 ;;;   sh=0 for LSL#0, sh=1 for LSL#12
 ;;;
 
-(define-function %emit-add-sub-imm (sf is-sub sh imm12 Rn Rd)
-  (let ((base (bitwise-or (bitwise-shift sf 31)
-                          (if (= is-sub 1) 0x51000000 0x11000000))))
-    (emit-u32 (bitwise-or base
-                          (bitwise-shift sh 22)
-                          (bitwise-shift imm12 10)
-                          (bitwise-shift Rn 5)
-                          Rd))))
+(define-function %emit-add-sub-imm (sf is-sub set-flags sh imm12 Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+                        (bitwise-shift is-sub 30)
+                        (bitwise-shift set-flags 29)
+                        0x11000000
+                        (bitwise-shift sh 22)
+                        (bitwise-shift imm12 10)
+                        (bitwise-shift Rn 5)
+                        Rd)))
 
 (define-instruction ADDXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 0 LSL0 imm12 Rn Rd))
+  (%emit-add-sub-imm 1 0 0 LSL0 imm12 Rn Rd))
 
 (define-instruction ADDWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 0 LSL0 imm12 Rn Rd))
+  (%emit-add-sub-imm 0 0 0 LSL0 imm12 Rn Rd))
 
 (define-instruction SUBXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 1 LSL0 imm12 Rn Rd))
+  (%emit-add-sub-imm 1 1 0 LSL0 imm12 Rn Rd))
 
 (define-instruction SUBWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 1 LSL0 imm12 Rn Rd))
+  (%emit-add-sub-imm 0 1 0 LSL0 imm12 Rn Rd))
+
+(define-instruction ADDSXimm (Rd Rn imm12)
+  (%emit-add-sub-imm 1 0 1 LSL0 imm12 Rn Rd))
+
+(define-instruction ADDSWimm (Rd Rn imm12)
+  (%emit-add-sub-imm 0 0 1 LSL0 imm12 Rn Rd))
+
+(define-instruction SUBSXimm (Rd Rn imm12)
+  (%emit-add-sub-imm 1 1 1 LSL0 imm12 Rn Rd))
+
+(define-instruction SUBSWimm (Rd Rn imm12)
+  (%emit-add-sub-imm 0 1 1 LSL0 imm12 Rn Rd))
+
+;;;
+;;; Compare immediate aliases: CMP Xn, #imm = SUBS XZR, Xn, #imm
+;;;
+(define-instruction CMPXimm (Rn imm12)
+  (SUBSXimm XZR Rn imm12))
+
+(define-instruction CMPWimm (Rn imm12)
+  (SUBSWimm XZR Rn imm12))
 
 ;;;
 ;;; ADD/SUB shifted register
-;;;   sf | 0 0 1 0 1 0 1 1 | shift N | Rm | 0 0 0 0 0 0 | Rn | Rd
+;;;   sf | op | S | 0 1 0 1 1 | shift | 0 | Rm | imm6 | Rn | Rd
+;;;   op=0 for ADD, op=1 for SUB; S=1 sets flags
 ;;;   shift: 00=LSL 01=LSR 10=ASR
 ;;;
 
-(define-function %emit-add-sub-reg (sf is-sub shift Rm Rn Rd)
-  (let ((base (if (= is-sub 1) 0x4B000000 0x0B000000)))
-    (emit-u32 (bitwise-or (bitwise-shift sf 31)
-                          base
-                          (bitwise-shift shift 22)
-                          (bitwise-shift Rm 16)
-                          (bitwise-shift Rn 5)
-                          Rd))))
+(define-function %emit-add-sub-reg (sf is-sub set-flags shift Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+                        (bitwise-shift is-sub 30)
+                        (bitwise-shift set-flags 29)
+                        0x0B000000
+                        (bitwise-shift shift 22)
+                        (bitwise-shift Rm 16)
+                        (bitwise-shift Rn 5)
+                        Rd)))
 
 (define-instruction ADDXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 0 LSL Rm Rn Rd))
+  (%emit-add-sub-reg 1 0 0 LSL Rm Rn Rd))
 
 (define-instruction ADDWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 0 LSL Rm Rn Rd))
+  (%emit-add-sub-reg 0 0 0 LSL Rm Rn Rd))
 
 (define-instruction SUBXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 1 LSL Rm Rn Rd))
+  (%emit-add-sub-reg 1 1 0 LSL Rm Rn Rd))
 
 (define-instruction SUBWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 1 LSL Rm Rn Rd))
+  (%emit-add-sub-reg 0 1 0 LSL Rm Rn Rd))
+
+(define-instruction ADDSXreg (Rd Rn Rm)
+  (%emit-add-sub-reg 1 0 1 LSL Rm Rn Rd))
+
+(define-instruction ADDSWreg (Rd Rn Rm)
+  (%emit-add-sub-reg 0 0 1 LSL Rm Rn Rd))
+
+(define-instruction SUBSXreg (Rd Rn Rm)
+  (%emit-add-sub-reg 1 1 1 LSL Rm Rn Rd))
+
+(define-instruction SUBSWreg (Rd Rn Rm)
+  (%emit-add-sub-reg 0 1 1 LSL Rm Rn Rd))
+
+;;;
+;;; Compare register aliases: CMP Xn, Xm = SUBS XZR, Xn, Xm
+;;; Negate alias: NEG Xd, Xm = SUB Xd, XZR, Xm
+;;;
+(define-instruction CMPXreg (Rn Rm)
+  (SUBSXreg XZR Rn Rm))
+
+(define-instruction CMPWreg (Rn Rm)
+  (SUBSWreg XZR Rn Rm))
+
+(define-instruction NEG (Xd Xm)
+  (SUBXreg Xd XZR Xm))
 
 ;;;
 ;;; Logical shifted register: AND, ORR, EOR, ANDS
@@ -190,6 +240,34 @@
 
 (define-instruction ANDSWreg (Rd Rn Rm)
   (%emit-logical-reg 0 3 LSL Rm Rn Rd))
+
+;;;
+;;; ORN (inclusive OR NOT) -- shifted register
+;;;   Same as ORR but with N=1 (bit 21)
+;;;
+
+(define-function %emit-orn (sf shift Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+                        (bitwise-shift 1 29)      ; opc=01
+                        0x0A000000
+                        (bitwise-shift shift 22)
+                        0x00200000                 ; N=1 (bit 21)
+                        (bitwise-shift Rm 16)
+                        (bitwise-shift Rn 5)
+                        Rd)))
+
+(define-instruction ORNXreg (Xd Xn Xm)
+  (%emit-orn 1 LSL Xm Xn Xd))
+
+;;;
+;;; Logical aliases: MOV Xd, Xm = ORR Xd, XZR, Xm
+;;;                    MVN Xd, Xm = ORN Xd, XZR, Xm
+;;;
+(define-instruction MOVreg (Xd Xm)
+  (ORRXreg Xd XZR Xm))
+
+(define-instruction MVN (Xd Xm)
+  (ORNXreg Xd XZR Xm))
 
 ;;;
 ;;; Load/Store unsigned offset
@@ -315,3 +393,154 @@
   (emit-u32 (bitwise-or 0xD4000000
                         (bitwise-shift imm16 5)
                         0x00000001)))
+
+;;;
+;;; Multiply: MUL Xd, Xn, Xm
+;;;   sf | 0 0 1 1 0 | 1 1 | Rm | 0 | 1 1 1 1 1 | Rn | Rd
+;;;
+
+(define-function %emit-mul (sf Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+                        0x1B007C00
+                        (bitwise-shift Rm 16)
+                        (bitwise-shift Rn 5)
+                        Rd)))
+
+(define-instruction MUL (Xd Xn Xm)
+  (%emit-mul 1 Xm Xn Xd))
+
+;;;
+;;; Unsigned divide: UDIV Xd, Xn, Xm
+;;;   2-source DP: opcode2 = 000010
+;;;
+
+(define-function %emit-2source (sf opcode2 Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+                        0x9AC00000
+                        (bitwise-shift opcode2 10)
+                        (bitwise-shift Rm 16)
+                        (bitwise-shift Rn 5)
+                        Rd)))
+
+(define-instruction UDIV (Xd Xn Xm)
+  (%emit-2source 1 2 Xm Xn Xd))
+
+;;;
+;;; Variable shift: LSLV, LSRV, ASRV
+;;;   2-source DP: opcode2 = 001000 (LSLV), 001001 (LSRV), 001010 (ASRV)
+;;;
+
+(define-instruction LSLV (Xd Xn Xm)
+  (%emit-2source 1 8 Xm Xn Xd))
+
+(define-instruction LSRV (Xd Xn Xm)
+  (%emit-2source 1 9 Xm Xn Xd))
+
+(define-instruction ASRV (Xd Xn Xm)
+  (%emit-2source 1 10 Xm Xn Xd))
+
+;;;
+;;; Conditional set: CSET Xd, cond
+;;;   = CSINC Xd, XZR, XZR, inv(cond)
+;;;   cond: 0=EQ 1=NE 10=GE 11=LT 12=GT 13=LE
+;;;
+
+(define-instruction CSET (Xd cond)
+  (emit-u32 (bitwise-or 0x9A9F07E0
+                        (bitwise-shift (bitwise-xor cond 1) 12)
+                        Xd)))
+
+;;;
+;;; Sign extend word: SXTW Xd, Xn
+;;;   SBFM: sf=1, opc=00, N=1, immr=0, imms=0
+;;;
+
+(define-instruction SXTW (Xd Xn)
+  (emit-u32 (bitwise-or 0x93407C00
+                        (bitwise-shift Xn 5)
+                        Xd)))
+
+;;;
+;;; PC-relative address: ADR Xd, label
+;;;   0 | 1 0 0 0 0 | immhi | immlo | Rd
+;;;   offset is a 21-bit signed byte offset (not divided by 4)
+;;;   enc: immlo = offset[1:0], immhi = offset[20:2]
+;;;
+
+(define-function %emit-adr (Rd offset)
+  (let ((immlo (bitwise-and offset 3))
+        (immhi (bitwise-shift offset -2)))
+    (emit-u32 (bitwise-or 0x10000000
+                          (bitwise-shift immlo 29)
+                          (bitwise-shift (bitwise-and immhi 0x7FFFF) 5)
+                          Rd))))
+
+(define-instruction ADR (Xd designator)
+  (typecase designator
+    (<long>   (%emit-adr Xd designator))
+    (<label>  (emit-label designator
+                          (lambda (v) (%emit-adr Xd v))
+                          4 (- 0 (current-laddress))))
+    (<symbol> (ADR Xd (%ensure-label designator)))
+    (else     (error "ADR: unexpected: " designator))))
+
+;;;
+;;; Branch instructions (PC-relative)
+;;;   B label:  offset/4 in imm26
+;;;   BL label: offset/4 in imm26
+;;;
+
+(define-function %emit-b-imm26 (opcode offset)
+  (emit-u32 (bitwise-or opcode
+                        (bitwise-and (bitwise-shift offset -2)
+                                     0x3FFFFFF))))
+
+(define-instruction B (designator)
+  (typecase designator
+    (<long>   (%emit-b-imm26 0x14000000 designator))
+    (<label>  (emit-label designator
+                          (lambda (v) (%emit-b-imm26 0x14000000 v))
+                          4 (- 0 (current-laddress))))
+    (<symbol> (B (%ensure-label designator)))
+    (else     (error "B: unexpected: " designator))))
+
+(define-instruction BL (designator)
+  (typecase designator
+    (<long>   (%emit-b-imm26 0x94000000 designator))
+    (<label>  (emit-label designator
+                          (lambda (v) (%emit-b-imm26 0x94000000 v))
+                          4 (- 0 (current-laddress))))
+    (<symbol> (BL (%ensure-label designator)))
+    (else     (error "BL: unexpected: " designator))))
+
+;;;
+;;; Conditional branch: B.cond label
+;;;   0x54000000 | imm19<<5 | cond
+;;;   imm19 = offset/4
+;;;
+
+(define-function %emit-b-imm19 (cond offset)
+  (emit-u32 (bitwise-or 0x54000000
+                        (bitwise-shift (bitwise-and (bitwise-shift offset -2) 0x7FFFF) 5)
+                        cond)))
+
+(define-instruction BCOND (designator cond)
+  (typecase designator
+    (<long>   (%emit-b-imm19 cond designator))
+    (<label>  (emit-label designator
+                          (lambda (v) (%emit-b-imm19 cond v))
+                          4 (- 0 (current-laddress))))
+    (<symbol> (BCOND (%ensure-label designator) cond))
+    (else     (error "BCOND: unexpected: " designator))))
+
+;;;
+;;; Conditional branch convenience wrappers
+;;;   ARM condition codes: EQ=0 NE=1 GE=10 LT=11 GT=12 LE=13
+;;;
+
+(define-instruction BEQ (designator) (BCOND designator 0))
+(define-instruction BNE (designator) (BCOND designator 1))
+(define-instruction BGE (designator) (BCOND designator 10))
+(define-instruction BLT (designator) (BCOND designator 11))
+(define-instruction BGT (designator) (BCOND designator 12))
+(define-instruction BLE (designator) (BCOND designator 13))
