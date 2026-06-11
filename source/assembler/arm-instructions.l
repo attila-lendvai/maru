@@ -21,11 +21,50 @@
   ;; Registers X0..X31
   (define-numbered-constants "X" 0 31))
 
+;; prefix0=offset, prefix1=offset+1, ..., prefixN=offset+count
+(define-form define-offset-numbered-constants (prefix offset count)
+  `(begin
+    ,@(let ((result ()) (i 0))
+        (while (<= i count)
+          (push result
+                `(define-constant ,(string->symbol
+                                    (concat-string prefix (number->string i)))
+                     ,(+ offset i)))
+          (incr i))
+        result)))
+
+;; X registers (sf-bit=1): X0=32..X31=63
+(define-offset-numbered-constants "X" 32 31)
+
+;; W registers (sf-bit=0): W0=0..W31=31
+(define-offset-numbered-constants "W" 0 31)
+
 ;; some aliases
 (define FP X29)    ; frame pointer
 (define LP X30)    ; link register
 (define SP X31)    ; stack pointer
-(define XZR X31)   ; always zero register in some opcodes
+(define XZR X31)   ; always zero register in 64-bit opcodes
+(define WZR W31)   ; always zero register in 32-bit opcodes
+
+;; helpers for width encoding in register values
+(define-function rindex (r) (bitwise-and r 31))
+(define-function sf-bit (r) (bitwise-shift r -5))
+(define-function reg-size (r) (if (= (sf-bit r) 1) 3 2))
+
+(define-function sf-check regs
+  (let ((w (sf-bit (car regs))))
+    (set regs (cdr regs))
+    (while regs
+      (assert (= w (sf-bit (car regs)))
+        "width mismatch: " (car regs))
+      (set regs (cdr regs)))
+    w))
+
+(define-function assert-X-reg regs
+  (while regs
+    (assert (= 1 (sf-bit (car regs)))
+      (car regs) " must be an X register")
+    (set regs (cdr regs))))
 
 ;; shift field constants for ADD/SUB immediate (sh bit 22)
 (define-constant LSL0  0)   ; LSL#0: imm12 used as-is
@@ -71,31 +110,22 @@
 ;;;   hw: shift/16 (0..3)
 ;;;
 
-(define-function %emit-move-wide (sf opc hw imm16 Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-move-wide (opc hw imm16 Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-bit Rd) 31)
                         (bitwise-shift opc 29)
                         0x12800000
                         (bitwise-shift hw 21)
                         (bitwise-shift imm16 5)
-                        Rd)))
+                        (rindex Rd))))
 
 (define-instruction MOVZ (Rd imm16 hw)
-  (%emit-move-wide 1 2 hw imm16 Rd))
-
-(define-instruction MOVZW (Rd imm16 hw)
-  (%emit-move-wide 0 2 hw imm16 Rd))
+  (%emit-move-wide 2 hw imm16 Rd))
 
 (define-instruction MOVN (Rd imm16 hw)
-  (%emit-move-wide 1 0 hw imm16 Rd))
-
-(define-instruction MOVNW (Rd imm16 hw)
-  (%emit-move-wide 0 0 hw imm16 Rd))
+  (%emit-move-wide 0 hw imm16 Rd))
 
 (define-instruction MOVK (Rd imm16 hw)
-  (%emit-move-wide 1 3 hw imm16 Rd))
-
-(define-instruction MOVKW (Rd imm16 hw)
-  (%emit-move-wide 0 3 hw imm16 Rd))
+  (%emit-move-wide 3 hw imm16 Rd))
 
 ;;;
 ;;; ADD/SUB immediate
@@ -104,48 +134,33 @@
 ;;;   sh=0 for LSL#0, sh=1 for LSL#12
 ;;;
 
-(define-function %emit-add-sub-imm (sf is-sub set-flags sh imm12 Rn Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-add-sub-imm (is-sub set-flags sh imm12 Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rd Rn) 31)
                         (bitwise-shift is-sub 30)
                         (bitwise-shift set-flags 29)
                         0x11000000
                         (bitwise-shift sh 22)
                         (bitwise-shift imm12 10)
-                        (bitwise-shift Rn 5)
-                        Rd)))
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rd))))
 
-(define-instruction ADDXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 0 0 LSL0 imm12 Rn Rd))
+(define-instruction ADDimm (Rd Rn imm12)
+  (%emit-add-sub-imm 0 0 LSL0 imm12 Rn Rd))
 
-(define-instruction ADDWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 0 0 LSL0 imm12 Rn Rd))
+(define-instruction SUBimm (Rd Rn imm12)
+  (%emit-add-sub-imm 1 0 LSL0 imm12 Rn Rd))
 
-(define-instruction SUBXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 1 0 LSL0 imm12 Rn Rd))
+(define-instruction ADDSimm (Rd Rn imm12)
+  (%emit-add-sub-imm 0 1 LSL0 imm12 Rn Rd))
 
-(define-instruction SUBWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 1 0 LSL0 imm12 Rn Rd))
-
-(define-instruction ADDSXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 0 1 LSL0 imm12 Rn Rd))
-
-(define-instruction ADDSWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 0 1 LSL0 imm12 Rn Rd))
-
-(define-instruction SUBSXimm (Rd Rn imm12)
-  (%emit-add-sub-imm 1 1 1 LSL0 imm12 Rn Rd))
-
-(define-instruction SUBSWimm (Rd Rn imm12)
-  (%emit-add-sub-imm 0 1 1 LSL0 imm12 Rn Rd))
+(define-instruction SUBSimm (Rd Rn imm12)
+  (%emit-add-sub-imm 1 1 LSL0 imm12 Rn Rd))
 
 ;;;
-;;; Compare immediate aliases: CMP Xn, #imm = SUBS XZR, Xn, #imm
+;;; Compare immediate alias: CMP Xn/Wn, #imm = SUBS XZR, Xn/Wn, #imm
 ;;;
-(define-instruction CMPXimm (Rn imm12)
-  (SUBSXimm XZR Rn imm12))
-
-(define-instruction CMPWimm (Rn imm12)
-  (SUBSWimm XZR Rn imm12))
+(define-instruction CMPimm (Rn imm12)
+  (SUBSimm (bitwise-or WZR (bitwise-shift (sf-bit Rn) 5)) Rn imm12))
 
 ;;;
 ;;; ADD/SUB shifted register
@@ -154,52 +169,37 @@
 ;;;   shift: 00=LSL 01=LSR 10=ASR
 ;;;
 
-(define-function %emit-add-sub-reg (sf is-sub set-flags shift Rm Rn Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-add-sub-reg (is-sub set-flags shift Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rd Rn Rm) 31)
                         (bitwise-shift is-sub 30)
                         (bitwise-shift set-flags 29)
                         0x0B000000
                         (bitwise-shift shift 22)
-                        (bitwise-shift Rm 16)
-                        (bitwise-shift Rn 5)
-                        Rd)))
+                        (bitwise-shift (rindex Rm) 16)
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rd))))
 
-(define-instruction ADDXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 0 0 LSL Rm Rn Rd))
+(define-instruction ADDreg (Rd Rn Rm)
+  (%emit-add-sub-reg 0 0 LSL Rm Rn Rd))
 
-(define-instruction ADDWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 0 0 LSL Rm Rn Rd))
+(define-instruction SUBreg (Rd Rn Rm)
+  (%emit-add-sub-reg 1 0 LSL Rm Rn Rd))
 
-(define-instruction SUBXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 1 0 LSL Rm Rn Rd))
+(define-instruction ADDSreg (Rd Rn Rm)
+  (%emit-add-sub-reg 0 1 LSL Rm Rn Rd))
 
-(define-instruction SUBWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 1 0 LSL Rm Rn Rd))
-
-(define-instruction ADDSXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 0 1 LSL Rm Rn Rd))
-
-(define-instruction ADDSWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 0 1 LSL Rm Rn Rd))
-
-(define-instruction SUBSXreg (Rd Rn Rm)
-  (%emit-add-sub-reg 1 1 1 LSL Rm Rn Rd))
-
-(define-instruction SUBSWreg (Rd Rn Rm)
-  (%emit-add-sub-reg 0 1 1 LSL Rm Rn Rd))
+(define-instruction SUBSreg (Rd Rn Rm)
+  (%emit-add-sub-reg 1 1 LSL Rm Rn Rd))
 
 ;;;
-;;; Compare register aliases: CMP Xn, Xm = SUBS XZR, Xn, Xm
-;;; Negate alias: NEG Xd, Xm = SUB Xd, XZR, Xm
+;;; Compare register alias: CMP Xn/Wn, Xm/Wm = SUBS XZR, Xn/Wn, Xm/Wm
+;;; Negate alias: NEG Xd/Wd, Xm/Wm = SUB Xd/Wd, XZR, Xm/Wm
 ;;;
-(define-instruction CMPXreg (Rn Rm)
-  (SUBSXreg XZR Rn Rm))
-
-(define-instruction CMPWreg (Rn Rm)
-  (SUBSWreg XZR Rn Rm))
+(define-instruction CMPreg (Rn Rm)
+  (SUBSreg (bitwise-or WZR (bitwise-shift (sf-bit Rn) 5)) Rn Rm))
 
 (define-instruction NEG (Xd Xm)
-  (SUBXreg Xd XZR Xm))
+  (SUBreg Xd XZR Xm))
 
 ;;;
 ;;; Logical shifted register: AND, ORR, EOR, ANDS
@@ -207,67 +207,55 @@
 ;;;   opc: 00=AND 01=ORR 10=EOR 11=ANDS
 ;;;
 
-(define-function %emit-logical-reg (sf opc shift Rm Rn Rd)
-  (let ((base (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-logical-reg (opc shift Rm Rn Rd)
+  (let ((base (bitwise-or (bitwise-shift (sf-check Rd Rn Rm) 31)
                           (bitwise-shift opc 29)
                           0x0A000000)))
     (emit-u32 (bitwise-or base
                           (bitwise-shift shift 22)
-                          (bitwise-shift Rm 16)
-                          (bitwise-shift Rn 5)
-                          Rd))))
+                          (bitwise-shift (rindex Rm) 16)
+                          (bitwise-shift (rindex Rn) 5)
+                          (rindex Rd)))))
 
-(define-instruction ANDXreg (Rd Rn Rm)
-  (%emit-logical-reg 1 0 LSL Rm Rn Rd))
+(define-instruction ANDreg (Rd Rn Rm)
+  (%emit-logical-reg 0 LSL Rm Rn Rd))
 
-(define-instruction ANDWreg (Rd Rn Rm)
-  (%emit-logical-reg 0 0 LSL Rm Rn Rd))
+(define-instruction ORRreg (Rd Rn Rm)
+  (%emit-logical-reg 1 LSL Rm Rn Rd))
 
-(define-instruction ORRXreg (Rd Rn Rm)
-  (%emit-logical-reg 1 1 LSL Rm Rn Rd))
+(define-instruction EORreg (Rd Rn Rm)
+  (%emit-logical-reg 2 LSL Rm Rn Rd))
 
-(define-instruction ORRWreg (Rd Rn Rm)
-  (%emit-logical-reg 0 1 LSL Rm Rn Rd))
-
-(define-instruction EORXreg (Rd Rn Rm)
-  (%emit-logical-reg 1 2 LSL Rm Rn Rd))
-
-(define-instruction EORWreg (Rd Rn Rm)
-  (%emit-logical-reg 0 2 LSL Rm Rn Rd))
-
-(define-instruction ANDSXreg (Rd Rn Rm)
-  (%emit-logical-reg 1 3 LSL Rm Rn Rd))
-
-(define-instruction ANDSWreg (Rd Rn Rm)
-  (%emit-logical-reg 0 3 LSL Rm Rn Rd))
+(define-instruction ANDSreg (Rd Rn Rm)
+  (%emit-logical-reg 3 LSL Rm Rn Rd))
 
 ;;;
 ;;; ORN (inclusive OR NOT) -- shifted register
 ;;;   Same as ORR but with N=1 (bit 21)
 ;;;
 
-(define-function %emit-orn (sf shift Rm Rn Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-orn (shift Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rd Rn Rm) 31)
                         (bitwise-shift 1 29)      ; opc=01
                         0x0A000000
                         (bitwise-shift shift 22)
                         0x00200000                 ; N=1 (bit 21)
-                        (bitwise-shift Rm 16)
-                        (bitwise-shift Rn 5)
-                        Rd)))
+                        (bitwise-shift (rindex Rm) 16)
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rd))))
 
-(define-instruction ORNXreg (Xd Xn Xm)
-  (%emit-orn 1 LSL Xm Xn Xd))
+(define-instruction ORNreg (Xd Xn Xm)
+  (%emit-orn LSL Xm Xn Xd))
 
 ;;;
-;;; Logical aliases: MOV Xd, Xm = ORR Xd, XZR, Xm
-;;;                    MVN Xd, Xm = ORN Xd, XZR, Xm
+;;; Logical aliases: MOV Xd/Wd, Xm/Wm = ORR Xd/Wd, XZR, Xm/Wm
+;;;                    MVN Xd/Wd, Xm/Wm = ORN Xd/Wd, XZR, Xm/Wm
 ;;;
 (define-instruction MOVreg (Xd Xm)
-  (ORRXreg Xd XZR Xm))
+  (ORRreg Xd XZR Xm))
 
 (define-instruction MVN (Xd Xm)
-  (ORNXreg Xd XZR Xm))
+  (ORNreg Xd XZR Xm))
 
 ;;;
 ;;; Load/Store unsigned offset
@@ -282,34 +270,39 @@
     (emit-u32 (bitwise-or base
                           (bitwise-shift opc 22)
                           (bitwise-shift imm12 10)
-                          (bitwise-shift Rn 5)
-                          Rt))))
+                          (bitwise-shift (rindex Rn) 5)
+                          (rindex Rt)))))
 
-(define-instruction LDRX (Rt Rn imm12)
-  (%emit-ldst-unsigned 3 1 imm12 Rn Rt))
+(define-instruction LDR (Rt Rn imm12)
+  (assert-X-reg Rn)
+  (%emit-ldst-unsigned (reg-size Rt) 1 imm12 Rn Rt))
 
-(define-instruction STRX (Rt Rn imm12)
-  (%emit-ldst-unsigned 3 0 imm12 Rn Rt))
-
-(define-instruction LDRW (Rt Rn imm12)
-  (%emit-ldst-unsigned 2 1 imm12 Rn Rt))
-
-(define-instruction STRW (Rt Rn imm12)
-  (%emit-ldst-unsigned 2 0 imm12 Rn Rt))
+(define-instruction STR (Rt Rn imm12)
+  (assert-X-reg Rn)
+  (%emit-ldst-unsigned (reg-size Rt) 0 imm12 Rn Rt))
 
 (define-instruction LDRB (Rt Rn imm12)
+  (assert (= 0 (sf-bit Rt)) "LDRB: Rt must be W")
+  (assert-X-reg Rn)
   (%emit-ldst-unsigned 0 1 imm12 Rn Rt))
 
 (define-instruction STRB (Rt Rn imm12)
+  (assert (= 0 (sf-bit Rt)) "STRB: Rt must be W")
+  (assert-X-reg Rn)
   (%emit-ldst-unsigned 0 0 imm12 Rn Rt))
 
 (define-instruction LDRH (Rt Rn imm12)
+  (assert (= 0 (sf-bit Rt)) "LDRH: Rt must be W")
+  (assert-X-reg Rn)
   (%emit-ldst-unsigned 1 1 imm12 Rn Rt))
 
 (define-instruction STRH (Rt Rn imm12)
+  (assert (= 0 (sf-bit Rt)) "STRH: Rt must be W")
+  (assert-X-reg Rn)
   (%emit-ldst-unsigned 1 0 imm12 Rn Rt))
 
 (define-instruction LDRSW (Rt Rn imm12)
+  (assert-X-reg Rt Rn)
   (%emit-ldst-unsigned 2 2 imm12 Rn Rt))
 
 ;;;
@@ -321,52 +314,33 @@
 ;;;   imm7: signed offset / scale (scale=8 for 64-bit, 4 for 32-bit)
 ;;;
 
-(define-function %emit-stp-ldp (opc mode is-load imm7 Rt2 Rn Rt)
-  (let ((base (bitwise-or (bitwise-shift opc 30)
-                          0x28000000
-                          (bitwise-shift mode 23)
-                          (bitwise-shift is-load 22))))
-    (emit-u32 (bitwise-or base
-                          (bitwise-shift (bitwise-and imm7 0x7F) 15)
-                          (bitwise-shift Rt2 10)
-                          (bitwise-shift Rn 5)
-                          Rt))))
+(define-function %emit-stp-ldp (mode is-load imm7 Rt2 Rn Rt)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rt2 Rn Rt) 31)
+                        0x28000000
+                        (bitwise-shift mode 23)
+                        (bitwise-shift is-load 22)
+                        (bitwise-shift (bitwise-and imm7 0x7F) 15)
+                        (bitwise-shift (rindex Rt2) 10)
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rt))))
 
-(define-instruction STPX (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 2 0 imm7 Rt2 Rn Rt1))
+(define-instruction STP (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 2 0 imm7 Rt2 Rn Rt1))
 
-(define-instruction STPW (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 2 0 imm7 Rt2 Rn Rt1))
+(define-instruction LDP (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 2 1 imm7 Rt2 Rn Rt1))
 
-(define-instruction LDPX (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 2 1 imm7 Rt2 Rn Rt1))
+(define-instruction STPpre (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 3 0 imm7 Rt2 Rn Rt1))
 
-(define-instruction LDPW (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 2 1 imm7 Rt2 Rn Rt1))
+(define-instruction LDPpre (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 3 1 imm7 Rt2 Rn Rt1))
 
-(define-instruction STPXpre (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 3 0 imm7 Rt2 Rn Rt1))
+(define-instruction STPpost (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 1 0 imm7 Rt2 Rn Rt1))
 
-(define-instruction STPWpre (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 3 0 imm7 Rt2 Rn Rt1))
-
-(define-instruction LDPXpre (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 3 1 imm7 Rt2 Rn Rt1))
-
-(define-instruction LDPWpre (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 3 1 imm7 Rt2 Rn Rt1))
-
-(define-instruction STPXpost (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 1 0 imm7 Rt2 Rn Rt1))
-
-(define-instruction STPWpost (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 1 0 imm7 Rt2 Rn Rt1))
-
-(define-instruction LDPXpost (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 2 1 1 imm7 Rt2 Rn Rt1))
-
-(define-instruction LDPWpost (Rt1 Rt2 Rn imm7)
-  (%emit-stp-ldp 0 1 1 imm7 Rt2 Rn Rt1))
+(define-instruction LDPpost (Rt1 Rt2 Rn imm7)
+  (%emit-stp-ldp 1 1 imm7 Rt2 Rn Rt1))
 
 ;;;
 ;;; Branch to register: BR, BLR
@@ -374,9 +348,10 @@
 ;;;
 
 (define-function %emit-br (op1 Rn)
+  (assert-X-reg Rn)
   (emit-u32 (bitwise-or 0xD6000000
                         (bitwise-shift op1 16)
-                        (bitwise-shift Rn 5))))
+                        (bitwise-shift (rindex Rn) 5))))
 
 (define-instruction BR (Rn)
   (%emit-br 0x1F Rn))
@@ -399,31 +374,31 @@
 ;;;   sf | 0 0 1 1 0 | 1 1 | Rm | 0 | 1 1 1 1 1 | Rn | Rd
 ;;;
 
-(define-function %emit-mul (sf Rm Rn Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-mul (Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rd Rn Rm) 31)
                         0x1B007C00
-                        (bitwise-shift Rm 16)
-                        (bitwise-shift Rn 5)
-                        Rd)))
+                        (bitwise-shift (rindex Rm) 16)
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rd))))
 
 (define-instruction MUL (Xd Xn Xm)
-  (%emit-mul 1 Xm Xn Xd))
+  (%emit-mul Xm Xn Xd))
 
 ;;;
 ;;; Unsigned divide: UDIV Xd, Xn, Xm
 ;;;   2-source DP: opcode2 = 000010
 ;;;
 
-(define-function %emit-2source (sf opcode2 Rm Rn Rd)
-  (emit-u32 (bitwise-or (bitwise-shift sf 31)
+(define-function %emit-2source (opcode2 Rm Rn Rd)
+  (emit-u32 (bitwise-or (bitwise-shift (sf-check Rd Rn Rm) 31)
                         0x9AC00000
                         (bitwise-shift opcode2 10)
-                        (bitwise-shift Rm 16)
-                        (bitwise-shift Rn 5)
-                        Rd)))
+                        (bitwise-shift (rindex Rm) 16)
+                        (bitwise-shift (rindex Rn) 5)
+                        (rindex Rd))))
 
 (define-instruction UDIV (Xd Xn Xm)
-  (%emit-2source 1 2 Xm Xn Xd))
+  (%emit-2source 2 Xm Xn Xd))
 
 ;;;
 ;;; Variable shift: LSLV, LSRV, ASRV
@@ -431,13 +406,13 @@
 ;;;
 
 (define-instruction LSLV (Xd Xn Xm)
-  (%emit-2source 1 8 Xm Xn Xd))
+  (%emit-2source 8 Xm Xn Xd))
 
 (define-instruction LSRV (Xd Xn Xm)
-  (%emit-2source 1 9 Xm Xn Xd))
+  (%emit-2source 9 Xm Xn Xd))
 
 (define-instruction ASRV (Xd Xn Xm)
-  (%emit-2source 1 10 Xm Xn Xd))
+  (%emit-2source 10 Xm Xn Xd))
 
 ;;;
 ;;; Conditional set: CSET Xd, cond
@@ -446,9 +421,10 @@
 ;;;
 
 (define-instruction CSET (Xd cond)
+  (assert-X-reg Xd)
   (emit-u32 (bitwise-or 0x9A9F07E0
                         (bitwise-shift (bitwise-xor cond 1) 12)
-                        Xd)))
+                        (rindex Xd))))
 
 ;;;
 ;;; Sign extend word: SXTW Xd, Xn
@@ -456,9 +432,10 @@
 ;;;
 
 (define-instruction SXTW (Xd Xn)
+  (assert-X-reg Xd Xn)
   (emit-u32 (bitwise-or 0x93407C00
-                        (bitwise-shift Xn 5)
-                        Xd)))
+                        (bitwise-shift (rindex Xn) 5)
+                        (rindex Xd))))
 
 ;;;
 ;;; PC-relative address: ADR Xd, label
@@ -468,12 +445,13 @@
 ;;;
 
 (define-function %emit-adr (Rd offset)
+  (assert-X-reg Rd)
   (let ((immlo (bitwise-and offset 3))
         (immhi (bitwise-shift offset -2)))
     (emit-u32 (bitwise-or 0x10000000
                           (bitwise-shift immlo 29)
                           (bitwise-shift (bitwise-and immhi 0x7FFFF) 5)
-                          Rd))))
+                          (rindex Rd)))))
 
 (define-instruction ADR (Xd designator)
   (typecase designator

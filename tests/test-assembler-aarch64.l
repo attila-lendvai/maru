@@ -13,10 +13,10 @@
 
 (define-test add-sub-immediate ()
   (with-assembling ((code))
-    (ADDWimm X0 X1 42)
-    (ADDXimm X2 X3 42)
-    (SUBWimm X4 X5 100)
-    (SUBXimm X6 X7 255)
+    (ADDimm W0 W1 42)
+    (ADDimm X2 X3 42)
+    (SUBimm W4 W5 100)
+    (SUBimm X6 X7 255)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-add-sub-imm.bin")
       (concat-strings
        ".text\n"
@@ -34,10 +34,10 @@
 
 (define-test add-sub-register ()
   (with-assembling ((code))
-    (ADDWreg X10 X11 X12)
-    (ADDXreg X13 X14 X15)
-    (SUBWreg X16 X17 X18)
-    (SUBXreg X19 X20 X21)
+    (ADDreg W10 W11 W12)
+    (ADDreg X13 X14 X15)
+    (SUBreg W16 W17 W18)
+    (SUBreg X19 X20 X21)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-add-sub-reg.bin")
       (concat-strings
        ".text\n"
@@ -55,10 +55,10 @@
 
 (define-test mov-immediate ()
   (with-assembling ((code))
-    (MOVZW X10 0x1234 LSL0)
+    (MOVZ  W10 0x1234 LSL0)
     (MOVZ  X11 0x5678 LSL0)
     (MOVZ  X12 0xABCD LSL16)
-    (MOVNW X13 0x1234 LSL0)
+    (MOVN  W13 0x1234 LSL0)
     (MOVN  X14 0x5678 LSL0)
     (MOVK  X15 0x9ABC LSL48)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-mov-imm.bin")
@@ -80,12 +80,12 @@
 
 (define-test logical-register ()
   (with-assembling ((code))
-    (ANDWreg X0 X1 X2)
-    (ANDXreg X3 X4 X5)
-    (ORRWreg X6 X7 X8)
-    (ORRXreg X9 X10 X11)
-    (EORWreg X12 X13 X14)
-    (EORXreg X15 X16 X17)
+    (ANDreg W0 W1 W2)
+    (ANDreg X3 X4 X5)
+    (ORRreg W6 W7 W8)
+    (ORRreg X9 X10 X11)
+    (EORreg W12 W13 W14)
+    (EORreg X15 X16 X17)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-logical-reg.bin")
       (concat-strings
        ".text\n"
@@ -105,14 +105,14 @@
 
 (define-test load-store-unsigned ()
   (with-assembling ((code))
-    (LDRX  X0 X1 1)    ; offset 8 (imm12=1, scaled by 8)
-    (STRX  X2 X3 2)    ; offset 16
-    (LDRW  X4 X5 3)    ; offset 12 (imm12=3, scaled by 4)
-    (STRW  X6 X7 4)    ; offset 16
-    (LDRB  X15 X16 8)
-    (LDRH  X17 X18 8)
-    (STRB  X19 X20 24)
-    (STRH  X21 X22 16)
+    (LDR   X0 X1 1)    ; offset 8 (imm12=1, scaled by 8)
+    (STR   X2 X3 2)    ; offset 16
+    (LDR   W4 X5 3)    ; offset 12 (imm12=3, scaled by 4)
+    (STR   W6 X7 4)    ; offset 16
+    (LDRB  W15 X16 8)
+    (LDRH  W17 X18 8)
+    (STRB  W19 X20 24)
+    (STRH  W21 X22 16)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-ldst-uns.bin")
       (concat-strings
        ".text\n"
@@ -149,8 +149,8 @@
 
 (define-test stp-ldp ()
   (with-assembling ((code))
-    (STPX  X8 X9 X10 6)  ; offset 48 (imm7=6, scaled by 8)
-    (LDPX  X11 X12 X13 8) ; offset 64
+    (STP  X8 X9 X10 6)  ; offset 48 (imm7=6, scaled by 8)
+    (LDP  X11 X12 X13 8) ; offset 64
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-stp-ldp.bin")
       (concat-strings
        ".text\n"
@@ -217,10 +217,10 @@
 
 (define-test adds-subs-immediate ()
   (with-assembling ((code))
-    (ADDSWimm X0 X1 42)
-    (ADDSXimm X2 X3 42)
-    (SUBSWimm X4 X5 100)
-    (SUBSXimm X6 X7 255)
+    (ADDSimm W0 W1 42)
+    (ADDSimm X2 X3 42)
+    (SUBSimm W4 W5 100)
+    (SUBSimm X6 X7 255)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adds-subs-imm.bin")
       (concat-strings
        ".text\n"
@@ -238,10 +238,10 @@
 
 (define-test adds-subs-register ()
   (with-assembling ((code))
-    (ADDSWreg X10 X11 X12)
-    (ADDSXreg X13 X14 X15)
-    (SUBSWreg X16 X17 X18)
-    (SUBSXreg X19 X20 X21)
+    (ADDSreg W10 W11 W12)
+    (ADDSreg X13 X14 X15)
+    (SUBSreg W16 W17 W18)
+    (SUBSreg X19 X20 X21)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-adds-subs-reg.bin")
       (concat-strings
        ".text\n"
@@ -259,10 +259,10 @@
 
 (define-test cmp ()
   (with-assembling ((code))
-    (CMPWimm X10 42)
-    (CMPXimm X11 100)
-    (CMPWreg X12 X13)
-    (CMPXreg X14 X15)
+    (CMPimm W10 42)
+    (CMPimm X11 100)
+    (CMPreg W12 W13)
+    (CMPreg X14 X15)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-cmp.bin")
       (concat-strings
        ".text\n"
@@ -295,7 +295,7 @@
 
 (define-test orn ()
   (with-assembling ((code))
-    (ORNXreg X0 X1 X2)
+    (ORNreg X0 X1 X2)
     (verify-encoding-aarch64 (concat-string +build-dir+ "/asm-aarch64-orn.bin")
       (concat-strings
        ".text\n"
