@@ -64,7 +64,13 @@
   (while regs
     (assert (= 1 (sf-bit (car regs)))
       (car regs) " must be an X register")
-    (set regs (cdr regs))))
+    (set regs (rest regs))))
+
+(define-function assert-W-reg regs
+  (while regs
+    (assert (zero? (sf-bit (car regs)))
+            (car regs) " must be an W register")
+    (set regs (rest regs))))
 
 ;; shift field constants for ADD/SUB immediate (sh bit 22)
 (define-constant LSL0  0)   ; LSL#0: imm12 used as-is
@@ -127,6 +133,32 @@
 (define-instruction MOVK (rd imm16 hw)
   (%emit-move-wide 3 hw imm16 rd))
 
+;;; MOVi: load a 64-bit immediate value into a register
+;;; Uses MOVZ for the lowest non-zero 16-bit chunk, MOVK for remaining chunks
+(define-function MOVi (rd val)
+  (let ((chunk0 (bitwise-and val 65535))
+        (chunk1 (bitwise-and (bitwise-shift val -16) 65535))
+        (chunk2 (bitwise-and (bitwise-shift val -32) 65535))
+        (chunk3 (bitwise-and (bitwise-shift val -48) 65535)))
+    (if (not (= 0 chunk0))
+        (begin
+          (MOVZ rd chunk0 0)
+          (when (not (= 0 chunk1)) (MOVK rd chunk1 1))
+          (when (not (= 0 chunk2)) (MOVK rd chunk2 2))
+          (when (not (= 0 chunk3)) (MOVK rd chunk3 3)))
+      (if (not (= 0 chunk1))
+          (begin
+            (MOVZ rd chunk1 1)
+            (when (not (= 0 chunk2)) (MOVK rd chunk2 2))
+            (when (not (= 0 chunk3)) (MOVK rd chunk3 3)))
+        (if (not (= 0 chunk2))
+            (begin
+              (MOVZ rd chunk2 2)
+              (when (not (= 0 chunk3)) (MOVK rd chunk3 3)))
+          (if (not (= 0 chunk3))
+              (MOVZ rd chunk3 3)
+            (MOVZ rd 0 0)))))))
+
 ;;;
 ;;; ADD/SUB immediate
 ;;;   sf | op | S | 1 0 0 0 1 | sh | imm12 | Rn | Rd
@@ -135,6 +167,9 @@
 ;;;
 
 (define-function %emit-add-sub-imm (is-sub set-flags sh imm12 rs rd)
+  (safety 1 (assert (and (is <long> imm12)
+                         (<= 0 imm12 0xfff))
+                    "%emit-add-sub-imm: imm12 out of range (0-4095): " imm12))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs) 31)
                         (bitwise-shift is-sub 30)
                         (bitwise-shift set-flags 29)
@@ -144,17 +179,26 @@
                         (bitwise-shift (rindex rs) 5)
                         (rindex rd))))
 
+(define-function %emit-add-sub-imm/label (name is-sub set-flags sh imm12 rs rd)
+  (typecase imm12
+    (<long>   (%emit-add-sub-imm is-sub set-flags sh imm12 rs rd))
+    (<label>  (emit-label imm12
+                          (lambda (v) (%emit-add-sub-imm is-sub set-flags sh v rs rd))
+                          4 ()))
+    (<symbol> (%emit-add-sub-imm/label name is-sub set-flags sh (%ensure-label imm12) rs rd))
+    (else     (error (symbol->string name) ": unexpected imm12: " imm12))))
+
 (define-instruction ADDi (rd rs imm12)
-  (%emit-add-sub-imm 0 0 LSL0 imm12 rs rd))
+  (%emit-add-sub-imm/label 'ADDi 0 0 LSL0 imm12 rs rd))
 
 (define-instruction SUBi (rd rs imm12)
-  (%emit-add-sub-imm 1 0 LSL0 imm12 rs rd))
+  (%emit-add-sub-imm/label 'SUBi 1 0 LSL0 imm12 rs rd))
 
 (define-instruction ADDSi (rd rs imm12)
-  (%emit-add-sub-imm 0 1 LSL0 imm12 rs rd))
+  (%emit-add-sub-imm/label 'ADDSi 0 1 LSL0 imm12 rs rd))
 
 (define-instruction SUBSi (rd rs imm12)
-  (%emit-add-sub-imm 1 1 LSL0 imm12 rs rd))
+  (%emit-add-sub-imm/label 'SUBSi 1 1 LSL0 imm12 rs rd))
 
 ;;;
 ;;; Compare immediate alias: CMP Xn/Wn, #imm = SUBS XZR, Xn/Wn, #imm
@@ -252,7 +296,7 @@
 ;;;                    MVN Xd/Wd, Xm/Wm = ORN Xd/Wd, XZR, Xm/Wm
 ;;;
 (define-instruction MOVr (rd rs)
-  (ORRr rd XZR rs))
+  (ADDi rd rs 0))
 
 (define-instruction MVN (rd rs)
   (ORNr rd XZR rs))
@@ -359,6 +403,9 @@
 (define-instruction BLR (raddr)
   (%emit-br 0x3F raddr))
 
+(define-instruction RET (raddr)
+  (%emit-br 0x5F raddr))
+
 ;;;
 ;;; Supervisor Call: SVC
 ;;;   1 1 0 1 0 1 0 0 | 0 0 0 0 0 0 0 0 | imm16 | 0 0 0 0 1
@@ -421,7 +468,7 @@
 ;;;
 
 (define-instruction CSET (rd cond)
-  (assert-X-reg rd)
+  (safety 1 (assert-X-reg rd))
   (emit-u32 (bitwise-or 0x9A9F07E0
                         (bitwise-shift (bitwise-xor cond 1) 12)
                         (rindex rd))))
@@ -432,7 +479,7 @@
 ;;;
 
 (define-instruction SXTW (rd rs)
-  (assert-X-reg rd rs)
+  (safety 1 (assert-X-reg rd) (assert-W-reg rs))
   (emit-u32 (bitwise-or 0x93407C00
                         (bitwise-shift (rindex rs) 5)
                         (rindex rd))))
@@ -445,7 +492,7 @@
 ;;;
 
 (define-function %emit-adr (rd offset)
-  (assert-X-reg rd)
+  (safety 1 (assert-X-reg rd))
   (let ((immlo (bitwise-and offset 3))
         (immhi (bitwise-shift offset -2)))
     (emit-u32 (bitwise-or 0x10000000
