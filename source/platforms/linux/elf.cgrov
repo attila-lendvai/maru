@@ -17,6 +17,11 @@ integer DT_NULL DT_NEEDED DT_PLTRELSZ DT_PLTGOT DT_HASH DT_STRTAB DT_SYMTAB DT_R
 
 sizes Elf64_Ehdr Elf64_Phdr Elf64_Dyn
 
+string  NN_GNU_PROPERTY_TYPE_0
+integer NT_GNU_PROPERTY_TYPE_0
+
+integer GNU_PROPERTY_AARCH64_FEATURE_1_AND GNU_PROPERTY_AARCH64_FEATURE_1_BTI
+
 //
 // Section Headers
 //
@@ -46,6 +51,11 @@ integer STB_LOCAL STB_GLOBAL STB_WEAK
 integer R_X86_64_NONE R_X86_64_64 R_X86_64_PC32 R_X86_64_GOT32 R_X86_64_PLT32 R_X86_64_COPY R_X86_64_GLOB_DAT R_X86_64_JUMP_SLOT R_X86_64_RELATIVE R_X86_64_GOTPCREL R_X86_64_32 R_X86_64_32S R_X86_64_16 R_X86_64_PC16 R_X86_64_8 R_X86_64_PC8
 
 sizes Elf64_Rela
+
+//
+// AArch64 relocations
+//
+integer R_AARCH64_RELATIVE (defined __aarch64__)
 
 //
 // less $(guix build linux-libre-headers)/include/linux/elf-em.h

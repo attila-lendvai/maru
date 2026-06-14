@@ -1,5 +1,6 @@
 // find $(guix build glibc | tail -n 2 | head -n 1)/include/ | grep waitflags
 // grep -r "P_PID" $(guix build glibc | tail -n 2 | head -n 1)/include/
+// grep -r MAP_ANONYMOUS $(guix build linux-libre-headers)/include/
 // less $(guix build linux-libre-headers)/include/linux/sched.h
 // less $(guix build linux-libre-headers)/include/asm/unistd_32.h
 // less $(guix build --target=aarch64-linux-gnu linux-libre-headers)/include/asm/unistd_64.h
@@ -9,11 +10,13 @@ prefix linux/
 
 // default _GNU_SOURCE 1
 
-header	sys/syscall.h sys/wait.h sys/mman.h unistd.h linux/sched.h fcntl.h
+header	sys/syscall.h
+
+integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_mmap SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4 SYS_pipe2 SYS_dup3 SYS_getcwd SYS_statx
+
+header	sys/wait.h unistd.h linux/sched.h fcntl.h
 
 integer STDIN_FILENO STDOUT_FILENO STDERR_FILENO
-
-integer	SYS_exit SYS_read SYS_write SYS_openat SYS_close SYS_chdir SYS_lseek SYS_brk SYS_fsync SYS_mprotect SYS_clone SYS_execve SYS_waitid SYS_wait4 SYS_pipe2 SYS_dup3 SYS_getcwd SYS_statx
 
 integer AT_FDCWD
 
@@ -21,7 +24,14 @@ integer SIGCHLD CLONE_VM CLONE_VFORK WNOHANG WSTOPPED WEXITED WNOWAIT P_ALL P_PI
 
 integer O_RDONLY O_WRONLY O_RDWR O_CREAT O_TRUNC SEEK_SET SEEK_CUR SEEK_END
 
-integer PROT_READ PROT_WRITE PROT_EXEC
+header	sys/mman.h
+
+// less $(guix build linux-libre-headers)/include/asm-generic/mman-common.h
+integer PROT_READ PROT_WRITE PROT_EXEC PROT_NONE
+integer MAP_TYPE MAP_FIXED MAP_ANONYMOUS MAP_POPULATE MAP_NONBLOCK MAP_STACK MAP_HUGETLB MAP_SYNC MAP_FIXED_NOREPLACE
+
+// less $(guix build linux-libre-headers)/include/linux/mman.h
+integer MAP_SHARED MAP_PRIVATE
 
 header linux/stat.h
 
