@@ -571,6 +571,11 @@ test-compiler-x86: $(BUILD_x86)/compiler-test
 test-compiler-llvm: $(BUILD_llvm)/compiler-test
 	$(BUILD_llvm)/compiler-test a b c
 
+test-compiler-arm: $(BUILD)/compiler-test-arm
+	$(if $(shell which qemu-aarch64 2>/dev/null),\
+		qemu-aarch64 -L /usr/aarch64-linux-gnu $< a b c,\
+		$(warning qemu-aarch64 not found, install with: apt install qemu-user-static))
+
 # TODO backend duplication
 $(BUILD_x86)/compiler-test: $(EVAL0) tests/compiler-test.l $(EVAL_OBJ_x86) $(EMIT_FILES_x86)
 	@mkdir -p $(BUILD_x86)
@@ -580,6 +585,18 @@ $(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm): $(EVAL0) tests/compiler-test.
 	@mkdir -p $(BITCODE_DIR)
 	@mkdir -p $(BUILD_llvm)
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),tests/compiler-test.l,$(BITCODE_DIR)/compiler-test.$(ASM_FILE_EXT_llvm))
+
+#    source/platforms/linux/linux.cgrov.$(TARGET).l source/platforms/linux/elf.cgrov.$(TARGET).l
+$(BUILD)/compiler-test-arm: TARGET_ARCH = aarch64
+#$(BUILD)/compiler-test-arm: LD_LINUX = /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1
+# ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
+$(BUILD)/compiler-test-arm: LD_LINUX = /gnu/store/h2ssmncfl4xf6icv3h81vbvhim6yq5kw-glibc-2.41/lib/ld-linux-aarch64.so.1
+$(BUILD)/compiler-test-arm: $(EVAL0) tests/compiler-test.l \
+    source/compiler/emit-arm.l \
+    source/assembler/arm-instructions.l source/assembler/single-pass-arm.l
+	@mkdir -p $(BUILD)
+	$(call compile,$(EVAL0_DIR),$(EVAL0),arm,tests/compiler-test.l,$(BUILD)/compiler-test-arm)
+	chmod +x $(BUILD)/compiler-test-arm
 
 test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
 	$(TEST_EVAL) boot.l tests/evaluator-tests.l
