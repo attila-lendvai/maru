@@ -51,7 +51,7 @@
 ;; before the .data segment. it works on linux/elf, but may require
 ;; more care on other platforms.
 (define-form gc/read-only-object? (obj)
-  `(< ,obj gc/memory-base))
+  `(< ,obj gc/lowest-memory-address))
 
 ;;;
 ;;; tagging
@@ -96,6 +96,7 @@
 (define gc/root-max             0)
 
 (define gc/memory-base          0)
+(define gc/lowest-memory-address 0)
 (define gc/memory-last          0)
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
@@ -103,6 +104,13 @@
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (platform/acquire-memory size)))
     (or ptr (fatal "out of memory"))
+    ;; keep gc/lowest-memory-address as the lowest address across all
+    ;; heap blocks so that gc/read-only-object?'s check works regardless
+    ;; of whether the allocator grows upward or downward (e.g. mmap
+    ;; allocates from the top of the address space downward, while brk
+    ;; grows upward).
+    (when (< ptr gc/lowest-memory-address)
+      (set gc/lowest-memory-address ptr))
     (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
     (set (<header>-next  ptr) ptr)
@@ -301,6 +309,7 @@
   (debug (platform/diag-print "gc/initialize is speaking\n"))
   (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
     (set gc/memory-base ptr)
+    (set gc/lowest-memory-address ptr)
     (set gc/memory-last ptr))
   (gc/grow-root-vector))
 
