@@ -7,8 +7,8 @@
 (when (feature emit-with-object-headers)
   (eval-in-host
    '(case *compiler-backend*
-     (("i686" "x86-64")
-      (load "source/compiler/emit-objects-x86.l"))
+     (("x86" "arm")
+      (load "source/compiler/emit-objects.l"))
      (else
       (load (concat-strings "source/compiler/emit-objects-"*compiler-backend*".l"))))))
 
