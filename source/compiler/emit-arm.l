@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; This is a compiler that emits x86-64 machine code directly into an
+;;; This is a compiler that emits aarch64 machine code directly into an
 ;;; Elf64 executable.
 ;;;
 
@@ -115,14 +115,14 @@
 (define-operand LI64 LITERAL)
 (define-operand R64 REGISTER)
 
-(define-operand STACK-PARAM STACK-CELL	()	self.offset"(%rbp)")
+(define-operand STACK-PARAM STACK-CELL	()	self.offset"(x29)")
 
 (with-forms
     ((x ((ctor name-prefix)
          (let ((i 0)
                (count 32)
                (result ()))
-           (while (<= i count)
+           (while (< i count)
              (let ((reg (concat-symbol name-prefix (number->string i))))
                (push result
                      ;; the op/ prefix stands for operand
@@ -133,6 +133,12 @@
              ,@result)))))
   (x R32 W)
   (x R64 X))
+
+(define op/FP op/X29)    ; frame pointer
+(define op/LP op/X30)    ; link register
+(define op/SP op/X31)    ; stack pointer
+(define op/XZR op/X31)   ; always zero register in 64-bit opcodes
+(define op/WZR op/W31)   ; always zero register in 32-bit opcodes
 
 ;;;
 ;;; Compiler Infrastructure
@@ -165,7 +171,7 @@
     (temp-limit			0)
     (free-temp-regs		+callee-saved-registers+)
     (clobbered-temp-regs	(array +n-callee-saved-registers+))
-    (current-value		op/RAX)
+    (current-value		op/X0)
     ))
 
 (define-function new-temp-index (c)
@@ -177,7 +183,7 @@
       i)))
 
 (define-function new-stack-cell (-c-)
-  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
+  (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
 
 (define-function alloc-reg-temp (self)
   (with-instance-accessors self <compiler>
@@ -213,7 +219,7 @@
 ;;;
 ;;; Relocation tracking for ET_DYN
 ;;;
-(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_X86_64_RELATIVE relocations
+(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_AARCH64_RELATIVE relocations
 
 (define-function register-rela (segment paddress value)
   (push *rela-entries* (list segment paddress value)))
@@ -441,104 +447,89 @@
   )
 
 (define-instruction BR		()
-  ((label)			(JMPm $1 0 0 0)))
+  ((label)			(B $1)))
 
 (define-instruction BF		(true 0 false)
-  ((REGISTER label)		(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
-                                (JE $2)))
+  ((REGISTER label)		(ANDSr XZR (<REGISTER>-name $1) (<REGISTER>-name $1))
+                                (BEQ $2)))
 
 (define-instruction BT		(true 0 false)
-  ((REGISTER label)		(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
-                                (JNE $2)))
+  ((REGISTER label)		(ANDSr XZR (<REGISTER>-name $1) (<REGISTER>-name $1))
+                                (BNE $2)))
 
 (define-instruction CALL	(false 0 true)
-  ((label)			(CALLQm $1 0 0 0)))
+  ((label)			(BL $1)))
 
 ;; TODO merge into CALL?
 (define-instruction CALLPTR	(true 0 false)
-  ((REGISTER)			(CALLQr (<REGISTER>-name $1))))
+  ((REGISTER)			(BLR (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
-  ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) ESP 0 0 (<REGISTER>-name $1)))
-  ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (ADDLir lit (<REGISTER>-name $1)))))
-  ((R64 STACK-CELL)		(ADDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (ADDr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
                                     ((= 0 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
-                                     (ADDQi32r lit reg))
+                                    ((< 0 lit 4096)
+                                     (ADDi reg reg lit))
                                     (else
-                                     (MOVQi64r lit RBX)
-                                     (ADDQrr RBX reg))))))
+                                     (MOVi X16 lit)
+                                     (ADDr reg reg X16))))))
 
 (define-instruction SUB		(true 0 true)
-  ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) ESP 0 0 (<REGISTER>-name $1)))
-  ;; TODO wtf? the order...
-  ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (SUBLir lit (<REGISTER>-name $1)))))
-  ((R64 STACK-CELL)		(SUBQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ;; TODO wtf? the order...
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (SUBr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
                                     ((= 0 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
-                                     (SUBQi32r lit reg))
+                                    ((< 0 lit 4096)
+                                     (SUBi reg reg lit))
                                     (else
-                                     (MOVQi64r lit RBX)
-                                     (SUBQrr RBX reg))))))
+                                     (MOVi X16 lit)
+                                     (SUBr reg reg X16))))))
 
-;; TODO x86 mul operates on eax, which somehow needs to be encoded
-;; into the instruction. same applies to div.
-(define-instruction MUL		()
-  ((STACK-CELL)			(MULQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
+(define-instruction MULTIPLY	()
+  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (MUL X0 X0 X16))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
-                                  ;; TODO emit shifts when possible
                                   (else
-                                   (MOVQir (<LITERAL>-value $1) RCX)
-                                   (MULQrr RCX RAX)))))
+                                   (MOVi X16 (<LITERAL>-value $1))
+                                   (MUL X0 X0 X16)))))
 
-;; the x86 div instruction is unsigned division
-(define-instruction DIV		()
-  ((STACK-CELL)			(XORQrr RDX RDX)
-                                (DIVQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
+(define-instruction DIVIDE	()
+  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (UDIV X0 X0 X16))
   ((LI64)			(cond
-                                  ((= 1 (<LITERAL>-value $1))
-                                   ;; remainder is zero, %rax is unchanged
-                                   (XORQrr RDX RDX))
-                                  ;; TODO emit shifts when possible
+                                  ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   (else
-                                   (XORQrr RDX RDX) ; the upper side of 64 bit operand
-                                   (MOVQir (<LITERAL>-value $1) RCX) ; divisor
-                                   (DIVQrr RCX RAX)))))
+                                   (MOVi X16 (<LITERAL>-value $1))
+                                   (UDIV X0 X0 X16)))))
 
 (define-instruction AND		(true 0 true)
-  ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (ANDr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
                                     ((= 0 lit)
-                                     (XORQrr reg reg))
+                                     (EORr reg reg reg))
                                     ((= -1 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
-                                     (ANDQi32r lit reg))
                                     (else
-                                     (MOVQi64r lit RBX)
-                                     (ANDQrr RBX reg))))))
+                                     (MOVi X16 lit)
+                                     (ANDr reg reg X16))))))
 
 (define-instruction OR		(true 0 true)
-  ((R64 STACK-CELL)		(ORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (ORRr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -546,16 +537,15 @@
                                      ;; NOP
                                      )
                                     ((= -1 lit)
-                                     (MOVQi32r -1 reg))
-                                    ((< -0x80000000 lit 0x80000000)
-                                     (ORQi32r lit reg))
+                                     (MOVi X16 lit)
+                                     (ORRr reg reg X16))
                                     (else
-                                     (MOVQi64r lit RBX)
-                                     (ORQrr RBX reg))))))
+                                     (MOVi X16 lit)
+                                     (ORRr reg reg X16))))))
 
-;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
-  ((R64 STACK-CELL)		(XORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (EORr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -563,176 +553,211 @@
                                      ;; NOP
                                      )
                                     ((= -1 lit)
-                                     (NOTQr reg))
-                                    ((< -0x80000000 lit 0x80000000)
-                                     (XORQi32r lit reg))
+                                     (MVN reg reg))
                                     (else
-                                     (MOVQi64r lit RBX)
-                                     (XORQrr RBX reg))))))
+                                     (MOVi X16 lit)
+                                     (EORr reg reg X16))))))
 
 (define-instruction BITWISE-NOT	(true 0 true)
-  ((REGISTER)			(NOTQr (<REGISTER>-name $1))))
+  ((REGISTER)			(MVN (<REGISTER>-name $1) (<REGISTER>-name $1))))
 
 (define-instruction LOGIC-NOT	(true 0 true)
-  ((REGISTER)			(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
-                                (SETEr AL)
-                                (MOVZBQrr AL (<REGISTER>-name $1))))
+  ((REGISTER)			(CMPi (<REGISTER>-name $1) 0)
+                                 (CSET (<REGISTER>-name $1) 0)))  ; EQ cond = 0
 
-(define-instruction NEG		(true 0 true)
-  ((REGISTER)			(NEGQr (<REGISTER>-name $1))))
+(define-instruction NEGATE	(true 0 true)
+  ((REGISTER)			(NEG (<REGISTER>-name $1) (<REGISTER>-name $1))))
 
 (define-instruction ASL		(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 0 RCX)
-                                (SALQrr CL (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (LSLV (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
                                   (unless (= 0 lit)
-                                    (SALQir lit (<REGISTER>-name $1))))))
+                                    (MOVi X16 lit)
+                                    (LSLV reg reg X16)))))
 
 (define-instruction ASR		(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 0 RCX)
-                                (SARQrr CL (<REGISTER>-name $1)))
-  ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
+  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (ASRV (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
+  ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
+                                      (reg (<REGISTER>-name $1)))
                                   (unless (= 0 lit)
-                                    (SARQir lit (<REGISTER>-name $1))))))
+                                    (MOVi X16 lit)
+                                    (ASRV reg reg X16)))))
 
 (define-instruction ADDR	(false 0 true)
-  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RAX))
-  ;;((label)			(LEAQmr	$1 0 0 0 RAX))
-  ((STACK-CELL)			(LEAQmr	(<STACK-CELL>-offset $1) RBP 0 0 RAX)))
+  ((GLOBAL-CELL)		(ADR X0 (<GLOBAL-CELL>-address $1)))
+  ((STACK-CELL)			(ADDi X0 SP (<STACK-CELL>-offset $1))))
 
 (define-instruction MOVE	()
-  ((LI64 STACK-CELL)		(MOVQim (<LITERAL>-value $1) (<STACK-CELL>-offset $2) RBP 0 0))
-  ((LI64 R64)			(MOVQir (<LITERAL>-value $1) (<REGISTER>-name $2)))
-  ((STACK-CELL STACK-CELL)	(MOVQmr (<STACK-CELL>-offset $1) RBP 0 0 RCX)
-                                (MOVQrm RCX (<STACK-CELL>-offset $2) RBP 0 0))
-  ((R64 STACK-CELL)		(MOVQrm (<REGISTER>-name $1) (<STACK-CELL>-offset $2) RBP 0 0))
-  ((STACK-CELL R64)		(MOVQmr (<STACK-CELL>-offset $1) RBP 0 0 (<REGISTER>-name $2)))
-  ((R64 R64)			(MOVQrr (<REGISTER>-name $1) (<REGISTER>-name $2))))
+  ((LI64 STACK-CELL)		(MOVi X16 (<LITERAL>-value $1))
+                                (STR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
+  ((LI64 R64)			(MOVi (<REGISTER>-name $2) (<LITERAL>-value $1)))
+  ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (STR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
+  ((R64 STACK-CELL)		(STR (<REGISTER>-name $1) SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
+  ((STACK-CELL R64)		(LDR (<REGISTER>-name $2) SP (bitwise-shift (<STACK-CELL>-offset $1) -3)))
+  ((R64 R64)			(MOVr (<REGISTER>-name $2) (<REGISTER>-name $1))))
 
 (define-instruction LOAD	(false 0 true)
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
-                                    (XORQrr RAX RAX)
-                                  (MOVQir (<LITERAL>-value $1) RAX)))
-  ((STACK-CELL)			(MOVQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
-  ((R64)			(MOVQrr (<REGISTER>-name $1) RAX))
-  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RAX)
-                                (MOVQmr 0 RAX 0 0 RAX))
-  ((GLOBAL-ADDR)		(LEAQmr	(<GLOBAL-ADDR>-address $1) 0 0 0 RAX))
-  ;; ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
-  ;;       			(println "	mov	(%rax), %rax"))
+                                    (EORr X0 X0 X0)
+                                  (MOVi X0 (<LITERAL>-value $1))))
+  ((STACK-CELL)			(LDR X0 SP (bitwise-shift (<STACK-CELL>-offset $1) -3)))
+  ((R64)			(MOVr X0 (<REGISTER>-name $1)))
+  ((GLOBAL-CELL)		(ADR X0 (<GLOBAL-CELL>-address $1))
+                                (LDR X0 X0 0))
+  ((GLOBAL-ADDR)		(ADR X0 (<GLOBAL-ADDR>-address $1)))
   )
-;; $1 what, $2 where
+
+(define-instruction/emit-forms LOAD 1
+  ((STACK-PARAM)			(LDR X0 X29 (bitwise-shift (<STACK-CELL>-offset $1) -3))))
+
 (define-instruction STORE	(true 0 false)
-  ((R64 GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $2) 0 0 0 RBX)
-                                (MOVQrm (<REGISTER>-name $1) 0 RBX 0 1))
-  ;; ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
-  ;;                               (println "	mov	"$1", (%rbx)"))
-  ((R64 R64)			(MOVQrm (<REGISTER>-name $1) 0 (<REGISTER>-name $2) 0 1))
-  ((R64 STACK-CELL)		(MOVQrm (<REGISTER>-name $1) (<STACK-CELL>-offset $2) RBP 0 1)))
+  ((R64 GLOBAL-CELL)		(ADR X16 (<GLOBAL-CELL>-address $2))
+                                (STR (<REGISTER>-name $1) X16 0))
+  ((R64 R64)			(STR (<REGISTER>-name $1) (<REGISTER>-name $2) 0))
+  ((R64 STACK-CELL)		(STR (<REGISTER>-name $1) SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
+  ((R64 STACK-PARAM)		(STR (<REGISTER>-name $1) X29 (bitwise-shift (<STACK-CELL>-offset $2) -3))))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
 (define-instruction LOAD-I8	(false 0 true)
-  ((STACK-CELL)			(MOVQmr (<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (LEAQmr 0 RAX RCX 1 RCX)
-                                (XORQrr RAX RAX)
-                                (MOVBmr 0 RCX 0 1 AL))
+  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (ADDr X16 X0 X16)
+                                (LDRB W0 X16 0))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
                                   (if (= 0 offset)
-                                      (MOVQrr RAX RCX)
-                                    (LEAQmr offset RAX 0 1 RCX)))
-                                (XORQrr RAX RAX)
-                                (MOVBmr 0 RCX 0 1 AL)))
+                                      (LDRB W0 X0 0)
+                                    (begin
+                                      (ADDi X16 X0 offset)
+                                      (LDRB W0 X16 0))))))
 
 (define-instruction STORE-I8	(false 0 true)
   ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (XORQrr	RBX RBX))
-                                (MOVBmr	(<STACK-CELL>-offset $2) RBP 0 1 BL)
-                                (MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVBrm	BL 0 RAX RCX 1)
+                                  (EORr X17 X17 X17))
+                                (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (ADDr X17 X0 X17)
+                                (STRB W16 X17 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RBX RAX)))
-  ((STACK-CELL LI64)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
+                                  (MOVr X0 X16)))
+  ((STACK-CELL LI64)		(LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (ADDr X17 X0 X17)
                                 (if-at-expand (feature strict-semantics-for-compiled-set)
                                     (begin
-                                     (XORQrr	RBX RBX)
-                                     (MOVBir	(<LITERAL>-value $2) BL)
-                                     (MOVBrm	BL 0 RAX RCX 1)
-                                     (MOVQrr	RBX RAX))
-                                  (MOVBim	(<LITERAL>-value $2) 0 RAX RCX 1))))
+                                     (EORr X16 X16 X16)
+                                     (MOVi X16 (<LITERAL>-value $2))
+                                     (STRB W16 X17 0)
+                                     (MOVr X0 X16))
+                                  (begin
+                                    (MOVi X16 (<LITERAL>-value $2))
+                                    (STRB W16 X17 0)))))
 
 (when-at-expand (feature lower/array)
   ;; TODO these two are the same as the -OOP versions, except the MOV's scale
   (define-instruction LOAD-CELL	(false 0 true)
-    ((STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr 0 RAX RCX 1 RAX))
-    ((LI64)			(LEAQmr	(<LITERAL>-value $1) RAX 0 0 RAX) ; index
-				(MOVQmr 0 RAX 0 0 RAX)))
+    ((STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (ADDr X16 X0 X16)
+                                (LDR X0 X16 0))
+    ((LI64)			(let ((offset (<LITERAL>-value $1)))
+                                  (if (= 0 offset)
+                                      (LDR X0 X0 0)
+                                    (begin
+                                      (ADDi X0 X0 offset)
+                                      (LDR X0 X0 0))))))
 
   (define-instruction STORE-CELL	(false 0 true)
-    ((STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RBX) ; value
-				(MOVQrm	RBX 0 RAX RCX 1))))
+    ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (ADDr X16 X0 X16)
+                                (STR X17 X16 0))))
 
 (define-instruction LOAD-OOP	(false 0 true)
-  ((STACK-CELL)			(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr 0 RAX RCX 8 RAX))
-  ((LI64)			(let ((offset (<LITERAL>-value $1)))
+  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (MOVi X17 8)
+                                (MUL X16 X16 X17)
+                                (ADDr X16 X0 X16)
+                                (LDR X0 X16 0))
+  ((LI64)			(let ((offset (* (<LITERAL>-value $1) 8)))
                                   (if (= 0 offset)
-                                      (MOVQmr 0 RAX 0 0 RAX)
-                                    (LEAQmr (* offset 8) RAX 0 0 RCX)
-                                    (MOVQmr 0 RCX 0 0 RAX)))))
+                                      (LDR X0 X0 0)
+                                    (if (< offset 4096)
+                                        (begin
+                                          (ADDi X0 X0 offset)
+                                          (LDR X0 X0 0))
+                                      (begin
+                                        (MOVi X16 offset)
+                                        (ADDr X0 X0 X16)
+                                        (LDR X0 X0 0)))))))
 
-;; object is in RAX; args: offset, value
+;; object is in X0 (base); args: index, value
 (define-instruction STORE-OOP	(false 0 true)
-  ((STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RDX)
-                                (MOVQrm	RDX 0 RAX RCX 8)
+  ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (MOVi X15 8)
+                                (MUL X16 X16 X15)
+                                (ADDr X16 X0 X16)
+                                (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RDX RAX)))
-  ((LI64 LI64)			(MOVQir	(<LITERAL>-value $2) RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $1) 8) RAX 0 0)
+                                  (MOVr X0 X17)))
+  ((LI64 LI64)			(MOVi X16 (* (<LITERAL>-value $1) 8))
+                                (ADDr X16 X0 X16)
+                                (MOVi X17 (<LITERAL>-value $2))
+                                (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RDX RAX)))
-  ((STACK-CELL LI64)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVQir	(<LITERAL>-value $2) RDX)
-                                (MOVQrm	RDX 0 RAX RCX 8)
+                                  (MOVr X0 X17)))
+  ((STACK-CELL LI64)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (MOVi X15 8)
+                                (MUL X16 X16 X15)
+                                (ADDr X16 X0 X16)
+                                (MOVi X17 (<LITERAL>-value $2))
+                                (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RDX RAX)))
-  ((LI64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $1) 8) RAX 0 0)
+                                  (MOVr X0 X17)))
+  ((LI64 STACK-CELL)		(MOVi X16 (* (<LITERAL>-value $1) 8))
+                                (ADDr X16 X0 X16)
+                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RDX RAX))))
+                                  (MOVr X0 X17))))
 
 (define-instruction PUSH	()
-  ((LI64)			(PUSHQi (<LITERAL>-value $1)))
-  ((R64)			(PUSHQr (<REGISTER>-name $1))))
+  ((LI64)			(MOVi X16 (<LITERAL>-value $1))
+                                (SUBi SP SP 8)
+                                (STR X16 SP 0))
+  ((R64)			(SUBi SP SP 8)
+                                (STR (<REGISTER>-name $1) SP 0)))
 
 (define-instruction POP		()
-  ((R64)			(POPQr (<REGISTER>-name $1))))
+  ((R64)			(LDR (<REGISTER>-name $1) SP 0)
+                                (ADDi SP SP 8)))
 
-(define-form define-instruction/comparator (maru-name x86-name)
+(define-form define-instruction/comparator (maru-name cond)
   `(define-instruction ,maru-name (true 0 true)
      ((R64 STACK-CELL)
-      ;; TODO order?!
-      (CMPQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1))
-      (,x86-name AL)
-      (MOVZBQrr AL (<REGISTER>-name $1)))
+      (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+      (CMPr (<REGISTER>-name $1) X16)
+      (CSET (<REGISTER>-name $1) ,cond))
      ((R64 LI64)
       (let ((lit (<LITERAL>-value $2)))
         (if (= 0 lit)
-            (TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
-          (CMPQir lit (<REGISTER>-name $1))))
-      (,x86-name AL)
-      (MOVZBQrr AL (<REGISTER>-name $1)))))
+            (CMPi (<REGISTER>-name $1) 0)
+          (if (< lit 4096)
+              (CMPi (<REGISTER>-name $1) lit)
+            (begin
+              (MOVi X16 lit)
+              (CMPr (<REGISTER>-name $1) X16))))
+        (CSET (<REGISTER>-name $1) ,cond)))))
 
-(define-instruction/comparator LT SETLr)
-(define-instruction/comparator LE SETLEr)
-(define-instruction/comparator EQ SETEr)
-(define-instruction/comparator GE SETGEr)
-(define-instruction/comparator GT SETGr)
-;;(define-instruction/comparator NE "setne")
+(define-instruction/comparator LT 11)
+(define-instruction/comparator LE 13)
+(define-instruction/comparator EQ 0)
+(define-instruction/comparator GE 10)
+(define-instruction/comparator GT 12)
+;;(define-instruction/comparator NE 1)
 
 ;; a vector of assoc lists indexed by operator arity
 (define *special-operators*
@@ -740,9 +765,9 @@
            `(;; nullary
              ()
              ;; unary
-             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
+             ((-  ,NEGATE) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
              ;; binary
-             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
+             ((+  ,ADD) (-   ,SUB) (* ,MULTIPLY) (/ ,DIVIDE)
               (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
               (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
@@ -806,16 +831,25 @@
         (emit STORE $ temp)
         temp))))
 
-(let ((program-code-offset (slave-value (record/slot-index <target-function> 'program-code))))
+(let ((program-code-byte-offset (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
   (define-function compile-call-to-<target-function> (-c-)
     ;; TODO assert the type to be <target-function>
     ;; TODO assert nr of args = params
+    ;; Load fn ptr into X16, NOT X0, because X0 holds arg1
+    (emit MOVE $ op/X16)
     (when (feature emit-with-object-headers)
-      ;; i.e. this is a full <target-function> object. when the
-      ;; feature is disabled then it's just a raw function pointer to
-      ;; be called.
-      (emit LOAD-OOP (LI64 program-code-offset)))
-    (emit CALLPTR $)
+      ;; LOAD-OOP: load data[program-code-slot] from the object
+      (if (= 0 program-code-byte-offset)
+          (LDR X16 X16 0)
+        (if (< program-code-byte-offset 4096)
+            (begin
+              (ADDi X16 X16 program-code-byte-offset)
+              (LDR X16 X16 0))
+          (begin
+            (MOVi X17 program-code-byte-offset)
+            (ADDr X16 X16 X17)
+            (LDR X16 X16 0)))))
+    (emit CALLPTR op/X16)
     ()))
 
 (define-function closure-code-label (name)
@@ -832,8 +866,16 @@
   ())
 
 (define-method compile-call-to (slave-value <target-function>) (op -c-)
-  (comp op)
-  (compile-call-to-<target-function> -c-))
+  (let* ((value self)
+         (name (<target-function>-name value)))
+    (when name
+      (emit-comment 3 (string-append "// " name)))
+    (if (feature redefinable-functions-in-target)
+        (let ()
+          (comp op)
+          (compile-call-to-<target-function> -c-))
+      (emit CALL (closure-code-label name))))
+  ())
 
 ;; this case is handled early in compile-call
 ;; (define-method compile-call-to <pair> (op -c-)
@@ -1034,17 +1076,18 @@
 
 ;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
 (define-instruction ENTER-FRAME	()
-  ((_)				(PUSHQr RBP)
-                                (MOVQrr RSP RBP)
-                                (unless (= 0 $1)
-                                  (SUBQir $1 RSP))))
+  ((_)				(STPpre FP LP SP -2)
+				(MOVr FP SP)
+				(unless (= 0 $1)
+				  (SUBi SP SP $1))))
 
 (define-instruction LEAVE-FRAME	()
-  ((_)				(LEAVE)
-                                (RET)))
+  ((_)				(ADDi SP FP 0)
+				(LDPpost FP LP SP 2)
+				(RET LP)))
 
 (define-instruction SEXT	()
-  ((R32 R64)			(MOVSBQrr (<REGISTER>-name $1) (<REGISTER>-name $2))))
+  ((R32 R64)			(SXTW (<REGISTER>-name $2) (<REGISTER>-name $1))))
 
 ;;;
 ;;; Compiling lambdas
@@ -1076,7 +1119,7 @@
           (push spill-locs spill-loc)))
 
       ;; assign the stack locations to the params passed on the stack
-      (let ((i 2))        ; 2 is the pushed RBP and the return address
+      (let ((i 2))        ; 2 is the pushed FP and LP (return address)
         (list-do var params
           (let ((offset (* i +word-size-in-bytes+)))
             (set (<variable>-value var) (STACK-PARAM offset)))
@@ -1089,6 +1132,16 @@
             (stack-cells	(list-reverse! spill-locs)))
         (times-do (min param-count +n-param-registers+)
           (emit MOVE (pop regs) (pop stack-cells))))
+
+      ;; spill the stack-passed params (args 9+) from X29 to SP-relative cells
+      (let ((i 2))        ; 2 is the pushed FP and LP
+        (list-do var params
+          (let* ((offset (* i +word-size-in-bytes+))
+                 (spill-cell (new-stack-cell -c-)))
+            (LDR X0 X29 (bitwise-shift offset -3))
+            (STR X0 SP (bitwise-shift (<STACK-CELL>-offset spill-cell) -3))
+            (set (<variable>-value var) spill-cell))
+          (incr i)))
 
       ;; Compile the fn body (COMP is a form, we cannot MAP it).
       (list-do el body
@@ -1208,17 +1261,25 @@
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))
-    (emit ADD op/RSP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+    (emit ADD op/SP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
     (free-temps tmps-to-free)))
 
 (define-method compile-call-to <STACK-CELL> (op -c-)
-  (emit LOAD self)
-  (compile-call-to-<target-function> -c-))
+  ;; Load fn ptr into X16, NOT X0, because X0 is arg 1 (already set up)
+  (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset self) -3))
+  (when (feature emit-with-object-headers)
+    (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
+  (emit CALLPTR op/X16)
+  ())
 
 (define-method compile-call-to <R64> (op -c-)
-  (unless (= RAX (<REGISTER>-name self))
-    (emit MOVE self op/RAX))
-  (compile-call-to-<target-function> -c-))
+  ;; Move fn ptr to X16 to avoid clobbering arg 1 in X0
+  (unless (= X16 (<REGISTER>-name self))
+    (emit MOVE self op/X16))
+  (when (feature emit-with-object-headers)
+    (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
+  (emit CALLPTR op/X16)
+  ())
 
 ;; TODO
 ;; (define-method compile-call-to <C-function> (op -c-)
@@ -1308,16 +1369,16 @@
         (lambda (expr -c-)
           ;; the function prologue we also employ is like this:
           ;;
-          ;; push	%rbp
-          ;; mov	%rsp, %rbp
-          ;; sub	$n, %rsp
+          ;; stp	x29, x30, [sp, #-16]!
+          ;; mov	x29, sp
+          ;; sub	sp, sp, $n
           ;; ...
           ;;
-          ;; so, the 8(%rbp) is to undo the push %rbp, so that we
-          ;; regain the %rsp value at the entry point to the function.
+          ;; so, the 16(sp) is to undo the stp and sub, so that we
+          ;; regain the sp value at the entry point to the function.
 
-          (LEAQmr	8 RBP 0 0 RAX)
-          (set (<compiler>-current-value -c-) op/RAX)))
+          (ADDi X0 X29 16)
+          (set (<compiler>-current-value -c-) op/X0)))
   ))
 
 ;;;
@@ -1351,7 +1412,7 @@
           )
          ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
-          (emit LOAD (GLOBAL-ADDR (label self.name))))
+          (emit LOAD (GLOBAL-CELL (label self.name))))
          (else
           (emit LOAD (GLOBAL-CELL (label self.name))))))
       (else
@@ -1446,7 +1507,16 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-(define-constant +n-program-headers+ 8)
+;; Note type for GNU_PROPERTY (NT_GNU_PROPERTY_TYPE_0)
+(define-constant +nt-gnu-property-type-0+ 5)
+
+;; Property types for AArch64
+(define-constant +gnu-property-aarch64-feature-1-and+ -1073741824) ; 0xc0000000 as signed i32
+
+;; Feature flags for AArch64
+(define-constant +gnu-property-aarch64-feature-1-bti+ 1)
+
+(define-constant +n-program-headers+ 9)
 (define-constant +n-section-headers+ 11)
 (define-constant +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                                       (* +n-program-headers+
@@ -1455,9 +1525,9 @@
                                          elf/sizeof-Elf64_Shdr)))
 
 (define-constant +code-segment-address+		0x00000000)
+(define-constant +data-segment-address+		0x00040000)
+(define-constant +bss-segment-address+		0x00050000)
 (define-constant +ro-data-segment-address+	0x00100000)
-(define-constant +data-segment-address+		0x00200000)
-(define-constant +bss-segment-address+		0x00300000)
 
 ;; TODO this is neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
@@ -1497,6 +1567,21 @@
   (.ascii	+ld.so-path+)
   (.i8		0)
   (label!	'elf-interpreter-end)
+
+  ;; GNU_PROPERTY note for AArch64 BTI compatibility
+  (.align	4)
+  (label!	'gnu-property-note)
+  (.i32		4)                          ; n_namesz = sizeof("GNU\0")
+  (.i32		16)                         ; n_descsz = sizeof(property desc)
+  (.i32		+nt-gnu-property-type-0+)   ; n_type
+  (.ascii	"GNU")
+  (.i8		0)                          ; name padding
+  (.i32		+gnu-property-aarch64-feature-1-and+) ; pr_type
+  (.i32		4)                          ; pr_datasz
+  (.i32		0)                          ; pr_data (BTI flag disabled)
+  (.i32		0)                          ; padding to 8-byte boundary
+  (label!	'gnu-property-note-end)
+
   (.align	elf/page-size)
 
   (create-segment 'elf-prefix)
@@ -1512,7 +1597,7 @@
   (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
   (.i16		elf/ET_DYN)      ; e_type
-  (.i16		elf/EM_X86_64)   ; e_machine
+  (.i16		elf/EM_AARCH64)   ; e_machine
   (.i32		1)               ; e_version
   (.i64		(closure-code-label '_start)) ; e_entry (entry point)
   (.i64		(label 'program-headers	(- self (laddress 'elf-header-start)))) ; e_phoff	Start of program headers (file offset)
@@ -1568,9 +1653,36 @@
                          elf/page-size)
     (incr file-position size/text)
 
-    ;; ro-data segment (must be last, because this will also mmap the )
+    ;; NOTE: program headers must be emitted in increasing vaddr order
+    ;; for ld-linux to process them correctly. The file-position
+    ;; computation tracks the file layout order (text, ro-data, data),
+    ;; but the headers are emitted in vaddr order.
+
     (set size/ro-data (segment-length 'ro-data))
     (set file-offset/ro-data file-position)
+
+    ;; data segment (vaddr 0x40000)
+    (set size/data (segment-length 'data))
+    (set file-offset/data (+ file-position size/ro-data))
+    (emit-program-header elf/PT_LOAD
+                         file-offset/data
+                         size/data size/data
+                         (+ elf/PF_R elf/PF_W)
+                         +data-segment-address+
+                         elf/page-size)
+
+    ;; BSS (vaddr 0x50000) p_offset must point past all file data
+    (set size/bss (segment-length 'bss))
+    (when (= 0 size/bss)
+      (set size/bss 1))
+    (emit-program-header elf/PT_LOAD
+                         (+ file-position size/ro-data size/data)
+                         0 size/bss
+                         (+ elf/PF_R elf/PF_W)
+                         +bss-segment-address+
+                         elf/page-size)
+
+    ;; ro-data segment (vaddr 0x100000)
     (emit-program-header elf/PT_LOAD
                          file-offset/ro-data
                          size/ro-data size/ro-data
@@ -1579,38 +1691,26 @@
                          elf/page-size)
     (incr file-position size/ro-data)
 
-    ;; mark the entire ro-data segment to become read-only after
-    ;; relocation is finished. note that it's possible to mark only a
-    ;; subset of it using this extra PT_GNU_RELRO program header.
+    ;; GNU_RELRO (same range as ro-data)
     (emit-program-header elf/PT_GNU_RELRO file-offset/ro-data
                          size/ro-data size/ro-data
                          elf/PF_R
                          +ro-data-segment-address+
                          elf/page-size)
 
-    ;; data segment
-    (set size/data (segment-length 'data))
-    (set file-offset/data file-position)
-    (emit-program-header elf/PT_LOAD
-                         file-offset/data
-                         size/data size/data
-                         (+ elf/PF_R elf/PF_W)
-                         +data-segment-address+
-                         elf/page-size)
+    ;; data segment continues after ro-data in the file
     (incr file-position size/data)
 
-    ;; BSS, aka zero-initialized data
-    (set size/bss (segment-length 'bss))
-    (when (= 0 size/bss)
-      ;; zero is illegal, and not emitting is more trouble than just
-      ;; setting it to 1.
-      (set size/bss 1))
-    (emit-program-header elf/PT_LOAD
-                         file-position
-                         0 size/bss
-                         (+ elf/PF_R elf/PF_W)
-                         +bss-segment-address+
-                         elf/page-size)
+    ;; PT_NOTE segment (GNU_PROPERTY note for BTI compatibility)
+    (let ((note-size (- (laddress 'gnu-property-note-end)
+                        (laddress 'gnu-property-note))))
+      (emit-program-header elf/PT_NOTE
+                           (+ file-offset/ro-data
+                              (paddress 'gnu-property-note))
+                           note-size note-size
+                           elf/PF_R
+                           (laddress 'gnu-property-note)
+                           4))
 
     ;; PT_INTERP segment (dynamic linker path)
     ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
@@ -1753,16 +1853,6 @@
                   .symtab .strtab .shstrtab)
     (write-segment-to-stream name stream)))
 
-(define-form syscall (sys-number . args)
-  `(begin
-    (MOVQir	,sys-number RAX)
-    ,@(map (lambda (arg reg)
-             ;; this being a macro opens the possibility for automatic
-             ;; opcode selection based on the provided arg.
-             `(MOVQir	,arg ,reg))
-           args '(RDI RSI RDX R10 R8 R9))
-    (SYSCALL)))
-
 (define-function emit-relocation-tables ()
   (with-current-segment 'ro-data
     (.align elf/alignof-Elf64_Rela)
@@ -1786,8 +1876,8 @@
             ;; Elf64_Rela entry (3 cells):
             ;; 1. r_offset: byte offset in file where relocation applies (paddress + segment file offset)
             (.i64 (+ segment-base paddress))
-            ;; 2. r_info: relocation type (R_X86_64_RELATIVE = 8, base-relative)
-            (.i64 elf/R_X86_64_RELATIVE)
+            ;; 2. r_info: relocation type (R_AARCH64_RELATIVE = 1027)
+            (.i64 elf/R_AARCH64_RELATIVE)
             ;; 3. r_addend: constant addend for relocation (0 for pure relative)
             (.i64 addend
                   ;;(+ segment-base paddress)

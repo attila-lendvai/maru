@@ -11,12 +11,12 @@
        (let ((arg (pop args))
              (reg (pop regs)))
          (typecase arg
-           (<REGISTER>		(MOVQrr (<REGISTER>-name arg) reg))
-           (<LI64>		(MOVQir (<LITERAL>-value arg) reg))
-           (<STACK-CELL>	(MOVQmr (<STACK-CELL>-offset arg) RBP 0 0 reg))
+           (<REGISTER>   (MOVr reg (<REGISTER>-name arg)))
+           (<LI64>       (MOVi reg (<LITERAL>-value arg)))
+           (<STACK-CELL> (LDR reg SP (bitwise-shift (<STACK-CELL>-offset arg) -3)))
            (else
             (error "LINUX-SYSCALL: unexpected argument type: "(type-of arg)", prints as: "arg)))))
-     (SYSCALL))))
+     (SVC 0))))
 
 ;; TODO add a <target-function> for this? or add a macro whose
 ;; expansion contains a literal x86 asm LINUX-SYSCALL instruction that
