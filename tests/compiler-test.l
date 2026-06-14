@@ -616,65 +616,71 @@
 ;;          b))
 ;;   (* 2 42))
 
-;; (begin-for-syntax
-;;  (define-function string+length (str)
-;;    (let ((len (string-length str)))
-;;      (assert (< 0 len))
-;;      `((string->C-string ,str) ,len))))
+(begin-for-syntax
+ (define-function string+length (str)
+   (let ((len (string-length str)))
+     (assert (< 0 len))
+     `((string->C-string ,str) ,len))))
 
 ;;; TODO are we compiled for libc or linux platform? or both?
-;; (define-test compile/syscall/1
-;;     (let ()
-;;       ;; (eval-at-expand
-;;       ;;  `(linux-syscall linux/write 2 ,@(string+length "\n\t*** compile/syscall/1 is printing this to fd 2\n")))
-;;       (let ((fd (linux-syscall linux/open (C-string "/dev/null") linux/O_RDONLY)))
-;;         (<= 0 fd)))
-;;   true)
 
-;; (define-test compile/syscall/2
-;;     (let ((fd (linux-syscall linux/open
-;;                              (C-string "/tmp/_maru-test")
-;;                              (bitwise-or linux/O_RDWR
-;;                                          linux/O_CREAT)
-;;                              420 ; "rw-r--r--"
-;;                              )))
-;;       (or (= 4 (eval-at-expand
-;;                 `(linux-syscall linux/write fd ,@(string+length "1234"))))
-;;           (failure "unexpected linux/write return code"))
-;;       (or (= 2 (linux-syscall linux/lseek fd 2 linux/SEEK_SET))
-;;           (failure "unexpected linux/lseek return code"))
-;;       (let ((buf 0))
-;;         (or (= 1 (linux-syscall linux/read fd (address-of buf) 1))
-;;             (failure "unexpected linux/read return code"))
-;;         (char-at (address-of buf) 0)))
-;;   ?3)
+(when-at-expand (feature platform/linux)
 
-;; (define-test compile/syscall/3
-;;     (let ((fd (linux-syscall linux/open
-;;                              (C-string "/tmp/_maru-test")
-;;                              (bitwise-or linux/O_RDWR
-;;                                          linux/O_CREAT)
-;;                              420 ; "rw-r--r--"
-;;                              )))
-;;       (eval-at-expand
-;;        `(linux-syscall linux/write fd ,@(string+length "1234")))
-;;       (let ((char ?5))
-;;         (linux-syscall linux/write fd (address-of char) 1))
-;;       (linux-syscall linux/lseek fd 2 linux/SEEK_SET)
-;;       (let ((buf 0)
-;;             (char 0)
-;;             (result 0))
-;;         (linux-syscall linux/read fd (address-of buf) 1)
-;;         (set char (char-at (address-of buf) 0))
-;;         ;; TODO FIXME on llvm 64 bits it fails when the char is not printed?! probably due to some optimization.
-;;         ;;(libc/fprintf libc/stdout "\n  *** char 1: %c\n" char)
-;;         (incr result (- char ?0))
-;;         (linux-syscall linux/lseek fd 4 linux/SEEK_SET)
-;;         (linux-syscall linux/read fd (address-of buf) 1)
-;;         (set char (char-at (address-of buf) 0))
-;;         ;;(libc/fprintf libc/stdout "\n  *** char 2: %c\n" char)
-;;         (incr result (- char ?0))))
-;;   (+ 3 5))
+(define-test compile/syscall/1
+    (let ()
+      ;; (eval-at-expand
+      ;;  `(syscall linux/write 2 ,@(string+length "\n\t*** compile/syscall/1 is printing this to fd 2\n")))
+      (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD
+                         (C-string "/dev/null")
+                         linux/O_RDONLY)))
+        (<= 0 fd)))
+  true)
+
+(define-test compile/syscall/2
+    (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD
+                       (C-string "/tmp/_maru-test")
+                       (bitwise-or linux/O_RDWR
+                                   linux/O_CREAT)
+                       420              ; "rw-r--r--"
+                       )))
+      (or (= 4 (eval-at-expand
+                `(syscall linux/SYS_write fd ,@(string+length "1234"))))
+          (failure "unexpected linux/write return code"))
+      (or (= 2 (syscall linux/SYS_lseek fd 2 linux/SEEK_SET))
+          (failure "unexpected linux/lseek return code"))
+      (let ((buf 0))
+        (or (= 1 (syscall linux/SYS_read fd (address-of buf) 1))
+            (failure "unexpected linux/read return code"))
+        (char-at (address-of buf) 0)))
+  ?3)
+
+(define-test compile/syscall/3
+    (let ((fd (syscall linux/SYS_openat linux/AT_FDCWD
+                       (C-string "/tmp/_maru-test")
+                       (bitwise-or linux/O_RDWR
+                                   linux/O_CREAT)
+                       420              ; "rw-r--r--"
+                       )))
+      (eval-at-expand
+       `(syscall linux/SYS_write fd ,@(string+length "1234")))
+      (let ((char ?5))
+        (syscall linux/SYS_write fd (address-of char) 1))
+      (syscall linux/SYS_lseek fd 2 linux/SEEK_SET)
+      (let ((buf 0)
+            (char 0)
+            (result 0))
+        ;; read the char 3
+        (syscall linux/SYS_read fd (address-of buf) 1)
+        (set char (char-at (address-of buf) 0))
+        (incr result (- char ?0))
+        ;; read the char 5
+        (syscall linux/SYS_lseek fd 4 linux/SEEK_SET)
+        (syscall linux/SYS_read fd (address-of buf) 1)
+        (set char (char-at (address-of buf) 0))
+        (incr result (- char ?0))))
+  (+ 3 5))
+
+) ;; when-at-expand (feature platform/linux))
 
 (define-function main (argc argv)
   (platform/diag-print "Printing test command line args:\n")
