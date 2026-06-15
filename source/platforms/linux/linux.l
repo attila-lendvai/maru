@@ -117,8 +117,10 @@
     ;;(assert (< 0 *current-break*))
     )
   (let ((new-break	(syscall linux/SYS_brk (+ *current-break* size)))
-        (result	*current-break*))
-    ;;(assert (= size (- new-break *current-break*)))
+        (result		*current-break*))
+    (when (= new-break *current-break*)
+      (platform/diag-print "SYS_brk failed, aborting")
+      (platform/halt))
     (set *current-break* new-break)
     ;; KLUDGE we make all allocated memory executable.
     ;; `make test-elf` generates machine code and wants to call it...
