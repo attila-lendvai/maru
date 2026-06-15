@@ -144,7 +144,7 @@
              (buf	(platform/acquire-memory size)))
         (libc/snprintf buf size (C-string "foo%sbaz%ld") (C-string "bar") 42)
         (let ((res (= 0 (libc/strcmp (C-string "foobarbaz42") buf))))
-          (libc/free buf)
+          ;; (libc/free buf) ; could come from posix's mmap, so let's just not free it
           res))
     true)
 
