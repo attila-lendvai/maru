@@ -27,47 +27,17 @@
   (int pipe (*))
   )
 
-;; malloc doesn't return page-aligned memory, so we round down the
-;; returned address, and round up the end address. this should work,
-;; but using mmap would probably be the right way.
-(define-form platform/acquire-memory (in-size)
-  `(let* ((size		,in-size)
-          (buf		(libc/malloc size))
-          (page-size	(posix/sysconf posix/_SC_PAGESIZE))
-          ;; the page-size-alined boundaries encompassing the returned block
-          (addr-start	(align-address-down buf page-size))
-          (addr-size	(- (align-address-up (+ buf size) page-size)
-                           addr-start)))
-     (when (= 0 buf)
-       (platform/diag-print "malloc returned with NULL")
-       (platform/halt))
-     ;; KLUDGE we make all allocated memory executable.
-     ;; `make test-elf` generates machine code and wants to call it...
-     (unless (= 0 (posix/mprotect addr-start addr-size
-                                  ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
-                                      posix/PROT_EXEC)))
-       (platform/diag-print "mprotect failed")
-       ;;(platform/diag-print "mprotect returned with "(long libc/errno))
-       (platform/halt))
-     buf))
-
-;; TODO this is subtly broken: bootstrap goes quite far ahead, but
-;; then it misbehaves (endless loop, or unable to apply undefined).
-;; ideally the API should be extended to be able to allocate/extend a
-;; continuous block of memory that the GC may take advantage of. for
-;; that we would need to receive the current range.
-
-;; (define-form platform/acquire-memory (size)
-;;   ;; KLUDGE we make all allocated memory executable.
-;;   ;; `make test-elf` generates machine code and wants to call it...
-;;   `(let* ((page-size (posix/sysconf posix/_SC_PAGESIZE))
-;;           (buf (posix/mmap 0 (align-address-up ,size page-size)
-;;                           ,(+ (+ posix/PROT_READ posix/PROT_WRITE)
-;;                               posix/PROT_EXEC)
-;;                           ,(+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
-;;                           -1 0)))
-;;      ;;(platform/diag-print "mmap returned with "(pointer buf)"\n")
-;;      (when (= buf posix/MAP_FAILED)
-;;        (platform/diag-print "mmap returned with MAP_FAILED")
-;;        (platform/halt))
-;;      buf))
+(define-function platform/acquire-memory (size)
+  ;; KLUDGE we make all allocated memory executable.
+  ;; some tests generate machine code and want to call it...
+  (let* ((page-size (posix/sysconf posix/_SC_PAGESIZE))
+         (buf (posix/mmap 0 (align-address-up size page-size)
+                          (+ (+ posix/PROT_READ posix/PROT_WRITE)
+                             posix/PROT_EXEC)
+                          (+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
+                          -1 0)))
+    ;;(platform/diag-print "mmap returned with "(pointer buf)"\n")
+    (when (< buf 0)
+      (platform/diag-print "mmap returned with an error\n")
+      (platform/halt))
+    buf))
