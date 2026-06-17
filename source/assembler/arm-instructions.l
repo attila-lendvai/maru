@@ -296,7 +296,7 @@
 ;;;                    MVN Xd/Wd, Xm/Wm = ORN Xd/Wd, XZR, Xm/Wm
 ;;;
 (define-instruction MOVr (rd rs)
-  (ADDi rd rs 0))
+  (ORRr rd XZR rs))
 
 (define-instruction MVN (rd rs)
   (ORNr rd XZR rs))
@@ -403,8 +403,8 @@
 (define-instruction BLR (raddr)
   (%emit-br 0x3F raddr))
 
-(define-instruction RET (raddr)
-  (%emit-br 0x5F raddr))
+(define-instruction RET args
+  (%emit-br 0x5F (if args (first args) LP)))
 
 ;;;
 ;;; Supervisor Call: SVC
