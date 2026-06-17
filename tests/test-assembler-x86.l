@@ -14,34 +14,34 @@
 (define-test alu ()
   (with-assembling ((code))
     ;; ADD: register-register (B, Q)
-    (ADDBrr _BL _AL)
-    (ADDQrr _RCX _RDX)
+    (ADDBrr BL AL)
+    (ADDQrr RCX RDX)
     ;; ADD: immediate-register (Q i8, Q i32)
-    (ADDQi8r 7 _RAX)
-    (ADDQi32r 0x12345678 _RBX)
+    (ADDQi8r 7 RAX)
+    (ADDQi32r 0x12345678 RBX)
     ;; ADD: auto-selection (i8 vs i32)
-    (ADDQir 127 _RCX)
-    (ADDQir 128 _RDX)
+    (ADDQir 127 RCX)
+    (ADDQir 128 RDX)
     ;; SUB: register-register (B, Q)
-    (SUBBrr _BL _AL)
-    (SUBQrr _RCX _RDX)
+    (SUBBrr BL AL)
+    (SUBQrr RCX RDX)
     ;; SUB: immediate-register
-    (SUBQi8r 7 _RAX)
-    (SUBQi32r 0x100 _RBX)
+    (SUBQi8r 7 RAX)
+    (SUBQi32r 0x100 RBX)
     ;; AND, OR, XOR, CMP: register-register (Q)
-    (ANDQrr _RAX _RBX)
-    (ORQrr  _RCX _RDX)
-    (XORQrr _R8  _R9)
-    (CMPQrr _R10 _R11)
+    (ANDQrr RAX RBX)
+    (ORQrr  RCX RDX)
+    (XORQrr R8  R9)
+    (CMPQrr R10 R11)
     ;; ADC, SBB: register-register (Q)
-    (ADCQrr _RAX _RBX)
-    (SBBQrr _RCX _RDX)
+    (ADCQrr RAX RBX)
+    (SBBQrr RCX RDX)
     ;; 16-bit variants
-    (ADDWrr _BX _AX)
-    (SUBWrr _CX _DX)
-    (verify-encoding (concat-string +build-dir+ "/asm-alu.bin")
-      (concat-strings
-       ".text
+    (ADDWrr BX AX)
+    (SUBWrr CX DX)
+    (verify-encoding/x86
+     "asm-alu.bin"
+     ".text
 .globl _start
 _start:
     add %bl, %al
@@ -62,7 +62,7 @@ _start:
     sbb %rcx, %rdx
     add %bx, %ax
     sub %cx, %dx
-"))))
+")))
 
 ;; ============================================================================
 ;; MOV: MOV variants, sign/zero extend
@@ -71,30 +71,30 @@ _start:
 (define-test mov ()
   (with-assembling ((code))
     ;; MOV: register-register (B, W, L, Q)
-    (MOVBrr _AL _BL)
-    (MOVWrr _AX _BX)
-    (MOVLrr _EAX _EBX)
-    (MOVQrr _RCX _RDX)
+    (MOVBrr AL BL)
+    (MOVWrr AX BX)
+    (MOVLrr EAX EBX)
+    (MOVQrr RCX RDX)
     ;; MOV: immediate-register (B, W, L)
-    (MOVBir 0x42 _AL)
-    (MOVWir 0x1234 _AX)
-    (MOVLir 0x12345678 _EAX)
+    (MOVBir 0x42 AL)
+    (MOVWir 0x1234 AX)
+    (MOVLir 0x12345678 EAX)
     ;; MOVQir: auto-selects i32 vs i64 encoding
-    (MOVQir 42 _RAX)
-    (MOVQir 0x1122334455667788 _RBX)
-    (MOVQir 0x7fffffff _RCX)
-    (MOVQir 0x80000000 _RDX)
+    (MOVQir 42 RAX)
+    (MOVQir 0x1122334455667788 RBX)
+    (MOVQir 0x7fffffff RCX)
+    (MOVQir 0x80000000 RDX)
     ;; Sign/zero extend
-    (MOVSBLrr _AL _EAX)
-    (MOVZBLrr _BL _EBX)
-    (MOVSBQrr _CL _RCX)
-    (MOVZBQrr _DL _RDX)
+    (MOVSBLrr AL EAX)
+    (MOVZBLrr BL EBX)
+    (MOVSBQrr CL RCX)
+    (MOVZBQrr DL RDX)
     ;; High registers
-    (MOVQrr _R8 _R9)
-    (MOVQrr _R10 _R11)
-    (verify-encoding (concat-string +build-dir+ "/asm-mov.bin")
-      (concat-strings
-       ".text
+    (MOVQrr R8 R9)
+    (MOVQrr R10 R11)
+    (verify-encoding/x86
+     "asm-mov.bin"
+     ".text
 .globl _start
 _start:
     mov %al, %bl
@@ -114,7 +114,7 @@ _start:
     movzbq %dl, %rdx
     mov %r8, %r9
     mov %r10, %r11
-"))))
+")))
 
 ;; ============================================================================
 ;; Control flow: JMP, CALL, RET, conditional jumps
@@ -123,17 +123,17 @@ _start:
 (define-test control ()
   (with-assembling ((code))
     ;; CALL: register
-    (CALLQr _RAX)
+    (CALLQr RAX)
     ;; RET
     (RETQ)
-    (verify-encoding (concat-string +build-dir+ "/asm-control.bin")
-      (concat-strings
-       ".text
+    (verify-encoding/x86
+     "asm-control.bin"
+     ".text
 .globl _start
 _start:
     call *%rax
     ret
-"))))
+")))
 
 ;; ============================================================================
 ;; Shift and rotate: SHL, SHR, SAR, ROL, ROR
@@ -142,25 +142,25 @@ _start:
 (define-test shift ()
   (with-assembling ((code))
     ;; SHL: imm=1, imm!=1, CL variant (B, L)
-    (SHLBir 1 _AL)
-    (SHLBir 3 _BL)
-    (SHLBrr _CL _DL)
-    (SHLLir 1 _EAX)
-    (SHLLir 4 _EBX)
-    (SHLLrr _CL _ECX)
+    (SHLBir 1 AL)
+    (SHLBir 3 BL)
+    (SHLBrr CL DL)
+    (SHLLir 1 EAX)
+    (SHLLir 4 EBX)
+    (SHLLrr CL ECX)
     ;; SHR (B only)
-    (SHRBir 1 _AL)
+    (SHRBir 1 AL)
     ;; SAR (B and Q)
-    (SARBir 1 _AL)
-    (SARQir 1 _RAX)
-    (SARQrr _CL _RCX)
+    (SARBir 1 AL)
+    (SARQir 1 RAX)
+    (SARQrr CL RCX)
     ;; ROL (B only)
-    (ROLBir 1 _AL)
+    (ROLBir 1 AL)
     ;; ROR (B only)
-    (RORBir 1 _AL)
-    (verify-encoding (concat-string +build-dir+ "/asm-shift.bin")
-      (concat-strings
-       ".text
+    (RORBir 1 AL)
+    (verify-encoding/x86
+     "asm-shift.bin"
+     ".text
 .globl _start
 _start:
     shl $1, %al
@@ -175,7 +175,7 @@ _start:
     sar %cl, %rcx
     rol $1, %al
     ror $1, %al
-"))))
+")))
 
 ;; ============================================================================
 ;; Unary: NEG, NOT, INC, DEC, TEST
@@ -184,30 +184,30 @@ _start:
 (define-test unary ()
   (with-assembling ((code))
     ;; NEG: B, W, L, Q (register)
-    (NEGBr _AL)
-    (NEGWr _AX)
-    (NEGLr _EAX)
-    (NEGQr _RAX)
+    (NEGBr AL)
+    (NEGWr AX)
+    (NEGLr EAX)
+    (NEGQr RAX)
     ;; NOT: B, Q
-    (NOTBr _BL)
-    (NOTQr _RBX)
+    (NOTBr BL)
+    (NOTQr RBX)
     ;; INC: L, Q
-    (INCLr _ECX)
-    (INCQr _RCX)
+    (INCLr ECX)
+    (INCQr RCX)
     ;; DEC: L only (Q variant doesn't exist)
-    (DECLr _EDX)
+    (DECLr EDX)
     ;; TEST: register-register (B, W, L, Q)
-    (TESTBrr _AL _BL)
-    (TESTWrr _AX _BX)
-    (TESTLrr _EAX _EBX)
-    (TESTQrr _RCX _RDX)
+    (TESTBrr AL BL)
+    (TESTWrr AX BX)
+    (TESTLrr EAX EBX)
+    (TESTQrr RCX RDX)
     ;; TEST: immediate-register (B, W, L)
-    (TESTBir 0xff _BL)
-    (TESTWir 0xffff _BX)
-    (TESTLir 0x7fffffff _EBX)
-    (verify-encoding (concat-string +build-dir+ "/asm-unary.bin")
-      (concat-strings
-       ".text
+    (TESTBir 0xff BL)
+    (TESTWir 0xffff BX)
+    (TESTLir 0x7fffffff EBX)
+    (verify-encoding/x86
+     "asm-unary.bin"
+     ".text
 .globl _start
 _start:
     neg %al
@@ -226,7 +226,7 @@ _start:
     test $0xff, %bl
     test $0xffff, %bx
     test $0x7fffffff, %ebx
-"))))
+")))
 
 ;; ============================================================================
 ;; Multiply and divide: MUL, IMUL, DIV, IDIV
@@ -235,28 +235,28 @@ _start:
 (define-test muldiv ()
   (with-assembling ((code))
     ;; MUL: B, W, L, Q
-    (MULBrr _BL _AL)
-    (MULWrr _BX _AX)
-    (MULLrr _EBX _EAX)
-    (MULQrr _RBX _RAX)
+    (MULBrr BL AL)
+    (MULWrr BX AX)
+    (MULLrr EBX EAX)
+    (MULQrr RBX RAX)
     ;; IMUL: 2-operand (W, L)
-    (IMULWrr _BX _AX)
-    (IMULLrr _EBX _EAX)
+    (IMULWrr BX AX)
+    (IMULLrr EBX EAX)
     ;; IMUL: 3-operand (W, L)
-    (IMULWirr 42 _BX _AX)
-    (IMULLirr 42 _EBX _EAX)
-    (IMULLirr 0x100 _ECX _EDX)
+    (IMULWirr 42 BX AX)
+    (IMULLirr 42 EBX EAX)
+    (IMULLirr 0x100 ECX EDX)
     ;; DIV: B, W, L, Q
-    (DIVBrr _BL _AL)
-    (DIVWrr _BX _AX)
-    (DIVLrr _EBX _EAX)
-    (DIVQrr _RBX _RAX)
+    (DIVBrr BL AL)
+    (DIVWrr BX AX)
+    (DIVLrr EBX EAX)
+    (DIVQrr RBX RAX)
     ;; IDIV: B, L (Q variant doesn't exist)
-    (IDIVBrr _BL _AL)
-    (IDIVLrr _EBX _EAX)
-    (verify-encoding (concat-string +build-dir+ "/asm-muldiv.bin")
-      (concat-strings
-       ".text
+    (IDIVBrr BL AL)
+    (IDIVLrr EBX EAX)
+    (verify-encoding/x86
+     "asm-muldiv.bin"
+     ".text
 .globl _start
 _start:
     mul %bl
@@ -274,7 +274,7 @@ _start:
     div %rbx
     idiv %bl
     idiv %ebx
-"))))
+")))
 
 ;; ============================================================================
 ;; Special: SYSCALL, LEA, NOP, PUSH/POP, BSWAP, XCHG, flags, conversions
@@ -285,23 +285,23 @@ _start:
     ;; SYSCALL
     (SYSCALL)
     ;; LEA: various addressing modes
-    (LEAQmr 0 _RAX _RBX 1 _RCX)
-    (LEAQmr 8 _RAX _RBX 4 _RCX)
-    (LEAQmr 0x80 _RAX _RBX 1 _RCX)
-    (LEAQmr 0 _RAX 0 0 _RBX)
+    (LEAQmr 0 RAX RBX 1 RCX)
+    (LEAQmr 8 RAX RBX 4 RCX)
+    (LEAQmr 0x80 RAX RBX 1 RCX)
+    (LEAQmr 0 RAX 0 0 RBX)
     ;; NOP
     (NOP)
     ;; PUSH/POP: L, Q
-    (PUSHLr _EAX)
-    (POPLr _EBX)
-    (PUSHQr _RCX)
-    (POPQr _RDX)
+    (PUSHLr EAX)
+    (POPLr EBX)
+    (PUSHQr RCX)
+    (POPQr RDX)
     ;; BSWAP
-    (BSWAPr _EAX)
-    (BSWAPLr _EBX)
+    (BSWAPr EAX)
+    (BSWAPLr EBX)
     ;; XCHG: B, L, Q
-    (XCHGBrr _AL _BL)
-    (XCHGLrr _ECX _EDX)
+    (XCHGBrr AL BL)
+    (XCHGLrr ECX EDX)
     ;; LAHF, SAHF
     (LAHF)
     (SAHF)
@@ -311,9 +311,9 @@ _start:
     ;; CLC, STC
     (CLC)
     (STC)
-    (verify-encoding (concat-string +build-dir+ "/asm-special.bin")
-      (concat-strings
-       ".text
+    (verify-encoding/x86
+     "asm-special.bin"
+     ".text
 .globl _start
 _start:
     syscall
@@ -336,7 +336,7 @@ _start:
     cqo
     clc
     stc
-"))))
+")))
 
 ;; ============================================================================
 ;; REX prefix and memory addressing edge cases
@@ -345,31 +345,31 @@ _start:
 (define-test rex-memory ()
   (with-assembling ((code))
     ;; R8-R15: register-register operations
-    (ADDQrr _R8 _R9)
-    (MOVQrr _R10 _R11)
-    (SUBQrr _R12 _R13)
-    (ANDQrr _R14 _R15)
+    (ADDQrr R8 R9)
+    (MOVQrr R10 R11)
+    (SUBQrr R12 R13)
+    (ANDQrr R14 R15)
     ;; R8-R15: 32-bit variants
-    (ADDLrr _R8D _R9D)
-    (MOVLir 42 _R10D)
+    (ADDLrr R8D R9D)
+    (MOVLir 42 R10D)
     ;; SIB: scale factors 2, 4, 8
-    (LEAQmr 0 _RAX _RBX 2 _RCX)
-    (LEAQmr 0 _RAX _RBX 4 _RCX)
-    (LEAQmr 0 _RAX _RBX 8 _RCX)
+    (LEAQmr 0 RAX RBX 2 RCX)
+    (LEAQmr 0 RAX RBX 4 RCX)
+    (LEAQmr 0 RAX RBX 8 RCX)
     ;; Memory addressing: disp0 vs disp8 vs disp32 auto-selection
-    (ADDQim 7 0 _RAX 0 0)
-    (ADDQim 7 0x7f _RBX 0 0)
-    (ADDQim 7 0x80 _RCX 0 0)
-    (ADDQim 7 0x100 _RDX 0 0)
+    (ADDQim 7 0 RAX 0 0)
+    (ADDQim 7 0x7f RBX 0 0)
+    (ADDQim 7 0x80 RCX 0 0)
+    (ADDQim 7 0x100 RDX 0 0)
     ;; RIP-relative: LEA with zero and non-zero displacement
-    (LEAQmr 0 0 0 0 _RAX)
+    (LEAQmr 0 0 0 0 RAX)
     ;; CALL: relative call
     (JMPm 0 0 0 0)
     ;; MOVQmr: RIP-relative load
-    (MOVQmr 0 0 0 0 _RBX)
-    (verify-encoding (concat-string +build-dir+ "/asm-rex-memory.bin")
-      (concat-strings
-       ".text
+    (MOVQmr 0 0 0 0 RBX)
+    (verify-encoding/x86
+     "asm-rex-memory.bin"
+     ".text
 .globl _start
 _start:
     add %r8, %r9
@@ -388,6 +388,6 @@ _start:
     lea 0x0(%rip), %rax
     jmp 0x0
     mov 0x0(%rip), %rbx
-"))))
+")))
 
 (run-tests)

@@ -646,15 +646,15 @@ test-jit: $(TEST_EVAL) tests/jit.l source/assembler/x86-instructions.l
 	rm -f $(BUILD)/jit/*
 	$(TEST_EVAL) boot.l --define +target-triple+ "$(TARGET)" tests/jit.l
 
-test-assembler: test-assembler-x86 test-assembler-aarch64
+test-assembler: test-assembler-x86 test-assembler-arm
 
 test-assembler-x86: $(TEST_EVAL) tests/test-assembler-x86.l source/assembler/x86-instructions.l source/assembler/single-pass-x86.l
-	@mkdir -p $(BUILD)
+	@mkdir -p $(BUILD)/asm-x86
 	$(TEST_EVAL) boot.l tests/test-assembler-x86.l
 
-test-assembler-aarch64: $(TEST_EVAL) tests/test-assembler-aarch64.l source/assembler/arm-instructions.l source/assembler/single-pass-arm.l
-	@mkdir -p $(BUILD)
-	$(TEST_EVAL) boot.l tests/test-assembler-aarch64.l
+test-assembler-arm: $(TEST_EVAL) tests/test-assembler-arm.l source/assembler/arm-instructions.l source/assembler/single-pass-arm.l
+	@mkdir -p $(BUILD)/asm-arm
+	$(TEST_EVAL) boot.l tests/test-assembler-arm.l
 
 test-parser: $(TEST_EVAL) tests/parsing/gnu-bc.g.l tests/parsing/* source/parsing/*
 	$(TEST_EVAL) boot.l tests/parsing/gnu-bc-test.l
