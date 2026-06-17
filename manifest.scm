@@ -25,7 +25,9 @@
  (gnu packages commencement)
  (guix)
  (guix profiles)
- (guix packages))
+ (guix packages)
+ (guix build-system gnu)
+ )
 
 (define (cross-package-entry pkg target-triplet)
   (manifest-entry
@@ -34,18 +36,36 @@
      (with-parameters ((%current-target-system target-triplet))
        pkg))))
 
+(define-public binutils-prefixed
+  (package
+    (inherit binutils)
+    (name "binutils-prefixed")
+    (arguments
+     (substitute-keyword-arguments (package-arguments binutils)
+       ((#:configure-flags flags #~'())
+        #~(cons "--program-prefix=aarch64-linux-gnu-" #$flags))))))
+
 (manifest
  (append
-   ;; you can pick specific version-classes here
+
+  ;; you can pick specific version-classes here
   (map package->manifest-entry
        (list
         clang-toolchain-21              ; use a specific version
+        lld-21  ; can cross-compile; clang-toolchain comes with GNU ld
         ;; clang-toolchain                 ; use whatever is in guix (usually old)
         ;; gcc-toolchain
         ))
 
   ;; This works, but the header file alone is not enough to compile to i686.
   ;; (list (cross-package-entry glibc "i686-linux-gnu"))
+
+  ;; this leads to an attempt to compile it locally but fails with:
+  ;; objcopy: Unable to recognise the format of the input file `/tmp/guix-build-glibc-2.41.drv-0/build/libc_pic.os'
+  ;; there's this, too (cross-clang): https://issues.guix.gnu.org/54239
+  ;; (list (cross-package-entry glibc "aarch64-linux-gnu"))
+
+  (list (cross-package-entry binutils-prefixed "aarch64-linux-gnu"))
 
   ;; get the latest from the channels you have `guix pull`ed
   (manifest-entries
@@ -75,5 +95,5 @@
       "gdb"
       "cgdb"
       "cutter"
-      "intel-xed" ; for authoritative disassembling
+      "intel-xed"                    ; for authoritative disassembling
       )))))
