@@ -475,8 +475,8 @@
 ;; between expression-like constants and instruction-like runtime
 ;; code. It's baked into the LLVM grammar and won't ever change, so we
 ;; have to deal with it ourselves.
-(define-function emit/header->payload (input)
-  (print "getelementptr %\"<header>\", %\"<header>\"* "input", i32 1"))
+(define-function emit/header->payload (dest input)
+  (println "	"dest" = getelementptr %\"<header>\", %\"<header>\"* "input", i32 1"))
 
 (define-function emit/header->payload/in-constants (input)
   (print "getelementptr (%\"<header>\", %\"<header>\"* "input", i32 1)"))
@@ -525,25 +525,16 @@
   ((STACK-CELL _)		(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL _)			(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL string)		(if (feature emit-with-object-headers)
-                                    (begin
-                                      (print "	"$reg1" = ")
-                                      (emit/header->payload $1)
-                                      (println))
+                                    (emit/header->payload $reg1 $1)
                                   (println "	"$reg1" = load %oop, %oop* "$1)))
   ((GLOBAL expr)		(if (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
                                   (if (feature emit-with-object-headers)
-                                      (let ()
-                                        (print "	"$reg1" = ")
-                                        (emit/header->payload $1))
-                                    (print "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0"))
-                                  (println)))
+                                      (emit/header->payload $reg1 $1)
+                                    (println "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0"))))
   ;; literals: closures, strings
   ((CONSTANT _)			(if (feature emit-with-object-headers)
-                                    (begin
-                                      (print "	"$reg1" = ")
-                                      (emit/header->payload $1)
-                                      (println))
+                                    (emit/header->payload $reg1 $1)
                                   ;; just an alias to set the output value
                                   (println "	"$reg1" = bitcast ptr "$1" to %oop")))
   ((GLOBAL C-function)		(print "	"$reg1" = bitcast ")
