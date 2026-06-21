@@ -306,7 +306,11 @@
      (<compiler>-current-value -c-)))
 
 (define-form gen (instr-name . args)
-  `(%gen -c- ,instr-name (list ,@args)))
+  `(%gen -c- ,instr-name (list ,@(map (lambda (arg)
+                                         (if (= '$ arg)
+                                             '(<compiler>-current-value -c-)
+                                           arg))
+                                       args))))
 
 (define-function emit-gen-buffer (-c-)
   (array-do entry (<compiler>-gen-buffer -c-)
@@ -574,21 +578,20 @@
 ;; (define-instruction FRAMEADDRESS	(false 1 true)
 ;;   ((long)			(println "	"$reg1" = call ptr @llvm.frameaddress(i32 "$1")")))
 
-(define-instruction CALL	(false 1 true)
-  ((GLOBAL _)			(emit-llvm-call $reg1
+(define-instruction CALL	(false 2 true)
+  ;; NOTE only the third variant uses two tmp's; first two ignores/"wastes" $reg1
+  ((GLOBAL _)			(emit-llvm-call $reg2
                                                 $1
                                                 $2
                                                 '%oop
                                                 (map (lambda _ '%oop) $2) ; param types
                                                 ()))
-  ((C-function _)		(emit-llvm-call $reg1
+  ((C-function _)		(emit-llvm-call $reg2
                                                 (EXTERNAL (<C-function>-name $1))
                                                 $2
                                                 (C-type->llvm-type (<C-function>-return-type $1))
                                                 (map C-type->llvm-type (<C-function>-parameter-types $1))
-                                                (<C-function>-vararg? $1))))
-
-(define-instruction CALLPTR	(true 2 true)
+                                                (<C-function>-vararg? $1)))
   ((LOCAL _)			(let ((param-types (map (lambda _ '%oop) $2)))
                                   (print "	"$reg1" = bitcast %oop "$1" to ")
                                   (emit-llvm-fn-type '%oop param-types ())
@@ -901,7 +904,7 @@
       ;; be called.
       (gen BITCAST '%oop "%\"<target-function>\"*")
       (gen LOAD-OOP (LITERAL program-code-offset)))
-    (gen CALLPTR arg-regs)
+    (gen CALL $ arg-regs)
     ()))
 
 (define-function compile-call-to-global-function (op arg-regs -c-)

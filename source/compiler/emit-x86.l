@@ -431,10 +431,7 @@
                                 (JNE $2)))
 
 (define-instruction CALL	(false 0 true)
-  ((label)			(CALLQm $1 0 0 0)))
-
-;; TODO merge into CALL?
-(define-instruction CALLPTR	(true 0 false)
+  ((label)			(CALLQm $1 0 0 0))
   ((REGISTER)			(CALLQr (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
@@ -797,7 +794,7 @@
       ;; feature is disabled then it's just a raw function pointer to
       ;; be called.
       (emit LOAD-OOP $ (LI64 program-code-offset)))
-    (emit CALLPTR $)
+    (emit CALL $)
     ()))
 
 (define-function closure-code-label (name)
