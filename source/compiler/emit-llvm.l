@@ -512,10 +512,6 @@
 (define-instruction BITCAST	(true 1 true)
   ((_ _ _)			(println "	"$reg1" = bitcast "$2" "$1" to "$3)))
 
-(define-instruction GEP		(true 1 true)
-  ;; args: ptr type index1 index2
-  ((_ _ _ _)			(println "	"$reg1" = getelementptr "$2", "$2"* "$1", i32 "$3", i32 "$4)))
-
 (define-instruction RET		(false 1 false)
   ((LITERAL)			(println "	"$reg1" = inttoptr %word "$1" to %oop")
                                 (println "	ret %oop "$reg1))
@@ -528,7 +524,13 @@
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
   ((STACK-CELL _)		(println "	"$reg1" = load %oop, %oop* "$1))
   ((GLOBAL _)			(println "	"$reg1" = load %oop, %oop* "$1))
-  ((GLOBAL expr)		(if-at-expand (feature redefinable-functions-in-target)
+  ((GLOBAL string)		(if (feature emit-with-object-headers)
+                                    (begin
+                                      (print "	"$reg1" = ")
+                                      (emit/header->payload $1)
+                                      (println))
+                                  (println "	"$reg1" = load %oop, %oop* "$1)))
+  ((GLOBAL expr)		(if (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
                                   (if (feature emit-with-object-headers)
                                       (let ()
@@ -536,10 +538,14 @@
                                         (emit/header->payload $1))
                                     (print "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0"))
                                   (println)))
-  ;; closures
-  ((CONSTANT expr)		(print "	"$reg1" = ")
-				(emit/header->payload $1)
-				(println))
+  ;; literals: closures, strings
+  ((CONSTANT _)			(if (feature emit-with-object-headers)
+                                    (begin
+                                      (print "	"$reg1" = ")
+                                      (emit/header->payload $1)
+                                      (println))
+                                  ;; just an alias to set the output value
+                                  (println "	"$reg1" = bitcast ptr "$1" to %oop")))
   ((GLOBAL C-function)		(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %oop"))
@@ -1227,15 +1233,6 @@
                                      (gen LOAD (GLOBAL self.name) value)))))
       (else
        (error "compile of <variable> failed for " self ", holding the value " value)))))
-
-(define-method compile <string> (-c-)
-  (set (<compiler>-current-value -c-)
-       (compile-object self -c-))
-  (if (feature emit-with-object-headers)
-      (begin
-       (gen GEP (LOCAL '<string-h>) 0 1) ; 1 means skip the header
-       (gen BITCAST "%word*" "%oop"))
-    (gen BITCAST "ptr" "%oop")))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))
