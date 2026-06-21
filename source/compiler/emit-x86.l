@@ -404,7 +404,7 @@
   ((pair)			(apply print-all (concat-list
                                                   (list *debug-output* "; ")
                                                   $1))
-                                ;; TODO this needs either and append with n args or
+                                ;; TODO this needs either an append with n args or
                                 ;; a smarter apply
                                 (print-all *debug-output* "\n")))
 
@@ -475,30 +475,28 @@
                                      (MOVQi64r lit RBX)
                                      (SUBQrr RBX reg))))))
 
-;; TODO x86 mul operates on eax, which somehow needs to be encoded
-;; into the instruction. same applies to div.
-(define-instruction MUL		()
-  ((STACK-CELL)			(MULQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
-  ((LI64)			(cond
-                                  ((= 1 (<LITERAL>-value $1))) ; nothing to do
+(define-instruction MUL		(true 0 true)
+  ((R64 STACK-CELL)		(MULQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 LI64)			(cond
+                                  ((= 1 (<LITERAL>-value $2))) ; nothing to do
                                   ;; TODO emit shifts when possible
                                   (else
-                                   (MOVQir (<LITERAL>-value $1) RCX)
-                                   (MULQrr RCX RAX)))))
+                                   (MOVQir (<LITERAL>-value $2) RCX)
+                                   (MULQrr RCX (<REGISTER>-name $1))))))
 
 ;; the x86 div instruction is unsigned division
-(define-instruction DIV		()
-  ((STACK-CELL)			(XORQrr RDX RDX)
-                                (DIVQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
-  ((LI64)			(cond
-                                  ((= 1 (<LITERAL>-value $1))
+(define-instruction DIV		(true 0 true)
+  ((R64 STACK-CELL)		(XORQrr RDX RDX)
+                                (DIVQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 LI64)			(XORQrr RDX RDX) ; the upper side of 128 bit operand
+                                (cond
+                                  ((= 1 (<LITERAL>-value $2))
                                    ;; remainder is zero, %rax is unchanged
-                                   (XORQrr RDX RDX))
+                                   )
                                   ;; TODO emit shifts when possible
                                   (else
-                                   (XORQrr RDX RDX) ; the upper side of 64 bit operand
-                                   (MOVQir (<LITERAL>-value $1) RCX) ; divisor
-                                   (DIVQrr RCX RAX)))))
+                                   (MOVQir (<LITERAL>-value $2) RCX) ; divisor
+                                   (DIVQrr RCX (<REGISTER>-name $1))))))
 
 (define-instruction AND		(true 0 true)
   ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
@@ -612,75 +610,80 @@
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
-(define-instruction LOAD-I8	(false 0 true)
-  ((STACK-CELL)			(MOVQmr (<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (LEAQmr 0 RAX RCX 1 RCX)
+(define-instruction LOAD-I8	(true 0 true)
+  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (LEAQmr 0 (<REGISTER>-name $1) RCX 1 RCX)
                                 (XORQrr RAX RAX)
                                 (MOVBmr 0 RCX 0 1 AL))
-  ((LI64)			(let ((offset (<LITERAL>-value $1)))
+  ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
                                   (if (= 0 offset)
-                                      (MOVQrr RAX RCX)
-                                    (LEAQmr offset RAX 0 1 RCX)))
+                                      (MOVQrr (<REGISTER>-name $1) RCX)
+                                    (LEAQmr offset (<REGISTER>-name $1) 0 1 RCX)))
                                 (XORQrr RAX RAX)
                                 (MOVBmr 0 RCX 0 1 AL)))
 
-(define-instruction STORE-I8	(false 0 true)
-  ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
+(define-instruction STORE-I8	(true 0 true)
+  ((R64 STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (XORQrr	RBX RBX))
-                                (MOVBmr	(<STACK-CELL>-offset $2) RBP 0 1 BL)
-                                (MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVBrm	BL 0 RAX RCX 1)
+                                (MOVBmr	(<STACK-CELL>-offset $3) RBP 0 1 BL)
+                                (MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (MOVBrm	BL 0 (<REGISTER>-name $1) RCX 1)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RBX RAX)))
-  ((STACK-CELL LI64)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
+  ((R64 STACK-CELL LI64)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (if-at-expand (feature strict-semantics-for-compiled-set)
                                     (begin
                                      (XORQrr	RBX RBX)
-                                     (MOVBir	(<LITERAL>-value $2) BL)
-                                     (MOVBrm	BL 0 RAX RCX 1)
+                                     (MOVBir	(<LITERAL>-value $3) BL)
+                                     (MOVBrm	BL 0 (<REGISTER>-name $1) RCX 1)
                                      (MOVQrr	RBX RAX))
-                                  (MOVBim	(<LITERAL>-value $2) 0 RAX RCX 1))))
+                                  (MOVBim	(<LITERAL>-value $3) 0 (<REGISTER>-name $1) RCX 1))))
 
 (when-at-expand (feature lower/array)
-  ;; TODO these two are the same as the -OOP versions, except the MOV's scale
-  (define-instruction LOAD-CELL	(false 0 true)
-    ((STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr 0 RAX RCX 1 RAX))
-    ((LI64)			(LEAQmr	(<LITERAL>-value $1) RAX 0 0 RAX) ; index
+
+;; TODO these two are the same as the -OOP versions, except the MOV's scale
+(define-instruction LOAD-CELL	(true 0 true)
+  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
+				(MOVQmr 0 (<REGISTER>-name $1) RCX 1 RAX))
+  ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX) ; index
 				(MOVQmr 0 RAX 0 0 RAX)))
 
-  (define-instruction STORE-CELL	(false 0 true)
-    ((STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RBX) ; value
-				(MOVQrm	RBX 0 RAX RCX 1))))
+(define-instruction STORE-CELL	(true 0 true)
+  ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
+				(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RBX) ; value
+				(MOVQrm	RBX 0 (<REGISTER>-name $1) RCX 1)))
 
-(define-instruction LOAD-OOP	(false 0 true)
-  ((STACK-CELL)			(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX) ; index
-				(MOVQmr 0 RAX RCX 8 RAX))
-  ((LI64)			(let ((offset (<LITERAL>-value $1)))
+) ; (feature lower/array)
+
+(define-instruction LOAD-OOP	(true 0 true)
+  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
+				(MOVQmr 0 (<REGISTER>-name $1) RCX 8 RAX))
+  ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
                                   (if (= 0 offset)
-                                      (MOVQmr 0 RAX 0 0 RAX)
-                                    (LEAQmr (* offset 8) RAX 0 0 RCX)
+                                      (MOVQmr 0 (<REGISTER>-name $1) 0 0 RAX)
+                                    (LEAQmr (* offset 8) (<REGISTER>-name $1) 0 0 RCX)
                                     (MOVQmr 0 RCX 0 0 RAX)))))
 
 ;; object is in RAX; args: offset, value
-(define-instruction STORE-OOP	(false 0 true)
-  ((STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RDX)
-                                (MOVQrm	RDX 0 RAX RCX 8)
+(define-instruction STORE-OOP	(true 0 true)
+  ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX)
+                                (MOVQrm	RDX 0 (<REGISTER>-name $1) RCX 8)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  ;; TODO these should probably mess with the current-value,
+                                  ;; instead of move'ing into RAX
+                                  (MOVQrr	RDX RAX)))
+  ((R64 LI64 LI64)		(MOVQir	(<LITERAL>-value $3) RDX) ; value
+                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
-  ((LI64 LI64)			(MOVQir	(<LITERAL>-value $2) RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $1) 8) RAX 0 0)
+  ((R64 STACK-CELL LI64)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (MOVQir	(<LITERAL>-value $3) RDX)
+                                (MOVQrm	RDX 0 (<REGISTER>-name $1) RCX 8)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
-  ((STACK-CELL LI64)		(MOVQmr	(<STACK-CELL>-offset $1) RBP 0 1 RCX)
-                                (MOVQir	(<LITERAL>-value $2) RDX)
-                                (MOVQrm	RDX 0 RAX RCX 8)
-                                (when-at-expand (feature strict-semantics-for-compiled-set)
-                                  (MOVQrr	RDX RAX)))
-  ((LI64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $1) 8) RAX 0 0)
+  ((R64 LI64 STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX) ; value
+                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX))))
 
@@ -793,7 +796,7 @@
       ;; i.e. this is a full <target-function> object. when the
       ;; feature is disabled then it's just a raw function pointer to
       ;; be called.
-      (emit LOAD-OOP (LI64 program-code-offset)))
+      (emit LOAD-OOP $ (LI64 program-code-offset)))
     (emit CALLPTR $)
     ()))
 
@@ -953,22 +956,18 @@
   (comp (car args))
   ;; FIXME we shouldn't need to instantiate the instructions here...
   (let ((instr (op ())))
-    (if (<instruction>-has-input? instr)
-        (emit op $)
-      (emit op))))
+    (assert (<instruction>-has-input? instr))
+    (emit op $)))
 
 ;; FIXME? these implement a right-to-left evaluation order, while
-;; function calls implement the opposite. note that this is entangled
-;; with e.g. the LOAD/STORE instructions above, as they expect arg0 to
-;; be loaded in %rax.
+;; function calls implement the opposite.
 (define-function compile/binary-operator (op args -c-)
   (let ((tmp (compile/expr-into-temp-or-literal (cadr args) -c-)))
     (comp (car args))
     (free-temp tmp)
     (let ((instr (op ())))
-      (if (<instruction>-has-input? instr)
-          (emit op $ tmp)
-        (emit op tmp)))))
+      (assert (<instruction>-has-input? instr))
+      (emit op $ tmp))))
 
 (define-function compile/ternary-operator (op args -c-)
   (let ((tmp2 (compile/expr-into-temp-or-literal (third  args) -c-))
@@ -977,9 +976,8 @@
     (free-temp tmp1)
     (free-temp tmp2)
     (let ((instr (op ())))
-      (if (<instruction>-has-input? instr)
-          (emit op $ tmp1 tmp2)
-        (emit op tmp1 tmp2)))))
+      (assert (<instruction>-has-input? instr))
+      (emit op $ tmp1 tmp2))))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
 
