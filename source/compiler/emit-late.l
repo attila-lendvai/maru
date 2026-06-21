@@ -1,57 +1,5 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define-function features->print-forms (names)
-  (let ((elements ())
-        (first-time true))
-    (map (lambda (name)
-           (if first-time
-               (set first-time false)
-             (push elements ", "))
-           (push elements (symbol->string name))
-           (push elements "=")
-           (push elements `(feature ,name)))
-         names)
-    (list-reverse! elements)))
-
-(define-form comment-features ()
-  `(emit-comment 0 "features: "
-                 ,@(features->print-forms
-                    '(emit-with-object-headers
-                      redefinable-functions-in-target
-                      strict-semantics-for-compiled-set
-                      profiler
-                      track-expr-names
-                      object-canary
-                      debug-info))))
-
-(define-function compile-env (env -c-)
-  (verbosity 1
-    (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
-    (map (lambda (sym)
-           (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
-         '(+operating-system+ +architecture+ +little-endian?+
-           +word-size-in-bits+
-           ;;oop/alignment-in-bytes oop/align-padding
-           ;;oop/payload-mask oop/tag-mask
-           )))
-  (comment-features)
-  (emit-prelude -c-)
-  ;; NOTE this array-do will not pick up any new definitions added to
-  ;; the env after the iterations has begun (see e.g. the
-  ;; COMPILE-DEFINITION of <selector>).
-  (array-do var (<env>-bindings env)
-    (let* ((name		(<variable>-name  var))
-           (value		(<variable>-value var))
-           (type-blacklist	(list <form> <fixed>))
-           (name-blacklist	'()))
-      (unless (or (member? (type-of value) type-blacklist)
-                  (member? name name-blacklist))
-        (emit-comment 1 "defn "name)
-        (verbosity 1 (warn name ", "))
-        (compile-definition value name -c-))))
-  (verbosity 1 (warn "\n"))
-  (emit-gen-buffer -c-))
-
 ;;;
 ;;; <selector>
 ;;;
@@ -76,7 +24,7 @@
       (let ((impl-fn (array-at methods i)))
         (when impl-fn
           (let ((slave-type-id (eval-in-slave `(<type>-slave-id ,(type-object-for-id i)))))
-            (emit-comment 1 "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn))
+            (emit-comment 2 "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn))
             (or index-min (set index-min slave-type-id))
             (set index-max slave-type-id)
             ;; NOTE this takes the parameter signature of the first method

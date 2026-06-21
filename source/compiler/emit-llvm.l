@@ -30,6 +30,294 @@
 ;;;   - *foo* is a global
 
 (require "source/compiler/emit-early.l")
+
+;;;
+;;; Utils
+;;;
+(let ((counter 0))
+  (define-function unique-name (prefix)
+    (concat-string prefix (number->string (incr counter)))))
+
+;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
+(define-function expr-n-required-parameters (op)
+  (let ((params		(<expr>-parameters op))
+        (n-params	()))
+    (cond
+      ((not params))                   ; (lambda () ...)
+      ((symbol? params))               ; (lambda args ...)
+      ((pair? params)
+       (set n-params 1)
+       (while (pair? (set params (rest params)))
+         (incr n-params))
+       (when (symbol? params)          ; (lambda (arg1 . rest) ...)
+         (set n-params ())))
+      (else
+       (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
+    n-params))
+
+(define-function %llvm-escape (prefix str char-needs-quoting? ordinary-char? . with-zero)
+  (with-forms ((putnext ((c) `(string-append mangled ,c))))
+    (let* ((mangled (string))
+           (quote-result? ())
+           (digit-for (lambda (c)
+                        (if (< c 10)
+                            (+ c ?0)
+                          (+ c (- ?A 10)))))
+           (write-char (lambda (c)
+                         (when (char-needs-quoting? c)
+                           (set quote-result? true))
+                         (if (ordinary-char? c)
+                             (putnext c)
+                           (putnext ?\\)
+                           (putnext (digit-for (bitwise-shift c -4)))
+                           (putnext (digit-for (bitwise-and c 0xf)))))))
+      (when prefix
+        (string-do c prefix
+          (write-char c)))
+      (string-do c str
+        (write-char c))
+      (when with-zero
+        (write-char ?\x00))
+      (when quote-result?
+        (putnext ?\")
+        (string-insert mangled 0 ?\"))
+      mangled)))
+
+(define-function llvm/ordinary-char? (c)
+  (and (<= 32 c) (<= c 127)
+       (not (= ?\" c))
+       (not (= ?\\ c))))
+
+(define-function llvm/escape-string (str . with-zero)
+  (%llvm-escape ()
+                str
+                (lambda _ true)           ; always wrap it in double quotes
+                llvm/ordinary-char?
+                with-zero))
+
+(define-function llvm/escape-identifier (prefix name)
+  ;; NOTE we don't need to escape ptr and word (two globally defined types that we use) because
+  ;; our globals are prefixed by llvm/escape-global-identifier.
+  (set name (symbol->string name))
+  (%llvm-escape prefix
+                name
+                (lambda (c)
+                  (not (or (and (<= ?a c) (<= c ?z))
+                           (and (<= ?A c) (<= c ?Z))
+                           (and (<= ?0 c) (<= c ?9))
+                           (member? c '(?- ?$ ?. ?_)))))
+                llvm/ordinary-char?))
+
+(define-function llvm/escape-local-identifier (name)
+  (llvm/escape-identifier () name))
+
+(define-function llvm/escape-global-identifier (name)
+  (llvm/escape-identifier +maru-label-prefix+ name))
+
+;;;
+;;; Operands
+;;;
+
+(define-function define-operand/make-setters (type-name fields)
+  (when (pair? fields)
+    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
+          (define-operand/make-setters type-name (cdr fields)))))
+
+(define-form define-operand (name super . rest)
+  (let* ((direct-slots	(pop rest))
+         (type-name	(symbol->type-name name))
+         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super))
+                                 ,direct-slots)))
+         (effective-slots (<record>-effective-slots type)))
+    (assert (is <record> type))
+    (eval `(define-function ,name ,effective-slots
+             (let ((self (new ,type-name)))
+               ,@(define-operand/make-setters type-name effective-slots)
+               self)))
+    (when rest
+      `(define-print-method ,type-name (print-all -stream- ,@rest)))))
+
+(define-operand		GLOBAL		() (name)		"@"(llvm/escape-global-identifier self.name))
+(define-operand		EXTERNAL    GLOBAL ()			"@"self.name)
+(define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier self.name))
+(define-operand		LITERAL		() (value)		self.value)
+;; TODO delete the value slot
+(define-operand		CONSTANT	() (name value)		self.name)
+(define-operand		STACK-CELL	() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string self.id))))
+(define-operand		LABEL		() (name)		(llvm/escape-local-identifier self.name))
+
+(define-form UNIQUE-LABEL ()
+  `(LABEL (new-label-name -c-)))
+
+(define-function local? (obj)
+  (= <LOCAL> (type-of obj)))
+
+(define-function temp? (obj)
+  (= <STACK-CELL> (type-of obj)))
+
+(define-function closure-object-label (name)
+  (GLOBAL (if (feature redefinable-functions-in-target)
+              (concat-string (symbol->string name) ".obj")
+            name)))
+
+;;;
+;;; compiler infrastructure
+;;;
+
+(define-record <compiler> ()
+  (level
+   temp-counter
+   temp-limit
+   free-stack-cells
+   gen-buffer
+   current-value              ; the output of the previous-instruction
+   ))
+
+(define-function new-temp-index (c)
+  (with-instance-accessors c <compiler>
+    (let ((i c.temp-counter))
+      (incr c.temp-counter)
+      (when (< c.temp-limit c.temp-counter)
+        (set c.temp-limit c.temp-counter))
+      i)))
+
+(define-function new-stack-cell (-c-)
+  (STACK-CELL (new-temp-index -c-)))
+
+(define-function alloc-stack-temp (-c-)
+  (or (pop (<compiler>-free-stack-cells -c-))
+      (new-stack-cell -c-)))
+
+(define-function %free-temp (-c- obj)
+  (when (is <STACK-CELL> obj)
+    (push (<compiler>-free-stack-cells -c-) obj)))
+
+(define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
+(define-form free-temp (temp)			`(%free-temp -c- ,temp))
+(define-form free-temps (temp)			`(%free-temps -c- ,temp))
+
+(define-function accessible-variable-or-die (var -c-)
+  (or (global-variable? var)
+      (let ((comp-level	(<compiler>-level -c-))
+            (var-level	(<env>-level (<variable>-env var))))
+        (when (< var-level comp-level)
+          (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
+
+;;;
+;;; Instructions
+;;;
+
+(define-record <instruction> ()
+  ;; TODO some of these slots are the same for all instances; they should reside on the type
+  (regs
+   has-input?
+   n-regs
+   produces-output?
+   ))
+
+(define-function %emit-form/mm-params (index types)
+  (when (pair? types)
+    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
+      (cons (list (awhen (and (not (= (first types) '_))
+                              (first types))
+                    (symbol->type-name it))
+                  param-name)
+            (%emit-form/mm-params (+ index 1) (cdr types))))))
+
+(define-function %emit-form/reg-accessor (index)
+  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
+        (body `(array-at __regs__ ,index)))
+    (list var-name () `((_) ',body))))
+
+(define-function %emit-form/reg-accessors (index)
+  (when (<= 0 index)
+    (cons (%emit-form/reg-accessor index)
+          (%emit-form/reg-accessors (- index 1)))))
+
+(define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
+  (when (pair? emit-forms)
+    (let* ((emit-form (first emit-forms))
+           (args (first emit-form))
+           (body (rest emit-form)))
+      ;; TODO what about dispatching on -c-?
+      ;; (cons `(define-multimethod emit-instruction ((<llvm-compiler> -c-) (,type-name self) ,@(%emit-form/mm-params 1 args))
+      (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
+               ;;(println "; emitting " self)
+               (let ((__regs__ (<instruction>-regs self)))
+                 (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
+                   ,@body)))
+            (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
+
+;; FIXME n-regs should be extracted from the definition
+(define-form define-instruction/emit-forms (instr-name n-regs . emit-forms)
+  `(let ()
+     ,@(%define-instruction/emit-forms instr-name n-regs (symbol->type-name instr-name) emit-forms)))
+
+;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
+(define-form define-instruction (instr-name reg-spec . emit-forms)
+  (let ((has-input?		(first reg-spec))
+        (n-regs			(or (second reg-spec) 0))
+        (produces-output?	(third reg-spec))
+        (type-name		(symbol->type-name instr-name))
+        (singleton-name		(concat-symbol instr-name '-instance)))
+    `(let ()
+       (define-record ,type-name <instruction> ())
+       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
+       (define ,singleton-name (make ,type-name
+                                 (has-input?		,has-input?)
+                                 (n-regs		',n-regs)
+                                 (produces-output?	,produces-output?)))
+       (define-function ,instr-name (regs)
+         (if regs
+             (make ,type-name
+               (regs			regs)
+               (has-input?		,has-input?)
+               (n-regs			',n-regs)
+               (produces-output?	,produces-output?))
+           ,singleton-name))
+
+       ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
+
+;;;
+;;; Emission
+;;;
+
+(define-generic emit-instruction)
+
+(define-form emit (instr-name . args)
+  `(%emit -c- ,instr-name (list ,@args)))
+
+(define-instruction COMMENT	()
+  ;; just a default that can be redefined
+  ((pair)			(print "; ") (apply println $1)))
+
+(define-function %emit (-c- factory args)
+  (let* ((instr (factory ())))
+    (when (and (<= 3 *compiler-verbosity*)
+               (not (is <COMMENT> instr)))
+      ;; TODO move this into emit-instruction?
+      (print-all *debug-output* "; EMIT of "instr", args: "args"\n"))
+    (apply emit-instruction (cons -c- (cons instr args)))))
+
+(define-form comp (obj)
+  `(let ((__obj__ ,obj))
+     (emit-comment 2 "COMPILE of "__obj__)
+     (compile __obj__ -c-)
+     (<compiler>-current-value -c-)))
+
+(define-form gen (instr-name . args)
+  `(%gen -c- ,instr-name (list ,@args)))
+
+(define-function emit-gen-buffer (-c-)
+  (array-do entry (<compiler>-gen-buffer -c-)
+    ;; GENE = GEN Emit
+    (emit-comment 3 "GENE of "(first entry)", args: "(rest entry))
+    (apply emit-instruction (cons -c- entry))))
+
+(define-selector compile-definition)
+(define-selector compile-call-to)
+(define-selector emit-prelude _) ; default is NOP
+
 (require "source/streams-min-late.l")
 (require "source/files.l")
 
@@ -102,92 +390,6 @@
          (error "llvm-type-bitsize: unexpected type "type))
        (cdr entry)))))
 
-(define-function %llvm-escape (prefix str char-needs-quoting? ordinary-char? . with-zero)
-  (with-forms ((putnext ((c) `(string-append mangled ,c))))
-    (let* ((mangled (string))
-           (quote-result? ())
-           (digit-for (lambda (c)
-                        (if (< c 10)
-                            (+ c ?0)
-                          (+ c (- ?A 10)))))
-           (write-char (lambda (c)
-                         (when (char-needs-quoting? c)
-                           (set quote-result? true))
-                         (if (ordinary-char? c)
-                             (putnext c)
-                           (putnext ?\\)
-                           (putnext (digit-for (bitwise-shift c -4)))
-                           (putnext (digit-for (bitwise-and c 0xf)))))))
-      (when prefix
-        (string-do c prefix
-          (write-char c)))
-      (string-do c str
-        (write-char c))
-      (when with-zero
-        (write-char ?\x00))
-      (when quote-result?
-        (putnext ?\")
-        (string-insert mangled 0 ?\"))
-      mangled)))
-
-(define-function llvm/ordinary-char? (c)
-  (and (<= 32 c) (<= c 127)
-       (not (= ?\" c))
-       (not (= ?\\ c))))
-
-(define-function llvm/escape-string (str . with-zero)
-  (%llvm-escape ()
-                str
-                (lambda _ true)           ; always wrap it in double quotes
-                llvm/ordinary-char?
-                with-zero))
-
-(define-function llvm/escape-identifier (prefix name)
-  ;; NOTE we don't need to escape ptr and word (two globally defined types that we use) because
-  ;; our globals are prefixed by llvm/escape-global-identifier.
-  (set name (symbol->string name))
-  (%llvm-escape prefix
-                name
-                (lambda (c)
-                  (not (or (and (<= ?a c) (<= c ?z))
-                           (and (<= ?A c) (<= c ?Z))
-                           (and (<= ?0 c) (<= c ?9))
-                           (member? c '(?- ?$ ?. ?_)))))
-                llvm/ordinary-char?))
-
-(define-function llvm/escape-local-identifier (name)
-  (llvm/escape-identifier () name))
-
-(define-function llvm/escape-global-identifier (name)
-  (llvm/escape-identifier +maru-label-prefix+ name))
-
-;;;
-;;; Operands
-;;;
-
-(define-operand		GLOBAL		() (name)		"@"(llvm/escape-global-identifier self.name))
-(define-operand		EXTERNAL    GLOBAL ()			"@"self.name)
-(define-operand		LOCAL		() (name)		"%"(llvm/escape-local-identifier self.name))
-(define-operand		LITERAL		() (value)		self.value)
-;; TODO delete the value slot
-(define-operand		CONSTANT	() (name value)		self.name)
-(define-operand		STACK-CELL	() (id)			"%"(llvm/escape-local-identifier (concat-string "t" (number->string self.id))))
-(define-operand		LABEL		() (name)		(llvm/escape-local-identifier self.name))
-
-(define-form UNIQUE-LABEL ()
-  `(LABEL (new-label-name -c-)))
-
-(define-function local? (obj)
-  (= <LOCAL> (type-of obj)))
-
-(define-function temp? (obj)
-  (= <STACK-CELL> (type-of obj)))
-
-(define-function closure-object-label (name)
-  (GLOBAL (if (feature redefinable-functions-in-target)
-              (concat-string (symbol->string name) ".obj")
-            name)))
-
 ;;;
 ;;; Compiler early
 ;;;
@@ -205,20 +407,6 @@
 
     (reg-counter		0)
     (label-counter		0)))
-
-(define-function run-compiler (env output-path)
-  (with-open-stream (stream output-path "w")
-    (let ((prev-stdout *standard-output*))
-      (set *standard-output* stream)
-      (compile-env env (llvm-compiler 1))
-      (set *standard-output* prev-stdout))))
-
-(define-function new-stack-cell (-c-)
-  (STACK-CELL (new-temp-index -c-)))
-
-(define-function %free-temp (-c- obj)
-  (when (is <STACK-CELL> obj)
-    (push (<compiler>-free-stack-cells -c-) obj)))
 
 ;;;
 ;;; LLVM IR Instructions
@@ -335,8 +523,8 @@
   ;; args: ptr type (for method dispatch)
   ((LITERAL long)		(println "	"$reg1" = inttoptr %word "$1" to %oop"))
   ((STACK-CELL _)		(println "	"$reg1" = load %oop, %oop* "$1))
-  ((GLOBAL  _)			(println "	"$reg1" = load %oop, %oop* "$1))
-  ((GLOBAL  expr)		(if-at-expand (feature redefinable-functions-in-target)
+  ((GLOBAL _)			(println "	"$reg1" = load %oop, %oop* "$1))
+  ((GLOBAL expr)		(if-at-expand (feature redefinable-functions-in-target)
                                     (println "	"$reg1" = load %oop, %oop* "$1) ; this could be a call-next-method
                                   (if (feature emit-with-object-headers)
                                       (let ()
@@ -348,10 +536,10 @@
   ((CONSTANT expr)		(print "	"$reg1" = ")
 				(emit/header->payload $1)
 				(println))
-  ((GLOBAL   C-function)	(print "	"$reg1" = bitcast ")
+  ((GLOBAL C-function)		(print "	"$reg1" = bitcast ")
 				(emit-llvm-C-fn-type $2 false)
 				(println "* @" (<C-function>-name $2) " to %oop"))
-  ((GLOBAL  C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
+  ((GLOBAL C-variable)		(let ((type (C-type->llvm-type (<C-variable>-type $2))))
                                   (println "	"$reg1" = load "type", "type"* @"(<C-variable>-name $2)))))
 
 (define-instruction STORE	(true 0 false)
@@ -552,21 +740,15 @@
 ;;;
 ;;; Emitting objects
 ;;;
-;;; if you want to grok this, then you better head over to the x86 backend...
-
-;; KLUDGE due to load order headaches we set the default like this
-;; instead of at the DEFINE-SELECTOR.
-;; (set (<selector>-default compile)
-;;      (lambda (self -c-)
-;;        ;; FIXME in case of <undefined> we need this to reach the (LOAD
-;;        ;; LITERAL long) instruction emitter, but this way it leads to
-;;        ;; (LOAD LITERAL nil). another problem is that for full objects
-;;        ;; we need to skip the object header, but not for immediates.
-;;        ;; because of this we can only partially mirror the x86 infra
-;;        ;; here.
-;;        (gen LOAD (compile-object self -c-) self)))
+;;; if you want to grok this, then you better head over to the x86 backend first...
 
 ;; KLUDGE this shouldn't be done by hand, but automated based on the type meta-data
+
+;; TODO? maybe rename to COMPILE-LITERAL
+(define-selector compile-object)
+
+(define-selector compile (self -c-)
+  (gen LOAD (compile-object self -c-) self))
 
 (define-function emit-object/C-string (self -c-)
   (let ((const (CONSTANT (GLOBAL (unique-name "cstr")) self)))
@@ -577,7 +759,7 @@
   (LITERAL (target-value false)))
 
 (define-method compile-object <string> (-c-)
-    (emit-object/C-string self -c-))
+  (emit-object/C-string self -c-))
 
 ;;;
 ;;; Compiling lambdas
@@ -1095,6 +1277,19 @@
       (print (GLOBAL name)" = global %oop ")
       (emit/header->payload/in-constants object-label))))
 
+;; this, and the whole emit-object business is kinda KLUDGEy
+(define-function compile-array (self -c-)
+  (let ((compiled (array (array-length self))))
+    (for (i 0 (array-length self))
+      (let ((obj (array-at self i)))
+        (set (array-at compiled i)
+             (typecase obj
+               (<long>		(compile-object obj -c-))
+               (<expr>		(compile-expr   obj () -c-))
+               (<undefined>	(compile-object obj -c-))
+               (else (error "compile-array: don't know how to compile: "obj))))))
+    compiled))
+
 ;; kinda KLUDGE
 ;; this is used when emitting the literal dispatch tables of <selectors>
 ;; FIXME merge this somehow into the compile-object protocol?
@@ -1162,5 +1357,40 @@
     (when (defined? '*llvm-platform-specific-prelude*)
       (emit INLINE (eval '*llvm-platform-specific-prelude*)))
     ))
+
+(define-function compile-env (env -c-)
+  (verbosity 1
+    (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
+    (map (lambda (sym)
+           (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
+         '(+operating-system+ +architecture+ +little-endian?+
+           +word-size-in-bits+
+           ;;oop/alignment-in-bytes oop/align-padding
+           ;;oop/payload-mask oop/tag-mask
+           )))
+  (comment-features)
+  (emit-prelude -c-)
+  ;; NOTE this array-do will not pick up any new definitions added to
+  ;; the env after the iterations has begun (see e.g. the
+  ;; COMPILE-DEFINITION of <selector>).
+  (array-do var (<env>-bindings env)
+    (let* ((name		(<variable>-name  var))
+           (value		(<variable>-value var))
+           (type-blacklist	(list <form> <fixed>))
+           (name-blacklist	'()))
+      (unless (or (member? (type-of value) type-blacklist)
+                  (member? name name-blacklist))
+        (emit-comment 1 "defn "name)
+        (verbosity 1 (warn name ", "))
+        (compile-definition value name -c-))))
+  (verbosity 1 (warn "\n"))
+  (emit-gen-buffer -c-))
+
+(define-function run-compiler (env output-path)
+  (with-open-stream (stream output-path "w")
+    (let ((prev-stdout *standard-output*))
+      (set *standard-output* stream)
+      (compile-env env (llvm-compiler 1))
+      (set *standard-output* prev-stdout))))
 
 (require "source/compiler/emit-late.l")

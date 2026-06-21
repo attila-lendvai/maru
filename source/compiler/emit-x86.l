@@ -25,8 +25,7 @@
 ;;;   - +foo+ is a constant
 ;;;   - *foo* is a global
 
-(require "source/conversion.l")
-(require "source/c/cffi.l")
+(require "source/compiler/emit-early.l")
 (require "source/ansiterm.l")
 (require "source/files.l")
 (require "source/assembler/single-pass-x86.l")
@@ -35,15 +34,8 @@
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")
 
-(define *compiler-verbosity* 0)
-
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
-
-(define-constant +maru-label-prefix+ "m_")
-
-(define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
-(define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
 ;; forwards
 (define compile-expr)
@@ -51,10 +43,6 @@
 ;;;
 ;;; Utils
 ;;;
-(let ((counter 0))
-  (define-function unique-name (prefix)
-    (concat-string prefix (number->string (incr counter)))))
-
 (define-function align (alignment value)
   (bitwise-and (+ value (- alignment 1))
                (- alignment)))
@@ -361,11 +349,6 @@
 (define-instruction COMMENT	()
   ;; just a default that can be redefined
   ((pair)			(print "; ") (apply println $1)))
-
-;; this is faster than (emit COMMENT ...) by skipping the evaluation early
-(define-form emit-comment (level . args)
-  `(when (<= ,level *compiler-verbosity*)
-     (emit COMMENT (list ,@args))))
 
 (define-function %emit (-c- factory args)
   (let* ((instr (factory ())))
@@ -1412,30 +1395,6 @@
         (label! name)
         (emit CELL object-label)))))
 
-(define-function features->print-forms (names)
-  (let ((elements ())
-        (first-time true))
-    (map (lambda (name)
-           (if first-time
-               (set first-time false)
-             (push elements ", "))
-           (push elements (symbol->string name))
-           (push elements "=")
-           (push elements `(feature ,name)))
-         names)
-    (list-reverse! elements)))
-
-(define-form comment-features ()
-  `(emit-comment 0 "features: "
-                 ,@(features->print-forms
-                    '(emit-with-object-headers
-                      redefinable-functions-in-target
-                      strict-semantics-for-compiled-set
-                      profiler
-                      track-expr-names
-                      object-canary
-                      debug-info))))
-
 (define elf/page-size	0x1000) ; is this the system page-size?
 (define ideal-cache-line-alignment 64)
 
@@ -1880,58 +1839,7 @@
                                 "\t" (<variable>-name var))))))))
   (verbosity 1 (warn "\n")))
 
-;;;
-;;; <selector>
-;;;
-;; TODO ideally the method vector of the selector should be
-;; addressed/filled according to the slave type id's. when that is
-;; achieved, then we can simply COMPILE-DEFINITION the method array,
-;; without the translation.
-;;
-;; TODO this whole thing should be merged with the emit-object stuff,
-;; or rather, with whatever simplified will replace the current
-;; emit-object machinery.
-(define-method compile-definition (slave-value <selector>) (name -c-)
-  (let ((target-env		(slave-value *globals*))
-        (methods		(eval-in-slave `(<selector>-methods ,self)))
-        (target-methods		(array))
-        (dispatch-table-name	(concat-symbols name '.method-table))
-        (parameters		())
-        (index-min		())
-        (index-max		0))
-    ;; build a trimmed methods array with the slave type id's as indexes
-    (for (i 0 (array-length methods))
-      (let ((impl-fn (array-at methods i)))
-        (when impl-fn
-          (let ((slave-type-id (eval-in-slave `(<type>-slave-id ,(type-object-for-id i)))))
-            (emit-comment 2 "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn))
-            (or index-min (set index-min slave-type-id))
-            (set index-max slave-type-id)
-            ;; NOTE this takes the parameter signature of the first method
-            ;; and assumes it's the same for the rest.
-            (if parameters
-                (assert (= (list-length parameters) (list-length (<expr>-parameters impl-fn))) "unsupported: <selector> "name" has specializations with varying number of parameters")
-              (set parameters (map (lambda (el)
-                                     (<variable>-name el))
-                                   (<expr>-parameters impl-fn)))
-              (assert (= (first parameters) 'self)))
-            (set (array-at target-methods (- slave-type-id index-min)) impl-fn)))))
-    ;; define and emit the dispatch table
-    (emit-comment 2 "<selector> dispatch table for '"name"', from "index-min", to "index-max)
-    (environment-define target-env dispatch-table-name target-methods)
-    (compile-definition target-methods dispatch-table-name -c-)
-    ;; the selector function
-    (emit-comment 2 "<selector> stub for "name)
-    (let ((stub	(eval-in-target
-                 `(,lambda ,parameters
-                    (let ((type (type-of self)))
-                      (safety 1
-                        (unless (and (<= ,index-min type)
-                                     (<= type ,index-max))
-                          ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
-                          (error "selector '",(symbol->string name)"' has no method for type " (box <long> type))))
-                      ((oop-at (address-of ,dispatch-table-name) (- type ,index-min)) ,@parameters))))))
-      (compile-definition stub name -c-))))
-
 (define-function run-compiler (env output-path)
   (compile-env env (compiler 1) output-path))
+
+(require "source/compiler/emit-late.l")
