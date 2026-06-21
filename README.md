@@ -29,7 +29,7 @@ This document aims to present an overview of Maru at its latest
 developmental stage.
 
 In the earlier developmental stages (i.e. in the other git branches)
-this file contains notes relevant to that specific stage.
+this file contains notes relevant only to that specific stage.
 
 There are various documents in the [`doc/`](doc/) directory that
 discuss some topics in further detail.
@@ -58,14 +58,14 @@ make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 
 My primary platform. There's a `manifest.scm` file in the repo, so you
 can run `guix shell` to enter into the same environment that I use
-when I work on Maru. Guix can also be used as a simple package manager
-on any Linux distro, no need to install Guix System.
+when I work on Maru. Guix can also be used as a simple per-user
+package manager on any Linux distro.
 
 #### Nix and NixOS
 
-Used to be my primary platform. There's a (potentially bitrotten)
+Used to be my primary platform. There's a bitrotten
 `default.nix` file in the repo, so you can run `nix-shell` to enter
-into the same environment that I used on NixOS.
+into the environment that I used on NixOS.
 
 #### Debian, and derivatives
 
@@ -73,19 +73,10 @@ into the same environment that I used on NixOS.
 sudo apt install make time rlwrap
 ```
 
-You will need LLVM, and/or a C compiler (any version beyond LLVM 8 should work):
+You will need LLVM, and/or a C compiler:
 
 ```
 sudo apt install llvm clang
-```
-
-For now the x86 backend only supports 32 bit mode. To use it you will
-need to have support for compiling and running 32 bit C code. On
-Debian based x86_64 systems this will install all the necessary
-libraries:
-
-```
-sudo apt install gcc-multilib
 ```
 
 #### MacOS (darwin)
@@ -93,18 +84,16 @@ sudo apt install gcc-multilib
 As of this writing (2026) both the x86_64 and the LLVM backends can
 bootstrap on an x86_64 MacOS running in kvm on a Linux. There's even CI
 set up for testing every commit on an arm64 runner using `arch -x86_64
-make [...]` (but they fail currently).
+make [...]` (they fail currently).
 
 The following instructions worked in the kvm setup as of 2026:
 
 1. Make sure XCode is installed. In a Terminal:
-
 ```
 xcode-select --install
 ```
 
 2. [Install Homebrew](https://brew.sh/)
-
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
@@ -116,14 +105,15 @@ echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
-#### Guix on OpenWRT on an aarch64 hw
+#### Guix on OpenWRT on aarch64 hadrware
 
-I own a BPI-R4 (a powerful router) that is currently running
-OpenWrt. I installed Guix (an advanced package manager) on it out of
-curiosity.
+I own a BPI-R4 (an
+[SBC](https://en.wikipedia.org/wiki/Single-board_computer)) that is
+currently running OpenWrt. I installed [Guix](https://guix.gnu.org/)
+on it out of curiosity.
 
 In that environment Maru can bootstrap itself using the LLVM backend
-and through both the `libc` and the `linux` platform.
+and on both the `libc` and the `linux` platform.
 
 #### Other platforms
 
@@ -136,8 +126,10 @@ Patches are welcome to support other platforms.
 
 ## Who
 
-Originally written by [Ian Piumarta](https://www.piumarta.com/software/maru/),
-at around 2011. Full commit history is available in the
+Originally written by [Ian
+Piumarta](https://www.piumarta.com/software/maru/) at around 2011, as
+part of a Viewpoints Research Institute project. Full commit history
+is retained in the
 [`piumarta`](https://github.com/attila-lendvai/maru/tree/piumarta)
 branch.
 
@@ -151,10 +143,12 @@ Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru
 
 ## Why
 
-* Programming badly needs
-[better foundations](https://github.com/nagydani/seedling/blob/master/RATIONALE.md),
-and Maru is part of this exploration. The foundations should get **smaller, simpler,
-more self-contained, and more approachable** by people who set out to learn programming.
+* Programming badly needs [better
+foundations](https://github.com/nagydani/seedling/blob/master/RATIONALE.md),
+and Maru is part of this exploration. The foundations should get
+**smaller, simpler, more self-contained, and more approachable** for
+people who set out to learn programming. This is also necessary for
+more trust in our computing environment.
 
 * I'm fascinated by bootstrapping issues.
 We lose a lot of value by not capturing the history of the growth of a language, including
@@ -164,7 +158,7 @@ port to a new architecture, and then have a self-contained, formal bootstrap pro
 can automatically "grow" an entire computing system on top of that freshly laid, tiny foundation.
 
 * Ian seems to have abandoned Maru, and his published archive couldn't
-be run as-is. But it's an interesting piece of code that deserves a
+be run as-is. But this is an interesting piece of code that deserves a
 repo and a maintainer to keep bitrot at bay.
 
 * This work is full of puzzles that are a whole lot of fun to solve!
@@ -172,13 +166,13 @@ repo and a maintainer to keep bitrot at bay.
 ## Contribution
 
 You are very welcome to contribute, but beware that short of any
-contributors **this repo receives forced pushes** every now and then
-(i.e.  **`git push -f`** rewriting git history (except the `piumarta`
-branch)). This will stop eventually when contributors show up, or I
-settle down with a build setup that nicely facilitates bootstrapping
-multiple, parallel paths of language development. Please make sure
-that you open a git branch for your work, and/or that you are ready
-for some `git fetch` and `git rebase`.
+contributors **this repo will receive occasional forced pushes** (i.e.
+**`git push -f`** rewriting git history (except the `piumarta`
+branch)). This will cease eventually when contributors show up, or
+when I settle down with a build setup that nicely facilitates
+bootstrapping multiple, parallel paths of language development. Please
+make sure that you open a git branch for your work, and that you are
+ready for some `git fetch` and `git rebase`.
 
 ## Status
 
@@ -192,35 +186,14 @@ There's the `maru.1` line of development that started from the
 properly bootstrapped the extra features of the `piumarta` branch,
 i.e. without evolving `eval.c` in parallel. I only use the 2300 LoC of
 throwaway C code as the initial stepping stone in the bootstrap
-process, but once the first step is made, the C code is left behind
-for good. The head of the `maru.3` branch should be semantically
-equivalent to the `eval.l` that resides in the `piumarta` branch.
+process (branch `maru.1.c99`), but once the first step is made, the C
+code is left behind for good. The head of the `maru.3` branch should
+be semantically equivalent to the `eval.l` that resides in the
+`piumarta` branch.
 
 After that I started to further evolve Maru's implementation in the
 `maru.4` branch and beyond. Each branch contains a readme explaining
 what's relevant for that stage.
-
-### Critique of the current codebase
-
-IOW, here's a sort of high-level TODO list:
-
-To accommodate the various experiments, I had to cut the lisp codebase
-into countless files. This tree of small files should/could be
-simplified, and hopefully will be done once I will have rewritten the
-build in Maru.
-
-The accidental complexity in the Makefile is an abomination compared
-to the rest of the project. I'm looking forward to obsoleting it for
-good by rewriting the build in Maru.
-
-Many interesting experiments in the Piumarta branch are not yet
-revived.
-
-I'm not happy about how types are done currently. First, they are just
-runtime tags really, not types in the type-check sense. A simple
-static type system should be added, if for nothing else to show where
-its place would be in the codebase, and to contrast it with the
-runtime tagged values.
 
 ### Notable new features
 
@@ -229,6 +202,12 @@ new features. Some that are worth mentioning:
 
   - An x86-64 backend that directly generates Elf binary files,
     i.e. no external dependencies are needed for bootstrapping.
+
+  - With the x86-64 backend and the Linux platform it's truly
+    freestanding: there is no external dependency beyond a bootstrap
+    binary that can animate the codebase. No make, no gcc, no
+    assemblers; nothing else than the Linux kernel and a bootstrap
+    binary.
 
   - An LLVM backend that emits .ll LLVM IR text files.
 
@@ -241,11 +220,11 @@ new features. Some that are worth mentioning:
     hardware drivers (i.e. all dynamically allocated memory needs to
     be managed by our own GC, all IO behind our own abstractions,
     etc). Other platforms: *libc* (functional), and *metacircular*
-    (only planned).
+    (only a placeholder for now).
 
   - The host and the slave are isolated while bootstrapping which makes it possible to
     do things like reordering types (changing their type id in the target),
-    or changing their object layout.
+    or changing runtime object layout.
 
   - Relying on this isolation, the code in `eval.l` now looks pretty much the same
     as something that is meant to be loaded into the evaluator (i.e. the function
@@ -260,9 +239,8 @@ new features. Some that are worth mentioning:
 
   - A bootstrapped PEG parser.
 
-  - An x86-64 backend that directly generates Elf binaries
-
-  - A C groveller that uses a DSL implemented by a PEG grammar.
+  - A proper C groveller that uses a DSL implemented through a PEG
+    grammar (see `source/c/`).
 
 ### Future plans
 
@@ -285,6 +263,11 @@ new features. Some that are worth mentioning:
     [PEG](https://en.wikipedia.org/wiki/Parsing_expression_grammar)
     compiler. More generally, make the parser extendable.
 
+  - To accommodate the various experiments, I had to cut the lisp
+    codebase into countless files. This tree of small files
+    should/could be simplified, and hopefully will be done now that I
+    have rewritten the build itself in Maru.
+
   - Implement modules and phase separation along with what is outlined in
     [Submodules in Racket - You Want it When, Again?](https://www.cs.utah.edu/plt/publications/gpce13-f-color.pdf).
     Part of this is already done and is used in the bootstrap process.
@@ -297,7 +280,8 @@ new features. Some that are worth mentioning:
     because it's easily testable using QEMU. Or port it to an ARM
     board (like Raspberry Pi)? Or maybe even attempt a C64 port?
 
-  - Revive all the goodies in the `piumarta` branch, but in a structured way.
+  - Revive more goodies from the `piumarta` branch, but in a
+    structured way.
 
   - Investigate [Cranelift](https://cranelift.dev/),
     [QBE](https://c9x.me/compile/),
@@ -305,35 +289,32 @@ new features. Some that are worth mentioning:
     [Tilde](https://yasserarg.com/tb),
     and consider adding them as backends.
 
-  - Simplify the types-are-objects (as opposed to integers) part and
-    its bootstrap, and maybe even make it optional?
+  - I'm not happy about how types are done currently. First, they are
+    just runtime tags really, not types in the type-check sense. A
+    simple static type system should be added, if for nothing else to
+    show where its place would be in the codebase, and to contrast it
+    with the runtime tagged values.
 
-  - Weed out some of the added bloat/complexity (e.g. compile closures
-    instead of `<selector>`s, and use them to implement streams; write a
-    tree shaker; etc).
+  - Weed out some of the added bloat/complexity (e.g. maybe compile
+    closures instead of `<selector>`s, and use them to implement
+    streams; write a tree shaker; etc).
 
-  - Fully merge the language and API that the compiler and the evaluator understands;
-    i.e. make the level-shifted code (`eval.l` & co.) less different than code
-    understood by the evaluator. This would mean that we can e.g. load/compile
-    `source/buffer.l` both into the level-shifted code and into the evaluator.
-    This is slowly happening, but it's nowhere near done, and I'm not even sure
-    what being done means here.
+  - Fully merge the language and API that the compiler and the
+    evaluator understands; i.e. make the level-shifted code (`eval.l`
+    & co.) even less different than code understood by the evaluator.
+    This is slowly happening, but it's nowhere near done, and I'm not
+    even sure what being done means here.
 
   - Maybe add [PEG-based tree rewriter](https://www.piumarta.com/S3-2010/)
     to the repo as a branch, and use it as a bootstrap stage. It seems to
     be an earlier, or different iteration of the same idea.
-
-  - Introduce a simplified language that drops some langauge features,
-    e.g. remove *forms* and the *expand* protocol. Make sure that this
-    language can bootstrap itself off of C99. Then reintroduce *forms*
-    and *expand* by using this simplified Maru as the bootstrap host.
 
   - Understand and incorporate François René Rideau's model of
     [First Class Implementations: Climbing up the Semantic Tower](https://www.youtube.com/watch?v=fH51qhI3hq0),
     (see this [couple of page summary](https://github.com/fare/climbing), or
     see his [page on reflection](http://fare.tunes.org/reflection.html))
     
-  - Maybe rename *long* to *word* throughout the project.
+  - Maybe rename *long* throughout the project. To *word* or *cell*?
 
 </details>
 
@@ -460,7 +441,7 @@ A list of projects that are relevant in this context:
 
   - [blynn's Haskell compiler](https://github.com/blynn/compiler):
     bootstrap a Haskell compiler incrementally from C, with extensive
-    documentation..
+    documentation.
 
   - [ichbins](https://github.com/darius/ichbins) is a minimal
     self-hosting compiler of a Lisp dialect to C in 6 pages of

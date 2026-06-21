@@ -1175,7 +1175,6 @@
       (emit PUSH op))
 
     (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
-                         ;; FIXME delete unused arg-locs
                          (compile-call-to op-value op -c-))
            (arity	(list-length args)))
       (when (and n-params
@@ -1461,6 +1460,14 @@
   (.ascii	"ELF")
   (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
+  ;; The reason we added support for ET_DYN is that we want to
+  ;; implement a C FFI (a questionable decision, admittedly); i.e. we
+  ;; want to be able to reference symbols in .so files and use dlopen
+  ;; at runtime. but ET_DYN brings ASLR with it, and we have internal
+  ;; references in the data segment, therefore we now need to emit
+  ;; relocation info in the section headers. Quite some complexity to
+  ;; get admission into the C universe.
+  ;; see commit: 'x86: emit relocation info, ET_DYN binaries'
   (.i16		elf/ET_DYN)      ; e_type
   (.i16		elf/EM_X86_64)   ; e_machine
   (.i32		1)               ; e_version

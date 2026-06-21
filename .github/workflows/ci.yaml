@@ -69,7 +69,8 @@ jobs:
       - run:  timeout 5m make PLATFORM=linux test-jit
       - run:  timeout 5m make PLATFORM=posix test-jit
 
-      - run: |
+      - name: Bootstrap with *safety* set to 3
+        run: |
           sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
           timeout 5m make PLATFORM=linux test-bootstrap
 

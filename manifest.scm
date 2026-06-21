@@ -65,6 +65,7 @@
   ;; there's this, too (cross-clang): https://issues.guix.gnu.org/54239
   ;; (list (cross-package-entry glibc "aarch64-linux-gnu"))
 
+  ;; Needed to be able to cross-compile to aarch64? (add proper comment it next time!)
   (list (cross-package-entry binutils-prefixed "aarch64-linux-gnu"))
 
   ;; get the latest from the channels you have `guix pull`ed

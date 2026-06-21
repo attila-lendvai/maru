@@ -12,10 +12,11 @@
      (else
       (load (concat-strings "source/compiler/emit-objects-"*compiler-backend*".l"))))))
 
+;; write out a .dep file that contains a list of the
+;; dependencies. used/read by build.l.
 (eval-in-host
  `(let ((output-file (pop *command-line-arguments*)))
     (run-compiler ,*target-env* output-file)
-    ;; write out a .dep file that contains a list of dependencies
     (with-open-stream (stream (concat-string output-file ".dep") "w")
       (dump-all  stream (concat-list ',*load-history* *load-history*))
       (print-all stream "\n"))))

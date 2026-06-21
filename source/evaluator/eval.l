@@ -52,7 +52,8 @@
          ,@(%make-make-inits *env* 'self. inits)
          self))))
 
-;; TODO ? rename to allocate-memory
+;; TODO ? rename to allocate-object/heap
+;; TODO introduce allocate-object/stack
 (define-vm-function allocate ((type <long>) (slot-count <long>))
   (gc/allocate type (words-to-bytes slot-count)))
 

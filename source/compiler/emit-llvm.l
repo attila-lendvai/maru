@@ -572,9 +572,6 @@
      (println "	"$reg3" = getelementptr [0 x %oop], [0 x %oop]* "$reg2", %word 0, %word 1")
      (println "	"$reg4" = bitcast %oop* "$reg3" to %oop"))))
 
-;; (define-instruction FRAMEADDRESS	(false 1 true)
-;;   ((long)			(println "	"$reg1" = call ptr @llvm.frameaddress(i32 "$1")")))
-
 (define-instruction CALL	(false 2 true)
   ;; NOTE only the third variant uses two tmp's; first two ignores/"wastes" $reg1
   ((GLOBAL _)			(emit-llvm-call $reg2
@@ -1341,8 +1338,6 @@
                 "%\"<target-function-h>\" = type { %\"<header>\", %\"<target-function>\"}\n"))
     ;; we represent libc's FILE* with an opaque type
     (emit INLINE "%m_libc-FILE = type opaque\n")
-    ;;(emit INLINE "declare ptr @llvm.sponentry()\n")
-    (emit INLINE "declare ptr @llvm.frameaddress(i32)\n")
     ;; TODO KLUDGE introduce a cleaner mechanism to emit platform
     ;; specific literal code (in this case for memset).
     (when (defined? '*llvm-platform-specific-prelude*)
