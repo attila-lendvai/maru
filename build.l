@@ -19,8 +19,12 @@
 ;;; infra
 ;;;
 
+;; non-standard naming convention, so that ./build.sh debug=true ... works
+;; FIXME how not to confuse the debug of the build with the debug level compilation?
+(define debug false)
+
 (define-function debug-log args
-  (when false
+  (when debug
     (print-all *debug-output* term/FG-BLUE args"\n" term/RESET)))
 
 (define-function maybe-set-variable (env arg)
@@ -108,28 +112,63 @@
   (unless (file-exists? path) ; FIXME
     ($ "mkdir -p '"path"'")))
 
-(define-function load-deps-for (output-path)
-  (let ((deps-path (concat-string output-path ".dep")))
+(define-function load-dependency-file (output-path file-extension)
+  (let ((deps-path (concat-string output-path file-extension)))
     (when (file-exists? deps-path)
       (with-open-file (file deps-path "r")
         (let* ((stream (file-stream file))
                (deps (read stream)))
-          (debug-log output-path"\n  dependencies: "deps)
-          (cons "boot.l" deps))))))
+          deps)))))
 
-(define-function needs-recompile? (output-path deps)
-  (debug-log "needs-recompile?" output-path deps)
-  (when deps
-    (set deps (ensure-list deps)))
-  (or (not (file-exists? output-path))
-      (let ((output-mtime (file-modification-time output-path))
-            (result false))
-        (while (and (not result)
-                    (pair? deps))
-          (let ((dep (pop deps)))
-            (when (< output-mtime (file-modification-time dep))
-              (set result true))))
-        result)))
+(define-function load-deps-for (output-path)
+  (let ((deps (load-dependency-file output-path ".dep")))
+    (debug-log output-path"\n  .dep dependencies: "deps)
+    (when deps
+      (cons "boot.l" deps))))
+
+(define-function load-vars-for (output-path)
+  (let ((vars (load-dependency-file output-path ".vars")))
+    (debug-log output-path"\n  .vars dependencies: "vars)
+    vars))
+
+(define-function needs-recompile? (output-path . rest)
+  (let ((deps (pop rest))
+        (vars (pop rest)))
+    (when deps
+      (set deps (ensure-list deps)))
+    (debug-log "needs-recompile?" output-path deps vars)
+    (or (let ((result false))
+          (while (and (not result)
+                      (let ((entry (pop vars)))
+                        (when entry
+                          (let* ((var (pop entry))
+                                 (expected-value (pop entry))
+                                 (actual-value (variable-value *globals* var)))
+                            (unless (= actual-value
+                                       expected-value)
+                              (set result true))
+                            true)))))
+          result)
+        (not (file-exists? output-path))
+        (let ((output-mtime (file-modification-time output-path))
+              (result false))
+          (while (and (not result)
+                      (pair? deps))
+            (let ((dep (pop deps)))
+              (when (< output-mtime (file-modification-time dep))
+                (set result true))))
+          result))))
+
+(define *input-variables-for-build*
+  '(profiler ld.so))
+
+(define-function save-dep-vars (output-file variables)
+  (let ((result ()))
+    (list-do var variables
+      (push result (list var (variable-value *globals* var))))
+    (with-open-stream (stream (concat-string output-file ".vars") "w")
+      (dump-all  stream result)
+      (print-all stream "\n"))))
 
 ;;;
 ;;; backends and platforms
@@ -304,7 +343,7 @@
          (host-eval "eval")
          (host-eval-full-path (concat-strings host-dir "/" host-eval)))
     ;; no deps, i.e. it's only triggered when the file is missing.
-    (when (needs-recompile? host-eval-full-path ())
+    (when (needs-recompile? host-eval-full-path)
       ($ "git show-ref --verify --quiet refs/heads/"*previous-stage*" || \
 git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
       ($ "test -d '"host-dir"' || git worktree add --detach --force '"host-dir"' '"*previous-stage*"'")
@@ -315,7 +354,11 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
       ($ "find '"host-dir"/build' -type f -exec touch {} +")
       ($ "make --directory='"host-dir"' PLATFORM=posix eval-llvm"))
 
-    (when (needs-recompile? (concat-strings host-dir "/source/c/cgrov.g.l") ())
+    ;; the host's source/c/cgrov.g.l is loaded by its
+    ;; source/c/compile-cgrov.l, which we are exercising directly
+    ;; later, so we must make sure that it's built. see
+    ;; COMPILE-CGROV-FILE below.
+    (when (needs-recompile? (concat-strings host-dir "/source/c/cgrov.g.l"))
       ($ "make --directory='"host-dir"' PLATFORM=posix source/c/cgrov.g.l"))
 
     (list host-dir host-eval)))
@@ -364,9 +407,16 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 ;;; Compile Maru
 ;;;
 
-(define-function run-maru-compiler (host-dir host-eval slave-dir backend platform source output-path evolving?)
+(define-function run-maru-compiler (host-dir host-eval slave-dir backend
+                                             platform source output-path evolving?)
+
   (when (let ((abs-output-path (concat-strings slave-dir "/" output-path)))
-          (needs-recompile? abs-output-path (load-deps-for abs-output-path)))
+          (needs-recompile? abs-output-path
+                            (load-deps-for abs-output-path)
+                            (load-vars-for abs-output-path)))
+
+    (save-dep-vars output-path *input-variables-for-build*)
+
     (run-with-host
      host-dir host-eval
      (list-remove
