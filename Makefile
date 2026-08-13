@@ -40,7 +40,7 @@ PREVIOUS_STAGE_BACKEND	= -llvm
 
 HOST_OS		= $(shell uname -s)
 TARGET_ARCH	?= $(shell uname -m)
-PLATFORM	?= linux
+PLATFORM	?= posix
 VERBOSITY	?= -v #-v -v
 
 # see https://stackoverflow.com/a/20983251/14464
