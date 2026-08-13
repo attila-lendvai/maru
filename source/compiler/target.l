@@ -47,9 +47,7 @@
 (set (feature platform/libc)		false)
 (set (feature platform/posix)		false)
 (set (feature platform/linux)		false)
-;; this is used in the assembler experiments. let's comment it out for now
-;; when compiling with the 32 bit x86 backend.
-(set (feature lower/array)		(not (= 32 +word-size-in-bits+)))
+(set (feature lower/array)		true)
 
 ;; TODO set up proper framework for optimization control, merge with *optimised*
 (set (feature optimize-space)		true)
