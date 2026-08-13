@@ -77,7 +77,9 @@ ifeq ($(PLATFORM),linux)
 # https://clang.llvm.org/docs/UsersManual.html#freestanding-builds
 # -Ttext=0x08048000,-no-pie is needed to produce an ELF without a dynamic linker
 # reference (clang -m32 inserts to a dangling /gnu/store reference)
-  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie
+# --build-id=none is needed to avoid error:
+# section .note.gnu.build-id LMA [08048154,08048177] overlaps section .text LMA [08048000,080740a0]
+  CFLAGS	+= -nostdlib -nostartfiles -ffreestanding -Wl,-Bstatic,-Ttext=0x08048000,-no-pie,--build-id=none
 endif
 
 LLVM_VERSION	?=
