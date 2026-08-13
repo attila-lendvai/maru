@@ -188,11 +188,13 @@ GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions
 
 # We can only list files in souce/platforms/$(PLATFORM) that are
 # universally available in each platform.
-EVALUATOR_FILES = $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l $(PLATFORM).cgrov.$(TARGET).l eval.l vm-functions.l) \
+EVALUATOR_FILES = $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l vm-functions.l) \
  $(addprefix source/platforms/,load-platform.l platform-c-based.l platform-common.l) \
- $(if $(filter posix,$(PLATFORM)),source/platforms/libc/libc.cgrov.$(TARGET).l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l vm-with-file-support.l types.l) \
  $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
+
+CGROV_FILES = source/platforms/$(PLATFORM)/$(PLATFORM).cgrov.$(TARGET).l \
+ $(if $(filter posix,$(PLATFORM)),source/platforms/libc/libc.cgrov.$(TARGET).l)
 
 # for some optional C files, e.g. profiler.c
 EVAL_OBJ_x86	=
@@ -330,7 +332,8 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
-	@$(call ensure-built,$(HOST_DIR)/eval)
+	$(call ensure-built,$(HOST_DIR)/eval)
+	$(MAKE) $(CGROV_FILES)
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory*	"$(HOST_DIR)"			\
 		--define *slave-directory*	"$(SLAVE_DIR)"			\
@@ -356,7 +359,8 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES
 
 $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
-	@$(call ensure-built,$(HOST_DIR)/eval)
+	$(call ensure-built,$(HOST_DIR)/eval)
+	$(MAKE) $(CGROV_FILES)
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
@@ -384,6 +388,7 @@ $(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_F
 $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
 	$(call ensure-built,$(EVAL0))
+	$(MAKE) $(CGROV_FILES)
 	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
 
@@ -396,6 +401,7 @@ $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86
 $(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(EVAL0))
+	$(MAKE) $(CGROV_FILES)
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
