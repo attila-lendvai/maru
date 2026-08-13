@@ -37,7 +37,7 @@
                           (+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
                           -1 0)))
     ;;(platform/diag-print "mmap returned with "(pointer buf)"\n")
-    (when (< buf 0)
+    (when (= buf posix/MAP_FAILED)
       (platform/diag-print "mmap returned with an error\n")
       (platform/halt))
     buf))
