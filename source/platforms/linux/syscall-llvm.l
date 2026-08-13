@@ -50,7 +50,7 @@
          (push input-regs (pop regs)))
        (set input-regs (list-reverse! input-regs)))
 
-     (println instr"\", ")
+     (println instr"\",")
      (print "	\""output)
      (map (lambda (_ reg)
             (assert reg)   ; this will fail for more args than regs.
