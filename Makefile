@@ -328,8 +328,9 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 # TODO actually do this: wrap emit files below with
 # --eval "(set-working-directory \"$(SLAVE_DIR)\")"
 # --eval "(set-working-directory \"$(HOST_DIR)\")"
-$(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
+$(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
+	@$(call ensure-built,$(HOST_DIR)/eval)
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory*	"$(HOST_DIR)"			\
 		--define *slave-directory*	"$(SLAVE_DIR)"			\
@@ -353,8 +354,9 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) $(HOST_DIR)/eval source/bootstrapping/*.l 
 		source/platforms/run-compiler.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) $(HOST_DIR)/eval source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
+	@$(call ensure-built,$(HOST_DIR)/eval)
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
@@ -459,7 +461,8 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 
 # compile *.cgrov files into *.cgrov.l
 # Must use the host eval if we want to use its output while building this stage.
-%.cgrov.$(TARGET).l: %.cgrov $(HOST_DIR)/eval
+%.cgrov.$(TARGET).l: %.cgrov
+	@$(call ensure-built,$(HOST_DIR)/eval)
 	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
 	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
