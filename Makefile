@@ -294,7 +294,7 @@ $(HOST_DIR)/eval:
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
 # a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
 	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
-	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) PLATFORM=linux $(PREVIOUS_STAGE_EXTRA_TARGETS) eval$(PREVIOUS_STAGE_BACKEND)
+	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) PLATFORM=libc $(PREVIOUS_STAGE_EXTRA_TARGETS) eval$(PREVIOUS_STAGE_BACKEND)
 
 update-eval0: $(EVAL0_DIR)
 	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../.. && make clean
