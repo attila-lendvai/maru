@@ -69,8 +69,9 @@
 (define-function concat-strings-separated-by (separator args)
   (let ((result (car args)))
     (while (set args (cdr args))
-      (set result (concat-string result
-                                 (concat-string separator (car args)))))
+      (when (car args)
+        (set result (concat-string result
+                                   (concat-string separator (car args))))))
     result))
 
 (define-function absolute-path? (path)
@@ -94,8 +95,17 @@
     (string-trim-end
      (run-program* "/usr/bin/env" (list "sh" "-c" arg-string) () () 'string))))
 
+(define *host-os*	(run-program/shell/stdout "uname -s"))
+(define *host-arch*	(run-program/shell/stdout "uname -m"))
+
 (define-function canonicalize-path (path)
-  (run-program/shell/stdout "readlink --canonicalize '"path"'"))
+  (apply run-program/shell/stdout
+         (list (case *host-os*
+                 ("Linux"	"readlink --canonicalize '")
+                 ("Darwin"	"realpath '")
+                 (else		(error "canonicalize-path: unimplemented for '"*host-os*"'")))
+               path
+               "'")))
 
 (define-function same-file-contents-or-die (file1 file2)
   ($ "cmp "file1" "file2))
@@ -226,9 +236,6 @@
 (define *host-dir*		(canonicalize-path (concat-strings* *build* "/" *previous-stage*))) ; aka (build-path *previous-stage*)
 (define *slave-dir*		(working-directory))
 
-(define *host-os*	(run-program/shell/stdout "uname -s"))
-(define *host-arch*	(run-program/shell/stdout "uname -m"))
-
 (define target/arch	*host-arch*)
 (define target/vendor	"unknown")
 (define target/os	"linux")
@@ -239,12 +246,13 @@
    "-" (list target/arch target/vendor target/os target/abi)))
 
 (define ld.so
-  (run-program/shell/stdout
-   "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
-   ;; or alternatively:
-   ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
-   ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
-   ))
+  (when (= *host-os* "Linux")
+    (run-program/shell/stdout
+     "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
+     ;; or alternatively:
+     ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
+     ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
+     )))
 
 ;; eval0-phase check-outs the most recent commit into build/eval0, and
 ;; uses that as the source code for compiling the eval0 binary
@@ -431,7 +439,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
         (map (lambda (el)
                (list "--define"
                      (symbol->string (first el))
-                     (second el)))
+                     (or (second el) "")))
              `((*host-directory*	,host-dir)
                (*slave-directory*	,slave-dir)
                (*compiler-backend*	,(<backend>-name backend))
