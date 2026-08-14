@@ -91,6 +91,26 @@
                                   (println "	lea	(%eax, %ebx), %eax")
                                   (println "	movb	"$2", (%eax)"))))
 
+(when-at-expand (feature lower/array)
+
+;; TODO these two are the same as the -OOP versions, except the lea's multiplier
+(define-instruction/emit-forms LOAD-CELL 0
+  ((_)				(println "	mov	"$1", %ebx")
+                                (println "	lea	(%eax, %ebx, 1), %ebx")
+                                (println "	mov	(%ebx), %eax")))
+
+(define-instruction/emit-forms STORE-CELL 0
+  ((STACK-CELL _)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (let ()
+                                      (println "	mov	"$1", %ebx")
+                                      (println "	lea	(%eax, %ebx, 1), %ebx")
+                                      (println "	mov	"$2", %eax")
+                                      (println "	mov	%eax, (%ebx)"))
+                                  (println "	mov	"$1", %ebx")
+                                  (println "	lea	(%eax, %ebx, 1), %eax")
+                                  (println "	mov	"$2", (%eax)"))))
+)
+
 (define-instruction/emit-forms LOAD-OOP 0
   ((STACK-CELL)			(println "	mov	"$1", %ebx")
                                 (println "	lea	(%eax, %ebx, 4), %ebx")
