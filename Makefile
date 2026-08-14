@@ -357,7 +357,9 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES
 		source/platforms/run-compiler.l					\
 			>$@ || { $(BACKDATE_FILE) $@; exit 42; }
 
-$(BITCODE_DIR)/eval0.ll: $(EVAL_OBJ_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
+$(BITCODE_DIR)/eval0: $(EVAL_OBJ_llvm)
+
+$(BITCODE_DIR)/eval0.ll: source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(HOST_DIR)/eval)
 	$(MAKE) $(CGROV_FILES)
@@ -398,14 +400,18 @@ $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
-$(BITCODE_DIR)/eval1.ll: $(EVAL_OBJ_llvm) boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval1: $(EVAL_OBJ_llvm)
+
+$(BITCODE_DIR)/eval1.ll: boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(EVAL0))
 	$(MAKE) $(CGROV_FILES)
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
 
-$(BITCODE_DIR)/eval2.ll: $(EVAL_OBJ_llvm) $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
+$(BITCODE_DIR)/eval2: $(EVAL_OBJ_llvm)
+
+$(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	$(call compile-llvm,$(SLAVE_DIR),$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
