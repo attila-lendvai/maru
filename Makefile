@@ -430,7 +430,7 @@ define compile
 	source/platforms/load-platform.l					\
 	$(4)									\
 	source/platforms/run-compiler.l						\
-	>$(5) && $(call print_file_size,$(5)) || { $(BACKDATE_FILE) $(5); exit 42; }
+	>$(5) && $(call print_file_size,$(5)) || { cat $(5); $(BACKDATE_FILE) $(5); exit 42; }
 endef
 #	>$(5) 2> >(tee $(5).build-log >&2) || { $(BACKDATE_FILE) $(5); exit 42; }
 
