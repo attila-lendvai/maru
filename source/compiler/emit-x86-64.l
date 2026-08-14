@@ -98,7 +98,7 @@
 (when-at-expand (feature lower/array)
   ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
   (define-instruction/emit-forms LOAD-CELL 0
-    ((STACK-CELL)		(println "	mov	"$1", %rcx")
+    ((_)			(println "	mov	"$1", %rcx")
 				(println "	lea	(%rax, %rcx, 1), %rcx")
 				(println "	mov	(%rcx), %rax")))
 
