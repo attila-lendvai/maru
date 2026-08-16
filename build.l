@@ -310,13 +310,17 @@
 (define-function host-path (file)
   (concat-strings *host-dir* "/" file))
 
-(define-function run-with-host (host-dir host-eval argv . rest)
+(define-function run-with-host (argv . rest)
+  (run-program* (concat-strings *host-dir*"/eval") argv
+                (pop rest) (pop rest) (pop rest) (pop rest)))
+
+(define-function run-with-host/shell args
+  (apply run-program/shell (concat-list (list "cd '"*host-dir*"' && ./eval")
+                                        args)))
+
+(define-function run-with-stage (host-dir host-eval argv . rest)
   (let ((host-binary (concat-strings host-dir"/"host-eval)))
     (run-program* host-binary argv (pop rest) (pop rest) (pop rest) (pop rest))))
-
-(define-function run-with-host/shell (host-dir host-eval . args)
-  (apply run-program/shell (concat-list (list "cd '"host-dir"' && "host-eval)
-                                        args)))
 
 (define-function clean-backends args
   (let ((backend (pop args))
@@ -391,9 +395,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
   ;; NOTE if we call (compile-host) here, then it'll get triggered
   ;; while we are compiling eval0 in the build/eval0 dir; i.e. it
   ;; would unnecessarily compile the previous stage one more time.
-  (let* ((host-dir	*host-dir*)
-         (host-eval	"eval")
-         (c-file     (concat-strings file-path "." (target-triple) ".c"))
+  (let* ((c-file     (concat-strings file-path "." (target-triple) ".c"))
          (exe-file   (concat-strings c-file ".exe"))
          (final-file (concat-strings file-path "." (target-triple) ".l")))
     (when (needs-recompile? final-file (list file-path))
@@ -404,7 +406,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
       ;;  (list (host-path "boot.l") (host-path "source/c/compile-cgrov.l") file-path)
       ;;  () () c-file)
 
-      (run-with-host/shell host-dir "./"host-eval" boot.l source/c/compile-cgrov.l '"
+      (run-with-host/shell " boot.l source/c/compile-cgrov.l '"
                            file-path "' >'"c-file"'")
 
       (compile-C-file cflags c-file exe-file ())
@@ -425,7 +427,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 
     (save-dep-vars output-path *input-variables-for-build*)
 
-    (run-with-host
+    (run-with-stage
      host-dir host-eval
      (list-remove
       ()
@@ -615,17 +617,17 @@ git --no-pager log --pretty=oneline -1")))
 
 (define-function compile-maru/stage-2 (backend platform)
   ;; eval2 is always compiled using eval1.
-  (compile-maru/stage-1 backend platform)
-  (compile-maru backend platform
-                *slave-dir* (build-output backend platform "eval1")
-                *slave-dir* "eval2" false))
+  (let ((eval1 (compile-maru/stage-1 backend platform)))
+    (compile-maru backend platform
+                  *slave-dir* eval1
+                  *slave-dir* "eval2" false)))
 
 (define-function bootstrap args
   (let ((backend  (or (pop args) default-backend))
         (platform (or (pop args) default-platform)))
     (assert (subtype? (type-of backend) <backend>))
     (assert (subtype? (type-of platform) <platform>))
-    (let ((eval1 (build-output backend platform "eval1"))
+    (let ((eval1 (compile-maru/stage-1 backend platform))
           (eval2 (compile-maru/stage-2 backend platform)))
       (same-file-contents-or-die eval1 eval2))))
 
