@@ -78,7 +78,7 @@
   (= ?/ (string-at path 0)))
 
 (define-function log-run-program (arg-string)
-  (print-all *standard-output* term/FG-CYAN "-> "arg-string"\n" term/RESET))
+  (print-all *standard-output* term/FG-CYAN "-> " arg-string term/RESET "\n"))
 
 (define-function run-program* (binary argv . rest)
   (log-run-program (concat-strings-separated-by " " (cons binary argv)))
