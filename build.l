@@ -170,6 +170,8 @@
           result))))
 
 (define *input-variables-for-build*
+  ;; NOTE: default-backend and default-platform should not matter,
+  ;; because they get encoded into the build output path.
   '(profiler ld.so))
 
 (define-function save-dep-vars (output-file variables)
@@ -422,7 +424,10 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 
   (when (let ((abs-output-path (concat-strings slave-dir "/" output-path)))
           (needs-recompile? abs-output-path
-                            (load-deps-for abs-output-path)
+                            (concat-list
+                             (load-deps-for abs-output-path)
+                             ;; FIXME why do i need to add this here?
+                             (list source))
                             (load-vars-for abs-output-path)))
 
     (save-dep-vars output-path *input-variables-for-build*)
@@ -474,7 +479,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
          ,output-path
          ))))))
 
-(define-function %compile-maru (backend platform host-dir host-eval slave-dir output-name evolving?)
+(define-function %compile-maru (backend platform host-dir host-eval slave-dir input-file output-name evolving?)
   (let ((platform-name (to-string platform)))
     (compile-cgrov-file (concat-strings slave-dir "/source/platforms/"platform-name"/"platform-name".cgrov"))
     (cond
@@ -489,9 +494,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 
     (run-maru-compiler
      host-dir host-eval slave-dir backend platform
-     (concat-strings* "source/platforms/"platform"/eval.l")
-     output
-     evolving?)
+     input-file output evolving?)
 
     output))
 
@@ -523,15 +526,16 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 
 (define-multimethod compile-maru ((<x86> backend) platform
                                   host-dir host-eval
-                                  slave-dir output-name evolving?)
+                                  slave-dir input-file output-name evolving?)
   ;; TODO use call-next-method, or even an :after method!
-  (let ((output (%compile-maru backend platform host-dir host-eval slave-dir output-name evolving?)))
+  (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
+                               input-file output-name evolving?)))
     ($ "cd '"slave-dir"' && chmod +x " output)
     output))
 
 (define-multimethod compile-maru ((<llvm> backend) platform
                                   host-dir host-eval
-                                  slave-dir output-name evolving?)
+                                  slave-dir input-file output-name evolving?)
   (let ((cflags (cflags-for backend platform))
         (obj-files ()))
 
@@ -547,9 +551,12 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
           (push obj-files output))))
 
     ;; compile maru
-    (let* ((output-ll (%compile-maru backend platform host-dir host-eval
-                                     slave-dir (concat-string output-name ".ll")
-                                     evolving?))
+    (let* ((output-ll
+             (%compile-maru backend platform host-dir host-eval
+                            slave-dir
+                            input-file
+                            (concat-string output-name ".ll")
+                            evolving?))
            (unstripped-path (build-output backend platform
                                           (concat-string output-name ".unstripped")))
            (binary          (build-output backend platform output-name)))
@@ -589,7 +596,8 @@ git --no-pager log --pretty=oneline -1")))
 (define-function compile-maru/stage-0 (backend platform)
   (let* ((res (compile-host))
          (host-dir  (pop res))
-         (host-eval (pop res)))
+         (host-eval (pop res))
+         (input-file (concat-strings* "source/platforms/"platform"/eval.l")))
     (if eval0-phase
         (let ((eval0-dir (checkout-eval0))
               (cwd-backup (working-directory)))
@@ -597,30 +605,34 @@ git --no-pager log --pretty=oneline -1")))
           ;; we compile a build/eval0/build/.../eval0 binary that will not be
           ;; touched later until an update-eval0 is run.
           (set (working-directory) eval0-dir)
-          (let ((binary (compile-maru backend platform host-dir host-eval eval0-dir "eval0" true)))
+          (let ((binary (compile-maru backend platform host-dir host-eval eval0-dir
+                                      input-file "eval0" true)))
             (set (working-directory) cwd-backup)
             (list eval0-dir binary)))
 
       (list *slave-dir*
-            (compile-maru backend platform host-dir host-eval *slave-dir* "eval0" true)))))
+            (compile-maru backend platform host-dir host-eval *slave-dir*
+                          input-file "eval0" true)))))
 
 (define-function compile-maru/stage-1 (backend platform)
   ;; eval0 is either in build/eval0/build/... or in our own build/
   ;; next to eval1 & eval2, depending on eval0-phase. we don't know
   ;; which one, hence the extra dance about the stage-0 return value.
-  (let* ((res (compile-maru/stage-0 backend platform))
+  (let* ((input-file (concat-strings* "source/platforms/"platform"/eval.l"))
+         (res (compile-maru/stage-0 backend platform))
          (eval0-dir (pop res))
          (eval0 (pop res)))
     (compile-maru backend platform
                   eval0-dir eval0
-                  *slave-dir* "eval1" false)))
+                  *slave-dir* input-file "eval1" false)))
 
 (define-function compile-maru/stage-2 (backend platform)
   ;; eval2 is always compiled using eval1.
-  (let ((eval1 (compile-maru/stage-1 backend platform)))
+  (let ((eval1 (compile-maru/stage-1 backend platform))
+        (input-file (concat-strings* "source/platforms/"platform"/eval.l")))
     (compile-maru backend platform
                   *slave-dir* eval1
-                  *slave-dir* "eval2" false)))
+                  *slave-dir* input-file "eval2" false)))
 
 (define-function bootstrap args
   (let ((backend  (or (pop args) default-backend))
@@ -728,7 +740,29 @@ git --no-pager log --pretty=oneline -1")))
   (test-assembler-x86)
   (test-assembler-arm))
 
+(define-generic test-compiler args
+  (let ((backend  (or (pop args) default-backend))
+        (platform (or (pop args) default-platform)))
+
+    (let* ((input-file	"tests/compiler-test.l")
+           (output-name	"compiler-test")
+           (stage0	(compile-maru/stage-0 backend platform))
+           (host-dir	(pop stage0))
+           (host-eval	(pop stage0)))
+
+      (let ((binary (compile-maru backend platform host-dir host-eval *slave-dir*
+                                  input-file output-name true)))
+        ($ binary)))))
+
 (define-function test ()
+  ;; Platform = linux
+  (when (= *host-os* "Linux")
+    (test-compiler llvm linux)
+    (when (= *host-arch* "x86_64")
+      (test-compiler x86 linux)))
+
+  (test-compiler llvm libc)
+  (test-compiler llvm posix)
   (test-evaluator)
   (test-parser)
   (test-elf)
@@ -765,7 +799,9 @@ git --no-pager log --pretty=oneline -1")))
                                            (maybe-set-variable *globals* str))
                                          *command-line-arguments*)))))
     (debug-log "main is applying: "args)
-    (if (is <expr> (first args))
+    (if (or (is <expr>		(first args))
+            (is <selector>	(first args))
+            (is <generic>	(first args)))
         (apply (first args) (rest args))
       (error "usage: build.l fn-name arg1 arg2 arg3\n  where everything will be looked up in the *globals* env, and if defined then the value will be used instead of the name.")))
   (set *command-line-arguments* ())     ; we consumed it all
