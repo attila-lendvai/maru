@@ -9,7 +9,7 @@ HOST_DIR="$BUILD/$PREVIOUS_STAGE"
 
 ensure_host_binary() {
     if [ ! -e "$HOST_DIR/eval" ]; then
-        echo "Building host..."
+        echo "build.sh is building the host..."
 
         mkdir -p "$BUILD"
 
@@ -43,5 +43,7 @@ ensure_host_binary() {
 }
 
 ensure_host_binary
+
+echo "Calling build.l"
 
 exec "$HOST_DIR/eval" boot.l build.l "$@"

@@ -98,26 +98,26 @@
 (define-vm-function (lower/array-length ()) ((array <lower/array>))
   (box <long> (lower/array-length array)))
 
-;; lower/array-at accessor is byte sized
-(define-vm-function (lower/array-at ()) ((array <lower/array>) (idx <long>))
-  (box <long> (lower/array-at array idx)))
+;; lower/array-at accessor is byte sized, and byte indexed
+(define-vm-function (lower/array-at ()) ((array <lower/array>) (byteindex <long>))
+  (box <long> (lower/array-at array byteindex)))
 
-(define-vm-function (set-lower/array-at ()) ((array <lower/array>) (idx <long>) value)
+(define-vm-function (set-lower/array-at ()) ((array <lower/array>) (byteindex <long>) value)
   (typecase value
     (<long>
      ;; TODO add error reporting? this only writes out the lowest
      ;; byte of the value.
-     (set (lower/array-at array idx) (unbox <long> value)))
+     (set (lower/array-at array byteindex) (unbox <long> value)))
     (<lower-cell>
      ;; ensure the array has enough capacity
-     (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
-     (set (cell-at (<lower/array>-elements array) idx)
+     (set (lower/array-at array (+ byteindex +word-size-in-bytes+)) 0)
+     (set (cell-at (<lower/array>-elements array) byteindex)
           (unbox <lower-cell> value)))
     (else
      (error "set-lower/array-at doesn't know how to handle value: "value)))
   value)
 
-;; cell-at accessor is target cell sized
+;; cell-at accessor is target cell sized, and byte indexed
 (with-forms
     ((with-bounds-checking
          (body

@@ -545,6 +545,7 @@
 ;;;
 
 (define-function %emit-b-imm19 (cond offset)
+  ;; TODO bring the (or cond ...) to compile time
   (emit-u32 (bitwise-or 0x54000000
                         (bitwise-shift (bitwise-and (bitwise-shift offset -2) 0x7FFFF) 5)
                         cond)))
@@ -558,10 +559,26 @@
     (<symbol> (BCOND (%ensure-label designator) cond))
     (else     (error "BCOND: unexpected: " designator))))
 
+;;; ARM condition codes:
 ;;;
-;;; Conditional branch convenience wrappers
-;;;   ARM condition codes: EQ=0 NE=1 GE=10 LT=11 GT=12 LE=13
-;;;
+;;;   Value  Condition  Meaning
+;;;   -----  ---------  -----------------------------------------------
+;;;      0   EQ         Equal
+;;;      1   NE         Not equal
+;;;      2   CS / HS    Carry set / unsigned higher or same
+;;;      3   CC / LO    Carry clear / unsigned lower
+;;;      4   MI         Minus / negative
+;;;      5   PL         Plus / positive or zero
+;;;      6   VS         Overflow
+;;;      7   VC         No overflow
+;;;      8   HI         Unsigned higher
+;;;      9   LS         Unsigned lower or same
+;;;     10   GE         Signed greater or equal
+;;;     11   LT         Signed less than
+;;;     12   GT         Signed greater than
+;;;     13   LE         Signed less or equal
+;;;     14   AL         Always
+;;;     15   NV         Never
 
 (define-instruction BEQ (designator) (BCOND designator 0))
 (define-instruction BNE (designator) (BCOND designator 1))

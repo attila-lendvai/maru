@@ -192,6 +192,7 @@
       ;; classes. there's no point in a separate <long> and
       ;; <lower-cell> case when both can be covered by e.g. a boxed
       ;; word branch.
+      ;; TODO long-lower-cell comparison? in both direction
       (<long>		(and (long? rhs)
                              (= (unbox <long> lhs)
                                 (unbox <long> rhs))

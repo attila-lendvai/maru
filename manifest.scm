@@ -81,7 +81,7 @@
       ;;"clang-toolchain"
       "glibc"
       "glibc:debug"
-      ;; "libffi"
+      "libffi"                          ; for the c99 implementations
       "make"
       "time"
       "ncurses"        ; for clear, reset, tput (used by the Makefile)
