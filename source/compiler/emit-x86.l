@@ -483,9 +483,9 @@
 
 ;; the x86 div instruction is unsigned division
 (define-instruction DIV		(true 0 true)
-  ((R64 STACK-CELL)		(XORQrr RDX RDX)
-                                (DIVQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
-  ((R64 LI64)			(XORQrr RDX RDX) ; the upper side of 128 bit operand
+  ((R64 STACK-CELL)		(CQO)
+                                (IDIVQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 LI64)			(CQO)
                                 (cond
                                   ((= 1 (<LITERAL>-value $2))
                                    ;; remainder is zero, %rax is unchanged
@@ -493,7 +493,7 @@
                                   ;; TODO emit shifts when possible
                                   (else
                                    (MOVQir (<LITERAL>-value $2) RCX) ; divisor
-                                   (DIVQrr RCX (<REGISTER>-name $1))))))
+                                   (IDIVQrr RCX (<REGISTER>-name $1))))))
 
 (define-instruction AND		(true 0 true)
   ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
