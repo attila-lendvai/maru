@@ -623,6 +623,8 @@
 (define-function IDIVWmr (D B I S R)		(rindex/AX R)	(_wO_r_X 0xf7		_b111	D B I S))
 (define-function IDIVLrr (RS RD)		(rindex/EAX RD)	(_O_Mrm 0xf7 _b11	_b111	(rindex/32 RS)))
 (define-function IDIVLmr (D B I S R)		(rindex/EAX R)	(_O_r_X 0xf7		_b111	D B I S))
+(define-function IDIVQrr (RS RD)	(_REX 1 RS 0 RD)(IDIVLrr (to-r32 RS) (to-r32 RD)))
+(define-function IDIVQmr (D B I S R)	(_REX 1 S 0 R)	(IDIVLmr D (to-r32 B) (to-r32 I) S (to-r32 R)))
 
 (define-function MULBrr (RS RD)			(rindex/AL RD)	(_O_Mrm  0xf6 _b11 _b100	(rindex/8 RS)))
 (define-function MULBmr (D B I S R)		(rindex/AL R)	(_O_r_X  0xf6 _b100		D B I S))
