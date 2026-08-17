@@ -755,19 +755,21 @@ git --no-pager log --pretty=oneline -1")))
         ($ binary)))))
 
 (define-function test ()
-  ;; Platform = linux
-  (when (= *host-os* "Linux")
-    (test-compiler llvm linux)
-    (when (= *host-arch* "x86_64")
-      (test-compiler x86 linux)))
-
   (test-compiler llvm libc)
   (test-compiler llvm posix)
   (test-evaluator)
   (test-parser)
-  (test-elf)
-  (test-jit)
-  (test-assembler)
+
+  (when (= *host-os* "Linux")
+
+    (test-compiler llvm linux)
+    (test-assembler) ; uses x86_64-linux-gnu-objcopy and stuff...
+
+    (when (= *host-arch* "x86_64")
+
+      (test-compiler x86 linux)
+      (test-elf)
+      (test-jit)))
   )
 
 ;;;

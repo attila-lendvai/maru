@@ -48,7 +48,8 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
@@ -58,17 +59,7 @@ jobs:
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
 
-      - run:  timeout 5m ./build.sh test-evaluator
-      - run:  timeout 5m ./build.sh test-parser
-#      - run:  timeout 5m ./build.sh PLATFORM=libc  test-compiler-llvm
-#      - run:  timeout 5m ./build.sh PLATFORM=posix test-compiler-llvm
-#      - run:  timeout 5m ./build.sh PLATFORM=linux test-compiler
-
-      - run:  timeout 5m ./build.sh default-platform=posix test-elf
-      - run:  timeout 5m ./build.sh default-platform=linux test-elf
-
-      - run:  timeout 5m ./build.sh default-platform=linux test-jit
-      - run:  timeout 5m ./build.sh default-platform=posix test-jit
+      - run:  timeout 5m ./build.sh test
 
       - name: Bootstrap with *safety* set to 3
         run: |
@@ -104,7 +95,9 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
+
 
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
@@ -113,10 +106,7 @@ jobs:
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
 
-      - run:  timeout 5m ./build.sh test-evaluator
-      - run:  timeout 5m ./build.sh test-parser
-#      - run:  timeout 5m ./build.sh PLATFORM=libc  test-compiler-llvm
-#      - run:  timeout 5m ./build.sh PLATFORM=linux test-compiler-llvm
+      - run:  timeout 5m ./build.sh test
 
   build-darwin:
     name: "darwin aarch64 (errors ignored)"
@@ -181,7 +171,8 @@ jobs:
       - name: Add Homebrew LLVM to PATH
         run: echo "$(brew --prefix llvm)/bin:$(brew --prefix coreutils)/bin" >> $GITHUB_PATH
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm libc
         continue-on-error: true      # TODO
@@ -192,14 +183,8 @@ jobs:
       - run:  timeout 3m arch -arm64  ./build.sh profiler=1 bootstrap llvm posix
         continue-on-error: true      # TODO
 
-      - run:  timeout 3m ./build.sh test-evaluator
+      - run:  timeout 3m ./build.sh test
         continue-on-error: true      # TODO
-
-      - run:  timeout 3m ./build.sh test-parser
-        continue-on-error: true      # TODO
-
-#      - run:  timeout 3m ./build.sh test-compiler-llvm
-#        continue-on-error: true      # TODO
 
 # TODO fix and reenable
   build-linux-amd64-full-bootstrap:
