@@ -39,21 +39,26 @@
   ;; (unless interactive?
   ;;   (let ((libc-handle (unbox <lower-cell> (<libc-stream>-handle input))))
   ;;     (libc/fscanf libc-handle "#!%*[^\x0a\x0d]"))) ; drop the possible #!./eval first line of the file
-  (gc/let* (res)
+  (gc/let* (exp
+            result)
     (while (let ()
              (when interactive?
                ($put-all output "maru> ")
                (platform/flush-streams))
-             (not (= +end+ (set res (read input)))))
-      (unless (= +end+ res)
-        (set res (expand-encode-eval res))
+             (not (= +end+ (set exp (read input)))))
+      (unless (= +end+ exp)
+        (set result (expand-encode-eval exp))
         (when interactive?
-          (do-print output res false)
+          (do-print output result false)
           ($put output ?\n)             ; newline
           (platform/flush-streams))))
     (when interactive?
       ($put-all output "\nmorituri te salutant\n"))
-    res))
+
+    ;; FIXME this is somewhat arbitrary
+    (if (long? result)
+	result
+      (box <long> 0))))
 
 (define-form with-input-from-file (args . body)
   (let ((var		(first args))
@@ -89,11 +94,13 @@
     ;; TODO shouldn't the processing be moved into the upper? into boot.l?
 
     ;; process *cla*
-    (let (cla)
+    (let ((exit-code 0)
+          cla)
       (gc/let* (arg
                 tmp)
         (with-forms ((pop-cla (_ '(set (<variable>-value cla-var) (set cla (get/tail cla))))))
-          (while (pair? (set cla (<variable>-value cla-var)))
+          (while (and (= 0 exit-code)
+                      (pair? (set cla (<variable>-value cla-var))))
             (set arg (get/head cla))
             (pop-cla)
             (cond
@@ -173,4 +180,9 @@
               (else
                (verbosity 1 (print-all *debug-output* "loading file: "arg"\t(as a CLA)\n"))
                (with-input-from-file (stream arg)
-                 (repl-stream stream *standard-output* false))))))))))
+                 (set exit-code (unbox <long> (repl-stream stream *standard-output* false)))
+                 (when (or (<= 2 *verbosity*)
+                           (not (= 0 exit-code)))
+                   (print-all *debug-output* "exit-code of file "arg": "(box <long> exit-code)"\n"))))))))
+
+      exit-code)))

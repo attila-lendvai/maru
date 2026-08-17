@@ -152,16 +152,17 @@
   (when init-hook
     (init-hook))
 
-  (process-command-line-arguments argc argv)
+  (let ((exit-code (process-command-line-arguments argc argv)))
 
-  (debug-print "main is on the way out")
+    (debug-print "main is on the way out")
 
-  (verbosity 1
-    (gc/collect)
-    (gc/print-statistics))
-  (when-at-expand (feature profiler)
-    (profiler/disable))
-  (platform/flush-streams)
+    (verbosity 1
+      (gc/collect)
+      (gc/print-statistics))
+    (when-at-expand (feature profiler)
+      (profiler/disable))
+    (platform/flush-streams)
 
-  (debug-print "main is returning normally")
-  0)
+    (debug-print "main is returning normally, exit code: " (box <long> exit-code))
+
+    exit-code))

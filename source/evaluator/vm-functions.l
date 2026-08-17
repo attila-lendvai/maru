@@ -401,7 +401,7 @@
   (let ((exit-code (posix/waitpid child-pid 0)))
     (unless (= 0 exit-code)
       (error "spawn-program returned exit code: "(box <long> exit-code)))
-    exit-code))
+    (box <long> exit-code)))
 
 (define-function run-program/stdout/slurp (path argv envp)
   (with-open-pipe (stdout-read-fd stdout-write-fd)
