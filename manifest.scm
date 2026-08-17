@@ -29,21 +29,23 @@
  (guix build-system gnu)
  )
 
-(define (cross-package-entry pkg target-triplet)
-  (manifest-entry
-    (inherit (package->manifest-entry pkg))
-    (item
-     (with-parameters ((%current-target-system target-triplet))
-       pkg))))
-
-(define-public binutils-prefixed
-  (package
-    (inherit binutils)
-    (name "binutils-prefixed")
-    (arguments
-     (substitute-keyword-arguments (package-arguments binutils)
-       ((#:configure-flags flags #~'())
-        #~(cons "--program-prefix=aarch64-linux-gnu-" #$flags))))))
+(define (binutils-prefixed target-triplet)
+  (let ((pkg (package
+              (inherit binutils)
+              (name (string-append "binutils-prefixed-" target-triplet))
+              (arguments
+               (substitute-keyword-arguments
+                (package-arguments binutils)
+                ((#:configure-flags flags #~'())
+                 #~(cons #$(string-append "--program-prefix="
+                                          target-triplet
+                                          "-")
+                         #$flags)))))))
+    (manifest-entry
+     (inherit (package->manifest-entry pkg))
+     (item
+      (with-parameters ((%current-target-system target-triplet))
+        pkg)))))
 
 (manifest
  (append
@@ -65,8 +67,11 @@
   ;; there's this, too (cross-clang): https://issues.guix.gnu.org/54239
   ;; (list (cross-package-entry glibc "aarch64-linux-gnu"))
 
-  ;; Needed to be able to cross-compile to aarch64? (add proper comment it next time!)
-  (list (cross-package-entry binutils-prefixed "aarch64-linux-gnu"))
+  (list
+   ;; these are needed for the assembler tests. by making the prefixes
+   ;; explicit, it works transparently in the x86 and arm CI runners.
+   (binutils-prefixed "aarch64-linux-gnu")
+   (binutils-prefixed "x86_64-linux-gnu"))
 
   ;; get the latest from the channels you have `guix pull`ed
   (manifest-entries

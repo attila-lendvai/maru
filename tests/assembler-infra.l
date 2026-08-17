@@ -4,6 +4,7 @@
 ;;; Used by test-assembler-x86.l and test-assembler-aarch64.l.
 
 (require "tests/infra.l")
+(require "source/ansiterm.l")
 
 (define-function string-trim-end (str)
   (let ((end (string-length str)))
@@ -17,6 +18,7 @@
   (string-trim-end (run-program path argv () () 'string)))
 
 (define-function run-shell (cmd)
+  ;; (print-all *debug-output* term/FG-BLUE cmd"\n" term/RESET)
   (run-capture "/usr/bin/env" (list "sh" "-c" cmd)))
 
 (define-function write-file (path contents)
@@ -32,8 +34,8 @@
   (let ((src-file (concat-string ref-bin ".s"))
         (obj-file (concat-string ref-bin ".o")))
     (write-file src-file asm-source)
-    (run-shell (concat-strings "clang -c -o " obj-file " " src-file))
-    (run-shell (concat-strings "objcopy -j .text -O binary " obj-file " " ref-bin))))
+    (run-shell (concat-strings "clang -target x86_64 -c -o " obj-file " " src-file))
+    (run-shell (concat-strings "x86_64-linux-gnu-objcopy -j .text -O binary " obj-file " " ref-bin))))
 
 (define-function verify-encoding/x86 (filename asm-source)
   (let ((bin-filename (concat-string "build/asm-x86/" filename)))

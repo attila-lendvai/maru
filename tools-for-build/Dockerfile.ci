@@ -2,10 +2,10 @@
 # podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 -f Dockerfile.ci .
 
 # need to log in with a token generated at: https://github.com/settings/tokens
-# podman login ghcr.io -u attila-lendvai -p <personal-access-token>
+# podman login ghcr.io -u attila-lendvai
 
-# podman push maru-ci ghcr.io/attila-lendvai/maru-ci:amd64
-# podman push maru-ci ghcr.io/attila-lendvai/maru-ci:arm64
+# podman push ghcr.io/attila-lendvai/maru-ci:amd64
+# podman push ghcr.io/attila-lendvai/maru-ci:arm64
 
 # for the first time go to:
 # https://github.com/attila-lendvai?tab=packages&ecosystem=container
@@ -27,6 +27,8 @@ RUN apt-get update && \
         clang-20 \
         libc6-dev \
         libffi-dev \
+        binutils-aarch64-linux-gnu \
+        binutils-x86-64-linux-gnu \
         git \
         time \
         lsb-release software-properties-common gnupg \
