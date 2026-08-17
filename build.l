@@ -702,12 +702,23 @@ git --no-pager log --pretty=oneline -1")))
 ;;; tests
 ;;;
 
-(define-function test-jit ()
+(define-function %test-jit ()
   (let ((dir (build-path "jit")))
     ($ "rm -f '"dir"/*'")
     (ensure-directory-exists dir)
     (run-with-stage-1 (list "boot.l" "--define" "+target-triple+" (target-triple)
                             "tests/jit.l"))))
+
+(define-function test-jit ()
+  (let ((prev-platform default-platform))
+
+    (set default-platform linux)
+    (%test-jit)
+
+    (set default-platform posix)
+    (%test-jit)
+
+    (set default-platform prev-platform)))
 
 (define-function test-elf ()
   (let ((run (lambda (file)
