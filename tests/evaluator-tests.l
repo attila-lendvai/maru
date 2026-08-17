@@ -416,9 +416,21 @@
 
 (when-at-expand (defined? 'lower/array)
   (define-test lower/array/1 ()
-    (let ((x (lower/array 200)))
+    (let ((value 0x1122334455667788))
+      ;; long - lower-cell conversion roundtrip
+      (test-assert (= (lower-cell->long (long->lower-cell value))
+                      value)))
+
+    (let* ((arr	(lower/array 200))
+           (x	(<lower/array>-elements arr)))
+
+      ;; array is initialized to zero
+      (test-assert (= (lower/array-at arr 0) 0))
+      (test-assert (= (cell-at x 0) (long->lower-cell 0)))
+
       (set (cell-at x 0) 0x1122334455667788)
       (set (cell-at x 7) 0)
+
       ;; FIXME this assumes little endian
       (test-assert (= (cell-at x 0) (long->lower-cell 0x0022334455667788)))
       (test-assert (= (cell-at x 1) (long->lower-cell 0x0000223344556677)))
