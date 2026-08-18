@@ -68,7 +68,7 @@ else ifeq ($(HOST_OS),Darwin)
   #TARGET_OS	?= darwin$(shell uname -r)
   TARGET_OS	?= darwin
   TARGET_ABI	=
-  CFLAGS	+= -Wl,-no_uuid
+  #CFLAGS	+= -Wl,-no_uuid # newer darwin refuses to run the binary with -no_uuid
   EVAL_WRAPPER	:= time
 endif
 
