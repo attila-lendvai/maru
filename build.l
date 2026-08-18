@@ -799,7 +799,10 @@ git --no-pager log --pretty=oneline -1")))
      (set target/vendor	"apple")
      (set target/os	"darwin")
      (set target/abi	())
-     (set cflags (concat-string cflags " -Wl,-no_uuid"))))
+     ;; NOTE newer Darwin refuses to start exe's without LC_UUID
+     ;; dyld[6416]: missing LC_UUID load command in .../maru.10/eval
+     ;; (set cflags (concat-string cflags " -Wl,-no_uuid"))
+     ))
 
   (let* ((args (map (lambda (str)
                       ;; second: _ means false
