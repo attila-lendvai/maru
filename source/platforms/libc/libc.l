@@ -85,6 +85,11 @@
   (libc/fputc char libc/stderr)
   char)
 
+;; a variant of platform/diag-print that uses fprintf. it's available
+;; earlier in the load order.
+(define-form libc/diag-printf (format . args)
+  `(libc/fprintf libc/stderr (string->C-string ,format) ,@args))
+
 (define-form platform/halt args
   ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
   `(libc/exit ,@(or args '(-42))))
