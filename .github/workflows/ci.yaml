@@ -46,7 +46,8 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap
       - run:  timeout 5m make PLATFORM=posix test-bootstrap
@@ -104,7 +105,8 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
@@ -182,7 +184,8 @@ jobs:
       - name: Add Homebrew LLVM to PATH
         run: echo "$(brew --prefix llvm)/bin:$(brew --prefix coreutils)/bin" >> $GITHUB_PATH
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 3m arch -arm64  make PLATFORM=libc test-bootstrap-llvm
         continue-on-error: true      # TODO
@@ -240,6 +243,7 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version && cc --version
+      - run:  clang --version || true
+      - run:  cc --version || true
 
       - run:  timeout 20m make test-bootstrap-recursively
