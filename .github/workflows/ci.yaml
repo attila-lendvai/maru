@@ -109,7 +109,7 @@ jobs:
       - run:  timeout 5m ./build.sh test
 
   build-darwin:
-    name: "darwin aarch64 (errors ignored)"
+    name: "darwin aarch64"
     runs-on: macos-latest
     defaults:
       run:
@@ -175,16 +175,12 @@ jobs:
       - run:  cc --version || true
 
       - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm libc
-        continue-on-error: true      # TODO
 
       - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm posix
-        continue-on-error: true      # TODO
 
       - run:  timeout 3m arch -arm64  ./build.sh profiler=1 bootstrap llvm posix
-        continue-on-error: true      # TODO
 
       - run:  timeout 3m ./build.sh test
-        continue-on-error: true      # TODO
 
 # TODO fix and reenable
   build-linux-amd64-full-bootstrap:
