@@ -718,6 +718,7 @@ git --no-pager log --pretty=oneline -1")))
                             "tests/jit.l"))))
 
 (define-function test-jit ()
+  (debug-log "test-jit is starting")
   (let ((prev-platform default-platform))
 
     (set default-platform linux)
@@ -729,6 +730,7 @@ git --no-pager log --pretty=oneline -1")))
     (set default-platform prev-platform)))
 
 (define-function test-elf ()
+  (debug-log "test-elf is starting")
   (let ((run (lambda (file)
                (run-with-stage-1
                 (list "boot.l"
@@ -748,18 +750,22 @@ git --no-pager log --pretty=oneline -1")))
   (ensure-directory-exists (build-path "asm-arm"))
   (run-with-stage-1 (list "boot.l" "tests/test-assembler-arm.l")))
 
-(define-function test-evaluator ()
-  (run-with-stage-1 (list "boot.l" "tests/evaluator-tests.l")))
-
-(define-function test-parser ()
-  (compile-peg-grammar "tests/parsing/gnu-bc")
-  (run-with-stage-1 (list "boot.l" "tests/parsing/gnu-bc-test.l")))
-
 (define-function test-assembler ()
+  (debug-log "test-assembler is starting")
   (test-assembler-x86)
   (test-assembler-arm))
 
+(define-function test-evaluator ()
+  (debug-log "test-evaluator is starting")
+  (run-with-stage-1 (list "boot.l" "tests/evaluator-tests.l")))
+
+(define-function test-parser ()
+  (debug-log "test-parser is starting")
+  (compile-peg-grammar "tests/parsing/gnu-bc")
+  (run-with-stage-1 (list "boot.l" "tests/parsing/gnu-bc-test.l")))
+
 (define-generic test-compiler args
+  (debug-log "test-compiler is starting")
   (let ((backend  (or (pop args) default-backend))
         (platform (or (pop args) default-platform)))
 
