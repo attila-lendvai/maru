@@ -14,7 +14,7 @@
      (set arch		'IA-32)
      (set word-size	32))
 
-    (("aarch64")
+    (("aarch64" "arm64")
      (set arch		'aarch64)
      (set word-size	64))
 
