@@ -2,10 +2,10 @@
 
 ;; this is very similar in effect to read-time evaluation in CL, aka #.(foo)
 (define-form eval-at-expand (form)
-  (eval form))
+  (eval form *env*))
 
 (define-form if-at-expand (cond true-form . false-forms)
-  (if (eval cond)
+  (if (eval cond *env*)
       true-form
     (if (and false-forms
              (cdr false-forms))
@@ -13,7 +13,7 @@
       (car false-forms))))
 
 (define-form when-at-expand (cond . true-forms)
-  (if (eval cond)
+  (if (eval cond *env*)
       (if (and true-forms
                (cdr true-forms))
           `(let ()
