@@ -98,6 +98,9 @@
 (define *host-os*	(run-program/shell/stdout "uname -s"))
 (define *host-arch*	(run-program/shell/stdout "uname -m"))
 
+(when (= *host-arch* "arm64")
+  (set *host-arch* "aarch64"))
+
 (define-function canonicalize-path (path)
   (apply run-program/shell/stdout
          (list (case *host-os*
@@ -641,7 +644,12 @@ git --no-pager log --pretty=oneline -1")))
     (assert (subtype? (type-of platform) <platform>))
     (let ((eval1 (compile-maru/stage-1 backend platform))
           (eval2 (compile-maru/stage-2 backend platform)))
-      (same-file-contents-or-die eval1 eval2))))
+      ;; TODO add same-file-contents-or-die for the sources
+
+      ;; Newer darwin refuses to run binaries without an uuid, so they
+      ;; will never by byte-identical.
+      (unless (= *host-os* "Darwin")
+        (same-file-contents-or-die eval1 eval2)))))
 
 (define-function bootstrap-matrix ()
   ;; TODO finish it... it needs to skip cross compilation, etc. this
