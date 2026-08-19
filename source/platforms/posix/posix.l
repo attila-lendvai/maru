@@ -30,14 +30,23 @@
 (define-function platform/acquire-memory (size)
   ;; KLUDGE we make all allocated memory executable.
   ;; some tests generate machine code and want to call it...
-  (let* ((page-size (posix/sysconf posix/_SC_PAGESIZE))
-         (buf (posix/mmap 0 (align-address-up size page-size)
-                          (+ (+ posix/PROT_READ posix/PROT_WRITE)
-                             posix/PROT_EXEC)
-                          (+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
-                          -1 0)))
+  (let* ((page-size	(posix/sysconf posix/_SC_PAGESIZE))
+         (prot-flags	(+ (+ posix/PROT_READ posix/PROT_WRITE)
+                           ;; FIXME darwin refuses to mmap WRITE +
+                           ;; EXEC region. for now we only need
+                           ;; exec for the JIT experiments, which
+                           ;; only works on x86-64.
+                           (eval-at-expand
+                            (case +architecture+
+                              (x86-64	posix/PROT_EXEC)
+                              (else	0)))))
+         (buf		(posix/mmap 0 (align-address-up size page-size)
+                                    prot-flags
+                                    (+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
+                                    -1 0)))
     ;;(platform/diag-print "mmap returned with "(pointer buf)"\n")
     (when (= buf posix/MAP_FAILED)
-      (platform/diag-print "mmap returned with an error\n")
+      (libc/diag-printf "mmap with prot %ld has returned with error %ld\n"
+                        prot-flags libc/errno)
       (platform/halt))
     buf))
