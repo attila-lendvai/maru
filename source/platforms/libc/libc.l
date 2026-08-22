@@ -90,9 +90,11 @@
 (define-form libc/diag-printf (format . args)
   `(libc/fprintf libc/stderr (string->C-string ,format) ,@args))
 
-(define-form platform/halt args
-  ;;(libc/abort) don't use libc/abort because the stdout is not properly finished when it's redirected into a file
-  `(libc/exit ,@(or args '(-42))))
+(define-function platform/halt (exit-code)
+  ;; NOTE don't use libc/abort because the stdout is not properly
+  ;; finished/flushed when it's redirected into a file
+  (libc/diag-printf "platform/halt, errno is %ld\n" libc/errno)
+  (libc/exit exit-code))
 
 (define-form platform/acquire-memory (size)
   `(libc/malloc ,size))

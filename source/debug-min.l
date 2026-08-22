@@ -47,4 +47,4 @@
   `(let ()
      (fatal-prologue)
      (platform/diag-print ,@forms "\n")
-     (platform/halt)))
+     (platform/halt 20)))
