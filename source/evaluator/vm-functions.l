@@ -420,7 +420,8 @@
         result))))
 
 (define-function run-program/stdout/file (path argv envp stdout-path)
-  (let* ((stdout-fd (posix/open stdout-path (bitwise-or posix/O_WRONLY
+  (let* ((stdout-fd (posix/open stdout-path
+                                (bitwise-or (bitwise-or posix/O_WRONLY
                                                         posix/O_CREAT)
                                             posix/O_TRUNC)
                                 posix/default-umask))
