@@ -15,8 +15,8 @@
   (or (<= 0 rc) (error "syscall*: "(box <long> syscall-number)" returned with: "(box <long> rc)"\n"))
   rc)
 
-(load "source/platforms/linux/streams.l")
 (load "source/platforms/linux/vm-functions.l")
+(load "source/platforms/linux/streams.l")
 (load "source/evaluator/vm-with-file-support.l")
 
 (define-function main (argc argv)

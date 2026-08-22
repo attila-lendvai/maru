@@ -2,7 +2,8 @@
 
 (define-function file-open-or-die (path mode)
   (or (file-open path mode)
-      (error "file-open failed for path "path", mode "mode)))
+      (error "file-open failed for path '"path"', mode '"mode
+             "', cwd '"(working-directory)"'")))
 
 (define-function file-close-or-die (handle)
   (or (file-close handle)
