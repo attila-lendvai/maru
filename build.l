@@ -78,7 +78,7 @@
   (= ?/ (string-at path 0)))
 
 (define-function log-run-program (arg-string)
-  (print-all *standard-output* term/FG-CYAN "-> " arg-string term/RESET "\n"))
+  (print-all *debug-output* term/FG-CYAN "-> " arg-string term/RESET "\n"))
 
 (define-function run-program* (binary argv . rest)
   (log-run-program (concat-strings-separated-by " " (cons binary argv)))
@@ -669,6 +669,14 @@ git --no-pager log --pretty=oneline -1")))
   (let ((binary (compile-maru/stage-1 default-backend default-platform)))
     (run-program* binary argv (pop rest) (pop rest) (pop rest) (pop rest))))
 
+(define-function repl args
+  (let ((backend  (or (pop args) default-backend))
+        (platform (or (pop args) default-platform)))
+    (assert (subtype? (type-of backend) <backend>))
+    (assert (subtype? (type-of platform) <platform>))
+    ($ "rlwrap --no-warning "(compile-maru/stage-1 backend platform)
+       " boot.l -")))
+
 ;;;
 ;;; PEG parser
 ;;;
@@ -689,15 +697,14 @@ git --no-pager log --pretty=oneline -1")))
     output))
 
 (define-function compile-peg-grammar (grammar)
-  (bootstrap-peg)
-
-  (let* ((input		(concat-string grammar ".g"))
+  (let* ((compiled-peg	(bootstrap-peg))
+         (input		(concat-string grammar ".g"))
          (output	(concat-string input ".l")) ; i.e. foo.g.l
          (compiler	"source/parsing/compile-peg-grammar.l")
          (deps		(list input
                               compiler
-                              "source/parsing/parser.l"
-                              "source/parsing/peg.g.l")))
+                              compiled-peg
+                              "source/parsing/parser.l")))
     (when (needs-recompile? output deps)
       ;; TODO when this fails it leaves an empty file that must be deleted
       ;; TODO convert to a /shell variant? that || rm's the file
