@@ -4,7 +4,19 @@
 (set (feature platform/posix) true)
 
 (require "source/platforms/platform-c-based.l")
+
+;; It's tempting to just include the posix cgrov values, but even
+;; though they mostly overlap, there's no guarantee that they are
+;; the same.
+;; (require-cgrov "source/platforms/posix/posix")
+
 (require-cgrov "source/platforms/linux/linux")
+
+;; Internally we define a posix API, so we need to define
+;; some posix/foo constants.
+(define-constant posix/O_WRONLY linux/O_WRONLY)
+(define-constant posix/O_CREAT  linux/O_CREAT)
+(define-constant posix/O_TRUNC  linux/O_TRUNC)
 
 (define main) ; forward
 
