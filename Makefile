@@ -333,7 +333,7 @@ $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_x86) boot.l
 	@mkdir -p $(BUILD_x86)
 	$(call ensure-built,$(HOST_DIR)/eval)
-	$(MAKE) $(CGROV_FILES)
+	$(call ensure-built,$(CGROV_FILES))
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory*	"$(HOST_DIR)"			\
 		--define *slave-directory*	"$(SLAVE_DIR)"			\
@@ -362,7 +362,7 @@ $(BITCODE_DIR)/eval0: $(EVAL_OBJ_llvm)
 $(BITCODE_DIR)/eval0.ll: source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILES_llvm) boot.l
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(HOST_DIR)/eval)
-	$(MAKE) $(CGROV_FILES)
+	$(call ensure-built,$(CGROV_FILES))
 	$(EVAL_WRAPPER) $(HOST_DIR)/eval $(VERBOSITY)				\
 		--define *host-directory* 	"$(HOST_DIR)"			\
 		--define *slave-directory* 	"$(SLAVE_DIR)"			\
@@ -390,6 +390,8 @@ $(BITCODE_DIR)/eval0.ll: source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILE
 $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_x86)
 	$(call ensure-built,$(EVAL0))
+	$(call ensure-built,$(CGROV_FILES))
+	$(BACKDATE_FILE) $(CGROV_FILES)
 	$(MAKE) $(CGROV_FILES)
 	$(call compile-x86,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BUILD_x86)/eval0.s $(BUILD_x86)/eval1.s >$(BUILD_x86)/eval1.s.diff
@@ -397,6 +399,7 @@ $(BUILD_x86)/eval1.s: $(EVAL_OBJ_x86) boot.l $(EMIT_FILES_x86) source/bootstrapp
 # eval2 is the second iteration of us that gets built by our own compiler, and animated by our own eval1 executable.
 # eval2 is just a test: its output should be the exact same files as eval1.*
 $(BUILD_x86)/eval2.s: $(EVAL_OBJ_x86) $(BUILD_x86)/eval1 boot.l $(EMIT_FILES_x86) source/bootstrapping/*.l $(EVALUATOR_FILES)
+	$(call ensure-built,$(CGROV_FILES))
 	$(call compile-x86,$(SLAVE_DIR),$(BUILD_x86)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BUILD_x86)/eval1.s $(BUILD_x86)/eval2.s >$(BUILD_x86)/eval2.s.diff
 
@@ -405,6 +408,8 @@ $(BITCODE_DIR)/eval1: $(EVAL_OBJ_llvm)
 $(BITCODE_DIR)/eval1.ll: boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
 	@mkdir -p $(BUILD_llvm) $(BITCODE_DIR)
 	$(call ensure-built,$(EVAL0))
+	$(call ensure-built,$(CGROV_FILES))
+	$(BACKDATE_FILE) $(CGROV_FILES)
 	$(MAKE) $(CGROV_FILES)
 	$(call compile-llvm,$(EVAL0_DIR),$(EVAL0),source/platforms/$(PLATFORM)/eval.l,$@)
 #	@-$(DIFF) $(BITCODE_DIR)/eval0.ll $(BITCODE_DIR)/eval1.ll >$(BITCODE_DIR)/eval1.ll.diff
@@ -412,7 +417,7 @@ $(BITCODE_DIR)/eval1.ll: boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EV
 $(BITCODE_DIR)/eval2: $(EVAL_OBJ_llvm)
 
 $(BITCODE_DIR)/eval2.ll: $(BUILD_llvm)/eval1 boot.l $(EMIT_FILES_llvm) source/bootstrapping/*.l $(EVALUATOR_FILES)
-	$(MAKE) $(CGROV_FILES)
+	$(call ensure-built,$(CGROV_FILES))
 	$(call compile-llvm,$(SLAVE_DIR),$(BUILD_llvm)/eval1,source/platforms/$(PLATFORM)/eval.l,$@)
 	@-$(DIFF) $(BITCODE_DIR)/eval1.ll $(BITCODE_DIR)/eval2.ll >$(BITCODE_DIR)/eval2.ll.diff
 
@@ -468,15 +473,19 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	cp $< $@
 
 # compile *.g PEG rules into maru parser implementations
-%.g.l: %.g $(GEN_EVAL) source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
-	$(EVAL_WRAPPER) $(GEN_EVAL) -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
+%.g.l: %.g source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
+	$(MAKE) PLATFORM=posix eval-llvm
+	./eval -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
 # compile *.cgrov files into *.cgrov.l
 # Must use the host eval if we want to use its output while building this stage.
 %.cgrov.$(TARGET).l: %.cgrov
-	@$(call ensure-built,$(HOST_DIR)/eval)
-	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
+# KLUDGE do not call the host, use the checked-in eval1.ll to generate the cgrov files
+#	@$(call ensure-built,$(HOST_DIR)/eval)
+#	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
+	$(MAKE) PLATFORM=posix eval-llvm source/c/cgrov.g.l
+	./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
 	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
 	./$<.exe >> $@.new
