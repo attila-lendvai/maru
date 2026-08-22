@@ -21,7 +21,7 @@
      (abort))
     ((< 2 *error-level*)
      (platform/diag-print "NESTED ERROR 2, giving up...\n")
-     (platform/halt)))
+     (platform/halt 19)))
   (platform/diag-print "\nERROR: "))
 
 (define-function error-epilogue ()
@@ -180,4 +180,4 @@
     (fatal "ABORTING at error level " *error-level*))
   (print-backtrace)
   (platform/flush-streams)
-  (platform/halt))
+  (platform/halt 18))
