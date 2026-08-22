@@ -31,6 +31,7 @@ jobs:
       - name: System info
         run: |
           echo "===== OS Info ====="
+          echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
@@ -78,6 +79,7 @@ jobs:
       - name: System info
         run: |
           echo "===== OS Info ====="
+          echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
@@ -195,6 +197,7 @@ jobs:
       - name: System info
         run: |
           echo "===== OS Info ====="
+          echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
