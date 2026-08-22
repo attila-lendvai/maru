@@ -5,15 +5,10 @@
 ;; TODO not sure whether this technique of (address-of char) is
 ;; digestable for LLVM. it's a KLUDGE anyway...
 
+;; An internally used posix/foo API.
 (define-function posix/open (path flags mode)
   (syscall linux/SYS_openat linux/AT_FDCWD path
            flags mode))
-
-;; We define a posix API, so we need to export some constants. They
-;; are not guaranteed to be the same between the kernel and the libc
-;; (which is implementing posix), but these are.
-(define-constant posix/O_WRONLY linux/O_WRONLY)
-(define-constant posix/O_CREAT  linux/O_CREAT)
 
 (define-function posix/close (fd)
   (syscall* linux/SYS_close fd))
