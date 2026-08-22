@@ -3,7 +3,7 @@
 ;;; Common defs for all platforms.
 
 ;; 420 is "rw-r--r--"
-(define-constant posix/default-umask 420)
+(define-constant posix/default-file-mode 420)
 
 (define-form align-address-up (var page-size)
   `(bitwise-and (+ ,var (- ,page-size 1))

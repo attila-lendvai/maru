@@ -424,7 +424,7 @@
                                 (bitwise-or (bitwise-or posix/O_WRONLY
                                                         posix/O_CREAT)
                                             posix/O_TRUNC)
-                                posix/default-umask))
+                                posix/default-file-mode))
          (child-pid (unbox <long> (spawn-program path argv envp
                                                  stdout-fd -1))))
     (posix/close stdout-fd)
