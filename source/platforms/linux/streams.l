@@ -55,7 +55,7 @@
                                                    linux/O_TRUNC)))
                           (else
                            (error "file-open: unexpected mode "mode" while opening "path)))
-                        posix/default-umask)))
+                        posix/default-file-mode)))
     (when (<= 0 fd)
       (debug (platform/diag-print "file-open will box fd "(long fd)"\n"))
       (box <lower-cell> fd))))
