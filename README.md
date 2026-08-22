@@ -44,12 +44,23 @@ Maru's architecture is described in [doc/how.md](doc/how.md).
 
 #### Build instructions
 
-To test a bootstrap cycle using one or all of the backends:
+Table of supported platforms:
+
+| Backends↓ Platforms→ | libc         | Posix          | Linux kernel    |
+|:---------------------|:------------:|:--------------:|:---------------:|
+| LLVM          | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc (untested) | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc (untested) | `i686`<br>`x86-64`<br>etc (untested) |
+| x86                  |  ❌ (planned) |  ❌ (planned)  |  `x86-64` Elf64  |
+| Arm                  |  ❌ (planned) |  ❌ (planned)  |  `aarch64` Elf64 (soon) |
+
+To test a bootstrap cycle:
 
 ```
-make test-bootstrap-x86    # defaults to the libc platform
-make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
+./build.sh bootstrap llvm linux
+./build.sh bootstrap [llvm,x86] [libc,posix,linux]
 ```
+
+`build.sh` is just a thin wrapper for calling functions defined in
+`build.l`.
 
 <details>
 <summary>Platform specific instructions</summary>
@@ -63,6 +74,9 @@ package manager on top of any Linux distro.
 
 #### Debian, and derivatives
 
+See [the Docker files](tools-for-build/) that are used in the
+CI. Otherwise:
+
 ```
 sudo apt install make time rlwrap
 ```
@@ -75,12 +89,12 @@ sudo apt install llvm clang
 
 #### MacOS (Darwin)
 
-As of this writing (2026) both the `x86_64` and the LLVM backends can
-bootstrap on an `x86_64` MacOS running in kvm on a Linux. There's also
-a [CI](.github/workflows/ci.yaml) set up for testing in an `arm64`
+As of 2026-08 the LLVM backend can bootstrap on recent MacOS versions,
+both on `x86-64` and `arm64` (Apple silicon). There's
+[CI](.github/workflows/ci.yaml) set up for testing in an `arm64`
 runner.
 
-The following instructions worked in the kvm setup:
+The following instructions worked in an x86-64 kvm setup:
 
 1. Make sure XCode is installed. In a Terminal:
 ```
@@ -99,7 +113,7 @@ echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
-#### Guix on OpenWRT on aarch64 hadrware
+#### Guix on top of OpenWRT running on aarch64 hardware
 
 I have the ability to test Maru on OpenWrt with
 [Guix](https://guix.gnu.org/) installed on it.
@@ -192,17 +206,6 @@ what's relevant for that stage.
 There are several Maru stages/branches now, introducing non-trivial
 new features. Some that are worth mentioning:
 
-  - An x86-64 backend that directly generates Elf binary files,
-    i.e. no external dependencies are needed for bootstrapping.
-
-  - With the x86-64 backend and the Linux platform it's truly
-    freestanding: there is no external dependency beyond a bootstrap
-    binary that can animate the codebase. No make, no gcc, no
-    assemblers; nothing else than the Linux kernel and a bootstrap
-    binary.
-
-  - An LLVM backend that emits .ll LLVM IR text files.
-
   - Introduction of [*platforms*](platforms.md), and notably the
     `linux` platform that compiles to a statically linked executable
     that only uses Linux kernel
@@ -214,9 +217,20 @@ new features. Some that are worth mentioning:
     etc). Other platforms: *libc* (functional), and *metacircular*
     (only a placeholder for now).
 
-  - The host and the slave are isolated while bootstrapping which makes it possible to
-    do things like reordering types (changing their type id in the target),
-    or changing runtime object layout.
+  - An x86-64 compiler backend that directly generates Elf64 binary
+    files in a single pass.
+
+  - With the x86-64 backend on the Linux platform it's truly
+    **freestanding**: there is no external dependency beyond a
+    bootstrap binary that can animate the codebase. No make, no gcc,
+    no assemblers; nothing else than the Linux kernel and a bootstrap
+    binary.
+
+  - An LLVM backend that emits .ll LLVM IR text files.
+
+  - The host and the slave are isolated while bootstrapping which
+    makes it possible to do things like reordering types (changing
+    their type id in the target), or changing runtime object layout.
 
   - Relying on this isolation, the code in `eval.l` now looks pretty much the same
     as something that is meant to be loaded into the evaluator (i.e. the function

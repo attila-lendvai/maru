@@ -17,14 +17,15 @@ without any leftovers from the superfluous `<module>` abstraction.
 
 ## Assorted changes
 
- - The x86 backend directly generates x86-64 Elf binary file.
-
- - Adds support for `aarch64`.
-
  - A new `build.l` finally supersedes the ugly `Makefile`.
 
- - Drops the text-assembler based x86 backend to move forward. It may
-   be reinstated now that we have a more reasonable build system.
+ - The x86 backend directly generates x86-64 Elf binary files in a
+   single pass. The text-assembler based x86 backend has been removed,
+   but may be reinstated now that we have a more bearable build
+   system.
+
+ - Adds support for `aarch64` Darwin. The LLVM backend can now
+   bootstrap on Apple silicon.
 
 ## Stats
 
