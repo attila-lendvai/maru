@@ -193,6 +193,13 @@ jobs:
       - run:  timeout 3m arch -arm64  make PLATFORM=posix test-bootstrap-llvm
         continue-on-error: true      # TODO
 
+      # - name: Upload build results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: build-results
+      #     path: |
+      #       build/**
+
       - run:  timeout 3m arch -arm64  make PROFILER=1 PLATFORM=posix test-bootstrap-llvm
         continue-on-error: true      # TODO
 
