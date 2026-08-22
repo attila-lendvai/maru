@@ -29,25 +29,35 @@ char** posix_envp()
  *   child PID on success
  *   -1 on failure
  */
-pid_t posix_spawn_program(const char *path, char *const argv[], char *const envp[], int stdout_fd, int stderr_fd)
+pid_t posix_spawn_program(const char *path, char *const argv[], char *const envp[],
+                          int stdout_fd, int stderr_fd)
 {
+    // this works, but it has some issues...
+
     pid_t pid = fork();
 
-    if (pid == 0) {
-        // Child
-        if (stdout_fd >= 0) {
-            dup2(stdout_fd, STDOUT_FILENO);
+    if (pid == 0) { // Child
+
+        if (stdout_fd >= 0 && stdout_fd != STDOUT_FILENO) { // dup2(1, 1) is a NOP
+            if (dup2(stdout_fd, STDOUT_FILENO) < 0) {
+                perror("dup2(stdout)");
+                _exit(127);
+            }
             close(stdout_fd);
         }
-        if (stderr_fd >= 0) {
-            dup2(stderr_fd, STDERR_FILENO);
+
+        if (stderr_fd >= 0 && stderr_fd != STDERR_FILENO) { // dup2(2, 2) is a NOP
+            if (dup2(stderr_fd, STDERR_FILENO) < 0) {
+                perror("dup2(stderr)");
+                _exit(127);
+            }
             close(stderr_fd);
         }
 
         execve(path, argv, envp ? envp : environ);
 
         // execve only returns on failure
-        fprintf(stderr, "execve failed: %s\n", strerror(errno));
+        perror(path);
         _exit(127);
     }
 
