@@ -422,6 +422,7 @@
 (define-function run-program/stdout/file (path argv envp stdout-path)
   (let* ((stdout-fd (posix/open stdout-path (bitwise-or posix/O_WRONLY
                                                         posix/O_CREAT)
+                                            posix/O_TRUNC)
                                 posix/default-umask))
          (child-pid (unbox <long> (spawn-program path argv envp
                                                  stdout-fd -1))))

@@ -8,6 +8,8 @@
 ;; clear && build/maru.10/eval boot.l build.l bootstrap x86 linux
 ;; ./eval boot.l build.l target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap llvm linux
 
+;; TODO run-with-stage-1 and the run-with-* is ripe for a cleanup
+
 (require "source/env-min.l")
 (require "source/sequences.l")
 (require "source/selector.l")

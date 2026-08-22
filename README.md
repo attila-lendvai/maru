@@ -59,13 +59,7 @@ make PLATFORM=[libc,linux] test-bootstrap[-llvm,-x86]
 My primary platform. There's a `manifest.scm` file in the repo, so you
 can run `guix shell` to enter into the same environment that I use
 when I work on Maru. Guix can also be used as a simple per-user
-package manager on any Linux distro.
-
-#### Nix and NixOS
-
-Used to be my primary platform. There's a bitrotten
-`default.nix` file in the repo, so you can run `nix-shell` to enter
-into the environment that I used on NixOS.
+package manager on top of any Linux distro.
 
 #### Debian, and derivatives
 
@@ -79,14 +73,14 @@ You will need LLVM, and/or a C compiler:
 sudo apt install llvm clang
 ```
 
-#### MacOS (darwin)
+#### MacOS (Darwin)
 
-As of this writing (2026) both the x86_64 and the LLVM backends can
-bootstrap on an x86_64 MacOS running in kvm on a Linux. There's even CI
-set up for testing every commit on an arm64 runner using `arch -x86_64
-make [...]` (they fail currently).
+As of this writing (2026) both the `x86_64` and the LLVM backends can
+bootstrap on an `x86_64` MacOS running in kvm on a Linux. There's also
+a [CI](.github/workflows/ci.yaml) set up for testing in an `arm64`
+runner.
 
-The following instructions worked in the kvm setup as of 2026:
+The following instructions worked in the kvm setup:
 
 1. Make sure XCode is installed. In a Terminal:
 ```
@@ -107,19 +101,17 @@ source ~/.bash_profile
 
 #### Guix on OpenWRT on aarch64 hadrware
 
-I own a BPI-R4 (an
-[SBC](https://en.wikipedia.org/wiki/Single-board_computer)) that is
-currently running OpenWrt. I installed [Guix](https://guix.gnu.org/)
-on it out of curiosity.
+I have the ability to test Maru on OpenWrt with
+[Guix](https://guix.gnu.org/) installed on it.
 
 In that environment Maru can bootstrap itself using the LLVM backend
-and on both the `libc` and the `linux` platform.
+with all three platform abstractions (`libc`, `posix`, and `linux`).
 
 #### Other platforms
 
 Maru should work everywhere where there's a `libc` and LLVM/clang is
 available. Alternatively, it should be able to bootstrap on any x86
-machine where a libc and the gnu toolchain is available.
+machine where a libc and the Gnu toolchain is available.
 
 Patches are welcome to support other platforms.
 </details>
@@ -137,7 +129,7 @@ The current gardener is [attila@lendvai.name](mailto:attila@lendvai.name).
 
 ## Where
 
-Bugs and patches: [maru github page](https://github.com/attila-lendvai/maru).
+Bugs and patches: [Maru's GitHub page](https://github.com/attila-lendvai/maru).
 
 Discussion: [maru-dev google group](https://groups.google.com/forum/#!forum/maru-dev).
 
@@ -165,7 +157,7 @@ repo and a maintainer to keep bitrot at bay.
 
 ## Contribution
 
-You are very welcome to contribute, but beware that short of any
+You are very welcome to contribute, but beware that short of any regular
 contributors **this repo will receive occasional forced pushes** (i.e.
 **`git push -f`** rewriting git history (except the `piumarta`
 branch)). This will cease eventually when contributors show up, or
