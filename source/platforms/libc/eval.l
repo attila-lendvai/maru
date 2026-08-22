@@ -29,9 +29,9 @@
 ;;         (box <long> result)
 ;;       (error "invalid number in string->long, libc/strtol has failed for string " str))))
 
-(load "source/platforms/libc/streams.l")
 ;; use target/platform so that we can override it from posix
 (load (host-value (concat-strings "source/platforms/"target/platform"/vm-functions.l")))
+(load "source/platforms/libc/streams.l")
 (load "source/evaluator/vm-with-file-support.l")
 
 (define-function main (argc argv)
