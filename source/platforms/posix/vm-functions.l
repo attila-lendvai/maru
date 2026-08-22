@@ -2,13 +2,6 @@
 
 (load (concat-strings "source/platforms/libc/vm-functions.l"))
 
-;; functions implemented in posix.c
-(define-C-functions ()
-  (pid_t posix/spawn-program (* * * int int))
-  (pid_t posix/waitpid (pid_t int))
-  (* posix/envp ())
-  )
-
 (define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)

@@ -14,7 +14,9 @@
 (define-C-functions posix/
   ;;(* getcwd (* size_t))
   (* fdopen (int *))
-  (int open (* int mode_t))
+  ;; FIXME posix open is in fact (int open (* int ...)) i.e. mode_t is
+  ;; passed as variadic, which has different ABI rules, and it's not
+  ;; implemented by our the compiler backends.
   (int close (int))
   (ssize_t read (int * size_t))
   (int mprotect (* size_t int))
@@ -25,6 +27,14 @@
   (pid_t waitpid (pid_t * int))
   (* dlsym (* *))
   (int pipe (*))
+  )
+
+;; functions implemented in posix.c
+(define-C-functions ()
+  (pid_t posix/spawn-program (* * * int int))
+  (pid_t posix/waitpid (pid_t int))
+  (int posix/open (* int int)) ; KLUDGE to avoid variadic passing of mode_t
+  (* posix/envp ())
   )
 
 (define-function platform/acquire-memory (size)

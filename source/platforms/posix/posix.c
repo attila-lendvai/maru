@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 extern char **environ;
 
@@ -82,4 +83,19 @@ int posix_waitpid(pid_t pid, int options)
     }
 
     return -1;
+}
+
+/*
+  KLUDGE mode_t is passed as variadic, which has different ABI rules
+  than non-variadic args, and on aarch64 darwin it actually is
+  different enough that it breaks.
+
+  TODO The proper fix is to implement variadic stuff in the compiler
+  backends, but it's not worth the effort compared to a simple
+  workaround like this.
+
+*/
+int posix_open(const char *path, int flags, int mode)
+{
+    return open(path, flags, mode);
 }
