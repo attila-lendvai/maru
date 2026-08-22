@@ -1,5 +1,5 @@
-# podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 -f Dockerfile.ci .
-# podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 -f Dockerfile.ci .
+# podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 --build-arg CI_IMAGE_VERSION=$(date --rfc-3339 date) -f Dockerfile.ci .
+# podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 --build-arg CI_IMAGE_VERSION=$(date --rfc-3339 date) -f Dockerfile.ci .
 
 # need to log in with a token generated at: https://github.com/settings/tokens
 # podman login ghcr.io -u attila-lendvai -p <personal-access-token>
@@ -17,7 +17,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 ARG TARGETARCH
 
+ARG CI_IMAGE_VERSION=dev
+ENV CI_IMAGE_VERSION=$CI_IMAGE_VERSION
+
 RUN echo TARGETARCH="$TARGETARCH"
+RUN echo CI_IMAGE_VERSION="$CI_IMAGE_VERSION"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
