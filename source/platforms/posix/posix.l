@@ -48,5 +48,5 @@
     (when (= buf posix/MAP_FAILED)
       (libc/diag-printf "mmap with prot %ld has returned with error %ld\n"
                         prot-flags libc/errno)
-      (platform/halt))
+      (platform/halt 38))
     buf))
