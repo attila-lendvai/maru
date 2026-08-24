@@ -252,14 +252,34 @@
   (concat-strings-separated-by
    "-" (list target/arch target/vendor target/os target/abi)))
 
-(define ld.so
-  (when (= *host-os* "Linux")
-    (run-program/shell/stdout
-     "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
-     ;; or alternatively:
-     ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
-     ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
-     )))
+;; the ELF interpreter path to embed into the target binaries. it can
+;; be overridden from the command line with ld.so=...; when not set,
+;; effective-ld.so resolves a default based on target/arch at use time
+;; and caches it here (the default cannot be computed at load time,
+;; because target/arch may be set from the command line only after
+;; this file is loaded).
+(define ld.so ())
+
+(define-function effective-ld.so ()
+  (unless ld.so
+    (set ld.so
+         (if (= target/arch *host-arch*)
+             (when (= *host-os* "Linux")
+               (run-program/shell/stdout
+                "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
+                ;; or alternatively:
+                ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
+                ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
+                ))
+           ;; cross-compiling: embed the canonical interpreter path of the
+           ;; target system, so that the resulting binaries can be copied over
+           ;; and run on real hardware. when running them under qemu-user,
+           ;; QEMU_LD_PREFIX (see build.sh) makes qemu resolve the path within
+           ;; the cross toolchain's sysroot.
+           (case target/arch
+             ("aarch64"	"/lib/ld-linux-aarch64.so.1")
+             (else	(error "effective-ld.so: unknown interpreter path for target/arch "(type-of target/arch)" "target/arch", please set ld.so explicitly"))))))
+  ld.so)
 
 ;; eval0-phase check-outs the most recent commit into build/eval0, and
 ;; uses that as the source code for compiling the eval0 binary
@@ -461,7 +481,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                (target/abi		,target/abi)
                (target/platform		,(<platform>-name platform))
                (feature/profiler/build	,(to-string profiler))
-               (+ld.so-path+		,ld.so)
+               (+ld.so-path+		,(effective-ld.so))
                )))
        ;; files to load
        `("source/bootstrapping/prepare.l"
@@ -533,6 +553,15 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                                   host-dir host-eval
                                   slave-dir input-file output-name evolving?)
   ;; TODO use call-next-method, or even an :after method!
+  (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
+                               input-file output-name evolving?)))
+    ($ "cd '"slave-dir"' && chmod +x " output)
+    output))
+
+(define-multimethod compile-maru ((<arm> backend) platform
+                                  host-dir host-eval
+                                  slave-dir input-file output-name evolving?)
+  ;; the arm backend also generates a standalone Elf binary
   (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
                                input-file output-name evolving?)))
     ($ "cd '"slave-dir"' && chmod +x " output)
@@ -744,7 +773,7 @@ git --no-pager log --pretty=oneline -1")))
                (run-with-stage-1
                 (list "boot.l"
                       "--define" "+target-triple+" (target-triple)
-                      "--define" "+ld.so-path+" ld.so
+                      "--define" "+ld.so-path+" (effective-ld.so)
                       file))
                ($ "file=build/$(basename --suffix=.l '"file"') && chmod +x $file && ./$file"))))
     (run "tests/test-elf.x86-64.traditional.l")

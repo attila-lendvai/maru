@@ -505,12 +505,12 @@
 
 (define-instruction DIVIDE	()
   ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
-                                (UDIV X0 X0 X16))
+                                (SDIV X0 X0 X16))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
                                   (else
                                    (MOVi X16 (<LITERAL>-value $1))
-                                   (UDIV X0 X0 X16)))))
+                                   (SDIV X0 X0 X16)))))
 
 (define-instruction AND		(true 0 true)
   ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
@@ -629,11 +629,16 @@
                                 (ADDr X16 X0 X16)
                                 (LDRB W0 X16 0))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
-                                  (if (= 0 offset)
-                                      (LDRB W0 X0 0)
-                                    (begin
-                                      (ADDi X16 X0 offset)
-                                      (LDRB W0 X16 0))))))
+                                  (cond
+                                    ((= 0 offset)
+                                     (LDRB W0 X0 0))
+                                    ((<= 0 offset 4095)
+                                     (ADDi X16 X0 offset)
+                                     (LDRB W0 X16 0))
+                                    (else
+                                     (MOVi X16 offset)
+                                     (ADDr X16 X0 X16)
+                                     (LDRB W0 X16 0))))))
 
 (define-instruction STORE-I8	(false 0 true)
   ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
@@ -663,11 +668,16 @@
                                 (ADDr X16 X0 X16)
                                 (LDR X0 X16 0))
     ((LI64)			(let ((offset (<LITERAL>-value $1)))
-                                  (if (= 0 offset)
-                                      (LDR X0 X0 0)
-                                    (begin
-                                      (ADDi X0 X0 offset)
-                                      (LDR X0 X0 0))))))
+                                  (cond
+                                    ((= 0 offset)
+                                     (LDR X0 X0 0))
+                                    ((<= 0 offset 4095)
+                                     (ADDi X0 X0 offset)
+                                     (LDR X0 X0 0))
+                                    (else
+                                     (MOVi X16 offset)
+                                     (ADDr X0 X0 X16)
+                                     (LDR X0 X0 0))))))
 
   (define-instruction STORE-CELL	(false 0 true)
     ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
@@ -682,16 +692,18 @@
                                 (ADDr X16 X0 X16)
                                 (LDR X0 X16 0))
   ((LI64)			(let ((offset (* (<LITERAL>-value $1) 8)))
-                                  (if (= 0 offset)
-                                      (LDR X0 X0 0)
-                                    (if (< offset 4096)
-                                        (begin
-                                          (ADDi X0 X0 offset)
-                                          (LDR X0 X0 0))
-                                      (begin
-                                        (MOVi X16 offset)
-                                        (ADDr X0 X0 X16)
-                                        (LDR X0 X0 0)))))))
+                                  (cond
+                                    ((= 0 offset)
+                                     (LDR X0 X0 0))
+                                    ;; the LDR imm12 is unsigned; negative
+                                    ;; offsets need to go through a register
+                                    ((<= 0 offset 4095)
+                                     (ADDi X0 X0 offset)
+                                     (LDR X0 X0 0))
+                                    (else
+                                     (MOVi X16 offset)
+                                     (ADDr X0 X0 X16)
+                                     (LDR X0 X0 0))))))
 
 ;; object is in X0 (base); args: index, value
 (define-instruction STORE-OOP	(false 0 true)
@@ -745,7 +757,9 @@
       (let ((lit (<LITERAL>-value $2)))
         (if (= 0 lit)
             (CMPi (<REGISTER>-name $1) 0)
-          (if (< lit 4096)
+          ;; CMPi's imm12 is unsigned (0-4095), negative or large
+          ;; values must go through a register
+          (if (<= 0 lit 4095)
               (CMPi (<REGISTER>-name $1) lit)
             (begin
               (MOVi X16 lit)
@@ -1074,10 +1088,12 @@
 ;;; x86-64 -- INSTRUCTIONS
 ;;;
 
-;; ENTER is slow, so don't use it (LEAVE is fine): https://stackoverflow.com/questions/5959890/enter-vs-push-ebp-mov-ebp-esp-sub-esp-imm-and-leave-vs-mov-esp-ebp
+;;; NOTE: in logical register instructions (e.g. ORR, i.e. MOVr) the
+;;; register number 31 encodes XZR, not SP. SP can only be the target
+;;; of ADD/SUB immediate ops. so we must use ADDi to move SP into FP.
 (define-instruction ENTER-FRAME	()
   ((_)				(STPpre FP LP SP -2)
-				(MOVr FP SP)
+				(ADDi FP SP 0)
 				(unless (= 0 $1)
 				  (SUBi SP SP $1))))
 
@@ -1096,7 +1112,7 @@
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;;(assert (is <expr> self))
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
-  (.align +function-alignmet+ 0x90)
+  (.align +function-alignmet+)
 
   (let* ((body		(<expr>-body self))
          (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
@@ -1412,7 +1428,7 @@
           )
          ((and (not (feature redefinable-functions-in-target))
                (is <expr> value))
-          (emit LOAD (GLOBAL-CELL (label self.name))))
+          (emit LOAD (GLOBAL-ADDR (label self.name))))
          (else
           (emit LOAD (GLOBAL-CELL (label self.name))))))
       (else

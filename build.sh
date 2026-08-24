@@ -2,6 +2,20 @@
 
 set -eu
 
+# For running foreign-arch target binaries under qemu-user
+# (binfmt_misc). Both are inert when running native binaries, and they
+# are inherited by every spawned child process.
+#
+# QEMU_LD_PREFIX: our cross-built binaries embed the canonical ELF
+#   interpreter path (e.g. /lib/ld-linux-aarch64.so.1); qemu resolves
+#   it against this prefix to find it in the cross toolchain sysroot.
+# QEMU_RESERVED_VA: qemu pre-allocates a private guest virtual address
+#   region, which keeps brk growing like on native Linux. without it
+#   the guest ld.so loads us into the mmap area where the break cannot
+#   grow anymore.
+export QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-/usr/aarch64-linux-gnu}"
+export QEMU_RESERVED_VA="${QEMU_RESERVED_VA:-4G}"
+
 PREVIOUS_STAGE_BACKEND="-llvm"
 PREVIOUS_STAGE="maru.10"
 BUILD="build"
