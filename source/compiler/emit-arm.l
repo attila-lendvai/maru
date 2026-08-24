@@ -1652,31 +1652,35 @@
     ;; computation tracks the file layout order (text, ro-data, data),
     ;; but the headers are emitted in vaddr order.
 
+    ;; ro-data segment - precompute: data and bss offsets depend on ro-data size
     (set size/ro-data (segment-length 'ro-data))
     (set file-offset/ro-data file-position)
 
-    ;; data segment (vaddr 0x40000)
+    ;; data segment
     (set size/data (segment-length 'data))
-    (set file-offset/data (+ file-position size/ro-data))
+    (set file-offset/data (+ file-offset/ro-data size/ro-data))
     (emit-program-header elf/PT_LOAD
                          file-offset/data
                          size/data size/data
                          (+ elf/PF_R elf/PF_W)
                          +data-segment-address+
                          elf/page-size)
+    (incr file-position size/data)
 
-    ;; BSS (vaddr 0x50000) p_offset must point past all file data
+    ;; BSS, aka zero-initialized data
     (set size/bss (segment-length 'bss))
     (when (= 0 size/bss)
+      ;; zero is illegal, and not emitting is more trouble than just
+      ;; setting it to 1.
       (set size/bss 1))
     (emit-program-header elf/PT_LOAD
-                         (+ file-position size/ro-data size/data)
+                         (+ file-position size/ro-data)
                          0 size/bss
                          (+ elf/PF_R elf/PF_W)
                          +bss-segment-address+
                          elf/page-size)
 
-    ;; ro-data segment (vaddr 0x100000)
+    ;; ro-data segment
     (emit-program-header elf/PT_LOAD
                          file-offset/ro-data
                          size/ro-data size/ro-data
@@ -1685,7 +1689,9 @@
                          elf/page-size)
     (incr file-position size/ro-data)
 
-    ;; GNU_RELRO (same range as ro-data)
+    ;; mark the entire ro-data segment to become read-only after
+    ;; relocation is finished. note that it's possible to mark only a
+    ;; subset of it using this extra PT_GNU_RELRO program header.
     (emit-program-header elf/PT_GNU_RELRO file-offset/ro-data
                          size/ro-data size/ro-data
                          elf/PF_R
