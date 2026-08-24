@@ -1124,6 +1124,7 @@
     ;; (emit-comment 1 "params: "(list-length (<expr>-parameters self))
     ;;               ", frame-size: "frame-size"("(/ frame-size +word-size-in-bytes+)
     ;;               "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
+    (BTI-C)
     (emit ENTER-FRAME frame-body-size)
 
     (let ((spill-locs	()))
@@ -1523,16 +1524,7 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-;; Note type for GNU_PROPERTY (NT_GNU_PROPERTY_TYPE_0)
-(define-constant +nt-gnu-property-type-0+ 5)
-
-;; Property types for AArch64
-(define-constant +gnu-property-aarch64-feature-1-and+ -1073741824) ; 0xc0000000 as signed i32
-
-;; Feature flags for AArch64
-(define-constant +gnu-property-aarch64-feature-1-bti+ 1)
-
-(define-constant +n-program-headers+ 9)
+(define-constant +n-program-headers+ 8)
 (define-constant +n-section-headers+ 11)
 (define-constant +elf-prefix-size+ (+ elf/sizeof-Elf64_Ehdr
                                       (* +n-program-headers+
@@ -1583,20 +1575,6 @@
   (.ascii	+ld.so-path+)
   (.i8		0)
   (label!	'elf-interpreter-end)
-
-  ;; GNU_PROPERTY note for AArch64 BTI compatibility
-  (.align	4)
-  (label!	'gnu-property-note)
-  (.i32		4)                          ; n_namesz = sizeof("GNU\0")
-  (.i32		16)                         ; n_descsz = sizeof(property desc)
-  (.i32		+nt-gnu-property-type-0+)   ; n_type
-  (.ascii	"GNU")
-  (.i8		0)                          ; name padding
-  (.i32		+gnu-property-aarch64-feature-1-and+) ; pr_type
-  (.i32		4)                          ; pr_datasz
-  (.i32		0)                          ; pr_data (BTI flag disabled)
-  (.i32		0)                          ; padding to 8-byte boundary
-  (label!	'gnu-property-note-end)
 
   (.align	elf/page-size)
 
@@ -1716,17 +1694,6 @@
 
     ;; data segment continues after ro-data in the file
     (incr file-position size/data)
-
-    ;; PT_NOTE segment (GNU_PROPERTY note for BTI compatibility)
-    (let ((note-size (- (laddress 'gnu-property-note-end)
-                        (laddress 'gnu-property-note))))
-      (emit-program-header elf/PT_NOTE
-                           (+ file-offset/ro-data
-                              (paddress 'gnu-property-note))
-                           note-size note-size
-                           elf/PF_R
-                           (laddress 'gnu-property-note)
-                           4))
 
     ;; PT_INTERP segment (dynamic linker path)
     ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
