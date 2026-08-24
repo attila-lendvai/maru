@@ -149,6 +149,15 @@
 ;; TODO get this from parsing AT_PAGESZ in main
 (define-constant %page-size-in-bytes 4096)
 
+;; i386 doesn't have SYS_mmap (its old variant takes a pointer to an
+;; arg struct), only SYS_mmap2, whose offset argument counts in units
+;; of 4096 bytes. we always pass 0 as the offset, so they are
+;; equivalent here.
+(define-constant linux/SYS_mmap*
+  (case +architecture+
+    (IA-32	'linux/SYS_mmap2)
+    (else	'linux/SYS_mmap)))
+
 (define-function platform/acquire-memory/via-mmap (size)
   ;; KLUDGE we make all allocated memory executable.
   ;; `make test-elf` generates machine code and wants to call it...
@@ -161,12 +170,11 @@
   ;; gc/read-only-object? intact. MAP_FIXED_NOREPLACE ensures that we
   ;; don't clobber anything that might have been mapped there in the
   ;; meantime (needs linux 4.17+).
-  ;; TODO i686 doesn't have SYS_mmap (it would need old_mmap/mmap2).
   (unless *mmap-hint*
     (set *mmap-hint* (align-address-up (syscall linux/SYS_brk 0)
                                        %page-size-in-bytes)))
   (set size (align-address-up size %page-size-in-bytes))
-  (let ((result	(syscall linux/SYS_mmap
+  (let ((result	(syscall linux/SYS_mmap*
                          *mmap-hint*			; addr
                          size				; length
                          (+ (+ linux/PROT_READ linux/PROT_WRITE)
