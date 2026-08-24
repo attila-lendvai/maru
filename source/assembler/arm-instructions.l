@@ -107,7 +107,10 @@
   (SEVL  0xD50320BF)
   (ISB   0xD5033FDF)
   (RET   0xD65F03C0)
-  (ERET  0xD69F03E0))
+  (ERET  0xD69F03E0)
+  (BTI-C  0xD503245F)
+  (BTI-J  0xD503249F)
+  (BTI-JC 0xD50324DF))
 
 ;;;
 ;;; Move wide immediate: MOVZ, MOVN, MOVK
