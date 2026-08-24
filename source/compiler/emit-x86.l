@@ -1760,9 +1760,13 @@
       (label! '.dynsym)
       (.i64 0 0 0) ; TODO better express elf/sizeof-Elf64_Sym number of zero bytes
 
-      ;; (.align 8)
-      ;; (label! 'dt-hash)
-      ;; (.i32 1 1 0 0)
+      ;; minimal SysV hash table for the dummy symbol above (nbucket,
+      ;; nchain, one empty bucket, one terminating chain entry). musl
+      ;; >=1.2.4 unconditionally looks up "malloc" in every loaded dso
+      ;; during startup, and its sysv_lookup derefs dso->hashtab; a
+      ;; symtab without a hash table crashes the process there.
+      (label! 'dt-hash)
+      (.i32 1 1 0 0)
 
       ;; Dynamic Linking Metadata Table
       (label! '.dynamic)
@@ -1775,7 +1779,7 @@
       (.i64 elf/DT_STRSZ	1)
       (.i64 elf/DT_SYMTAB	(laddress '.dynsym))
       (.i64 elf/DT_SYMENT	elf/sizeof-Elf64_Sym)
-      ;;(.i64 elf/DT_HASH		(laddress 'dt-hash))
+      (.i64 elf/DT_HASH		(laddress 'dt-hash))
       (.i64 elf/DT_NULL		0))
     (label! '.dynamic-end)))
 
