@@ -437,8 +437,10 @@
 ;;;
 
 (define-function %emit-2source (opcode2 rs2 rs1 rd)
+  ;; 0x1ac00000 is the 2-source data processing template with the sf
+  ;; bit cleared; sf-check supplies it for 64-bit registers.
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
-                        0x9AC00000
+                        0x1AC00000
                         (bitwise-shift opcode2 10)
                         (bitwise-shift (rindex rs2) 16)
                         (bitwise-shift (rindex rs1) 5)
@@ -446,6 +448,11 @@
 
 (define-instruction UDIV (rd rs1 rs2)
   (%emit-2source 2 rs2 rs1 rd))
+
+;; Signed divide: SDIV Xd, Xn, Xm (opcode2 = 000011)
+
+(define-instruction SDIV (rd rs1 rs2)
+  (%emit-2source 3 rs2 rs1 rd))
 
 ;;;
 ;;; Variable shift: LSLV, LSRV, ASRV
