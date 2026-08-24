@@ -278,6 +278,7 @@
            ;; the cross toolchain's sysroot.
            (case target/arch
              ("aarch64"	"/lib/ld-linux-aarch64.so.1")
+             (("i686" "i386")	"/lib/ld-linux.so.2")
              (else	(error "effective-ld.so: unknown interpreter path for target/arch "(type-of target/arch)" "target/arch", please set ld.so explicitly"))))))
   ld.so)
 
