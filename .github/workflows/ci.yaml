@@ -56,6 +56,9 @@ jobs:
       - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm linux
       - run:  timeout 5m ./build.sh bootstrap x86  linux
+      # the self-contained x86 binaries are mapped/run through musl's
+      # ELF interpreter instead of glibc's
+      - run:  timeout 5m ./build.sh ld.so=/lib/ld-musl-x86_64.so.1 bootstrap x86 linux
 
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
@@ -104,6 +107,10 @@ jobs:
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm linux
+
+      # same as above on amd64: only the arm backend embeds an ELF
+      # interpreter, so llvm would silently not exercise musl here
+      - run:  timeout 5m ./build.sh ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
 
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux

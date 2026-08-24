@@ -39,6 +39,8 @@ RUN apt-get update && \
         wget \
         curl \
         ca-certificates \
+        musl \
+        musl-dev \
     # Conditional packages for x86
     && if [ "$TARGETARCH" = "amd64" ]; then \
       dpkg --add-architecture i386 && \
