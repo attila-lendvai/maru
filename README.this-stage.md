@@ -27,6 +27,10 @@ without any leftovers from the superfluous `<module>` abstraction.
  - Adds support for `aarch64` Darwin. The LLVM backend can now
    bootstrap on Apple silicon.
 
+ - Adds support for `aarch64` Linux: the Elf64 generating `arm`
+   backend now fully self-hosts, even in qemu-user on x86_64
+   hosts. See the notes in [doc/how.md](doc/how.md) for details.
+
 ## Stats
 
 TODO
