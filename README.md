@@ -44,13 +44,13 @@ Maru's architecture is described in [doc/how.md](doc/how.md).
 
 #### Build instructions
 
-Table of supported platforms:
+Table of supported OS'es:
 
-| Backends↓ Platforms→ | libc         | Posix          | Linux kernel    |
+| Backend↓ Platform→   | libc         | Posix          | Linux kernel    |
 |:---------------------|:------------:|:--------------:|:---------------:|
-| LLVM          | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc (untested) | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc (untested) | `i686`<br>`x86-64`<br>etc (untested) |
-| x86                  |  ❌ (planned) |  ❌ (planned)  |  `x86-64` Elf64  |
-| Arm                  |  ❌ (planned) |  ❌ (planned)  |  `aarch64` Elf64 (soon) |
+| LLVM          | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc | `i686`<br>`x86-64`<br>etc |
+| x86                  |  ❌ (planned) |  ❌ (planned)  |  `x86-64` Elf64: glibc, musl  |
+| Arm                  |  ❌ (planned) |  ❌ (planned)  |  `aarch64` Elf64: glibc, musl |
 
 To test a bootstrap cycle:
 
