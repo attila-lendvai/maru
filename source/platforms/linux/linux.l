@@ -146,8 +146,8 @@
 ;; growing, starting right above the binary's break.
 (define *mmap-hint* 0)
 
-;; TODO get this from parsing AT_PAGESZ in main
-(define-constant %page-size-in-bytes 4096)
+;; the kernel hands us the page size in the auxv; parsed in _start
+(define *kernel-page-size* 0)
 
 ;; i386 doesn't have SYS_mmap (its old variant takes a pointer to an
 ;; arg struct), only SYS_mmap2, whose offset argument counts in units
@@ -172,8 +172,8 @@
   ;; meantime (needs linux 4.17+).
   (unless *mmap-hint*
     (set *mmap-hint* (align-address-up (syscall linux/SYS_brk 0)
-                                       %page-size-in-bytes)))
-  (set size (align-address-up size %page-size-in-bytes))
+                                       *kernel-page-size*)))
+  (set size (align-address-up size *kernel-page-size*))
   (let ((result	(syscall linux/SYS_mmap*
                          *mmap-hint*			; addr
                          size				; length
@@ -264,6 +264,16 @@ exit:
 (define-function posix/envp ()
   %envp)
 
+;; auxv is (a_type a_val) machine-word pairs, terminated by an AT_NULL pair
+(define-function %parse-kernel-page-size (auxv)
+  (let ((i 0))
+    (while (< 0 (oop-at auxv i))
+      (when (= (oop-at auxv i) linux/AT_PAGESZ)
+        (set *kernel-page-size* (oop-at auxv (+ i 1))))
+      (incr i 2))
+    (unless (< 0 *kernel-page-size*)
+      (platform/diag-print "AT_PAGESZ not found in the auxv, aborting")
+      (platform/halt 41))))
 
 ;; https://www.muppetlabs.com/~breadbox/software/tiny/teensy.html
 ;; http://www.dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html
@@ -306,10 +316,14 @@ exit:
   ;; +---------------------+
   ;; Lower memory
 
-  ;; TODO parse AT_PAGESZ (the page size)
   (let* ((sp (stack-pointer-on-entry))
          (argc (oop-at sp 0))
          (argv (+ sp (words-to-bytes 1)))
          (envp (+ argv (words-to-bytes (+ argc 1)))))
     (set %envp envp)
+    ;; the auxv follows the envp array's NULL terminator
+    (let ((cursor envp))
+      (while (< 0 (oop-at cursor 0))
+        (set cursor (+ cursor (words-to-bytes 1))))
+      (%parse-kernel-page-size (+ cursor (words-to-bytes 1))))
     (syscall linux/SYS_exit (main argc argv))))
