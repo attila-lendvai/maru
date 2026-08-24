@@ -121,7 +121,7 @@
 (define *initial-break* 0)
 (define *current-break* 0)
 
-(define-function platform/acquire-memory (size)
+(define-function platform/acquire-memory/via-brk (size)
   ;; https://gist.github.com/nikAizuddin/f4132721126257ec4345
   (unless *initial-break*
     (set *current-break* (set *initial-break* (syscall linux/SYS_brk 0)))
@@ -141,6 +141,56 @@
              (+ (+ linux/PROT_READ linux/PROT_WRITE)
                 linux/PROT_EXEC))
     result))
+
+;; the address of the next chunk to hand out via mmap, kept monotonically
+;; growing, starting right above the binary's break.
+(define *mmap-hint* 0)
+
+;; TODO get this from parsing AT_PAGESZ in main
+(define-constant %page-size-in-bytes 4096)
+
+(define-function platform/acquire-memory/via-mmap (size)
+  ;; KLUDGE we make all allocated memory executable.
+  ;; `make test-elf` generates machine code and wants to call it...
+  ;;
+  ;; We don't let the kernel choose the address (it would map us into
+  ;; its mmap area, which can lie below our static image, e.g. under
+  ;; qemu-user with a guest ld.so), but hand out consecutive chunks
+  ;; starting right above the binary's break. this way all heap memory
+  ;; stays above the static image, keeping the invariant of
+  ;; gc/read-only-object? intact. MAP_FIXED_NOREPLACE ensures that we
+  ;; don't clobber anything that might have been mapped there in the
+  ;; meantime (needs linux 4.17+).
+  ;; TODO i686 doesn't have SYS_mmap (it would need old_mmap/mmap2).
+  (unless *mmap-hint*
+    (set *mmap-hint* (align-address-up (syscall linux/SYS_brk 0)
+                                       %page-size-in-bytes)))
+  (set size (align-address-up size %page-size-in-bytes))
+  (let ((result	(syscall linux/SYS_mmap
+                         *mmap-hint*			; addr
+                         size				; length
+                         (+ (+ linux/PROT_READ linux/PROT_WRITE)
+                            linux/PROT_EXEC)
+                         (+ (+ linux/MAP_PRIVATE linux/MAP_ANONYMOUS)
+                            linux/MAP_FIXED_NOREPLACE)
+                         -1				; fd
+                         0)))				; offset
+    ;; NOTE the raw syscall returns -errno on failure (libc's
+    ;; MAP_FAILED == -1 doesn't apply here).
+    (when (< result 0)
+      (platform/diag-print "SYS_mmap failed, aborting")
+      (platform/halt 40))
+    (set *mmap-hint* (+ *mmap-hint* size))
+    result))
+
+(define-function platform/acquire-memory (size)
+  ;; the brk based allocator remains the default: it grows the heap
+  ;; right above the binary's static image, which keeps the assumption
+  ;; of gc/read-only-object? (all heap memory lies above the static
+  ;; image) true even in environments where the mmap area is not (see
+  ;; via-mmap's comment). swap the call below to try the mmap based
+  ;; allocator.
+  (platform/acquire-memory/via-brk size))
 
 (eval-in-host '(load "source/platforms/linux/syscall.l"))
 
