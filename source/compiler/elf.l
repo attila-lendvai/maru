@@ -1,6 +1,165 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;;; Shared ELF emission helpers for the x86-64 and aarch64 backends.
+(require "source/compiler/emit-early.l")
+
+;;;
+;;; Utils
+;;;
+
+(define-function align (alignment value)
+  (bitwise-and (+ value (- alignment 1))
+               (- alignment)))
+
+;;;
+;;; Relocation tracking for ET_DYN
+;;;
+(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_X86_64_RELATIVE relocations
+
+(define-function register-rela (segment paddress value)
+  (push *rela-entries* (list segment paddress value)))
+
+;;;
+;;; Operands
+;;;
+
+(define-function define-operand/make-setters (type-name fields)
+  (when (pair? fields)
+    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
+          (define-operand/make-setters type-name (cdr fields)))))
+
+(define-form define-operand (name super . rest)
+  (let* ((direct-slots	(pop rest))
+         (type-name	(symbol->type-name name))
+         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super))
+                                 ,direct-slots)))
+         (effective-slots (<record>-effective-slots type)))
+    (assert (is <record> type))
+    (eval `(define-function ,name ,effective-slots
+             (let ((self (new ,type-name)))
+               ,@(define-operand/make-setters type-name effective-slots)
+               self)))
+    (when rest
+      `(define-print-method ,type-name (print-all -stream- ,@rest)))))
+
+(define-operand REGISTER ()	(name index))
+(define-operand LITERAL ()	(value)		"$"self.value)
+;; we must be able to differenciate when a pointer points to a CELL to
+;; be read (called GLOBAL-CELL), or when we need the pointer itself
+;; (called GLOBAL-ADDR).
+(define-operand GLOBAL-CELL ()	(address))
+(define-operand GLOBAL-ADDR ()	(address))
+(define-operand STACK-CELL ()	(offset))
+
+(define-operand LI32 LITERAL)
+(define-operand R32 REGISTER)
+
+(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
+(define-operand LI64 LITERAL)
+(define-operand R64 REGISTER)
+
+(define-operand STACK-PARAM STACK-CELL	()	self.offset"(bp)")
+
+;;;
+;;; Instruction infra
+;;;
+
+(define-generic emit-instruction)
+
+(define-record <instruction> ()
+  ;; TODO some of these slots are the same for all instances; they should reside on the type
+  (regs
+   has-input?
+   n-regs
+   produces-output?
+   ))
+
+(define-function %emit-form/mm-params (index types)
+  (when (pair? types)
+    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
+      (cons (list (awhen (and (not (= (first types) '_))
+                              (first types))
+                    (symbol->type-name it))
+                  param-name)
+            (%emit-form/mm-params (+ index 1) (cdr types))))))
+
+(define-function %emit-form/reg-accessor (index)
+  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
+        (body `(array-at __regs__ ,index)))
+    (list var-name () `((_) ',body))))
+
+(define-function %emit-form/reg-accessors (index)
+  (when (<= 0 index)
+    (cons (%emit-form/reg-accessor index)
+          (%emit-form/reg-accessors (- index 1)))))
+
+(define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
+  (when (pair? emit-forms)
+    (let* ((emit-form (first emit-forms))
+           (args (first emit-form))
+           (body (rest emit-form)))
+      (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
+               ;;(println "; emitting " self)
+               (let ((__regs__ (<instruction>-regs self)))
+                 (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
+                   ,@body)))
+            (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
+
+;; FIXME n-regs should be extracted from the definition
+(define-form define-instruction/emit-forms (instr-name n-regs . emit-forms)
+  `(let ()
+     ,@(%define-instruction/emit-forms instr-name n-regs (symbol->type-name instr-name) emit-forms)))
+
+;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
+(define-form define-instruction (instr-name reg-spec . emit-forms)
+  (let ((has-input?		(first reg-spec))
+        (n-regs			(or (second reg-spec) 0))
+        (produces-output?	(third reg-spec))
+        (type-name		(symbol->type-name instr-name))
+        (singleton-name		(concat-symbol instr-name '-instance)))
+    `(let ()
+       (define-record ,type-name <instruction> ())
+       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
+       (define ,singleton-name (make ,type-name
+                                 (has-input?		,has-input?)
+                                 (n-regs		',n-regs)
+                                 (produces-output?	,produces-output?)))
+       (define-function ,instr-name (regs)
+         (if regs
+             (make ,type-name
+               (regs			regs)
+               (has-input?		,has-input?)
+               (n-regs			',n-regs)
+               (produces-output?	,produces-output?))
+           ,singleton-name))
+
+       ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
+
+;;;
+;;; Instructions
+;;;
+
+(define-instruction COMMENT	()
+  ((pair)			(apply print-all (concat-list
+                                                  (list *debug-output* "; ")
+                                                  $1))
+                                ;; TODO this needs either an append
+                                ;; with n args, or a smarter apply
+                                (print-all *debug-output* "\n")))
+
+;; The natural pointer/word size of the target.
+(define-instruction CELL	()
+  ((LI64)			(.i64 (<LITERAL>-value $1)))
+  ((GLOBAL-ADDR)		(let ((addr (<GLOBAL-ADDR>-address $1)))
+                                   (register-rela (current-segment)
+                                                  (current-paddress)
+                                                  addr)
+                                   (.i64 addr)))
+  ((long)			(.i64 $1))
+  )
+
+;;;
+;;; Elf emission
+;;;
 
 ;; TODO this is neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
