@@ -108,6 +108,69 @@ _start:
   )
 
 ;; ============================================================================
+;; Load/Store unscaled offset: LDUR, STUR, LDURB, STURB, LDURH, STURH
+;; ============================================================================
+
+(define-asm-test load-store-unscaled
+  "ldur x0, [x1, #0]
+   ldur x2, [x3, #-8]
+   stur x4, [x5, #16]
+   stur x6, [x7, #-120]
+   ldur w8, [x9, #4]
+   stur w10, [x11, #-55]
+   ldurb w12, [x13, #1]
+   sturb w14, [x15, #-32]
+   ldurh w16, [x17, #2]
+   sturh w18, [x19, #-64]
+"
+  (LDUR  X0 X1 0)
+  (LDUR  X2 X3 -8)
+  (STUR  X4 X5 16)
+  (STUR  X6 X7 -120)
+  (LDUR  W8 X9 4)
+  (STUR  W10 X11 -55)
+  (LDURB W12 X13 1)
+  (STURB W14 X15 -32)
+  (LDURH W16 X17 2)
+  (STURH W18 X19 -64)
+  )
+
+;; Signed imm9 boundary and FP-relative edge cases for stack cells
+(define-asm-test load-store-unscaled-edge
+  "ldur x0, [x1, #-256]
+   ldur x2, [x3, #-255]
+   ldur x4, [x5, #254]
+   ldur x6, [x7, #255]
+   stur x8, [x9, #-256]
+   stur x10, [x11, #-255]
+   stur x12, [x13, #254]
+   stur x14, [x15, #255]
+   ldur x16, [x29, #-8]
+   ldur x16, [x29, #-16]
+   ldur x16, [x29, #-24]
+   ldur x16, [x29, #-32]
+   stur x0, [x29, #-8]
+   stur x0, [x29, #-16]
+"
+  ;; signed imm9 boundaries
+  (LDUR  X0 X1 -256)
+  (LDUR  X2 X3 -255)
+  (LDUR  X4 X5 254)
+  (LDUR  X6 X7 255)
+  (STUR  X8 X9 -256)
+  (STUR  X10 X11 -255)
+  (STUR  X12 X13 254)
+  (STUR  X14 X15 255)
+  ;; FP-relative stack cell offsets
+  (LDUR  X16 X29 -8)
+  (LDUR  X16 X29 -16)
+  (LDUR  X16 X29 -24)
+  (LDUR  X16 X29 -32)
+  (STUR  X0 X29 -8)
+  (STUR  X0 X29 -16)
+  )
+
+;; ============================================================================
 ;; LDRSW, STP/LDP
 ;; ============================================================================
 
