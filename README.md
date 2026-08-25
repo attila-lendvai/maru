@@ -44,7 +44,7 @@ Maru's architecture is described in [doc/how.md](doc/how.md).
 
 #### Build instructions
 
-Table of supported OS'es:
+Table of supported (tested) environments:
 
 | Backend↓ Platform→   | libc         | Posix          | Linux kernel    |
 |:---------------------|:------------:|:--------------:|:---------------:|
@@ -56,11 +56,32 @@ To test a bootstrap cycle:
 
 ```
 ./build.sh bootstrap llvm linux
-./build.sh bootstrap [llvm,x86] [libc,posix,linux]
+./build.sh bootstrap [llvm,arm,x86] [libc,posix,linux]
 ```
 
-`build.sh` is just a thin wrapper for calling functions defined in
-`build.l`.
+To cross compile to an `aarch64` OpenWrt:
+
+```
+./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
+```
+
+This should even run on an `x86_64` host through qemu-user with binfmt misc:
+
+```
+apt install qemu-user-static gcc-aarch64-linux-gnu
+./build.sh target/arch=aarch64 bootstrap arm linux
+```
+
+And even with aarch64 musl libc inside qemu (`build.sh` sets a
+reasonable `QEMU_LD_PREFIX`):
+
+```
+apt install qemu-user-static gcc-aarch64-linux-gnu musl
+./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
+```
+
+Note that `build.sh` is just a thin wrapper for calling functions
+defined in `build.l`.
 
 <details>
 <summary>Platform specific instructions</summary>
@@ -214,19 +235,19 @@ new features. Some that are worth mentioning:
     running directly on the bare metal, minus dealing with the
     hardware drivers (i.e. all dynamically allocated memory needs to
     be managed by our own GC, all IO behind our own abstractions,
-    etc). Other platforms: *libc* (functional), and *metacircular*
-    (only a placeholder for now).
+    etc). Other platforms: *libc* (functional), *posix* (extends
+    libc), and *metacircular* (only a placeholder for now).
 
-  - An x86-64 compiler backend that directly generates Elf64 binary
-    files in a single pass.
+  - New **compiler backends**:
+    - `x86-64` and `aarch64` that directly generate Elf64 binary files
+      in a single pass.
 
-  - With the x86-64 backend on the Linux platform it's truly
-    **freestanding**: there is no external dependency beyond a
-    bootstrap binary that can animate the codebase. No make, no gcc,
-    no assemblers; nothing else than the Linux kernel and a bootstrap
-    binary.
+    - An LLVM backend that emits .ll LLVM IR text files.
 
-  - An LLVM backend that emits .ll LLVM IR text files.
+  - With the `x86-64` and `aarch64` backends on the Linux platform
+    it's truly **freestanding**: there is no external dependency
+    beyond a bootstrap binary that animates the codebase; i.e. no
+    make, no assemblers, not even a linker.
 
   - The host and the slave are isolated while bootstrapping which
     makes it possible to do things like reordering types (changing
@@ -246,7 +267,8 @@ new features. Some that are worth mentioning:
   - A bootstrapped PEG parser.
 
   - A proper C groveller that uses a DSL implemented through a PEG
-    grammar (see `source/c/`).
+    grammar (see `source/c/`). It generates and compiles C code, that
+    is then run to print the grovelled C values.
 
 ### Future plans
 
