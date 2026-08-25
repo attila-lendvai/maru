@@ -77,9 +77,6 @@
 
 (require "source/compiler/elf.l")
 
-(define-function new-stack-cell (-c-)
-  (STACK-CELL (* (new-temp-index -c-) +word-size-in-bytes+)))
-
 ;;;
 ;;; Emission
 ;;;
@@ -154,7 +151,7 @@
   ((REGISTER)			(BLR (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (ADDr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -169,7 +166,7 @@
                                      (ADDr reg reg X16))))))
 
 (define-instruction SUB		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (SUBr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -184,7 +181,7 @@
                                      (SUBr reg reg X16))))))
 
 (define-instruction MULTIPLY	()
-  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (MUL X0 X0 X16))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
@@ -193,7 +190,7 @@
                                    (MUL X0 X0 X16)))))
 
 (define-instruction DIVIDE	()
-  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (SDIV X0 X0 X16))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))) ; nothing to do
@@ -202,7 +199,7 @@
                                    (SDIV X0 X0 X16)))))
 
 (define-instruction AND		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (ANDr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -217,7 +214,7 @@
                                      (ANDr reg reg X16))))))
 
 (define-instruction OR		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (ORRr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -233,7 +230,7 @@
                                      (ORRr reg reg X16))))))
 
 (define-instruction XOR		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (EORr (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -258,7 +255,7 @@
   ((REGISTER)			(NEG (<REGISTER>-name $1) (<REGISTER>-name $1))))
 
 (define-instruction ASL		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (LSLV (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -267,7 +264,7 @@
                                     (LSLV reg reg X16)))))
 
 (define-instruction ASR		(true 0 true)
-  ((R64 STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
                                 (ASRV (<REGISTER>-name $1) (<REGISTER>-name $1) X16))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -277,23 +274,23 @@
 
 (define-instruction ADDR	(false 0 true)
   ((GLOBAL-CELL)		(ADR X0 (<GLOBAL-CELL>-address $1)))
-  ((STACK-CELL)			(ADDi X0 SP (<STACK-CELL>-offset $1))))
+  ((STACK-CELL)			(SUBi X0 FP (- 0 (<STACK-CELL>-offset $1)))))
 
 (define-instruction MOVE	()
   ((LI64 STACK-CELL)		(MOVi X16 (<LITERAL>-value $1))
-                                (STR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
+                                (STUR X16 FP (<STACK-CELL>-offset $2)))
   ((LI64 R64)			(MOVi (<REGISTER>-name $2) (<LITERAL>-value $1)))
-  ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
-                                (STR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
-  ((R64 STACK-CELL)		(STR (<REGISTER>-name $1) SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
-  ((STACK-CELL R64)		(LDR (<REGISTER>-name $2) SP (bitwise-shift (<STACK-CELL>-offset $1) -3)))
+  ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (STUR X16 FP (<STACK-CELL>-offset $2)))
+  ((R64 STACK-CELL)		(STUR (<REGISTER>-name $1) FP (<STACK-CELL>-offset $2)))
+  ((STACK-CELL R64)		(LDUR (<REGISTER>-name $2) FP (<STACK-CELL>-offset $1)))
   ((R64 R64)			(MOVr (<REGISTER>-name $2) (<REGISTER>-name $1))))
 
 (define-instruction LOAD	(false 0 true)
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (EORr X0 X0 X0)
                                   (MOVi X0 (<LITERAL>-value $1))))
-  ((STACK-CELL)			(LDR X0 SP (bitwise-shift (<STACK-CELL>-offset $1) -3)))
+  ((STACK-CELL)			(LDUR X0 FP (<STACK-CELL>-offset $1)))
   ((R64)			(MOVr X0 (<REGISTER>-name $1)))
   ((GLOBAL-CELL)		(ADR X0 (<GLOBAL-CELL>-address $1))
                                 (LDR X0 X0 0))
@@ -301,20 +298,20 @@
   )
 
 (define-instruction/emit-forms LOAD 1
-  ((STACK-PARAM)			(LDR X0 X29 (bitwise-shift (<STACK-CELL>-offset $1) -3))))
+  ((STACK-PARAM)			(LDUR X0 FP (<STACK-CELL>-offset $1))))
 
 (define-instruction STORE	(true 0 false)
   ((R64 GLOBAL-CELL)		(ADR X16 (<GLOBAL-CELL>-address $2))
                                 (STR (<REGISTER>-name $1) X16 0))
   ((R64 R64)			(STR (<REGISTER>-name $1) (<REGISTER>-name $2) 0))
-  ((R64 STACK-CELL)		(STR (<REGISTER>-name $1) SP (bitwise-shift (<STACK-CELL>-offset $2) -3)))
-  ((R64 STACK-PARAM)		(STR (<REGISTER>-name $1) X29 (bitwise-shift (<STACK-CELL>-offset $2) -3))))
+  ((R64 STACK-CELL)		(STUR (<REGISTER>-name $1) FP (<STACK-CELL>-offset $2)))
+  ((R64 STACK-PARAM)		(STUR (<REGISTER>-name $1) FP (<STACK-CELL>-offset $2))))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
 (define-instruction LOAD-I8	(false 0 true)
-  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (ADDr X16 X0 X16)
                                 (LDRB W0 X16 0))
   ((LI64)			(let ((offset (<LITERAL>-value $1)))
@@ -332,13 +329,13 @@
 (define-instruction STORE-I8	(false 0 true)
   ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (EORr X17 X17 X17))
-                                (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
-                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+                                (LDUR X16 FP (<STACK-CELL>-offset $2))
+                                (LDUR X17 FP (<STACK-CELL>-offset $1))
                                 (ADDr X17 X0 X17)
                                 (STRB W16 X17 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVr X0 X16)))
-  ((STACK-CELL LI64)		(LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL LI64)		(LDUR X17 FP (<STACK-CELL>-offset $1))
                                 (ADDr X17 X0 X17)
                                 (if-at-expand (feature strict-semantics-for-compiled-set)
                                     (begin
@@ -353,7 +350,7 @@
 (when-at-expand (feature lower/array)
   ;; TODO these two are the same as the -OOP versions, except the MOV's scale
   (define-instruction LOAD-CELL	(false 0 true)
-    ((STACK-CELL)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+    ((STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (ADDr X16 X0 X16)
                                 (LDR X0 X16 0))
     ((LI64)			(let ((offset (<LITERAL>-value $1)))
@@ -370,13 +367,13 @@
 
   ;; args: base in X0 (implicit), offset, value
   (define-instruction STORE-CELL	(false 0 true)
-    ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
-                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+    ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (LDUR X17 FP (<STACK-CELL>-offset $2))
                                 (ADDr X16 X0 X16)
                                 (STR X17 X16 0))))
 
 (define-instruction LOAD-OOP	(false 0 true)
-  ((STACK-CELL)			(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (MOVi X17 8)
                                 (MUL X16 X16 X17)
                                 (ADDr X16 X0 X16)
@@ -397,8 +394,8 @@
 
 ;; object is in X0 (base); args: index, value
 (define-instruction STORE-OOP	(false 0 true)
-  ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
-                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+  ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (LDUR X17 FP (<STACK-CELL>-offset $2))
                                 (MOVi X15 8)
                                 (MUL X16 X16 X15)
                                 (ADDr X16 X0 X16)
@@ -411,7 +408,7 @@
                                 (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVr X0 X17)))
-  ((STACK-CELL LI64)		(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
+  ((STACK-CELL LI64)		(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (MOVi X15 8)
                                 (MUL X16 X16 X15)
                                 (ADDr X16 X0 X16)
@@ -421,7 +418,7 @@
                                   (MOVr X0 X17)))
   ((LI64 STACK-CELL)		(MOVi X16 (* (<LITERAL>-value $1) 8))
                                 (ADDr X16 X0 X16)
-                                (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+                                (LDUR X17 FP (<STACK-CELL>-offset $2))
                                 (STR X17 X16 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVr X0 X17))))
@@ -440,7 +437,7 @@
 (define-form define-instruction/comparator (maru-name cond)
   `(define-instruction ,maru-name (true 0 true)
      ((R64 STACK-CELL)
-      (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
+      (LDUR X16 FP (<STACK-CELL>-offset $2))
       (CMPr (<REGISTER>-name $1) X16)
       (CSET (<REGISTER>-name $1) ,cond))
      ((R64 LI64)
@@ -840,13 +837,13 @@
         (times-do (min param-count +n-param-registers+)
           (emit MOVE (pop regs) (pop stack-cells))))
 
-      ;; spill the stack-passed params (args 9+) from X29 to SP-relative cells
+      ;; spill the stack-passed params (args 9+) from FP to SP-relative cells
       (let ((i 2))        ; 2 is the pushed FP and LP
         (list-do var params
           (let* ((offset (* i +word-size-in-bytes+))
                  (spill-cell (new-stack-cell -c-)))
-            (LDR X0 X29 (bitwise-shift offset -3))
-            (STR X0 SP (bitwise-shift (<STACK-CELL>-offset spill-cell) -3))
+            (LDR X0 FP (bitwise-shift offset -3))
+            (STUR X0 FP (<STACK-CELL>-offset spill-cell))
             (set (<variable>-value var) spill-cell))
           (incr i)))
 
@@ -973,7 +970,7 @@
 
 (define-method compile-call-to <STACK-CELL> (op -c-)
   ;; Load fn ptr into X16, NOT X0, because X0 is arg 1 (already set up)
-  (LDR X16 SP (bitwise-shift (<STACK-CELL>-offset self) -3))
+  (LDUR X16 FP (<STACK-CELL>-offset self))
   (when (feature emit-with-object-headers)
     (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
   (emit CALLPTR op/X16)
@@ -1084,7 +1081,7 @@
           ;; so, the 16(sp) is to undo the stp and sub, so that we
           ;; regain the sp value at the entry point to the function.
 
-          (ADDi X0 X29 16)
+          (ADDi X0 FP 16)
           (set (<compiler>-current-value -c-) op/X0)))
   ))
 

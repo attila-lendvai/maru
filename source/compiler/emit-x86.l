@@ -66,9 +66,6 @@
 
 (require "source/compiler/elf.l")
 
-(define-function new-stack-cell (-c-)
-  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
-
 ;;;
 ;;; Emission
 ;;;
