@@ -176,7 +176,9 @@
 (define *input-variables-for-build*
   ;; NOTE: default-backend and default-platform should not matter,
   ;; because they get encoded into the build output path.
-  '(profiler ld.so))
+  ;; Candidates:
+  ;;  - ld.so but that gets set in effective-ld.so, leading to recompiles
+  '(profiler))
 
 (define-function save-dep-vars (output-file variables)
   (let ((result ()))
