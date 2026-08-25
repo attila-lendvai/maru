@@ -393,8 +393,8 @@
   ((LI64)			(PUSHQi (<LITERAL>-value $1)))
   ((R64)			(PUSHQr (<REGISTER>-name $1))))
 
-(define-instruction POP		()
-  ((R64)			(POPQr (<REGISTER>-name $1))))
+;; (define-instruction POP		()
+;;   ((R64)			(POPQr (<REGISTER>-name $1))))
 
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
@@ -871,7 +871,7 @@
          (arg-stack-cell-count	(max 0 (- arg-count +n-param-registers+)))
          (arg-regs	+param-registers+))
 
-    ;; move the reg passed operands into the regs
+    ;; move the reg-passed operands into the regs
     (times-do (min arg-count +n-param-registers+)
       (emit MOVE (pop arg-operands) (pop arg-regs)))
 

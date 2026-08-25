@@ -59,6 +59,12 @@
           ;; used as a variable, then the full object is loaded, not
           ;; the address of the entry point.
           (label! name))
+        ;; TODO investigate: it's possible to write an
+        ;; elf-load-address-relative offset here and when reading the
+        ;; slot then just fix it up. that way we could drop all the
+        ;; relocation related complexity. but then all other parts of
+        ;; the codebase (GC, printer, etc?) must be prepared to deal
+        ;; with such slots?
         (emit CELL (GLOBAL-ADDR entry-label))
         (when name-op
           (emit CELL name-op))

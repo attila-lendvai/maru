@@ -45,6 +45,9 @@ through binfmt_misc.
 - Record/type names in angle brackets: `<segment>`, `<label>`
 - 2-space indentation, closing parens on same line (stacked: `))`)
 
+- In ARM assembly, prefer register aliases (FP, LP, SP, XZR, WZR) over
+  raw register names (X29, X30, X31) to increase readability
+
 ## Testing Patterns
 
 - When writing something intended for human consumption, (comment, commit message, reply to prompt) use as few words as possible. Pick every word meticulously to reduce the volume to a strict minimum. Be down to the point. Less is more.

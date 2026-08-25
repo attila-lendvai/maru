@@ -368,6 +368,7 @@
                                      (ADDr X0 X0 X16)
                                      (LDR X0 X0 0))))))
 
+  ;; args: base in X0 (implicit), offset, value
   (define-instruction STORE-CELL	(false 0 true)
     ((STACK-CELL STACK-CELL)	(LDR X16 SP (bitwise-shift (<STACK-CELL>-offset $1) -3))
                                 (LDR X17 SP (bitwise-shift (<STACK-CELL>-offset $2) -3))
