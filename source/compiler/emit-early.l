@@ -41,3 +41,24 @@
                       track-expr-names
                       object-canary
                       debug-info))))
+
+;;;
+;;; Utils
+;;;
+
+;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
+(define-function expr-n-required-parameters (op)
+  (let ((params		(<expr>-parameters op))
+        (n-params	()))
+    (cond
+      ((not params))                   ; (lambda () ...)
+      ((symbol? params))               ; (lambda args ...)
+      ((pair? params)
+       (set n-params 1)
+       (while (pair? (set params (rest params)))
+         (incr n-params))
+       (when (symbol? params)          ; (lambda (arg1 . rest) ...)
+         (set n-params ())))
+      (else
+       (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
+    n-params))

@@ -36,87 +36,15 @@
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")
 
-(define *compiler-verbosity* 0)
-
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
-
-(define-constant +maru-label-prefix+ "m_")
-
-(define-function string->type-name (str) (string->symbol (concat-string "<" (concat-string str ">"))))
-(define-function symbol->type-name (sym) (string->type-name (symbol->string sym)))
 
 ;; forwards
 (define compile-expr)
 
 ;;;
-;;; Utils
+;;; Registers
 ;;;
-(let ((counter 0))
-  (define-function unique-name (prefix)
-    (concat-string prefix (number->string (incr counter)))))
-
-(define-function align (alignment value)
-  (bitwise-and (+ value (- alignment 1))
-               (- alignment)))
-
-;; TODO this is naive, should also deal with varargs explicitly instead of just returning nil
-(define-function expr-n-required-parameters (op)
-  (let ((params		(<expr>-parameters op))
-        (n-params	()))
-    (cond
-      ((not params))                   ; (lambda () ...)
-      ((symbol? params))               ; (lambda args ...)
-      ((pair? params)
-       (set n-params 1)
-       (while (pair? (set params (rest params)))
-         (incr n-params))
-       (when (symbol? params)          ; (lambda (arg1 . rest) ...)
-         (set n-params ())))
-      (else
-       (error "expr-n-required-parameters: error parsing <expr> " op ", parameters " params)))
-    n-params))
-
-;;;
-;;; Operands
-;;;
-
-(define-function define-operand/make-setters (type-name fields)
-  (when (pair? fields)
-    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
-          (define-operand/make-setters type-name (cdr fields)))))
-
-(define-form define-operand (name super . rest)
-  (let* ((direct-slots	(pop rest))
-         (type-name	(symbol->type-name name))
-         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super))
-                                 ,direct-slots)))
-         (effective-slots (<record>-effective-slots type)))
-    (assert (is <record> type))
-    (eval `(define-function ,name ,effective-slots
-             (let ((self (new ,type-name)))
-               ,@(define-operand/make-setters type-name effective-slots)
-               self)))
-    (when rest
-      `(define-print-method ,type-name (print-all -stream- ,@rest)))))
-
-(define-operand REGISTER ()	(name index))
-(define-operand LITERAL ()	(value)		"$"self.value)
-;; we must be able to differenciate when a pointer points to a CELL to
-;; be read (called GLOBAL-CELL), or when we need the pointer itself
-;; (called GLOBAL-ADDR).
-(define-operand GLOBAL-CELL ()	(address))
-(define-operand GLOBAL-ADDR ()	(address))
-(define-operand STACK-CELL ()	(offset))
-
-(define-operand LI32 LITERAL)
-(define-operand R32 REGISTER)
-
-(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
-(define-operand LI64 LITERAL)
-(define-operand R64 REGISTER)
-
-(define-operand STACK-PARAM STACK-CELL	()	self.offset"(x29)")
 
 (with-forms
     ((x ((ctor name-prefix)
@@ -218,14 +146,6 @@
           (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
 
 ;;;
-;;; Relocation tracking for ET_DYN
-;;;
-(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_AARCH64_RELATIVE relocations
-
-(define-function register-rela (segment paddress value)
-  (push *rela-entries* (list segment paddress value)))
-
-;;;
 ;;; Early ELF stuff
 ;;;
 (define-constant +.text-section-index+		1)
@@ -284,83 +204,8 @@
                      size))
 
 ;;;
-;;; Instructions
-;;;
-
-(define-record <instruction> ()
-  ;; TODO some of these slots are the same for all instances; they should reside on the type
-  (regs
-   has-input?
-   n-regs
-   produces-output?
-   ))
-
-(define-function %emit-form/mm-params (index types)
-  (when (pair? types)
-    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
-      (cons (list (awhen (and (not (= (first types) '_))
-                              (first types))
-                    (symbol->type-name it))
-                  param-name)
-            (%emit-form/mm-params (+ index 1) (cdr types))))))
-
-(define-function %emit-form/reg-accessor (index)
-  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
-        (body `(array-at __regs__ ,index)))
-    (list var-name () `((_) ',body))))
-
-(define-function %emit-form/reg-accessors (index)
-  (when (<= 0 index)
-    (cons (%emit-form/reg-accessor index)
-          (%emit-form/reg-accessors (- index 1)))))
-
-(define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
-  (when (pair? emit-forms)
-    (let* ((emit-form (first emit-forms))
-           (args (first emit-form))
-           (body (rest emit-form)))
-      (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
-               ;;(println "; emitting " self)
-               (let ((__regs__ (<instruction>-regs self)))
-                 (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
-                   ,@body)))
-            (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
-
-;; FIXME n-regs should be extracted from the definition
-(define-form define-instruction/emit-forms (instr-name n-regs . emit-forms)
-  `(let ()
-     ,@(%define-instruction/emit-forms instr-name n-regs (symbol->type-name instr-name) emit-forms)))
-
-;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
-(define-form define-instruction (instr-name reg-spec . emit-forms)
-  (let ((has-input?		(first reg-spec))
-        (n-regs			(or (second reg-spec) 0))
-        (produces-output?	(third reg-spec))
-        (type-name		(symbol->type-name instr-name))
-        (singleton-name		(concat-symbol instr-name '-instance)))
-    `(let ()
-       (define-record ,type-name <instruction> ())
-       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
-       (define ,singleton-name (make ,type-name
-                                 (has-input?		,has-input?)
-                                 (n-regs		',n-regs)
-                                 (produces-output?	,produces-output?)))
-       (define-function ,instr-name (regs)
-         (if regs
-             (make ,type-name
-               (regs			regs)
-               (has-input?		,has-input?)
-               (n-regs			',n-regs)
-               (produces-output?	,produces-output?))
-           ,singleton-name))
-
-       ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
-
-;;;
 ;;; Emission
 ;;;
-
-(define-generic emit-instruction)
 
 (define-form emit (instr-name . args)
   `(%emit -c- ,instr-name (list ,@(map (lambda (arg)
@@ -368,15 +213,6 @@
                                              '(<compiler>-current-value -c-)
                                            arg))
                                        args))))
-
-(define-instruction COMMENT	()
-  ;; just a default that can be redefined
-  ((pair)			(print "; ") (apply println $1)))
-
-;; this is faster than (emit COMMENT ...) by skipping the evaluation early
-(define-form emit-comment (level . args)
-  `(when (<= ,level *compiler-verbosity*)
-     (emit COMMENT (list ,@args))))
 
 (define-function %emit (-c- factory args)
   (let* ((instr (factory ())))
@@ -427,25 +263,6 @@
 ;;;
 ;;; INSTRUCTIONS
 ;;;
-
-(define-instruction/emit-forms COMMENT 0
-  ((pair)			(apply print-all (concat-list
-                                                  (list *debug-output* "; ")
-                                                  $1))
-                                ;; TODO this needs either and append with n args or
-                                ;; a smarter apply
-                                (print-all *debug-output* "\n")))
-
-;; The natural pointer/word size of the target.
-(define-instruction CELL	()
-  ((LI64)			(.i64 (<LITERAL>-value $1)))
-  ((GLOBAL-ADDR)		(let ((addr (<GLOBAL-ADDR>-address $1)))
-                                   (register-rela (current-segment)
-                                                  (current-paddress)
-                                                  addr)
-                                   (.i64 addr)))
-  ((long)			(.i64 $1))
-  )
 
 (define-instruction BR		()
   ((label)			(B $1)))
@@ -1495,30 +1312,6 @@
         (label! name)
         (emit CELL object-label)))))
 
-(define-function features->print-forms (names)
-  (let ((elements ())
-        (first-time true))
-    (map (lambda (name)
-           (if first-time
-               (set first-time false)
-             (push elements ", "))
-           (push elements (symbol->string name))
-           (push elements "=")
-           (push elements `(feature ,name)))
-         names)
-    (list-reverse! elements)))
-
-(define-form comment-features ()
-  `(emit-comment 0 "features: "
-                 ,@(features->print-forms
-                    '(emit-with-object-headers
-                      redefinable-functions-in-target
-                      strict-semantics-for-compiled-set
-                      profiler
-                      track-expr-names
-                      object-canary
-                      debug-info))))
-
 (define elf/page-size	0x1000) ; is this the system page-size?
 (define ideal-cache-line-alignment 64)
 
@@ -1942,58 +1735,7 @@
                                 "\t" (<variable>-name var))))))))
   (verbosity 1 (warn "\n")))
 
-;;;
-;;; <selector>
-;;;
-;; TODO ideally the method vector of the selector should be
-;; addressed/filled according to the slave type id's. when that is
-;; achieved, then we can simply COMPILE-DEFINITION the method array,
-;; without the translation.
-;;
-;; TODO this whole thing should be merged with the emit-object stuff,
-;; or rather, with whatever simplified will replace the current
-;; emit-object machinery.
-(define-method compile-definition (slave-value <selector>) (name -c-)
-  (let ((target-env		(slave-value *globals*))
-        (methods		(eval-in-slave `(<selector>-methods ,self)))
-        (target-methods		(array))
-        (dispatch-table-name	(concat-symbols name '.method-table))
-        (parameters		())
-        (index-min		())
-        (index-max		0))
-    ;; build a trimmed methods array with the slave type id's as indexes
-    (for (i 0 (array-length methods))
-      (let ((impl-fn (array-at methods i)))
-        (when impl-fn
-          (let ((slave-type-id (eval-in-slave `(<type>-slave-id ,(type-object-for-id i)))))
-            (emit-comment 2 "<selector> method for "name", type id "slave-type-id" (in host: "i"), parameters: "(<expr>-parameters impl-fn))
-            (or index-min (set index-min slave-type-id))
-            (set index-max slave-type-id)
-            ;; NOTE this takes the parameter signature of the first method
-            ;; and assumes it's the same for the rest.
-            (if parameters
-                (assert (= (list-length parameters) (list-length (<expr>-parameters impl-fn))) "unsupported: <selector> "name" has specializations with varying number of parameters")
-              (set parameters (map (lambda (el)
-                                     (<variable>-name el))
-                                   (<expr>-parameters impl-fn)))
-              (assert (= (first parameters) 'self)))
-            (set (array-at target-methods (- slave-type-id index-min)) impl-fn)))))
-    ;; define and emit the dispatch table
-    (emit-comment 2 "<selector> dispatch table for '"name"', from "index-min", to "index-max)
-    (environment-define target-env dispatch-table-name target-methods)
-    (compile-definition target-methods dispatch-table-name -c-)
-    ;; the selector function
-    (emit-comment 2 "<selector> stub for "name)
-    (let ((stub	(eval-in-target
-                 `(,lambda ,parameters
-                    (let ((type (type-of self)))
-                      (safety 1
-                        (unless (and (<= ,index-min type)
-                                     (<= type ,index-max))
-                          ;; TODO ideally this should use the default handler provided at DEFINE-SELECTOR
-                          (error "selector '",(symbol->string name)"' has no method for type " (box <long> type))))
-                      ((oop-at (address-of ,dispatch-table-name) (- type ,index-min)) ,@parameters))))))
-      (compile-definition stub name -c-))))
-
 (define-function run-compiler (env output-path)
   (compile-env env (compiler 1) output-path))
+
+(require "source/compiler/emit-late.l")
