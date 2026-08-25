@@ -4,9 +4,6 @@
 ;;; Compiler Infrastructure
 ;;;
 
-;; TODO would be nice if this could be merged between x86 and arm
-(define new-stack-cell) ; forward
-
 (define-record <compiler> ()
   (level
    temp-counter
@@ -38,6 +35,9 @@
       (when (< c.temp-limit c.temp-counter)
         (set c.temp-limit c.temp-counter))
       i)))
+
+(define-function new-stack-cell (-c-)
+  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
 
 (define-function alloc-reg-temp (self)
   (with-instance-accessors self <compiler>

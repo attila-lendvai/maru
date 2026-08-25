@@ -13,7 +13,7 @@
          (typecase arg
            (<REGISTER>   (MOVr reg (<REGISTER>-name arg)))
            (<LI64>       (MOVi reg (<LITERAL>-value arg)))
-           (<STACK-CELL> (LDR reg SP (bitwise-shift (<STACK-CELL>-offset arg) -3)))
+            (<STACK-CELL> (LDUR reg FP (<STACK-CELL>-offset arg)))
            (else
             (error "LINUX-SYSCALL: unexpected argument type: "(type-of arg)", prints as: "arg)))))
      (SVC 0))))
