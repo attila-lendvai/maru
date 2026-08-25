@@ -353,6 +353,51 @@
   (%emit-ldst-unsigned 2 2 imm12 raddr rd))
 
 ;;;
+;;; Load/Store unscaled offset
+;;;   size | 1 1 1 0 0 0 | opc | 0 | imm9 | 1 0 | Rn | Rt
+;;;   size=11 for X, 10 for W, 01 for H, 00 for B
+;;;   opc (bits 23-22): 00=STUR 01=LDUR
+;;;   imm9: signed byte offset (-256 to +255)
+;;;
+
+(define-function %emit-ldst-unscaled (size opc imm9 Rn Rt)
+  (let ((base (bitwise-or (bitwise-shift size 30)
+                          0x38000000)))
+    (emit-u32 (bitwise-or base
+                          (bitwise-shift opc 22)
+                          (bitwise-shift (bitwise-and imm9 0x1FF) 12)
+                          (bitwise-shift (rindex Rn) 5)
+                          (rindex Rt)))))
+
+(define-instruction LDUR (rd raddr imm9)
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled (reg-size rd) 1 imm9 raddr rd))
+
+(define-instruction STUR (rs raddr imm9)
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled (reg-size rs) 0 imm9 raddr rs))
+
+(define-instruction LDURB (rd raddr imm9)
+  (assert (= 0 (sf-bit rd)) "rt must be a W register")
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled 0 1 imm9 raddr rd))
+
+(define-instruction STURB (rs raddr imm9)
+  (assert (= 0 (sf-bit rs)) "rt must be a W register")
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled 0 0 imm9 raddr rs))
+
+(define-instruction LDURH (rd raddr imm9)
+  (assert (= 0 (sf-bit rd)) "rt must be a W register")
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled 1 1 imm9 raddr rd))
+
+(define-instruction STURH (rs raddr imm9)
+  (assert (= 0 (sf-bit rs)) "rt must be a W register")
+  (assert-X-reg raddr)
+  (%emit-ldst-unscaled 1 0 imm9 raddr rs))
+
+;;;
 ;;; Store/Load Pair: STP, LDP
 ;;;   opc | 1 0 1 0 0 1 | mode | L | imm7 | Rt2 | Rn | Rt
 ;;;   opc=10 for 64-bit, 00 for 32-bit
