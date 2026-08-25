@@ -55,21 +55,24 @@
   (let ((w (sf-bit (car regs))))
     (set regs (cdr regs))
     (while regs
-      (assert (= w (sf-bit (car regs)))
-        "width mismatch: " (car regs))
+      (assert (= w (sf-bit (car regs))) "width mismatch: " (car regs))
       (set regs (cdr regs)))
     w))
 
 (define-function assert-X-reg regs
   (while regs
-    (assert (= 1 (sf-bit (car regs)))
-      (car regs) " must be an X register")
+    (assert (= 1 (sf-bit (car regs))) (car regs) " must be an X register")
     (set regs (rest regs))))
 
 (define-function assert-W-reg regs
   (while regs
-    (assert (zero? (sf-bit (car regs)))
-            (car regs) " must be an W register")
+    (assert (zero? (sf-bit (car regs))) (car regs) " must be an W register")
+    (set regs (rest regs))))
+
+(define-function assert-valid-reg regs
+  (while regs
+    (assert (zero? (bitwise-shift (car regs) -6))
+            (car regs) " must be a valid register (X0-X31 or W0-W31)")
     (set regs (rest regs))))
 
 ;; shift field constants for ADD/SUB immediate (sh bit 22)
@@ -139,6 +142,7 @@
 ;;; MOVi: load a 64-bit immediate value into a register
 ;;; Uses MOVZ for the lowest non-zero 16-bit chunk, MOVK for remaining chunks
 (define-function MOVi (rd val)
+  (safety 1 (assert-valid-reg rd))
   (let ((chunk0 (bitwise-and val 65535))
         (chunk1 (bitwise-and (bitwise-shift val -16) 65535))
         (chunk2 (bitwise-and (bitwise-shift val -32) 65535))
@@ -170,9 +174,10 @@
 ;;;
 
 (define-function %emit-add-sub-imm (is-sub set-flags sh imm12 rs rd)
-  (safety 1 (assert (and (is <long> imm12)
-                         (<= 0 imm12 0xfff))
-                    "%emit-add-sub-imm: imm12 out of range (0-4095): " imm12))
+  (safety 1
+    (assert (and (is <long> imm12)
+                 (<= 0 imm12 0xfff))
+            "%emit-add-sub-imm: imm12 out of range (0-4095): " imm12))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs) 31)
                         (bitwise-shift is-sub 30)
                         (bitwise-shift set-flags 29)
@@ -217,6 +222,7 @@
 ;;;
 
 (define-function %emit-add-sub-reg (is-sub set-flags shift rs2 rs1 rd)
+  (safety 1 (assert-valid-reg rd rs1 rs2))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
                         (bitwise-shift is-sub 30)
                         (bitwise-shift set-flags 29)
@@ -255,6 +261,7 @@
 ;;;
 
 (define-function %emit-logical-reg (opc shift rs2 rs1 rd)
+  (safety 1 (assert-valid-reg rd rs1 rs2))
   (let ((base (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
                           (bitwise-shift opc 29)
                           0x0A000000)))
@@ -282,6 +289,7 @@
 ;;;
 
 (define-function %emit-orn (shift rs2 rs1 rd)
+  (safety 1 (assert-valid-reg rd rs1 rs2))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
                         (bitwise-shift 1 29)      ; opc=01
                         0x0A000000
@@ -312,6 +320,10 @@
 ;;;
 
 (define-function %emit-ldst-unsigned (size opc imm12 Rn Rt)
+  (safety 1
+    (assert-X-reg Rn)
+    (assert-valid-reg Rt)
+    (assert (<= 0 imm12 0xfff) "imm12 out of range: " imm12))
   (let ((base (bitwise-or (bitwise-shift size 30)
                           0x39000000)))
     (emit-u32 (bitwise-or base
@@ -321,35 +333,29 @@
                           (rindex Rt)))))
 
 (define-instruction LDR (rd raddr imm12)
-  (assert-X-reg raddr)
   (%emit-ldst-unsigned (reg-size rd) 1 imm12 raddr rd))
 
 (define-instruction STR (rs raddr imm12)
-  (assert-X-reg raddr)
   (%emit-ldst-unsigned (reg-size rs) 0 imm12 raddr rs))
 
 (define-instruction LDRB (rd raddr imm12)
-  (assert (= 0 (sf-bit rd)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rd))
   (%emit-ldst-unsigned 0 1 imm12 raddr rd))
 
 (define-instruction STRB (rs raddr imm12)
-  (assert (= 0 (sf-bit rs)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rs))
   (%emit-ldst-unsigned 0 0 imm12 raddr rs))
 
 (define-instruction LDRH (rd raddr imm12)
-  (assert (= 0 (sf-bit rd)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rd))
   (%emit-ldst-unsigned 1 1 imm12 raddr rd))
 
 (define-instruction STRH (rs raddr imm12)
-  (assert (= 0 (sf-bit rs)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rs))
   (%emit-ldst-unsigned 1 0 imm12 raddr rs))
 
 (define-instruction LDRSW (rd raddr imm12)
-  (assert-X-reg rd raddr)
+  (safety 1 (assert-X-reg rd))
   (%emit-ldst-unsigned 2 2 imm12 raddr rd))
 
 ;;;
@@ -361,6 +367,10 @@
 ;;;
 
 (define-function %emit-ldst-unscaled (size opc imm9 Rn Rt)
+  (safety 1
+    (assert-X-reg Rn)
+    (assert-valid-reg Rt)
+    (assert (<= -256 imm9 255) "imm9 out of range: " imm9))
   (let ((base (bitwise-or (bitwise-shift size 30)
                           0x38000000)))
     (emit-u32 (bitwise-or base
@@ -370,31 +380,25 @@
                           (rindex Rt)))))
 
 (define-instruction LDUR (rd raddr imm9)
-  (assert-X-reg raddr)
   (%emit-ldst-unscaled (reg-size rd) 1 imm9 raddr rd))
 
 (define-instruction STUR (rs raddr imm9)
-  (assert-X-reg raddr)
   (%emit-ldst-unscaled (reg-size rs) 0 imm9 raddr rs))
 
 (define-instruction LDURB (rd raddr imm9)
-  (assert (= 0 (sf-bit rd)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rd))
   (%emit-ldst-unscaled 0 1 imm9 raddr rd))
 
 (define-instruction STURB (rs raddr imm9)
-  (assert (= 0 (sf-bit rs)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rs))
   (%emit-ldst-unscaled 0 0 imm9 raddr rs))
 
 (define-instruction LDURH (rd raddr imm9)
-  (assert (= 0 (sf-bit rd)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rd))
   (%emit-ldst-unscaled 1 1 imm9 raddr rd))
 
 (define-instruction STURH (rs raddr imm9)
-  (assert (= 0 (sf-bit rs)) "rt must be a W register")
-  (assert-X-reg raddr)
+  (safety 1 (assert-W-reg rs))
   (%emit-ldst-unscaled 1 0 imm9 raddr rs))
 
 ;;;
@@ -407,6 +411,9 @@
 ;;;
 
 (define-function %emit-stp-ldp (mode is-load imm7 Rt2 Rn Rt)
+  (safety 1
+    (assert-X-reg Rn)
+    (assert-valid-reg Rt Rt2))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check Rt2 Rn Rt) 31)
                         0x28000000
                         (bitwise-shift mode 23)
@@ -440,7 +447,7 @@
 ;;;
 
 (define-function %emit-br (op1 raddr)
-  (assert-X-reg raddr)
+  (safety 1 (assert-X-reg raddr))
   (emit-u32 (bitwise-or 0xD6000000
                         (bitwise-shift op1 16)
                         (bitwise-shift (rindex raddr) 5))))
@@ -460,6 +467,7 @@
 ;;;
 
 (define-instruction SVC (imm16)
+  (safety 1 (assert (<= 0 imm16 0xffff) "SVC imm16 out of range: " imm16))
   (emit-u32 (bitwise-or 0xD4000000
                         (bitwise-shift imm16 5)
                         0x00000001)))
@@ -470,6 +478,7 @@
 ;;;
 
 (define-function %emit-mul (rs2 rs1 rd)
+  (safety 1 (assert-valid-reg rd rs1 rs2))
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
                         0x1B007C00
                         (bitwise-shift (rindex rs2) 16)
@@ -485,6 +494,7 @@
 ;;;
 
 (define-function %emit-2source (opcode2 rs2 rs1 rd)
+  (safety 1 (assert-valid-reg rd rs1 rs2))
   ;; 0x1ac00000 is the 2-source data processing template with the sf
   ;; bit cleared; sf-check supplies it for 64-bit registers.
   (emit-u32 (bitwise-or (bitwise-shift (sf-check rd rs1 rs2) 31)
@@ -523,7 +533,9 @@
 ;;;
 
 (define-instruction CSET (rd cond)
-  (safety 1 (assert-X-reg rd))
+  (safety 1
+    (assert-X-reg rd)
+    (assert (<= 0 cond 0xf) "CSET cond out of range: " cond))
   (emit-u32 (bitwise-or 0x9A9F07E0
                         (bitwise-shift (bitwise-xor cond 1) 12)
                         (rindex rd))))
@@ -534,7 +546,9 @@
 ;;;
 
 (define-instruction SXTW (rd rs)
-  (safety 1 (assert-X-reg rd) (assert-W-reg rs))
+  (safety 1
+    (assert-X-reg rd)
+    (assert-W-reg rs))
   (emit-u32 (bitwise-or 0x93407C00
                         (bitwise-shift (rindex rs) 5)
                         (rindex rd))))
@@ -547,7 +561,9 @@
 ;;;
 
 (define-function %emit-adr (rd offset)
-  (safety 1 (assert-X-reg rd))
+  (safety 1
+    (assert-X-reg rd)
+    (assert (<= -0x100000 offset 0xfffff) "ADR offset out of range: " offset))
   (let ((immlo (bitwise-and offset 3))
         (immhi (bitwise-shift offset -2)))
     (emit-u32 (bitwise-or 0x10000000
@@ -571,6 +587,9 @@
 ;;;
 
 (define-function %emit-b-imm26 (opcode offset)
+  (safety 1
+    (assert (zero? (bitwise-and offset 0x3)) "B/BL offset is not a multiple of 4: " offset)
+    (assert (<= -0x8000000 offset 0x7fffffc) "B/BL offset out of range: " offset))
   (emit-u32 (bitwise-or opcode
                         (bitwise-and (bitwise-shift offset -2)
                                      0x3FFFFFF))))
@@ -600,10 +619,15 @@
 ;;;
 
 (define-function %emit-b-imm19 (cond offset)
-  ;; TODO bring the (or cond ...) to compile time
-  (emit-u32 (bitwise-or 0x54000000
-                        (bitwise-shift (bitwise-and (bitwise-shift offset -2) 0x7FFFF) 5)
-                        cond)))
+  (safety 1
+    (assert (zero? (bitwise-and offset 0x3))
+            "B.cond offset is not a multiple of 4: " offset)
+    (assert (<= -0x100000 offset 0xffffc) "B.cond offset out of range: " offset))
+  (emit-u32
+   (bitwise-or 0x54000000
+               (bitwise-shift (bitwise-and (bitwise-shift offset -2) 0x7FFFF)
+                              5)
+               cond)))
 
 (define-instruction BCOND (designator cond)
   (typecase designator
