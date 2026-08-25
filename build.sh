@@ -1,19 +1,28 @@
 #!/usr/bin/env sh
 
+# clear && ./build.sh bootstrap x86 linux
+# clear && ./build.sh target/arch=i686 bootstrap llvm linux
+# clear && ./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
+
 set -eu
 
 # For running foreign-arch target binaries under qemu-user
-# (binfmt_misc). Both are inert when running native binaries, and they
-# are inherited by every spawned child process.
+# (binfmt_misc):
 #
 # QEMU_LD_PREFIX: our cross-built binaries embed the canonical ELF
 #   interpreter path (e.g. /lib/ld-linux-aarch64.so.1); qemu resolves
 #   it against this prefix to find it in the cross toolchain sysroot.
+
+# On Guix (it adds a couple of seconds)
+#export QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-$(guix build --system=aarch64-linux musl)}"
+
+# On Debian
+export QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-/usr/aarch64-linux-gnu}"
+
 # QEMU_RESERVED_VA: qemu pre-allocates a private guest virtual address
-#   region, which keeps brk growing like on native Linux. without it
+#   region, which keeps brk growing like on native Linux. Without it
 #   the guest ld.so loads us into the mmap area where the break cannot
 #   grow anymore.
-export QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-/usr/aarch64-linux-gnu}"
 export QEMU_RESERVED_VA="${QEMU_RESERVED_VA:-4G}"
 
 PREVIOUS_STAGE_BACKEND="-llvm"

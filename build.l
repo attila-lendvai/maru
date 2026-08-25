@@ -1,12 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-;; TODO: test-compiler repl run run0 run-bare run-x86 run-llvm
+;; TODO: targets to add: run run0 run-bare run-x86 run-llvm
 ;; test-bootstrap-recursively
-
-;; clear && make PLATFORM=linux build/maru.10/eval
-;; TODO this loads our source/ into the previous-stage-eval binary:
-;; clear && build/maru.10/eval boot.l build.l bootstrap x86 linux
-;; ./eval boot.l build.l target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap llvm linux
 
 ;; TODO run-with-stage-1 and the run-with-* is ripe for a cleanup
 
@@ -161,16 +156,20 @@
                                  (actual-value (variable-value *globals* var)))
                             (unless (= actual-value
                                        expected-value)
+                              (debug-log "yes, due to variable "var", expected "expected-value", actual "actual-value)
                               (set result true))
                             true)))))
           result)
-        (not (file-exists? output-path))
+        (when (not (file-exists? output-path))
+          (debug-log "yes, output file is missing")
+          true)
         (let ((output-mtime (file-modification-time output-path))
               (result false))
           (while (and (not result)
                       (pair? deps))
             (let ((dep (pop deps)))
               (when (< output-mtime (file-modification-time dep))
+                (debug-log "yes, due to file "dep)
                 (set result true))))
           result))))
 
@@ -629,6 +628,7 @@ git --no-pager log --pretty=oneline -1")))
 ;; eval0 is a cache: we compile/bootstrap a recent-ish commit of this
 ;; stage, and then use that in the rest of the build.
 (define-function compile-maru/stage-0 (backend platform)
+  (debug-log "compile-maru/stage-0: "backend" "platform)
   (let* ((res (compile-host))
          (host-dir  (pop res))
          (host-eval (pop res))
@@ -640,6 +640,10 @@ git --no-pager log --pretty=oneline -1")))
           ;; we compile a build/eval0/build/.../eval0 binary that will not be
           ;; touched later until an update-eval0 is run.
           (set (working-directory) eval0-dir)
+          ;; TODO if we e.g. change ld.so, then this recompiles eval0,
+          ;; too. but do we want that? just extra work on the CI...
+          ;; TODO also, maybe we should always compile eval0 for the
+          ;; host? even when target/arch=aarch64 in a qemu?
           (let ((binary (compile-maru backend platform host-dir host-eval eval0-dir
                                       input-file "eval0" true)))
             (set (working-directory) cwd-backup)
@@ -653,6 +657,7 @@ git --no-pager log --pretty=oneline -1")))
   ;; eval0 is either in build/eval0/build/... or in our own build/
   ;; next to eval1 & eval2, depending on eval0-phase. we don't know
   ;; which one, hence the extra dance about the stage-0 return value.
+  (debug-log "compile-maru/stage-1: "backend" "platform)
   (let* ((input-file (concat-strings* "source/platforms/"platform"/eval.l"))
          (res (compile-maru/stage-0 backend platform))
          (eval0-dir (pop res))
@@ -663,6 +668,7 @@ git --no-pager log --pretty=oneline -1")))
 
 (define-function compile-maru/stage-2 (backend platform)
   ;; eval2 is always compiled using eval1.
+  (debug-log "compile-maru/stage-2: "backend" "platform)
   (let ((eval1 (compile-maru/stage-1 backend platform))
         (input-file (concat-strings* "source/platforms/"platform"/eval.l")))
     (compile-maru backend platform
