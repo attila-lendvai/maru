@@ -33,6 +33,7 @@ jobs:
           echo "===== OS Info ====="
           echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
+          echo Kernel page size: $(getconf PAGE_SIZE)
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
           uname -m
@@ -84,6 +85,7 @@ jobs:
           echo "===== OS Info ====="
           echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
+          echo Kernel page size: $(getconf PAGE_SIZE)
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
           uname -m
@@ -206,6 +208,7 @@ jobs:
           echo "===== OS Info ====="
           echo "CI image version: $CI_IMAGE_VERSION"
           uname -a
+          echo Kernel page size: $(getconf PAGE_SIZE)
           sw_vers || lsb_release -a || cat /etc/os-release || true
           echo "===== CPU Info ====="
           uname -m
