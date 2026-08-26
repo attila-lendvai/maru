@@ -13,6 +13,12 @@
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
 
+;; TODO this stinks. get rid of this or comment the why...
+(define-function closure-code-label (name)
+  (label (if (feature emit-with-object-headers)
+             (concat-symbol name '.code)
+           name)))
+
 ;;;
 ;;; Relocation tracking for ET_DYN
 ;;;
