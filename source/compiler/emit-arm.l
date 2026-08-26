@@ -381,17 +381,6 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVr X0 X17))))
 
-(define-instruction PUSH	()
-  ((LI64)			(MOVi X16 (<LITERAL>-value $1))
-                                (SUBi SP SP 8)
-                                (STR X16 SP 0))
-  ((R64)			(SUBi SP SP 8)
-                                (STR (<REGISTER>-name $1) SP 0)))
-
-(define-instruction POP		()
-  ((R64)			(LDR (<REGISTER>-name $1) SP 0)
-                                (ADDi SP SP 8)))
-
 ;;; NOTE: in logical register instructions (e.g. ORR, i.e. MOVr) the
 ;;; register number 31 encodes XZR, not SP. SP can only be the target
 ;;; of ADD/SUB immediate ops. so we must use ADDi to move SP into FP.
@@ -732,16 +721,36 @@
          ;; because the arg expression can be of any complexity;
          ;; i.e. they may call other functions, which would overwrite
          ;; the arg registers...
-         (arg-stack-cell-count	(max 0 (- arg-count +n-param-registers+)))
+
+         ;; The (align ... 2) is needed to keep SP 16 byte aligned. We
+         ;; sometimes leave an unused word on the stack, but that is
+         ;; fine.
+         (arg-stack-cell-count	(align (max 0 (- arg-count +n-param-registers+)) 2))
          (arg-regs	+param-registers+))
 
     ;; move the reg passed operands into the regs
     (times-do (min arg-count +n-param-registers+)
       (emit MOVE (pop arg-operands) (pop arg-regs)))
 
-    ;; push the remaining (i.e. stack-passed) arguments in reverse order
-    (list-do op (list-reverse! arg-operands)
-      (emit PUSH op))
+    ;; The remaining args are passed through the stack. NOTE that on
+    ;; aarch64 SP must always be 16-byte aligned when it is used in a
+    ;; LDR or STR.
+
+    (emit SUB op/SP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+
+    (let ((index 0))
+      (list-do op arg-operands
+        ;; TODO KLUDGE it should be this: (emit STORE op SP index) but
+        ;; STORE has no offset... and STORE-OOP and STORE-CELL takes
+        ;; the base implicitly in the accumulator.
+        (typecase op
+          (<R64>
+           (STR (<REGISTER>-name op) SP index))
+          (<LI64>
+           (MOVi X16 (<LITERAL>-value op))
+           (STR X16 SP index))
+          (else (error "operand with unexpected type while storing arguments: "op ", " (type-of op))))
+        (incr index)))
 
     (let* ((n-params	 (emit-comment 2 "compile-call-to: "op-value)
                          ;; FIXME delete unused arg-locs
