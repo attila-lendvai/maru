@@ -1,5 +1,15 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; TODO ? introduce abstraction for ABIs...
+(define-constant +call-frame-alignmet+
+    (case (target-value +word-size-in-bits+)
+      (32 (case (target-value +operating-system+)
+            (darwin	16)
+            (else	4)))
+      (64 16)))
+
+(define-constant +function-alignmet+ 16)
+
 ;;;
 ;;; Compiler Infrastructure
 ;;;
@@ -69,3 +79,74 @@
             (var-level	(<env>-level (<variable>-env var))))
         (when (< var-level comp-level)
           (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
+
+;;;
+;;; Emission
+;;;
+
+(define-form emit (instr-name . args)
+  `(%emit -c- ,instr-name (list ,@(map (lambda (arg)
+                                         (if (= '$ arg)
+                                             '(<compiler>-current-value -c-)
+                                           arg))
+                                       args))))
+
+(define-function %emit (-c- factory args)
+  (let* ((instr (factory ())))
+    (when (and (<= 3 *compiler-verbosity*)
+               (not (is <COMMENT> instr)))
+      ;; TODO move this into emit-instruction?
+      (print-all *debug-output* "; EMIT of "instr", args: "args"\n"))
+    (apply emit-instruction (cons -c- (cons instr args)))))
+
+(define-form comp (obj)
+  `(let ((__obj__ ,obj))
+     (emit-comment 2 "COMPILE of "__obj__)
+     ;;(assert (= (get-segment 'code) (current-segment)))
+     (compile __obj__ -c-)
+     (<compiler>-current-value -c-)))
+
+;;;
+;;; Forward declarations and generics
+;;;
+
+(define compile-expr)
+(define LOAD)
+(define *special-forms*)
+(define compile-call-form)
+
+(define-selector compile-object)
+
+(define-selector compile (self -c-)
+  (emit LOAD (compile-object self -c-)))
+
+(define-selector compile-definition)
+
+(define-selector compile-call-to)
+
+(define-selector emit-prelude _) ; the default is NOP
+
+;;;
+;;; Common handlers
+;;;
+
+(define-function emit-object/C-string (self -c-)
+  (emit-comment 3 "emit-object/C-string for: "self)
+  (GLOBAL-ADDR
+   (with-new-label 'ro-data
+     (.ascii self)
+     (.i8 0))))
+
+(define-function compile/C-string (expr -c-)
+  (assert (= (list-length expr) 2))
+  (emit LOAD (emit-object/C-string (second expr) -c-)))
+
+(define-method compile-object <string> (-c-)
+  (emit-object/C-string self -c-))
+
+(define-method compile-object <undefined> (-c-)
+  (LI64 (target-value false)))
+
+(define-function compile/lambda (form -c-)
+  (let ((expr (eval form)))
+    (emit LOAD (compile-expr expr () -c-))))
