@@ -1,188 +1,71 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(require "source/compiler/emit-early.l")
-
 ;;;
-;;; Utils
+;;; Compiler Infrastructure
 ;;;
 
-(define-function align (alignment value)
-  (bitwise-and (+ value (- alignment 1))
-               (- alignment)))
+;; TODO would be nice if this could be merged between x86 and arm
+(define new-stack-cell) ; forward
 
-;;;
-;;; Relocation tracking for ET_DYN
-;;;
-(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_X86_64_RELATIVE relocations
+(define-record <compiler> ()
+  (level
+   temp-counter
+   temp-limit
+   free-stack-cells
+   current-value              ; the output of the previous-instruction
 
-(define-function register-rela (segment paddress value)
-  (push *rela-entries* (list segment paddress value)))
+   fn-epilogue-label
+   c-function-entries
 
-;;;
-;;; Operands
-;;;
-
-(define-function define-operand/make-setters (type-name fields)
-  (when (pair? fields)
-    (cons `(set (slot-value ,type-name ,(car fields) self) ,(car fields))
-          (define-operand/make-setters type-name (cdr fields)))))
-
-(define-form define-operand (name super . rest)
-  (let* ((direct-slots	(pop rest))
-         (type-name	(symbol->type-name name))
-         (type		(eval `(define-record ,type-name ,(when super (symbol->type-name super))
-                                 ,direct-slots)))
-         (effective-slots (<record>-effective-slots type)))
-    (assert (is <record> type))
-    (eval `(define-function ,name ,effective-slots
-             (let ((self (new ,type-name)))
-               ,@(define-operand/make-setters type-name effective-slots)
-               self)))
-    (when rest
-      `(define-print-method ,type-name (print-all -stream- ,@rest)))))
-
-(define-operand REGISTER ()	(name index))
-(define-operand LITERAL ()	(value)		"$"self.value)
-;; we must be able to differenciate when a pointer points to a CELL to
-;; be read (called GLOBAL-CELL), or when we need the pointer itself
-;; (called GLOBAL-ADDR).
-(define-operand GLOBAL-CELL ()	(address))
-(define-operand GLOBAL-ADDR ()	(address))
-(define-operand STACK-CELL ()	(offset))
-
-(define-operand LI32 LITERAL)
-(define-operand R32 REGISTER)
-
-(define-operand GOT64 GLOBAL-CELL)     ; GOT = Global Offset Table (darwin)
-(define-operand LI64 LITERAL)
-(define-operand R64 REGISTER)
-
-(define-operand STACK-PARAM STACK-CELL	()	self.offset"(bp)")
-
-;;;
-;;; Instruction infra
-;;;
-
-(define-generic emit-instruction)
-
-(define-record <instruction> ()
-  ;; TODO some of these slots are the same for all instances; they should reside on the type
-  (regs
-   has-input?
-   n-regs
-   produces-output?
+   free-temp-regs
+   clobbered-temp-regs
    ))
 
-(define-function %emit-form/mm-params (index types)
-  (when (pair? types)
-    (let ((param-name (string->symbol (concat-string "$" (number->string index)))))
-      (cons (list (awhen (and (not (= (first types) '_))
-                              (first types))
-                    (symbol->type-name it))
-                  param-name)
-            (%emit-form/mm-params (+ index 1) (cdr types))))))
+(define-function compiler (level)
+  (make <compiler>
+    (level			level)
+    (temp-counter		0)
+    (temp-limit			0)
+    (free-temp-regs		+callee-saved-registers+)
+    (clobbered-temp-regs	(array +n-callee-saved-registers+))
+    (current-value		+accumulator-register+)
+    ))
 
-(define-function %emit-form/reg-accessor (index)
-  (let ((var-name (string->symbol (concat-string "$reg" (number->string (+ index 1)))))
-        (body `(array-at __regs__ ,index)))
-    (list var-name () `((_) ',body))))
+(define-function new-temp-index (c)
+  (with-instance-accessors c <compiler>
+    (let ((i c.temp-counter))
+      (incr c.temp-counter)
+      (when (< c.temp-limit c.temp-counter)
+        (set c.temp-limit c.temp-counter))
+      i)))
 
-(define-function %emit-form/reg-accessors (index)
-  (when (<= 0 index)
-    (cons (%emit-form/reg-accessor index)
-          (%emit-form/reg-accessors (- index 1)))))
+(define-function alloc-reg-temp (self)
+  (with-instance-accessors self <compiler>
+    (if false ;; TODO self.free-temp-regs
+        (let ((reg (pop self.free-temp-regs)))
+          (set (array-at self.clobbered-temp-regs (<REGISTER>-index reg)) reg)
+          reg)
+      (or (pop (<compiler>-free-stack-cells self))
+          (new-stack-cell self)))))
 
-(define-function %define-instruction/emit-forms (instr-name n-regs type-name emit-forms)
-  (when (pair? emit-forms)
-    (let* ((emit-form (first emit-forms))
-           (args (first emit-form))
-           (body (rest emit-form)))
-      (cons `(define-multimethod emit-instruction (-c- (,type-name self) ,@(%emit-form/mm-params 1 args))
-               ;;(println "; emitting " self)
-               (let ((__regs__ (<instruction>-regs self)))
-                 (with-forms (,@(%emit-form/reg-accessors (- n-regs 1)))
-                   ,@body)))
-            (%define-instruction/emit-forms instr-name n-regs type-name (rest emit-forms))))))
+(define-function %free-temp (-c- obj)
+  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
+  (typecase obj
+    (<R64>		(push (<compiler>-free-temp-regs -c-) obj))
+    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
 
-;; FIXME n-regs should be extracted from the definition
-(define-form define-instruction/emit-forms (instr-name n-regs . emit-forms)
-  `(let ()
-     ,@(%define-instruction/emit-forms instr-name n-regs (symbol->type-name instr-name) emit-forms)))
+(define-function alloc-stack-temp (-c-)
+  (or (pop (<compiler>-free-stack-cells -c-))
+      (new-stack-cell -c-)))
 
-;; (define-instruction name (has-input? n-regs produces-output?) emit-forms)
-(define-form define-instruction (instr-name reg-spec . emit-forms)
-  (let ((has-input?		(first reg-spec))
-        (n-regs			(or (second reg-spec) 0))
-        (produces-output?	(third reg-spec))
-        (type-name		(symbol->type-name instr-name))
-        (singleton-name		(concat-symbol instr-name '-instance)))
-    `(let ()
-       (define-record ,type-name <instruction> ())
-       ;;(define-print-method ,type-name (print-all -stream- ,(symbol->string name)))
-       (define ,singleton-name (make ,type-name
-                                 (has-input?		,has-input?)
-                                 (n-regs		',n-regs)
-                                 (produces-output?	,produces-output?)))
-       (define-function ,instr-name (regs)
-         (if regs
-             (make ,type-name
-               (regs			regs)
-               (has-input?		,has-input?)
-               (n-regs			',n-regs)
-               (produces-output?	,produces-output?))
-           ,singleton-name))
+(define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
+(define-form free-temp (temp)			`(%free-temp -c- ,temp))
+(define-form free-temps (temp)			`(%free-temps -c- ,temp))
 
-       ,@(%define-instruction/emit-forms instr-name n-regs type-name emit-forms))))
-
-;;;
-;;; Instructions
-;;;
-
-(define-instruction COMMENT	()
-  ((pair)			(apply print-all (concat-list
-                                                  (list *debug-output* "; ")
-                                                  $1))
-                                ;; TODO this needs either an append
-                                ;; with n args, or a smarter apply
-                                (print-all *debug-output* "\n")))
-
-;; The natural pointer/word size of the target.
-(define-instruction CELL	()
-  ((LI64)			(.i64 (<LITERAL>-value $1)))
-  ((GLOBAL-ADDR)		(let ((addr (<GLOBAL-ADDR>-address $1)))
-                                   (register-rela (current-segment)
-                                                  (current-paddress)
-                                                  addr)
-                                   (.i64 addr)))
-  ((long)			(.i64 $1))
-  )
-
-;;;
-;;; Elf emission
-;;;
-
-;; TODO this is neither in struct nor readelf print order...
-(define-function emit-program-header (type file-offset file-size mem-size flags
-                                           start alignment)
-  (.i32	type)                           ; p_type
-  (.i32	flags)                          ; p_flags
-  (.i64	file-offset)                    ; p_offset - File offset
-  (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
-  (.i64	0)       ; p_paddr - ignored
-  (.i64	file-size)                      ; p_filesz - Size in file
-  (.i64	mem-size)                       ; p_memsz - Size in memory
-  (.i64	alignment))
-
-(define-function emit-section-header (name-offset type flags addr
-                                      offset size link info addralign entsize)
-
-  (.i32 name-offset)	; sh_name   - offset into .shstrtab
-  (.i32 type)		; sh_type   - section type (SHT_*)
-  (.i64 flags)		; sh_flags  - SHF_*
-  (.i64 addr)		; sh_addr   - virtual address (if mapped)
-  (.i64 offset)		; sh_offset - file offset
-  (.i64 size)		; sh_size   - section size in bytes
-  (.i32 link)		; sh_link   - index of related section
-  (.i32 info)		; sh_info   - extra section info
-  (.i64 addralign)	; sh_addralign - alignment requirement
-  (.i64 entsize))	; sh_entsize - size of each entry (0 if not fixed-size)
+;; FIXME this has been neutered by the expr-queue that flattens closure emission
+(define-function accessible-variable-or-die (var -c-)
+  (or (global-variable? var)
+      (let ((comp-level	(<compiler>-level -c-))
+            (var-level	(<env>-level (<variable>-env var))))
+        (when (< var-level comp-level)
+          (error "cannot access variable "var", closures are not yet supported by the compiler.")))))

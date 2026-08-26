@@ -29,14 +29,12 @@
 (require "source/ansiterm.l")
 (require "source/files.l")
 (require "source/assembler/single-pass-x86.l")
-(require "source/compiler/elf.l")
 
 (require "source/c/cgrov.l")
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")
 
-;; TODO this is kludgey. why only this one, etc...
-(define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
+(require "source/compiler/elf-early.l")
 
 ;; forwards
 (define compile-expr)
@@ -58,139 +56,18 @@
   (x R32 EAX EBX ECX EDX ESP EBP ESI EDI)
   (x R64 RAX RBX RCX RDX RSP RBP RSI RDI R8 R9 R10 R11 R12 R13 R14 R15))
 
-;;;
-;;; Compiler Infrastructure
-;;;
-
 (define-constant +param-registers+   `(quote ,(list op/RDI op/RSI op/RDX op/RCX op/R8 op/R9)))
 (define-constant +n-param-registers+ (list-length +param-registers+))
 
 (define-constant +callee-saved-registers+   `(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
 (define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
 
-(define-record <compiler> ()
-  (level
-   temp-counter
-   temp-limit
-   free-stack-cells
-   current-value              ; the output of the previous-instruction
+(define-constant +accumulator-register+ op/RAX)
 
-   fn-epilogue-label
-   c-function-entries
-
-   free-temp-regs
-   clobbered-temp-regs
-   ))
-
-(define-function compiler (level)
-  (make <compiler>
-    (level			level)
-    (temp-counter		0)
-    (temp-limit			0)
-    (free-temp-regs		+callee-saved-registers+)
-    (clobbered-temp-regs	(array +n-callee-saved-registers+))
-    (current-value		op/RAX)
-    ))
-
-(define-function new-temp-index (c)
-  (with-instance-accessors c <compiler>
-    (let ((i c.temp-counter))
-      (incr c.temp-counter)
-      (when (< c.temp-limit c.temp-counter)
-        (set c.temp-limit c.temp-counter))
-      i)))
+(require "source/compiler/elf.l")
 
 (define-function new-stack-cell (-c-)
   (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
-
-(define-function alloc-reg-temp (self)
-  (with-instance-accessors self <compiler>
-    (if false ;; TODO self.free-temp-regs
-        (let ((reg (pop self.free-temp-regs)))
-          (set (array-at self.clobbered-temp-regs (<REGISTER>-index reg)) reg)
-          reg)
-      (or (pop (<compiler>-free-stack-cells self))
-          (new-stack-cell self)))))
-
-(define-function %free-temp (-c- obj)
-  ;; FIXME this is a mess! %free-temp is called with all kinds of objects...
-  (typecase obj
-    (<R64>		(push (<compiler>-free-temp-regs -c-) obj))
-    (<STACK-CELL>	(push (<compiler>-free-stack-cells -c-) obj))))
-
-(define-function alloc-stack-temp (-c-)
-  (or (pop (<compiler>-free-stack-cells -c-))
-      (new-stack-cell -c-)))
-
-(define-function %free-temps (-c- temps)	(list-do temp temps (%free-temp -c- temp)))
-(define-form free-temp (temp)			`(%free-temp -c- ,temp))
-(define-form free-temps (temp)			`(%free-temps -c- ,temp))
-
-;; FIXME this has been neutered by the expr-queue that flattens closure emission
-(define-function accessible-variable-or-die (var -c-)
-  (or (global-variable? var)
-      (let ((comp-level	(<compiler>-level -c-))
-            (var-level	(<env>-level (<variable>-env var))))
-        (when (< var-level comp-level)
-          (error "cannot access variable "var", closures are not yet supported by the compiler.")))))
-
-;;;
-;;; Early ELF stuff
-;;;
-(define-constant +.text-section-index+		1)
-;;(define-constant +.rodata-section-index+	2)
-(define-constant +.data-section-index+		3)
-(define-constant +.bss-section-index+		4)
-;;(define-constant +.dynamic-section-index+	5)
-;;(define-constant +.rela.dyn-section-index+	6)
-(define-constant +.dynstr-section-index+	7)
-;;(define-constant +.symtab-section-index+	8)
-(define-constant +.strtab-section-index+	9)
-(define-constant +.shstrtab-section-index+	10)
-
-(define-function %emit-strtab-entry (segment-name str)
-  (let (result)
-    (with-current-segment segment-name
-      (set result (current-paddress))
-      (.ascii	(symbol->string str)) ; symbol->string is also ok for strings
-      (.i8 0))
-    result))
-
-(define-function emit-shstrtab-entry (str)
-  (%emit-strtab-entry '.shstrtab str))
-
-(define-function emit-strtab-entry (str)
-  (%emit-strtab-entry '.strtab str))
-
-(define-function emit-symtab-entry (name-offset info other section-index
-                                                value size)
-  (with-current-segment '.symtab
-    (.i32 name-offset)		; st_name: offset into .strtab
-    ;; upper 4 bits: binding (STB_*)
-    ;; lower 4 bits: type (STT_*)
-    (.i8  info)			; st_info: bind/type (e.g. STT_FUNC, STB_GLOBAL)
-    (.i8  other)		; st_other: visibility (usually 0)
-    (.i16 section-index)	; st_shndx: section index (.text, etc.)
-    (.i64 value)		; st_value: address of symbol
-    (.i64 size)))		; st_size: size of symbol in bytes
-
-(define-function emit-symtab-entry/variable (name section-index value size)
-  (emit-symtab-entry (emit-strtab-entry name)
-                     (+ (bitwise-shift elf/STB_GLOBAL 4)
-                        elf/STT_OBJECT)
-                     0
-                     section-index
-                     value
-                     +word-size-in-bytes+))
-
-(define-function emit-symtab-entry/function (name value size)
-  (emit-symtab-entry (emit-strtab-entry name)
-                     (+ (bitwise-shift elf/STB_GLOBAL 4)
-                        elf/STT_FUNC)
-                     0
-                     +.text-section-index+
-                     value
-                     size))
 
 ;;;
 ;;; Emission
@@ -238,12 +115,6 @@
       (64 16)))
 
 (define-constant +function-alignmet+ 16)
-
-;; TODO use the grovelled __USER_LABEL_PREFIX__
-;; (define-constant +external-label-prefix+
-;;     (case (target-value +operating-system+)
-;;       (darwin	"_")
-;;       (else	"")))
 
 (define-record <c-function-entry> ()
   (ptr-label
@@ -1222,12 +1093,6 @@
       (with-current-segment 'data
         (label! name)
         (emit CELL object-label)))))
-
-(define elf/page-size	0x1000) ; is this the system page-size?
-(define ideal-cache-line-alignment 64)
-
-(assert (= elf/sizeof-Elf64_Ehdr 64))
-(assert (= elf/sizeof-Elf64_Phdr 56))
 
 (define-constant +n-program-headers+ 8)
 (define-constant +n-section-headers+ 11)
