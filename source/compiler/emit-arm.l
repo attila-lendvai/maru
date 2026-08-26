@@ -144,10 +144,7 @@
                                 (BNE $2)))
 
 (define-instruction CALL	(false 0 true)
-  ((label)			(BL $1)))
-
-;; TODO merge into CALL?
-(define-instruction CALLPTR	(true 0 false)
+  ((label)			(BL $1))
   ((REGISTER)			(BLR (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
@@ -550,7 +547,7 @@
             (MOVi X17 program-code-byte-offset)
             (ADDr X16 X16 X17)
             (LDR X16 X16 0)))))
-    (emit CALLPTR op/X16)
+    (emit CALL op/X16)
     ()))
 
 (define-function closure-code-label (name)
@@ -973,7 +970,7 @@
   (LDUR X16 FP (<STACK-CELL>-offset self))
   (when (feature emit-with-object-headers)
     (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
-  (emit CALLPTR op/X16)
+  (emit CALL op/X16)
   ())
 
 (define-method compile-call-to <R64> (op -c-)
@@ -982,7 +979,7 @@
     (emit MOVE self op/X16))
   (when (feature emit-with-object-headers)
     (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
-  (emit CALLPTR op/X16)
+  (emit CALL op/X16)
   ())
 
 ;; TODO
