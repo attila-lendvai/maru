@@ -883,9 +883,16 @@
                                          elf/sizeof-Elf64_Shdr)))
 
 (define-constant +code-segment-address+		0x00000000)
-(define-constant +ro-data-segment-address+	0x00040000)
-(define-constant +data-segment-address+		0x00060000)
-(define-constant +bss-segment-address+		0x00080000)
+(define-constant +code-segment-space+		0x00040000)
+
+(define-constant +ro-data-segment-address+	(+ +code-segment-address+	+code-segment-space+))
+(define-constant +ro-data-segment-space+	0x00020000)
+
+(define-constant +data-segment-address+		(+ +ro-data-segment-address+	+ro-data-segment-space+))
+(define-constant +data-segment-space+		0x00020000)
+
+(define-constant +bss-segment-address+		(+ +data-segment-address+	+data-segment-space+))
+(define-constant +bss-segment-space+		0xffffffff) ; there's plenty of nothing at the end...
 
 (define-function write-elf-to-stream (stream)
   (.segment	'code)
@@ -966,16 +973,17 @@
                            (paddress 'program-headers)
                            size size
                            elf/PF_R
-                           (laddress 'program-headers)
-                           8))
+                           8
+                           (laddress 'program-headers)))
 
     ;; text segment
     (emit-program-header elf/PT_LOAD
                          file-offset/text
                          size/text size/text
                          (+ elf/PF_R elf/PF_X)
+                         elf/page-size
                          +code-segment-address+
-                         elf/page-size)
+                         +code-segment-space+)
     (incr file-position size/text)
 
     ;; ro-data segment (must be last, because this will also mmap the )
@@ -985,8 +993,9 @@
                          file-offset/ro-data
                          size/ro-data size/ro-data
                          (+ elf/PF_R elf/PF_W)
+                         elf/page-size
                          +ro-data-segment-address+
-                         elf/page-size)
+                         +ro-data-segment-space+)
     (incr file-position size/ro-data)
 
     ;; mark the entire ro-data segment to become read-only after
@@ -995,8 +1004,8 @@
     (emit-program-header elf/PT_GNU_RELRO file-offset/ro-data
                          size/ro-data size/ro-data
                          elf/PF_R
-                         +ro-data-segment-address+
-                         elf/page-size)
+                         elf/page-size
+                         +ro-data-segment-address+)
 
     ;; data segment
     (set size/data (segment-length 'data))
@@ -1005,8 +1014,9 @@
                          file-offset/data
                          size/data size/data
                          (+ elf/PF_R elf/PF_W)
+                         elf/page-size
                          +data-segment-address+
-                         elf/page-size)
+                         +data-segment-space+)
     (incr file-position size/data)
 
     ;; BSS, aka zero-initialized data
@@ -1019,8 +1029,9 @@
                          file-position
                          0 size/bss
                          (+ elf/PF_R elf/PF_W)
+                         elf/page-size
                          +bss-segment-address+
-                         elf/page-size)
+                         +bss-segment-space+)
 
     ;; PT_INTERP segment (dynamic linker path)
     ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
@@ -1031,8 +1042,8 @@
                               (paddress 'elf-interpreter-start))
                            interp-size interp-size
                            elf/PF_R
-                           (laddress 'elf-interpreter-start)
-                           1))
+                           1
+                           (laddress 'elf-interpreter-start)))
 
     (set size/relocation-tables (- (laddress '.dynamic-end)
                                    (laddress '.dynamic)))
@@ -1041,8 +1052,8 @@
                             (paddress '.dynamic))
                          size/relocation-tables size/relocation-tables
                          elf/PF_R
-                         (laddress '.dynamic)
-                         8)
+                         8
+                         (laddress '.dynamic))
 
     (label! 'program-headers-end)
 
