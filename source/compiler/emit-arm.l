@@ -975,9 +975,9 @@
                                          elf/sizeof-Elf64_Shdr)))
 
 (define-constant +code-segment-address+		0x00000000)
-(define-constant +data-segment-address+		0x00040000)
-(define-constant +bss-segment-address+		0x00050000)
-(define-constant +ro-data-segment-address+	0x00100000)
+(define-constant +ro-data-segment-address+	0x00040000)
+(define-constant +data-segment-address+		0x00060000)
+(define-constant +bss-segment-address+		0x00080000)
 
 (define-function write-elf-to-stream (stream)
   (.segment	'code)
@@ -1063,40 +1063,9 @@
                          elf/page-size)
     (incr file-position size/text)
 
-    ;; NOTE: program headers must be emitted in increasing vaddr order
-    ;; for ld-linux to process them correctly. The file-position
-    ;; computation tracks the file layout order (text, ro-data, data),
-    ;; but the headers are emitted in vaddr order.
-
-    ;; ro-data segment - precompute: data and bss offsets depend on ro-data size
+    ;; ro-data segment (must be last, because this will also mmap the )
     (set size/ro-data (segment-length 'ro-data))
     (set file-offset/ro-data file-position)
-
-    ;; data segment
-    (set size/data (segment-length 'data))
-    (set file-offset/data (+ file-offset/ro-data size/ro-data))
-    (emit-program-header elf/PT_LOAD
-                         file-offset/data
-                         size/data size/data
-                         (+ elf/PF_R elf/PF_W)
-                         +data-segment-address+
-                         elf/page-size)
-    (incr file-position size/data)
-
-    ;; BSS, aka zero-initialized data
-    (set size/bss (segment-length 'bss))
-    (when (= 0 size/bss)
-      ;; zero is illegal, and not emitting is more trouble than just
-      ;; setting it to 1.
-      (set size/bss 1))
-    (emit-program-header elf/PT_LOAD
-                         (+ file-position size/ro-data)
-                         0 size/bss
-                         (+ elf/PF_R elf/PF_W)
-                         +bss-segment-address+
-                         elf/page-size)
-
-    ;; ro-data segment
     (emit-program-header elf/PT_LOAD
                          file-offset/ro-data
                          size/ro-data size/ro-data
@@ -1114,8 +1083,29 @@
                          +ro-data-segment-address+
                          elf/page-size)
 
-    ;; data segment continues after ro-data in the file
+    ;; data segment
+    (set size/data (segment-length 'data))
+    (set file-offset/data file-position)
+    (emit-program-header elf/PT_LOAD
+                         file-offset/data
+                         size/data size/data
+                         (+ elf/PF_R elf/PF_W)
+                         +data-segment-address+
+                         elf/page-size)
     (incr file-position size/data)
+
+    ;; BSS, aka zero-initialized data
+    (set size/bss (segment-length 'bss))
+    (when (= 0 size/bss)
+      ;; zero is illegal, and not emitting is more trouble than just
+      ;; setting it to 1.
+      (set size/bss 1))
+    (emit-program-header elf/PT_LOAD
+                         file-position
+                         0 size/bss
+                         (+ elf/PF_R elf/PF_W)
+                         +bss-segment-address+
+                         elf/page-size)
 
     ;; PT_INTERP segment (dynamic linker path)
     ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
