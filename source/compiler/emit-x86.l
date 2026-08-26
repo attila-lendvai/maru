@@ -62,7 +62,10 @@
 (define-constant +callee-saved-registers+   `(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
 (define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
 
-(define-constant +accumulator-register+ op/RAX)
+;; TODO ? use +accumulator+ in the instructions and everywhere
+;; else in general where relevant.
+(define-constant +accumulator+		RAX)
+(define-constant +op/accumulator+	op/RAX)
 
 (require "source/compiler/elf.l")
 
@@ -672,8 +675,7 @@
   (compile-call-to-<target-function> -c-))
 
 (define-method compile-call-to <R64> (op -c-)
-  (unless (= RAX (<REGISTER>-name self))
-    (emit MOVE self op/RAX))
+  (emit MOVE self +op/accumulator+)
   (compile-call-to-<target-function> -c-))
 
 ;; TODO

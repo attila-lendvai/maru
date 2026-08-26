@@ -35,7 +35,7 @@
     (temp-limit			0)
     (free-temp-regs		+callee-saved-registers+)
     (clobbered-temp-regs	(array +n-callee-saved-registers+))
-    (current-value		+accumulator-register+)
+    (current-value		+op/accumulator+)
     ))
 
 (define-function new-temp-index (c)

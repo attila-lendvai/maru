@@ -70,7 +70,16 @@
 (define-constant +callee-saved-registers+   `(quote ,(list op/X19 op/X20 op/X21 op/X22 op/X23 op/X24 op/X25 op/X26 op/X27 op/X28)))
 (define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
 
-(define-constant +accumulator-register+ op/X0)
+;; TODO ? use +accumulator+ in the instructions and everywhere
+;; else in general where relevant.
+
+;; NOTE in the arm ABI X0 is both the accumulator and also the first
+;; parameter; i.e. there's a clash that the x86-64 ABI doesn't
+;; have. Because of that definitions like compile-call-to-<target-function>
+;; or compile-call-to <STACK-CELL> cannot be shared between the two
+;; backends.
+(define-constant +accumulator+		X0)
+(define-constant +op/accumulator+	op/X0)
 
 (require "source/compiler/elf.l")
 
@@ -755,8 +764,7 @@
 
 (define-method compile-call-to <R64> (op -c-)
   ;; Move fn ptr to X16 to avoid clobbering arg 1 in X0
-  (unless (= X16 (<REGISTER>-name self))
-    (emit MOVE self op/X16))
+  (emit MOVE self op/X16)
   (when (feature emit-with-object-headers)
     (LDR X16 X16 (* (slave-value (record/slot-index <target-function> 'program-code)) 8)))
   (emit CALL op/X16)
