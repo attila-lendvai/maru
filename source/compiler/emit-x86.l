@@ -86,10 +86,10 @@
   ((REGISTER)			(CALLQr (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
-  ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) ESP 0 0 (<REGISTER>-name $1)))
-  ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (ADDLir lit (<REGISTER>-name $1)))))
+  ;; ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ;; ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
+  ;;                                 (unless (= lit 0)
+  ;;       			    (ADDLir lit (<REGISTER>-name $1)))))
   ((R64 STACK-CELL)		(ADDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -104,11 +104,11 @@
                                      (ADDQrr RBX reg))))))
 
 (define-instruction SUB		(true 0 true)
-  ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) ESP 0 0 (<REGISTER>-name $1)))
-  ;; TODO wtf? the order...
-  ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
-                                  (unless (= lit 0)
-				    (SUBLir lit (<REGISTER>-name $1)))))
+  ;; ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ;; ;; TODO wtf? the order...
+  ;; ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
+  ;;                                 (unless (= lit 0)
+  ;;       			    (SUBLir lit (<REGISTER>-name $1)))))
   ((R64 STACK-CELL)		(SUBQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
   ;; TODO wtf? the order...
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
