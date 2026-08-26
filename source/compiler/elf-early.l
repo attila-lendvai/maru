@@ -189,7 +189,9 @@
 
 ;; TODO this is neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
-                                           start alignment)
+                                           alignment start . rest)
+  (when rest
+    (assert (<= file-size (first rest)) "emit-program-header: ran out of space"))
   (.i32	type)                           ; p_type
   (.i32	flags)                          ; p_flags
   (.i64	file-offset)                    ; p_offset - File offset
