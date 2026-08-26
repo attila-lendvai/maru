@@ -883,9 +883,9 @@
                                          elf/sizeof-Elf64_Shdr)))
 
 (define-constant +code-segment-address+		0x00000000)
-(define-constant +ro-data-segment-address+	0x00100000)
-(define-constant +data-segment-address+		0x00200000)
-(define-constant +bss-segment-address+		0x00300000)
+(define-constant +ro-data-segment-address+	0x00040000)
+(define-constant +data-segment-address+		0x00060000)
+(define-constant +bss-segment-address+		0x00080000)
 
 (define-function write-elf-to-stream (stream)
   (.segment	'code)
