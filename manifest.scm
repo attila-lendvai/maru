@@ -77,6 +77,7 @@
   (manifest-entries
    (specifications->manifest
     '("coreutils"
+      "nss-certs" ; so that git pull works on OpenWrt
       "diffutils"
       ;;"clang-toolchain"
       "glibc"
