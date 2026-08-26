@@ -832,16 +832,21 @@ git --no-pager log --pretty=oneline -1")))
   (test-evaluator)
   (test-parser)
 
-  (when (= *host-os* "Linux")
+  (case *host-os*
 
-    (test-compiler llvm linux)
-    (test-assembler) ; uses x86_64-linux-gnu-objcopy and stuff...
+    ("Linux"
+     (test-compiler llvm linux)
+     (test-assembler)     ; uses x86_64-linux-gnu-objcopy and stuff...
 
-    (when (= *host-arch* "x86_64")
+     (case *host-arch*
 
-      (test-compiler x86 linux)
-      (test-elf)
-      (test-jit)))
+       ("x86_64"
+        (test-compiler x86 linux)
+        (test-elf)
+        (test-jit))
+
+       ("aarch64"
+        (test-compiler arm linux)))))
   )
 
 ;;;
