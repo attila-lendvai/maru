@@ -372,9 +372,18 @@
   (comp op)
   (compile-call-to-<target-function> -c-))
 
-;;;
-;;; Compiling lambdas
-;;;
+(define-function sf/stack-pointer-on-entry (expr -c-)
+  ;; the usual function prologue that we also employ is like this:
+  ;;
+  ;; push	%rbp
+  ;; mov	%rsp, %rbp
+  ;; sub	$n, %rsp
+  ;;
+  ;; so, the 8(%rbp) is to undo the push %rbp, so that we
+  ;; regain the %rsp value at the entry point to the function.
+
+  (LEAQmr	+word-size-in-bytes+ RBP 0 0 RAX)
+  (set (<compiler>-current-value -c-) op/RAX))
 
 (require "source/compiler/elf-late.l")
 
@@ -579,36 +588,6 @@
 ;;      (error "TODO sign-extend a short to 64 bits")))
 ;;   (unless (<C-function>-vararg? self)
 ;;     (list-length (<C-function>-parameter-types self))))
-
-;;;
-;;; Special Forms
-;;;
-(define *special-forms* (list
-  (cons (target-value let)		compile/let)
-  (cons (target-value and)		compile/and)
-  (cons (target-value or)		compile/or)
-  (cons (target-value if)		compile/if)
-  (cons (target-value while)		compile/while)
-  (cons (target-value set)		compile/set)
-  (cons (target-value lambda)		compile/lambda)
-  (cons (target-value return)		compile/return)
-  (cons (target-value address-of)	compile/address-of)
-  (cons (target-value C-string)		compile/C-string)
-  (cons (target-value stack-pointer-on-entry)
-        (lambda (expr -c-)
-          ;; the function prologue we also employ is like this:
-          ;;
-          ;; push	%rbp
-          ;; mov	%rsp, %rbp
-          ;; sub	$n, %rsp
-          ;; ...
-          ;;
-          ;; so, the 8(%rbp) is to undo the push %rbp, so that we
-          ;; regain the %rsp value at the entry point to the function.
-
-          (LEAQmr	8 RBP 0 0 RAX)
-          (set (<compiler>-current-value -c-) op/RAX)))
-  ))
 
 (define-constant +n-program-headers+ 8)
 (define-constant +n-section-headers+ 11)

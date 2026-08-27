@@ -428,9 +428,18 @@
       (emit CALL (closure-code-label name))))
   ())
 
-;;;
-;;; Compiling lambdas
-;;;
+(define-function sf/stack-pointer-on-entry (expr -c-)
+  ;; the usual function prologue that we also employ is like this:
+  ;;
+  ;; STP	FP, LP, [SP, #-16]!   ; push FP and LP
+  ;; MOV	FP, SP
+  ;; SUB	SP, SP, $n
+  ;;
+  ;; so, the 16(SP) is to undo the STP and SUB, so that we
+  ;; regain the SP value at the entry point to the function.
+
+  (ADDi X0 FP (eval-at-expand (* 2 +word-size-in-bytes+)))
+  (set (<compiler>-current-value -c-) op/X0))
 
 (require "source/compiler/elf-late.l")
 
@@ -674,36 +683,6 @@
 ;;      (error "TODO sign-extend a short to 64 bits")))
 ;;   (unless (<C-function>-vararg? self)
 ;;     (list-length (<C-function>-parameter-types self))))
-
-;;;
-;;; Special Forms
-;;;
-(define *special-forms* (list
-  (cons (target-value let)		compile/let)
-  (cons (target-value and)		compile/and)
-  (cons (target-value or)		compile/or)
-  (cons (target-value if)		compile/if)
-  (cons (target-value while)		compile/while)
-  (cons (target-value set)		compile/set)
-  (cons (target-value lambda)		compile/lambda)
-  (cons (target-value return)		compile/return)
-  (cons (target-value address-of)	compile/address-of)
-  (cons (target-value C-string)		compile/C-string)
-  (cons (target-value stack-pointer-on-entry)
-        (lambda (expr -c-)
-          ;; the function prologue we also employ is like this:
-          ;;
-          ;; stp	x29, x30, [sp, #-16]!
-          ;; mov	x29, sp
-          ;; sub	sp, sp, $n
-          ;; ...
-          ;;
-          ;; so, the 16(sp) is to undo the stp and sub, so that we
-          ;; regain the sp value at the entry point to the function.
-
-          (ADDi X0 FP 16)
-          (set (<compiler>-current-value -c-) op/X0)))
-  ))
 
 (define-constant +n-program-headers+ 8)
 (define-constant +n-section-headers+ 11)
