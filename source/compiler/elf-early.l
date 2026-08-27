@@ -1,6 +1,13 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (require "source/compiler/emit-early.l")
+(require "source/ansiterm.l")
+(require "source/files.l")
+
+(require "source/c/cgrov.l")
+(require-cgrov "source/platforms/linux/linux")
+(require-cgrov "source/platforms/linux/elf")
+
 
 ;;;
 ;;; Utils
@@ -12,12 +19,6 @@
 
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
-
-;; TODO this stinks. get rid of this or comment the why...
-(define-function closure-code-label (name)
-  (label (if (feature emit-with-object-headers)
-             (concat-symbol name '.code)
-           name)))
 
 ;;;
 ;;; Relocation tracking for ET_DYN

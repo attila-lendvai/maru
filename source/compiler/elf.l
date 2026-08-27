@@ -1,5 +1,8 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+(define-constant +n-param-registers+		(list-length +param-registers+))
+(define-constant +n-callee-saved-registers+	(list-length +callee-saved-registers+))
+
 ;; TODO ? introduce abstraction for ABIs...
 (define-constant +call-frame-alignmet+
     (case (target-value +word-size-in-bits+)
@@ -9,6 +12,12 @@
       (64 16)))
 
 (define-constant +function-alignmet+ 16)
+
+;; TODO this stinks. get rid of this or comment the why...
+(define-function closure-code-label (name)
+  (label (if (feature emit-with-object-headers)
+             (concat-symbol name '.code)
+           name)))
 
 ;;;
 ;;; Compiler Infrastructure
