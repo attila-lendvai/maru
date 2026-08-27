@@ -174,8 +174,16 @@
     (or whitespace?
         (= (string-at str i) ?\; ))))
 
+;; TODO delme, cleanup. it was needed because file-stream is coming
+;; from the VM, and it was missing the $peek (i.e. not the lower's
+;; peek, but the upper's).
+(define-form with-open-stream* (args . body)
+  `(with-open-file (__file__ ,@(rest args))
+     (let ((,(first args) (file-input-stream __file__ ,(second args))))
+       ,@body)))
+
 (define-function count-maru-loc (path)
-  (with-open-stream (stream path "r")
+  (with-open-stream* (stream path "r")
     (let ((loc 0)
           (line ()))
       (while (not (= +end+ (set line (input-stream-up-to stream ?\n))))

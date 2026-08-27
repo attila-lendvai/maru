@@ -40,16 +40,19 @@
        ))
 
     (eval-in-host
-     `(let ()
-        (let ((print-it (lambda (env-name file-list)
-                          (let ((loc (foldr + 0 (map count-maru-loc file-list))))
-                            (print-all *error-output* env-name " env loaded "
-                                       (list-length file-list) " files, " loc " LoC\n")
-                            loc))))
-          (print-all
-           *error-output*
-           "Total: " term/BOLD
-           (+ (print-it "Host" ',host-files)
-              (print-it "Slave" (slave-value *load-history*)))
-           term/RESET" LoC\n")))))
+     `(let ((host-files ',host-files)
+            (slave-files (slave-value *load-history*)))
+        (let ((print-it
+                (lambda (env-name file-list suffix)
+                  (let ((loc (foldr + 0 (map count-maru-loc file-list))))
+                    (print-all *debug-output* env-name " env loaded "
+                               (list-length file-list) " files, "
+                               term/FG-GREEN term/BOLD loc term/RESET" LoC "
+                               suffix "\n")
+                    loc))))
+          (print-it "Host"  host-files  "(the compiler)")
+          (print-it "Slave" slave-files "(the next eval)")
+          (print-all *debug-output* "Host: "  host-files  "\n")
+          (print-all *debug-output* "Slave: " slave-files "\n")
+          ))))
   ())
