@@ -70,7 +70,7 @@
   (assert (pair? prog) "compile/expressions-into-temp: prog is empty or not a list") ; this is against silently storing an uninitialized EAX while compiling e.g. (let (x) ...)
   ;; NOTE it's tempting here to check for single-element prog's, and
   ;; turning them into a compile/expression, but our single caller,
-  ;; namely compile/let, requires a temp location, even when
+  ;; namely sf/let, requires a temp location, even when
   ;; initialized to literal values.
   (while (pair? prog)
     (comp (car prog))
@@ -79,7 +79,7 @@
     (emit STORE $ temp)
     temp))
 
-(define-function compile/let-binding (binding comp)
+(define-function %let-binding (binding comp)
   ;; we unconditionally initialize empty bindings to () to avoid hidden bugs,
   ;; at a small cost of initializing temp locations even when it wouldn't be necessary.
   ;; TODO cleanup! expand now brings let bindings to a normal form (to ease encode's job). think this through...
@@ -92,13 +92,13 @@
     (assert (= (type-of var) <variable>) "compile/let-binding: encountered a non-variable: " var)
     (set (<variable>-value var) tmp)))
 
-(define-function compile/let (expr -c-)
-  (let ((temps (map-with compile/let-binding (caddr expr) -c-)))
+(define-function sf/let (expr -c-)
+  (let ((temps (map-with %let-binding (caddr expr) -c-)))
     (list-do stmt (cdddr expr)
       (comp stmt))
     (free-temps temps)))
 
-(define-function compile/set (expr -c-)
+(define-function sf/set (expr -c-)
   (let* ((var	(second expr))
          (value	(<variable>-value var)))
     (accessible-variable-or-die var -c-)
@@ -116,7 +116,7 @@
       (else
        (emit STORE $ (GLOBAL-CELL (label (<variable>-name var))))))))
 
-(define-function compile/address-of (expr -c-)
+(define-function sf/address-of (expr -c-)
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
     (let ((val (<variable>-value var)))
@@ -131,7 +131,7 @@
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
-(define-function compile/and (expr -c-)
+(define-function sf/and (expr -c-)
   (let ((done (label)))
     (set expr (cdr expr))
     (while expr
@@ -140,7 +140,7 @@
         (emit BF $ done)))
     (label! done)))
 
-(define-function compile/or (expr -c-)
+(define-function sf/or (expr -c-)
   (let ((done (label)))
     (set expr (cdr expr))
     (while expr
@@ -149,7 +149,7 @@
         (emit BT $ done)))
     (label! done)))
 
-(define-function compile/if (expr -c-)
+(define-function sf/if (expr -c-)
   (let ((condition	(second expr))
         (then		(third expr))
         (else		(cdddr expr))
@@ -170,7 +170,7 @@
       (comp stmt))
     (label! l/end)))
 
-(define-function compile/while (expr -c-)
+(define-function sf/while (expr -c-)
   (let ((l/body	(label))
         (l/cond	(label))
         (body	(cddr expr)))
@@ -183,11 +183,33 @@
     (comp (second expr))
     (emit BT $ l/body)))
 
-(define-function compile/return (expr -c-)
+(define-function sf/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
   (emit BR (or (<compiler>-fn-epilogue-label -c-)
                (set (<compiler>-fn-epilogue-label -c-) (label)))))
+
+(define-function sf/lambda (form -c-)
+  (let ((expr (eval form)))
+    (emit LOAD (compile-expr expr () -c-))))
+
+(define-function sf/C-string (expr -c-)
+  (assert (= (list-length expr) 2))
+  (emit LOAD (emit-object/C-string (second expr) -c-)))
+
+(define *special-forms* (list
+  (cons (target-value let)		sf/let)
+  (cons (target-value and)		sf/and)
+  (cons (target-value or)		sf/or)
+  (cons (target-value if)		sf/if)
+  (cons (target-value while)		sf/while)
+  (cons (target-value set)		sf/set)
+  (cons (target-value lambda)		sf/lambda)
+  (cons (target-value return)		sf/return)
+  (cons (target-value address-of)	sf/address-of)
+  (cons (target-value C-string)		sf/C-string)
+  (cons (target-value stack-pointer-on-entry) sf/stack-pointer-on-entry)
+  ))
 
 ;;;
 ;;; Special Operators

@@ -146,16 +146,8 @@
      (.ascii self)
      (.i8 0))))
 
-(define-function compile/C-string (expr -c-)
-  (assert (= (list-length expr) 2))
-  (emit LOAD (emit-object/C-string (second expr) -c-)))
-
 (define-method compile-object <string> (-c-)
   (emit-object/C-string self -c-))
 
 (define-method compile-object <undefined> (-c-)
   (LI64 (target-value false)))
-
-(define-function compile/lambda (form -c-)
-  (let ((expr (eval form)))
-    (emit LOAD (compile-expr expr () -c-))))
