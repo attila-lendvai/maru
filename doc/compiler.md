@@ -12,16 +12,20 @@ target language; i.e. to the language of the foundational [platform](platforms.m
 that was chosen to build the Maru VM on top of (e.g. x86 machine code,
 LLVM, libc, the Linux kernel, etc).
 
-The two compiler backends currently emit text files. Therefore, for
-now, a C toolchain is required for a full cycle of bootstrap even on
-x86. This requirement can be eliminated with the help of an x86
-assembler that directly outputs machine code; i.e. there's no inherent
-external dependency on the C infrastructure in the codebase. See the
-`test-elf` proof of concept that drectly emits a ELF binary.
-
 This subset of Maru is basically a list of toplevel definitions
 collected into the target environment and then level-shifted to the
-target (see `compile-definition`).
+target arch (see `compile-definition`).
+
+Backends:
+ - **LLVM**: currently emits a .ll text file, and as such it depends
+   on a C toolchain and LLVM. Future plan is to link to the LLVM libs
+   and generate .bc into a memory buffer, and then emit binaries
+   without exec'ing external binaries.
+
+ - **x86**, **arm**: they directly emit an ELF64 binary. They have no
+   dependencies beyond a bootstrap binary (when using the Linux
+   platform abstraction).
+
 
 ## Literal values understood by the compiler
 
@@ -61,6 +65,7 @@ meta level that is assembling this environment can use the full Maru
 language (as brought to life by the Maru evaluator that is hosting the
 bootstrap process).
 
+
 ## Literals as full heap objects
 
 For some literal values the compiler emits valid heap objects into the
@@ -91,6 +96,7 @@ representation). Currently this means +2 words: `flags` and `type`;
 the rest of the GC header slots (`next` and `chunk-size`) are not
 emitted/needed.
 
+
 ## Peculiarities of the compiler
 
 i.e. peculiarities of the subset of Maru that the compiler can
@@ -99,13 +105,15 @@ level-shift to machine code; you can also read it as a TODO list:
  - `=` is simple integer equality, i.e. it's very different from the
    `=` in the VM that does e.g. string comparison
 
- - for now lambda's cannot capture anything (fails with an explicit
-   error)
+ - lambda's cannot capture variables
+
+ - no support for variable number of args for functions
 
  - special-operators can only take two arguments; i.e. arithmetics,
    comparators, etc (and the error message is obscure)
 
  - more, TODO
+
 
 ## Compile-time phases: `expand` and `encode`
 
@@ -143,6 +151,32 @@ basically a global=external=outside variable.
 This could come together with the introduction of nested local
 `define`s, too.
 
+
+## ELF-emitting backends
+
+The `x86` and `arm` backends directly emit ELF64 binary files.
+
+These binaries are `ET_DYN`, which is substantially more complex than
+`ET_EXEC`. The reason is ASLR (address space randomization): if our
+segments are not loaded at the same memory addresses, then we need to
+emit section headers and relocation information for cross-segment
+references.
+
+For example, the `code` slot of `<target-function>` might point from
+the `data` segment into the `text` segment. Such references need
+relocation information so they can be fixed up by the libc's dynamic
+loader when the binary is loaded.
+
+We added `ET_DYN` support because we want to support a C FFI (a
+questionable decision, admittedly). In particular, we want to
+reference symbols in `.so` files and use `dlopen` at runtime.
+
+Getting admission into the C universe requires quite a bit of
+complexity.
+
+See commit: `x86: emit relocation info, ET_DYN binaries`.
+
+
 ## Compilation of types
 
 Maru is dinamically typed, and currently there's no static
@@ -164,6 +198,7 @@ its startup code. This could either be done by the usual way of having
 a separate exe and a heap image file, or by emitting objects into the
 static space, or having also a dynamic space that is relocated into
 the heap at startup.
+
 
 ## Knowledge base
 

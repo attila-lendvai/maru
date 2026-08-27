@@ -1,5 +1,15 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;;; Naming:
+;;;   - EMIT: emit instructions into the output stream
+;;;   - COMPILE: something more involved than a simple emit
+;;;   - -foo- is an implicit var in the lexenv
+;;;   - +foo+ is a constant
+;;;   - *foo* is a global
+;;;
+;;; See *special-operators* and *special-forms* for the list of
+;;; specially handled constructs
+
 (require "source/conversion.l")
 (require "source/c/cffi.l")
 
