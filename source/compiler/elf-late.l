@@ -131,6 +131,64 @@
         (else
          (error "address-of: don't know how to compile for variable " var ", holding the value " val))))))
 
+(define-function compile/and (expr -c-)
+  (let ((done (label)))
+    (set expr (cdr expr))
+    (while expr
+      (comp (car expr))
+      (when (set expr (cdr expr))
+        (emit BF $ done)))
+    (label! done)))
+
+(define-function compile/or (expr -c-)
+  (let ((done (label)))
+    (set expr (cdr expr))
+    (while expr
+      (comp (car expr))
+      (when (set expr (cdr expr))
+        (emit BT $ done)))
+    (label! done)))
+
+(define-function compile/if (expr -c-)
+  (let ((condition	(second expr))
+        (then		(third expr))
+        (else		(cdddr expr))
+        (l/false	(label))
+        (l/end		(label)))
+    (comp condition)
+    ;; the current-value from the condition is false when we jump to
+    ;; the else branch, therefore we don't need to clear the
+    ;; current-value when the else branch is empty.
+    (emit BF $ l/false)
+    (comp then)
+    ;; therefore, we can just fall through with the return value of
+    ;; the true branch when the else branch is empty.
+    (when else
+      (emit BR l/end))
+    (label! l/false)
+    (list-do stmt else
+      (comp stmt))
+    (label! l/end)))
+
+(define-function compile/while (expr -c-)
+  (let ((l/body	(label))
+        (l/cond	(label))
+        (body	(cddr expr)))
+    (when body ; only need to skip it at first if there's any at all
+      (emit BR l/cond))
+    (label! l/body)
+    (list-do stmt body
+      (and stmt (comp stmt)))
+    (label! l/cond)
+    (comp (second expr))
+    (emit BT $ l/body)))
+
+(define-function compile/return (expr -c-)
+  (list-do stmt (cdr expr)
+    (comp stmt))
+  (emit BR (or (<compiler>-fn-epilogue-label -c-)
+               (set (<compiler>-fn-epilogue-label -c-) (label)))))
+
 ;;;
 ;;; Special Operators
 ;;;
@@ -168,6 +226,41 @@
         (emit op tmp1 tmp2)))))
 
 (define +operator-compilers+ (list->array (list () compile/unary-operator compile/binary-operator compile/ternary-operator)))
+
+;; a vector of assoc lists indexed by operator arity
+(define *special-operators*
+    (let ((table
+           `(;; nullary
+             ()
+             ;; unary
+             ((-  ,NEGATE) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
+             ;; binary
+             ((+  ,ADD) (-   ,SUB) (* ,MULTIPLY) (/ ,DIVIDE)
+              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
+              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
+              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
+              (char-at		,LOAD-I8)
+              (byte-at		,LOAD-I8)
+              ,@(when-at-expand (feature lower/array)
+                  `((cell-at	,LOAD-CELL)))
+              (oop-at		,LOAD-OOP)
+             )
+             ;; ternary
+             ((set-char-at	,STORE-I8)
+              (set-byte-at	,STORE-I8)
+              ,@(when-at-expand (feature lower/array)
+                  `((set-cell-at ,STORE-CELL)))
+              (set-oop-at	,STORE-OOP)
+             ))))
+      (list->array
+       (map (lambda (arity-line)
+              (map (lambda (entry)
+                     (let* ((op-name (car entry))
+                            (op (eval-in-target op-name)))
+                       (assert op "operator not found while building *special-operators* "op)
+                       (cons op (cdr entry))))
+                   arity-line))
+            table))))
 
 (define-method compile <pair> (-c-)
   (let* ((op		(first self))

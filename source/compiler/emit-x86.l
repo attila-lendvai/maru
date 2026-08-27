@@ -1,43 +1,11 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
-;;;
+
 ;;; This is a compiler that emits x86-64 machine code directly into an
 ;;; Elf64 executable.
 ;;;
 
-;;; TODO
-;;;  - factor out the C ffi stuff into a separate file
-
-;;; It can compile a subset of Maru.
-;;;
-;;; Limitations and peculiarities:
-;;;   - lambda's cannot capture variables
-;;;   - no variable number of args for functions
-;;;   - some literal objects are emitted as valid objects that can participate
-;;;     in the heap; see the EMIT-OBJECT methods for an up-to-date list.
-;;;   - probaby more
-;;;   - see *special-operators* and *special-forms* for the list of specially
-;;;     handled constructs
-;;;
-;;; Naming:
-;;;   - EMIT: emit instructions into the output stream
-;;;   - COMPILE: something more involved than a simple emit
-;;;   - -foo- is an implicit var in the lexenv
-;;;   - +foo+ is a constant
-;;;   - *foo* is a global
-
-(require "source/compiler/emit-early.l")
-(require "source/ansiterm.l")
-(require "source/files.l")
 (require "source/assembler/single-pass-x86.l")
-
-(require "source/c/cgrov.l")
-(require-cgrov "source/platforms/linux/linux")
-(require-cgrov "source/platforms/linux/elf")
-
 (require "source/compiler/elf-early.l")
-
-;; forwards
-(define compile-expr)
 
 ;;;
 ;;; Registers
@@ -56,11 +24,8 @@
   (x R32 EAX EBX ECX EDX ESP EBP ESI EDI)
   (x R64 RAX RBX RCX RDX RSP RBP RSI RDI R8 R9 R10 R11 R12 R13 R14 R15))
 
-(define-constant +param-registers+   `(quote ,(list op/RDI op/RSI op/RDX op/RCX op/R8 op/R9)))
-(define-constant +n-param-registers+ (list-length +param-registers+))
-
-(define-constant +callee-saved-registers+   `(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
-(define-constant +n-callee-saved-registers+ (list-length +callee-saved-registers+))
+(define-constant +param-registers+		`(quote ,(list op/RDI op/RSI op/RDX op/RCX op/R8 op/R9)))
+(define-constant +callee-saved-registers+	`(quote ,(list op/RBX op/R12 op/R13 op/R14 op/R15)))
 
 ;; TODO ? use +accumulator+ in the instructions and everywhere
 ;; else in general where relevant.
@@ -126,7 +91,7 @@
                                      (MOVQi64r lit RBX)
                                      (SUBQrr RBX reg))))))
 
-(define-instruction MUL		(true 0 true)
+(define-instruction MULTIPLY	(true 0 true)
   ((R64 STACK-CELL)		(MULQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
   ((R64 LI64)			(cond
                                   ((= 1 (<LITERAL>-value $2))) ; nothing to do
@@ -136,7 +101,7 @@
                                    (MULQrr RCX (<REGISTER>-name $1))))))
 
 ;; the x86 div instruction is unsigned division
-(define-instruction DIV		(true 0 true)
+(define-instruction DIVIDE	(true 0 true)
   ((R64 STACK-CELL)		(CQO)
                                 (IDIVQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
   ((R64 LI64)			(CQO)
@@ -206,7 +171,7 @@
                                 (SETEr AL)
                                 (MOVZBQrr AL (<REGISTER>-name $1))))
 
-(define-instruction NEG		(true 0 true)
+(define-instruction NEGATE	(true 0 true)
   ((REGISTER)			(NEGQr (<REGISTER>-name $1))))
 
 (define-instruction ASL		(true 0 true)
@@ -387,41 +352,6 @@
 (define-instruction/comparator GT SETGr)
 ;;(define-instruction/comparator NE "setne")
 
-;; a vector of assoc lists indexed by operator arity
-(define *special-operators*
-    (let ((table
-           `(;; nullary
-             ()
-             ;; unary
-             ((-  ,NEG) (not ,LOGIC-NOT) (bitwise-not ,BITWISE-NOT))
-             ;; binary
-             ((+  ,ADD) (-   ,SUB) (* ,MUL) (/ ,DIV)
-              (bitwise-and ,AND) (bitwise-or ,OR) (bitwise-xor ,XOR)
-              (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
-              (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
-              (char-at		,LOAD-I8)
-              (byte-at		,LOAD-I8)
-              ,@(when-at-expand (feature lower/array)
-                  `((cell-at	,LOAD-CELL)))
-              (oop-at		,LOAD-OOP)
-             )
-             ;; ternary
-             ((set-char-at	,STORE-I8)
-              (set-byte-at	,STORE-I8)
-              ,@(when-at-expand (feature lower/array)
-                  `((set-cell-at ,STORE-CELL)))
-              (set-oop-at	,STORE-OOP)
-             ))))
-      (list->array
-       (map (lambda (arity-line)
-              (map (lambda (entry)
-                     (let* ((op-name (car entry))
-                            (op (eval-in-target op-name)))
-                       (assert op "operator not found while building *special-operators* "op)
-                       (cons op (cdr entry))))
-                   arity-line))
-            table))))
-
 ;;;
 ;;; Compiling lambdas
 ;;;
@@ -443,77 +373,15 @@
   (compile-call-to-<target-function> -c-))
 
 ;;;
-;;; Special Forms
-;;;
-
-(define-function compile/and (expr -c-)
-  (let ((done (label)))
-    (set expr (cdr expr))
-    (while expr
-      (comp (car expr))
-      (when (set expr (cdr expr))
-        (emit BF $ done)))
-    (label! done)))
-
-(define-function compile/or (expr -c-)
-  (let ((done (label)))
-    (set expr (cdr expr))
-    (while expr
-      (comp (car expr))
-      (when (set expr (cdr expr))
-        (emit BT $ done)))
-    (label! done)))
-
-(define-function compile/if (expr -c-)
-  (let ((condition	(second expr))
-        (then		(third expr))
-        (else		(cdddr expr))
-        (l/false	(label))
-        (l/end		(label)))
-    (comp condition)
-    ;; the current-value from the condition is false when we jump to
-    ;; the else branch, therefore we don't need to clear the
-    ;; current-value when the else branch is empty.
-    (emit BF $ l/false)
-    (comp then)
-    ;; therefore, we can just fall through with the return value of
-    ;; the true branch when the else branch is empty.
-    (when else
-      (emit BR l/end))
-    (label! l/false)
-    (list-do stmt else
-      (comp stmt))
-    (label! l/end)))
-
-(define-function compile/while (expr -c-)
-  (let ((l/body	(label))
-        (l/cond	(label))
-        (body	(cddr expr)))
-    (when body ; only need to skip it at first if there's any at all
-      (emit BR l/cond))
-    (label! l/body)
-    (list-do stmt body
-      (and stmt (comp stmt)))
-    (label! l/cond)
-    (comp (second expr))
-    (emit BT $ l/body)))
-
-(define-function compile/return (expr -c-)
-  (list-do stmt (cdr expr)
-    (comp stmt))
-  (emit BR (or (<compiler>-fn-epilogue-label -c-)
-               (set (<compiler>-fn-epilogue-label -c-) (label)))))
-
-(require "source/compiler/elf-late.l")
-
-;;;
 ;;; Compiling lambdas
 ;;;
+
+(require "source/compiler/elf-late.l")
 
 (define-function emit-expr-code (self entry-point-label parent-comp)
   ;;(assert (is <expr> self))
   ;; NOTE printing the code as-is, i.e. without escaping, may break the comment syntax
-  (.align +function-alignmet+ 0x90)
+  (.align +function-alignmet+)
 
   (let* ((body		(<expr>-body self))
          (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
@@ -536,7 +404,7 @@
           (push spill-locs spill-loc)))
 
       ;; assign the stack locations to the params passed on the stack
-      (let ((i 2))        ; 2 is the pushed RBP and the return address
+      (let ((i 2))        ; 2 is the pushed frame pointer and return address
         (list-do var params
           (let ((offset (* i +word-size-in-bytes+)))
             (set (<variable>-value var) (STACK-PARAM offset)))
@@ -713,7 +581,7 @@
 ;;     (list-length (<C-function>-parameter-types self))))
 
 ;;;
-;;; *special-forms*
+;;; Special Forms
 ;;;
 (define *special-forms* (list
   (cons (target-value let)		compile/let)
@@ -774,6 +642,7 @@
   (.ascii	+ld.so-path+)
   (.i8		0)
   (label!	'elf-interpreter-end)
+
   (.align	elf/page-size)
 
   (create-segment 'elf-prefix)
@@ -788,14 +657,6 @@
   (.ascii	"ELF")
   (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  ;; The reason we added support for ET_DYN is that we want to
-  ;; implement a C FFI (a questionable decision, admittedly); i.e. we
-  ;; want to be able to reference symbols in .so files and use dlopen
-  ;; at runtime. but ET_DYN brings ASLR with it, and we have internal
-  ;; references in the data segment, therefore we now need to emit
-  ;; relocation info in the section headers. Quite some complexity to
-  ;; get admission into the C universe.
-  ;; see commit: 'x86: emit relocation info, ET_DYN binaries'
   (.i16		elf/ET_DYN)      ; e_type
   (.i16		elf/EM_X86_64)   ; e_machine
   (.i32		1)               ; e_version
