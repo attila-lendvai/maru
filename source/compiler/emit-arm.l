@@ -558,13 +558,6 @@
   (emit BR (or (<compiler>-fn-epilogue-label -c-)
                (set (<compiler>-fn-epilogue-label -c-) (label)))))
 
-(define-function emit-object/C-string (self -c-)
-  (emit-comment 3 "emit-object/C-string for: "self)
-  (GLOBAL-ADDR
-   (with-new-label 'ro-data
-     (.ascii self)
-     (.i8 0))))
-
 (require "source/compiler/elf-late.l")
 
 ;;;
