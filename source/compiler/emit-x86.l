@@ -1174,16 +1174,6 @@
                   .symtab .strtab .shstrtab)
     (write-segment-to-stream name stream)))
 
-(define-form syscall (sys-number . args)
-  `(begin
-    (MOVQir	,sys-number RAX)
-    ,@(map (lambda (arg reg)
-             ;; this being a macro opens the possibility for automatic
-             ;; opcode selection based on the provided arg.
-             `(MOVQir	,arg ,reg))
-           args '(RDI RSI RDX R10 R8 R9))
-    (SYSCALL)))
-
 (define-function emit-relocation-tables ()
   (with-current-segment 'ro-data
     (.align elf/alignof-Elf64_Rela)
