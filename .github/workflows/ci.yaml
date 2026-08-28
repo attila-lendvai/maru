@@ -245,7 +245,8 @@ jobs:
         continue-on-error: true      # TODO
 
   build-linux-amd64-full-bootstrap:
-    if: github.ref != 'refs/heads/staging'
+#    if: github.ref != 'refs/heads/staging'
+    if: github.ref != 'refs/heads/staging' && false
     name: "linux x86_64 full bootstrap"
     runs-on: ubuntu-24.04
     container:
