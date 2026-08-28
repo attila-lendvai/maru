@@ -363,7 +363,7 @@
     (emit-symtab-entry/variable name
                                 (if (= 0 self) +.bss-section-index+ +.data-section-index+)
                                 (current-laddress)
-                                +word-size-in-bytes+)
+                                target/cell-size/bytes)
     (emit CELL self)))
 
 ;; kinda KLUDGE
@@ -389,7 +389,7 @@
       (emit-symtab-entry/variable name
                                   +.data-section-index+
                                   (current-laddress)
-                                  +word-size-in-bytes+)
+                                  target/cell-size/bytes)
       (array-do el compiled
         (emit CELL el)))))
 
@@ -768,8 +768,10 @@
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
-         '(target/os target/arch target/little-endian?
-           +word-size-in-bits+
+         '(target/os
+           target/arch
+           target/little-endian?
+           target/cell-size/bits
            ;;oop/alignment-in-bytes oop/align-padding
            ;;oop/payload-mask oop/tag-mask
            )))

@@ -18,7 +18,7 @@
                (- alignment)))
 
 ;; TODO this is kludgey. why only this one, etc...
-(define-constant +word-size-in-bytes+ (target-value +word-size-in-bytes+))
+(define-constant target/cell-size/bytes (target-value target/cell-size/bytes))
 
 ;;;
 ;;; Relocation tracking for ET_DYN
@@ -249,7 +249,7 @@
                      0
                      section-index
                      value
-                     +word-size-in-bytes+))
+                     target/cell-size/bytes))
 
 (define-function emit-symtab-entry/function (name value size)
   (emit-symtab-entry (emit-strtab-entry name)

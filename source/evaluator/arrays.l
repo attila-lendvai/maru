@@ -5,7 +5,7 @@
 ;; TODO this has no proper bounds checking. decide whether it's really a good idea to just return nil when index is out of range
 (define-form define-vector-accessors (type-name basename elements-are-pointers? accessor copier mover element-size-in-bytes)
   ;; TODO this assert itself is broken, probably due to some peciuliarity of define-form/target
-  ;;(assert (or (not elements-are-pointers?) (= element-size-in-bytes +word-size-in-bytes+)))
+  ;;(assert (or (not elements-are-pointers?) (= element-size-in-bytes target/cell-size/bytes)))
   (let ((setter-name (concat-symbols 'set- basename 'at))
         (getter-name (concat-symbol basename 'at))
         (length-name (concat-symbol basename 'length))
@@ -72,7 +72,7 @@
              (set (slot-value ,type-name size obj) (box <long> size))))
          obj))))
 
-(define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
+(define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	target/cell-size/bytes)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
 
 (when-at-expand (feature lower/array)
@@ -110,7 +110,7 @@
      (set (lower/array-at array byteindex) (unbox <long> value)))
     (<lower-cell>
      ;; ensure the array has enough capacity
-     (set (lower/array-at array (+ byteindex +word-size-in-bytes+)) 0)
+     (set (lower/array-at array (+ byteindex target/cell-size/bytes)) 0)
      (set (cell-at (<lower/array>-elements array) byteindex)
           (unbox <lower-cell> value)))
     (else
@@ -125,7 +125,7 @@
              (safety 2 (let ((header (gc/header-of base)))
                          (assert (and (gc/valid-header-canary? header)
                                       (<= 0 byteindex)
-                                      (<= (+ byteindex +word-size-in-bytes+) (<header>-size header)))
+                                      (<= (+ byteindex target/cell-size/bytes) (<header>-size header)))
                                  "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
              ,@body))))
 
@@ -143,7 +143,7 @@
                (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
 
 (define-function lower/array-ensure-capacity/cell (array cell-index)
-  (set (lower/array-at array (- (* (+ cell-index 1) +word-size-in-bytes+)
+  (set (lower/array-at array (- (* (+ cell-index 1) target/cell-size/bytes)
                                 1))
        0))
 

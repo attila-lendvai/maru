@@ -37,8 +37,8 @@
       ;; and without the eval we would pass a form object between the
       ;; host and the slave, but we want to pass the value.
       (define-constant target/triple		,(eval 'target/triple))
-      (define-constant +word-size-in-bits+	,word-size)
-      (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
+      (define-constant target/cell-size/bits	,word-size)
+      (define-constant target/cell-size/bytes	,(/ word-size 8)))))
 
 (switch-to-slave-env)
 
@@ -59,13 +59,13 @@
 ;; FIXME these would be too much trouble to define above because nested quasiquote doesn't work
 (define-form bytes-to-words (value)
   (if (long? value)
-      (/  value +word-size-in-bytes+)
-    `(/ ,value ,+word-size-in-bytes+)))
+      (/  value target/cell-size/bytes)
+    `(/ ,value ,target/cell-size/bytes)))
 
 (define-form words-to-bytes (value)
   (if (long? value)
-      (* value  +word-size-in-bytes+)
-    `(* ,value ,+word-size-in-bytes+)))
+      (* value  target/cell-size/bytes)
+    `(* ,value ,target/cell-size/bytes)))
 
 ;; we rebind these to point to the actual definitions (as opposed to the symbols naming them),
 ;; so that CONS can be redefined in the target and the expansion of quasiquotes still work as expected
@@ -198,9 +198,9 @@
 
 (define-function %bitwise-shift (value shift)
   (cond
-    ((<= +word-size-in-bits+ shift)
+    ((<= target/cell-size/bits shift)
      0)
-    ((<= shift (- +word-size-in-bits+))
+    ((<= shift (- target/cell-size/bits))
      (if (< value 0) -1 0))
     ((< 0 shift)
      (arithmethic-shift-left value shift))
@@ -211,9 +211,9 @@
 (define-form bitwise-shift (value shift)
   (typecase shift
     (<long>	(cond
-                  ((<= +word-size-in-bits+ shift)
+                  ((<= target/cell-size/bits shift)
                    0)
-                  ((<= shift (- +word-size-in-bits+))
+                  ((<= shift (- target/cell-size/bits))
                    (if (< value 0) -1 0))
                   ((< 0 shift)
                    `(arithmethic-shift-left ,value ,shift))

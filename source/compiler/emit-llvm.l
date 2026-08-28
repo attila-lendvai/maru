@@ -326,7 +326,7 @@
 (define *C-type->llvm-type*
     (concat-list
      '((void		void))
-     (case (target-value +word-size-in-bits+)
+     (case (target-value target/cell-size/bits)
        (32
         '((int			i32)
           (long			i32)
@@ -346,7 +346,7 @@
           (off_t		i64)
           (pid_t		i32)))
        (else
-        (error "unexpected word size in +word-size-in-bits+: "(target-value +word-size-in-bits+))))))
+        (error "unexpected word size in target/cell-size/bits: "(target-value target/cell-size/bits))))))
 
 (define-function C-type->llvm-type (type)
   (cond
@@ -369,7 +369,7 @@
 (define-function llvm-type-bitsize (type)
   (assert (symbol? type))
   (case type
-    (%oop	(target-value +word-size-in-bits+))
+    (%oop	(target-value target/cell-size/bits))
     (void	0)
     (else
      (let ((entry (assq type '((i64 . 64) (i32 . 32) (i16 . 16) (i8 . 8)))))
@@ -842,13 +842,13 @@
            (gen LOAD (LITERAL 0) 0))
           (else
            (let ((bitsize	(llvm-type-bitsize llvm-type))
-                 (word-size	(target-value +word-size-in-bits+)))
+                 (word-size	(target-value target/cell-size/bits)))
              (cond
                ((< bitsize word-size)
                 (gen SEXT llvm-type '%word))
 
                ((> bitsize word-size)
-                (error "This shouldn't happen: (> bitsize +word-size-in-bits+) for FFI type " c-type))))
+                (error "This shouldn't happen: (> bitsize target/cell-size/bits) for FFI type " c-type))))
            (gen INTTOPTR '%word))))))
 
 (define-function compile-call-form (op args -c-)
@@ -1278,7 +1278,7 @@
 
 (define-method emit-prelude <llvm-compiler> ()
   (let (;;(target-triplet		(slave-value +target-triplet+))
-        (word-size		(target-value +word-size-in-bits+))
+        (word-size		(target-value target/cell-size/bits))
         (-c- self))
     (verbosity 1 (warn "\nCompiling to LLVM, word size: " word-size " bits\n\n"))
     ;;(assert (string?	target-triplet))
@@ -1332,8 +1332,10 @@
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
-         '(target/os target/arch target/little-endian?
-           +word-size-in-bits+
+         '(target/os
+           target/arch
+           target/little-endian?
+           target/cell-size/bits
            ;;oop/alignment-in-bytes oop/align-padding
            ;;oop/payload-mask oop/tag-mask
            )))

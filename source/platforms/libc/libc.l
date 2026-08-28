@@ -74,7 +74,7 @@
   `(libc/memmove ,to ,from ,count))
 
 (define-form platform/clear-cells (from cell-count)
-  `(libc/bzero ,from (* ,cell-count +word-size-in-bytes+)))
+  `(libc/bzero ,from (* ,cell-count target/cell-size/bytes)))
 
 (define-form platform/diag-print-string (str)
   `(libc/fputs (string->C-string ,str) libc/stderr))

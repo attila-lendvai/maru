@@ -438,7 +438,7 @@
   ;; so, the 16(SP) is to undo the STP and SUB, so that we
   ;; regain the SP value at the entry point to the function.
 
-  (ADDi X0 FP (eval-at-expand (* 2 +word-size-in-bytes+)))
+  (ADDi X0 FP (eval-at-expand (* 2 target/cell-size/bytes)))
   (set (<compiler>-current-value -c-) op/X0))
 
 (require "source/compiler/elf-late.l")
@@ -456,8 +456,8 @@
 
     (label! entry-point-label)
     ;; (emit-comment 1 "params: "(list-length (<expr>-parameters self))
-    ;;               ", frame-size: "frame-size"("(/ frame-size +word-size-in-bytes+)
-    ;;               "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
+    ;;               ", frame-size: "frame-size"("(/ frame-size target/cell-size/bytes)
+    ;;               "), temp-size: "temp-size "("(/ temp-size  target/cell-size/bytes)")")
     (BTI-C)
     (emit ENTER-FRAME frame-body-size)
 
@@ -472,7 +472,7 @@
       ;; assign the stack locations to the params passed on the stack
       (let ((i 2))        ; 2 is the pushed frame pointer and return address
         (list-do var params
-          (let ((offset (* i +word-size-in-bytes+)))
+          (let ((offset (* i target/cell-size/bytes)))
             (set (<variable>-value var) (STACK-PARAM offset)))
           (incr i)))
 
@@ -487,7 +487,7 @@
       ;; spill the stack-passed params (args 9+) from FP to SP-relative cells
       (let ((i 2))        ; 2 is the pushed FP and LP
         (list-do var params
-          (let* ((offset (* i +word-size-in-bytes+))
+          (let* ((offset (* i target/cell-size/bytes))
                  (spill-cell (new-stack-cell -c-)))
             (LDR X0 FP (bitwise-shift offset -3))
             (STUR X0 FP (<STACK-CELL>-offset spill-cell))
@@ -500,13 +500,13 @@
 
       ;; Calculate the frame and emit the entire fn
       (let* ((temp-size	(* (<compiler>-temp-limit -c-)
-                           +word-size-in-bytes+))
+                           target/cell-size/bytes))
              (frame-size	(align +call-frame-alignmet+
                                        (+ temp-size
                                           ;; the pushed %ebp and the return address
-                                          (* 2 +word-size-in-bytes+)))))
+                                          (* 2 target/cell-size/bytes)))))
 
-        (label! frame-body-size (- frame-size (* 2 +word-size-in-bytes+)))
+        (label! frame-body-size (- frame-size (* 2 target/cell-size/bytes)))
 
         (awhen (<compiler>-fn-epilogue-label -c-)
           (label! it))
@@ -608,7 +608,7 @@
     ;; aarch64 SP must always be 16-byte aligned when it is used in a
     ;; LDR or STR.
 
-    (emit SUB op/SP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+    (emit SUB op/SP (LI64 (* arg-stack-cell-count target/cell-size/bytes)))
 
     (let ((index 0))
       (list-do op arg-operands
@@ -631,7 +631,7 @@
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))
-    (emit ADD op/SP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+    (emit ADD op/SP (LI64 (* arg-stack-cell-count target/cell-size/bytes)))
     (free-temps tmps-to-free)))
 
 (define-method compile-call-to <STACK-CELL> (op -c-)

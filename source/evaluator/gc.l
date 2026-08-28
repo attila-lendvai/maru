@@ -56,7 +56,7 @@
 ;;;
 ;;; tagging
 ;;;
-(define-constant oop/alignment-in-bytes		+word-size-in-bytes+)
+(define-constant oop/alignment-in-bytes		target/cell-size/bytes)
 (define-constant oop/align-padding		(- oop/alignment-in-bytes 1))
 (define-constant oop/payload-mask		(- oop/alignment-in-bytes))
 (define-constant oop/tag-mask			(bitwise-not oop/payload-mask))
@@ -265,7 +265,7 @@
                        (obj (gc/payload-of header)))
                   (set (<header>-flags header) <header>-flags/used)
                   (set (<header>-type header) type)
-                  (platform/clear-cells obj (/ chunk-size +word-size-in-bytes+))
+                  (platform/clear-cells obj (/ chunk-size target/cell-size/bytes))
                   (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
                   (safety 4 (assert (gc/live-chunk? header) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))

@@ -5,7 +5,7 @@
 
 ;; TODO ? introduce abstraction for ABIs...
 (define-constant +call-frame-alignmet+
-    (case (target-value +word-size-in-bits+)
+    (case (target-value target/cell-size/bits)
       (32 (case (target-value target/os)
             (darwin	16)
             (else	4)))
@@ -56,7 +56,7 @@
       i)))
 
 (define-function new-stack-cell (-c-)
-  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) +word-size-in-bytes+))))
+  (STACK-CELL (- 0 (* (+ 1 (new-temp-index -c-)) target/cell-size/bytes))))
 
 (define-function alloc-reg-temp (self)
   (with-instance-accessors self <compiler>

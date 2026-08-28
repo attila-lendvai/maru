@@ -20,7 +20,7 @@
     (emit-comment 3 "emitting object header for type-id: "type-id)
 
     (with-current-segment 'data
-      (.align +word-size-in-bytes+)
+      (.align target/cell-size/bytes)
 
       ;; NEXT and CHUNK-SIZE should only ever be read by the GC,
       ;; but this here is the emission of read-only literals. the
@@ -52,7 +52,7 @@
         (when name
           (emit-symtab-entry/variable name +.data-section-index+
                                       (current-laddress)
-                                      +word-size-in-bytes+)
+                                      target/cell-size/bytes)
           ;; we define the object's address into the assembler env
           ;; (instead of the entry-point to the actual machine
           ;; instructions). this is needed so that when a function is
@@ -105,7 +105,7 @@
          (emit-symtab-entry/variable (concat-string "str" (integer->string counter))
                                      +.data-section-index+
                                      (current-laddress)
-                                     +word-size-in-bytes+)
+                                     target/cell-size/bytes)
          (emit CELL size)
          (emit CELL elements))))))
 

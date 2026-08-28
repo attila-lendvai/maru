@@ -382,7 +382,7 @@
   ;; so, the 8(%rbp) is to undo the push %rbp, so that we
   ;; regain the %rsp value at the entry point to the function.
 
-  (LEAQmr	+word-size-in-bytes+ RBP 0 0 RAX)
+  (LEAQmr	target/cell-size/bytes RBP 0 0 RAX)
   (set (<compiler>-current-value -c-) op/RAX))
 
 (require "source/compiler/elf-late.l")
@@ -400,8 +400,8 @@
 
     (label! entry-point-label)
     ;; (emit-comment 1 "params: "(list-length (<expr>-parameters self))
-    ;;               ", frame-size: "frame-size"("(/ frame-size +word-size-in-bytes+)
-    ;;               "), temp-size: "temp-size "("(/ temp-size  +word-size-in-bytes+)")")
+    ;;               ", frame-size: "frame-size"("(/ frame-size target/cell-size/bytes)
+    ;;               "), temp-size: "temp-size "("(/ temp-size  target/cell-size/bytes)")")
     (emit ENTER-FRAME frame-body-size)
 
     (let ((spill-locs	()))
@@ -415,7 +415,7 @@
       ;; assign the stack locations to the params passed on the stack
       (let ((i 2))        ; 2 is the pushed frame pointer and return address
         (list-do var params
-          (let ((offset (* i +word-size-in-bytes+)))
+          (let ((offset (* i target/cell-size/bytes)))
             (set (<variable>-value var) (STACK-PARAM offset)))
           (incr i)))
 
@@ -433,13 +433,13 @@
 
       ;; Calculate the frame and emit the entire fn
       (let* ((temp-size	(* (<compiler>-temp-limit -c-)
-                           +word-size-in-bytes+))
+                           target/cell-size/bytes))
              (frame-size	(align +call-frame-alignmet+
                                        (+ temp-size
                                           ;; the pushed %ebp and the return address
-                                          (* 2 +word-size-in-bytes+)))))
+                                          (* 2 target/cell-size/bytes)))))
 
-        (label! frame-body-size (- frame-size (* 2 +word-size-in-bytes+)))
+        (label! frame-body-size (- frame-size (* 2 target/cell-size/bytes)))
 
         (awhen (<compiler>-fn-epilogue-label -c-)
           (label! it))
@@ -544,7 +544,7 @@
                  (not (= n-params arity)))
         (error "compile: calling "op" with the wrong number of arguments: "
                args", while expecting "n-params)))
-    (emit ADD op/RSP (LI64 (* arg-stack-cell-count +word-size-in-bytes+)))
+    (emit ADD op/RSP (LI64 (* arg-stack-cell-count target/cell-size/bytes)))
     (free-temps tmps-to-free)))
 
 (define-method compile-call-to <STACK-CELL> (op -c-)
