@@ -6,7 +6,7 @@
 ;; TODO ? introduce abstraction for ABIs...
 (define-constant +call-frame-alignmet+
     (case (target-value +word-size-in-bits+)
-      (32 (case (target-value +operating-system+)
+      (32 (case (target-value target/os)
             (darwin	16)
             (else	4)))
       (64 16)))

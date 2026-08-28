@@ -5,6 +5,7 @@
 ;;;
 
 (let (arch word-size)
+  ;; normalize arch into a symbol
   (case target/arch
     ("x86_64"
      (set arch		'x86-64)
@@ -22,18 +23,20 @@
      (error "Couldn't identify architecture and word size from target/arch: "target/arch)))
 
   ;; define in the host to be able to load cgrov.l
-  (define-constant +target-triple+		(concat-strings target/arch "-" target/vendor "-" target/os
+  (define-constant target/triple		(concat-strings target/arch "-" target/vendor "-" target/os
                                                                 (if (equal "" target/abi)
                                                                     ""
                                                                   (concat-string "-" target/abi))))
 
   (eval-in-slave
    `(let ()
-      (define-constant +architecture+		'',arch)
-      (define-constant +operating-system+	'',(string->symbol target/os))
-      (define-constant +little-endian?+		true) ; this is needed by the compiler tests
-      ;; TODO why do i need that eval here? without this the value will be a FORM
-      (define-constant +target-triple+		,(eval '+target-triple+))
+      (define-constant target/arch		'',arch)
+      (define-constant target/os		'',(string->symbol target/os))
+      (define-constant target/little-endian?	true) ; this is needed by the compiler tests
+      ;; we need the eval here because constants are <form> objects,
+      ;; and without the eval we would pass a form object between the
+      ;; host and the slave, but we want to pass the value.
+      (define-constant target/triple		,(eval 'target/triple))
       (define-constant +word-size-in-bits+	,word-size)
       (define-constant +word-size-in-bytes+	,(/ word-size 8)))))
 

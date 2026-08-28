@@ -12,7 +12,7 @@
          input-regs
          output
          clobbers)
-     (case (slave-value +architecture+)
+     (case (slave-value target/arch)
        (IA-32
         ;; at most 6 args passed in regs. the rest should be spilled
         ;; to the stack, but we don't support that.
@@ -41,7 +41,7 @@
         (set output	"={x0}")
         (set clobbers	+linux/syscall/clobbered-registers/aarch64+))
        (else
-        (error "LLVM LINUX-SYSCALL instruction is not implemented for +architecture+ "(slave-value +architecture+))))
+        (error "LLVM LINUX-SYSCALL instruction is not implemented for target/arch "(slave-value target/arch))))
 
      ;; limit input-regs to the number of args
      (let ((regs input-regs))

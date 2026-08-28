@@ -465,21 +465,21 @@
                    (- (- +word-size-in-bits+ 32)))
   (cond
     ((= 32 +word-size-in-bits+)
-     (if +little-endian?+ 0x33323130 0x30313233))
+     (if target/little-endian? 0x33323130 0x30313233))
     ;; TODO add read-time eval for this?
     ;; ((= 64 +word-size-in-bits+)
-    ;;  (if +little-endian?+ 0x3736353433323130 0x303132334353637))
+    ;;  (if target/little-endian? 0x3736353433323130 0x303132334353637))
     ((= 64 +word-size-in-bits+)
-     (if +little-endian?+ 0x37363534 0x3031323))))
+     (if target/little-endian? 0x37363534 0x3031323))))
 
 (define-test compile/oop-at/2
     (bitwise-shift (oop-at (C-string "0z0000x01z1111x12z2222x23z3333x3") 1)
                    (- (- +word-size-in-bits+ 32)))
   (cond
     ((= 32 +word-size-in-bits+)
-     (if +little-endian?+ 0x30783030 0x30307830))
+     (if target/little-endian? 0x30783030 0x30307830))
     ((= 64 +word-size-in-bits+)
-     (if +little-endian?+ 0x31783131 0x317a3131))))
+     (if target/little-endian? 0x31783131 0x317a3131))))
 
 (when-at-expand (feature platform/libc)
   (define-test compile/set-oop-at/1
@@ -489,12 +489,12 @@
         (libc/strcmp buf
                      (cond
                        ((= 32 +word-size-in-bits+)
-                        (if +little-endian?+
+                        (if target/little-endian?
                             (C-string "0123kuk189abcdefghijklmnopqrst")
                           (C-string "01231kuk89abcdefghijklmnopqrst")))
                        ((= 64 +word-size-in-bits+)
                         ;; NOTE the lower 32 bits are zero, so they end the cstr
-                        (if +little-endian?+
+                        (if target/little-endian?
                             (C-string "01234567kuk1")
                           (C-string "TODO fill me in"))))))
     0)
@@ -507,12 +507,12 @@
         (libc/strcmp buf
                      (cond
                        ((= 32 +word-size-in-bits+)
-                        (if +little-endian?+
+                        (if target/little-endian?
                             (C-string "01234567kuk1cdefghijklmnopqrst")
                           (C-string "012345671kukcdefghijklmnopqrst")))
                        ((= 64 +word-size-in-bits+)
                         ;; NOTE the lower 32 bits are zero, so they end the cstr
-                        (if +little-endian?+
+                        (if target/little-endian?
                             (C-string "0123456789abcdefkuk1")
                           (C-string "TODO fill me in"))))))
     0)

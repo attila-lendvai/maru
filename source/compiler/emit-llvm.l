@@ -545,7 +545,7 @@
 ;; llvm.sponentry is only supported on arm64
 ;; reported as: https://github.com/llvm/llvm-project/issues/164427
 ;; https://llvm.org/docs/LangRef.html#id419
-(if (= 'aarch64 (slave-value +architecture+))
+(if (= 'aarch64 (slave-value target/arch))
     (define-instruction SPONENTRY	(false 1 true)
       (()				(println "	"$reg1" = call ptr @llvm.sponentry()")))
   ;; therefore we need to do this complicated version (it's llvm.frameaddress() + 1 pointer)
@@ -1332,7 +1332,7 @@
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
-         '(+operating-system+ +architecture+ +little-endian?+
+         '(target/os target/arch target/little-endian?
            +word-size-in-bits+
            ;;oop/alignment-in-bytes oop/align-padding
            ;;oop/payload-mask oop/tag-mask

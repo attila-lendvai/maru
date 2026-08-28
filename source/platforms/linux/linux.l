@@ -154,7 +154,7 @@
 ;; of 4096 bytes. we always pass 0 as the offset, so they are
 ;; equivalent here.
 (define-constant linux/SYS_mmap*
-  (case +architecture+
+  (case target/arch
     (IA-32	'linux/SYS_mmap2)
     (else	'linux/SYS_mmap)))
 

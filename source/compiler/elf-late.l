@@ -110,7 +110,7 @@
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
        (error "TODO <C-variable>")
-       ;; (emit STORE $ ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
+       ;; (emit STORE $ ((if (= 'darwin (target-value target/os)) GOT64 GLOBAL-CELL)
        ;;             (EXTERNAL-LABEL (<C-variable>-name value))))
        )
       (else
@@ -330,7 +330,7 @@
          ((is <C-variable> value)
           ;; TODO dispatch on the type of the C-variable
           (error "TODO <C-variable>")
-          ;; (emit LOAD ((if (= 'darwin (target-value +operating-system+)) GOT64 GLOBAL-CELL)
+          ;; (emit LOAD ((if (= 'darwin (target-value target/os)) GOT64 GLOBAL-CELL)
           ;;            (EXTERNAL-LABEL (<C-variable>-name value))))
           )
          ((and (not (feature redefinable-functions-in-target))
@@ -768,7 +768,7 @@
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
     (map (lambda (sym)
            (warn (symbol->string sym)"	"(eval-in-slave sym)"\n"))
-         '(+operating-system+ +architecture+ +little-endian?+
+         '(target/os target/arch target/little-endian?
            +word-size-in-bits+
            ;;oop/alignment-in-bytes oop/align-padding
            ;;oop/payload-mask oop/tag-mask

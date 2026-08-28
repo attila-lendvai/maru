@@ -253,6 +253,9 @@
   (concat-strings-separated-by
    "-" (list target/arch target/vendor target/os target/abi)))
 
+(define-function cross-compiling? ()
+  (not (= target/arch *host-arch*)))
+
 ;; the ELF interpreter path to embed into the target binaries. it can
 ;; be overridden from the command line with ld.so=...; when not set,
 ;; effective-ld.so resolves a default based on target/arch at use time
@@ -264,23 +267,18 @@
 (define-function effective-ld.so ()
   (unless ld.so
     (set ld.so
-         (if (= target/arch *host-arch*)
-             (when (= *host-os* "Linux")
-               (run-program/shell/stdout
-                "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
-                ;; or alternatively:
-                ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
-                ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
-                ))
-           ;; cross-compiling: embed the canonical interpreter path of the
-           ;; target system, so that the resulting binaries can be copied over
-           ;; and run on real hardware. when running them under qemu-user,
-           ;; QEMU_LD_PREFIX (see build.sh) makes qemu resolve the path within
-           ;; the cross toolchain's sysroot.
-           (case target/arch
-             ("aarch64"	"/lib/ld-linux-aarch64.so.1")
-             (("i686" "i386")	"/lib/ld-linux.so.2")
-             (else	(error "effective-ld.so: unknown interpreter path for target/arch "(type-of target/arch)" "target/arch", please set ld.so explicitly"))))))
+         (if (cross-compiling?)
+             (case target/arch
+               ("aarch64"	"/lib/ld-linux-aarch64.so.1")
+               (("i686" "i386")	"/lib/ld-linux.so.2")
+               (else		(error "effective-ld.so: unknown interpreter path for target/arch '"target/arch"', please set ld.so explicitly")))
+           (when (= *host-os* "Linux")
+             (run-program/shell/stdout
+              "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
+              ;; or alternatively:
+              ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
+              ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
+              )))))
   ld.so)
 
 ;; eval0-phase check-outs the most recent commit into build/eval0, and
@@ -761,7 +759,7 @@ git --no-pager log --pretty=oneline -1")))
   (let ((dir (build-path "jit")))
     ($ "rm -f '"dir"/*'")
     (ensure-directory-exists dir)
-    (run-with-stage-1 (list "boot.l" "--define" "+target-triple+" (target-triple)
+    (run-with-stage-1 (list "boot.l" "--define" "target/triple" (target-triple)
                             "tests/jit.l"))))
 
 (define-function test-jit ()
@@ -781,7 +779,7 @@ git --no-pager log --pretty=oneline -1")))
   (let ((run (lambda (file)
                (run-with-stage-1
                 (list "boot.l"
-                      "--define" "+target-triple+" (target-triple)
+                      "--define" "target/triple" (target-triple)
                       "--define" "+ld.so-path+" (effective-ld.so)
                       file))
                ($ "file=build/$(basename --suffix=.l '"file"') && chmod +x $file && ./$file"))))

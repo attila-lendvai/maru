@@ -47,7 +47,7 @@
                            ;; exec for the JIT experiments, which
                            ;; only works on x86-64.
                            (eval-at-expand
-                            (case +architecture+
+                            (case target/arch
                               (x86-64	posix/PROT_EXEC)
                               (else	0)))))
          (buf		(posix/mmap 0 (align-address-up size page-size)
