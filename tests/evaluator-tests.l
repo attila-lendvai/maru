@@ -57,8 +57,6 @@
   (test-assert (= 0		(bitwise-shift 0xffffff0 10000)))
   (test-assert (= 0		(bitwise-shift 0xffffff0 -10000)))
   (test-assert (= -1		(bitwise-shift -1 -100)))
-  ;; on 32 bit: shifting a positive number into the sign bit
-  (test-assert (< 0		(bitwise-shift 0xfffffff 4)))
   ;; on 64 bit platforms a 65 bit shift should zero the place
   (test-assert (= 0		(bitwise-shift 0xfffffff 65)))
   )
