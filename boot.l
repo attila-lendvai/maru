@@ -246,6 +246,15 @@
     ;; this is effectively a DEFINE-SYMBOL-FORM
     `(environment-define *globals* ',var-name ,(form () (lambda _ value)))))
 
+(define-form when-feature (feature . true-forms)
+  `(when-at-expand (feature ,feature)
+     ,@true-forms))
+
+(define-form if-feature (feature true-form . false-forms)
+  `(if-at-expand (feature ,feature)
+       ,true-form
+     ,@false-forms))
+
 (set (feature profiler)			(when (defined? 'feature/profiler/build)
                                           (eval 'feature/profiler/build)))
 (set (feature profiler/cumulative)	true) ; walk the stack and increment everyone found
