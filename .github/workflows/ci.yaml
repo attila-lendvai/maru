@@ -50,6 +50,8 @@ jobs:
       - run:  clang --version || true
       - run:  cc --version || true
 
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
+
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap
       - run:  timeout 5m make PLATFORM=posix test-bootstrap
       - run:  timeout 5m make PLATFORM=linux test-bootstrap
@@ -116,6 +118,8 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
@@ -202,6 +206,8 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
       - run:  timeout 3m arch -arm64  make PLATFORM=libc test-bootstrap-llvm
 
