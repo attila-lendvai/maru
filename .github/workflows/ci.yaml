@@ -53,6 +53,8 @@ jobs:
       - run:  clang --version || true
       - run:  cc --version || true
 
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
+
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm linux
@@ -105,6 +107,7 @@ jobs:
       - run:  clang --version || true
       - run:  cc --version || true
 
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
@@ -184,6 +187,8 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+
+      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
       - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm libc
 
