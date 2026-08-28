@@ -136,6 +136,50 @@ _start:
   )
 
 ;; ============================================================================
+;; Relative and RIP-relative control transfer
+;; ============================================================================
+
+(define-asm-test relative-control
+  "
+  call 0x0
+  jmp 0x0
+  callq *0x0(%rip)
+  callq *-4(%rip)
+  callq *0x100(%rip)
+  jmpq *0x0(%rip)
+  jmpq *8(%rip)
+  callq *(%rbx)
+  callq *0x7f(%rbx)
+  jmpq *0x100(%rcx)
+  callq *8(%rbp)
+  callq *8(%r13)
+  jmpq *(%r12,%rbx,2)
+  callq *0x0(,%r12,8)
+"
+  ;; direct relative calls/jumps
+  (CALLQrel32 0)
+  (JMPQrel32 0)
+  ;; dispatcher: (D 0 0 0) selects rip+disp32
+  (CALLQm 0 0 0 0)
+  (CALLQm -4 0 0 0)
+  ;; named rip forms
+  (CALLQripm 0x100)
+  (JMPQm 0 0 0 0)
+  (JMPQripm 8)
+  ;; base+disp, disp8/32 auto-selection
+  (CALLQm 0 RBX 0 0)
+  (CALLQm 0x7f RBX 0 0)
+  (JMPQm 0x100 RCX 0 0)
+  (CALLQm 8 RBP 0 0)
+  ;; REX.B: high base register
+  (CALLQm 8 R13 0 0)
+  ;; SIB: index+scale, REX.B
+  (JMPQm 0 R12 RBX 2)
+  ;; SIB: index only + disp32, REX.X
+  (CALLQm 0 0 R12 8)
+  )
+
+;; ============================================================================
 ;; Shift and rotate: SHL, SHR, SAR, ROL, ROR
 ;; ============================================================================
 
@@ -364,8 +408,8 @@ _start:
   (ADDQim 7 0x100 RDX 0 0)
   ;; RIP-relative: LEA with zero and non-zero displacement
   (LEAQmr 0 0 0 0 RAX)
-  ;; CALL: relative call
-  (JMPm 0 0 0 0)
+  ;; JMP: relative call
+  (JMPQrel32 0)
   ;; MOVQmr: RIP-relative load
   (MOVQmr 0 0 0 0 RBX)
   )

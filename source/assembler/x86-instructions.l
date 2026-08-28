@@ -728,7 +728,7 @@
 
 (define-function BSWAPLr (R)			(_OOr 0x0fc8 (rindex/32 R)))
 (define-function CALLr (RD)			(_O_Mrm 255 _b11 _b010 (rindex/32 RD)))
-(define-function CALLm (MD MB MI MS)		(if (undefined-registers? MB MI) (_O_rel32 232 MD) (_O_r_X 255 _b010 MD MB MI MS)))
+(define-function CALLm (MD MB MI MS)		(_O_r_X 255 _b010 MD MB MI MS))
 (define-function CMPXCHGBrr (RS RD)		(_OO_Mrm 4016 _b11 (rindex/8 RS) (rindex/8 RD)))
 (define-function CMPXCHGBrm (RS MD MB MI MS)	(_OO_r_X 4016 (rindex/8 RS) MD MB MI MS))
 (define-function CMPXCHGWrr (RS RD)		(_wOO_Mrm 4017 _b11 (rindex/16 RS) (rindex/16 RD)))
@@ -753,7 +753,7 @@
 (define-function INVLPGm (MD MB MI MS)		(_OO_r_X 3841 _b111 MD MB MI MS))
 
 (define-function JMPSm (D B I S)		(if (undefined-registers? B I) (_O_rel8  235 D) (ASMFAIL "illegal mode in short jump")))
-(define-function JMPm (D B I S)			(if (undefined-registers? B I) (_O_rel32 233 D) (_O_r_X 255 _b100 D B I S)))
+(define-function JMPm (D B I S)			(_O_r_X 255 _b100 D B I S))
 (define-function JMPr (R)			(_O_Mrm 255 _b11 _b100 (rindex/32 R)))
 (define-function LAHF () (_O 159))
 (define-function LEALmr (MD MB MI MS RD) (_O_r_X 141 (rindex/32 RD) MD MB MI MS))
@@ -948,13 +948,19 @@
 
 (define-function CALLQr (R) (let () (_REX 0 R 0 0) (CALLr (to-r32 R))))
 (define-function CALLQm (D B I S) (let () (_REX 0 0 I B) (CALLm D (to-r32 B) (to-r32 I) S)))
+(define-function CALLQrel32 (D)			(_O_rel32 232 D))
+(define-function CALLQripm (D)			(_O_r_X 255 _b010 D 0 0 0))
 (define-function INCQr (R) (let () (_REX 1 0 0 R) (_O_Mrm 255 _b11 _b000 (rindex (to-r32 R)))))
 (define-function JMPQr (R) (let () (_REX 0 R 0 0) (JMPr (to-r32 R))))
 (define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (to-r32 B) (to-r32 I) S)))
+(define-function JMPQrel32 (D)			(_O_rel32 233 D))
+(define-function JMPQripm (D)			(_O_r_X 255 _b100 D 0 0 0))
 (define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
 (define-function LEAVEQ () (LEAVE))
 
 (define-function MOVSBQrr (S D) (let () (_REX 1 S 0 D) (MOVSBLrr S (to-r32 D))))
+;; movsxd (a.k.a. movslq): unlike MOV, ModRM.reg is the r64 destination
+(define-function MOVSXD (S D) (let () (_REX 1 D 0 S) (_O_Mrm 0x63 _b11 (rindex/32 (to-r32 D)) (rindex/32 S))))
 (define-function MOVSBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVSBLmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
 (define-function MOVZBQrr (S D) (let () (_REX 1 S 0 D) (MOVZBLrr S (to-r32 D))))
 (define-function MOVZBQmr (D B I S R) (let () (_REX 1 S 0 D) (MOVZBLmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
