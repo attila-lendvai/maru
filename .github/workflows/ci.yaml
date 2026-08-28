@@ -26,6 +26,8 @@ jobs:
     container:
       image: ghcr.io/attila-lendvai/maru-ci:amd64
       options: --init
+    env:
+      TERM: xterm
 
     steps:
       - name: System info
@@ -80,6 +82,8 @@ jobs:
     container:
       image: ghcr.io/attila-lendvai/maru-ci:arm64
       options: --init
+    env:
+      TERM: xterm
 
     steps:
       - name: System info
@@ -128,6 +132,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      TERM: xterm
 
     steps:
       - name: System info
@@ -206,6 +212,8 @@ jobs:
     container:
       image: ghcr.io/attila-lendvai/maru-ci:amd64
       options: --init
+    env:
+      TERM: xterm
 
     steps:
       - name: System info
