@@ -143,7 +143,7 @@ else
   $(error "Unexpected TARGET_ARCH '$(TARGET_ARCH)'.")
 endif
 
-BACKDATE_FILE	= touch -t 200012312359
+BACKDATE_FILE	= touch --no-create -t 200012312359
 
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
