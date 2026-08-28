@@ -229,7 +229,7 @@
                                   (else
                                    (println "	xor	%edx, %edx") ; the upper side of 64 bit operand
                                    (println "	mov	"$1", %ecx") ; divisor
-                                   (println "	div	%ecx"))))
+                                   (println "	idiv	%ecx"))))
   ((LI64)			(cond
                                   ((= 1 (<LITERAL>-value $1))
                                    ;; remainder is zero, %rax is unchanged
@@ -238,7 +238,7 @@
                                   (else
                                    (println "	xor	%rdx, %rdx") ; the upper side of 64 bit operand
                                    (println "	mov	"$1", %rcx") ; divisor
-                                   (println "	div	%rcx")))))
+                                   (println "	idiv	%rcx")))))
 
 (define-instruction AND		(true 0 true)
   ((R32 STACK-CELL)		(println "	and	"$2", "$1))
@@ -308,11 +308,11 @@
 ;; ecx. same applies to asr.
 (define-instruction ASL		(true 0 true)
   ((R32 STACK-CELL)		(println "	mov	"$2", %ecx")
-				(println "	sal	%cl, "$1))
+				(println "	shl	%cl, "$1))
   ((R32 LI32)			(unless (= 0 (<LITERAL>-value $2))
 				  (println "	shl	"$2", "$1)))
   ((R64 STACK-CELL)		(println "	mov	"$2", %rcx")
-		                (println "	sal	%cl, "$1))
+		                (println "	shl	%cl, "$1))
   ((R64 LI64)			(unless (= 0 (<LITERAL>-value $2))
                                   (println "	shl	"$2", "$1)))
   ((R64 R64)			(println "	shl	"$2", "$1)))
