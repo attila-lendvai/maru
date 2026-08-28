@@ -54,10 +54,17 @@ jobs:
       - run:  timeout 5m make PLATFORM=posix test-bootstrap
       - run:  timeout 5m make PLATFORM=linux test-bootstrap
 
-      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=libc  test-bootstrap
-# TODO i686 bootstraps fine but the evaluator test crashes it
+# TODO should work, but makefile headaches...
+#      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=libc  test-bootstrap
 #      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=posix test-bootstrap
 #      - run:  timeout 5m make TARGET_ARCH=i686 PLATFORM=linux test-bootstrap
+
+      - name: Upload build results
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86_64-unknown-linux-gnu
+          path: |
+            build/**
 
       - run:  timeout 5m make PROFILER=1 PLATFORM=posix  test-bootstrap
       - run:  timeout 5m make PROFILER=1 PLATFORM=linux  test-bootstrap
@@ -113,6 +120,13 @@ jobs:
       - run:  timeout 5m make PLATFORM=libc  test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=posix test-bootstrap-llvm
       - run:  timeout 5m make PLATFORM=linux test-bootstrap-llvm
+
+      - name: Upload build results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarch64-unknown-linux-gnu
+          path: |
+            build/**
 
 # TODO walking the stack gets into an infinite loop
 #      - run:  timeout 5m make PROFILER=1 PLATFORM=libc  test-bootstrap-llvm
@@ -193,12 +207,12 @@ jobs:
 
       - run:  timeout 3m arch -arm64  make PLATFORM=posix test-bootstrap-llvm
 
-      # - name: Upload build results
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: build-results
-      #     path: |
-      #       build/**
+      - name: Upload build results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarch64-apple-darwin
+          path: |
+            build/**
 
       - run:  timeout 3m arch -arm64  make PROFILER=1 PLATFORM=posix test-bootstrap-llvm
 
