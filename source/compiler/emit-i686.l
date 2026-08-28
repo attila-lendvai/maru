@@ -91,7 +91,7 @@
                                   (println "	lea	(%eax, %ebx), %eax")
                                   (println "	movb	"$2", (%eax)"))))
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
 
 ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
 (define-instruction/emit-forms LOAD-CELL 0

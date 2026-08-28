@@ -74,49 +74,49 @@
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	+word-size-in-bytes+)
 (define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
 
-;;; NOTE: lower/array is currently only used by the assembler and jit
+;;; NOTE: memory-block is currently only used by the assembler and jit
 ;;; experiments
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
   ;; FIXME: if these two when-at-expand's are merged, then a set form
   ;; transform (expand/encode/etc) happens differently and it fails to
   ;; load.
-  (define-vector-accessors <lower/array>	lower/array-	()	byte-at		copy-bytes	platform/move-bytes	1))
+  (define-vector-accessors <memory-block>	memory-block/	()	byte-at		copy-bytes	platform/move-bytes	1))
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
 
 ;; TODO decide where the DEFINE-VM-FUNCTION should be and make it uniform
 ;; TODO conditionalize this on a feature?
-(define-vm-function lower/array ((capacity <long> 0))
-  (make <lower/array>
+(define-vm-function memory-block ((capacity <long> 0))
+  (make <memory-block>
     (size	(box <long> 0))
     (elements	(when (> capacity 0)
                   (allocate-data capacity)))))
 
-(define-vm-function lower/array->lower/function ((array <lower/array>))
+(define-vm-function memory-block->lower/function ((array <memory-block>))
   (make <target-function>
-    (program-code	(slot-value <lower/array> elements array))))
+    (program-code	(slot-value <memory-block> elements array))))
 
-(define-vm-function (lower/array-length ()) ((array <lower/array>))
-  (box <long> (lower/array-length array)))
+(define-vm-function (memory-block/length ()) ((array <memory-block>))
+  (box <long> (memory-block/length array)))
 
-;; lower/array-at accessor is byte sized
-(define-vm-function (lower/array-at ()) ((array <lower/array>) (idx <long>))
-  (box <long> (lower/array-at array idx)))
+;; memory-block/at accessor is byte sized
+(define-vm-function (memory-block/at ()) ((array <memory-block>) (idx <long>))
+  (box <long> (memory-block/at array idx)))
 
-(define-vm-function (set-lower/array-at ()) ((array <lower/array>) (idx <long>) value)
+(define-vm-function (set-memory-block/at ()) ((array <memory-block>) (idx <long>) value)
   (typecase value
     (<long>
      ;; TODO add error reporting? this only writes out the lowest
      ;; byte of the value.
-     (set (lower/array-at array idx) (unbox <long> value)))
+     (set (memory-block/at array idx) (unbox <long> value)))
     (<lower-cell>
      ;; ensure the array has enough capacity
-     (set (lower/array-at array (+ idx +word-size-in-bytes+)) 0)
-     (set (cell-at (<lower/array>-elements array) idx)
+     (set (memory-block/at array (+ idx +word-size-in-bytes+)) 0)
+     (set (cell-at (<memory-block>-elements array) idx)
           (unbox <lower-cell> value)))
     (else
-     (error "set-lower/array-at doesn't know how to handle value: "value)))
+     (error "set-memory-block/at doesn't know how to handle value: "value)))
   value)
 
 ;; cell-at accessor is target cell sized
@@ -144,35 +144,35 @@
                (<long>		value)
                (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
 
-(define-function lower/array-ensure-capacity/cell (array cell-index)
-  (set (lower/array-at array (- (* (+ cell-index 1) +word-size-in-bytes+)
+(define-function memory-block/ensure-capacity/cell (array cell-index)
+  (set (memory-block/at array (- (* (+ cell-index 1) +word-size-in-bytes+)
                                 1))
        0))
 
 (define-function to-lower-array (obj offset)
-  (let ((lower-array (lower/array 4))
+  (let ((lower-array (memory-block 4))
         (i offset))
     (typecase obj
       (<undefined>)
       (<array>
        (let ((limit (+ 1 (array-length obj))))
          (while (< i limit)
-           (lower/array-ensure-capacity/cell lower-array i)
+           (memory-block/ensure-capacity/cell lower-array i)
            ;; NOTE: we can't cache the elements slot, because it's
            ;; changing when the array grows.
-           (set (oop-at (<lower/array>-elements lower-array) i)
+           (set (oop-at (<memory-block>-elements lower-array) i)
                 (string->C-string (array-at obj i)))
            (incr i))))
       (<pair>
        (while (pair? obj)
-         (lower/array-ensure-capacity/cell lower-array i)
-         (set (oop-at (<lower/array>-elements lower-array) i)
+         (memory-block/ensure-capacity/cell lower-array i)
+         (set (oop-at (<memory-block>-elements lower-array) i)
               (string->C-string (pop obj)))
          (incr i)))
       (else (error "to-lower-array: cannot handle passed obj of type "(type-of obj))))
     lower-array))
 
-) ; (feature lower/array)
+) ; (feature memory-block)
 
 (define-vm-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))
   (string-do char insertion

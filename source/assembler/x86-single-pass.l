@@ -26,7 +26,7 @@
 (define-function create-segment (name)
   (let ((segment
           (make <segment>
-            (buffer	(lower/array 4096))
+            (buffer	(memory-block 4096))
             (%name	name)
             ;; TODO for a working address-of upper function we either need
             ;; full-cell <long>, or more generally use <lower-cell> and
@@ -97,7 +97,7 @@
     (else (error "get-segment: not a valid segment designator: "desig))))
 
 (define-function segment-length (desig)
-  (lower/array-length (<segment>-buffer (get-segment desig))))
+  (memory-block/length (<segment>-buffer (get-segment desig))))
 
 (define-function .segment (desig)
   (typecase desig
@@ -115,7 +115,7 @@
     (write-segment-to-stream (current-segment) stream)))
 
 (define-function segment->function (segment)
-  (lower/array->lower/function (<segment>-buffer segment)))
+  (memory-block->lower/function (<segment>-buffer segment)))
 
 (define-function assembler->function (a)
   (segment->function (<assembler>-current-segment a)))
@@ -343,11 +343,11 @@
             (buffer	(<segment>-buffer segment))
             (position	(<segment>-paddress segment)))
        ;; (print-all *debug-output* "_B is storing 0x" (integer->hex-string value) " at 0x"(integer->hex-string position)
-       ;;            ", segment-length: 0x"(integer->hex-string (lower/array-length buffer))
+       ;;            ", segment-length: 0x"(integer->hex-string (memory-block/length buffer))
        ;;            ", laddress: 0x"(integer->hex-string (<segment>-laddress segment))
        ;;            "\n")
        (incr (<segment>-laddress segment))
-       (set (lower/array-at buffer position) value)
+       (set (memory-block/at buffer position) value)
        (set (<segment>-paddress segment) (+ 1 position))))
     (<label>	(emit-label value _B 1 ()))
     (else	(error "_B: called with unexpected value: "value", type: "(type-of value)))))
@@ -383,7 +383,7 @@
      ;; (print-all *debug-output* "_Q is storing a <lower-cell>: "value
      ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
      (let ((segment (current-segment)))
-       (set (lower/array-at (<segment>-buffer segment)
+       (set (memory-block/at (<segment>-buffer segment)
                             (<segment>-paddress segment))
             value)
        (incr (<segment>-paddress segment) 8)

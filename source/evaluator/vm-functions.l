@@ -374,7 +374,7 @@
 ;; evaluating in the slave env, where the unwrapped DEFINED? should
 ;; just work. instead i get: form encountered in interpreted code with
 ;; args ((oop-at.0+29 obj.2+0 0) 1)
-(when-at-expand (and (feature lower/array)
+(when-at-expand (and (feature memory-block)
                      (host-value (defined? 'posix/spawn-program *target-env*)))
 
 (define-vm-function spawn-program ((path <string>)
@@ -385,14 +385,14 @@
   (let ((argv/lower (to-lower-array argv 1))
         (path/lower (string->C-string path)))
     ;; argv[0] is the path of the binary
-    (set (oop-at (<lower/array>-elements argv/lower) 0) path/lower)
+    (set (oop-at (<memory-block>-elements argv/lower) 0) path/lower)
     ;; NULL terminated
-    (let ((i (bytes-to-words (lower/array-length argv/lower))))
-      (lower/array-ensure-capacity/cell argv/lower i)
-      (set (oop-at (<lower/array>-elements argv/lower) i) 0))
+    (let ((i (bytes-to-words (memory-block/length argv/lower))))
+      (memory-block/ensure-capacity/cell argv/lower i)
+      (set (oop-at (<memory-block>-elements argv/lower) i) 0))
 
     (box <long> (posix/spawn-program path/lower
-                                     (<lower/array>-elements argv/lower)
+                                     (<memory-block>-elements argv/lower)
                                      (posix/envp)
                                      stdout-fd
                                      stderr-fd))))

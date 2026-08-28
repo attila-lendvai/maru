@@ -358,7 +358,7 @@
   ((R64 R64)			(println "	mov	"$1", "$2"")) ; e.g. when dest is an arg reg in a function call
   ((R64 STACK-CELL)		(println "	mov	"$1", "$2)))
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
   ;; TODO these two are the same as the -OOP versions, except the lea's multiplier
   (define-instruction LOAD-CELL	(false 0 true))
 
@@ -519,14 +519,14 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
-              ,@(when-at-expand (feature lower/array)
+              ,@(when-at-expand (feature memory-block)
                   `((cell-at	,LOAD-CELL)))
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
              ((set-char-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              ,@(when-at-expand (feature lower/array)
+              ,@(when-at-expand (feature memory-block)
                   `((set-cell-at ,STORE-CELL)))
               (set-oop-at	,STORE-OOP)
              ))))

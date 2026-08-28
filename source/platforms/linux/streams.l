@@ -164,9 +164,9 @@
   (typecase obj
     (<string>
      (%put-all self.fd (string->C-string obj) (string-length obj)))
-    (when-at-expand (feature lower/array)
-      (<lower/array>
-       (%put-all self.fd (slot-value <lower/array> elements obj) (lower/array-length obj))))
+    (when-at-expand (feature memory-block)
+      (<memory-block>
+       (%put-all self.fd (slot-value <memory-block> elements obj) (memory-block/length obj))))
     (else
      (error "<fd-stream> $put-all: unexpected elements: " obj)))
   obj)
