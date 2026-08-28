@@ -39,7 +39,7 @@
 ;;;
 
 (define-instruction BR		()
-  ((label)			(JMPm $1 0 0 0)))
+  ((label)			(JMPQrel32 $1)))
 
 (define-instruction BF		(true 0 false)
   ((REGISTER label)		(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
@@ -50,7 +50,7 @@
                                 (JNE $2)))
 
 (define-instruction CALL	(false 0 true)
-  ((label)			(CALLQm $1 0 0 0))
+  ((label)			(CALLQrel32 $1))
   ((REGISTER)			(CALLQr (<REGISTER>-name $1))))
 
 (define-instruction ADD		(true 0 true)
