@@ -56,6 +56,8 @@ RUN apt-get update && \
 # SHELL ["/bin/bash", "-c"]
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 && \
-    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
 WORKDIR /workspace
