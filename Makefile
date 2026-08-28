@@ -456,8 +456,9 @@ endef
 
 # This "function" is useful when you need an eval executable, but you don't want to
 # have it rebuilt each time when you are working on e.g. the compiler.
+# NOTE this doesn't work for filenames with spaces
 define ensure-built
-  test -e $(1) || $(MAKE) $(1)
+  $(foreach f,$(1),test -e "$(f)" || $(MAKE) "$(f)";)
 endef
 
 ###
