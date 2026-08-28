@@ -312,7 +312,7 @@ $(EVAL0_DIR):
 #  - the 32 bit llvm target yields the fastest binary
 $(EVAL0_DIR)/$(EVAL0_BINARY): $(EVAL0_DIR)
 	$(MAKE) --directory=$(EVAL0_DIR)		\
-		TARGET_ARCH=$(TARGET_ARCH)		\
+		TARGET_ARCH=$(shell uname -m)		\
 		TARGET_VENDOR=$(TARGET_VENDOR)		\
 		TARGET_OS=$(TARGET_OS)			\
 		TARGET_ABI=$(TARGET_ABI)		\
