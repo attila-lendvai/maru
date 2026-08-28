@@ -638,7 +638,7 @@
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
 ;; args: baseptr, byteindex
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
  (define-instruction LOAD-CELL	(true 4 true)
    ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -666,7 +666,7 @@
 				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
 
 ;; args: baseptr, byteindex, value
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
   (define-instruction STORE-CELL	(true 4 true)
    ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -1155,14 +1155,14 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-I8)
               (byte-at		,LOAD-I8)
-              ,@(when-at-expand (feature lower/array)
+              ,@(when-at-expand (feature memory-block)
                   `((cell-at	,LOAD-CELL)))
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
              ((set-char-at	,STORE-I8)
               (set-byte-at	,STORE-I8)
-              ,@(when-at-expand (feature lower/array)
+              ,@(when-at-expand (feature memory-block)
                   `((set-cell-at ,STORE-CELL)))
               (set-oop-at	,STORE-OOP)
              ))))

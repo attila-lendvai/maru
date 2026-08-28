@@ -74,9 +74,9 @@
   (typecase obj
     (<string>
      (%put-all self.handle (string->C-string obj) (string-length obj)))
-    (when-at-expand (feature lower/array)
-      (<lower/array>
-       (%put-all self.handle (slot-value <lower/array> elements obj) (lower/array-length obj))))
+    (when-at-expand (feature memory-block)
+      (<memory-block>
+       (%put-all self.handle (slot-value <memory-block> elements obj) (memory-block/length obj))))
     (else
      (error "<libc-stream> $put-all: unexpected value to write: " obj)))
   obj)

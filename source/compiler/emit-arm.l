@@ -272,7 +272,7 @@
                                     (MOVi X16 (<LITERAL>-value $2))
                                     (STRB W16 X17 0)))))
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
   ;; TODO these two are the same as the -OOP versions, except the MOV's scale
   (define-instruction LOAD-CELL	(false 0 true)
     ((STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $1))

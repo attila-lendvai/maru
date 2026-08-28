@@ -261,7 +261,7 @@
                                      (MOVQrr	RBX RAX))
                                   (MOVBim	(<LITERAL>-value $3) 0 (<REGISTER>-name $1) RCX 1))))
 
-(when-at-expand (feature lower/array)
+(when-at-expand (feature memory-block)
 
 ;; TODO these two are the same as the -OOP versions, except the MOV's scale
 (define-instruction LOAD-CELL	(true 0 true)
@@ -275,7 +275,7 @@
 				(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RBX) ; value
 				(MOVQrm	RBX 0 (<REGISTER>-name $1) RCX 1)))
 
-) ; (feature lower/array)
+) ; (feature memory-block)
 
 (define-instruction LOAD-OOP	(true 0 true)
   ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index

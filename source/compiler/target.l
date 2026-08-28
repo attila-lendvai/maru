@@ -50,7 +50,7 @@
 (set (feature platform/libc)		false)
 (set (feature platform/posix)		false)
 (set (feature platform/linux)		false)
-(set (feature lower/array)		true)
+(set (feature memory-block)		true)
 
 ;; TODO set up proper framework for optimization control, merge with *optimised*
 (set (feature optimize-space)		true)

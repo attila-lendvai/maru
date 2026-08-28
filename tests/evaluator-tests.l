@@ -414,18 +414,18 @@
     ;; (a-record-selector2 x)
     ))
 
-(when-at-expand (defined? 'lower/array)
-  (define-test lower/array/1 ()
+(when-at-expand (defined? 'memory-block)
+  (define-test memory-block/1 ()
     (let ((value 0x1122334455667788))
       ;; long - lower-cell conversion roundtrip
       (test-assert (= (lower-cell->long (long->lower-cell value))
                       value)))
 
-    (let* ((arr	(lower/array 200))
-           (x	(<lower/array>-elements arr)))
+    (let* ((arr	(memory-block 200))
+           (x	(<memory-block>-elements arr)))
 
       ;; array is initialized to zero
-      (test-assert (= (lower/array-at arr 0) 0))
+      (test-assert (= (memory-block/at arr 0) 0))
       (test-assert (= (cell-at x 0) (long->lower-cell 0)))
 
       (set (cell-at x 0) 0x1122334455667788)
@@ -437,14 +437,14 @@
       (test-assert (= (cell-at x 2) (long->lower-cell 0x0000002233445566)))
       ))
 
-  (define-test lower/array/2 ()
-    (let ((x (lower/array 200))
+  (define-test memory-block/2 ()
+    (let ((x (memory-block 200))
           (limit 50000))
       (for (i 0 limit)
-        (set (lower/array-at x i) 42))
-      (test-assert (= limit (lower/array-length x)))
-      (test-assert (= 42 (lower/array-at x 0)))
-      (test-assert (= 42 (lower/array-at x (- limit 1))))
+        (set (memory-block/at x i) 42))
+      (test-assert (= limit (memory-block/length x)))
+      (test-assert (= 42 (memory-block/at x 0)))
+      (test-assert (= 42 (memory-block/at x (- limit 1))))
       )))
 
 (define-function many-args (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)

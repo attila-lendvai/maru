@@ -17,14 +17,14 @@
     (lower/$put-all stream (<assembler>-buffer a))))
 
 (define-function assembler->function (a)
-  (lower/array->lower/function (<assembler>-buffer a)))
+  (memory-block->lower/function (<assembler>-buffer a)))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
 ;; Output buffer writers used by the assembler instructions.
 (define-function emit-i8  (value)
   (let ((buf (<assembler>-buffer *assembler*)))
-    (set (lower/array-at buf (lower/array-length buf)) value))
+    (set (memory-block/at buf (memory-block/length buf)) value))
   (let* ((env (<assembler>-env *assembler*))
          (current (variable-value env '$)))
     (environment-define env '$ (+ 1 current))))
@@ -85,7 +85,7 @@
       ;;(println "Running phase "phase-counter)
       (set phased false)
       ;; reset/clear the buffer
-      (set buffer (lower/array 4096))
+      (set buffer (memory-block 4096))
       (set (<assembler>-buffer a) buffer)
       ;; TODO ?
       ;; (let ((addr (address-of (<buffer>-elements buffer))))
@@ -135,5 +135,5 @@
               (eval instr env))))
           (else
            (error "unexpected asm instruction "instr)))))
-    (println "assembled "(lower/array-length buffer)" bytes in "phase-counter" phases")
+    (println "assembled "(memory-block/length buffer)" bytes in "phase-counter" phases")
     a))
