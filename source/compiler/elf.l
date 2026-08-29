@@ -13,11 +13,14 @@
 
 (define-constant +function-alignmet+ 16)
 
+(define-function closure-code-label-desig (name)
+  (if (feature emit-with-object-headers)
+      (concat-symbol name '.code)
+    name))
+
 ;; TODO this stinks. get rid of this or comment the why...
 (define-function closure-code-label (name)
-  (label (if (feature emit-with-object-headers)
-             (concat-symbol name '.code)
-           name)))
+  (label (closure-code-label-desig name)))
 
 ;;;
 ;;; Compiler Infrastructure
@@ -123,6 +126,7 @@
 (define LOAD)
 (define *special-forms*)
 (define compile-call-form)
+(define external-trampoline-label)
 
 (define-selector compile-object)
 
@@ -135,6 +139,12 @@
 
 (define-selector emit-prelude _) ; the default is NOP
 
+;; Synthesizes the process entry point (the '_start label, i.e. what
+;; e_entry points at) for platforms that define no maru-level _start
+;; (e.g. libc, where the entry only needs to call main and exit). The
+;; backends implement it; the default is NOP, so platforms with their
+;; own _start (linux) and backends without FFI (llvm) are unaffected.
+(define-function emit-entry-point-wrapper -c-)
 ;;;
 ;;; Common handlers
 ;;;

@@ -173,12 +173,23 @@
                 (set result true))))
           result))))
 
+;; The emission type of the elf backends (the value is passed down to
+;; the compiler as elf-emission-type; see load-platform.l). The CLI
+;; key elf-emission-type= overrides it.
+(define elf-emission-type ())
+
+;; How the link phase links the c-obj: statically with libc.a
+;; ('static), or dynamically against libc.so.6 ('dynamic; the
+;; default). Only meaningful for C-based platforms; the linux platform
+;; links freestanding (-nostdlib) regardless.
+(define C-obj/link-type "dynamic")
+
 (define *input-variables-for-build*
   ;; NOTE: default-backend and default-platform should not matter,
   ;; because they get encoded into the build output path.
   ;; Candidates:
   ;;  - ld.so but that gets set in effective-ld.so, leading to recompiles
-  '(profiler))
+  '(profiler elf-emission-type C-obj/link-type))
 
 (define-function save-dep-vars (output-file variables)
   (let ((result ()))
@@ -216,6 +227,15 @@
 (define-record <libc>     <platform>)
 (define-record <posix>    <platform>)
 (define-record <linux>    <platform>)
+
+;; The effective emission type: the CLI key if set, else the platform
+;; default (c-obj for the C-based platforms, standalone for linux).
+(define-function elf-emission-type/effective (platform)
+  (or elf-emission-type
+      (if (or (= (<platform>-name platform) "libc")
+              (= (<platform>-name platform) "posix"))
+          "c-obj"
+        "standalone")))
 
 (define libc  (new <libc>  "libc"))
 (define posix (new <posix> "posix"))
@@ -301,6 +321,27 @@
 
 (define-generic cflags-for (backend platform)
   cflags)
+
+;; The elf backends emit non-PIC code with absolute addressing, so
+;; their links must not produce a PIE. The static link type bakes
+;; libc.a into the binary; the default dynamic link leaves libc.so.6
+;; to ld.so.
+(define-function elf-cflags ()
+  (concat-strings cflags
+                  " -fno-pie -no-pie"
+                  (if (= C-obj/link-type "static") " -static" "")))
+
+(define-multimethod cflags-for ((<x86> backend) (<libc> platform))
+  (elf-cflags))
+
+(define-multimethod cflags-for ((<x86> backend) (<posix> platform))
+  (elf-cflags))
+
+(define-multimethod cflags-for ((<arm> backend) (<libc> platform))
+  (elf-cflags))
+
+(define-multimethod cflags-for ((<arm> backend) (<posix> platform))
+  (elf-cflags))
 
 (define-multimethod cflags-for (backend (<linux> platform))
   ;; NOTE: -ffreestanding -fno-builtin-memset doesn't help, -O still
@@ -417,6 +458,15 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
          " -o '"output"' '"full-path"' "more-files-str)))
   output)
 
+;; Cuts the final, stripped artifact from an unstripped binary (the
+;; linker records the input file names as STT_FILE symbols, so the
+;; unstripped binaries are not reproducible)
+(define-function strip-binary (slave-dir unstripped-path binary)
+  (when (needs-recompile? binary (list unstripped-path))
+    ($ "cd '"slave-dir"' && "strip" -o '"binary"' '"unstripped-path"'")
+    ($ "cd '"slave-dir"' && chmod +x '"binary"'"))
+  binary)
+
 (define-function compile-cgrov-file (file-path)
   (assert (absolute-path? file-path))
   ;; NOTE if we call (compile-host) here, then it'll get triggered
@@ -482,6 +532,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                (target/platform		,(<platform>-name platform))
                (feature/profiler/build	,(to-string profiler))
                (+ld.so-path+		,(effective-ld.so))
+               (elf-emission-type	,(elf-emission-type/effective platform))
                )))
        ;; files to load
        `("source/bootstrapping/prepare.l"
@@ -549,23 +600,54 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 
 (define-generic compile-maru args (apply %compile-maru args))
 
+(define-function %compile-c-objects (backend platform cflags)
+  ;; compiles the platform's C support files (libc.c etc.) into
+  ;; object files, and returns their paths
+  (map (lambda (entry)
+         (let* ((c-file (first entry))
+                (c-file-path (second entry))
+                (c-file-sans-ext (concat-string c-file ""))) ; poor man's copy
+           (decr (string-length c-file-sans-ext) 2) ; drop .c extension
+           (compile-C-file (concat-strings cflags " -c")
+                           c-file-path
+                           (build-output backend platform
+                                         (concat-string c-file-sans-ext ".o"))
+                           ())))
+       (maru-C-files backend platform)))
+
+(define-function %compile-maru/elf (backend platform host-dir host-eval
+                                    slave-dir input-file output-name evolving?)
+  (if (= "c-obj" (elf-emission-type/effective platform))
+      ;; emits the relocatable object (the output name gains a .o
+      ;; suffix), links it with the platform's C support objects into
+      ;; an executable binary, which is then stripped.
+      (let* ((object (%compile-maru backend platform host-dir host-eval slave-dir
+                                    input-file
+                                    (concat-string output-name ".o")
+                                    evolving?))
+             (cflags (cflags-for backend platform))
+             (obj-files (%compile-c-objects backend platform cflags))
+             (unstripped-path (build-output backend platform
+                                            (concat-string output-name ".unstripped")))
+             (binary (build-output backend platform output-name)))
+        (compile-C-file cflags object unstripped-path obj-files)
+        (strip-binary slave-dir unstripped-path binary))
+    (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
+                                 input-file output-name evolving?)))
+      ($ "cd '"slave-dir"' && chmod +x " output)
+      output)))
+
 (define-multimethod compile-maru ((<x86> backend) platform
                                   host-dir host-eval
                                   slave-dir input-file output-name evolving?)
-  ;; TODO use call-next-method, or even an :after method!
-  (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
-                               input-file output-name evolving?)))
-    ($ "cd '"slave-dir"' && chmod +x " output)
-    output))
+  (%compile-maru/elf backend platform host-dir host-eval
+                     slave-dir input-file output-name evolving?))
 
 (define-multimethod compile-maru ((<arm> backend) platform
                                   host-dir host-eval
                                   slave-dir input-file output-name evolving?)
-  ;; the arm backend also generates a standalone Elf binary
-  (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
-                               input-file output-name evolving?)))
-    ($ "cd '"slave-dir"' && chmod +x " output)
-    output))
+  (%compile-maru/elf backend platform host-dir host-eval
+                     slave-dir input-file output-name evolving?))
 
 (define-multimethod compile-maru ((<llvm> backend) platform
                                   host-dir host-eval
@@ -600,11 +682,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                       (concat-strings slave-dir "/" unstripped-path)
                       obj-files)
 
-      (when (needs-recompile? binary (list unstripped-path))
-        ($ "cd '"slave-dir"' && "strip" -o '"binary"' '"unstripped-path"'")
-        ($ "cd '"slave-dir"' && chmod +x '"binary"'"))
-
-      binary)))
+      (strip-binary slave-dir unstripped-path binary))))
 
 (define-function checkout-eval0 ()
   ;; build-path returns relative path. without absolutizing it,

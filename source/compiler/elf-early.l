@@ -2,12 +2,15 @@
 
 (require "source/compiler/emit-early.l")
 (require "source/ansiterm.l")
+(require "source/sequences-basic.l")
 (require "source/files.l")
 
 (require "source/c/cgrov.l")
 (require-cgrov "source/platforms/linux/linux")
 (require-cgrov "source/platforms/linux/elf")
 
+(when-feature cffi
+  (require "source/compiler/cffi.l"))
 
 ;;;
 ;;; Utils
@@ -19,14 +22,6 @@
 
 ;; TODO this is kludgey. why only this one, etc...
 (define-constant target/cell-size/bytes (target-value target/cell-size/bytes))
-
-;;;
-;;; Relocation tracking for ET_DYN
-;;;
-(define *rela-entries* ())  ; list of (segment . paddress) pairs needing R_X86_64_RELATIVE relocations
-
-(define-function register-rela (segment paddress value)
-  (push *rela-entries* (list segment paddress value)))
 
 ;;;
 ;;; Operands
@@ -159,11 +154,9 @@
 ;; The natural pointer/word size of the target.
 (define-instruction CELL	()
   ((LI64)			(.i64 (<LITERAL>-value $1)))
-  ((GLOBAL-ADDR)		(let ((addr (<GLOBAL-ADDR>-address $1)))
-                                   (register-rela (current-segment)
-                                                  (current-paddress)
-                                                  addr)
-                                   (.i64 addr)))
+  ;; the address is a <label>; emit-i64 records the abs64 hole for
+  ;; the elf writers (R_*_RELATIVE standalone, R_*_64 in the c-obj)
+  ((GLOBAL-ADDR)		(.i64 (<GLOBAL-ADDR>-address $1)))
   ((long)			(.i64 $1))
   )
 
@@ -243,8 +236,11 @@
     (.i64 size)))		; st_size: size of symbol in bytes
 
 (define-function emit-symtab-entry/variable (name section-index value size)
+  ;; LOCAL: module-internal names must not collide at c-obj link time
+  ;; (the env may hold shadowed bindings); only main/_start and the
+  ;; UND externals are global (see relocatable-elf.l)
   (emit-symtab-entry (emit-strtab-entry name)
-                     (+ (bitwise-shift elf/STB_GLOBAL 4)
+                     (+ (bitwise-shift elf/STB_LOCAL 4)
                         elf/STT_OBJECT)
                      0
                      section-index
@@ -252,8 +248,9 @@
                      target/cell-size/bytes))
 
 (define-function emit-symtab-entry/function (name value size)
+  ;; see the LOCAL note in emit-symtab-entry/variable
   (emit-symtab-entry (emit-strtab-entry name)
-                     (+ (bitwise-shift elf/STB_GLOBAL 4)
+                     (+ (bitwise-shift elf/STB_LOCAL 4)
                         elf/STT_FUNC)
                      0
                      +.text-section-index+
