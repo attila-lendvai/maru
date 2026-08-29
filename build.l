@@ -732,29 +732,41 @@ git --no-pager log --pretty=oneline -1")))
 ;; stage, and then use that in the rest of the build.
 (define-function compile-maru/stage-0 (backend platform)
   (debug-log "compile-maru/stage-0: "backend" "platform)
-  (let* ((res (compile-host))
-         (host-dir  (pop res))
-         (host-eval (pop res))
-         (input-file (concat-strings* "source/platforms/"platform"/eval.l")))
-    (if eval0-phase
-        (let ((eval0-dir (checkout-eval0))
-              (cwd-backup (working-directory)))
-          ;; TODO? this could be a fork and waitpid, too
-          ;; we compile a build/eval0/build/.../eval0 binary that will not be
-          ;; touched later until an update-eval0 is run.
-          (set (working-directory) eval0-dir)
-          ;; TODO if we e.g. change ld.so, then this recompiles eval0,
-          ;; too. but do we want that? just extra work on the CI...
-          ;; TODO also, maybe we should always compile eval0 for the
-          ;; host? even when target/arch=aarch64 in a qemu?
-          (let ((binary (compile-maru backend platform host-dir host-eval eval0-dir
-                                      input-file "eval0" true)))
-            (set (working-directory) cwd-backup)
-            (list eval0-dir binary)))
+  (let* ((host		(compile-host))
+         (host-dir 	(pop host))
+         (host-eval	(pop host))
+         (input-file	(concat-strings* "source/platforms/"platform"/eval.l"))
+         (eval0-dir	(checkout-eval0)))
 
-      (list *slave-dir*
-            (compile-maru backend platform host-dir host-eval *slave-dir*
-                          input-file "eval0" true)))))
+    (if eval0-phase
+        (let ((eval0-backend	llvm)
+              (eval0-platform	libc))
+          (debug-log "compile-maru/stage-0: forking the eval0 build")
+          ;; All we want here is an eval0 binary compiled from a
+          ;; reasonably recent commit that works fast on the host to
+          ;; exercise the rest of the machinery. In some way it's a
+          ;; cache or workflow optimization: we get to enjoy the new
+          ;; features without opening a new branch, or evolutionary
+          ;; stage. Downside: delayed feedback when something breaks
+          ;; the bootstrap when the host is the previous stage.
+          (let* ((output (run-program/shell "cd '"eval0-dir"' &&
+                           ./build.sh eval0-phase=false compile-maru/stage-0 "
+                                            eval0-backend" "eval0-platform
+                                            " | tail -2"))
+                 ;; TODO read the path's from the fork's actual output
+                 ;; (input (string-stream output))
+                 ;; (results (read input))
+                 (eval0 (concat-strings* *build* "/" eval0-backend "-" eval0-platform
+                                         "/" (host-triple) "/eval0")))
+            (debug-log "compile-maru/stage-0 is returning from the fork: "eval0-dir eval0)
+            (list eval0-dir eval0)))
+      (let ((eval0 (compile-maru backend platform host-dir host-eval *slave-dir*
+                                 input-file "eval0" true)))
+        ;; API: we print two specific lines as the last output to stdout
+        ;; TODO pass the values to the parent
+        ;;(println *slave-dir*)
+        ;;(println eval0)
+        (list *slave-dir* eval0)))))
 
 (define-function compile-maru/stage-1 (backend platform)
   ;; eval0 is either in build/eval0/build/... or in our own build/
