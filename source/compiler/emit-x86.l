@@ -51,7 +51,8 @@
 
 (define-instruction CALL	(false 0 true)
   ((label)			(CALLQrel32 $1))
-  ((REGISTER)			(CALLQr (<REGISTER>-name $1))))
+  ((REGISTER)			(CALLQr (<REGISTER>-name $1)))
+  ((reloc-symbol)		(CALLQrel32 $1)))
 
 (define-instruction ADD		(true 0 true)
   ;; ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
@@ -259,7 +260,18 @@
                                      (MOVBir	(<LITERAL>-value $3) BL)
                                      (MOVBrm	BL 0 (<REGISTER>-name $1) RCX 1)
                                      (MOVQrr	RBX RAX))
-                                  (MOVBim	(<LITERAL>-value $3) 0 (<REGISTER>-name $1) RCX 1))))
+                                  (MOVBim	(<LITERAL>-value $3) 0 (<REGISTER>-name $1) RCX 1)))
+  ((R64 LI64 STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RCX)
+                                (MOVBrm	CL (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVZBQrr	CL RAX)))
+  ((R64 LI64 LI64)		(if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (begin
+                                     (XORQrr	RBX RBX)
+                                     (MOVBir	(<LITERAL>-value $3) BL)
+                                     (MOVBrm	BL (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1)
+                                     (MOVQrr	RBX RAX))
+                                  (MOVBim	(<LITERAL>-value $3) (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1))))
 
 (when-at-expand (feature memory-block)
 
@@ -328,7 +340,7 @@
                                 (RET)))
 
 (define-instruction SEXT	()
-  ((R32 R64)			(MOVSBQrr (<REGISTER>-name $1) (<REGISTER>-name $2))))
+  ((R32 R64)			(MOVSXD (<REGISTER>-name $1) (<REGISTER>-name $2))))
 
 (define-form define-instruction/comparator (maru-name x86-name)
   `(define-instruction ,maru-name (true 0 true)
@@ -555,43 +567,27 @@
   (emit MOVE self +op/accumulator+)
   (compile-call-to-<target-function> -c-))
 
-;; TODO
-;; (define-method compile-call-to <C-function> (op -c-)
-;;   (let* ((c-function-entries	(<compiler>-c-function-entries -c-))
-;;          (var			(defined? self.name c-function-entries))
-;;          (c-function-entry	(if var
-;;                                     (<variable>-value var)
-;;                                   (let* ((ptr-label (with-new-label 'data
-;;                                                       (.cell 0)))
-;;                                          (stub-label (with-new-label 'code
-;;                                                        ;; TODO
-;;                                                        ))
-;;                                          (entry ()))
-;;                                     (environment-define c-function-entries self.name entry)
-;;                                     entry))))
-;;     )
-;;
-;;   (.segment 'data)
-;;   (let ((fnptr (label))
-;;         (stub  (flabel)))
-;;     (.cell stub)
-;;     (.segment 'code)
-;;     (label stub)
-;;     )
-;;
-;;   (emit CALL (EXTERNAL-LABEL (<C-function>-name self)))
-;;   (case (<C-function>-return-type self)
-;;     ;; TODO introduce a proper infrastructure for this
-;;     (int
-;;      (emit SEXT op/EAX op/RAX))
-;;     (short
-;;      (error "TODO sign-extend a short to 64 bits")))
-;;   (unless (<C-function>-vararg? self)
-;;     (list-length (<C-function>-parameter-types self))))
-
 (define-function run-compiler (env output-path)
   (compile-env env (compiler 1) output-path
                elf/EM_X86_64
-               elf/R_X86_64_RELATIVE))
+               elf/R_X86_64_RELATIVE
+               elf/R_X86_64_GLOB_DAT))
+
+(define-method compile-call-to <C-function> (op -c-)
+  ;; 'link-time: a direct call against the UND symbol, resolved by the
+  ;; static linker ('c-obj); 'load-time: through the GOT-cell
+  ;; trampoline, resolved by ld.so ('standalone)
+  (if (= "c-obj" elf-emission-type)
+      (emit CALL (reloc-symbol (<C-function>-name self)))
+    (emit CALL (external-trampoline-label self -c-)))
+  (case (<C-function>-return-type self)
+    ;; TODO introduce a proper infrastructure for this
+    (int
+     (emit SEXT op/EAX op/RAX))
+    (short
+     (error "TODO sign-extend a short to 64 bits")))
+  (set (<compiler>-current-value -c-) op/RAX)
+  (unless (<C-function>-vararg? self)
+    (list-length (<C-function>-parameter-types self))))
 
 (require "source/compiler/emit-late.l")

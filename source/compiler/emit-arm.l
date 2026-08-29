@@ -67,7 +67,8 @@
 
 (define-instruction CALL	(false 0 true)
   ((label)			(BL $1))
-  ((REGISTER)			(BLR (<REGISTER>-name $1))))
+  ((REGISTER)			(BLR (<REGISTER>-name $1)))
+  ((reloc-symbol)		(BL $1)))
 
 (define-instruction ADD		(true 0 true)
   ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
@@ -261,6 +262,25 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVr X0 X16)))
   ((STACK-CELL LI64)		(LDUR X17 FP (<STACK-CELL>-offset $1))
+                                (ADDr X17 X0 X17)
+                                (if-at-expand (feature strict-semantics-for-compiled-set)
+                                    (begin
+                                     (EORr X16 X16 X16)
+                                     (MOVi X16 (<LITERAL>-value $2))
+                                     (STRB W16 X17 0)
+                                     (MOVr X0 X16))
+                                  (begin
+                                    (MOVi X16 (<LITERAL>-value $2))
+                                    (STRB W16 X17 0))))
+  ;; literal index, value in a stack cell
+  ((LI64 STACK-CELL)		(MOVi X17 (<LITERAL>-value $1))
+                                (ADDr X17 X0 X17)
+                                (LDUR X16 FP (<STACK-CELL>-offset $2))
+                                (STRB W16 X17 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVr X0 X16)))
+  ;; literal index and literal value
+  ((LI64 LI64)			(MOVi X17 (<LITERAL>-value $1))
                                 (ADDr X17 X0 X17)
                                 (if-at-expand (feature strict-semantics-for-compiled-set)
                                     (begin
@@ -650,43 +670,61 @@
   (emit CALL op/X16)
   ())
 
-;; TODO
-;; (define-method compile-call-to <C-function> (op -c-)
-;;   (let* ((c-function-entries	(<compiler>-c-function-entries -c-))
-;;          (var			(defined? self.name c-function-entries))
-;;          (c-function-entry	(if var
-;;                                     (<variable>-value var)
-;;                                   (let* ((ptr-label (with-new-label 'data
-;;                                                       (.cell 0)))
-;;                                          (stub-label (with-new-label 'code
-;;                                                        ;; TODO
-;;                                                        ))
-;;                                          (entry ()))
-;;                                     (environment-define c-function-entries self.name entry)
-;;                                     entry))))
-;;     )
+(define-method compile-call-to <C-function> (op -c-)
+  ;; 'link-time: a direct call against the UND symbol, resolved by the
+  ;; static linker ('c-obj); 'load-time: through the GOT-cell
+  ;; trampoline, resolved by ld.so ('standalone)
+  (if (= "c-obj" elf-emission-type)
+      (emit CALL (reloc-symbol (<C-function>-name self)))
+    (emit CALL (external-trampoline-label self -c-)))
+  (case (<C-function>-return-type self)
+    ;; TODO introduce a proper infrastructure for this
+    (int
+     (SXTW (<REGISTER>-name op/X0) (<REGISTER>-name op/W0)))
+    (short
+     (error "TODO sign-extend a short to 64 bits")))
+  (set (<compiler>-current-value -c-) op/X0)
+  (unless (<C-function>-vararg? self)
+    (list-length (<C-function>-parameter-types self))))
+
+;; The process entry point, synthesized when the platform defines no
+;; maru-level _start (e.g. libc, where the entry only needs to call
+;; main and exit). Emitted after the code pass, so main's label is
+;; already resolved.
 ;;
-;;   (.segment 'data)
-;;   (let ((fnptr (label))
-;;         (stub  (flabel)))
-;;     (.cell stub)
-;;     (.segment 'code)
-;;     (label stub)
-;;     )
-;;
-;;   (emit CALL (EXTERNAL-LABEL (<C-function>-name self)))
-;;   (case (<C-function>-return-type self)
-;;     ;; TODO introduce a proper infrastructure for this
-;;     (int
-;;      (emit SEXT op/EAX op/RAX))
-;;     (short
-;;      (error "TODO sign-extend a short to 64 bits")))
-;;   (unless (<C-function>-vararg? self)
-;;     (list-length (<C-function>-parameter-types self))))
+;; ld.so enters with x0/x1 undefined, [sp] holding argc and sp%16=0.
+;; The STP of the maru prologue pushes FP and LP, i.e. 16 bytes, so the
+;; 16-byte sp alignment required by the AAPCS at public interfaces
+;; holds throughout the whole call chain (unlike x86-64, where the
+;; 8-byte push rbp skews it; see emit-entry-point-wrapper in cffi-late.l).
+;; NOTE arm FFI (compile-call-to <C-function>) is not implemented yet,
+;; so this is only exercised once that lands.
+;; Same guards as the x86 entry wrapper in cffi-late.l: it references
+;; the FFI machinery, and the linux bootstrap provides no main/exit
+;; externals for it.
+(when-feature cffi
+  (define-function emit-entry-point-wrapper (-c-)
+    (let ((_start-desig (closure-code-label-desig '_start)))
+      (unless (%find-label _start-desig)
+        (assert (%find-label (closure-code-label-desig 'main))
+                "the platform provides no '_start' and no 'main' for the entry wrapper")
+        (with-current-segment 'code
+          (label! _start-desig)
+          (LDR X0 SP 0)                       ; ldr x0,[sp]     ; argc
+          (ADDi X1 SP 8)                      ; add x1,sp,#8    ; argv
+          (emit CALL (closure-code-label 'main))
+          (ADR X16 (emit-external-got-cell (register-external-symbol "exit") -c-))
+          (LDR X16 X16 0)
+          (BLR X16))
+        (emit-symtab-entry/function "_start"
+                                    (laddress _start-desig)
+                                    (- (current-laddress)
+                                       (laddress _start-desig)))))))
 
 (define-function run-compiler (env output-path)
   (compile-env env (compiler 1) output-path
                elf/EM_AARCH64
-               elf/R_AARCH64_RELATIVE))
+               elf/R_AARCH64_RELATIVE
+               elf/R_AARCH64_GLOB_DAT))
 
 (require "source/compiler/emit-late.l")

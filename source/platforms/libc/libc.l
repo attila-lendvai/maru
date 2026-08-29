@@ -32,6 +32,11 @@
   (int file_modification_time (*))
   )
 
+;; NOTE there is no _start here: the elf backends synthesize the
+;; process entry (load argc/argv, call main, exit) when the platform
+;; defines no maru-level _start. The llvm backend gets one from
+;; crt1.o, and linux.l defines its own, libc-free version.
+
 ;; the only correct way to grovel some global variables like stdin and
 ;; errno is to wrap them into a C function and call it from the lisp
 ;; side.
