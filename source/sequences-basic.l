@@ -78,6 +78,14 @@
       (set curr next))
     prev))
 
+(define-function list-find-if (predicate lst)
+  (let (result)
+    (while (and lst (not result))
+      (when (predicate (car lst))
+        (set result (car lst)))
+      (set lst (cdr lst)))
+    result))
+
 (define-function map1 (function list)
   (let ((head (cons)))
     (let ((tail head))
