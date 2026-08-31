@@ -267,7 +267,7 @@ exit:
 ;; auxv is (a_type a_val) machine-word pairs, terminated by an AT_NULL pair
 (define-function %parse-kernel-page-size (auxv)
   (let ((i 0))
-    (while (< 0 (oop-at auxv i))
+    (until (= (oop-at auxv i) linux/AT_NULL)
       (when (= (oop-at auxv i) linux/AT_PAGESZ)
         (set *kernel-page-size* (oop-at auxv (+ i 1))))
       (incr i 2))
@@ -323,7 +323,7 @@ exit:
     (set %envp envp)
     ;; the auxv follows the envp array's NULL terminator
     (let ((cursor envp))
-      (while (< 0 (oop-at cursor 0))
+      (until (= 0 (oop-at cursor 0))
         (set cursor (+ cursor (words-to-bytes 1))))
       (%parse-kernel-page-size (+ cursor (words-to-bytes 1))))
     (syscall linux/SYS_exit (main argc argv))))
