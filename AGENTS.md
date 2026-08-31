@@ -22,15 +22,55 @@ binfmt_misc, needs `qemu-user-static` and the
 
 Key=value CLI args set variables in build.l's globals (e.g.
 `target/arch=aarch64`, `eval0-phase=false`, `ld.so=...`,
-`default-backend=arm`, `default-platform=linux`). The aarch64 binaries
+`default-backend=arm`, `default-platform=linux`,
+`C-obj-emission-type=`, `C-obj-link-type=`). The aarch64 binaries
 embed the canonical `/lib/ld-linux-aarch64.so.1` and run transparently
 through binfmt_misc.
+
+## Final verification
+
+Match the verification to the blast radius of the change. A localized
+change only needs the targets that exercise it (see the narrow gate
+below); run the full gate before declaring a wide-reaching change
+done -- anything touching the compiler, the assembler, build.l,
+boot.l, or the platform layers. When in doubt, the narrow gate plus
+one `bootstrap` is the minimum.
+
+The full gate is what CI runs (.github/workflows/ci.yaml), plus what
+CI only gets for free on a clean checkout:
+
+- `./build.sh bootstrap llvm libc` / `llvm posix` / `llvm linux` / `x86 linux`
+- `./build.sh ld.so=/lib/ld-musl-x86_64.so.1 bootstrap x86 linux` (needs musl installed)
+- `./build.sh profiler=1 bootstrap llvm posix` / `profiler=1 bootstrap llvm linux`
+- `./build.sh test`
+- CI's safety=3 build: sed `*safety*` 1 -> 3 in boot.l, `bootstrap
+  llvm linux` and `bootstrap x86 linux`, revert boot.l
+- `eval0-phase=false bootstrap x86 linux` (and x86 libc): a clean
+  checkout compiles eval0 from scratch; the local eval0 cache skips
+  that path and can mask stage-0 breakage. `rm -rf build/eval0`
+  simulates a fresh clone with the cache machinery on.
+- the cross arm targets (CI runs arm natively):
+  `target/arch=aarch64 bootstrap arm linux`,
+  `target/arch=aarch64 test-compiler arm libc`, etc.
+- `./build.sh C-obj-link-type=static test-compiler x86 libc`
+
+The narrow gate picks the targets that exercise the change:
+
+- assembler encodings: `./build.sh test-assembler` (or `-x86` / `-arm`)
+- a backend's emission and FFI: `./build.sh test-compiler <backend> <platform>`
+- the evaluator: `./build.sh test-evaluator`
+- the ET_EXEC bootstrap bytes: `./build.sh bootstrap x86 linux`
+  (carries the fixed-point check implicitly)
+
+The `bootstrap` targets carry the fixed-point check (eval1 must be
+byte-identical to eval2) implicitly; no separate step needed.
 
 ## Project Structure
 
 - `boot.l` — minimal standard library loaded at bootstrap (~300 lines)
 - `source/evaluator/` — the Maru VM (eval.l, gc.l, vm.l, reader.l, etc.)
 - `source/compiler/` — compiler backends (emit-x86.l, emit-arm.l, emit-llvm.l)
+- `source/compiler/relocatable-elf.l` — the elf writers (c-obj ET_REL, standalone ET_DYN) and the relocation serializer
 - `source/assembler/` — runtime assemblers (x86-single-pass.l, x86-instructions.l, arm-instructions.l)
 - `source/platforms/` — libc/posix/linux platform layers
 - `tests/` — test files (infra.l, assembler-infra.l, test-assembler-x86.l, evaluator-tests.l, etc.)
@@ -131,3 +171,23 @@ through binfmt_misc.
 - `define-constant` substitutes at macroexpand-time (like `#define`); `define` is a runtime binding. Use `define-constant` whenever a name must be available during macro expansion (e.g. inside `define-instruction` bodies).
 
 - Prefer verifying through ./build.sh targets (bootstrap, test-*) over ad-hoc repro setups and manual artifact inspection. Stale or partially built trees and hand-rolled invocations mislead into chasing nonexistent bugs; rerun the canonical command clean before diagnosing any failure.
+
+- Two `define-instruction` flavors: `elf-early.l`'s is factory-style (operand cases dispatch by type name, e.g. `((reloc-symbol) (CALLQrel32 $1))`; `%emit` calls it with `()` first to get the singleton); `arm-instructions.l`'s defines plain functions called directly (`(BL label)`). Routing an arm-style instruction through `(emit ...)` fails with "unexpected: ()" — wrap it (see `CALL` in `emit-arm.l`).
+
+- Compiler-level `op/` registers are `<REGISTER>` records; emit-forms unwrap them via `(<REGISTER>-name $1)`. Raw arm instructions take the register symbols (`X16`, ...) whose value is the encoded number (X = 32+i, W = i).
+
+- Function bodies encode when their define runs; a forward reference into a file loaded later dies with `encode/symbol: failed for X`. The require order in `elf-late.l` (cffi-late.l, then relocatable-elf.l) is load-bearing.
+
+- Arch-specific code in the shared files (`cffi-late.l`, `elf-early.l`) must be guarded (`if-at-expand (= "x86" *compiler-backend*)`) or overridden per backend (e.g. `emit-entry-wrapper` in `emit-arm.l`).
+
+- New build-behavior variables must land in `*input-variables-for-build*` (build.l), else toggling their key doesn't trigger rebuilds and stale artifacts mislead.
+
+- `--define` values arrive as strings; dispatch with string `=`.
+
+- The bootstrap fixed point compares the stripped binaries: the link alone is not reproducible (ld records the input file names as `STT_FILE`), so the final artifact is cut from the `.unstripped` by `strip-binary` (build.l). Details: `doc/compiler.md`, "The fixup ledger".
+
+- Mysteriously-() definitions: suspect a compensating local paren imbalance — a missing close swallows the next define into the previous body while the file still balances file-wide. Verify with a per-form paren-delta scan, not a file-wide one.
+
+- Emitted-artifact debugging: `cmp -l` the two binaries to locate the diverging bytes; diff the `.o` disassembly against the linked binary to attribute corruption (assembler encoding vs relocation application).
+
+- `emit-label` protocol: `(label writer size . rest)` — rest carries an optional offset (a `<long>`) then an optional one-element reloc-type list; fixups without a reloc-type are never recorded.
