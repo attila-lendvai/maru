@@ -11,6 +11,9 @@
 # https://github.com/attila-lendvai?tab=packages&ecosystem=container
 # and make it public in the package settings
 
+# inspect the image
+# podman run --rm -it ghcr.io/attila-lendvai/maru-ci:amd64 bash
+
 FROM docker.io/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -29,23 +32,43 @@ RUN apt-get update && \
         make \
         llvm \
         clang-20 \
+        lld \
         libc6-dev \
         libffi-dev \
-        binutils-aarch64-linux-gnu \
+        binutils-i686-linux-gnu \
         binutils-x86-64-linux-gnu \
+        binutils-aarch64-linux-gnu \
         git \
         time \
+        diffoscope \
         lsb-release software-properties-common gnupg \
         wget \
         curl \
         ca-certificates \
+        qemu-user \
+        qemu-user-binfmt \
         musl \
         musl-dev \
-    # Conditional packages for x86
+    # Conditional packages per host arch
+    #
+    # clang needs the gcc runtime files (crtbegin.o et al, libgcc):
+    # its gcc installation detection only succeeds once they exist,
+    # and only then does it adopt the cross sysroot /usr/<triple>.
+    # hence no compilers, just the libgcc-13-dev files ("13" tracks
+    # the default gcc of the FROM image). NB: libc cross packages are
+    # named after the Debian arch (amd64, i386), the gcc ones after
+    # the triplet (x86-64). the cross libc-dev packages are only
+    # Recommends, so they must stay explicit under
+    # --no-install-recommends.
     && if [ "$TARGETARCH" = "amd64" ]; then \
-      dpkg --add-architecture i386 && \
-        apt-get update && \
-        apt-get install -y --no-install-recommends libc6-dev-i386 gcc-multilib; \
+      apt-get install -y --no-install-recommends libc6-dev-i386 \
+        libgcc-13-dev lib32gcc-13-dev libc6-dev-arm64-cross \
+        libgcc-13-dev-arm64-cross; \
+    fi \
+    && if [ "$TARGETARCH" = "aarch64" ]; then \
+      apt-get install -y --no-install-recommends libc6-dev-i386-cross \
+        libc6-dev-amd64-cross libgcc-13-dev-i386-cross \
+        libgcc-13-dev-amd64-cross; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 

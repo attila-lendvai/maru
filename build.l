@@ -131,7 +131,7 @@
                "'")))
 
 (define-function same-file-contents-or-die (file1 file2)
-  ($ "cmp "file1" "file2))
+  ($ "diffoscope "file1" "file2))
 
 (define-function file-exists? (path)
   ;; TODO this is lame, but...
@@ -357,8 +357,8 @@
 
 (define profiler	false)
 
-(define clang		"clang")
-(define strip		"llvm-strip")
+(define clang		"clang $LDFLAGS")
+(define strip		"llvm-strip --remove-section=.note.gnu.build-id")
 
 ;; NOTE: lld also can cross-compile, which would be nice, but it
 ;; produces a crashing eval0, even when not cross-compiling.
