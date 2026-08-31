@@ -92,18 +92,41 @@
     (string-trim-end
      (run-program* "/usr/bin/env" (list "sh" "-c" arg-string) () () 'string))))
 
-(define *host-os*	(run-program/shell/stdout "uname -s | tr '[:upper:]' '[:lower:]'"))
-(define *host-arch*	(run-program/shell/stdout "uname -m"))
+;; normalize the uname(1) output into the components of an llvm-style
+;; target triple. an unrecognized host is an error, rather than being
+;; silently misclassified.
+(define-function %host-os-name (uname-os)
+  (case uname-os
+    ("linux"	"linux")
+    ("darwin"	"darwin")
+    ("freebsd"	"freebsd")
+    ("netbsd"	"netbsd")
+    ("openbsd"	"openbsd")
+    ("sunos"	"solaris")
+    (else	(error "host-os-name: unexpected uname -s output '"uname-os"', please teach build.l about it"))))
 
-(when (= *host-arch* "arm64")
-  (set *host-arch* "aarch64"))
+(define-function %host-arch-name (uname-arch)
+  (case uname-arch
+    (("x86_64" "amd64")		"x86_64")
+    (("aarch64" "arm64")	"aarch64")
+    (("i386" "i686")		uname-arch)
+    (else			(error "host-arch-name: unexpected uname -m output '"uname-arch"', please teach build.l about it"))))
+
+(define host/os		(%host-os-name (run-program/shell/stdout "uname -s | tr '[:upper:]' '[:lower:]'")))
+(define host/arch	(%host-arch-name (run-program/shell/stdout "uname -m")))
+(define host/vendor	(case host/os ("darwin" "apple") (else "unknown")))
+(define host/abi	(case host/os ("linux" "gnu") (else ())))
+
+(define-function host-triple ()
+  (concat-strings-separated-by
+   "-" (list host/arch host/vendor host/os host/abi)))
 
 (define-function canonicalize-path (path)
   (apply run-program/shell/stdout
-         (list (case *host-os*
+         (list (case host/os
                  ("linux"	"readlink --canonicalize '")
                  ("darwin"	"realpath '")
-                 (else		(error "canonicalize-path: unimplemented for '"*host-os*"'")))
+                 (else		(error "canonicalize-path: unimplemented for '"host/os"'")))
                path
                "'")))
 
@@ -266,17 +289,17 @@
 (define *host-dir*		(canonicalize-path (concat-strings* *build* "/" *previous-stage*))) ; aka (build-path *previous-stage*)
 (define *slave-dir*		(working-directory))
 
-(define target/arch	*host-arch*)
-(define target/vendor	"unknown")
-(define target/os	"linux")
-(define target/abi	"gnu")
+(define target/arch	host/arch)
+(define target/vendor	host/vendor)
+(define target/os	host/os)
+(define target/abi	host/abi)
 
 (define-function target-triple ()
   (concat-strings-separated-by
    "-" (list target/arch target/vendor target/os target/abi)))
 
 (define-function cross-compiling? ()
-  (not (= target/arch *host-arch*)))
+  (not (= target/arch host/arch)))
 
 ;; the ELF interpreter path to embed into the target binaries. it can
 ;; be overridden from the command line with ld.so=...; when not set,
@@ -294,7 +317,7 @@
                ("aarch64"	"/lib/ld-linux-aarch64.so.1")
                (("i686" "i386")	"/lib/ld-linux.so.2")
                (else		(error "effective-ld.so: unknown interpreter path for target/arch '"target/arch"', please set ld.so explicitly")))
-           (when (= *host-os* "linux")
+           (when (= host/os "linux")
              (run-program/shell/stdout
               "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
               ;; or alternatively:
@@ -766,7 +789,7 @@ git --no-pager log --pretty=oneline -1")))
 
       ;; Newer darwin refuses to run binaries without an uuid, so they
       ;; will never by byte-identical.
-      (unless (= *host-os* "darwin")
+      (unless (= host/os "darwin")
         (same-file-contents-or-die eval1 eval2)))))
 
 (define-function bootstrap-matrix ()
@@ -910,13 +933,13 @@ git --no-pager log --pretty=oneline -1")))
   (test-evaluator)
   (test-parser)
 
-  (case *host-os*
+  (case host/os
 
     ("linux"
      (test-compiler llvm linux)
      (test-assembler)     ; uses x86_64-linux-gnu-objcopy and stuff...
 
-     (case *host-arch*
+     (case host/arch
 
        ("x86_64"
         (test-compiler x86 linux)
@@ -934,19 +957,8 @@ git --no-pager log --pretty=oneline -1")))
 (define-function main ()
   (debug-log "*command-line-arguments*" *command-line-arguments*)
 
-  (case *host-os*
-    ("linux"
-     (set target/vendor	"unknown")
-     (set target/os	"linux")
-     (set target/abi	"gnu"))
-    ("darwin"
-     (set target/vendor	"apple")
-     (set target/os	"darwin")
-     (set target/abi	())
-     ;; NOTE newer Darwin refuses to start exe's without LC_UUID
-     ;; dyld[6416]: missing LC_UUID load command in .../maru.10/eval
-     ;; (set cflags (concat-string cflags " -Wl,-no_uuid"))
-     ))
+  ;; target/* is initialized to the host triple at load time; the
+  ;; foo=bar CLAs below override it (e.g. target/arch=aarch64).
 
   (let* ((args (map (lambda (str)
                       ;; second: _ means false
