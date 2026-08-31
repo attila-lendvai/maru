@@ -79,6 +79,7 @@
     '("coreutils"
       "nss-certs" ; so that git pull works on OpenWrt
       "diffutils"
+      "diffoscope"
       ;;"clang-toolchain"
       "glibc"
       "glibc:debug"
@@ -102,5 +103,6 @@
       "gdb"
       "cgdb"
       "cutter"
+      "qemu"
       "intel-xed"                    ; for authoritative disassembling
       )))))

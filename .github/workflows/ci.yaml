@@ -20,6 +20,10 @@ on:
       - 'doc/**'
 
 jobs:
+
+###
+# x86_64 Linux
+###
   build-linux-amd64:
     name: "linux x86_64"
     runs-on: ubuntu-24.04
@@ -54,13 +58,21 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+      - run:  ld.lld --version || true
 
       - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
-      - run:  timeout 5m ./build.sh bootstrap llvm libc
-      - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm linux
+      - run:  timeout 5m ./build.sh bootstrap llvm posix
+      - run:  timeout 5m ./build.sh bootstrap llvm libc
+
       - run:  timeout 5m ./build.sh bootstrap x86  linux
+      - run:  timeout 5m ./build.sh bootstrap x86  posix
+      - run:  timeout 5m ./build.sh bootstrap x86  libc
+
+      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm posix
+      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm libc
+
       # the self-contained x86 binaries are mapped/run through musl's
       # ELF interpreter instead of glibc's
       - run:  timeout 5m ./build.sh ld.so=/lib/ld-musl-x86_64.so.1 bootstrap x86 linux
@@ -75,6 +87,10 @@ jobs:
           sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
           timeout 5m ./build.sh bootstrap llvm linux
           timeout 5m ./build.sh bootstrap x86  linux
+
+###
+# aarch64 Linux
+###
 
   build-linux-arm64:
     name: "linux aarch64"
@@ -110,6 +126,7 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+      - run:  ld.lld --version || true
 
       - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
@@ -125,6 +142,10 @@ jobs:
       - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
 
       - run:  timeout 5m ./build.sh test
+
+###
+# Darwin
+###
 
   build-darwin:
     name: "darwin aarch64"
@@ -193,6 +214,7 @@ jobs:
 
       - run:  clang --version || true
       - run:  cc --version || true
+      - run:  lld --version || true
 
       - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
@@ -203,6 +225,10 @@ jobs:
       - run:  timeout 3m arch -arm64  ./build.sh profiler=1 bootstrap llvm posix
 
       - run:  timeout 3m ./build.sh test
+
+###
+# Full bootstrap
+###
 
 # TODO fix and reenable
   build-linux-amd64-full-bootstrap:
@@ -241,3 +267,4 @@ jobs:
       - run:  clang --version && cc --version
 
       - run:  timeout 20m ./build.sh test-bootstrap-recursively
+
