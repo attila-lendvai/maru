@@ -142,8 +142,12 @@
                 linux/PROT_EXEC))
     result))
 
-;; the address of the next chunk to hand out via mmap, kept monotonically
-;; growing, starting right above the binary's break.
+;; KLUDGE whose only role is to keep gc/read-only-object?
+;; working. it requires the heap to lie above the static image,
+;; but mmap(0) picks from the top of the address space, which on
+;; 32-bit targets lies above 2^31, i.e. it compares negative against
+;; the image. hence the hint: right above the image (the program
+;; break), grown as we allocate. it's a delme...
 (define *mmap-hint* 0)
 
 ;; the kernel hands us the page size in the auxv; parsed in _start

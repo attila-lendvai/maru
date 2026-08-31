@@ -21,6 +21,7 @@
   (ssize_t read (int * size_t))
   (int mprotect (* size_t int))
   (* mmap (* size_t int int int off_t))
+  (* sbrk (long))
   (long sysconf (int))
   (pid_t fork ())
   (pid_t execve (* * *))
@@ -37,10 +38,19 @@
   (* posix/envp ())
   )
 
+;; KLUDGE whose only role is to keep gc/read-only-object?
+;; working. it requires the heap to lie above the static image,
+;; but mmap(0) picks from the top of the address space, which on
+;; 32-bit targets lies above 2^31, i.e. it compares negative against
+;; the image. hence the hint: right above the image (the program
+;; break), grown as we allocate. it's a delme...
+(define *mmap-hint* ())
+
 (define-function platform/acquire-memory (size)
   ;; KLUDGE we make all allocated memory executable.
   ;; some tests generate machine code and want to call it...
   (let* ((page-size	(posix/sysconf posix/_SC_PAGESIZE))
+         (aligned-size	(align-address-up size page-size))
          (prot-flags	(+ (+ posix/PROT_READ posix/PROT_WRITE)
                            ;; FIXME darwin refuses to mmap WRITE +
                            ;; EXEC region. for now we only need
@@ -50,7 +60,9 @@
                             (case target/arch
                               (x86-64	posix/PROT_EXEC)
                               (else	0)))))
-         (buf		(posix/mmap 0 (align-address-up size page-size)
+         (hint		(or *mmap-hint*
+                              (set *mmap-hint* (align-address-up (posix/sbrk 0) page-size))))
+         (buf		(posix/mmap hint aligned-size
                                     prot-flags
                                     (+ posix/MAP_PRIVATE posix/MAP_ANONYMOUS)
                                     -1 0)))
@@ -59,4 +71,5 @@
       (libc/diag-printf "mmap with prot %ld has returned with error %ld\n"
                         prot-flags libc/errno)
       (platform/halt 38))
+    (set *mmap-hint* (+ buf aligned-size))
     buf))
