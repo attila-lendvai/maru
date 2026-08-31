@@ -92,7 +92,7 @@
     (string-trim-end
      (run-program* "/usr/bin/env" (list "sh" "-c" arg-string) () () 'string))))
 
-(define *host-os*	(run-program/shell/stdout "uname -s"))
+(define *host-os*	(run-program/shell/stdout "uname -s | tr '[:upper:]' '[:lower:]'"))
 (define *host-arch*	(run-program/shell/stdout "uname -m"))
 
 (when (= *host-arch* "arm64")
@@ -101,8 +101,8 @@
 (define-function canonicalize-path (path)
   (apply run-program/shell/stdout
          (list (case *host-os*
-                 ("Linux"	"readlink --canonicalize '")
-                 ("Darwin"	"realpath '")
+                 ("linux"	"readlink --canonicalize '")
+                 ("darwin"	"realpath '")
                  (else		(error "canonicalize-path: unimplemented for '"*host-os*"'")))
                path
                "'")))
@@ -294,7 +294,7 @@
                ("aarch64"	"/lib/ld-linux-aarch64.so.1")
                (("i686" "i386")	"/lib/ld-linux.so.2")
                (else		(error "effective-ld.so: unknown interpreter path for target/arch '"target/arch"', please set ld.so explicitly")))
-           (when (= *host-os* "Linux")
+           (when (= *host-os* "linux")
              (run-program/shell/stdout
               "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
               ;; or alternatively:
@@ -766,7 +766,7 @@ git --no-pager log --pretty=oneline -1")))
 
       ;; Newer darwin refuses to run binaries without an uuid, so they
       ;; will never by byte-identical.
-      (unless (= *host-os* "Darwin")
+      (unless (= *host-os* "darwin")
         (same-file-contents-or-die eval1 eval2)))))
 
 (define-function bootstrap-matrix ()
@@ -912,7 +912,7 @@ git --no-pager log --pretty=oneline -1")))
 
   (case *host-os*
 
-    ("Linux"
+    ("linux"
      (test-compiler llvm linux)
      (test-assembler)     ; uses x86_64-linux-gnu-objcopy and stuff...
 
@@ -935,11 +935,11 @@ git --no-pager log --pretty=oneline -1")))
   (debug-log "*command-line-arguments*" *command-line-arguments*)
 
   (case *host-os*
-    ("Linux"
+    ("linux"
      (set target/vendor	"unknown")
      (set target/os	"linux")
      (set target/abi	"gnu"))
-    ("Darwin"
+    ("darwin"
      (set target/vendor	"apple")
      (set target/os	"darwin")
      (set target/abi	())
