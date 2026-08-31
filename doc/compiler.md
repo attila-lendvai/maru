@@ -22,9 +22,9 @@ Backends:
    and generate .bc into a memory buffer, and then emit binaries
    without exec'ing external binaries.
 
- - **x86**, **arm**: they directly emit an ELF64 binary. They have no
-   dependencies beyond a bootstrap binary (when using the Linux
-   platform abstraction).
+ - **x86**, **arm**: they emit ELF64: by default a relocatable
+   object (ET_REL, the c-obj) that the C toolchain links; they can
+   also emit a self-contained image. See below.
 
 
 ## Literal values understood by the compiler
@@ -154,27 +154,80 @@ This could come together with the introduction of nested local
 
 ## ELF-emitting backends
 
-The `x86` and `arm` backends directly emit ELF64 binary files.
+The `x86` and `arm` backends run a single compile pass that emits
+definitions into segments (code, ro-data, data, bss) and records a
+fixup for every hole whose resolution is deferred. One ledger, three
+shapes of output, selected by `C-obj-emission-type` (default per
+platform: `c-obj` on the C-based platforms, `standalone` on the linux
+bootstrap; the `C-obj-emission-type=` build key overrides it):
 
-These binaries are `ET_DYN`, which is substantially more complex than
-`ET_EXEC`. The reason is ASLR (address space randomization): if our
-segments are not loaded at the same memory addresses, then we need to
-emit section headers and relocation information for cross-segment
-references.
+```
+             compile-env (one pass)
+  env --> definitions into segments
+      +-> fixups: (segment, hole, target, role)
+                   |
+     +-------------+--------------------+
+     v             v                    v
+   c-obj        standalone           ET_EXEC
+   (ET_REL)     (ET_DYN)             (linux bootstrap)
+   .rela.*      .rela.dyn, dynsym    ledger ignored: all holes
+   symtab       GOT cells,           back-patched at fixed
+   main, _start trampolines, _start  addresses
+     |
+     v
+   clang -o exe exe.o libc.o
+```
 
-For example, the `code` slot of `<target-function>` might point from
-the `data` segment into the `text` segment. Such references need
-relocation information so they can be fixed up by the libc's dynamic
-loader when the binary is loaded.
+ - **c-obj**: a plain relocatable object linked by the C toolchain
+   (the link phase in `build.l`) with the platform's C support files
+   (e.g. `libc.c`). This is our admission ticket into the C universe:
+   foreign calls go out as `PLT32`/`CALL26` relocations against
+   undefined symbols, resolved by ld.
+ - **standalone**: a self-contained image with its own
+   `.dynsym`/`.rela.dyn`; ld.so resolves the externals at load time
+   (a GOT cell per external, filled via `GLOB_DAT`, and a code
+   trampoline jumping through it).
 
-We added `ET_DYN` support because we want to support a C FFI (a
-questionable decision, admittedly). In particular, we want to
-reference symbols in `.so` files and use `dlopen` at runtime.
+The ET_DYN complexity (cross-segment references, relocation info)
+stems from ASLR: if the segments are not loaded at fixed addresses,
+every absolute word needs a relocation. E.g. the `code` slot of a
+`<target-function>` points from `data` into `text`.
 
-Getting admission into the C universe requires quite a bit of
-complexity.
 
-See commit: `x86: emit relocation info, ET_DYN binaries`.
+### The fixup ledger
+
+Fixups are recorded where the holes are born, in the instruction
+encoders (`source/assembler/single-pass*.l`): only there is the
+encoding geometry known (field offset, width, pc-relative or
+absolute). The roles are arch-agnostic (`pc32`, `jump26`,
+`adr-prel-lo21`, `abs64`, ...); `reloc-number` in
+`source/compiler/relocatable-elf.l` maps them to the target's
+relocation numbers.
+
+The type of the reference decides what happens:
+
+ - `<label>` (internal): the assembler back-patches the hole when the
+   label is defined, and records it; the c-obj writer emits it into
+   `.rela.*` against the section symbols, because ld does the final
+   layout. Pc-relative encodings are position-independent, so the
+   standalone image needs no dynamic fixup for them.
+ - `<reloc-symbol>` (undefined external, i.e. FFI): never
+   self-patchable; always recorded, placeholder emitted.
+ - raw `<long>`: carries no referential intent; nothing recorded.
+
+Only the absolute data words (`abs64`) need dynamic fixup in the
+standalone image (`R_*_RELATIVE`); in the c-obj they become `R_*_64`
+against section symbols.
+
+Module-internal symbols are `STB_LOCAL` in the c-obj symtab (the env
+holds shadowed bindings, e.g. two `cdr.code`, which ld would reject);
+only `main`, `_start` and the UND externals are global.
+
+The link alone is not reproducible: the linker records the input
+file names as `STT_FILE` symbols (eval1.o vs eval2.o). So the c-obj
+is linked into an `.unstripped` binary, and `llvm-strip` cuts the
+final artifact -- like the llvm backend -- and the bootstrap's
+fixed-point check (eval1 = eval2) compares the stripped binaries.
 
 
 ## Compilation of types

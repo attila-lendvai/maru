@@ -6,6 +6,11 @@
 
 set -eu
 
+PREVIOUS_STAGE_BACKEND="-llvm"
+PREVIOUS_STAGE="maru.10"
+BUILD="build"
+HOST_DIR="$BUILD/$PREVIOUS_STAGE"
+
 # For running foreign-arch target binaries under qemu-user
 # (binfmt_misc):
 #
@@ -24,11 +29,6 @@ export QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-/usr/aarch64-linux-gnu}"
 #   the guest ld.so loads us into the mmap area where the break cannot
 #   grow anymore.
 export QEMU_RESERVED_VA="${QEMU_RESERVED_VA:-4G}"
-
-PREVIOUS_STAGE_BACKEND="-llvm"
-PREVIOUS_STAGE="maru.10"
-BUILD="build"
-HOST_DIR="$BUILD/$PREVIOUS_STAGE"
 
 ensure_host_binary() {
     if [ ! -e "$HOST_DIR/eval" ]; then
