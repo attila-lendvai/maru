@@ -441,6 +441,12 @@ A list of projects that are relevant in this context:
     initial bootstrap was done not by using another programming
     language/compiler, but by pen and paper!
 
+  - [forsp](https://xorvoid.com/forsp.html): an interesting amalgam of
+    Lisp and Forth. It dosn't self-host in the sense that there's only
+    a forsp.c (16kb, ~600 LoC), there's no compiler written in forsp,
+    but it does have a metacircular example, and a rather small one at
+    that.
+
   - [bootstrappable.org](http://bootstrappable.org/): a community
     around bootstrapping, and making/keeping projects
     bootstrapable. It brings together many interesting projects:
@@ -470,6 +476,10 @@ A list of projects that are relevant in this context:
   - [blynn's Haskell compiler](https://github.com/blynn/compiler):
     bootstrap a Haskell compiler incrementally from C, with extensive
     documentation.
+
+  - [UrScheme](http://canonical.org/~kragen/sw/urscheme/) is a minimal
+    self-hosting compiler of a subset of R5RS in about 1600 lines of
+    Scheme. Targets x86 through a text assembler.
 
   - [ichbins](https://github.com/darius/ichbins) is a minimal
     self-hosting compiler of a Lisp dialect to C in 6 pages of
