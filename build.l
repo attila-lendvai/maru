@@ -153,7 +153,9 @@
                         (when entry
                           (let* ((var (pop entry))
                                  (expected-value (pop entry))
-                                 (actual-value (variable-value *globals* var)))
+                                 ;; accept as good when var is missing from deps (?)
+                                 (actual-value (or (maybe-variable-value *globals* var)
+                                                   expected-value)))
                             (unless (= actual-value
                                        expected-value)
                               (debug-log "yes, due to variable "var", expected "expected-value", actual "actual-value)
