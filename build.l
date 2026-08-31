@@ -309,21 +309,42 @@
 ;; this file is loaded).
 (define ld.so ())
 
+;; glibc: /lib[64]/ld-linux[-<arch>].so.<N>, where N is the loader's
+;; own soname version, which froze at a different number per arch
+;; (the 32-bit x86 name predates the convention, hence no arch
+;; suffix; 64-bit x86 also lives under /lib64). musl is uniform:
+;; /lib/ld-musl-<arch>.so.1
+(define-function canonical-ld.so (arch)
+  (case arch
+    ("x86_64"		"/lib64/ld-linux-x86-64.so.2")
+    (("i686" "i386")	"/lib/ld-linux.so.2")
+    ("aarch64"		"/lib/ld-linux-aarch64.so.1")
+    (else		(error "canonical-ld.so: unknown target/arch '"arch"', please set ld.so explicitly"))))
+
 (define-function effective-ld.so ()
   (unless ld.so
     (set ld.so
-         (if (cross-compiling?)
-             (case target/arch
-               ("aarch64"	"/lib/ld-linux-aarch64.so.1")
-               (("i686" "i386")	"/lib/ld-linux.so.2")
-               (else		(error "effective-ld.so: unknown interpreter path for target/arch '"target/arch"', please set ld.so explicitly")))
-           (when (= host/os "linux")
-             (run-program/shell/stdout
-              "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
-              ;; or alternatively:
-              ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
-              ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
-              )))))
+         (cond
+           ((cross-compiling?)
+            ;; there's no local system to probe for the target's
+            ;; loader; the canonical path is the best default
+            (canonical-ld.so target/arch))
+           ((= host/os "linux")
+            ;; probing the host is the ground truth: it reflects the
+            ;; libc in use (glibc, musl) and non-canonical layouts
+            ;; (e.g. guix), regardless of the host arch
+            (let ((probed (run-program/shell/stdout
+                           "readelf -l /usr/bin/env | sed -n 's@.*Requesting program interpreter: \\(.*\\)]@\\1@p'"
+                           ;; or alternatively:
+                           ;;  "ldd /usr/bin/env | awk '/ld-linux/ {print ($3 ? $3 : $1)}'"
+                           ;;  ll $(guix build --system=aarch64-linux glibc | tail -n 2 | head -n 1)/lib/ld-linux*
+                           )))
+              (if (< 0 (string-length probed))
+                  probed
+                (canonical-ld.so target/arch))))
+           (else
+            ;; e.g. darwin: Mach-O, no ELF interpreter
+            ()))))
   ld.so)
 
 ;; eval0-phase check-outs the most recent commit into build/eval0, and
