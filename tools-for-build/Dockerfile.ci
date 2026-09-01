@@ -14,7 +14,7 @@
 # inspect the image
 # podman run --rm -it ghcr.io/attila-lendvai/maru-ci:amd64 bash
 
-FROM docker.io/ubuntu:24.04
+FROM docker.io/ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,7 +31,7 @@ RUN apt-get update && \
         bash \
         make \
         llvm \
-        clang-20 \
+        clang-22 \
         lld \
         libc6-dev \
         libffi-dev \
@@ -78,8 +78,8 @@ RUN apt-get update && \
 # Ensure bash is the default shell
 # SHELL ["/bin/bash", "-c"]
 
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 && \
-    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100 && \
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100 && \
     update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 && \
     update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
