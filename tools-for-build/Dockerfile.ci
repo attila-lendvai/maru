@@ -49,26 +49,22 @@ RUN apt-get update && \
         qemu-user-binfmt \
         musl \
         musl-dev \
-    # Conditional packages per host arch
-    #
-    # clang needs the gcc runtime files (crtbegin.o et al, libgcc):
-    # its gcc installation detection only succeeds once they exist,
-    # and only then does it adopt the cross sysroot /usr/<triple>.
-    # hence no compilers, just the libgcc-13-dev files ("13" tracks
-    # the default gcc of the FROM image). NB: libc cross packages are
-    # named after the Debian arch (amd64, i386), the gcc ones after
-    # the triplet (x86-64). the cross libc-dev packages are only
-    # Recommends, so they must stay explicit under
-    # --no-install-recommends.
+    # Conditional packages per host arch: the cross gcc's of the
+    # foreign targets. clang needs them for its gcc installation
+    # detection to find crtbegin et al (the native libgcc comes with
+    # clang itself). build.l points clang at the cross sysroot
+    # /usr/<triple> that they provide (clang does not adopt it on its
+    # own). NB: the cross libc-dev packages are only Recommends, so
+    # they must stay explicit under --no-install-recommends.
     && if [ "$TARGETARCH" = "amd64" ]; then \
-      apt-get install -y --no-install-recommends libc6-dev-i386 \
-        libgcc-13-dev lib32gcc-13-dev libc6-dev-arm64-cross \
-        libgcc-13-dev-arm64-cross; \
+      apt-get install -y --no-install-recommends \
+        gcc-aarch64-linux-gnu gcc-i686-linux-gnu \
+        libc6-dev-arm64-cross libc6-dev-i386-cross; \
     fi \
     && if [ "$TARGETARCH" = "aarch64" ]; then \
-      apt-get install -y --no-install-recommends libc6-dev-i386-cross \
-        libc6-dev-amd64-cross libgcc-13-dev-i386-cross \
-        libgcc-13-dev-amd64-cross; \
+      apt-get install -y --no-install-recommends \
+        gcc-x86-64-linux-gnu gcc-i686-linux-gnu \
+        libc6-dev-amd64-cross libc6-dev-i386-cross; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
