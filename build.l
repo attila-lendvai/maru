@@ -301,6 +301,28 @@
 (define-function cross-compiling? ()
   (not (= target/arch host/arch)))
 
+;; Debian's cross toolchains keep the target's headers and libs at
+;; /usr/<triple-ish>, but clang only searches them when told
+;; explicitly: without it cross compiles pick up the host's
+;; /usr/include. --sysroot is not usable for this: it disables the
+;; gcc installation detection (crtbegin, libgcc) and makes ld
+;; re-root the absolute paths of Debian's libc.so linker script
+;; inside the sysroot. an absent dir (e.g. Guix, or multilib-style
+;; native layouts) means no flags, i.e. the old behavior.
+(define-function cross-sysroot (arch)
+  (case arch
+    ("x86_64"		"/usr/x86-64-linux-gnu")
+    (("i686" "i386")	"/usr/i686-linux-gnu")
+    ("aarch64"		"/usr/aarch64-linux-gnu")
+    (else		())))
+
+(define-function C-cross-flags ()
+  (let ((dir (and (cross-compiling?)
+                  (cross-sysroot target/arch))))
+    (if (and dir (file-exists? dir))
+        (concat-strings " -isystem " dir "/include -B" dir "/lib -L" dir "/lib")
+      "")))
+
 ;; the ELF interpreter path to embed into the target binaries. it can
 ;; be overridden from the command line with ld.so=...; when not set,
 ;; effective-ld.so resolves a default based on target/arch at use time
@@ -501,6 +523,7 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
               "")))
       ($ clang" "lcflags
          " --target="(target-triple)
+         (C-cross-flags)
          " -o '"output"' '"full-path"' "more-files-str)))
   output)
 
