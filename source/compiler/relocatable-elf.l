@@ -320,27 +320,13 @@
 ;;;
 ;;; ELF header
 ;;;
-  (label!	'elf-header-start)
-  (.i8		0x7f)                   ; ident[0]
-  (.ascii	"ELF")
-  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
-  (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		elf/ET_DYN)      ; e_type
-  (.i16		arch)            ; e_machine
-  (.i32		1)               ; e_version
-  (.i64		(closure-code-label '_start)) ; e_entry (entry point)
-  (.i64		(label 'program-headers	(- self (laddress 'elf-header-start)))) ; e_phoff	Start of program headers (file offset)
-  (.i64		(label 'section-headers	(- self (laddress 'elf-header-start)))) ; e_shoff	Start of section headers
-  (.i32		0)               ; e_flags
-  (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
-  (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-program-headers+)   ; e_phnum	Number of program headers
-  (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize	Size of section header
-  (.i16		+n-section-headers+)   ; e_shnum	Number of section headers
-  (.i16		+.shstrtab-section-index+) ; e_shstrndx	Section header string table index
-  (label!	'elf-header-end)
-
-  (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr))
+  (emit-elf-header elf/ET_DYN arch
+                   (closure-code-label '_start)
+                   'program-headers
+                   +n-program-headers+
+                   'section-headers
+                   +n-section-headers+
+                   +.shstrtab-section-index+)
 
 ;;;
 ;;; Program headers (segment layout)
@@ -736,24 +722,12 @@
     (.segment 'elf-prefix)
     (.base 0)
 
-    (label!	'elf-header-start)
-    (.i8	0x7f)                   ; ident[0]
-    (.ascii	"ELF")
-    (.i8	elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
-    (.i8	0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-    (.i16	elf/ET_REL)      ; e_type
-    (.i16	arch)            ; e_machine
-    (.i32	1)               ; e_version
-    (.i64	0)               ; e_entry (objects have none)
-    (.i64	0)               ; e_phoff (objects have no program headers)
-    (.i64	(second (%c-obj-layout-entry layout 'shdr-table))) ; e_shoff
-    (.i32	0)               ; e_flags
-    (.i16	elf/sizeof-Elf64_Ehdr) ; e_ehsize
-    (.i16	0)               ; e_phentsize
-    (.i16	0)               ; e_phnum
-    (.i16	elf/sizeof-Elf64_Shdr) ; e_shentsize
-    (.i16	+n-section-headers+)   ; e_shnum
-    (.i16	+c-obj/.shstrtab-section-index+) ; e_shstrndx
+    (emit-elf-header elf/ET_REL arch
+                     0
+                     0 0
+                     (second (%c-obj-layout-entry layout 'shdr-table))
+                     +n-section-headers+
+                     +c-obj/.shstrtab-section-index+)
 
     (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
 

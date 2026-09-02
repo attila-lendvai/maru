@@ -441,6 +441,35 @@
 (define-constant +bss-segment-address+		(+ +data-segment-address+	+data-segment-space+))
 (define-constant +bss-segment-space+		0xffffffff) ; there's space for plenty of nothing at the end...
 
+;; The ELF header, shared by the three elf writers. E-PHOFF and E-SHOFF
+;; accept a number or a section desig; the desig form resolves as a
+;; fixup relative to the header start (file offset arithmetic).
+(define-function emit-elf-header (e-type arch e-entry e-phoff e-phnum e-shoff e-shnum e-shstrndx)
+  (label!	'elf-header-start)
+  (.i8		0x7f)                   ; ident[0]
+  (.ascii	"ELF")
+  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
+  (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
+  (.i16		e-type)          ; e_type
+  (.i16		arch)            ; e_machine
+  (.i32		1)               ; e_version
+  (.i64		e-entry)         ; e_entry (entry point)
+  (.i64		(if (symbol? e-phoff)
+                    (label e-phoff (- self (laddress 'elf-header-start)))
+                  e-phoff))      ; e_phoff
+  (.i64		(if (symbol? e-shoff)
+                    (label e-shoff (- self (laddress 'elf-header-start)))
+                  e-shoff))      ; e_shoff
+  (.i32		0)               ; e_flags
+  (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize
+  (.i16		(if (= 0 e-phnum) 0 elf/sizeof-Elf64_Phdr)) ; e_phentsize
+  (.i16		e-phnum)         ; e_phnum
+  (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize
+  (.i16		e-shnum)         ; e_shnum
+  (.i16		e-shstrndx)      ; e_shstrndx
+  (label!	'elf-header-end)
+  (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr)))
+
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))
 
@@ -469,27 +498,11 @@
 ;;;
 ;;; ELF header
 ;;;
-  (label!	'elf-header-start)
-  (.i8		0x7f)                   ; ident[0]
-  (.ascii	"ELF")
-  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
-  (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		elf/ET_EXEC)     ; e_type
-  (.i16		arch)            ; e_machine
-  (.i32		1)               ; e_version
-  (.i64		(closure-code-label '_start)) ; e_entry (entry point)
-  (.i64		(label 'program-headers	(- self (laddress 'elf-header-start)))) ; e_phoff	Start of program headers (file offset)
-  (.i64		0)               ; e_shoff (no section headers)
-  (.i32		0)               ; e_flags
-  (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
-  (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-program-headers+)   ; e_phnum	Number of program headers
-  (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize	Size of section header
-  (.i16		0)               ; e_shnum	Number of section headers
-  (.i16		0)               ; e_shstrndx	Section header string table index
-  (label!	'elf-header-end)
-
-  (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr))
+  (emit-elf-header elf/ET_EXEC arch
+                   (closure-code-label '_start)
+                   'program-headers
+                   +n-program-headers+
+                   0 0 0)
 
 ;;;
 ;;; Program headers (segment layout)
