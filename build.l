@@ -311,7 +311,7 @@
 ;; native layouts) means no flags, i.e. the old behavior.
 (define-function cross-sysroot (arch)
   (case arch
-    ("x86_64"		"/usr/x86-64-linux-gnu")
+    ("x86_64"		"/usr/x86_64-linux-gnu")
     (("i686" "i386")	"/usr/i686-linux-gnu")
     ("aarch64"		"/usr/aarch64-linux-gnu")
     (else		())))

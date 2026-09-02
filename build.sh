@@ -4,6 +4,10 @@
 # clear && ./build.sh target/arch=i686 bootstrap llvm linux
 # clear && ./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
 
+echo '******'
+echo '***' build.sh "$@"
+echo '******'
+
 set -eu
 
 PREVIOUS_STAGE_BACKEND="-llvm"
