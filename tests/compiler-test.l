@@ -125,6 +125,46 @@
       ((oop-at buf 0) 10 30 2))
   42)
 
+;; The standalone emission (elf-emission-type=standalone) has no link
+;; phase, so the platform's C glue (the maru_ wrappers of libc.c)
+;; would end up as unresolved UND symbols that ld.so aborts on at
+;; startup (GLOB_DAT relocs are processed eagerly). Redefine them here
+;; with direct libc references, so the glue <C-function>s stay
+;; unreferenced and never enter .dynsym.
+
+(define-form standalone-emission? ()
+  (eval-in-slave '(and (= "standalone" elf-emission-type)
+                   ;; TODO this, but it's only defined while bootstrapping: (feature platform/libc)
+                   (feature cffi))))
+
+(when-at-expand (standalone-emission?)
+  (define-C-function libc/fdopen		* fdopen (int *))
+  (define-function libc/get_stdin ()		(libc/fdopen 0 (C-string "r")))
+  (define-function libc/get_stdout ()		(libc/fdopen 1 (C-string "w")))
+  (define-function libc/get_stderr ()		(libc/fdopen 2 (C-string "w")))
+  (define-C-function libc/__errno_location	* __errno_location ())
+  (define-function libc/get_errno ()		(oop-at (libc/__errno_location) 0))
+  (define-C-function libc/chdir			int chdir (*))
+
+  (define-C-function libc/getcwd		* getcwd (* size_t))
+
+  (define-C-function libc/stat			int stat (* *))
+  (define libc/file_modification_time
+    (lambda (path)
+      ;; struct stat's st_mtim.tv_sec lives at offset 80 on x86-64 and
+      ;; aarch64; the wrapper's contract only needs a plausible mtime
+      (let ((buf (libc/malloc 144)))
+        (if (= 0 (libc/stat path buf))
+            (oop-at buf 10)
+          -1))))
+
+  (define-test compile/foreign-direct-libc/1
+      (let ((ret (libc/chdir (C-string "/"))))
+        (and (= 0 ret)
+             (= 0 (libc/strcmp (libc/getcwd (libc/malloc 128) 128)
+                               (C-string "/")))))
+    true))
+
 (when-at-expand (feature platform/libc)
 
   (define-test compile/foreign-function/1
