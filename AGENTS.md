@@ -83,7 +83,10 @@ byte-identical to eval2) implicitly; no separate step needed.
 - Source files are ASCII only -- no Unicode in comments or strings
 - `define-function` for named functions, `define-form` for macros
 - `define-test` + `test-assert` + `run-tests()` for interpreted tests
-- Predicates end with `?`, private helpers start with `%`, globals in `*...*`
+- Predicates end with `?`, globals in `*...*`. The `%` prefix marks internal helpers that
+  exist solely in service of another definition; a function that a reader needs to follow
+  the code -- shared across call sites, part of a subsystem's surface -- is not prefixed
+  (e.g. `emit-elf-header`), even if it is called from only one place.
 - Record/type names in angle brackets: `<segment>`, `<label>`
 - 2-space indentation, closing parens on same line (stacked: `))`)
 
