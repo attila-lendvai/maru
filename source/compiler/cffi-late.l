@@ -9,10 +9,12 @@
   ;; relocation in the standalone image, and by the static linker
   ;; through an R_*_64 one (pointing at the UND symbol) in the c-obj.
   (or (<external-symbol>-got-label entry)
-      (with-new-label 'data
-        (if (= "c-obj" elf-emission-type)
-            (.i64 (reloc-symbol (<external-symbol>-name entry)))
-          (emit CELL 0)))))
+      (let ((label (with-new-label 'data
+                     (if (= "c-obj" elf-emission-type)
+                         (.i64 (reloc-symbol (<external-symbol>-name entry)))
+                       (emit CELL 0)))))
+        (set (<external-symbol>-got-label entry) label)
+        label)))
 
 ;;; FFI: a C-function gets a code trampoline that jumps through its GOT
 ;;; cell. The GOT cell is emitted at the first reference, and the

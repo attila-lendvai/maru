@@ -983,6 +983,30 @@ git --no-pager log --pretty=oneline -1")))
                                   input-file output-name true)))
         ($ binary)))))
 
+;; The standalone ET_DYN emission of the elf backends: it has no link
+;; phase, so this is the only automated target that exercises
+;; write-standalone-elf-to-stream end to end (ld.so loads the artifact
+;; through PT_INTERP). See the guarded FFI redefinitions in
+;; compiler-test.l that make the artifact bootable.
+(define-function test-standalone-elf args
+  (debug-log "test-standalone-elf is starting")
+  (let ((backend  (or (pop args) default-backend))
+        (platform (or (pop args) default-platform)))
+    (let* ((input-file	"tests/compiler-test.l")
+           (output-name	"standalone-test")
+           (stage0	(compile-maru/stage-0 backend platform))
+           (host-dir	(pop stage0))
+           (host-eval	(pop stage0)))
+      ;; the artifact's .vars records the emission type, so the cache
+      ;; stays correct; a failed run kills this process, which resets
+      ;; the variable anyway
+      (let ((prev-emission-type elf-emission-type))
+        (set elf-emission-type "standalone")
+        (let ((binary (compile-maru backend platform host-dir host-eval *slave-dir*
+                                    input-file output-name true)))
+          (set elf-emission-type prev-emission-type)
+          ($ binary))))))
+
 (define-function test ()
   (test-compiler llvm libc)
   (test-compiler llvm posix)
@@ -992,18 +1016,21 @@ git --no-pager log --pretty=oneline -1")))
   (case host/os
 
     ("linux"
+
      (test-compiler llvm linux)
      (test-assembler)     ; uses x86_64-linux-gnu-objcopy and stuff...
 
      (case host/arch
 
-       ("x86_64"
+      ("x86_64"
         (test-compiler x86 linux)
+        (test-standalone-elf x86 libc)
         (test-elf)
         (test-jit))
 
-       ("aarch64"
-        (test-compiler arm linux)))))
+      ("aarch64"
+        (test-compiler arm linux)
+        (test-standalone-elf arm libc)))))
   )
 
 ;;;

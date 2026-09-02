@@ -11,6 +11,8 @@ backends (x86-64 ELF, aarch64 ELF, LLVM IR), runtime assemblers
 - `./build.sh test-evaluator` — uses default-backend/default-platform
 - `./build.sh test-assembler-arm` / `test-assembler-x86` / `test-assembler` — assembler encoding tests vs clang references
 - `./build.sh test-compiler <backend> <platform>` — compiled standalone executable tests
+- `./build.sh test-standalone <backend> <platform>` — the standalone ET_DYN emission of the elf
+  backends: compiles the compiler tests into an ld.so-loaded image and runs it
 - `./build.sh repl <backend> <platform>` — launch interactive REPL
 
 Cross-building aarch64 linux on an x86_64 host (runs via qemu-user +
