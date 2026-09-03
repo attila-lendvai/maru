@@ -317,128 +317,87 @@
   (.segment 'elf-prefix)
   (.base 0) ; without this the laddress is random, which disrupts .align
 
-;;;
-;;; ELF header
-;;;
-  (emit-elf-header elf/ET_DYN arch
-                   (closure-code-label '_start)
-                   'program-headers
-                   +n-program-headers+
-                   'section-headers
-                   +n-section-headers+
-                   +.shstrtab-section-index+)
+  ;; the ELF header alone is the file prefix; the program header table
+  ;; gets appended to the (mapped) text segment, so that AT_PHDR (load
+  ;; bias + e_phoff) keeps pointing into the first PT_LOAD
+  (let* ((pos		(align 8 (+ +elf-prefix-size+ (segment-length 'code))))
+         (table-size	(* +n-program-headers+ elf/sizeof-Elf64_Phdr))
+         (text-end	(align elf/page-size (+ pos table-size)))
+         (file-offsets	`((code		0)
+                            (ro-data	,text-end)
+                            (data	,(+ text-end (segment-length 'ro-data)))
+                            (bss	,(+ text-end
+                                                (segment-length 'ro-data)
+                                                (segment-length 'data)))))
+         (size/text	text-end)
+         (size/ro-data	(segment-length 'ro-data))
+         (size/data	(segment-length 'data))
+         (size/bss	(bss-size))
+         (size/relocation-tables (- (laddress '.dynamic-end)
+                                    (laddress '.dynamic)))
+         (file-offset/text	0)
+         (file-offset/ro-data	text-end)
+         (file-offset/data	(+ text-end size/ro-data))
+         (file-position	(%file-offset file-offsets 'bss)))
+
+    (emit-elf-header elf/ET_DYN arch
+                     (closure-code-label '_start)
+                     pos
+                     +n-program-headers+
+                     'section-headers
+                     +n-section-headers+
+                     +.shstrtab-section-index+)
 
 ;;;
 ;;; Program headers (segment layout)
 ;;;
-  (label! 'program-headers)
+    (with-current-segment 'code
+      (.align 8)
+      (label! 'phdr-table)
 
-  ;; code segment
-  (let* ((file-position		0)
-         (file-offset/text	file-position)
-         ;; the elf header is included into the code segment as per convention
-         (size/text		(+ (segment-length 'code) +elf-prefix-size+))
-         file-offset/ro-data
-         size/ro-data
-         file-offset/data
-         size/data
-         size/bss
-         size/relocation-tables)
-
-    ;; PT_PHDR
-    (let ((size
-            ;; TODO FIXME? this yields different values for the two sizes emitted. but why?
-            ;; (label 'program-headers-end (- self (laddress 'program-headers)))
-            ;; (label 'program-headers-end (- (laddress 'program-headers-end) (laddress 'program-headers)))
-            (* +n-program-headers+
-               elf/sizeof-Elf64_Phdr)))
+      ;; PT_PHDR
       (emit-program-header elf/PT_PHDR
-                           (paddress 'program-headers)
-                           size size
+                           pos
+                           table-size table-size
                            elf/PF_R
                            8
-                           (laddress 'program-headers)))
+                           (laddress 'phdr-table))
 
-    ;; text segment
-    (emit-program-header elf/PT_LOAD
-                         file-offset/text
-                         size/text size/text
-                         (+ elf/PF_R elf/PF_X)
-                         elf/page-size
-                         +code-segment-address+
-                         +code-segment-space+)
-    (incr file-position size/text)
+      (emit-base-load-phdrs file-offsets text-end)
 
-    ;; ro-data segment (must be last, because this will also mmap the )
-    (set size/ro-data (segment-length 'ro-data))
-    (set file-offset/ro-data file-position)
-    (emit-program-header elf/PT_LOAD
-                         file-offset/ro-data
-                         size/ro-data size/ro-data
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +ro-data-segment-address+
-                         +ro-data-segment-space+)
-    (incr file-position size/ro-data)
-
-    ;; mark the entire ro-data segment to become read-only after
-    ;; relocation is finished. note that it's possible to mark only a
-    ;; subset of it using this extra PT_GNU_RELRO program header.
-    (emit-program-header elf/PT_GNU_RELRO file-offset/ro-data
-                         size/ro-data size/ro-data
-                         elf/PF_R
-                         elf/page-size
-                         +ro-data-segment-address+)
-
-    ;; data segment
-    (set size/data (segment-length 'data))
-    (set file-offset/data file-position)
-    (emit-program-header elf/PT_LOAD
-                         file-offset/data
-                         size/data size/data
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +data-segment-address+
-                         +data-segment-space+)
-    (incr file-position size/data)
-
-    ;; BSS, aka zero-initialized data
-    (set size/bss (segment-length 'bss))
-    (when (= 0 size/bss)
-      ;; zero is illegal, and not emitting is more trouble than just
-      ;; setting it to 1.
-      (set size/bss 1))
-    (emit-program-header elf/PT_LOAD
-                         file-position
-                         0 size/bss
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +bss-segment-address+
-                         +bss-segment-space+)
-
-    ;; PT_INTERP segment (dynamic linker path)
-    ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
-    (let ((interp-size (- (laddress 'elf-interpreter-end)
-                          (laddress 'elf-interpreter-start))))
-      (emit-program-header elf/PT_INTERP
-                           (+ file-offset/ro-data
-                              (paddress 'elf-interpreter-start))
-                           interp-size interp-size
+      ;; mark the entire ro-data segment to become read-only after
+      ;; relocation is finished. note that it's possible to mark only a
+      ;; subset of it using this extra PT_GNU_RELRO program header.
+      (emit-program-header elf/PT_GNU_RELRO (%file-offset file-offsets 'ro-data)
+                           size/ro-data size/ro-data
                            elf/PF_R
-                           1
-                           (laddress 'elf-interpreter-start)))
+                           elf/page-size
+                           (%segment-base 'ro-data))
 
-    (set size/relocation-tables (- (laddress '.dynamic-end)
-                                   (laddress '.dynamic)))
-    (emit-program-header elf/PT_DYNAMIC
-                         (+ file-offset/ro-data
-                            (paddress '.dynamic))
-                         size/relocation-tables size/relocation-tables
-                         elf/PF_R
-                         8
-                         (laddress '.dynamic))
+      ;; PT_INTERP segment (dynamic linker path)
+      ;; NOTE: PT_INTERP doesn't add file content - it references existing .rodata content
+      (let ((interp-size (- (laddress 'elf-interpreter-end)
+                            (laddress 'elf-interpreter-start))))
+        (emit-program-header elf/PT_INTERP
+                             (+ (%file-offset file-offsets 'ro-data)
+                                (paddress 'elf-interpreter-start))
+                             interp-size interp-size
+                             elf/PF_R
+                             1
+                             (laddress 'elf-interpreter-start)))
 
-  (label! 'program-headers-end)
+      (emit-program-header elf/PT_DYNAMIC
+                           (+ (%file-offset file-offsets 'ro-data)
+                              (paddress '.dynamic))
+                           size/relocation-tables size/relocation-tables
+                           elf/PF_R
+                           8
+                           (laddress '.dynamic))
+
+      ;; the trailing padding makes the next segment's file offset
+      ;; page-congruent with its base
+      (.align elf/page-size)
+      (assert (= (+ +elf-prefix-size+ (segment-length 'code)) text-end)))
 
   (label! 'section-headers)
 
