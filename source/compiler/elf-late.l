@@ -410,24 +410,19 @@
 (define-constant +n-section-headers+
     (if-feature relocatable-elf 11 0))
 
+;; The file prefix: the bytes before the code segment, whose size the
+;; code segment's laddress base must match (the text LOAD maps them
+;; congruently). The c-obj has no program headers and its section
+;; header table goes to the end of the file; the standalone image
+;; still carries its section header table in the prefix, while the
+;; program header table goes to the end of the text segment.
 (define-constant +elf-prefix-size+
     (if-feature relocatable-elf
         (if-at-expand (= "c-obj" elf-emission-type)
-            ;; the c-obj has no program headers, and its section header
-            ;; table goes to the end of the file
             elf/sizeof-Elf64_Ehdr
-          ;; the ET_DYN image keeps its program headers and section
-          ;; headers in the prefix
           (+ elf/sizeof-Elf64_Ehdr
-             (* +n-program-headers+
-                elf/sizeof-Elf64_Phdr)
-             (* +n-section-headers+
-                elf/sizeof-Elf64_Shdr)))
-      (+ elf/sizeof-Elf64_Ehdr
-         (* +n-program-headers+
-            elf/sizeof-Elf64_Phdr)
-         (* +n-section-headers+
-            elf/sizeof-Elf64_Shdr))))
+             (* +n-section-headers+ elf/sizeof-Elf64_Shdr)))
+      elf/sizeof-Elf64_Ehdr))
 
 (define-constant +code-segment-address+		(if-feature relocatable-elf 0 0x00400000))
 (define-constant +code-segment-space+		0x00040000)
@@ -470,6 +465,59 @@
   (label!	'elf-header-end)
   (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr)))
 
+;; The bss segment carries no file content, but a zero memsz is
+;; illegal in a PT_LOAD.
+(define-function bss-size ()
+  (max 1 (segment-length 'bss)))
+
+(define-function %file-offset (file-offsets name)
+  (second (list-find-if (lambda (entry)
+                          (= name (first entry)))
+                        file-offsets)))
+
+;; the segment's base vaddr; the laddress slot is a moving cursor that
+;; advances with emission, so it must be rebased by the paddress
+(define-function %segment-base (name)
+  (let ((segment (get-segment name)))
+    (- (<segment>-laddress segment)
+       (<segment>-paddress segment))))
+
+;; Emits the four PT_LOAD program headers covering the assembler's
+;; segments. The vaddrs come from the segments' bases; the PT_LOAD
+;; p_offsets from FILE-OFFSETS ((name offset) ...). The text LOAD's
+;; size is TEXT-FILESZ: it covers the file prefix and this very
+;; program header table, which is being appended to the code segment
+;; as we emit. Returns FILE-OFFSETS.
+(define-function emit-base-load-phdrs (file-offsets text-filesz)
+  (list-do entry (list (list 'code	(+ elf/PF_R elf/PF_X)	+code-segment-space+)
+                       (list 'ro-data	(+ elf/PF_R elf/PF_W)	+ro-data-segment-space+)
+                       (list 'data	(+ elf/PF_R elf/PF_W)	+data-segment-space+))
+    (let* ((name	(first entry))
+           (size	(if (= name 'code)
+                            text-filesz
+                          (segment-length name))))
+      (emit-program-header elf/PT_LOAD
+                           (%file-offset file-offsets name)
+                           size size
+                           (second entry)
+                           elf/page-size
+                           (if (= name 'code)
+                               ;; the LOAD starts at the file's first
+                               ;; byte (the prefix), which maps at
+                               ;; +code-segment-address+; the segment's
+                               ;; own base sits behind the prefix
+                               +code-segment-address+
+                             (%segment-base name))
+                           (third entry))))
+  (emit-program-header elf/PT_LOAD
+                       (%file-offset file-offsets 'bss)
+                       0 (bss-size)
+                       (+ elf/PF_R elf/PF_W)
+                       elf/page-size
+                       (%segment-base 'bss)
+                       +bss-segment-space+)
+  file-offsets)
+
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))
 
@@ -495,77 +543,32 @@
   (.segment 'elf-prefix)
   (.base 0) ; without this the laddress is random, which disrupts .align
 
-;;;
-;;; ELF header
-;;;
-  (emit-elf-header elf/ET_EXEC arch
-                   (closure-code-label '_start)
-                   'program-headers
-                   +n-program-headers+
-                   0 0 0)
+  ;; the ELF header alone is the file prefix; the program header table
+  ;; gets appended to the (mapped) text segment, so that AT_PHDR (load
+  ;; bias + e_phoff) keeps pointing into the first PT_LOAD
+  (let* ((pos		(align 8 (+ +elf-prefix-size+ (segment-length 'code))))
+         (table-size	(* +n-program-headers+ elf/sizeof-Elf64_Phdr))
+         (text-end	(align elf/page-size (+ pos table-size)))
+         (file-offsets	`((code		0)
+                            (ro-data	,text-end)
+                            (data	,(+ text-end (segment-length 'ro-data)))
+                            (bss	,(+ text-end
+                                                (segment-length 'ro-data)
+                                                (segment-length 'data))))))
+    (emit-elf-header elf/ET_EXEC arch
+                     (closure-code-label '_start)
+                     pos
+                     +n-program-headers+
+                     0 0 0)
 
-;;;
-;;; Program headers (segment layout)
-;;;
-  (label! 'program-headers)
-
-  (let* ((file-position		0)
-         (file-offset/text	file-position)
-         ;; the elf header is included into the code segment as per convention
-         (size/text		(+ (segment-length 'code) +elf-prefix-size+))
-         file-offset/ro-data
-         size/ro-data
-         file-offset/data
-         size/data
-         size/bss)
-
-    ;; text segment
-    (emit-program-header elf/PT_LOAD
-                         file-offset/text
-                         size/text size/text
-                         (+ elf/PF_R elf/PF_X)
-                         elf/page-size
-                         +code-segment-address+
-                         +code-segment-space+)
-    (incr file-position size/text)
-
-    ;; ro-data segment
-    (set size/ro-data (segment-length 'ro-data))
-    (set file-offset/ro-data file-position)
-    (emit-program-header elf/PT_LOAD
-                         file-offset/ro-data
-                         size/ro-data size/ro-data
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +ro-data-segment-address+
-                         +ro-data-segment-space+)
-    (incr file-position size/ro-data)
-
-    ;; data segment
-    (set size/data (segment-length 'data))
-    (set file-offset/data file-position)
-    (emit-program-header elf/PT_LOAD
-                         file-offset/data
-                         size/data size/data
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +data-segment-address+
-                         +data-segment-space+)
-    (incr file-position size/data)
-
-    ;; BSS, aka zero-initialized data
-    (set size/bss (segment-length 'bss))
-    (when (= 0 size/bss)
-      ;; zero is illegal, and not emitting is more trouble than just
-      ;; setting it to 1.
-      (set size/bss 1))
-    (emit-program-header elf/PT_LOAD
-                         file-position
-                         0 size/bss
-                         (+ elf/PF_R elf/PF_W)
-                         elf/page-size
-                         +bss-segment-address+
-                         +bss-segment-space+))
+    (with-current-segment 'code
+      (.align 8)
+      (label! 'phdr-table)
+      (emit-base-load-phdrs file-offsets text-end)
+      ;; the trailing padding makes the next segment's file offset
+      ;; page-congruent with its base
+      (.align elf/page-size)
+      (assert (= (+ +elf-prefix-size+ (segment-length 'code)) text-end))))
 
   (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
 
