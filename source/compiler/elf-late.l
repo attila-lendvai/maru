@@ -137,7 +137,7 @@
     (while expr
       (comp (car expr))
       (when (set expr (cdr expr))
-        (emit BF $ done)))
+        (emit GOTOF $ done)))
     (label! done)))
 
 (define-function sf/or (expr -c-)
@@ -146,7 +146,7 @@
     (while expr
       (comp (car expr))
       (when (set expr (cdr expr))
-        (emit BT $ done)))
+        (emit GOTOT $ done)))
     (label! done)))
 
 (define-function sf/if (expr -c-)
@@ -159,12 +159,12 @@
     ;; the current-value from the condition is false when we jump to
     ;; the else branch, therefore we don't need to clear the
     ;; current-value when the else branch is empty.
-    (emit BF $ l/false)
+    (emit GOTOF $ l/false)
     (comp then)
     ;; therefore, we can just fall through with the return value of
     ;; the true branch when the else branch is empty.
     (when else
-      (emit BR l/end))
+      (emit GOTO l/end))
     (label! l/false)
     (list-do stmt else
       (comp stmt))
@@ -175,19 +175,19 @@
         (l/cond	(label))
         (body	(cddr expr)))
     (when body ; only need to skip it at first if there's any at all
-      (emit BR l/cond))
+      (emit GOTO l/cond))
     (label! l/body)
     (list-do stmt body
       (and stmt (comp stmt)))
     (label! l/cond)
     (comp (second expr))
-    (emit BT $ l/body)))
+    (emit GOTOT $ l/body)))
 
 (define-function sf/return (expr -c-)
   (list-do stmt (cdr expr)
     (comp stmt))
-  (emit BR (or (<compiler>-fn-epilogue-label -c-)
-               (set (<compiler>-fn-epilogue-label -c-) (label)))))
+  (emit GOTO (or (<compiler>-fn-epilogue-label -c-)
+                 (set (<compiler>-fn-epilogue-label -c-) (label)))))
 
 (define-function sf/lambda (form -c-)
   (let ((expr (eval form)))

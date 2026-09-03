@@ -38,14 +38,14 @@
 ;;; INSTRUCTIONS
 ;;;
 
-(define-instruction BR		()
+(define-instruction GOTO	()
   ((label)			(JMPQrel32 $1)))
 
-(define-instruction BF		(true 0 false)
+(define-instruction GOTOF	(true 0 false)
   ((REGISTER label)		(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
                                 (JE $2)))
 
-(define-instruction BT		(true 0 false)
+(define-instruction GOTOT	(true 0 false)
   ((REGISTER label)		(TESTQrr (<REGISTER>-name $1) (<REGISTER>-name $1))
                                 (JNE $2)))
 

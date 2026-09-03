@@ -54,14 +54,14 @@
 ;;; INSTRUCTIONS
 ;;;
 
-(define-instruction BR		()
+(define-instruction GOTO	()
   ((label)			(B $1)))
 
-(define-instruction BF		(true 0 false)
+(define-instruction GOTOF	(true 0 false)
   ((REGISTER label)		(ANDSr XZR (<REGISTER>-name $1) (<REGISTER>-name $1))
                                 (BEQ $2)))
 
-(define-instruction BT		(true 0 false)
+(define-instruction GOTOT	(true 0 false)
   ((REGISTER label)		(ANDSr XZR (<REGISTER>-name $1) (<REGISTER>-name $1))
                                 (BNE $2)))
 
