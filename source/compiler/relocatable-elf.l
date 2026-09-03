@@ -313,10 +313,8 @@
 
   (.segment	'ro-data)
   (label!	'elf-interpreter-start)
-  (.ascii	+ld.so-path+)
-  (.i8		0)
+  (.asciiz	+ld.so-path+)
   (label!	'elf-interpreter-end)
-
   (.align	elf/page-size)
 
   ;; append the program header table to the text segment, so that

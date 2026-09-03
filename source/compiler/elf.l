@@ -153,8 +153,7 @@
   (emit-comment 3 "emit-object/C-string for: "self)
   (GLOBAL-ADDR
    (with-new-label 'ro-data
-     (.ascii self)
-     (.i8 0))))
+     (.asciiz self))))
 
 (define-method compile-object <string> (-c-)
   (emit-object/C-string self -c-))

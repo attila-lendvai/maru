@@ -47,14 +47,12 @@
   (let ((offset 1))
     (list-do entry *external-symbols*
       (set (<external-symbol>-name-offset entry) offset)
-      (.ascii (<external-symbol>-name entry))
-      (.i8 0)
+      (.asciiz (<external-symbol>-name entry))
       (incr offset (+ 1 (string-length (<external-symbol>-name entry)))))
     ;; only add a DT_NEEDED entry when there are externals to resolve
     (when (pair? *external-symbols*)
       (set *libc-soname-offset* offset)
-      (.ascii +libc-soname+)
-      (.i8 0)))
+      (.asciiz +libc-soname+)))
   (label! '.dynstr-end))
 
 (define-function emit-dynsym ()

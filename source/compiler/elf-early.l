@@ -213,8 +213,7 @@
   (let (result)
     (with-current-segment segment-name
       (set result (current-paddress))
-      (.ascii	(symbol->string str)) ; symbol->string is also ok for strings
-      (.i8 0))
+      (.asciiz	(symbol->string str))) ; symbol->string is also ok for strings
     result))
 
 (define-function emit-shstrtab-entry (str)
