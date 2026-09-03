@@ -181,7 +181,7 @@
 (assert (= elf/sizeof-Elf64_Ehdr 64))
 (assert (= elf/sizeof-Elf64_Phdr 56))
 
-;; TODO this is neither in struct nor readelf print order...
+;; TODO args are neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
                                            alignment start . rest)
   (when rest

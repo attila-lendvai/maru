@@ -463,53 +463,41 @@
 (define-function bss-size ()
   (max 1 (segment-length 'bss)))
 
-(define-function %file-offset (file-offsets name)
-  (second (list-find-if (lambda (entry)
-                          (= name (first entry)))
-                        file-offsets)))
+;; Emits the four assember segments as PT_LOAD program headers.
+(define-function emit-base-phdrs ()
+  (let ((file-offset 0))
+    (list-do entry `((code	,(+ elf/PF_R elf/PF_X)	,+code-segment-space+)
+                     (ro-data	,(+ elf/PF_R elf/PF_W)	,+ro-data-segment-space+)
+                     (data	,(+ elf/PF_R elf/PF_W)	,+data-segment-space+))
 
-;; the segment's base vaddr; the laddress slot is a moving cursor that
-;; advances with emission, so it must be rebased by the paddress
-(define-function %segment-base (name)
-  (let ((segment (get-segment name)))
-    (- (<segment>-laddress segment)
-       (<segment>-paddress segment))))
+      (let* ((name		(first entry))
+             (permissions	(second entry))
+             (space		(third entry))
+             (size		(segment-length name)))
 
-;; Emits the four PT_LOAD program headers covering the assembler's
-;; segments. The vaddrs come from the segments' bases; the PT_LOAD
-;; p_offsets from FILE-OFFSETS ((name offset) ...). The text LOAD's
-;; size is TEXT-FILESZ: it covers the file prefix and this very
-;; program header table, which is being appended to the code segment
-;; as we emit. Returns FILE-OFFSETS.
-(define-function emit-base-load-phdrs (file-offsets text-filesz)
-  (list-do entry (list (list 'code	(+ elf/PF_R elf/PF_X)	+code-segment-space+)
-                       (list 'ro-data	(+ elf/PF_R elf/PF_W)	+ro-data-segment-space+)
-                       (list 'data	(+ elf/PF_R elf/PF_W)	+data-segment-space+))
-    (let* ((name	(first entry))
-           (size	(if (= name 'code)
-                            text-filesz
-                          (segment-length name))))
-      (emit-program-header elf/PT_LOAD
-                           (%file-offset file-offsets name)
-                           size size
-                           (second entry)
-                           elf/page-size
-                           (if (= name 'code)
-                               ;; the LOAD starts at the file's first
-                               ;; byte (the prefix), which maps at
-                               ;; +code-segment-address+; the segment's
-                               ;; own base sits behind the prefix
-                               +code-segment-address+
-                             (%segment-base name))
-                           (third entry))))
-  (emit-program-header elf/PT_LOAD
-                       (%file-offset file-offsets 'bss)
-                       0 (bss-size)
-                       (+ elf/PF_R elf/PF_W)
-                       elf/page-size
-                       (%segment-base 'bss)
-                       +bss-segment-space+)
-  file-offsets)
+        (verbosity 1 (print-all *debug-output* "emitting segment: "name", size: "size"\n"))
+        (emit-program-header elf/PT_LOAD
+                             file-offset
+                             size size
+                             permissions
+                             elf/page-size
+                             (if (= name 'code)
+                                 ;; the LOAD starts at the file's first
+                                 ;; byte (the prefix), which maps at
+                                 ;; +code-segment-address+; the segment's
+                                 ;; own base sits behind the prefix
+                                 +code-segment-address+
+                               (segment-base name))
+                             space)
+        (incr file-offset size)))
+
+    (emit-program-header elf/PT_LOAD
+                         file-offset
+                         0 (bss-size)
+                         (+ elf/PF_R elf/PF_W)
+                         elf/page-size
+                         (segment-base 'bss)
+                         +bss-segment-space+)))
 
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))
@@ -517,57 +505,48 @@
 (when-feature relocatable-elf
   (require "source/compiler/relocatable-elf.l"))
 
-(define-function write-elf-to-stream (stream arch)
-  ;; the static ET_EXEC image: a fixed-address binary with no
-  ;; relocations, no section headers, and no dynamic linking (this is
-  ;; the code path of (not (feature relocatable-elf))
-  (.segment	'code)
-  (.align	elf/page-size)
-
+;; Writes out a very simple/basic ET_EXEC ELF executable.
+(define-function write-elf-to-stream/static (stream arch)
+  ;; Writes out a very simple and static ET_EXEC ELF executable: a
+  ;; fixed-address binary with no relocations, no section headers, and
+  ;; no dynamic linking (this is the code path of (not (feature
+  ;; relocatable-elf)). The linux platform can function with this.
   (.segment	'data)
   (.align	elf/page-size)
 
   (.segment	'ro-data)
   (.align	elf/page-size)
 
-  ;; we write this into a separate segment (instead of the code
-  ;; segment), so that we can do this as the last step.
-  (create-segment 'elf-prefix)
-  (.segment 'elf-prefix)
-  (.base 0) ; without this the laddress is random, which disrupts .align
+  ;; append the program header table to the text segment, so that
+  ;; AT_PHDR (load bias + e_phoff) points into a mapped region.
+  (with-current-segment 'code
+    (.align	8)
+    (label!	'phdr-table)
 
-  ;; the ELF header alone is the file prefix; the program header table
-  ;; gets appended to the (mapped) text segment, so that AT_PHDR (load
-  ;; bias + e_phoff) keeps pointing into the first PT_LOAD
-  (let* ((pos		(align 8 (+ +elf-prefix-size+ (segment-length 'code))))
-         (table-size	(* +n-program-headers+ elf/sizeof-Elf64_Phdr))
-         (text-end	(align elf/page-size (+ pos table-size)))
-         (file-offsets	`((code		0)
-                            (ro-data	,text-end)
-                            (data	,(+ text-end (segment-length 'ro-data)))
-                            (bss	,(+ text-end
-                                                (segment-length 'ro-data)
-                                                (segment-length 'data))))))
+    ;; make space for the phdr table and .align it, so that the size
+    ;; of the .text segment becomes final after this point.
+    (with-segment-position-backup (current-segment)
+      (.i8/times 0 (* +n-program-headers+ elf/sizeof-Elf64_Phdr))
+      (.align	elf/page-size))
+
+    (emit-base-phdrs)
+
+    (.align	elf/page-size)
+
+    ;; we rewind the write position of the segment to write the ELF
+    ;; header. it's not elegant, but this is the last thing we do
+    ;; with the segment before emitting it, so it's ok here.
+    (set (current-paddress) 0)
+
     (emit-elf-header elf/ET_EXEC arch
                      (closure-code-label '_start)
-                     pos
+                     (paddress 'phdr-table)
                      +n-program-headers+
-                     0 0 0)
-
-    (with-current-segment 'code
-      (.align 8)
-      (label! 'phdr-table)
-      (emit-base-load-phdrs file-offsets text-end)
-      ;; the trailing padding makes the next segment's file offset
-      ;; page-congruent with its base
-      (.align elf/page-size)
-      (assert (= (+ +elf-prefix-size+ (segment-length 'code)) text-end))))
-
-  (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
+                     0 0 0))
 
   ;; we can start writing the file. note that the order must be in
   ;; sync with the headers above.
-  (list-do name '(elf-prefix code ro-data data) ; bss data is discarded
+  (list-do name '(code ro-data data) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
 (define-function compile-env (env -c- output-path machine-type reloc-type glob-dat-type)
@@ -589,8 +568,7 @@
   ;; COMPILE-DEFINITION of <selector>).
   (with-assembling (((code	(if-at-expand (= "c-obj" elf-emission-type)
                                     0
-                                  (+ +code-segment-address+
-                                     +elf-prefix-size+)))
+                                  +code-segment-address+))
                      (ro-data	(if-at-expand (= "c-obj" elf-emission-type)
                                     0
                                   +ro-data-segment-address+))
@@ -635,6 +613,9 @@
     ;; WITH-NEW-LABEL, or similar constructs.
     (.segment 'code)
 
+    ;; Make space for the ELF header; it will be emitted as the final step.
+    (.i8/times 0 elf/sizeof-Elf64_Ehdr)
+
     (array-do var (<env>-bindings env)
       (let* ((name		(<variable>-name  var))
              (value		(<variable>-value var))
@@ -645,19 +626,19 @@
           ;; (emit-comment 1 "defn "name)
           (verbosity 1 (warn name ", "))
           (compile-definition value name -c-))))
+    (verbosity 1 (warn "\n"))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))
 
-    (with-open-file (file output-path "w")
+    (with-open-stream (stream output-path "w")
       (if-feature relocatable-elf
-          (write-relocatable-to-stream (file-stream file) machine-type)
-        (write-elf-to-stream (file-stream file) machine-type)))
+          (write-elf-to-stream/relocatable stream machine-type)
+        (write-elf-to-stream/static stream machine-type)))
 
-    (when (<= 1 *compiler-verbosity*)
+    (verbosity 2
       (array-do var (<env>-bindings (<assembler>-env *assembler*))
         (let ((value (<variable>-value var)))
           (when (is <label> value)
             (emit COMMENT (list "0x"(integer->string (<label>-laddress value) 16)
-                                "\t" (<variable>-name var))))))))
-  (verbosity 1 (warn "\n")))
+                                "\t" (<variable>-name var)))))))))
