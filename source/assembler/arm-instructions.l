@@ -192,7 +192,7 @@
     (<long>   (%emit-add-sub-imm is-sub set-flags sh imm12 rs rd))
     (<label>  (emit-label imm12
                           (lambda (v) (%emit-add-sub-imm is-sub set-flags sh v rs rd))
-                          4 ()))
+                          4))
     (<symbol> (%emit-add-sub-imm/label name is-sub set-flags sh (%ensure-label imm12) rs rd))
     (else     (error (symbol->string name) ": unexpected imm12: " imm12))))
 
@@ -576,7 +576,7 @@
     (<long>   (%emit-adr rd designator))
     (<label>  (emit-label designator
                           (lambda (v) (%emit-adr rd v))
-                          4 (- 0 (current-laddress))))
+                          4 (- 0 (current-laddress)) 'adr-prel-lo21))
     (<symbol> (ADR rd (%ensure-label designator)))
     (else     (error "ADR: unexpected: " designator))))
 
@@ -599,7 +599,7 @@
     (<long>   (%emit-b-imm26 0x14000000 designator))
     (<label>  (emit-label designator
                           (lambda (v) (%emit-b-imm26 0x14000000 v))
-                          4 (- 0 (current-laddress))))
+                          4 (- 0 (current-laddress)) 'jump26))
     (<symbol> (B (%ensure-label designator)))
     (else     (error "B: unexpected: " designator))))
 
@@ -608,8 +608,14 @@
     (<long>   (%emit-b-imm26 0x94000000 designator))
     (<label>  (emit-label designator
                           (lambda (v) (%emit-b-imm26 0x94000000 v))
-                          4 (- 0 (current-laddress))))
+                          4 (- 0 (current-laddress)) 'call26))
     (<symbol> (BL (%ensure-label designator)))
+    ;; FFI: a direct call against the UND symbol; ld resolves it
+    ;; through its PLT (the R_AARCH64_CALL26 against an external
+    ;; symbol implies a PLT stub)
+    (<reloc-symbol>
+     (%record-relocation designator 'call26 4 0)
+     (%emit-b-imm26 0x94000000 0))
     (else     (error "BL: unexpected: " designator))))
 
 ;;;
@@ -634,7 +640,7 @@
     (<long>   (%emit-b-imm19 cond designator))
     (<label>  (emit-label designator
                           (lambda (v) (%emit-b-imm19 cond v))
-                          4 (- 0 (current-laddress))))
+                          4 (- 0 (current-laddress)) 'condbranch19))
     (<symbol> (BCOND (%ensure-label designator) cond))
     (else     (error "BCOND: unexpected: " designator))))
 

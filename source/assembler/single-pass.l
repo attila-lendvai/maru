@@ -19,9 +19,11 @@
 (define-record <assembler> ()
   (env        ; a lexical env where the asm instructions are evaluated
    current-segment ; the <segment> we are emitting into
+   relocations     ; list of (hole-segment hole-paddress target size offset type)
    ))
 
 (define *assembler*) ; TODO turn this into something else than a global variable
+
 
 (define-function create-segment (name)
   (let ((segment
@@ -41,7 +43,8 @@
             (paddress	0)
             ))
         (env (<assembler>-env *assembler*)))
-    (assert (not (defined? name env)))
+    (when (defined? name env)
+      (error "create-segment: the segment is already defined: "name" with value: "(variable-value env name)))
     (environment-define env name segment)
     ;; the first segment created becomes the current-segment
     (unless (<assembler>-current-segment *assembler*)
@@ -145,6 +148,26 @@
 
 (define-function current-laddress ()
   (<segment>-laddress (current-segment)))
+
+;; A relocation target that the static linker resolves by name (e.g.
+;; an imported C symbol). Unlike a <label>, it never gets defined.
+(define-record <reloc-symbol> ()
+  (name))
+
+(define-function reloc-symbol (name)
+  (make <reloc-symbol> (name name)))
+
+;; Records a relocation against the fixup hole at the current
+;; position. TARGET is either a <label> (resolved to a section symbol
+;; + offset at serialization time) or a <reloc-symbol>.
+(define-function %record-relocation (target type size offset)
+  (push (<assembler>-relocations *assembler*)
+        (list (current-segment)
+              (current-paddress)
+              target
+              size
+              offset
+              type)))
 
 (define-record <label> ()
   (segment
@@ -250,7 +273,9 @@
         (hole-paddress	())
         (hole-segment	())
         (writer		())
-        (offset		false))
+        (offset		false)
+        (size		false)
+        (reloc-type	false))
     (let ((emitter
             (lambda (state . args)
               (case state
@@ -263,34 +288,40 @@
                  ;;              ", (current-segment): " (current-segment)
                  ;;              "\n")
                  (set writer (pop args))
-                 (set offset (pop args)))
+                 (set offset (pop args))
+                 (set size (pop args))
+                 (set reloc-type (pop args))
+                 ;; reloc-type is absent for fixups that have no
+                 ;; relocation mapping yet (e.g. absolute imm fields)
+                 (when reloc-type
+                   (%record-relocation label (first reloc-type) size offset)))
                 (state/set
                  (let* ((paddress (pop args))
                         (laddress (pop args))
                         (saved-paddress	(<segment>-paddress hole-segment))
                         (saved-laddress	(<segment>-laddress hole-segment)))
-                   ;; the writers write into (current-segment), so we must set it
-                   (with-current-segment hole-segment
-                     (set (<segment>-paddress hole-segment) hole-paddress)
-                     ;; it's a forward label, so the form that calculates
-                     ;; the final value must be delayed into a future (a
-                     ;; closure). but now is the time to force it.
-                     (let ((final-laddress (value-future paddress laddress)))
-                       (when offset
-                         (incr final-laddress offset))
-                       ;; (print-all *debug-output* "state/set of an emitter, laddress 0x"
-                       ;;            (integer->string laddress 16)
-                       ;;            ", paddress: 0x" (integer->string paddress 16)
-                       ;;            ", hole-paddress: 0x" (integer->string hole-paddress 16)
-                       ;;            ", hole-segment: "  hole-segment
-                       ;;            ", final-laddress: 0x"  (integer->string final-laddress 16)
-                       ;;            ", writer: " writer
-                       ;;            "\n")
-                       (writer final-laddress)
-                       (set (<segment>-paddress hole-segment) saved-paddress)
-                       (set (<segment>-laddress hole-segment) saved-laddress))))
-                 ())
-                (else (error "unexpected state: "state))))))
+                    ;; the writers write into (current-segment), so we must set it
+                    (with-current-segment hole-segment
+                      (set (<segment>-paddress hole-segment) hole-paddress)
+                      ;; it's a forward label, so the form that calculates
+                      ;; the final value must be delayed into a future (a
+                      ;; closure). but now is the time to force it.
+                      (let ((final-laddress (value-future paddress laddress)))
+                        (when offset
+                          (incr final-laddress offset))
+                        ;; (print-all *debug-output* "state/set of an emitter, laddress 0x"
+                        ;;            (integer->string laddress 16)
+                        ;;            ", paddress: 0x" (integer->string paddress 16)
+                        ;;            ", hole-paddress: 0x" (integer->string hole-paddress 16)
+                        ;;            ", hole-segment: "  hole-segment
+                        ;;            ", final-laddress: 0x"  (integer->string final-laddress 16)
+                        ;;            ", writer: " writer
+                        ;;            "\n")
+                        (writer final-laddress)
+                        (set (<segment>-paddress hole-segment) saved-paddress)
+                        (set (<segment>-laddress hole-segment) saved-laddress))))
+                  ())
+                 (else (error "unexpected state: "state))))))
       (assert (not (<label>-primed-emitter label)))
       (set (<label>-primed-emitter label) emitter))
     label))
@@ -299,39 +330,50 @@
 ;;; Hooks for interfacing with the instruction emitters
 ;;;
 
-(define-function emit-label (label writer size offset)
+(define-function emit-label (label writer size . rest)
   ;; this is only called from the writers of the instructions, so the
-  ;; current segment is the right segment.
-  (if (resolved-label? label)
-      (begin
-       (assert (not (<label>-primed-emitter label)))
-       ;; if there's no primed emitter, then there's no calculation
-       ;; specified, so we just write out the laddress without
-       ;; instantiating closures and doing some extra dance that is
-       ;; only needed for future labels.
-       ;; this might be a FIXME... but will we ever need that use-case?
-       ;; (print-all *debug-output* "emit-label of a resolved label; laddress 0x"
-       ;;            (integer->string (or (<label>-laddress label) 0) 16)
-       ;;            ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
-       ;;            ", offset: " offset
-       ;;            "\n")
-       (writer (+ (<label>-laddress label)
-                  (or offset 0))))
-    (let ((emitter (or (<label>-primed-emitter label)
-                       (begin
-                        ;; there's no requested calculation in a
-                        ;; primed emitter, so we define a default one
-                        ;; that just takes the laddress.
-                        (%prime-label label (lambda (paddress laddress) laddress))
-                        (<label>-primed-emitter label)))))
-      ;; (print-all *debug-output* "emit-label is calling the emitter with 'state/emit; laddress 0x"
-      ;;             (integer->string (or (<label>-laddress label) 0) 16)
-      ;;             ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
-      ;;             ", offset: " offset "\n")
-      (emitter 'state/emit writer offset)
-      (push (<label>-emitters label) emitter)
-      (set (<label>-primed-emitter label) ())
-      (writer 0)))
+  ;; current segment is the right segment. REST carries an optional
+  ;; OFFSET (a <long>; the positional adjustment applied to the
+  ;; label's address), followed by the optional RELOC-TYPE (a
+  ;; one-element list; passed by callers whose fixups can be turned
+  ;; into relocations, see %record-relocation; when emitting a
+  ;; relocatable object it selects the relocation type).
+  (let ((offset (and (pair? rest)
+                     (is <long> (first rest))
+                     (pop rest)))
+        (reloc-type rest))
+    (if (resolved-label? label)
+        (begin
+         (assert (not (<label>-primed-emitter label)))
+         ;; if there's no primed emitter, then there's no calculation
+         ;; specified, so we just write out the laddress without
+         ;; instantiating closures and doing some extra dance that is
+         ;; only needed for future labels.
+         ;; this might be a FIXME... but will we ever need that use-case?
+         ;; (print-all *debug-output* "emit-label of a resolved label; laddress 0x"
+         ;;            (integer->string (or (<label>-laddress label) 0) 16)
+         ;;            ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
+         ;;            ", offset: " offset
+         ;;            "\n")
+         (when reloc-type
+           (%record-relocation label (first reloc-type) size offset))
+         (writer (+ (<label>-laddress label)
+                    (or offset 0))))
+      (let ((emitter (or (<label>-primed-emitter label)
+                         (begin
+                          ;; there's no requested calculation in a
+                          ;; primed emitter, so we define a default one
+                          ;; that just takes the laddress.
+                          (%prime-label label (lambda (paddress laddress) laddress))
+                          (<label>-primed-emitter label)))))
+        ;; (print-all *debug-output* "emit-label is calling the emitter with 'state/emit; laddress 0x"
+        ;;             (integer->string (or (<label>-laddress label) 0) 16)
+        ;;             ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
+        ;;             ", offset: " offset "\n")
+        (apply emitter (list 'state/emit writer offset size reloc-type))
+        (push (<label>-emitters label) emitter)
+        (set (<label>-primed-emitter label) ())
+      (writer 0))))
   label)
 
 (define-function emit-u8 (value)
@@ -355,7 +397,7 @@
     (<long>
      (assert (if (<= 0 value) (<= value 0xff) (<= -0x80 value)) "emit-i8: out of range: "value)
      (emit-u8 (bitwise-and value 0xff)))
-    (<label>	(emit-label value emit-i8 1 ()))
+    (<label>	(emit-label value emit-i8 1))
     (<symbol>	(emit-i8 (%ensure-label value)))
     (else	(error "emit-i8: called with unexpected value: "value", type: "(type-of value)))))
 
@@ -372,7 +414,7 @@
     (<long>
      (assert (<= -0x8000 value 0x7fff) "emit-i16: out of range: "value)
      (emit-u16 (bitwise-and value 0xffff)))
-    (<label>	(emit-label value emit-i16 2 ()))
+    (<label>	(emit-label value emit-i16 2))
     (<symbol>	(emit-i16 (%ensure-label value)))
     (else	(error "emit-i16: called with unexpected value: "value", type: "(type-of value)))))
 
@@ -392,7 +434,7 @@
      ;; TODO only works on 64 bit hosts
      (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
      (emit-u32 (bitwise-and value 0xffffffff)))
-    (<label>	(emit-label value emit-i32 4 ()))
+    (<label>	(emit-label value emit-i32 4))
     (<symbol>	(emit-i32 (%ensure-label value)))
     ;; (<lower-cell> TODO) needed to support 32 bit mode
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
@@ -419,7 +461,9 @@
   (typecase value
     (<long>	(emit-u64 value)) ; always in range on 64 bit hosts
     (<lower-cell> (emit-u64 value))
-    (<label>	(emit-label value emit-i64 8 ()))
+    (<label>	(emit-label value emit-i64 8 'abs64))
+    (<reloc-symbol>	(%record-relocation value 'symbol64 8 0)
+                 (emit-u64 0))
     (<symbol>	(emit-i64 (%ensure-label value)))
     (else	(error "emit-i64: called with unexpected value: "value", type: "(type-of value)))))
 
