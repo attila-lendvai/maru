@@ -288,6 +288,15 @@
     (emit-deferred-external-trampolines -c-)
     (emit-relocation-tables reloc-type glob-dat-type)))
 
+;; Pre-registers the section names in .shstrtab so that the file
+;; layout computed afterwards sees its final size; returns an alist of
+;; (name . shstrtab-offset) for the section header table.
+(define-function register-shstrtab-names (names)
+  (let ((alist ()))
+    (list-do name names
+      (push alist (cons name (emit-shstrtab-entry name))))
+    alist))
+
 ;;;
 ;;; ELF writers
 ;;;
@@ -317,10 +326,20 @@
   (.segment 'elf-prefix)
   (.base 0) ; without this the laddress is random, which disrupts .align
 
-  ;; the ELF header alone is the file prefix; the program header table
-  ;; gets appended to the (mapped) text segment, so that AT_PHDR (load
-  ;; bias + e_phoff) keeps pointing into the first PT_LOAD
-  (let* ((pos		(align 8 (+ +elf-prefix-size+ (segment-length 'code))))
+  ;; the prefix is the ELF header alone; the program header table is
+  ;; appended to the (mapped) text segment (so that AT_PHDR keeps
+  ;; pointing into the first PT_LOAD), and the section header table
+  ;; with the symbol/string tables goes to the end of the file. The
+  ;; .shstrtab names are registered before the layout is computed,
+  ;; c-obj style, so that its size is final.
+  (let* ((shstrtab-alist	(register-shstrtab-names
+                          '(".text" ".rodata" ".data" ".bss" ".dynamic"
+                            ".rela.dyn" ".dynstr" ".symtab" ".strtab" ".shstrtab")))
+         (name-offset		(lambda (name)
+                                (cdr (list-find-if (lambda (entry)
+                                                     (= name (first entry)))
+                                                   shstrtab-alist))))
+         (pos		(align 8 (+ +elf-prefix-size+ (segment-length 'code))))
          (table-size	(* +n-program-headers+ elf/sizeof-Elf64_Phdr))
          (text-end	(align elf/page-size (+ pos table-size)))
          (file-offsets	`((code		0)
@@ -329,22 +348,23 @@
                             (bss	,(+ text-end
                                                 (segment-length 'ro-data)
                                                 (segment-length 'data)))))
-         (size/text	text-end)
          (size/ro-data	(segment-length 'ro-data))
-         (size/data	(segment-length 'data))
          (size/bss	(bss-size))
          (size/relocation-tables (- (laddress '.dynamic-end)
                                     (laddress '.dynamic)))
-         (file-offset/text	0)
-         (file-offset/ro-data	text-end)
-         (file-offset/data	(+ text-end size/ro-data))
-         (file-position	(%file-offset file-offsets 'bss)))
+         (symtab-offset	(%file-offset file-offsets 'bss))
+         (size/symtab	(segment-length '.symtab))
+         (strtab-offset	(+ symtab-offset size/symtab))
+         (size/strtab	(segment-length '.strtab))
+         (shstrtab-offset (+ strtab-offset size/strtab))
+         (size/shstrtab	(segment-length '.shstrtab))
+         (shdr-table-offset (align 8 (+ shstrtab-offset size/shstrtab))))
 
     (emit-elf-header elf/ET_DYN arch
                      (closure-code-label '_start)
                      pos
                      +n-program-headers+
-                     'section-headers
+                     shdr-table-offset
                      +n-section-headers+
                      +.shstrtab-section-index+)
 
@@ -368,7 +388,7 @@
       ;; mark the entire ro-data segment to become read-only after
       ;; relocation is finished. note that it's possible to mark only a
       ;; subset of it using this extra PT_GNU_RELRO program header.
-      (emit-program-header elf/PT_GNU_RELRO (%file-offset file-offsets 'ro-data)
+      (emit-program-header elf/PT_GNU_RELRO text-end
                            size/ro-data size/ro-data
                            elf/PF_R
                            elf/page-size
@@ -379,16 +399,14 @@
       (let ((interp-size (- (laddress 'elf-interpreter-end)
                             (laddress 'elf-interpreter-start))))
         (emit-program-header elf/PT_INTERP
-                             (+ (%file-offset file-offsets 'ro-data)
-                                (paddress 'elf-interpreter-start))
+                             (+ text-end (paddress 'elf-interpreter-start))
                              interp-size interp-size
                              elf/PF_R
                              1
                              (laddress 'elf-interpreter-start)))
 
       (emit-program-header elf/PT_DYNAMIC
-                           (+ (%file-offset file-offsets 'ro-data)
-                              (paddress '.dynamic))
+                           (+ text-end (paddress '.dynamic))
                            size/relocation-tables size/relocation-tables
                            elf/PF_R
                            8
@@ -399,88 +417,83 @@
       (.align elf/page-size)
       (assert (= (+ +elf-prefix-size+ (segment-length 'code)) text-end)))
 
-  (label! 'section-headers)
-
 ;;;
-;;; This is fragile for reordering, must be in sync with the
-;;; +.*-section-index+ constants.
+;;; Section header table at the end of the file. This is fragile for
+;;; reordering, must be in sync with the +.*-section-index+ constants.
 ;;;
+    (create-segment 'shdr-table)
+    (.segment 'shdr-table)
+    (.base 0)
 
-  ;; section #0 must be NULL
-  (emit-section-header 0 0 0 0 0 0 0 0 0 0)
+    ;; section #0 must be NULL
+    (emit-section-header 0 0 0 0 0 0 0 0 0 0)
 
-  ;; section #1
-  (emit-section-header (emit-shstrtab-entry ".text")
-                       elf/SHT_PROGBITS
-                       (+ elf/SHF_ALLOC elf/SHF_EXECINSTR)
-                       +code-segment-address+
-                       file-offset/text
-                       size/text
-                       0 0 16 0)
+    ;; section #1: .text; covers the whole text LOAD
+    (emit-section-header (name-offset ".text")
+                         elf/SHT_PROGBITS
+                         (+ elf/SHF_ALLOC elf/SHF_EXECINSTR)
+                         +code-segment-address+
+                         0
+                         text-end
+                         0 0 16 0)
 
-  ;; section #2
-  (emit-section-header (emit-shstrtab-entry ".rodata")
-                       elf/SHT_PROGBITS
-                       elf/SHF_ALLOC
-                       +ro-data-segment-address+
-                       file-offset/ro-data
-                       size/ro-data
-                       0 0 16 0)
+    ;; section #2
+    (emit-section-header (name-offset ".rodata")
+                         elf/SHT_PROGBITS
+                         elf/SHF_ALLOC
+                         +ro-data-segment-address+
+                         text-end
+                         size/ro-data
+                         0 0 16 0)
 
-  ;; section #3
-  (emit-section-header (emit-shstrtab-entry ".data")
-                       elf/SHT_PROGBITS
-                       (+ elf/SHF_ALLOC elf/SHF_WRITE)
-                       +data-segment-address+
-                       file-offset/data
-                       size/data
-                       0 0 16 0)
+    ;; section #3
+    (emit-section-header (name-offset ".data")
+                         elf/SHT_PROGBITS
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         +data-segment-address+
+                         (%file-offset file-offsets 'data)
+                         (segment-length 'data)
+                         0 0 16 0)
 
-  ;; section #4
-  (emit-section-header (emit-shstrtab-entry ".bss")
-                       elf/SHT_NOBITS
-                       (+ elf/SHF_ALLOC elf/SHF_WRITE)
-                       +bss-segment-address+
-                       0
-                       size/bss
-                       0 0 16 0)
+    ;; section #4
+    (emit-section-header (name-offset ".bss")
+                         elf/SHT_NOBITS
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         +bss-segment-address+
+                         0
+                         size/bss
+                         0 0 16 0)
 
-  ;; section #5: .dynamic
-  (emit-section-header (emit-shstrtab-entry ".dynamic")
-                       elf/SHT_DYNAMIC
-                       (+ elf/SHF_ALLOC elf/SHF_WRITE)
-                       (laddress '.dynamic)
-                       (+ file-offset/ro-data
-                          (paddress '.dynamic))
-                       size/relocation-tables
-                       +.dynstr-section-index+
-                       0 8 elf/sizeof-Elf64_Dyn)
+    ;; section #5: .dynamic
+    (emit-section-header (name-offset ".dynamic")
+                         elf/SHT_DYNAMIC
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         (laddress '.dynamic)
+                         (+ text-end (paddress '.dynamic))
+                         size/relocation-tables
+                         +.dynstr-section-index+
+                         0 8 elf/sizeof-Elf64_Dyn)
 
-  ;; section #6: .rela.dyn
-  (emit-section-header (emit-shstrtab-entry ".rela.dyn")
-                       elf/SHT_RELA
-                       (+ elf/SHF_ALLOC elf/SHF_WRITE)
-                       (laddress '.rela.dyn)
-                       (+ file-offset/ro-data
-                          (paddress '.rela.dyn))
-                       (- (laddress '.rela.dyn-end)
-                          (laddress '.rela.dyn))
-                       0 0 8 elf/sizeof-Elf64_Rela)
+    ;; section #6: .rela.dyn
+    (emit-section-header (name-offset ".rela.dyn")
+                         elf/SHT_RELA
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         (laddress '.rela.dyn)
+                         (+ text-end (paddress '.rela.dyn))
+                         (- (laddress '.rela.dyn-end)
+                            (laddress '.rela.dyn))
+                         0 0 8 elf/sizeof-Elf64_Rela)
 
-  ;; section #7: .dynstr
-  (let ((name-offset		(emit-shstrtab-entry ".dynstr")))
-    (emit-section-header name-offset
+    ;; section #7: .dynstr
+    (emit-section-header (name-offset ".dynstr")
                          elf/SHT_STRTAB 0 0
-                         (+ file-offset/ro-data
-                            (paddress '.dynstr))
+                         (+ text-end (paddress '.dynstr))
                          (- (laddress '.dynstr-end)
                             (laddress '.dynstr))
-                         0 0 1 0))
+                         0 0 1 0)
 
-  ;; section #8: .symtab
-  (let ((size/symtab (segment-length '.symtab))
-        (symtab-offset file-position))
-    (emit-section-header (emit-shstrtab-entry ".symtab")
+    ;; section #8: .symtab
+    (emit-section-header (name-offset ".symtab")
                          elf/SHT_SYMTAB
                          0 0
                          symtab-offset
@@ -489,32 +502,33 @@
                          (/ size/symtab elf/sizeof-Elf64_Sym)
                          8
                          elf/sizeof-Elf64_Sym)
-    (incr file-position size/symtab))
 
-  ;; section #9: .strtab
-  (let ((size/strtab (segment-length '.strtab)))
-    (emit-section-header (emit-shstrtab-entry ".strtab")
+    ;; section #9: .strtab
+    (emit-section-header (name-offset ".strtab")
                          elf/SHT_STRTAB 0 0
-                         file-position
+                         strtab-offset
                          size/strtab 0 0 1 0)
-    (incr file-position size/strtab))
 
-  ;; section #10: .shstrtab
-  (let* ((name-offset		(emit-shstrtab-entry ".shstrtab"))
-         (size/shstrtab	(segment-length '.shstrtab)))
-    (emit-section-header name-offset
+    ;; section #10: .shstrtab
+    (emit-section-header (name-offset ".shstrtab")
                          elf/SHT_STRTAB 0 0
-                         file-position
+                         shstrtab-offset
                          size/shstrtab
-                         0 0 1 0))
+                         0 0 1 0)
 
-  (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
+    ;; pad .shstrtab so the section header table lands at its aligned
+    ;; file offset; the write loop then runs back to back
+    (with-current-segment '.shstrtab
+      (times-do (- shdr-table-offset (+ shstrtab-offset size/shstrtab))
+        (.i8 0)))
 
-  ;; we can start writing the file. note that the order must be in
-  ;; sync with the headers above.
+    (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
+
+    ;; we can start writing the file. note that the order must be in
+    ;; sync with the headers above.
     (list-do name '(elf-prefix code ro-data data) ; bss data is discarded
       (write-segment-to-stream name stream))
-    (list-do name '(.symtab .strtab .shstrtab)
+    (list-do name '(.symtab .strtab .shstrtab shdr-table)
       (write-segment-to-stream name stream))))
 
 ;;;
@@ -537,19 +551,6 @@
     (.symtab		8)
     (.strtab		1)
     (.shstrtab		1)))
-
-(define-function %c-obj-register-section-names ()
-  ;; pre-registers the section names in .shstrtab; must match the
-  ;; names used by %c-obj-emit-section-headers exactly, so that the
-  ;; layout (computed afterwards) sees the final .shstrtab size.
-  ;; returns an alist of (name . shstrtab-offset)
-  (let ((alist ()))
-    (list-do name '(".text" ".rodata" ".data" ".bss"
-                    ".rela.text" ".rela.data" ".rela.rodata"
-                    ".symtab" ".strtab" ".shstrtab")
-      (set alist (cons (cons name (emit-shstrtab-entry name))
-                       alist)))
-    alist))
 
 (define +c-obj/shdr-table-size+		(* 11 elf/sizeof-Elf64_Shdr))
 
@@ -576,7 +577,10 @@
         (set cursor (+ offset (third entry)))))))
 
 (define-function %c-obj-layout ()
-  (let ((shstrtab-alist	(%c-obj-register-section-names))
+  (let ((shstrtab-alist	(register-shstrtab-names
+                          '(".text" ".rodata" ".data" ".bss"
+                            ".rela.text" ".rela.data" ".rela.rodata"
+                            ".symtab" ".strtab" ".shstrtab")))
         (layout		())
         (pos		elf/sizeof-Elf64_Ehdr))
     (list-do entry +c-obj/section-layout+
