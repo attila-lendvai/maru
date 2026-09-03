@@ -24,7 +24,6 @@
 
 (define *assembler*) ; TODO turn this into something else than a global variable
 
-
 (define-function create-segment (name)
   (let ((segment
           (make <segment>
@@ -99,6 +98,13 @@
     (<segment> desig)
     (else (error "get-segment: not a valid segment designator: "desig))))
 
+;; the segment's base vaddr; the laddress slot is a moving cursor that
+;; advances with emission, so it must be rebased by the paddress
+(define-function segment-base (desig)
+  (let ((segment (get-segment desig)))
+    (- (<segment>-laddress segment)
+       (<segment>-paddress segment))))
+
 (define-function segment-length (desig)
   (memory-block/length (<segment>-buffer (get-segment desig))))
 
@@ -146,8 +152,23 @@
 (define-function current-paddress ()
   (<segment>-paddress (current-segment)))
 
+(define-function set-current-paddress (value)
+  (set (<segment>-paddress (current-segment)) value))
+
 (define-function current-laddress ()
   (<segment>-laddress (current-segment)))
+
+(define-function set-current-laddress (value)
+  (set (<segment>-laddress (current-segment)) value))
+
+(define-form with-segment-position-backup (segment . body)
+  `(let* ((__segment		,segment)
+          (__saved-paddress	(<segment>-paddress __segment))
+          (__saved-laddress	(<segment>-laddress __segment))
+          (__result (begin ,@body)))
+     (set (<segment>-paddress __segment) __saved-paddress)
+     (set (<segment>-laddress __segment) __saved-laddress)
+     __result))
 
 ;; A relocation target that the static linker resolves by name (e.g.
 ;; an imported C symbol). Unlike a <label>, it never gets defined.
@@ -297,29 +318,26 @@
                    (%record-relocation label (first reloc-type) size offset)))
                 (state/set
                  (let* ((paddress (pop args))
-                        (laddress (pop args))
-                        (saved-paddress	(<segment>-paddress hole-segment))
-                        (saved-laddress	(<segment>-laddress hole-segment)))
+                        (laddress (pop args)))
                     ;; the writers write into (current-segment), so we must set it
                     (with-current-segment hole-segment
-                      (set (<segment>-paddress hole-segment) hole-paddress)
-                      ;; it's a forward label, so the form that calculates
-                      ;; the final value must be delayed into a future (a
-                      ;; closure). but now is the time to force it.
-                      (let ((final-laddress (value-future paddress laddress)))
-                        (when offset
-                          (incr final-laddress offset))
-                        ;; (print-all *debug-output* "state/set of an emitter, laddress 0x"
-                        ;;            (integer->string laddress 16)
-                        ;;            ", paddress: 0x" (integer->string paddress 16)
-                        ;;            ", hole-paddress: 0x" (integer->string hole-paddress 16)
-                        ;;            ", hole-segment: "  hole-segment
-                        ;;            ", final-laddress: 0x"  (integer->string final-laddress 16)
-                        ;;            ", writer: " writer
-                        ;;            "\n")
-                        (writer final-laddress)
-                        (set (<segment>-paddress hole-segment) saved-paddress)
-                        (set (<segment>-laddress hole-segment) saved-laddress))))
+                      (with-segment-position-backup hole-segment
+                        (set (<segment>-paddress hole-segment) hole-paddress)
+                        ;; it's a forward label, so the form that calculates
+                        ;; the final value must be delayed into a future (a
+                        ;; closure). but now is the time to force it.
+                        (let ((final-laddress (value-future paddress laddress)))
+                          (when offset
+                            (incr final-laddress offset))
+                          ;; (print-all *debug-output* "state/set of an emitter, laddress 0x"
+                          ;;            (integer->string laddress 16)
+                          ;;            ", paddress: 0x" (integer->string paddress 16)
+                          ;;            ", hole-paddress: 0x" (integer->string hole-paddress 16)
+                          ;;            ", hole-segment: "  hole-segment
+                          ;;            ", final-laddress: 0x"  (integer->string final-laddress 16)
+                          ;;            ", writer: " writer
+                          ;;            "\n")
+                          (writer final-laddress)))))
                   ())
                  (else (error "unexpected state: "state))))))
       (assert (not (<label>-primed-emitter label)))
@@ -473,13 +491,25 @@
 (define-function .i32 vals (map emit-i32 vals))
 (define-function .i64 vals (map emit-i64 vals))
 
+(define-function .i8/times (value times)
+  (let* ((segment	(current-segment))
+         (buffer	(<segment>-buffer segment))
+         (position	(<segment>-paddress segment)))
+    (times-do times
+      (set (memory-block/at buffer position) value)
+      (incr position))
+    (incr (<segment>-laddress segment) times)
+    (incr (<segment>-paddress segment) times)))
+
 (define-function .ascii strs
-  (list-do str strs
-    (string-do char str
-      (emit-u8 char))))
+  (list-do el strs
+    (typecase el
+      (<string>	(string-do char el
+                  (emit-u8 char)))
+      (<long>	(emit-u8 el)))))
 
 (define-function .base (address)
-  (set (<segment>-laddress (current-segment)) address))
+  (set (current-laddress) address))
 
 (define-function %align (address alignment filler)
   ;; (print-all *debug-output* "segment-length before alignment: 0x"
