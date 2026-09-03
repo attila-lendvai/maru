@@ -72,10 +72,10 @@
     (elements	(when (< 0 capacity)
                   (allocate-data capacity)))))
 
-(define-function ascii-bytes->string (buf length)
-  (let ((str (string length)))
-    (copy-bytes buf (<string>-elements str) length)
-    str))
+;; (define-function ascii-bytes->string (buf length)
+;;   (let ((str (string length)))
+;;     (copy-bytes buf (<string>-elements str) length)
+;;     str))
 
 (define-function symbol (name)
   (safety 1 (assert (string? name)))
