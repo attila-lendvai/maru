@@ -133,6 +133,10 @@
 ;;; (see %record-relocation in single-pass.l).
 ;;;
 
+;; Section indices of the c-obj's shdr table: the emission order in
+;; %c-obj-emit-section-headers must match these. The STT_SECTION
+;; symbols of compile-env's symtab prologue (elf-late.l) carry the
+;; first four as st_shndx; the two sites must stay in sync.
 (define +c-obj/.text-section-index+		1)
 (define +c-obj/.rodata-section-index+		2)
 (define +c-obj/.data-section-index+		3)
@@ -143,10 +147,6 @@
 (define +c-obj/.symtab-section-index+		8)
 (define +c-obj/.strtab-section-index+		9)
 (define +c-obj/.shstrtab-section-index+		10)
-
-;; the number of symbols that precede the locals: the null symbol and
-;; the four section symbols (.text/.rodata/.data/.bss)
-(define +c-obj/n-preceding-symbols+		5)
 
 (define-function %c-obj-symbol-count ()
   (/ (segment-length '.symtab) elf/sizeof-Elf64_Sym))

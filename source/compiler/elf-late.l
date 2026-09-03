@@ -613,18 +613,22 @@
     (.segment	'.symtab)
     (emit-symtab-entry 0 0 0 0 0 0)		; mandated by the elf standard
     (when-at-expand (= "c-obj" elf-emission-type)
-      ;; section symbols for .text/.rodata/.data/.bss (indices 1-4),
-      ;; so that relocations can reference them; they must precede all
-      ;; other symbols (see +c-obj/n-preceding-symbols+)
-      (let ((section-index 1))
-        (while (<= section-index 4)
-          (emit-symtab-entry 0
-                             (+ (bitwise-shift elf/STB_LOCAL 4)
-                                elf/STT_SECTION)
-                             0
-                             section-index
-                             0 0)
-          (incr section-index))))
+      ;; section symbols, one per allocatable section, so that
+      ;; relocations can reference sections; their st_shndx values are
+      ;; the section indices of the shdr table (relocatable-elf.l's
+      ;; +c-obj/.*-section-index+ constants, emitted by
+      ;; %c-obj-emit-section-headers), and they must precede all other
+      ;; symbols
+      (list-do section-index (list +c-obj/.text-section-index+
+                                   +c-obj/.rodata-section-index+
+                                   +c-obj/.data-section-index+
+                                   +c-obj/.bss-section-index+)
+        (emit-symtab-entry 0
+                           (+ (bitwise-shift elf/STB_LOCAL 4)
+                              elf/STT_SECTION)
+                           0
+                           section-index
+                           0 0)))
 
     ;; This is the default segment, and whoever changes it should make
     ;; sure changes it back by using WITH-CURRENT-SEGMENT,
