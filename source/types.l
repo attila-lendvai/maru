@@ -386,6 +386,7 @@
     (set (<boxed-type>-one-word? type) one-word?)
     type))
 
+;; TODO rename to define-boxed-cell, or maybe define-boxed-cell-type
 (define-form define-boxed-word (name)
   `(define ,name ,(new-<boxed-type> name true)))
 
@@ -508,6 +509,7 @@
 (define-record		<pair>			() (head tail))
 
 ;; a heap object with a function pointer, and optionally a name.
+;; TODO rename to <lower-function>
 (define-record <target-function> ()
   (program-code
    (when-at-expand (feature track-expr-names)	name)

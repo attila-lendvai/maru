@@ -726,7 +726,7 @@
 
   ;; TODO stdout is a macro on darwin, therefore we wrap it in a
   ;; getter, therefore we can't set it as we did before
-  ;; (set libc/stdout (libc/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
+  ;; (set libc/stdout (posix/fdopen 0 "w")) ; to test the SET'ting of a <C-variable>
 
   (platform/diag-print (string term/FG-GREEN)"About to start running the compiled tests\n"(string term/RESET))
   (run-tests)

@@ -562,7 +562,6 @@
            ;;oop/payload-mask oop/tag-mask
            )))
   (comment-features)
-  (emit-prelude -c-)
   ;; NOTE this array-do will not pick up any new definitions added to
   ;; the env after the iterations has begun (see e.g. the
   ;; COMPILE-DEFINITION of <selector>).

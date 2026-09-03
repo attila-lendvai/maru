@@ -93,8 +93,8 @@
 ;;;
 
 ;; *target-env* will hold the definitions that need to be
-;; level-shifted (compiled). *slave-env* (*globals* here) will be the
-;; parent of *target-env*, therefore all <form>'s that are defined in
+;; level-shifted (compiled). *slave-env* will be the parent of
+;; *target-env*, therefore all <form>'s that are defined in
 ;; *slave-env* are available "in" the *target-env*.
 (assert (= *slave-env* *globals*))
 (define *target-env* (environment *slave-env*))
@@ -196,6 +196,11 @@
                 eval cons list car cdr form)
   (environment-define *globals* name (fixed (lambda args (eval-in-slave `(error ',name" encountered in interpreted code with args "',args))))))
 
+;; NOTE that this must be defined here if we want to provide
+;; BITWISE-SHIFT as a higher level API for left/right arithmetic shift
+;; supported by the compiler (e.g. in the compiler tests). the machine
+;; code instructions ignore signs, and in general ignore values larger
+;; than the maximum shift that makes sense.
 (define-function %bitwise-shift (value shift)
   (cond
     ((<= target/cell-size/bits shift)

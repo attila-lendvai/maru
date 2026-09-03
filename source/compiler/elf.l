@@ -137,8 +137,6 @@
 
 (define-selector compile-call-to)
 
-(define-selector emit-prelude _) ; the default is NOP
-
 ;; Synthesizes the process entry point (the '_start label, i.e. what
 ;; e_entry points at) for platforms that define no maru-level _start
 ;; (e.g. libc, where the entry only needs to call main and exit). The

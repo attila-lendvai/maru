@@ -624,7 +624,8 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
          ,output-path
          ))))))
 
-(define-function %compile-maru (backend platform host-dir host-eval slave-dir input-file output-name evolving?)
+(define-function %compile-maru (backend platform host-dir host-eval slave-dir
+                                        input-file output-name evolving?)
   (let ((platform-name (to-string platform)))
     (compile-cgrov-file (concat-strings slave-dir "/source/platforms/"platform-name"/"platform-name".cgrov"))
     (cond

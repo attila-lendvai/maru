@@ -82,7 +82,6 @@
 (when-at-expand (feature memory-block)
 
 ;; TODO decide where the DEFINE-VM-FUNCTION should be and make it uniform
-;; TODO conditionalize this on a feature?
 (define-vm-function memory-block ((capacity <long> 0))
   (make <memory-block>
     (size	(box <long> 0))
