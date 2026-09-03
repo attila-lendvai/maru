@@ -157,9 +157,9 @@ This could come together with the introduction of nested local
 The `x86` and `arm` backends run a single compile pass that emits
 definitions into segments (code, ro-data, data, bss) and records a
 fixup for every hole whose resolution is deferred. One ledger, three
-shapes of output, selected by `C-obj-emission-type` (default per
+shapes of output, selected by `elf-emission-type` (default per
 platform: `c-obj` on the C-based platforms, `standalone` on the linux
-bootstrap; the `C-obj-emission-type=` build key overrides it):
+bootstrap; the `elf-emission-type=` build key overrides it):
 
 ```
              compile-env (one pass)

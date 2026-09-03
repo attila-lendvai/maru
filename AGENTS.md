@@ -25,7 +25,7 @@ binfmt_misc, needs `qemu-user-static` and the
 Key=value CLI args set variables in build.l's globals (e.g.
 `target/arch=aarch64`, `eval0-phase=false`, `ld.so=...`,
 `default-backend=arm`, `default-platform=linux`,
-`C-obj-emission-type=`, `C-obj-link-type=`). The aarch64 binaries
+`elf-emission-type=`, `C-obj/link-type=`). The aarch64 binaries
 embed the canonical `/lib/ld-linux-aarch64.so.1` and run transparently
 through binfmt_misc.
 
@@ -54,7 +54,7 @@ CI only gets for free on a clean checkout:
 - the cross arm targets (CI runs arm natively):
   `target/arch=aarch64 bootstrap arm linux`,
   `target/arch=aarch64 test-compiler arm libc`, etc.
-- `./build.sh C-obj-link-type=static test-compiler x86 libc`
+- `./build.sh C-obj/link-type=static test-compiler x86 libc`
 
 The narrow gate picks the targets that exercise the change:
 
