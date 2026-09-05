@@ -97,7 +97,11 @@
 
 (define gc/memory-base          0)
 (define gc/lowest-memory-address 0)
-(define gc/memory-last          0)
+;; cursor into the circular chunk chain: the most recently allocated
+;; chunk. allocation scans start just after it, and heap growth splices
+;; new blocks in at that point. unlike gc/memory-base (fixed traversal
+;; anchor) it moves on every allocation.
+(define gc/allocation-cursor     0)
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
 
@@ -120,8 +124,8 @@
 
 (define-function gc/grow-heap (size)
   (let ((new-block (gc/acquire-new-heap-space size)))
-    (set (<header>-next new-block) (<header>-next gc/memory-last))
-    (set (<header>-next gc/memory-last) new-block)
+    (set (<header>-next new-block) (<header>-next gc/allocation-cursor))
+    (set (<header>-next gc/allocation-cursor) new-block)
     new-block))
 
 (define-function gc/object-size (obj)
@@ -226,7 +230,7 @@
   (set requested-size (oop/align requested-size)) ; only allow cell-sized allocation
   (and (= gc/alloc-count gc/allocations-until-gc)
        (gc/collect))
-  (let* ((first (<header>-next gc/memory-last))
+  (let* ((first (<header>-next gc/allocation-cursor))
          (chunk first)
          (total-size (+ requested-size size-of-<header>)))
     (while 1
@@ -242,8 +246,8 @@
                 (let ((next (<header>-next chunk)))
                   (set (<header>-next chunk) (<header>-next next))
                   (set chunk-size (set (<header>-size chunk) (+ chunk-size (+ size-of-<header> (<header>-size next)))))
-                  (when (= next gc/memory-last)
-                    (set gc/memory-last chunk))))
+                  (when (= next gc/allocation-cursor)
+                    (set gc/allocation-cursor chunk))))
               ;; TODO ? total-size includes the header while chunk-size is only the size of the payload space
               (when (or (< total-size chunk-size) ; we'll split this chunk
                         (= requested-size chunk-size)) ; we'll use the entire chunk
@@ -258,7 +262,7 @@
                     (set (<header>-next  chunk) split)
                     (set chunk-size requested-size)))
                 (gc/debug (platform/diag-print "alloc chunk "(pointer chunk)"\n"))
-                (set gc/memory-last chunk)
+                (set gc/allocation-cursor chunk)
                 (set gc/alloc-count (+ gc/alloc-count 1))
                 ;; initialize the freshly reserved chunk
                 (let* ((header chunk)
@@ -310,7 +314,7 @@
   (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
     (set gc/memory-base ptr)
     (set gc/lowest-memory-address ptr)
-    (set gc/memory-last ptr))
+    (set gc/allocation-cursor ptr))
   (gc/grow-root-vector))
 
 (define-form gc/protect (vars . prog)
