@@ -35,7 +35,7 @@
 (define-form assert		(test . args)	`(or ,test (error ,@(or args (list "kernel assertion failed")))))
 
 (define-form to-upper-boolean (form)
-  `(if ,form symbol/true))
+  `(and ,form symbol/true))
 
 ;;;
 ;;; override slot access with a specialized getter and setter
