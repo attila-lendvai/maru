@@ -193,18 +193,19 @@
       ;; <lower-cell> case when both can be covered by e.g. a boxed
       ;; word branch.
       ;; TODO long-lower-cell comparison? in both direction
-      (<long>		(and (long? rhs)
-                             (= (unbox <long> lhs)
-                                (unbox <long> rhs))
-                             symbol/true))
-      (<string>		(and (string? rhs)
-                             (= 0 (string-compare lhs rhs))
-                             symbol/true))
-      (<lower-cell>	(and (is <lower-cell> rhs)
-                             (= (unbox <lower-cell> lhs)
-                                (unbox <lower-cell> rhs))))
-      (else		(and (= lhs rhs)
-                             symbol/true)))))
+      (<long>		(to-upper-boolean
+                         (and (long? rhs)
+                              (= (unbox <long> lhs)
+                                 (unbox <long> rhs)))))
+      (<string>		(to-upper-boolean
+                         (and (string? rhs)
+                              (= 0 (string-compare lhs rhs)))))
+      (<lower-cell>	(to-upper-boolean
+                         (and (is <lower-cell> rhs)
+                              (= (unbox <lower-cell> lhs)
+                                 (unbox <lower-cell> rhs)))))
+      (else		(to-upper-boolean
+                         (= lhs rhs))))))
 
 (define-vm-function (exit ()) ((exit-code <long> 0))
   (when-at-expand (feature profiler)
