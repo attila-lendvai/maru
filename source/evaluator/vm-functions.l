@@ -383,7 +383,7 @@
                                    (stdout-fd <long> -1) (stderr-fd <long> -1))
   (safety 2 (or (not argv) (pair? argv) (is <array> argv) (error "spawn-program: argv is of type " (type-of argv))))
   ;; TODO actually use envp
-  (let ((argv/lower (to-lower-array argv 1))
+  (let ((argv/lower (to-C-strings argv 1))
         (path/lower (string->C-string path)))
     ;; argv[0] is the path of the binary
     (set (oop-at (<memory-block>-elements argv/lower) 0) path/lower)

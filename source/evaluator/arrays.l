@@ -144,11 +144,11 @@
                                 1))
        0))
 
-(define-function to-lower-array (obj offset)
+(define-function to-C-strings (obj offset)
   (let ((lower-array (memory-block 4))
         (i offset))
     (typecase obj
-      (<undefined>)
+      (<undefined>) ; empty list
       (<array>
        (let ((limit (+ 1 (array-length obj))))
          (while (< i limit)
@@ -164,7 +164,7 @@
          (set (oop-at (<memory-block>-elements lower-array) i)
               (string->C-string (pop obj)))
          (incr i)))
-      (else (error "to-lower-array: cannot handle passed obj of type "(type-of obj))))
+      (else (error "to-C-strings: cannot handle passed obj of type "(type-of obj))))
     lower-array))
 
 ) ; (feature memory-block)
