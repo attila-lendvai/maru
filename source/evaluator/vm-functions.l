@@ -111,18 +111,17 @@
   (if thing () symbol/true))
 
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
+;; TODO these silently ignore non-pair values in cdr position
 (define-vm-function (- ()) _
-  (if (pair? -args-)
-      (let ((value	(if (pair? (get/tail -args-))
-                            ;; 2+ args
-                            (unbox <long> (pop -args-))
-                          ;; 1 arg
-                          0)))
-        (while (pair? -args-)
-          (set value (- value (unbox <long> (pop -args-)))))
-        (box <long> value))
-    ;; 0 args
-    (box <long> 0)))
+  (let ((value	(if (and -args-
+                         (pair? (get/tail -args-)))
+                    ;; >= 2 args
+                    (unbox <long> (pop -args-))
+                  ;; <= 1 arg
+                  0)))
+    (while (pair? -args-)
+      (set value (- value (unbox <long> (pop -args-)))))
+    (box <long> value)))
 
 (define-vm-function (+ ()) _
   (let ((value	0))
@@ -131,9 +130,9 @@
     (box <long> value)))
 
 (define-vm-function (/ ()) _
-  (if (pair? -args-)
+  (if -args-
       (let ((value	(unbox <long> (pop -args-))))
-        (while (pair? -args-)
+        (while -args-
           (set value (/ value (unbox <long> (pop -args-)))))
         (box <long> value))
     (error "operator '/' needs at least one argument")))
@@ -146,7 +145,7 @@
 
 (define-form define-bitwise-operator (op)
   `(define-vm-function (,op ()) _
-     (or (pair? -args-) (error ,(concat-strings "operator '"(symbol->string op)"': called with zero arguments")))
+     (or -args- (error ,(concat-strings "operator '"(symbol->string op)"': called with zero arguments")))
      (let ((value (unbox <long> (pop -args-))))
        (while -args-
          (set value (,op value (unbox <long> (pop -args-)))))
@@ -164,11 +163,11 @@
 
 (define-form define-relation (op)
   `(define-vm-function (,op ()) _
-     (unless (pair? -args-)
+     (unless -args-
        (return symbol/true))
      (let ((current	(unbox <long> (pop -args-)))
            next)
-       (while (pair? -args-)
+       (while -args-
          ;; TODO this could use (set current (unbox <long> (pop
          ;; -args-))) but that heavily relies on the specifics of
          ;; compiler semantics (and doesn't work currently)
