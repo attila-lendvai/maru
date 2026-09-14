@@ -8,7 +8,6 @@
 ;;; garbage collector
 ;;; ----------------------------------------------------------------
 
-(load "source/evaluator/gc.l")
 (load "source/evaluator/eval.l")
 
 (define-function %syscall-rc-assert (syscall-number rc)
