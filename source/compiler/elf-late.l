@@ -405,7 +405,7 @@
 (define-constant +n-program-headers+
     (if-feature relocatable-elf
         (if-at-expand (= "c-obj" elf-emission-type) 0 8)
-      4))
+      5))
 
 (define-constant +n-section-headers+
     (if-feature relocatable-elf 11 0))
@@ -427,7 +427,13 @@
 (define-constant +data-segment-space+		0x00020000)
 
 (define-constant +bss-segment-address+		(+ +data-segment-address+	+data-segment-space+))
-(define-constant +bss-segment-space+		0xffffffff) ; there's space for plenty of nothing at the end...
+(define-constant +bss-segment-space+		0x00020000) ; reserved for bss; the heap image follows
+
+;; The heap image segment: the initial, pre-initialized heap. It is the
+;; last loaded segment, so the program break starts right after it and
+;; brk can grow the heap at runtime (see platform/acquire-memory).
+(define-constant +heap-segment-address+		(+ +bss-segment-address+	+bss-segment-space+))
+(define-constant +heap-segment-space+		0x01000000)
 
 ;; The ELF header, shared by the three elf writers. E-PHOFF and E-SHOFF
 ;; accept a number or a section desig; the desig form resolves as a
@@ -463,7 +469,7 @@
 (define-function bss-size ()
   (max 1 (segment-length 'bss)))
 
-;; Emits the four assember segments as PT_LOAD program headers.
+;; Emits the loaded assembler segments as PT_LOAD program headers.
 (define-function emit-base-phdrs ()
   (let ((file-offset 0))
     (list-do entry `((code	,(+ elf/PF_R elf/PF_X)	,+code-segment-space+)
@@ -491,13 +497,30 @@
                              space)
         (incr file-offset size)))
 
+    ;; bss has no file content; the heap image follows it in memory.
+    (assert (<= (segment-length 'bss) +bss-segment-space+)
+            "emit-base-phdrs: bss does not fit in its reserved space")
+
     (emit-program-header elf/PT_LOAD
                          file-offset
                          0 (bss-size)
                          (+ elf/PF_R elf/PF_W)
                          elf/page-size
                          (segment-base 'bss)
-                         +bss-segment-space+)))
+                         +bss-segment-space+)
+
+    (if-feature relocatable-elf
+        ()
+      ;; The heap image is the last loaded segment, so the program break
+      ;; starts right after it: brk grows the heap without a gap.
+      (emit-program-header elf/PT_LOAD
+                           file-offset
+                           (segment-length 'heap)
+                           (segment-length 'heap)
+                           (+ elf/PF_R elf/PF_W)
+                           elf/page-size
+                           (segment-base 'heap)
+                           +heap-segment-space+))))
 
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))
@@ -516,6 +539,14 @@
 
   (.segment	'ro-data)
   (.align	elf/page-size)
+
+  ;; Initialize the empty heap image. It is the last loaded segment;
+  ;; later stages move literals into it. For now it only holds this
+  ;; placeholder cell so that its PT_LOAD has content.
+  (.segment	'heap)
+  (.align	target/cell-size/bytes)
+  (label!	'heap-start)
+  (.i8/times	0 target/cell-size/bytes)
 
   ;; append the program header table to the text segment, so that
   ;; AT_PHDR (load bias + e_phoff) points into a mapped region.
@@ -546,7 +577,7 @@
 
   ;; we can start writing the file. note that the order must be in
   ;; sync with the headers above.
-  (list-do name '(code ro-data data) ; bss segment needs no storage
+  (list-do name '(code ro-data data heap) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
 (define-function compile-env (env -c- output-path machine-type reloc-type glob-dat-type)
@@ -577,6 +608,9 @@
                      (bss	(if-at-expand (= "c-obj" elf-emission-type)
                                     0
                                   +bss-segment-address+))
+                     (heap	(if-at-expand (= "c-obj" elf-emission-type)
+                                    0
+                                  +heap-segment-address+))
                      (.shstrtab	0)
                      (.symtab	0)
                      (.strtab	0)))
