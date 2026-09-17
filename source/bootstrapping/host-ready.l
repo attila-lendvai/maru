@@ -11,9 +11,7 @@
 ;; you can think of *slave-env* as the syntax-module of the target: all macros,
 ;; constants, and any meta-level stuff are evaluated in that environment.
 ;; *target-env* will be set up later in emit-early.l.
-(let ((slave-env (environment (if-at-expand (defined? '*maru-module*) ; evolving?
-                                  (<module>-globals *maru-module*)
-                                *maru*))))
+(let ((slave-env (environment *maru*)))
   (assert (= 0 (<env>-level slave-env)))
   (when-at-expand (feature debug-info)
     (set (<env>-name slave-env) "slave"))
