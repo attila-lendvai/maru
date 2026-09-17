@@ -519,6 +519,8 @@
 ;; stored in the maru heap.
 (define-boxed-word <lower-cell>)
 
+(define-boxed-word <cell-64>)
+
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 ;;(define-function undefined?	(obj)	(= <undefined>	(type-of obj)))
 (define-function long?		(obj)	(= <long>	(type-of obj)))

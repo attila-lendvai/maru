@@ -443,7 +443,18 @@
       (test-assert (= limit (memory-block/length x)))
       (test-assert (= 42 (memory-block/at x 0)))
       (test-assert (= 42 (memory-block/at x (- limit 1))))
-      )))
+      ))
+
+  (define-test cell-64/1 ()
+    (let* ((arr	(memory-block 200))
+           (x	(<memory-block>-elements arr)))
+
+      (set (cell-at x 0) 0x1122334455667788)
+      (let ((c (cell-64-at arr 0)))
+        ;; set-cell-64-at returns its argument as-is
+        (test-assert (= c (set-cell-64-at arr 8 c)))
+        ;; the raw bytes round-tripped
+        (test-assert (= (cell-at x 0) (cell-at x 8)))))))
 
 (define-function many-args (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
   (+ x1 x10 x16))
