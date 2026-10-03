@@ -442,7 +442,13 @@
      (assert (<= 0 value 0xffffffff) "emit-u32: out of range: "value)
      (emit-u16 (bitwise-and 0xffff value))
      (emit-u16 (bitwise-and 0xffff (bitwise-shift value -16))))
-    ;; (<lower-cell> TODO) needed to support 32 bit mode
+    (<cell-32>
+     (let ((segment (current-segment)))
+       (set (memory-block/at (<segment>-buffer segment)
+                             (<segment>-paddress segment))
+            value)
+       (incr (<segment>-paddress segment) 4)
+       (incr (<segment>-laddress segment) 4)))
     (else	(error "emit-u32: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-i32 (value)
@@ -452,9 +458,11 @@
      ;; TODO only works on 64 bit hosts
      (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
      (emit-u32 (bitwise-and value 0xffffffff)))
-    (<label>	(emit-label value emit-i32 4))
+    (<cell-32>	(emit-u32 value))
+    (<label>	(emit-label value emit-i32 4 'abs32))
+    (<reloc-symbol>	(%record-relocation value 'symbol32 4 0)
+                 (emit-u32 0))
     (<symbol>	(emit-i32 (%ensure-label value)))
-    ;; (<lower-cell> TODO) needed to support 32 bit mode
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-u64 (value)
@@ -463,12 +471,12 @@
     (<long>
      (emit-u32 (bitwise-and 0xffffffff value))
      (emit-u32 (bitwise-and 0xffffffff (bitwise-shift value -32))))
-    (<lower-cell>
-     ;; (print-all *debug-output* "emit-u64 is storing a <lower-cell>: "value
+    (<cell-64>
+     ;; (print-all *debug-output* "emit-u64 is storing a <cell-64>: "value
      ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
      (let ((segment (current-segment)))
        (set (memory-block/at (<segment>-buffer segment)
-                            (<segment>-paddress segment))
+                             (<segment>-paddress segment))
             value)
        (incr (<segment>-paddress segment) 8)
        (incr (<segment>-laddress segment) 8)))
@@ -478,7 +486,7 @@
   ;;(println "emit-i64, value: "value", at laddress: " (current-laddress))
   (typecase value
     (<long>	(emit-u64 value)) ; always in range on 64 bit hosts
-    (<lower-cell> (emit-u64 value))
+    (<cell-64> (emit-u64 value))
     (<label>	(emit-label value emit-i64 8 'abs64))
     (<reloc-symbol>	(%record-relocation value 'symbol64 8 0)
                  (emit-u64 0))

@@ -981,6 +981,9 @@
 (define-function INVD ()		(_OO 0x0f08))
 (define-function SYSCALL ()		(_OO 0x0f05))
 
+(define-function INT (IM)		(_O 0xcd) (emit-u8 IM))
+(define-function INT3 ()		(_O 0xcc))
+
 (define-function CBW ()			(_wO 0x98))
 (define-function CLC ()			(_O 0xf8))
 (define-function CWD ()			(_O 0x99)) ; 16 bit mode
