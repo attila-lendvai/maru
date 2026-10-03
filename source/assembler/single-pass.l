@@ -397,23 +397,21 @@
 (define-function emit-u8 (value)
   (typecase value
     (<long>
-     (assert (<= 0 value 0xff) "emit-u8: out of range: "value)
+     (assert (<= -0x80 value 0xff) "emit-u8: out of range: "value)
      (let* ((segment	(current-segment))
             (buffer	(<segment>-buffer segment))
             (position	(<segment>-paddress segment)))
-       ;; (print-all *debug-output* "emit-u8 is storing 0x" (integer->hex-string value) " at 0x"(integer->hex-string position)
-       ;;            ", segment-length: 0x"(integer->hex-string (memory-block/length buffer))
-       ;;            ", laddress: 0x"(integer->hex-string (<segment>-laddress segment))
-       ;;            "\n")
        (incr (<segment>-laddress segment))
-       (set (memory-block/at buffer position) value)
+       (set (memory-block/at buffer position) (bitwise-and value 0xff))
        (set (<segment>-paddress segment) (+ 1 position))))
+    (<label>	(emit-label value emit-u8 1))
+    (<symbol>	(emit-u8 (%ensure-label value)))
     (else	(error "emit-u8: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-i8 (value)
   (typecase value
     (<long>
-     (assert (if (<= 0 value) (<= value 0xff) (<= -0x80 value)) "emit-i8: out of range: "value)
+     (assert (<= -0x80 value 0x7f) "emit-i8: out of range: "value)
      (emit-u8 (bitwise-and value 0xff)))
     (<label>	(emit-label value emit-i8 1))
     (<symbol>	(emit-i8 (%ensure-label value)))
@@ -422,9 +420,11 @@
 (define-function emit-u16 (value)
   (typecase value
     (<long>
-     (assert (<= 0 value 0xffff) "emit-u16: out of range: "value)
+     (assert (<= -0x8000 value 0xffff) "emit-u16: out of range: "value)
      (emit-u8 (bitwise-and 0xff value))
      (emit-u8 (bitwise-and 0xff (bitwise-shift value -8))))
+    (<label>	(emit-label value emit-u16 2))
+    (<symbol>	(emit-u16 (%ensure-label value)))
     (else	(error "emit-u16: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-i16 (value)
@@ -439,7 +439,7 @@
 (define-function emit-u32 (value)
   (typecase value
     (<long>
-     (assert (<= 0 value 0xffffffff) "emit-u32: out of range: "value)
+     (assert (<= -0x80000000 value 0xffffffff) "emit-u32: out of range: "value)
      (emit-u16 (bitwise-and 0xffff value))
      (emit-u16 (bitwise-and 0xffff (bitwise-shift value -16))))
     (<cell-32>
@@ -449,24 +449,23 @@
             value)
        (incr (<segment>-paddress segment) 4)
        (incr (<segment>-laddress segment) 4)))
+    (<label>	(emit-label value emit-u32 4 'abs32))
+    (<reloc-symbol>	(%record-relocation value 'symbol32 4 0)
+                 (emit-u32 0))
+    (<symbol>	(emit-u32 (%ensure-label value)))
     (else	(error "emit-u32: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-i32 (value)
-  ;;(println "emit-i32, value: "value)
   (typecase value
     (<long>
      ;; TODO only works on 64 bit hosts
      (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
      (emit-u32 (bitwise-and value 0xffffffff)))
-    (<cell-32>	(emit-u32 value))
     (<label>	(emit-label value emit-i32 4 'abs32))
-    (<reloc-symbol>	(%record-relocation value 'symbol32 4 0)
-                 (emit-u32 0))
     (<symbol>	(emit-i32 (%ensure-label value)))
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-u64 (value)
-  ;;(println "emit-u64, value: "value", at laddress: " (current-laddress))
   (typecase value
     (<long>
      (emit-u32 (bitwise-and 0xffffffff value))
@@ -480,24 +479,24 @@
             value)
        (incr (<segment>-paddress segment) 8)
        (incr (<segment>-laddress segment) 8)))
+    (<label>	(emit-label value emit-u64 8 'abs64))
+    (<reloc-symbol>	(%record-relocation value 'symbol64 8 0)
+                 (emit-u64 0))
+    (<symbol>	(emit-u64 (%ensure-label value)))
     (else	(error "emit-u64: called with unexpected value: "value", type: "(type-of value)))))
 
 (define-function emit-i64 (value)
-  ;;(println "emit-i64, value: "value", at laddress: " (current-laddress))
   (typecase value
     (<long>	(emit-u64 value)) ; always in range on 64 bit hosts
-    (<cell-64> (emit-u64 value))
     (<label>	(emit-label value emit-i64 8 'abs64))
-    (<reloc-symbol>	(%record-relocation value 'symbol64 8 0)
-                 (emit-u64 0))
     (<symbol>	(emit-i64 (%ensure-label value)))
     (else	(error "emit-i64: called with unexpected value: "value", type: "(type-of value)))))
 
 ;; some aliases
-(define-function .i8  vals (map emit-i8  vals))
-(define-function .i16 vals (map emit-i16 vals))
-(define-function .i32 vals (map emit-i32 vals))
-(define-function .i64 vals (map emit-i64 vals))
+(define-function .u8  vals (map emit-u8  vals))
+(define-function .u16 vals (map emit-u16 vals))
+(define-function .u32 vals (map emit-u32 vals))
+(define-function .u64 vals (map emit-u64 vals))
 
 (define-function .i8/times (value times)
   (let* ((segment	(current-segment))

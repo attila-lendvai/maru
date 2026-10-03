@@ -111,13 +111,13 @@
       (JMPSm	'skip-1 0 0 0)
 
       (label!	'data-1)
-      (.i64	'skip-1) ; future label reference
+      (.u64	'skip-1) ; future label reference
 
       (label!	'skip-1)
       (JMPSm	'skip-2 0 0 0)
 
       (label!	'data-2)
-      (.i64	'skip-1) ; realized label reference
+      (.u64	'skip-1) ; realized label reference
       (NOP)
       (NOP)
       (NOP)
@@ -161,7 +161,7 @@
     (SUBQi32r	3 RAX)
     (RET)
     (label! 'exit-code)
-    (.i64	1))
+    (.u64	1))
 
 (define-jit-test jit-posix-5 ()
 

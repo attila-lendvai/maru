@@ -43,7 +43,7 @@
 
 (define-function emit-dynstr ()
   (label! '.dynstr)
-  (.i8 0)
+  (.u8 0)
   (let ((offset 1))
     (list-do entry *external-symbols*
       (set (<external-symbol>-name-offset entry) offset)
@@ -58,17 +58,17 @@
 (define-function emit-dynsym ()
   (.align elf/alignof-Elf64_Sym)
   (label! '.dynsym)
-  (.i64 0 0 0) ; the null symbol (see elf/sizeof-Elf64_Sym)
+  (.u64 0 0 0) ; the null symbol (see elf/sizeof-Elf64_Sym)
   (let ((index 1))
     (list-do entry *external-symbols*
       (set (<external-symbol>-dynsym-index entry) index)
       ;; Elf64_Sym: st_name, st_info, st_other, st_shndx, st_value, st_size
       ;; st_info = (STB_GLOBAL << 4) | STT_FUNC
-      (.i32 (<external-symbol>-name-offset entry))
-      (.i8 (+ (bitwise-shift elf/STB_GLOBAL 4) elf/STT_FUNC))
-      (.i8 0)
-      (.i16 elf/SHN_UNDEF)
-      (.i64 0 0)
+      (.u32 (<external-symbol>-name-offset entry))
+      (.u8 (+ (bitwise-shift elf/STB_GLOBAL 4) elf/STT_FUNC))
+      (.u8 0)
+      (.u16 elf/SHN_UNDEF)
+      (.u64 0 0)
       (incr index))))
 
 ;;; DT_GNU_HASH. We only ever import externals (all SHN_UNDEF) and
@@ -79,9 +79,9 @@
 (define-function emit-gnu-hash ()
   (label! 'gnu-hash)
   ;; nbuckets, symoffset, bloom_size (words), bloom_shift
-  (.i32 1 1 1 0)
-  (.i64 0)			; bloom filter (one 64-bit word, empty)
-  (.i32 0))			; buckets (one bucket, empty -> lookup fails)
+  (.u32 1 1 1 0)
+  (.u64 0)			; bloom filter (one 64-bit word, empty)
+  (.u32 0))			; buckets (one bucket, empty -> lookup fails)
 
 ;;; FFI: emit the trampolines for the externals that got referenced
 ;;; through external-trampoline-label; their bytes are emitted here

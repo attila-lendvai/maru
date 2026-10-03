@@ -65,14 +65,14 @@
 
 (define-function emit-program-header (type file-offset file-size mem-size flags
                                                   start alignment)
-  (.i32	type)                    ; p_type
-  (.i32	flags)                          ; p_flags
-  (.i64	file-offset)                    ; p_offset - File offset
-  (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
-  (.i64	0)       ; p_paddr - ignored
-  (.i64	file-size)                      ; p_filesz - Size in file
-  (.i64	mem-size)                       ; p_memsz - Size in memory
-  (.i64	alignment))
+  (.u32	type)                    ; p_type
+  (.u32	flags)                          ; p_flags
+  (.u64	file-offset)                    ; p_offset - File offset
+  (.u64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
+  (.u64	0)       ; p_paddr - ignored
+  (.u64	file-size)                      ; p_filesz - Size in file
+  (.u64	mem-size)                       ; p_memsz - Size in memory
+  (.u64	alignment))
 
 (define-function emit-program-header/segment (file-offset file-size mem-size flags
                                                           start alignment)
@@ -88,17 +88,17 @@
     (.segment 'ro-data)
     (label! 'elf/interpreter-start)
     (.ascii +ld.so-path+)
-    (.i8 0)
+    (.u8 0)
     (label! 'elf/interpreter-end)
 
     (let ((empty-string (label!)))
-      (.i8 0)
+      (.u8 0)
       (.segment 'ro-data)
       (.align 8)
       (label! 'elf/dynamic-table-start)
-      (.i64 elf/DT_STRTAB empty-string)
-      (.i64 elf/DT_SYMTAB 0)
-      (.i64 elf/DT_NULL 0)
+      (.u64 elf/DT_STRTAB empty-string)
+      (.u64 elf/DT_SYMTAB 0)
+      (.u64 elf/DT_NULL 0)
       (label! 'elf/dynamic-table-end)))
 
   (.segment 'data)
@@ -115,23 +115,23 @@
 ;;; ELF header
 ;;;
   (label!	'elf-header-start)
-  (.i8		0x7f)                   ; ident[0]
+  (.u8		0x7f)                   ; ident[0]
   (.ascii	"ELF")
-  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
-  (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		elf/ET_EXEC)     ; e_type
-  (.i16		elf/EM_X86_64)   ; e_machine
-  (.i32		1)               ; e_version
-  (.i64		(label 'code-segment-start)) ; e_entry (entry point)
-  (.i64		(label 'program-headers (- self (laddress 'elf-header-start)))) ; e_phoff	Start of program headers (file offset)
-  (.i64		0)                  ; e_shoff	Start of section headers
-  (.i32		0)                  ; e_flags
-  (.i16		(label 'elf-header-end (- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
-  (.i16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-  (.i16		+n-program-headers+)          ; e_phnum	Number of program headers
-  (.i16		0)           ; e_shentsize	Size of section header
-  (.i16		0)           ; e_shnum	Number of section headers
-  (.i16		0)      ; e_shstrndx	Section header string table index
+  (.u8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
+  (.u8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
+  (.u16		elf/ET_EXEC)     ; e_type
+  (.u16		elf/EM_X86_64)   ; e_machine
+  (.u32		1)               ; e_version
+  (.u64		(label 'code-segment-start)) ; e_entry (entry point)
+  (.u64		(label 'program-headers (- self (laddress 'elf-header-start)))) ; e_phoff	Start of program headers (file offset)
+  (.u64		0)                  ; e_shoff	Start of section headers
+  (.u32		0)                  ; e_flags
+  (.u16		(label 'elf-header-end (- self (laddress 'elf-header-start)))) ; e_ehsize	Size of this header
+  (.u16		elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
+  (.u16		+n-program-headers+)          ; e_phnum	Number of program headers
+  (.u16		0)           ; e_shentsize	Size of section header
+  (.u16		0)           ; e_shnum	Number of section headers
+  (.u16		0)      ; e_shstrndx	Section header string table index
   (label!	'elf-header-end)
 
   (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr))
@@ -221,9 +221,9 @@
 (define-function emit-global-variable args
   (if args
       (with-new-label 'data
-        (.i64 (first args)))
+        (.u64 (first args)))
     (with-new-label 'bss
-      (.i64 0))))
+      (.u64 0))))
 
 (define-function emit-base-lookup ()
   ;; NOTE AT_BASE is not set when it's not a dynamic elf

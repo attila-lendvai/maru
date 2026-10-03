@@ -11,7 +11,7 @@
   (or (<external-symbol>-got-label entry)
       (let ((label (with-new-label 'data
                      (if (= "c-obj" elf-emission-type)
-                         (.i64 (reloc-symbol (<external-symbol>-name entry)))
+                         (.u64 (reloc-symbol (<external-symbol>-name entry)))
                        (emit CELL 0)))))
         (set (<external-symbol>-got-label entry) label)
         label)))

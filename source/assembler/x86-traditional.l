@@ -56,7 +56,7 @@
                                  (- bytes 1))))
     (when (< 0 remainder)
       (times-do (- bytes remainder)
-        (emit-i8 0)))))
+        (emit-u8 0)))))
 
 (define-function assemble (program)
   (let* ((env		(environment *globals*))
@@ -110,27 +110,27 @@
               (let ((addr (eval (second instr) env)))
                 (environment-define env '$$ addr)
                 (environment-define env '$ addr)))
-             (.i8
+             (.u8
               (list-do byte (rest instr)
-                (emit-i8 (eval byte env))))
-             (.i16
+                (emit-u8 (eval byte env))))
+             (.u16
               (list-do half (rest instr)
-                (emit-i16 (eval half env))))
-             (.i32
+                (emit-u16 (eval half env))))
+             (.u32
               (list-do long (rest instr)
-                (emit-i32 (eval long env))))
-             (.i64
+                (emit-u32 (eval long env))))
+             (.u64
               (list-do quad (rest instr)
-                (emit-i64 (eval quad env))))
+                (emit-u64 (eval quad env))))
              (.ascii
               (list-do string (rest instr)
                 (string-do char string
-                  (emit-i8 char))))
+                  (emit-u8 char))))
              (.asciiz
               (list-do string (rest instr)
                 (string-do char string
-                  (emit-i8 char))
-                (emit-i8 0)))
+                  (emit-u8 char))
+                (emit-u8 0)))
              (else
               (eval instr env))))
           (else

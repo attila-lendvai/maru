@@ -43,55 +43,55 @@
 (assemble
   '((.base	base-address) ; typical 64-bit default base
 file-start
-    (.i8	0x7f)			; ident[0]
+    (.u8	0x7f)			; ident[0]
     (.ascii	"ELF")
-    (.i8	2 1 1 0)		; ELFCLASS64, ELFDATA2LSB, version, ELFOSABI_NONE
-    (.i8	0 0 0 0 0 0 0 0)	; EI_ABIVERSION and padding (total 16 ident bytes)
-    (.i16	2)			; e_type (ET_EXEC = 2)
-    (.i16	62)			; e_machine (EM_X86_64 = 62)
-    (.i32	1)			; e_version
-    (.i64	code-segment-start)	; e_entry (entry point)
-    (.i64	(- program-headers file-start))	; e_phoff	Start of program headers (file offset)
-    (.i64	0)			; e_shoff	Start of section headers
-    (.i32	0)			; e_flags
-    (.i16	elf-header-size)	; e_ehsize	Size of this header (ELF64_Ehdr = 64)
-    (.i16	program-header-size)	; e_phentsize	Size of program header entry (ELF64_Phdr = 56)
-    (.i16	3)			; e_phnum	Number of program headers
-    (.i16	0)			; e_shentsize	Size of section header
-    (.i16	0)			; e_shnum	Number of section headers
-    (.i16	0)			; e_shstrndx	Section header string table index
+    (.u8	2 1 1 0)		; ELFCLASS64, ELFDATA2LSB, version, ELFOSABI_NONE
+    (.u8	0 0 0 0 0 0 0 0)	; EI_ABIVERSION and padding (total 16 ident bytes)
+    (.u16	2)			; e_type (ET_EXEC = 2)
+    (.u16	62)			; e_machine (EM_X86_64 = 62)
+    (.u32	1)			; e_version
+    (.u64	code-segment-start)	; e_entry (entry point)
+    (.u64	(- program-headers file-start))	; e_phoff	Start of program headers (file offset)
+    (.u64	0)			; e_shoff	Start of section headers
+    (.u32	0)			; e_flags
+    (.u16	elf-header-size)	; e_ehsize	Size of this header (ELF64_Ehdr = 64)
+    (.u16	program-header-size)	; e_phentsize	Size of program header entry (ELF64_Phdr = 56)
+    (.u16	3)			; e_phnum	Number of program headers
+    (.u16	0)			; e_shentsize	Size of section header
+    (.u16	0)			; e_shnum	Number of section headers
+    (.u16	0)			; e_shstrndx	Section header string table index
     (.def	elf-header-size (- $ file-start))
 program-headers
     ;; code segment (PT_LOAD)
-    (.i32	elf/PT_LOAD)		; p_type
-    (.i32	(+ elf/PF_R elf/PF_X))	; p_flags (read, exec)
-    (.i64	0)			; p_offset (file offset)
-    (.i64	base-address)		; p_vaddr (virtual addr of segment) - base
-    (.i64	0)			; p_paddr
-    (.i64	code-segment-size)	; p_filesz
-    (.i64	code-segment-size)	; p_memsz
-    (.i64	elf/page-size)		; p_align
+    (.u32	elf/PT_LOAD)		; p_type
+    (.u32	(+ elf/PF_R elf/PF_X))	; p_flags (read, exec)
+    (.u64	0)			; p_offset (file offset)
+    (.u64	base-address)		; p_vaddr (virtual addr of segment) - base
+    (.u64	0)			; p_paddr
+    (.u64	code-segment-size)	; p_filesz
+    (.u64	code-segment-size)	; p_memsz
+    (.u64	elf/page-size)		; p_align
     (.def	program-header-size (- $ program-headers))
 
     ;; read-only data segment
-    (.i32	elf/PT_LOAD)		; p_type
-    (.i32	elf/PF_R)		; p_flags (read)
-    (.i64	(- ro-data-segment-start file-start))	; p_offset
-    (.i64	ro-data-segment-start)	; p_vaddr
-    (.i64	0)			; p_paddr
-    (.i64	ro-data-segment-size)	; p_filesz
-    (.i64	ro-data-segment-size)	; p_memsz
-    (.i64	4)			; p_align
+    (.u32	elf/PT_LOAD)		; p_type
+    (.u32	elf/PF_R)		; p_flags (read)
+    (.u64	(- ro-data-segment-start file-start))	; p_offset
+    (.u64	ro-data-segment-start)	; p_vaddr
+    (.u64	0)			; p_paddr
+    (.u64	ro-data-segment-size)	; p_filesz
+    (.u64	ro-data-segment-size)	; p_memsz
+    (.u64	4)			; p_align
 
     ;; writable data segment
-    (.i32	elf/PT_LOAD)		; p_type
-    (.i32	(+ elf/PF_R elf/PF_W))	; p_flags (read, write)
-    (.i64	(- data-segment-start file-start))	; p_offset
-    (.i64	data-segment-start)	; p_vaddr
-    (.i64	0)			; p_paddr
-    (.i64	data-segment-size)	; p_filesz
-    (.i64	data-segment-size)	; p_memsz
-    (.i64	4)			; p_align
+    (.u32	elf/PT_LOAD)		; p_type
+    (.u32	(+ elf/PF_R elf/PF_W))	; p_flags (read, write)
+    (.u64	(- data-segment-start file-start))	; p_offset
+    (.u64	data-segment-start)	; p_vaddr
+    (.u64	0)			; p_paddr
+    (.u64	data-segment-size)	; p_filesz
+    (.u64	data-segment-size)	; p_memsz
+    (.u64	4)			; p_align
 
 code-segment-start
     ;; print message (syscall write)
@@ -127,7 +127,7 @@ msg
 
 data-segment-start
 exit-code
-    (.i64	42)
+    (.u64	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
 (let ((filename "./build/test-elf.x86-64.traditional"))

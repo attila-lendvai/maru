@@ -78,24 +78,24 @@
                         (else (error "unexpected segment in .rela.dyn emission: "segment)))))
                 ;; Elf64_Rela entry (3 cells):
                 ;; 1. r_offset: byte offset in file where relocation applies (paddress + segment file offset)
-                (.i64 (+ segment-base paddress))
+                (.u64 (+ segment-base paddress))
                 ;; 2. r_info: relocation type
                 ;;    - R_AARCH64_RELATIVE = 1027 (base-relative)
                 ;;    - R_X86_64_RELATIVE = 8     (base-relative)
-                (.i64 reloc-type)
+                (.u64 reloc-type)
                 ;; 3. r_addend: the addend resolves lazily, all labels
                 ;; are defined by the time this table is emitted
-                (.i64 (<label>-laddress target)))
+                (.u64 (<label>-laddress target)))
               (incr rela-count)
               (incr relative-count))))
         ;; R_*_GLOB_DAT: resolve one imported symbol into its GOT cell
         (list-do entry *external-symbols*
-          (.i64 (+ +data-segment-address+
+          (.u64 (+ +data-segment-address+
                    (<label>-paddress (<external-symbol>-got-label entry))))
           ;; r_info = (dynsym-index << 32) | glob-dat-type
-          (.i64 (bitwise-or (bitwise-shift (<external-symbol>-dynsym-index entry) 32)
+          (.u64 (bitwise-or (bitwise-shift (<external-symbol>-dynsym-index entry) 32)
                             glob-dat-type))
-          (.i64 0)                ; r_addend
+          (.u64 0)                ; r_addend
           (incr rela-count)))
       (label! '.rela.dyn-end)
 
@@ -107,20 +107,20 @@
       (label! '.dynamic)
       ;; Elf64_Dyn struct entries, which really are just (name, tag) tuples
       (when (pair? *external-symbols*)
-        (.i64 elf/DT_NEEDED *libc-soname-offset*))
-      (.i64 elf/DT_RELA		(laddress '.rela.dyn))
-      (.i64 elf/DT_RELASZ	(* rela-count elf/sizeof-Elf64_Rela))
-      (.i64 elf/DT_RELAENT	elf/sizeof-Elf64_Rela)
+        (.u64 elf/DT_NEEDED *libc-soname-offset*))
+      (.u64 elf/DT_RELA		(laddress '.rela.dyn))
+      (.u64 elf/DT_RELASZ	(* rela-count elf/sizeof-Elf64_Rela))
+      (.u64 elf/DT_RELAENT	elf/sizeof-Elf64_Rela)
       ;; ld.so only fast-paths this many leading R_*_RELATIVE entries;
       ;; anything beyond must not be counted, or it asserts on GLOB_DAT
-      (.i64 elf/DT_RELACOUNT	relative-count)
-      (.i64 elf/DT_STRTAB	(laddress '.dynstr))
-      (.i64 elf/DT_STRSZ	(- (laddress '.dynstr-end)
+      (.u64 elf/DT_RELACOUNT	relative-count)
+      (.u64 elf/DT_STRTAB	(laddress '.dynstr))
+      (.u64 elf/DT_STRSZ	(- (laddress '.dynstr-end)
                                    (laddress '.dynstr)))
-      (.i64 elf/DT_SYMTAB	(laddress '.dynsym))
-      (.i64 elf/DT_SYMENT	elf/sizeof-Elf64_Sym)
-      (.i64 elf/DT_GNU_HASH	(laddress 'gnu-hash))
-      (.i64 elf/DT_NULL		0))
+      (.u64 elf/DT_SYMTAB	(laddress '.dynsym))
+      (.u64 elf/DT_SYMENT	elf/sizeof-Elf64_Sym)
+      (.u64 elf/DT_GNU_HASH	(laddress 'gnu-hash))
+      (.u64 elf/DT_NULL		0))
     (label! '.dynamic-end)))
 
 ;;;
@@ -265,10 +265,10 @@
                     (else		(error "unexpected relocation type: "type))))
                  (else		(error "unexpected relocation target: "target)))))
         (with-current-segment rela-segment
-          (.i64 hole-paddress)
-          (.i64 (bitwise-or (bitwise-shift symbol-index 32)
+          (.u64 hole-paddress)
+          (.u64 (bitwise-or (bitwise-shift symbol-index 32)
                             (arch-reloc-type arch type)))
-          (.i64 addend))))))
+          (.u64 addend))))))
 
 ;; The finalization that runs after the code pass, before the ELF
 ;; writer: the standalone image resolves its entry point and external
@@ -514,7 +514,7 @@
         ;; file offset; the write loop then runs back to back
         (with-current-segment '.shstrtab
           (times-do (- shdr-table-offset (+ shstrtab-offset size/shstrtab))
-            (.i8 0)))
+            (.u8 0)))
 
         ;; we can start writing the file. note that the order must be in
         ;; sync with the headers above.
@@ -564,7 +564,7 @@
         (when (< 0 gap)
           (with-current-segment previous
             (times-do gap
-              (.i8 0))))
+              (.u8 0))))
         (set previous name)
         (set cursor (+ offset (third entry)))))))
 

@@ -518,33 +518,37 @@
 ;;;
 
 (define-form define-alu-instruction (base-name op reg)
+  ;; the emit variant differs by field, not by op:
+  ;;  - B (8-bit op): imm8 is a raw byte
+  ;;  - W/L: imm8 sign-extends (signed), imm16/imm32 are raw
+  ;;  - Q: imm8/imm32 sign-extend (signed)
   (with-forms ((name ((size suffix) `(concat-symbols base-name ',size ',suffix))))
     `(begin
       ;; 8 bit
       (define-function ,(name B rr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,op		_b11 (rindex/8 S) (rindex/8 D))					)
-      (define-function ,(name B ir)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x80		_b11 ,reg (rindex/8 R))				(emit-i8 L)	)
+      (define-function ,(name B ir)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x80		_b11 ,reg (rindex/8 R))				(emit-u8 L)	)
 
       (define-function ,(name B mr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 2)	(rindex/8 R)	D (to-r32 B) (to-r32 I) S)			)
       (define-function ,(name B rm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,op		(rindex/8 R)	D (to-r32 B) (to-r32 I) S)			)
-      (define-function ,(name B im)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x80		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
+      (define-function ,(name B im)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x80		,reg		D (to-r32 B) (to-r32 I) S)	(emit-u8 L)	)
 
       ;; 16 bit
       (define-function ,(name W rr)	(S D)			  (_d16)(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/16 S) (rindex/16 D))				)
       (define-function ,(name W i8r)	(L R)			  (_d16)(_REX 0 0 0 R)	(_O_Mrm		0x83		_b11 ,reg (rindex/16 R))			(emit-i8 L)	)
-      (define-function ,(name W i16r)	(L R)			  (_d16)(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/16 R))			(emit-i16 L)	)
+      (define-function ,(name W i16r)	(L R)			  (_d16)(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/16 R))			(emit-u16 L)	)
       (define-function ,(name W mr)	(D B I S R)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/16 R)	D (to-r32 B) (to-r32 I) S)			)
       (define-function ,(name W rm)	(R D B I S)	(_a32 B I)(_d16)(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/16 R)	D (to-r32 B) (to-r32 I) S)			)
       (define-function ,(name W i8m)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_O_r_X		0x83		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
-      (define-function ,(name W i16m)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i16 L)	)
+      (define-function ,(name W i16m)	(L D B I S)	(_a32 B I)(_d16)(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-u16 L)	)
 
       ;; 32 bit
       (define-function ,(name L rr)	(S D)				(_REX 0 S 0 D)	(_O_Mrm		,(+ op 1)	_b11 (rindex/32 S) (rindex/32 D))				)
       (define-function ,(name L i8r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x83		_b11 ,reg (rindex/32 R))			(emit-i8 L)	)
-      (define-function ,(name L i32r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/32 R))			(emit-i32 L)	)
+      (define-function ,(name L i32r)	(L R)				(_REX 0 0 0 R)	(_O_Mrm		0x81		_b11 ,reg (rindex/32 R))			(emit-u32 L)	)
       (define-function ,(name L mr)	(D B I S R)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 3)	(rindex/32 R)	D (to-r32 B) (to-r32 I) S)			)
       (define-function ,(name L rm)	(R D B I S)	(_a32 B I)	(_REX 0 R I B)	(_O_r_X		,(+ op 1)	(rindex/32 R)	D (to-r32 B) (to-r32 I) S)			)
       (define-function ,(name L i8m)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x83		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i8 L)	)
-      (define-function ,(name L i32m)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-i32 L)	)
+      (define-function ,(name L i32m)	(L D B I S)	(_a32 B I)	(_REX 0 0 I B)	(_O_r_X		0x81		,reg		D (to-r32 B) (to-r32 I) S)	(emit-u32 L)	)
 
       (define-function ,(name L ir) (L R)		((if (i8? L) ,(name L i8r) ,(name L i32r)) L R))
       (define-function ,(name L im) (L D B I S)		((if (i8? L) ,(name L i8m) ,(name L i32m)) L D B I S))
@@ -654,8 +658,8 @@
 (define-function TESTWim (L D B I S)	(_wO_r_X   0xf7		_b000	D B I S) (emit-u16 L))
 (define-function TESTLrr (RS RD)	(_O_Mrm    0x85 _b11		(rindex/32 RS) (rindex/32 RD)))
 (define-function TESTLrm (R D B I S)	(_O_r_X    0x85			(rindex/32 R) D B I S))
-(define-function TESTLir (L R)		(_O_Mrm    0xf7 _b11	_b000	(rindex/32 R)) (emit-i32 L))
-(define-function TESTLim (L D B I S)	(_O_r_X    0xf7		_b000	D B I S) (emit-i32 L))
+(define-function TESTLir (L R)		(_O_Mrm    0xf7 _b11	_b000	(rindex/32 R)) (emit-u32 L))
+(define-function TESTLim (L D B I S)	(_O_r_X    0xf7		_b000	D B I S) (emit-u32 L))
 (define-function TESTQrr (S D)		(_REX 1 S 0 D) (TESTLrr (to-r32 S) (to-r32 D)))
 ;; TODO missing Q variants
 
@@ -664,26 +668,26 @@
 ;;;
 
 (define-function MOVBrr (S D)					(_REX 0 S 0 D)	(_O_Mrm 0x88 _b11 (rindex/8 S) (rindex/8 D)))
-(define-function MOVBir (L R)					(_REX 0 0 0 R)	(_Or    0xb0	(rindex/8 R))					(emit-i8 L))
+(define-function MOVBir (L R)					(_REX 0 0 0 R)	(_Or    0xb0	(rindex/8 R))					(emit-u8 L))
 (define-function MOVBmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8a	(rindex/8 R)	D (to-r32 B) (to-r32 I) S))
 (define-function MOVBrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x88	(rindex/8 R)	D (to-r32 B) (to-r32 I) S))
-(define-function MOVBim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_r_X 0xc6		   0	D (to-r32 B) (to-r32 I) S)	(emit-i8 L))
+(define-function MOVBim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_r_X 0xc6		   0	D (to-r32 B) (to-r32 I) S)	(emit-u8 L))
 
 (define-function MOVWrr (S D)				(_d16)	(_REX 0 S 0 D)	(_O_Mrm 0x89 _b11 (rindex/16 S) (rindex/16 D)))
-(define-function MOVWir (L R)				(_d16)	(_REX 0 0 0 R)	(_Or    0xb8	(rindex/16 R))					(emit-i16 L))
+(define-function MOVWir (L R)				(_d16)	(_REX 0 0 0 R)	(_Or    0xb8	(rindex/16 R))					(emit-u16 L))
 (define-function MOVWmr (D B I S R)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x8b	(rindex/16 R)	D (to-r32 B) (to-r32 I) S))
 (define-function MOVWrm (R D B I S)	(_a32 B I)	(_d16)	(_REX 0 R I B)	(_O_r_X 0x89	(rindex/16 R)	D (to-r32 B) (to-r32 I) S))
-(define-function MOVWim (L D B I S)	(_a32 B I)	(_d16)	(_REX 0 0 I B)	(_O_r_X 0xc7		    0	D (to-r32 B) (to-r32 I) S)	(emit-i16 L))
+(define-function MOVWim (L D B I S)	(_a32 B I)	(_d16)	(_REX 0 0 I B)	(_O_r_X 0xc7		    0	D (to-r32 B) (to-r32 I) S)	(emit-u16 L))
 
 (define-function MOVLrr (S D)					(_REX 0 S 0 D)	(_O_Mrm 0x89 _b11 (rindex/32 S) (rindex/32 D)))
-(define-function MOVLir (L R)					(_REX 0 0 0 R)	(_Or    0xb8	(rindex/32 R))					(emit-i32 L))
+(define-function MOVLir (L R)					(_REX 0 0 0 R)	(_Or    0xb8	(rindex/32 R))					(emit-u32 L))
 (define-function MOVLmr (D B I S R)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x8b	(rindex/32 R)	D (to-r32 B) (to-r32 I) S))
 (define-function MOVLrm (R D B I S)	(_a32 B I)		(_REX 0 R I B)	(_O_r_X 0x89	(rindex/32 R)	D (to-r32 B) (to-r32 I) S))
-(define-function MOVLim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_r_X 0xc7		    0	D (to-r32 B) (to-r32 I) S)	(emit-i32 L))
+(define-function MOVLim (L D B I S)	(_a32 B I)		(_REX 0 0 I B)	(_O_r_X 0xc7		    0	D (to-r32 B) (to-r32 I) S)	(emit-u32 L))
 
 (define-function MOVQrr (S D)					(_REX 1 S 0 D)	(MOVLrr (to-r32 S) (to-r32 D)))
 (define-function MOVQi32r (L R)					(_REX 1 0 0 R)	(_O_Mrm	0xc7 _b11 0 (rindex (to-r32 R)))			(emit-i32 L))
-(define-function MOVQi64r (L R)					(_REX 1 0 0 R)	(_Or	0xb8	(rindex (to-r32 R)))				(emit-i64 L))
+(define-function MOVQi64r (L R)					(_REX 1 0 0 R)	(_Or	0xb8	(rindex (to-r32 R)))				(emit-u64 L))
 (define-function MOVQmr (D B I S R)	(_a32 B I)		(_REX 1 R I B)	(_O_r_X 0x8b	(to-r32 R)	D (to-r32 B) (to-r32 I) S))
 (define-function MOVQrm (R D B I S)	(_a32 B I)		(_REX 1 R I B)	(_O_r_X 0x89	(to-r32 R)	D (to-r32 B) (to-r32 I) S))
 (define-function MOVQim (L D B I S)	(_a32 B I)		(_REX 1 0 I B)	(_O_r_X 0xc7	 0		D (to-r32 B) (to-r32 I) S)	(emit-i32 L))
@@ -742,7 +746,7 @@
 (define-function DECLr (RD)			(_O_Mrm 255 _b11 _b001 (rindex/32 RD)))
 (define-function DECLm (MD MB MI MS)		(_O_r_X 255 _b001 MD MB MI MS))
 
-(define-function ENTERii (W B)			(_O 200) (emit-i16 W) (emit-i8 B))
+(define-function ENTERii (W B)			(_O 200) (emit-u16 W) (emit-u8 B))
 
 (define-function INCBr (RD)			(_O_Mrm 254 _b11 _b000 (rindex/8 RD)))
 (define-function INCBm (MD MB MI MS)		(_O_r_X 254 _b000 MD MB MI MS))
@@ -790,7 +794,7 @@
 (define-function PUSHF () (_O 156))
 (define-function PUSHFD () (_wO 156))
 (define-function RET () (_O 195))
-(define-function RETi (IM) (_O 194) (emit-i16 IM))
+(define-function RETi (IM) (_O 194) (emit-u16 IM))
 (define-function ROLBir (IM RD) (if (= IM 1) (_O_Mrm 208 _b11 _b000 (rindex/8 RD)) (_O_Mrm 192 _b11 _b000 (rindex/8 RD)) (emit-u8 IM)))
 (define-function ROLBim (IM MD MB MS MI) (if (= IM 1) (_O_r_X 208 _b000 MD MB MI MS) (_O_r_X 192 _b000 MD MB MI MS) (emit-u8 IM)))
 (define-function ROLBrr (RS RD) (if (= RS CL) (_O_Mrm 210 _b11 _b000 (rindex/8 RD)) (ASMFAIL "source register must be CL")))

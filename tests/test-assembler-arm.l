@@ -439,7 +439,7 @@ skip:
   (ADR X0 'msg)
   (B 'skip)
   (label! 'msg)
-  (.i64 0xDEADBEEF)
+  (.u64 0xDEADBEEF)
   (label! 'skip)
   (NOP)
   )

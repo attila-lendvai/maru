@@ -433,13 +433,13 @@
 ;; fixup relative to the header start (file offset arithmetic).
 (define-function emit-elf-header (e-type machine-type e-entry e-phoff e-phnum e-shoff e-shnum e-shstrndx)
   (label!	'elf-header-start)
-  (.i8		0x7f)                   ; ident[0]
+  (.u8		0x7f)                   ; ident[0]
   (.ascii	"ELF")
-  (.i8		+elf-class+ elf/ELFDATA2LSB 1 elf/ELFOSABI_LINUX) ; version
-  (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-  (.i16		e-type)          ; e_type
-  (.i16		machine-type)    ; e_machine
-  (.i32		1)               ; e_version
+  (.u8		+elf-class+ elf/ELFDATA2LSB 1 elf/ELFOSABI_LINUX) ; version
+  (.u8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
+  (.u16		e-type)          ; e_type
+  (.u16		machine-type)    ; e_machine
+  (.u32		1)               ; e_version
   (.cell	e-entry)         ; e_entry (entry point)
   (.cell	(if (symbol? e-phoff)
                     (label e-phoff (- self (laddress 'elf-header-start)))
@@ -447,13 +447,13 @@
   (.cell	(if (symbol? e-shoff)
                     (label e-shoff (- self (laddress 'elf-header-start)))
                   e-shoff))      ; e_shoff
-  (.i32		0)               ; e_flags
-  (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize
-  (.i16		+phdr-size+)     ; e_phentsize
-  (.i16		e-phnum)         ; e_phnum
-  (.i16		+shdr-size+)     ; e_shentsize
-  (.i16		e-shnum)         ; e_shnum
-  (.i16		e-shstrndx)      ; e_shstrndx
+  (.u32		0)               ; e_flags
+  (.u16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize
+  (.u16		+phdr-size+)     ; e_phentsize
+  (.u16		e-phnum)         ; e_phnum
+  (.u16		+shdr-size+)     ; e_shentsize
+  (.u16		e-shnum)         ; e_shnum
+  (.u16		e-shstrndx)      ; e_shstrndx
   (label!	'elf-header-end)
   (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) +ehdr-size+)))
 
@@ -609,10 +609,10 @@
                      (.strtab	0)))
 
     (.segment	'.shstrtab)
-    (.i8	0)				; mandated by the elf standard
+    (.u8	0)				; mandated by the elf standard
 
     (.segment	'.strtab)
-    (.i8	0)				; mandated by the elf standard
+    (.u8	0)				; mandated by the elf standard
 
     (.segment	'.symtab)
     (emit-symtab-entry 0 0 0 0 0 0)		; mandated by the elf standard

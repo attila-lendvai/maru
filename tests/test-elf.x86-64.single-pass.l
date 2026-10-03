@@ -40,14 +40,14 @@
 (define hole 0)
 
 (define-function emit-program-header (flags start end alignment)
-  (.i32		elf/PT_LOAD)		; p_type
-  (.i32		flags)			; p_flags
-  (.i64		(label start (- pself (paddress 'file-start)))) ; p_offset - File offset
-  (.i64		(label start))		; p_vaddr (virtual addr of segment) - Virtual address
-  (.i64		0)			; p_paddr - ignored
-  (.i64		(label end (- pself (paddress start)))) ; p_filesz - Size in file
-  (.i64		(label end (- pself (paddress start)))) ; p_memsz - Size in memory
-  (.i64		alignment))		; p_align - Alignment constraint for both p_offset and p_vaddr
+  (.u32		elf/PT_LOAD)		; p_type
+  (.u32		flags)			; p_flags
+  (.u64		(label start (- pself (paddress 'file-start)))) ; p_offset - File offset
+  (.u64		(label start))		; p_vaddr (virtual addr of segment) - Virtual address
+  (.u64		0)			; p_paddr - ignored
+  (.u64		(label end (- pself (paddress start)))) ; p_filesz - Size in file
+  (.u64		(label end (- pself (paddress start)))) ; p_memsz - Size in memory
+  (.u64		alignment))		; p_align - Alignment constraint for both p_offset and p_vaddr
 
 (define-form syscall (sys-number . args)
   `(begin
@@ -68,23 +68,23 @@
 ;;;
 ;;; ELF header
 ;;;
-    (.i8	0x7f)           ; ident[0]
+    (.u8	0x7f)           ; ident[0]
     (.ascii	"ELF")
-    (.i8	elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
-    (.i8	0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
-    (.i16	elf/ET_EXEC)     ; e_type
-    (.i16	elf/EM_X86_64)   ; e_machine
-    (.i32	1)               ; e_version
-    (.i64	(label 'code-segment-start)) ; e_entry (entry point)
-    (.i64	(label	'program-headers (- pself (paddress 'file-start)))) ; e_phoff	Start of program headers (file offset)
-    (.i64	0)    ; e_shoff	Start of section headers
-    (.i32	0)    ; e_flags
-    (.i16	(label 'elf-header-end (- pself (paddress 'file-start)))) ; e_ehsize	Size of this header
-    (.i16	elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
-    (.i16	3)   ; e_phnum	Number of program headers
-    (.i16	0)   ; e_shentsize	Size of section header
-    (.i16	0)   ; e_shnum	Number of section headers
-    (.i16	0) ; e_shstrndx	Section header string table index
+    (.u8	elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
+    (.u8	0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
+    (.u16	elf/ET_EXEC)     ; e_type
+    (.u16	elf/EM_X86_64)   ; e_machine
+    (.u32	1)               ; e_version
+    (.u64	(label 'code-segment-start)) ; e_entry (entry point)
+    (.u64	(label	'program-headers (- pself (paddress 'file-start)))) ; e_phoff	Start of program headers (file offset)
+    (.u64	0)    ; e_shoff	Start of section headers
+    (.u32	0)    ; e_flags
+    (.u16	(label 'elf-header-end (- pself (paddress 'file-start)))) ; e_ehsize	Size of this header
+    (.u16	elf/sizeof-Elf64_Phdr) ; e_phentsize	Size of program header entry
+    (.u16	3)   ; e_phnum	Number of program headers
+    (.u16	0)   ; e_shentsize	Size of section header
+    (.u16	0)   ; e_shnum	Number of section headers
+    (.u16	0) ; e_shstrndx	Section header string table index
     (label!	'elf-header-end)
 
 ;;;
@@ -153,7 +153,7 @@
 ;;;
     (label!	'data-segment-start)
     (label!	'exit-code)
-    (.i64	42)
+    (.u64	42)
     (label!	'data-segment-end)
 
     (println "writing elf buffer to "filename)
