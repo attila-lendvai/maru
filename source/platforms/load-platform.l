@@ -6,7 +6,13 @@
                      ,(or (= target/platform "libc")
                           (= target/platform "posix"))))
 
-(load "source/compiler/target.l")
+(load "source/compiler/setup-target.l")
+
+(switch-to-target-env)
+
+(load "source/platforms/target.l")
+
+(switch-to-host-env)
 
 ;; The ET_REL c-obj emission (for the C toolchain) is the default on
 ;; the C-based platforms. The CLI key arrives as a string into the
