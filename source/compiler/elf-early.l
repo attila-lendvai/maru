@@ -143,6 +143,24 @@
 ;;; Instructions
 ;;;
 
+(case (target-value target/arch) ; the normalized value
+  (IA-32
+   (define .cell			.i32)
+   (define-constant +elf-class+		elf/ELFCLASS32)
+   (define-constant +ehdr-size+		elf/sizeof-Elf32_Ehdr)
+   (define-constant +shdr-size+		elf/sizeof-Elf32_Shdr)
+   (define-constant +phdr-size+		elf/sizeof-Elf32_Phdr)
+   )
+  ((x86-64 aarch64)
+   (define .cell			.i64)
+   (define-constant +elf-class+		elf/ELFCLASS64)
+   (define-constant +ehdr-size+		elf/sizeof-Elf64_Ehdr)
+   (define-constant +shdr-size+		elf/sizeof-Elf64_Shdr)
+   (define-constant +phdr-size+		elf/sizeof-Elf64_Phdr)
+   )
+  (else
+   (error "elf-late.l doesn't know how to deal with target/arch "target/arch)))
+
 (define-instruction COMMENT	()
   ((pair)			(apply print-all (concat-list
                                                   (list *debug-output* "; ")
@@ -153,11 +171,13 @@
 
 ;; The natural pointer/word size of the target.
 (define-instruction CELL	()
+  ;; TODO these should error when they mismatch the cell size
   ((LI64)			(.i64 (<LITERAL>-value $1)))
+  ((LI32)			(.i32 (<LITERAL>-value $1)))
   ;; the address is a <label>; emit-i64 records the abs64 hole for
   ;; the elf writers (R_*_RELATIVE standalone, R_*_64 in the c-obj)
-  ((GLOBAL-ADDR)		(.i64 (<GLOBAL-ADDR>-address $1)))
-  ((long)			(.i64 $1))
+  ((GLOBAL-ADDR)		(.cell (<GLOBAL-ADDR>-address $1)))
+  ((long)			(.cell $1))
   )
 
 ;;;
@@ -178,36 +198,33 @@
 (define elf/page-size	0x1000) ; FIXME should this be the system page-size?
 (define ideal-cache-line-alignment 64)
 
-(assert (= elf/sizeof-Elf64_Ehdr 64))
-(assert (= elf/sizeof-Elf64_Phdr 56))
-
 ;; TODO args are neither in struct nor readelf print order...
 (define-function emit-program-header (type file-offset file-size mem-size flags
                                            alignment start . rest)
   (when rest
     (assert (<= file-size (first rest)) "emit-program-header: ran out of space"))
-  (.i32	type)                           ; p_type
-  (.i32	flags)                          ; p_flags
-  (.i64	file-offset)                    ; p_offset - File offset
-  (.i64	start)   ; p_vaddr (virtual addr of segment) - Virtual address
-  (.i64	0)       ; p_paddr - ignored
-  (.i64	file-size)                      ; p_filesz - Size in file
-  (.i64	mem-size)                       ; p_memsz - Size in memory
-  (.i64	alignment))
+  (.i32		type)                           ; p_type
+  (.i32		flags)                          ; p_flags
+  (.cell	file-offset)                    ; p_offset - File offset
+  (.cell	start)   ; p_vaddr (virtual addr of segment) - Virtual address
+  (.cell	0)       ; p_paddr - ignored
+  (.cell	file-size)                      ; p_filesz - Size in file
+  (.cell	mem-size)                       ; p_memsz - Size in memory
+  (.cell	alignment))
 
 (define-function emit-section-header (name-offset type flags addr
                                       offset size link info addralign entsize)
 
-  (.i32 name-offset)	; sh_name   - offset into .shstrtab
-  (.i32 type)		; sh_type   - section type (SHT_*)
-  (.i64 flags)		; sh_flags  - SHF_*
-  (.i64 addr)		; sh_addr   - virtual address (if mapped)
-  (.i64 offset)		; sh_offset - file offset
-  (.i64 size)		; sh_size   - section size in bytes
-  (.i32 link)		; sh_link   - index of related section
-  (.i32 info)		; sh_info   - extra section info
-  (.i64 addralign)	; sh_addralign - alignment requirement
-  (.i64 entsize))	; sh_entsize - size of each entry (0 if not fixed-size)
+  (.i32		name-offset)	; sh_name   - offset into .shstrtab
+  (.i32		type)		; sh_type   - section type (SHT_*)
+  (.cell	flags)		; sh_flags  - SHF_*
+  (.cell	addr)		; sh_addr   - virtual address (if mapped)
+  (.cell	offset)		; sh_offset - file offset
+  (.cell	size)		; sh_size   - section size in bytes
+  (.i32		link)		; sh_link   - index of related section
+  (.i32		info)		; sh_info   - extra section info
+  (.cell	addralign)	; sh_addralign - alignment requirement
+  (.cell	entsize))	; sh_entsize - size of each entry (0 if not fixed-size)
 
 (define-function %emit-strtab-entry (segment-name str)
   (let (result)

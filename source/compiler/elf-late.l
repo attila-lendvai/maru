@@ -431,31 +431,31 @@
 ;; The ELF header, shared by the three elf writers. E-PHOFF and E-SHOFF
 ;; accept a number or a section desig; the desig form resolves as a
 ;; fixup relative to the header start (file offset arithmetic).
-(define-function emit-elf-header (e-type arch e-entry e-phoff e-phnum e-shoff e-shnum e-shstrndx)
+(define-function emit-elf-header (e-type machine-type e-entry e-phoff e-phnum e-shoff e-shnum e-shstrndx)
   (label!	'elf-header-start)
   (.i8		0x7f)                   ; ident[0]
   (.ascii	"ELF")
-  (.i8		elf/ELFCLASS64 elf/ELFDATA2LSB 1 elf/ELFOSABI_NONE) ; version
+  (.i8		+elf-class+ elf/ELFDATA2LSB 1 elf/ELFOSABI_LINUX) ; version
   (.i8		0 0 0 0 0 0 0 0) ; EI_ABIVERSION and padding (total 16 ident bytes)
   (.i16		e-type)          ; e_type
-  (.i16		arch)            ; e_machine
+  (.i16		machine-type)    ; e_machine
   (.i32		1)               ; e_version
-  (.i64		e-entry)         ; e_entry (entry point)
-  (.i64		(if (symbol? e-phoff)
+  (.cell	e-entry)         ; e_entry (entry point)
+  (.cell	(if (symbol? e-phoff)
                     (label e-phoff (- self (laddress 'elf-header-start)))
                   e-phoff))      ; e_phoff
-  (.i64		(if (symbol? e-shoff)
+  (.cell	(if (symbol? e-shoff)
                     (label e-shoff (- self (laddress 'elf-header-start)))
                   e-shoff))      ; e_shoff
   (.i32		0)               ; e_flags
   (.i16		(label 'elf-header-end	(- self (laddress 'elf-header-start)))) ; e_ehsize
-  (.i16		(if (= 0 e-phnum) 0 elf/sizeof-Elf64_Phdr)) ; e_phentsize
+  (.i16		+phdr-size+)     ; e_phentsize
   (.i16		e-phnum)         ; e_phnum
-  (.i16		elf/sizeof-Elf64_Shdr) ; e_shentsize
+  (.i16		+shdr-size+)     ; e_shentsize
   (.i16		e-shnum)         ; e_shnum
   (.i16		e-shstrndx)      ; e_shstrndx
   (label!	'elf-header-end)
-  (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) elf/sizeof-Elf64_Ehdr)))
+  (assert (= (- (laddress 'elf-header-end) (laddress 'elf-header-start)) +ehdr-size+)))
 
 ;; The bss segment carries no file content, but a zero memsz is
 ;; illegal in a PT_LOAD.
@@ -522,7 +522,7 @@
   (require "source/compiler/relocatable-elf.l"))
 
 ;; Writes out a very simple/basic ET_EXEC ELF executable.
-(define-function write-elf-to-stream/static (stream arch)
+(define-function write-elf-to-stream/static (stream machine-type)
   ;; Writes out a very simple and static ET_EXEC ELF executable: a
   ;; fixed-address binary with no relocations, no section headers, and
   ;; no dynamic linking (this is the code path of (not (feature
@@ -550,7 +550,7 @@
     ;; make space for the phdr table and .align it, so that the size
     ;; of the .text segment becomes final after this point.
     (with-segment-position-backup (current-segment)
-      (.i8/times 0 (* +n-program-headers+ elf/sizeof-Elf64_Phdr))
+      (.i8/times 0 (* +n-program-headers+ +phdr-size+))
       (.align	elf/page-size))
 
     (emit-base-phdrs)
@@ -562,7 +562,7 @@
     ;; with the segment before emitting it, so it's ok here.
     (set (current-paddress) 0)
 
-    (emit-elf-header elf/ET_EXEC arch
+    (emit-elf-header elf/ET_EXEC machine-type
                      (closure-code-label '_start)
                      (paddress 'phdr-table)
                      +n-program-headers+
@@ -640,7 +640,7 @@
     (.segment 'code)
 
     ;; Make space for the ELF header; it will be emitted as the final step.
-    (.i8/times 0 elf/sizeof-Elf64_Ehdr)
+    (.i8/times 0 +ehdr-size+)
 
     (array-do var (<env>-bindings env)
       (let* ((name		(<variable>-name  var))
