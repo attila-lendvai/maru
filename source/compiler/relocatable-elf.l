@@ -684,7 +684,7 @@
                      +n-section-headers+
                      +c-obj/.shstrtab-section-index+)
 
-    (assert (= (segment-length 'elf-prefix) +elf-prefix-size+))
+    (assert (= (segment-length 'elf-prefix) elf/sizeof-Elf64_Ehdr))
 
     ;; write the file; the layout carries the padded file offsets
     (write-segment-to-stream 'elf-prefix stream)

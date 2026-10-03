@@ -410,13 +410,6 @@
 (define-constant +n-section-headers+
     (if-feature relocatable-elf 11 0))
 
-;; The file prefix: the bytes before the code segment, whose size the
-;; code segment's laddress base must match (the text LOAD maps them
-;; congruently). The program header table sits at the end of the text
-;; segment, the section header table at the end of the file; the
-;; prefix is just the ELF header.
-(define-constant +elf-prefix-size+ elf/sizeof-Elf64_Ehdr)
-
 (define-constant +code-segment-address+		(if-feature relocatable-elf 0 0x00400000))
 (define-constant +code-segment-space+		0x00040000)
 
