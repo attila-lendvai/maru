@@ -203,13 +203,17 @@
                                            alignment start . rest)
   (when rest
     (assert (<= file-size (first rest)) "emit-program-header: ran out of space"))
+  ;; Elf32_Phdr orders p_flags after the sizes; Elf64_Phdr after p_type.
   (.i32		type)                           ; p_type
-  (.i32		flags)                          ; p_flags
+  (unless (= +elf-class+ elf/ELFCLASS32)
+    (.i32	flags))                         ; p_flags
   (.cell	file-offset)                    ; p_offset - File offset
   (.cell	start)   ; p_vaddr (virtual addr of segment) - Virtual address
   (.cell	0)       ; p_paddr - ignored
   (.cell	file-size)                      ; p_filesz - Size in file
   (.cell	mem-size)                       ; p_memsz - Size in memory
+  (when (= +elf-class+ elf/ELFCLASS32)
+    (.i32	flags))                         ; p_flags
   (.cell	alignment))
 
 (define-function emit-section-header (name-offset type flags addr
