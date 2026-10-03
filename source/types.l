@@ -515,11 +515,12 @@
    (when-at-expand (feature track-expr-names)	name)
    (when-at-expand (feature profiler)		profiler-counter)))
 
-;; a word/cell/pointer in the lower realm, boxed, so that it can be
-;; stored in the maru heap.
-(define-boxed-word <lower-cell>)
-
 (define-boxed-word <cell-64>)
+(define-boxed-word <cell-32>)
+
+;; a word/cell/pointer in the lower realm, boxed, so that it can be
+;; stored in the maru heap. sized like the running arch's natural word.
+(define <lower-cell> <cell-64>)
 
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 ;;(define-function undefined?	(obj)	(= <undefined>	(type-of obj)))
