@@ -89,6 +89,11 @@ byte-identical to eval2) implicitly; no separate step needed.
   (e.g. `emit-elf-header`), even if it is called from only one place.
 - Record/type names in angle brackets: `<segment>`, `<label>`
 - 2-space indentation, closing parens on same line (stacked: `))`)
+- Avoid magic numbers and strings: give recurring or meaningful values a
+  descriptive named constant (or enum), so no bare literal carries intent.
+  If a value comes from a spec (e.g. HTTP 200 OK), always use a constant,
+  even if used once. Keep genuinely self-explanatory, one-off values inline
+  to avoid clutter.
 
 - In ARM assembly, prefer register aliases (FP, LP, SP, XZR, WZR) over
   raw register names (X29, X30, X31) to increase readability
@@ -98,8 +103,6 @@ byte-identical to eval2) implicitly; no separate step needed.
 - When writing something intended for human consumption, (comment, commit message, reply to prompt) use as few words as possible. Pick every word meticulously to reduce the volume to a strict minimum. Be down to the point. Less is more.
 
 - Avoid superlatives and praise. Stop telling me I am absolutely right. Give me the cold hard truth.
-
-- Avoid magic numbers and strings by extracting recurring or meaningful values into descriptive constants (const) or enums. Keep self-explanatory, one-off values inline to avoid clutter. If a value comes from a spec (e.g. HTTP 200 OK), use a constant regardless.
 
 - Let the reader of the code breathe. Add empty lines between logical blocks of code.
 
