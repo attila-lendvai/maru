@@ -131,7 +131,7 @@ byte-identical to eval2) implicitly; no separate step needed.
    - tests:
    - x86:
    - arm:
-   - housekeeping - changes that do not change semantics, just readme, comments, code reordering. IOW, changes that do not change the behavior.
+   - housekeeping - only for trivial changes that cannot break anything, e.g. renames, comments, readme. Do NOT use it for code changes that may break behavior (e.g. reordering compiler internals), even when they are meant to be semantics-preserving; use a subsystem prefix instead.
 
  6) Wrap the body text manually at 72 characters to prevent Git formatting issues.
 
