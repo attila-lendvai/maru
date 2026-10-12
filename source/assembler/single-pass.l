@@ -461,7 +461,10 @@
      ;; TODO only works on 64 bit hosts
      (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
      (emit-u32 (bitwise-and value 0xffffffff)))
-    (<label>	(emit-label value emit-i32 4 'abs32))
+    ;; emit-i32 is for signed 32-bit immediates/displacements. a label
+    ;; here is a computed constant (e.g. a frame size), not an address,
+    ;; so it must not turn into a relocation.
+    (<label>	(emit-label value emit-i32 4))
     (<symbol>	(emit-i32 (%ensure-label value)))
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
 
