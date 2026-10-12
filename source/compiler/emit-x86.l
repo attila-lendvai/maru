@@ -221,14 +221,14 @@
   ;; ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
   ;;       			(println "	mov	(%rax), %rax"))
   )
-;; $1 what, $2 where
+;; args: dest, value
 (define-instruction STORE	(true 0 false)
-  ((R64 GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $2) 0 0 0 RBX)
-                                (MOVQrm (<REGISTER>-name $1) 0 RBX 0 1))
-  ;; ((R64 GOT64)			(println "	mov	"$2"@GOTPCREL(%rip), %rbx")
-  ;;                               (println "	mov	"$1", (%rbx)"))
-  ((R64 R64)			(MOVQrm (<REGISTER>-name $1) 0 (<REGISTER>-name $2) 0 1))
-  ((R64 STACK-CELL)		(MOVQrm (<REGISTER>-name $1) (<STACK-CELL>-offset $2) RBP 0 1)))
+  ((GLOBAL-CELL R64)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RBX)
+                                (MOVQrm (<REGISTER>-name $2) 0 RBX 0 1))
+  ;; ((GOT64 R64)			(println "	mov	"$1"@GOTPCREL(%rip), %rbx")
+  ;;                               (println "	mov	"$2", (%rbx)"))
+  ((R64 R64)			(MOVQrm (<REGISTER>-name $2) 0 (<REGISTER>-name $1) 0 1))
+  ((STACK-CELL R64)		(MOVQrm (<REGISTER>-name $2) (<STACK-CELL>-offset $1) RBP 0 1)))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
@@ -245,6 +245,7 @@
                                 (XORQrr RAX RAX)
                                 (MOVBmr 0 RCX 0 1 AL)))
 
+;; args: ptr, byteoffset, value
 (define-instruction STORE-I8	(true 0 true)
   ((R64 STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (XORQrr	RBX RBX))
@@ -282,9 +283,10 @@
   ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX) ; index
 				(MOVQmr 0 RAX 0 0 RAX)))
 
+;; args: ptr, byteoffset, value
 (define-instruction STORE-CELL	(true 0 true)
-  ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
-				(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RBX) ; value
+  ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+				(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RBX)
 				(MOVQrm	RBX 0 (<REGISTER>-name $1) RCX 1)))
 
 ) ; (feature memory-block)
@@ -298,7 +300,7 @@
                                     (LEAQmr (* offset 8) (<REGISTER>-name $1) 0 0 RCX)
                                     (MOVQmr 0 RCX 0 0 RAX)))))
 
-;; object is in RAX; args: offset, value
+;; args: ptr, celloffset, value
 (define-instruction STORE-OOP	(true 0 true)
   ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX)
@@ -520,7 +522,7 @@
                                   (is <R32> operand))
                               (let ((temp (alloc-reg-temp -c-)))
                                 (push tmps-to-free temp)
-                                (emit STORE $ temp)
+                                (emit STORE temp $)
                                 temp)
                             operand)))
          (arg-operands	(map (lambda (expr)

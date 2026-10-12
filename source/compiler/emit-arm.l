@@ -226,12 +226,13 @@
 (define-instruction/emit-forms LOAD 1
   ((STACK-PARAM)			(LDUR X0 FP (<STACK-CELL>-offset $1))))
 
+;; args: dest, value
 (define-instruction STORE	(true 0 false)
-  ((R64 GLOBAL-CELL)		(ADR X16 (<GLOBAL-CELL>-address $2))
-                                (STR (<REGISTER>-name $1) X16 0))
-  ((R64 R64)			(STR (<REGISTER>-name $1) (<REGISTER>-name $2) 0))
-  ((R64 STACK-CELL)		(STUR (<REGISTER>-name $1) FP (<STACK-CELL>-offset $2)))
-  ((R64 STACK-PARAM)		(STUR (<REGISTER>-name $1) FP (<STACK-CELL>-offset $2))))
+  ((GLOBAL-CELL R64)		(ADR X16 (<GLOBAL-CELL>-address $1))
+                                (STR (<REGISTER>-name $2) X16 0))
+  ((R64 R64)			(STR (<REGISTER>-name $2) (<REGISTER>-name $1) 0))
+  ((STACK-CELL R64)		(STUR (<REGISTER>-name $2) FP (<STACK-CELL>-offset $1)))
+  ((STACK-PARAM R64)		(STUR (<REGISTER>-name $2) FP (<STACK-CELL>-offset $1))))
 
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
@@ -252,6 +253,7 @@
                                      (ADDr X16 X0 X16)
                                      (LDRB W0 X16 0))))))
 
+;; args: ptr (implicit X0), byteoffset, value
 (define-instruction STORE-I8	(false 0 true)
   ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (EORr X17 X17 X17))
@@ -310,7 +312,7 @@
                                      (ADDr X0 X0 X16)
                                      (LDR X0 X0 0))))))
 
-  ;; args: base in X0 (implicit), offset, value
+  ;; args: ptr (implicit X0), byteoffset, value
   (define-instruction STORE-CELL	(false 0 true)
     ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (LDUR X17 FP (<STACK-CELL>-offset $2))
@@ -337,7 +339,7 @@
                                      (ADDr X0 X0 X16)
                                      (LDR X0 X0 0))))))
 
-;; object is in X0 (base); args: index, value
+;; args: ptr (implicit X0), celloffset, value
 (define-instruction STORE-OOP	(false 0 true)
   ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (LDUR X17 FP (<STACK-CELL>-offset $2))
@@ -595,7 +597,7 @@
                                   (is <R32> operand))
                               (let ((temp (alloc-reg-temp -c-)))
                                 (push tmps-to-free temp)
-                                (emit STORE $ temp)
+                                (emit STORE temp $)
                                 temp)
                             operand)))
          (arg-operands	(map (lambda (expr)

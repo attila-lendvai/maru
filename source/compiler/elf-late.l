@@ -35,7 +35,7 @@
     (else
       (comp expr)
       (let ((temp (alloc-stack-temp -c-)))
-        (emit STORE $ temp)
+        (emit STORE temp $)
         temp))))
 
 (define-function compile-call-to-global-function (op -c-)
@@ -76,7 +76,7 @@
     (comp (car prog))
     (set prog (cdr prog)))
   (let ((temp (alloc-stack-temp -c-)))
-    (emit STORE $ temp)
+    (emit STORE temp $)
     temp))
 
 (define-function %let-binding (binding comp)
@@ -106,15 +106,15 @@
     (cond
       ((or (is <STACK-CELL> value)
            (is <R64> value))
-       (emit STORE $ value))
+       (emit STORE value $))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
        (error "TODO <C-variable>")
-       ;; (emit STORE $ ((if (= 'darwin (target-value target/os)) GOT64 GLOBAL-CELL)
-       ;;             (EXTERNAL-LABEL (<C-variable>-name value))))
+       ;; (emit STORE ((if (= 'darwin (target-value target/os)) GOT64 GLOBAL-CELL)
+       ;;             (EXTERNAL-LABEL (<C-variable>-name value))) $)
        )
       (else
-       (emit STORE $ (GLOBAL-CELL (label (<variable>-name var))))))))
+       (emit STORE (GLOBAL-CELL (label (<variable>-name var))) $)))))
 
 (define-function sf/address-of (expr -c-)
   (let ((var (cadr expr)))
