@@ -638,6 +638,14 @@
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
 ;; args: ptr, byteoffset
+(define-instruction LOAD-U32	(true 6 true)
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
+				(println "	"$reg4" = bitcast i8* "$reg3" to i32*")
+				(println "	"$reg5" = load i32, i32* "$reg4", align 1")
+				(println "	"$reg6" = inttoptr i32 "$reg5" to %oop")))
+;; args: ptr, byteoffset
 (when-at-expand (feature memory-block)
  (define-instruction LOAD-CELL	(true 4 true)
    ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
@@ -664,6 +672,16 @@
 				(println "	store i8 "$reg4", i8* "$reg3)
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
 				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
+
+;; args: ptr, byteoffset, value
+(define-instruction STORE-U32	(true 6 true)
+  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
+				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
+				(println "	"$reg4" = bitcast i8* "$reg3" to i32*")
+				(println "	"$reg5" = ptrtoint %oop "$3" to i32")
+				(println "	store i32 "$reg5", i32* "$reg4", align 1")
+				(println "	"$reg6" = inttoptr i32 "$reg5" to %oop")))
 
 ;; args: ptr, byteoffset, value
 (when-at-expand (feature memory-block)
@@ -1155,6 +1173,7 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-U8)
               (u8-at		,LOAD-U8)
+              (u32-at		,LOAD-U32)
               ,(when-at-expand (feature memory-block)
                  `(cell-at	,LOAD-CELL))
               (oop-at		,LOAD-OOP)
@@ -1162,6 +1181,7 @@
              ;; ternary
              ((set-char-at	,STORE-U8)
               (set-u8-at	,STORE-U8)
+              (set-u32-at	,STORE-U32)
               ,(when-at-expand (feature memory-block)
                  `(set-cell-at ,STORE-CELL))
               (set-oop-at	,STORE-OOP)

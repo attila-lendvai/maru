@@ -276,6 +276,38 @@
                                      (MOVQrr	RBX RAX))
                                   (MOVBim	(<LITERAL>-value $3) (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1))))
 
+;; args: ptr, byteoffset
+(define-instruction LOAD-U32	(true 0 true)
+  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (LEAQmr 0 (<REGISTER>-name $1) RCX 1 RCX)
+                                (MOVLmr 0 RCX 0 0 EAX))
+  ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
+                                  (if (= 0 offset)
+                                      (MOVLmr 0 (<REGISTER>-name $1) 0 0 EAX)
+                                    (LEAQmr offset (<REGISTER>-name $1) 0 0 RCX)
+                                    (MOVLmr 0 RCX 0 0 EAX)))))
+
+;; args: ptr, byteoffset, value
+(define-instruction STORE-U32	(true 0 true)
+  ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX)
+                                (MOVLrm	EDX 0 (<REGISTER>-name $1) RCX 1)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVQrr	RDX RAX)))
+  ((R64 LI64 LI64)		(MOVQir	(<LITERAL>-value $3) RDX)
+                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVQrr	RDX RAX)))
+  ((R64 STACK-CELL LI64)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
+                                (MOVQir	(<LITERAL>-value $3) RDX)
+                                (MOVLrm	EDX 0 (<REGISTER>-name $1) RCX 1)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVQrr	RDX RAX)))
+  ((R64 LI64 STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX)
+                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVQrr	RDX RAX))))
+
 (when-at-expand (feature memory-block)
 
 ;; TODO these two are the same as the -OOP versions, except the MOV's scale

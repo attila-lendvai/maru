@@ -497,6 +497,33 @@
     (char-at (C-string "alma") 2)
   ?m)
 
+(define-test compile/u32-at/1
+    (let ((buf (platform/acquire-memory 16)))
+      (set (u32-at buf 0) 0x12345678)
+      (u32-at buf 0))
+  0x12345678)
+
+(define-test compile/u32-at/2
+    ;; the top bit must not sign-extend
+    (let ((buf (platform/acquire-memory 16)))
+      (set (u32-at buf 0) 0x89abcdef)
+      (u32-at buf 0))
+  0x89abcdef)
+
+(define-test compile/u32-at/3
+    (let ((buf (platform/acquire-memory 16)))
+      (set (u32-at buf 4) 0x0badf00d)
+      (u32-at buf 4))
+  0x0badf00d)
+
+(define-test compile/u32-at/4
+    ;; set-u32-at must write exactly 4 bytes, not clobber the neighbour
+    (let ((buf (platform/acquire-memory 16)))
+      (set (u32-at buf 0) 0x11111111)
+      (set (u32-at buf 4) 0x22222222)
+      (+ (u32-at buf 0) (u32-at buf 4)))
+  (+ 0x11111111 0x22222222))
+
 ;; NOTE one must be careful with those 0x123 constants when <long> is tagged, i.e. smaller than the target's word size
 ;; NOTE a 32 bit eval cannot read 64 bit numbers, so we need to >> everything by 32 bits there
 ;; NOTE shifting right is signed

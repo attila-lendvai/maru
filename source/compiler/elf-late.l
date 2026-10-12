@@ -263,6 +263,7 @@
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
               (char-at		,LOAD-U8)
               (u8-at		,LOAD-U8)
+              (u32-at		,LOAD-U32)
               ,(when-at-expand (feature memory-block)
                  `(cell-at	,LOAD-CELL))
               (oop-at		,LOAD-OOP)
@@ -270,6 +271,7 @@
              ;; ternary
              ((set-char-at	,STORE-U8)
               (set-u8-at	,STORE-U8)
+              (set-u32-at	,STORE-U32)
               ,(when-at-expand (feature memory-block)
                  `(set-cell-at ,STORE-CELL))
               (set-oop-at	,STORE-OOP)

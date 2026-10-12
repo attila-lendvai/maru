@@ -296,6 +296,50 @@
                                     (MOVi X16 (<LITERAL>-value $2))
                                     (STRB W16 X17 0)))))
 
+;; args: ptr (implicit X0), byteoffset
+(define-instruction LOAD-U32	(false 0 true)
+  ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (ADDr X16 X0 X16)
+                                (LDR W0 X16 0))
+  ((LI64)			(let ((offset (<LITERAL>-value $1)))
+                                  (cond
+                                    ((= 0 offset)
+                                     (LDR W0 X0 0))
+                                    ((<= 0 offset 4095)
+                                     (ADDi X16 X0 offset)
+                                     (LDR W0 X16 0))
+                                    (else
+                                     (MOVi X16 offset)
+                                     (ADDr X16 X0 X16)
+                                     (LDR W0 X16 0))))))
+
+;; args: ptr (implicit X0), byteoffset, value
+(define-instruction STORE-U32	(false 0 true)
+  ((STACK-CELL STACK-CELL)	(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (LDUR X17 FP (<STACK-CELL>-offset $2))
+                                (ADDr X16 X0 X16)
+                                (STR W17 X16 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVr X0 X17)))
+  ((LI64 LI64)			(MOVi X16 (<LITERAL>-value $1))
+                                (ADDr X16 X0 X16)
+                                (MOVi X17 (<LITERAL>-value $2))
+                                (STR W17 X16 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVr X0 X17)))
+  ((STACK-CELL LI64)		(LDUR X16 FP (<STACK-CELL>-offset $1))
+                                (ADDr X16 X0 X16)
+                                (MOVi X17 (<LITERAL>-value $2))
+                                (STR W17 X16 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVr X0 X17)))
+  ((LI64 STACK-CELL)		(MOVi X16 (<LITERAL>-value $1))
+                                (ADDr X16 X0 X16)
+                                (LDUR X17 FP (<STACK-CELL>-offset $2))
+                                (STR W17 X16 0)
+                                (when-at-expand (feature strict-semantics-for-compiled-set)
+                                  (MOVr X0 X17))))
+
 (when-at-expand (feature memory-block)
   ;; TODO these two are the same as the -OOP versions, except the MOV's scale
   ;; args: ptr (implicit X0), byteoffset
