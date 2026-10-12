@@ -178,21 +178,14 @@
 (define-function reloc-symbol (name)
   (make <reloc-symbol> (name name)))
 
-;; Records a relocation against the fixup hole at the current
-;; position. TARGET is either a <label> (resolved to a section symbol
-;; + offset at serialization time) or a <reloc-symbol>.
-(define-function %record-relocation (target type size offset)
-  (push (<assembler>-relocations *assembler*)
-        (list (current-segment)
-              (current-paddress)
-              target
-              size
-              offset
-              type)))
-
 (define-record <label> ()
   (segment
    %name ; for debugging
+   ;; ADDRESS? distinguishes a label that names a location in a segment
+   ;; (a reference to it may need a relocation) from a deferred value,
+   ;; e.g. a frame size computed later (a reference must never be
+   ;; relocated).
+   address?
    paddress
    laddress
    ;; primed-emitter is needed so that we can write something like
@@ -202,6 +195,25 @@
    ;; label emitter and calls the future to calculate the offset.
    primed-emitter
    emitters))
+
+;; Records a relocation against the fixup hole at the current
+;; position. TARGET is either a <label> (resolved to a section symbol
+;; + offset at serialization time) or a <reloc-symbol>.
+;;
+;; No relocation is recorded when TYPE is absent (the fixup has no
+;; relocation mapping, e.g. an absolute imm field), or when TARGET is a
+;; <label> that holds a deferred value rather than an address.
+(define-function %record-relocation (target type size offset)
+  (when (and type
+             (or (not (is <label> target))
+                 (<label>-address? target)))
+    (push (<assembler>-relocations *assembler*)
+          (list (current-segment)
+                (current-paddress)
+                target
+                size
+                offset
+                type))))
 
 (define-function %find-label (desig)
   (typecase desig
@@ -216,7 +228,8 @@
     (unless label
       (set label (make <label>
                    (segment	(current-segment))
-                   (%name	desig)))
+                   (%name	desig)
+                   (address?	true)))
       (when (is <symbol> desig)
         (environment-define (<assembler>-env *assembler*) desig label)))
     label))
@@ -266,6 +279,7 @@
           label)
       (make <label>
         (segment	(current-segment))
+        (address?	true)
         (paddress	paddress)
         (laddress	laddress)))))
 
@@ -278,14 +292,24 @@
         (assert (not args))
         (%ensure-label desig))
     (make <label>
-      (segment (current-segment)))))
+      (segment (current-segment))
+      (address? true))))
+
+;; An anonymous label whose references must never be relocated: it only
+;; carries a value that is filled in later (e.g. a frame size).
+(define-function label/deferred-value ()
+  (make <label>
+    (segment (current-segment))
+    (address? false)))
 
 (define-form label args
   (if (second args)
       (let ((desig (pop args))
             (value-form (pop args)))
         (assert (not args))
-        `(%prime-label (%ensure-label ,desig) (lambda (pself self) ,value-form)))
+        `(let ((__label__ (%ensure-label ,desig)))
+           (set (<label>-address? __label__) false)
+           (%prime-label __label__ (lambda (pself self) ,value-form))))
     `(%label ,@args)))
 
 (define-function %prime-label (desig value-future)
@@ -312,10 +336,7 @@
                  (set offset (pop args))
                  (set size (pop args))
                  (set reloc-type (pop args))
-                 ;; reloc-type is absent for fixups that have no
-                 ;; relocation mapping yet (e.g. absolute imm fields)
-                 (when reloc-type
-                   (%record-relocation label reloc-type size offset)))
+                 (%record-relocation label reloc-type size offset))
                 (state/set
                  (let* ((paddress (pop args))
                         (laddress (pop args)))
@@ -373,8 +394,7 @@
          ;;            ", paddress: 0x" (integer->string (or (<label>-paddress label) 0) 16)
          ;;            ", offset: " offset
          ;;            "\n")
-         (when reloc-type
-           (%record-relocation label reloc-type size offset))
+         (%record-relocation label reloc-type size offset)
          (writer (+ (<label>-laddress label)
                     (or offset 0))))
       (let ((emitter (or (<label>-primed-emitter label)
@@ -461,10 +481,7 @@
      ;; TODO only works on 64 bit hosts
      (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
      (emit-u32 (bitwise-and value 0xffffffff)))
-    ;; emit-i32 is for signed 32-bit immediates/displacements. a label
-    ;; here is a computed constant (e.g. a frame size), not an address,
-    ;; so it must not turn into a relocation.
-    (<label>	(emit-label value emit-i32 4))
+    (<label>	(emit-label value emit-i32 4 'abs32))
     (<symbol>	(emit-i32 (%ensure-label value)))
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
 

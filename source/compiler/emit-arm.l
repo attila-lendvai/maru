@@ -522,7 +522,7 @@
          (-c-		(compiler (+ 1 (<compiler>-level parent-comp))))
          (params	(<expr>-parameters self))
          (param-count	(list-length params))
-         (frame-body-size (label)))
+         (frame-body-size (label/deferred-value)))
 
     (label! entry-point-label)
     ;; (emit-comment 1 "params: "(list-length (<expr>-parameters self))
