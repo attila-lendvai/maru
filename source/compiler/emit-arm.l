@@ -212,6 +212,7 @@
                                   (unless (= src dst)
                                     (MOVr dst src)))))
 
+;; args: source
 (define-instruction LOAD	(false 0 true)
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (EORr X0 X0 X0)
@@ -237,7 +238,8 @@
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
-(define-instruction LOAD-I8	(false 0 true)
+;; args: ptr (implicit X0), byteoffset
+(define-instruction LOAD-U8	(false 0 true)
   ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (ADDr X16 X0 X16)
                                 (LDRB W0 X16 0))
@@ -254,7 +256,7 @@
                                      (LDRB W0 X16 0))))))
 
 ;; args: ptr (implicit X0), byteoffset, value
-(define-instruction STORE-I8	(false 0 true)
+(define-instruction STORE-U8	(false 0 true)
   ((STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (EORr X17 X17 X17))
                                 (LDUR X16 FP (<STACK-CELL>-offset $2))
@@ -296,6 +298,7 @@
 
 (when-at-expand (feature memory-block)
   ;; TODO these two are the same as the -OOP versions, except the MOV's scale
+  ;; args: ptr (implicit X0), byteoffset
   (define-instruction LOAD-CELL	(false 0 true)
     ((STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (ADDr X16 X0 X16)
@@ -319,6 +322,7 @@
                                 (ADDr X16 X0 X16)
                                 (STR X17 X16 0))))
 
+;; args: ptr (implicit X0), celloffset
 (define-instruction LOAD-OOP	(false 0 true)
   ((STACK-CELL)			(LDUR X16 FP (<STACK-CELL>-offset $1))
                                 (MOVi X17 8)

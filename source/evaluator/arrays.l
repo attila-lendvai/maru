@@ -71,13 +71,13 @@
          obj))))
 
 (define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	target/cell-size/bytes)
-(define-vector-accessors <string>	string-		()	byte-at		copy-bytes	platform/move-bytes	1)
+(define-vector-accessors <string>	string-		()	u8-at		copy-bytes	platform/move-bytes	1)
 
 (when-at-expand (feature memory-block)
   ;; FIXME: if these two when-at-expand's are merged, then a set form
   ;; transform (expand/encode/etc) happens differently and it fails to
   ;; load.
-  (define-vector-accessors <memory-block>	memory-block/	()	byte-at		copy-bytes	platform/move-bytes	1))
+  (define-vector-accessors <memory-block>	memory-block/	()	u8-at		copy-bytes	platform/move-bytes	1))
 
 (when-at-expand (feature memory-block)
 
@@ -207,17 +207,17 @@
          (diff	0)
          (i	0))
     (while (and (< i limit)
-                (= 0 (set diff (- (byte-at buf-a i)
-                                  (byte-at buf-b i)))))
+                (= 0 (set diff (- (u8-at buf-a i)
+                                  (u8-at buf-b i)))))
       (incr i))
     (cond
       ((or (not (= 0 diff))
            (= len-a len-b))
        diff)
       ((< len-a len-b)
-       (- 0 (byte-at buf-b len-a)))
+       (- 0 (u8-at buf-b len-a)))
       (else ;; (> len-a len-b)
-       (- (byte-at buf-a len-b) 0)))))
+       (- (u8-at buf-a len-b) 0)))))
 
 ;; we need this because in the target `=` is compiled to a dumb
 ;; non-dispatching integer comparison. if we want to share the

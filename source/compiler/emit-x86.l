@@ -209,6 +209,7 @@
                                   (unless (= src dst)
                                     (MOVQrr src dst)))))
 
+;; args: source
 (define-instruction LOAD	(false 0 true)
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (XORQrr RAX RAX)
@@ -233,7 +234,8 @@
 ;; TODO what about sign extension? maybe we will need a separate set of LOAD and STORE for signed and unsigned?
 ;; in haskell the signed ones are called integer, and the unsigned one are called word.
 ;; for now these are all unsigned, i.e. not sign extended.
-(define-instruction LOAD-I8	(true 0 true)
+;; args: ptr, byteoffset
+(define-instruction LOAD-U8	(true 0 true)
   ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (LEAQmr 0 (<REGISTER>-name $1) RCX 1 RCX)
                                 (XORQrr RAX RAX)
@@ -246,7 +248,7 @@
                                 (MOVBmr 0 RCX 0 1 AL)))
 
 ;; args: ptr, byteoffset, value
-(define-instruction STORE-I8	(true 0 true)
+(define-instruction STORE-U8	(true 0 true)
   ((R64 STACK-CELL STACK-CELL)	(when-at-expand (feature strict-semantics-for-compiled-set)
                                   (XORQrr	RBX RBX))
                                 (MOVBmr	(<STACK-CELL>-offset $3) RBP 0 1 BL)
@@ -277,10 +279,11 @@
 (when-at-expand (feature memory-block)
 
 ;; TODO these two are the same as the -OOP versions, except the MOV's scale
+;; args: ptr, byteoffset
 (define-instruction LOAD-CELL	(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
+  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
 				(MOVQmr 0 (<REGISTER>-name $1) RCX 1 RAX))
-  ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX) ; index
+  ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX)
 				(MOVQmr 0 RAX 0 0 RAX)))
 
 ;; args: ptr, byteoffset, value
@@ -291,8 +294,9 @@
 
 ) ; (feature memory-block)
 
+;; args: ptr, celloffset
 (define-instruction LOAD-OOP	(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX) ; index
+  ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
 				(MOVQmr 0 (<REGISTER>-name $1) RCX 8 RAX))
   ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
                                   (if (= 0 offset)

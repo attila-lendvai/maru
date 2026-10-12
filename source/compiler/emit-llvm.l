@@ -630,14 +630,14 @@
 (define-arithmetic-instruction ASL "shl")
 (define-arithmetic-instruction ASR "ashr")
 
-;; args: baseptr, index
-(define-instruction LOAD-I8	(true 5 true)
+;; args: ptr, byteoffset
+(define-instruction LOAD-U8	(true 5 true)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load i8, i8* "$reg3)
 				(println "	"$reg5" = inttoptr i8 "$reg4" to %oop")))
-;; args: baseptr, byteindex
+;; args: ptr, byteoffset
 (when-at-expand (feature memory-block)
  (define-instruction LOAD-CELL	(true 4 true)
    ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
@@ -645,7 +645,7 @@
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
 				(println "	"$reg4" = load %oop, %oop* "$reg3))))
 
-;; args: baseptr, cellindex
+;; args: ptr, celloffset
 (define-instruction LOAD-OOP	(true 4 true)
   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -655,8 +655,8 @@
 				(println "	"$reg2" = getelementptr [0 x %oop], [0 x %oop]* "$reg1", %word 0, %word "$2)
 				(println "	"$reg4" = load %oop, %oop* "$reg2)))
 
-;; args: baseptr, byteindex, value
-(define-instruction STORE-I8	(true 6 true)
+;; args: ptr, byteoffset, value
+(define-instruction STORE-U8	(true 6 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
@@ -665,7 +665,7 @@
 				(println "	"$reg5" = zext i8 "$reg4" to %word")
 				(println "	"$reg6" = inttoptr %word "$reg5" to %oop")))
 
-;; args: baseptr, byteindex, value
+;; args: ptr, byteoffset, value
 (when-at-expand (feature memory-block)
   (define-instruction STORE-CELL	(true 4 true)
    ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
@@ -674,7 +674,7 @@
 				(println "	store %oop "$3", %oop* "$reg3)
 				(println "	"$reg4" = bitcast %oop "$3" to %oop"))))
 
-;; args: baseptr, cellindex, value
+;; args: ptr, celloffset, value
 (define-instruction STORE-OOP	(true 4 true)
   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x %oop]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
@@ -1153,15 +1153,15 @@
               (bitwise-and  ,AND) (bitwise-or   ,OR ) (bitwise-xor ,XOR)
               (<  ,LT ) (<=  ,LE ) (= ,EQ ) (>= ,GE) (> ,GT) ; (!= ,NE)
               (arithmethic-shift-left ,ASL) (arithmethic-shift-right  ,ASR)
-              (char-at		,LOAD-I8)
-              (byte-at		,LOAD-I8)
+              (char-at		,LOAD-U8)
+              (u8-at		,LOAD-U8)
               ,(when-at-expand (feature memory-block)
                  `(cell-at	,LOAD-CELL))
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
-             ((set-char-at	,STORE-I8)
-              (set-byte-at	,STORE-I8)
+             ((set-char-at	,STORE-U8)
+              (set-u8-at	,STORE-U8)
               ,(when-at-expand (feature memory-block)
                  `(set-cell-at ,STORE-CELL))
               (set-oop-at	,STORE-OOP)

@@ -65,8 +65,8 @@
 
 (define-function copy-bytes (from to count)
   (for (i 0 count)
-    (set (byte-at to   i)
-         (byte-at from i))))
+    (set (u8-at to   i)
+         (u8-at from i))))
 
 (define-function platform/move-oops (from to wordcount)
   (cond
@@ -83,12 +83,12 @@
   (cond
     ((< to from)
      (for (i 0 count)
-       (set (byte-at to   i)
-            (byte-at from i))))
+       (set (u8-at to   i)
+            (u8-at from i))))
     ((< from to)
      (for (i (- count 1) -1 -1)
-       (set (byte-at to   i)
-            (byte-at from i))))))
+       (set (u8-at to   i)
+            (u8-at from i))))))
 
 (define-function platform/clear-cells (from cell-count)
 ;; TODO this is still rather high in the profiler. maybe introduce
