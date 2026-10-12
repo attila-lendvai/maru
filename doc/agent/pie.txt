@@ -1,0 +1,135 @@
+# -*- mode: outline; coding: utf-8-unix -*-
+
+* TODO pie for the elf backends
+  Make the x86, i686 and arm elf backends emit position-independent
+  (ET_DYN) binaries, instead of linking c-obj with -fno-pie and
+  emitting ET_EXEC in the standalone mode.
+
+** why
+   - aslr for the executable's own code and data (security)
+   - consistency with the llvm backend, whose posix/libc output is
+     already a pie
+   - drop the -fno-pie workaround added for i686 c-obj
+
+** current state
+   - every elf-backend output is ET_EXEC today: the default standalone
+     writer is write-elf-to-stream/static, and c-obj links with
+     elf-cflags (-fno-pie -no-pie)
+   - the ET_DYN writer (write-elf-to-stream/standalone) exists but is
+     only reached via test-standalone
+   - x86-64 and arm code is already pc-relative enough to be pie-cheap
+     (rip-relative globals, adrp); only the link flags hold it back
+   - i686 code uses absolute addressing (mov $addr, %reg), so pie
+     needs the ebx pic register and accepts text relocations
+   - the llvm backend hands pic IR to clang; target/arch=i686
+     bootstrap llvm posix is already a pie
+
+** the i386 pic register (ebx) problem
+   - i386 pic reserves ebx as the got base; the linker plts are
+     "jmp *off(%ebx)", so ebx must hold this module's got base at
+     every plt call
+   - each function that uses it must establish it itself:
+       push %ebx
+       call __x86.get_pc_thunk.bx
+       add  $_GLOBAL_OFFSET_TABLE_, %ebx
+       ...
+       pop  %ebx
+       ret
+   - the i686 backend clobbers ebx as a scratch register in three
+     instruction encoders and never saves or sets it up:
+       - STORE (GLOBAL-CELL case)
+       - STORE-U8 (strict-semantics-for-compiled-set path)
+       - STORE-OOP
+   - the register-temp allocator is disabled (alloc-reg-temp always
+     uses stack cells), so those three are the whole ebx surface
+   - x86-64 has the same "clobbers rbx, never saves it" behaviour, but
+     its got/plt is rip-relative, so no register is needed and ffi is
+     unaffected (still an abi violation for c callers, latent)
+
+** options
+*** A: reserve ebx + per-function pic prologue (standard -fpic)
+    - stop using ebx as scratch in the three encoders
+    - add a pic prologue/epilogue to every function: save ebx, load
+      the module got base (get_pc_thunk + add _GLOBAL_OFFSET_TABLE_),
+      restore ebx
+    - teach the assembler/writer a gotpc reloc role (R_386_GOTPC) and
+      the linker-magic _GLOBAL_OFFSET_TABLE_ symbol
+    + standard; plt calls stay one instruction
+    - touches the assembler and the c-obj writer (new reloc type);
+      adds a prologue to every function
+*** B: pc-relative got trampolines, no pic register
+    - for i686 c-obj, call c functions through per-external
+      trampolines instead of the plt:
+        call 1f
+      1: pop %eax
+         add $cell-1b, %eax
+         jmp *(%eax)
+    - emit the 32-bit got cell with an R_386_32 to the und symbol,
+      filled at load by the dynamic linker
+    - add an i686 branch to emit-deferred-external-trampolines; make
+      i686 compile-call-to <C-function> use external-trampoline-label
+      for c-obj too; call the trampoline emitter in the c-obj finalize
+    - small reloc-role addition for the 32-bit cell
+    + no ebx reservation; reuses the existing cffi-late.l machinery;
+      instruction encoders untouched; unifies c-obj and standalone ffi
+    - a few extra instructions per c call; c-obj now needs the
+      got-cell + trampoline path (currently standalone-only)
+*** C: set ebx up once in main/_start, never clobber it
+    - cheapest, but fragile: any c callback into our code, or any
+      future ebx use, breaks it
+*** D: keep non-pie (status quo)
+    - works, matches x86-64 c-obj, no text relocations, fastest start
+    - the only loss is aslr for the c-obj image itself
+
+** soft vs true pie
+   - maru's compiler emits absolute addresses for globals, so a pie of
+     this code needs load-time R_*_RELATIVE relocations in .text
+     (DT_TEXTREL); that weakens the point and is refused by -z text
+     and hardened loaders
+   - true (hardened) pie wants got-/pc-relative data access, a much
+     larger compiler change; on x86-64 the rip-relative form is
+     already there, on i386 it is not
+
+** recommended first step
+   - cheap: make the x86-64/arm c-obj links pie (the code is already
+     pc-relative; only elf-cflags needs changing), and verify
+   - i686: option B first (remove the ebx dependency), then move
+     globals to got-relative access if hardened-grade pie is wanted
+
+** concrete steps
+*** x86-64 and arm c-obj -> pie
+    - cflags-for for <x86>/<arm> + libc/posix currently returns
+      elf-cflags (-fno-pie -no-pie); drop the -fno-pie -no-pie (or add
+      a "pie" link type) so they link -fPIE -pie
+    - the c-obj data cells (CELL, GLOBAL-ADDR) are absolute and will
+      become R_*_RELATIVE load-time relocations; check `readelf -d` for
+      TEXTREL and decide whether that is acceptable
+    - verify: bootstrap x86 libc, bootstrap x86 posix, and
+      target/arch=aarch64 bootstrap arm libc
+*** i686 c-obj -> pie (option B)
+    - emit-i686.l: compile-call-to <C-function> currently emits
+      CALL (reloc-symbol name) for c-obj (the plt); make it use
+      external-trampoline-label for c-obj too
+    - cffi-late.l: emit-external-got-cell writes .u64 for c-obj; for
+      Elf32 write a .u32 cell (records the 32-bit symbol reloc) so the
+      linker fills it at load
+    - cffi-late.l: emit-deferred-external-trampolines has x86/arm
+      branches; add an i686 branch emitting:
+        call 1f
+      1: pop %eax
+         add $got-1b, %eax
+         jmp *(%eax)
+    - relocatable-elf.l: add the 32-bit abs/symbol reloc role for
+      EM_386 (arch-reloc-type), and call
+      emit-deferred-external-trampolines in the c-obj finalize branch
+      (it is currently standalone-only)
+    - build.l: i686 libc/posix cflags-for now returns elf-cflags; let
+      them link -fPIE -pie again once the above lands
+    - verify: target/arch=i686 bootstrap i686 libc and posix, plus a
+      C-calling smoke test (e.g. print via libc) to exercise the
+      trampolines
+
+** open questions
+   - why pie: aslr for c-obj, consistency with the standalone ET_DYN,
+     or dropping the -fno-pie workaround? that decides whether this
+     applies to all elf backends or only i686
