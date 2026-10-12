@@ -22,6 +22,12 @@ binfmt_misc, needs `qemu-user-static` and the
 - `./build.sh target/arch=aarch64 bootstrap arm linux`
 - `./build.sh target/arch=aarch64 test-evaluator` etc.
 
+The `x86` backend emits both widths; `target/arch` selects 32- vs
+64-bit (so no separate i686 backend):
+
+- `./build.sh target/arch=i686 bootstrap x86 linux`
+- `./build.sh target/arch=i686 test-compiler x86 linux` etc.
+
 Key=value CLI args set variables in build.l's globals (e.g.
 `target/arch=aarch64`, `eval0-phase=false`, `ld.so=...`,
 `default-backend=arm`, `default-platform=linux`,
@@ -71,7 +77,7 @@ byte-identical to eval2) implicitly; no separate step needed.
 
 - `boot.l` — minimal standard library loaded at bootstrap (~300 lines)
 - `source/evaluator/` — the Maru VM (eval.l, gc.l, vm.l, reader.l, etc.)
-- `source/compiler/` — compiler backends (emit-x86.l, emit-arm.l, emit-llvm.l)
+- `source/compiler/` — compiler backends (emit-x86-64.l, emit-x86-32.l, emit-arm.l, emit-llvm.l)
 - `source/compiler/relocatable-elf.l` — the elf writers (c-obj ET_REL, standalone ET_DYN) and the relocation serializer
 - `source/assembler/` — runtime assemblers (x86-single-pass.l, x86-instructions.l, arm-instructions.l)
 - `source/platforms/` — libc/posix/linux platform layers
@@ -97,6 +103,19 @@ byte-identical to eval2) implicitly; no separate step needed.
 
 - In ARM assembly, prefer register aliases (FP, LP, SP, XZR, WZR) over
   raw register names (X29, X30, X31) to increase readability
+
+## Project plans
+
+- When a design discussion yields a possible future project (an option
+  set, a tradeoff analysis, a deferred refactor), persist it as
+  `doc/agent/<projectname>.txt` -- one file per project -- instead
+  of leaving it in the conversation.
+- These files are Emacs outline mode: start with the mode header
+  `# -*- mode: outline; coding: utf-8-unix -*-`, then `*` / `**` / ...
+  headings, one level per section.
+- Record everything that was explored: the why, the options with
+  their tradeoffs, and any step-by-step instructions. These files exist
+  to be resumed later, so more detail is better than less.
 
 ## Testing Patterns
 
