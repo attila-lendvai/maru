@@ -18,6 +18,8 @@
      (case type
        (pc32		elf/R_X86_64_PC32)
        (plt32		elf/R_X86_64_PLT32)
+       (abs32		elf/R_X86_64_32)
+       (symbol32	elf/R_X86_64_32)
        (abs64		elf/R_X86_64_64)
        (symbol64	elf/R_X86_64_64)
        (else		(error "unknown x86-64 relocation type: "type))))
@@ -30,6 +32,13 @@
        (abs64		elf/R_AARCH64_ABS64)
        (symbol64	elf/R_AARCH64_ABS64)
        (else		(error "unknown aarch64 relocation type: "type))))
+    ((= arch elf/EM_386)
+     (case type
+       (pc32		elf/R_386_PC32)
+       (plt32		elf/R_386_PLT32)
+       (abs32		elf/R_386_32)
+       (symbol32	elf/R_386_32)
+       (else		(error "unknown i386 relocation type: "type))))
     (else
      (error "relocations are not implemented for this architecture yet: "arch))))
 
@@ -149,7 +158,7 @@
 (define +c-obj/.shstrtab-section-index+		10)
 
 (define-function %c-obj-symbol-count ()
-  (/ (segment-length '.symtab) elf/sizeof-Elf64_Sym))
+  (/ (segment-length '.symtab) +sym-size+))
 
 ;; TODO review and cleanup... this is not elegant...
 (define-function %c-obj-section-index-of (segment)
@@ -254,21 +263,32 @@
                  (<reloc-symbol>
                   (case type
                     (plt32		-4)
-                    ((adr-prel-lo21 jump26 call26 condbranch19 symbol64) 0)
+                    ((adr-prel-lo21 jump26 call26 condbranch19 symbol32 symbol64) 0)
                     (else		(error "unexpected relocation type against an external: "type))))
                  (<label>
                   (case type
                     (pc32		(- (<label>-laddress target) 4))
                     ((adr-prel-lo21 jump26 call26 condbranch19)
                      (<label>-laddress target))
-                    ((abs64 symbol64)	(<label>-laddress target))
+                    ((abs32 abs64 symbol64)	(<label>-laddress target))
                     (else		(error "unexpected relocation type: "type))))
                  (else		(error "unexpected relocation target: "target)))))
         (with-current-segment rela-segment
-          (.u64 hole-paddress)
-          (.u64 (bitwise-or (bitwise-shift symbol-index 32)
-                            (arch-reloc-type arch type)))
-          (.u64 addend))))))
+          (.cell hole-paddress)
+          ;; Elf32_Rel packs r_info as (sym << 8 | type); Elf64_Rela as
+          ;; (sym << 32 | type).
+          (.cell (bitwise-or (bitwise-shift symbol-index
+                                            (if (= +elf-class+ elf/ELFCLASS32) 8 32))
+                             (arch-reloc-type arch type))))
+        ;; Elf64_Rela carries the addend out of band; Elf32 is SHT_REL,
+        ;; where the addend lives in the fixup field instead.
+        (if (= +elf-class+ elf/ELFCLASS32)
+            (with-current-segment hole-segment
+              (with-segment-position-backup hole-segment
+                (set (<segment>-paddress hole-segment) hole-paddress)
+                (.cell addend)))
+          (with-current-segment rela-segment
+            (.cell addend)))))))
 
 ;; The finalization that runs after the code pass, before the ELF
 ;; writer: the standalone image resolves its entry point and external
@@ -544,7 +564,7 @@
     (.strtab		1)
     (.shstrtab		1)))
 
-(define +c-obj/shdr-table-size+		(* 11 elf/sizeof-Elf64_Shdr))
+(define +c-obj/shdr-table-size+		(* 11 +shdr-size+))
 
 (define-function %c-obj-layout-entry (layout name)
   (list-find-if (lambda (entry)
@@ -553,10 +573,13 @@
 
 ;; Appends zero bytes to the segments so that each section's content
 ;; starts exactly at its layout offset; the write loop can then write
-;; the segments back to back with no padding.
+;; the segments back to back with no padding. The initial gap (between
+;; the ELF header and the first section, when the header is smaller
+;; than the first section's alignment, e.g. Elf32) is padded into the
+;; elf-prefix, so the code segment's own content is not shifted.
 (define-function %c-obj-align-segments (layout)
-  (let ((cursor elf/sizeof-Elf64_Ehdr)
-        (previous 'code))
+  (let ((cursor +ehdr-size+)
+        (previous 'elf-prefix))
     (list-do entry layout
       (let* ((name	(first entry))
              (offset	(second entry))
@@ -574,7 +597,7 @@
                             ".rela.text" ".rela.data" ".rela.rodata"
                             ".symtab" ".strtab" ".shstrtab")))
         (layout		())
-        (pos		elf/sizeof-Elf64_Ehdr))
+        (pos		+ehdr-size+))
     (list-do entry +c-obj/section-layout+
       (let* ((name	  (first entry))
              (alignment   (second entry))
@@ -623,26 +646,26 @@
                          0 (second (%c-obj-layout-entry layout 'data)) (segment-length 'bss)
                          0 0 16 0)
     (emit-section-header (name-offset ".rela.text")
-                         elf/SHT_RELA
+                         +rel-section-type+
                          elf/SHF_INFO_LINK
                          0 (second (%c-obj-layout-entry layout 'rela-text)) (third (%c-obj-layout-entry layout 'rela-text))
                          +c-obj/.symtab-section-index+
                          +c-obj/.text-section-index+
-                         8 elf/sizeof-Elf64_Rela)
+                         8 +rel-size+)
     (emit-section-header (name-offset ".rela.data")
-                         elf/SHT_RELA
+                         +rel-section-type+
                          elf/SHF_INFO_LINK
                          0 (second (%c-obj-layout-entry layout 'rela-data)) (third (%c-obj-layout-entry layout 'rela-data))
                          +c-obj/.symtab-section-index+
                          +c-obj/.data-section-index+
-                         8 elf/sizeof-Elf64_Rela)
+                         8 +rel-size+)
     (emit-section-header (name-offset ".rela.rodata")
-                         elf/SHT_RELA
+                         +rel-section-type+
                          elf/SHF_INFO_LINK
                          0 (second (%c-obj-layout-entry layout 'rela-rodata)) (third (%c-obj-layout-entry layout 'rela-rodata))
                          +c-obj/.symtab-section-index+
                          +c-obj/.rodata-section-index+
-                         8 elf/sizeof-Elf64_Rela)
+                         8 +rel-size+)
     (emit-section-header (name-offset ".symtab")
                          elf/SHT_SYMTAB
                          0 0
@@ -650,9 +673,9 @@
                          +c-obj/.strtab-section-index+
                          ;; sh_info: the index of the first GLOBAL symbol
                          (- (/ (segment-length '.symtab)
-                               elf/sizeof-Elf64_Sym)
+                               +sym-size+)
                             *c-obj-n-global-symbols*)
-                         8 elf/sizeof-Elf64_Sym)
+                         8 +sym-size+)
     (emit-section-header (name-offset ".strtab")
                          elf/SHT_STRTAB 0 0
                          (second (%c-obj-layout-entry layout '.strtab)) (third (%c-obj-layout-entry layout '.strtab))
@@ -669,9 +692,8 @@
   (let* ((layout-and-alist (%c-obj-layout))
          (layout (first layout-and-alist))
          (shstrtab-alist (second layout-and-alist))
-         (file-position elf/sizeof-Elf64_Ehdr))
+         (file-position +ehdr-size+))
     (%c-obj-emit-section-headers layout shstrtab-alist)
-    (%c-obj-align-segments layout)
 
     (create-segment 'elf-prefix)
     (.segment 'elf-prefix)
@@ -684,7 +706,11 @@
                      +n-section-headers+
                      +c-obj/.shstrtab-section-index+)
 
-    (assert (= (segment-length 'elf-prefix) elf/sizeof-Elf64_Ehdr))
+    (assert (= (segment-length 'elf-prefix) +ehdr-size+))
+
+    ;; pad the elf-prefix up to the first section's offset, and each
+    ;; section up to the next one's
+    (%c-obj-align-segments layout)
 
     ;; write the file; the layout carries the padded file offsets
     (write-segment-to-stream 'elf-prefix stream)

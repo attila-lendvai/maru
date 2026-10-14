@@ -6,7 +6,7 @@
   ;;(println "emit-rel8, value: "value)
   (typecase value
     (<long>	(emit-i8 value))
-    (<label>	(emit-label value emit-rel8 1 (- 0 (current-laddress) 1) 'pc8))
+    (<label>	(emit-label value emit-rel8 1 (- 0 (current-laddress) 1)))
     (<reloc-symbol>	(error "emit-rel8: pc8 relocations against symbols are not supported: "(<reloc-symbol>-name value)))
     (<symbol>	(emit-rel8 (%ensure-label value)))
     (else	(error "emit-rel8: called with unexpected value: "value", type: "(type-of value)))))
