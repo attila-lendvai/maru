@@ -315,7 +315,7 @@
                  ;; reloc-type is absent for fixups that have no
                  ;; relocation mapping yet (e.g. absolute imm fields)
                  (when reloc-type
-                   (%record-relocation label (first reloc-type) size offset)))
+                   (%record-relocation label reloc-type size offset)))
                 (state/set
                  (let* ((paddress (pop args))
                         (laddress (pop args)))
@@ -359,7 +359,7 @@
   (let ((offset (and (pair? rest)
                      (is <long> (first rest))
                      (pop rest)))
-        (reloc-type rest))
+        (reloc-type (first rest)))
     (if (resolved-label? label)
         (begin
          (assert (not (<label>-primed-emitter label)))
@@ -374,7 +374,7 @@
          ;;            ", offset: " offset
          ;;            "\n")
          (when reloc-type
-           (%record-relocation label (first reloc-type) size offset))
+           (%record-relocation label reloc-type size offset))
          (writer (+ (<label>-laddress label)
                     (or offset 0))))
       (let ((emitter (or (<label>-primed-emitter label)
