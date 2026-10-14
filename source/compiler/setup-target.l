@@ -12,7 +12,9 @@
      (set word-size	64))
 
     (("i686" "i386")
-     (set arch		'IA-32)
+     ;; Intel's official name for this architecture is IA-32; we
+     ;; normalize it to x86-32 to match the x86-64 of the 64-bit case.
+     (set arch		'x86-32)
      (set word-size	32))
 
     (("aarch64")

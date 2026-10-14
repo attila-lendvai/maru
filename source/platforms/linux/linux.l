@@ -159,7 +159,7 @@
 ;; equivalent here.
 (define-constant linux/SYS_mmap*
   (case target/arch
-    (IA-32	'linux/SYS_mmap2)
+    (x86-32	'linux/SYS_mmap2)
     (else	'linux/SYS_mmap)))
 
 (define-function platform/acquire-memory/via-mmap (size)

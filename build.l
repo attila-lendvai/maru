@@ -33,6 +33,12 @@
           (set value (string))
         (string-append (or value var) ch)))
     (if value
+        ;; TODO resolving the value to a variable (needed for
+        ;; default-backend=arm, default-platform=linux) also hits
+        ;; target/* keys whose value names a global: e.g. target/os=linux
+        ;; resolves to the <linux> platform object. The i686 collision is
+        ;; gone now that the x86 backend covers both widths; a general fix
+        ;; is still pending.
         (let ((converted-value
                 (case value
                   ("true" true)

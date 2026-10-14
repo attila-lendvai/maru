@@ -33,7 +33,15 @@
                           (= target/platform "posix")
                           (= elf-emission-type "c-obj"))))
 
-(require (concat-strings "source/compiler/emit-" *compiler-backend* ".l"))
+;; The x86 backend emits 32- or 64-bit code; which one is a property of
+;; the target arch, not the backend. The normalized arch symbol already
+;; spells the suffix (x86-32 / x86-64), matching the emitter file names.
+(define-function emitter-name (backend-name)
+  (if (= backend-name "x86")
+      (symbol->string (target-value target/arch))
+    backend-name))
+
+(require (concat-strings "source/compiler/emit-" (emitter-name *compiler-backend*) ".l"))
 
 (switch-to-target-env)
 

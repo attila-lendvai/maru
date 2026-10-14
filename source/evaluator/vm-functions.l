@@ -339,12 +339,12 @@
   (make <target-function>
     (program-code ptr)))
 
-(when-at-expand (= target/arch 'IA-32)
-  (define-vm-function call-IA-32-machine-code (fn)
-    (debug-print "call-IA-32-machine-code will call "fn)
-    (assert (is <target-function> fn) "call-IA-32-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
+(when-at-expand (= target/arch 'x86-32)
+  (define-vm-function call-x86-32-machine-code (fn)
+    (debug-print "call-x86-32-machine-code will call "fn)
+    (assert (is <target-function> fn) "call-x86-32-machine-code: cannot call object of type "(type-of fn)", printing as "fn)
     (let ((result (box <long> (fn))))
-      (debug-print "call-IA-32-machine-code got back the control from "fn)
+      (debug-print "call-x86-32-machine-code got back the control from "fn)
       result)))
 
 (when-at-expand (= target/arch 'x86-64)

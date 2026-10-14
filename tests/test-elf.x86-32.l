@@ -117,7 +117,7 @@ var
     (.i32	42)
     (.def	data-segment-size (- $ data-segment-start))))
 
-(let ((filename "./build/test-elf.IA-32"))
+(let ((filename "./build/test-elf.x86-32"))
   (println "writing elf buffer to "filename)
   (save-assembler-buffer *assembler* filename))
 
@@ -141,13 +141,13 @@ var
 msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(.def	msglen (- $ msg))))
 
-(let ((filename "./build/runtime-buffer.IA-32"))
+(let ((filename "./build/runtime-buffer.x86-32"))
   (println "writing runtime buffer to "filename)
   (save-assembler-buffer *assembler* filename))
 
 (println "calling memory buffer, output should follow")
 
-(call-IA-32-machine-code (assembler->function *assembler*))
+(call-x86-32-machine-code (assembler->function *assembler*))
 
 (assemble '(
 	(movlIR	4 _EAX)				; write
@@ -158,11 +158,11 @@ msg	(.ascii	"*** Test output from running the dynamically compiled asm code\n")
 	(movlIR	1 _EAX)				; exit
 	(movlIR	0 _EBX)				; status
 	(int	0x80)
-msg	(.ascii	"*** You may run ./build/test-elf.IA-32 now for a friendly greeting\n")
+msg	(.ascii	"*** You may run ./build/test-elf.x86-32 now for a friendly greeting\n")
 	(.def	msglen (- $ msg))))
 
 (println "calling it, output should follow")
 
-(call-IA-32-machine-code (assembler->function *assembler*))
+(call-x86-32-machine-code (assembler->function *assembler*))
 
 (println "BUG: it shouldn't have returned!!!")

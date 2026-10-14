@@ -380,10 +380,11 @@
     (bitwise-and 0x12345678 -1)
   0x12345678)
 
-(define-test compile/bitwise-and/4
-    (let ((x 0x1122334455667788))
-      (bitwise-and x 0xffffffff))
-  0x55667788)
+(when-at-expand (= 64 target/cell-size/bits)
+  (define-test compile/bitwise-and/4
+      (let ((x 0x1122334455667788))
+        (bitwise-and x 0xffffffff))
+    0x55667788))
 
 ;;;
 ;;; OR
@@ -401,10 +402,11 @@
     (bitwise-or 0x12345678 -1)
   -1)
 
-(define-test compile/bitwise-or/4
-    (let ((x 0x1122334455667788))
-      (bitwise-or x 0xffffffff))
-  0x11223344ffffffff)
+(when-at-expand (= 64 target/cell-size/bits)
+  (define-test compile/bitwise-or/4
+      (let ((x 0x1122334455667788))
+        (bitwise-or x 0xffffffff))
+    0x11223344ffffffff))
 
 ;;;
 ;;; XOR
@@ -421,10 +423,11 @@
     (bitwise-xor 0x12345678 -1)
   -0x12345679)
 
-(define-test compile/bitwise-xor/4
-    (let ((x 0x1122334401010101))
-      (bitwise-xor x 0xffffffff))
-  0x11223344fefefefe)
+(when-at-expand (= 64 target/cell-size/bits)
+  (define-test compile/bitwise-xor/4
+      (let ((x 0x1122334401010101))
+        (bitwise-xor x 0xffffffff))
+    0x11223344fefefefe))
 
 ;;;
 ;;; NOT
@@ -438,9 +441,10 @@
     (bitwise-not 0xffff)
   -0x10000)
 
-(define-test compile/bitwise-not/2
-    (bitwise-not 0xffffffff)
-  -0x100000000)
+(when-at-expand (= 64 target/cell-size/bits)
+  (define-test compile/bitwise-not/2
+      (bitwise-not 0xffffffff)
+    -0x100000000))
 
 (define-test compile/bitwise-shift-left/1
     (bitwise-shift 0x0f 4)

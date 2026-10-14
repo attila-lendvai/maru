@@ -1,12 +1,12 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
-(define-constant +linux/syscall/argument-registers/x86_64+
+(define-constant +linux/syscall/argument-registers/x86-64+
     `(quote ,(list RAX RDI RSI RDX R10 R8 R9)))
 
 (define-instruction LINUX-SYSCALL (false 0 true)
   ((pair)
    (let ((args $1)
-         (regs +linux/syscall/argument-registers/x86_64+))
+         (regs +linux/syscall/argument-registers/x86-64+))
      (while args
        (let ((arg (pop args))
              (reg (pop regs)))

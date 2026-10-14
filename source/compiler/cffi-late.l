@@ -45,7 +45,7 @@
     (when (<external-symbol>-trampoline-label entry)
       (with-current-segment 'code
         (label! (<external-symbol>-trampoline-label entry))
-        (if-at-expand (= "x86" *compiler-backend*)
+        (if-at-expand (= "x86-64" (emitter-name *compiler-backend*))
             (JMPQripm (<external-symbol>-got-label entry))
           (if-at-expand (= "arm" *compiler-backend*)
               (begin
@@ -69,7 +69,7 @@
 ;; calls and breaks varargs libc functions (movaps).
 ;;
 ;; The body is x86-specific; emit-arm.l defines the aarch64 version.
-(if-at-expand (= "x86" *compiler-backend*)
+(if-at-expand (= "x86-64" (emitter-name *compiler-backend*))
     (define-function emit-entry-point-wrapper (-c-)
       (let ((desig (closure-code-label-desig '_start)))
         (unless (%find-label desig)

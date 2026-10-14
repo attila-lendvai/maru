@@ -13,11 +13,11 @@
          output
          clobbers)
      (case (slave-value target/arch)
-       (IA-32
+       (x86-32
         ;; at most 6 args passed in regs. the rest should be spilled
         ;; to the stack, but we don't support that.
         (set instr	"int	$$0x80")
-        (set input-regs	+linux/syscall/argument-registers/IA-32+)
+        (set input-regs	+linux/syscall/argument-registers/x86-32+)
         ;; https://stackoverflow.com/questions/47983371/why-do-x86-64-linux-system-calls-modify-rcx-and-what-does-the-value-mean
         ;; https://refspecs.linuxfoundation.org/elf/x86_64-abi-0.99.pdf
         ;; On IA-32 "A" means the edx:eax pair used together to
@@ -26,12 +26,12 @@
         ;; NOTE: seems like +{eax} is not a good input-output spec on x86,
         ;; i can't make it compile.
         (set output	"={eax}")
-        (set clobbers	+linux/syscall/clobbered-registers/IA-32+))
+        (set clobbers	+linux/syscall/clobbered-registers/x86-32+))
        (x86-64
         (set instr	"syscall")
-        (set input-regs	+linux/syscall/argument-registers/x86_64+)
+        (set input-regs	+linux/syscall/argument-registers/x86-64+)
         (set output	"={rax}")
-        (set clobbers	+linux/syscall/clobbered-registers/x86_64+))
+        (set clobbers	+linux/syscall/clobbered-registers/x86-64+))
        (aarch64
         (set instr	"svc #0")
         (set input-regs +linux/syscall/argument-registers/aarch64+)
