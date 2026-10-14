@@ -43,6 +43,8 @@ test -d build/ && find build/ -type f -exec touch '{}' + || true
 
 echo CI begins
 
+./build.sh C-obj/link-type=static test-compiler x86 libc
+
 ./build.sh bootstrap llvm linux
 ./build.sh bootstrap llvm posix
 ./build.sh bootstrap llvm libc
@@ -71,8 +73,15 @@ sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
 #
 git reset --hard
 
+./build.sh target/arch=i686 test-compiler x86  linux
+./build.sh target/arch=i686 test-compiler x86  posix
+
 ./build.sh target/arch=i686 bootstrap llvm posix
 ./build.sh target/arch=i686 bootstrap llvm libc
+
+./build.sh target/arch=i686 bootstrap x86  linux
+./build.sh target/arch=i686 bootstrap x86  posix
+./build.sh target/arch=i686 bootstrap x86  libc
 
 ./build.sh target/arch=aarch64 bootstrap arm  linux
 ./build.sh target/arch=aarch64 bootstrap arm  posix

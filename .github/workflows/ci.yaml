@@ -62,6 +62,11 @@ jobs:
 
       - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
+      # test-compiler runs first: it fails faster than a full bootstrap
+      - run:  timeout 5m ./build.sh target/arch=i686 test-compiler x86  linux
+      - run:  timeout 5m ./build.sh target/arch=i686 test-compiler x86  posix
+      - run:  timeout 5m ./build.sh C-obj/link-type=static test-compiler x86 libc
+
       - run:  timeout 5m ./build.sh bootstrap llvm linux
       - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm libc
@@ -72,6 +77,10 @@ jobs:
 
       - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm posix
       - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm libc
+
+      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  linux
+      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  posix
+      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  libc
 
       # the self-contained x86 binaries are mapped/run through musl's
       # ELF interpreter instead of glibc's
@@ -130,9 +139,15 @@ jobs:
 
       - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
 
+      - run:  timeout 5m ./build.sh test-compiler arm libc
+
       - run:  timeout 5m ./build.sh bootstrap llvm libc
       - run:  timeout 5m ./build.sh bootstrap llvm posix
       - run:  timeout 5m ./build.sh bootstrap llvm linux
+
+      - run:  timeout 5m ./build.sh bootstrap arm  linux
+      - run:  timeout 5m ./build.sh bootstrap arm  posix
+      - run:  timeout 5m ./build.sh bootstrap arm  libc
 
       # same as above on amd64: only the arm backend embeds an ELF
       # interpreter, so llvm would silently not exercise musl here
