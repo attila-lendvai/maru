@@ -47,11 +47,22 @@
                    '(gc/valid-header-canary? (gc/header-of __obj__))
                  'true)))))
 
+;; gc/unsigned-<: addresses are compared as unsigned. on 32-bit
+;; targets malloc may hand out blocks above 2^31, whose sign bit would
+;; make a signed < order them below the low static image. split on the
+;; sign bit: when the two signs differ the upper-half operand is the
+;; larger, otherwise the signed < already matches the unsigned one.
+(define-form gc/unsigned-< (a b)
+  `(let ((__a__ ,a) (__b__ ,b))
+     (if (= (< __a__ 0) (< __b__ 0))
+         (< __a__ __b__)
+       (< __b__ 0))))
+
 ;; TODO this assumes that the read-only data segment is loaded/mapped
 ;; before the .data segment. it works on linux/elf, but may require
 ;; more care on other platforms.
 (define-form gc/read-only-object? (obj)
-  `(< ,obj gc/lowest-memory-address))
+  `(gc/unsigned-< ,obj gc/lowest-memory-address))
 
 ;;;
 ;;; tagging
@@ -113,7 +124,7 @@
     ;; of whether the allocator grows upward or downward (e.g. mmap
     ;; allocates from the top of the address space downward, while brk
     ;; grows upward).
-    (when (< ptr gc/lowest-memory-address)
+    (when (gc/unsigned-< ptr gc/lowest-memory-address)
       (set gc/lowest-memory-address ptr))
     (set (<header>-size  ptr) (- size size-of-<header>))
     (set (<header>-flags ptr) 0)
