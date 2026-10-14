@@ -73,9 +73,13 @@
 
 (cond
   ((slave-value (is <immediate-type> <long>))
-
-   (define-method compile-object <long> (-c-)
-     (LI64 (eval-in-slave `(box <long> ,self)))))
+   ;; a <long> occupies one target cell: tag the operand with the
+   ;; target's width so CELL/LOAD pick the matching emitter
+   (if (= 64 (slave-value target/cell-size/bits))
+       (define-method compile-object <long> (-c-)
+         (LI64 (eval-in-slave `(box <long> ,self))))
+     (define-method compile-object <long> (-c-)
+       (LI32 (eval-in-slave `(box <long> ,self))))))
 
   ((slave-value (and (is <boxed-type> <long>)
                      (<boxed-type>-one-word? <long>)))

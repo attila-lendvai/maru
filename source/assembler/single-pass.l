@@ -414,6 +414,13 @@
       (writer 0))))
   label)
 
+;; The compiler host may itself be a 32-bit build (self-hosting i686),
+;; where a tagged <long> has only 31 bits of magnitude. The 32-bit
+;; range checks below can then neither be expressed as literals nor
+;; ever fail, so gate them on a wide host.
+(define-function wide-cell? ()
+  (< 0 (bitwise-shift 1 32)))
+
 (define-function emit-u8 (value)
   (typecase value
     (<long>
@@ -459,7 +466,8 @@
 (define-function emit-u32 (value)
   (typecase value
     (<long>
-     (assert (<= -0x80000000 value 0xffffffff) "emit-u32: out of range: "value)
+     (when (wide-cell?)
+       (assert (<= -0x80000000 value 0xffffffff) "emit-u32: out of range: "value))
      (emit-u16 (bitwise-and 0xffff value))
      (emit-u16 (bitwise-and 0xffff (bitwise-shift value -16))))
     (<cell-32>
@@ -478,8 +486,9 @@
 (define-function emit-i32 (value)
   (typecase value
     (<long>
-     ;; TODO only works on 64 bit hosts
-     (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0)) "emit-i32: out of range: "value)
+     (when (wide-cell?)
+       (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0))
+               "emit-i32: out of range: "value))
      (emit-u32 (bitwise-and value 0xffffffff)))
     (<label>	(emit-label value emit-i32 4 'abs32))
     (<symbol>	(emit-i32 (%ensure-label value)))

@@ -10,6 +10,7 @@
           ;; TODO we should handle global variables, too.
           (let ((x (<variable>-value expr)))
             (or (is <STACK-CELL>	x)
+                (is <STACK-PARAM>	x)
                 (is <LI64>		x)
                 (is <LI32>		x))))
      ;; (let ((value (<variable>-value expr)))
@@ -105,7 +106,9 @@
     (comp (third expr))
     (cond
       ((or (is <STACK-CELL> value)
-           (is <R64> value))
+           (is <STACK-PARAM> value)
+           (is <R64> value)
+           (is <R32> value))
        (emit STORE value $))
       ((is <C-variable> value)
        ;; TODO dispatch on the type of the C-variable
@@ -123,7 +126,8 @@
       (cond
         ((global-variable? var)
          (emit ADDR (GLOBAL-CELL (label (<variable>-name var)))))
-        ((is <STACK-CELL> val)
+        ((or (is <STACK-CELL> val)
+             (is <STACK-PARAM> val))
          (emit ADDR val))
         ;; ((is <R64> val)
         ;;  (maybe-spill-params -c-)
