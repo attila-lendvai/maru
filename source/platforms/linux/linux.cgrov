@@ -8,6 +8,16 @@
 
 prefix linux/
 
+header	stdint.h
+
+sizes	char short int long off_t size_t float double
+
+type	longlong	long long
+type	longdouble	long double
+type	pointer		void *
+
+sizes	longlong longdouble pointer
+
 // default _GNU_SOURCE 1
 
 header	sys/syscall.h

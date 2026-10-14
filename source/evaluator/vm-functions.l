@@ -363,12 +363,9 @@
 (define-form with-open-pipe (args . body)
   (let ((read-fd-name  (pop args))
         (write-fd-name (pop args)))
-    `(let ((__pipe-val__ 0)
-           ,read-fd-name
-           ,write-fd-name)
-       (posix/pipe (address-of __pipe-val__))
-       (set ,read-fd-name  (bitwise-and   __pipe-val__ 0xFFFFFFFF))
-       (set ,write-fd-name (bitwise-shift __pipe-val__ -32))
+    `(let* ((__fds__ (posix/pipe*))
+            (,read-fd-name  (unbox <long> (car __fds__)))
+            (,write-fd-name (unbox <long> (cdr __fds__))))
        ,@body)))
 
 ;; FIXME: why do i need the HOST-VALUE here?! WHEN-AT-EXPAND should be

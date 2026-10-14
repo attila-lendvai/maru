@@ -40,6 +40,15 @@
 (define-form posix/pipe (ptr)
   `(syscall* linux/SYS_pipe2 ,ptr 0))
 
+;; pipe(2) hands back two ints through a pointer to a 2-element array.
+;; Read them with U32-AT (word-width independent, so this also holds on
+;; i686) and return them as a pair of boxed <long>s, hiding the int[2].
+(define-vm-function posix/pipe* ()
+  (let ((fds (allocate-data (* 2 linux/sizeof-int))))
+    (posix/pipe fds)
+    (cons (box <long> (u32-at fds 0))
+          (box <long> (u32-at fds linux/sizeof-int)))))
+
 (define-vm-function working-directory ()
   (gc/let* ((buffer (allocate-data linux/PATH_MAX)))
     (let ((len (syscall* linux/SYS_getcwd buffer linux/PATH_MAX)))

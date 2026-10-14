@@ -2,6 +2,15 @@
 
 (load (concat-strings "source/platforms/libc/vm-functions.l"))
 
+;; pipe(2) hands back two ints through a pointer to a 2-element array.
+;; Read them with U32-AT (word-width independent, so this also holds on
+;; i686) and return them as a pair of boxed <long>s, hiding the int[2].
+(define-vm-function posix/pipe* ()
+  (let ((fds (allocate-data (* 2 libc/sizeof-int))))
+    (posix/pipe fds)
+    (cons (box <long> (u32-at fds 0))
+          (box <long> (u32-at fds libc/sizeof-int)))))
+
 (define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)
