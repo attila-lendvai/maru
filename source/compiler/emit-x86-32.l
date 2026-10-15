@@ -58,7 +58,7 @@
 ;;;
 
 (define-instruction GOTO	()
-  ((label)			(JMPQrel32 $1)))
+  ((label)			(JMP $1)))
 
 (define-instruction GOTOF	(true 0 false)
   ((REGISTER label)		(TESTLrr (<REGISTER>-name $1) (<REGISTER>-name $1))

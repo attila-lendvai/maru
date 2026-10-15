@@ -756,7 +756,15 @@
 (define-function INCLm (MD MB MI MS)		(_O_r_X 255 _b000 MD MB MI MS))
 (define-function INVLPGm (MD MB MI MS)		(_OO_r_X 3841 _b111 MD MB MI MS))
 
-(define-function JMPSm (D B I S)		(if (undefined-registers? B I) (_O_rel8  235 D) (ASMFAIL "illegal mode in short jump")))
+;; Whether D can be encoded as a rel8 branch. The single-pass loader
+;; (single-pass-x86.l) overrides this to also shorten a resolved label;
+;; the traditional assembler has its own label handling, so the default
+;; only considers a numeric displacement.
+(define branch-fits-rel8? i8?)
+
+(define-function JMPrel8 (D)			(_O_rel8 235 D))
+(define-function JMPrel32 (D)			(_O_rel32 233 D))
+(define-function JMP (D)			(if (branch-fits-rel8? D) (JMPrel8 D) (JMPrel32 D)))
 (define-function JMPm (D B I S)			(_O_r_X 255 _b100 D B I S))
 (define-function JMPr (R)			(_O_Mrm 255 _b11 _b100 (rindex/32 R)))
 (define-function LAHF () (_O 159))
@@ -953,12 +961,11 @@
 (define-function CALLQr (R) (let () (_REX 0 R 0 0) (CALLr (to-r32 R))))
 (define-function CALLQm (D B I S) (let () (_REX 0 0 I B) (CALLm D (to-r32 B) (to-r32 I) S)))
 (define-function CALLQrel32 (D)			(_O_rel32 232 D))
-(define-function CALLQripm (D)			(_O_r_X 255 _b010 D 0 0 0))
+(define-function CALLQrip (D)			(_O_r_X 255 _b010 D 0 0 0))
 (define-function INCQr (R) (let () (_REX 1 0 0 R) (_O_Mrm 255 _b11 _b000 (rindex (to-r32 R)))))
 (define-function JMPQr (R) (let () (_REX 0 R 0 0) (JMPr (to-r32 R))))
 (define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (to-r32 B) (to-r32 I) S)))
-(define-function JMPQrel32 (D)			(_O_rel32 233 D))
-(define-function JMPQripm (D)			(_O_r_X 255 _b100 D 0 0 0))
+(define-function JMPQrip (D)			(_O_r_X 255 _b100 D 0 0 0))
 (define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
 (define-function LEAVEQ () (LEAVE))
 
@@ -1061,7 +1068,7 @@
                       (define-function ,(concat-symbols base-name (string->symbol "32")) (D)
                         (%JCCrel32 ,(second entry) D))
                       (define-function ,base-name (D)
-                        (if (i8? D)
+                        (if (branch-fits-rel8? D)
                             (%JCCrel8 ,(second entry) D)
                           (%JCCrel32 ,(second entry) D))))))
                 entries))))))

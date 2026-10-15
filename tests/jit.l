@@ -40,7 +40,7 @@
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
 
       (let ((l/code (label)))
-        (JMPSm	l/code 0 0 0)
+        (JMPrel8	l/code)
 
         (let ((l/msg (label!)))
           (.ascii	+fputs-msg+)
@@ -74,7 +74,7 @@
           (stderr	(posix/dlsym posix/RTLD_DEFAULT "stderr")))
 
       (let ((l/code (label)))
-        (JMPSm	l/code 0 0 0)
+        (JMPrel8	l/code)
 
         (LEAQmr	'msg 0 0 0 RDI) ; a forward reference
         (NOP)
@@ -108,13 +108,13 @@
   (define-jit-test jit-posix-3
     (let ()
 
-      (JMPSm	'skip-1 0 0 0)
+      (JMPrel8	'skip-1)
 
       (label!	'data-1)
       (.u64	'skip-1) ; future label reference
 
       (label!	'skip-1)
-      (JMPSm	'skip-2 0 0 0)
+      (JMPrel8	'skip-2)
 
       (label!	'data-2)
       (.u64	'skip-1) ; realized label reference
@@ -189,7 +189,7 @@
     ;; only to test the instruction emitter
     (MOVQir	0x12345678 RAX)
     ;;(MOVQir	0x123456789abcdef0 RAX)
-    (JMPSm	'skip-text 0 0 0)
+    (JMPrel8	'skip-text)
 
     (label!	'msg)
     (.ascii	"*** linux syscall test output from the dynamically compiled code ***\n")

@@ -22,3 +22,15 @@
     (else	(error "emit-rel32: called with unexpected value: "value", type: "(type-of value)))))
 
 (require "source/assembler/x86-instructions.l")
+
+;; Label-aware override of the x86-instructions.l default: a resolved
+;; label within rel8 range of the end of a 2-byte short branch can be
+;; encoded short.
+(define-function branch-fits-rel8? (D)
+  (let ((l (typecase D
+             (<label>	D)
+             (<symbol>	(%find-label D))
+             (else	()))))
+    (if (and (is <label> l) (resolved-label? l))
+        (i8? (- (<label>-laddress l) (current-laddress) 2))
+      (i8? D))))

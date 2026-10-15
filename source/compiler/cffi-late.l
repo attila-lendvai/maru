@@ -46,7 +46,7 @@
       (with-current-segment 'code
         (label! (<external-symbol>-trampoline-label entry))
         (if-at-expand (= "x86-64" (emitter-name *compiler-backend*))
-            (JMPQripm (<external-symbol>-got-label entry))
+            (JMPQrip (<external-symbol>-got-label entry))
           (if-at-expand (= "arm" *compiler-backend*)
               (begin
                 (ADR X16 (<external-symbol>-got-label entry))
@@ -81,7 +81,7 @@
             (LEAQmr 8 RSP 0 0 RSI)          ; lea rsi,[rsp+8] ; argv
             (emit CALL (closure-code-label 'main))
             (MOVQrr RAX RDI)
-            (CALLQripm (emit-external-got-cell (register-external-symbol "exit") -c-)))
+            (CALLQrip (emit-external-got-cell (register-external-symbol "exit") -c-)))
           (emit-symtab-entry/function "_start"
                                       (laddress desig)
                                       (- (current-laddress)

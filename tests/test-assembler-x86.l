@@ -158,14 +158,14 @@ _start:
 "
   ;; direct relative calls/jumps
   (CALLQrel32 0)
-  (JMPQrel32 0)
+  (JMPrel32 0)
   ;; dispatcher: (D 0 0 0) selects rip+disp32
   (CALLQm 0 0 0 0)
   (CALLQm -4 0 0 0)
   ;; named rip forms
-  (CALLQripm 0x100)
+  (CALLQrip 0x100)
   (JMPQm 0 0 0 0)
-  (JMPQripm 8)
+  (JMPQrip 8)
   ;; base+disp, disp8/32 auto-selection
   (CALLQm 0 RBX 0 0)
   (CALLQm 0x7f RBX 0 0)
@@ -409,7 +409,7 @@ _start:
   ;; RIP-relative: LEA with zero and non-zero displacement
   (LEAQmr 0 0 0 0 RAX)
   ;; JMP: relative call
-  (JMPQrel32 0)
+  (JMPrel32 0)
   ;; MOVQmr: RIP-relative load
   (MOVQmr 0 0 0 0 RBX)
   )
