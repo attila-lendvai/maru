@@ -211,7 +211,7 @@ The type of the reference decides what happens:
    `.rela.*` against the section symbols, because ld does the final
    layout. Pc-relative encodings are position-independent, so the
    standalone image needs no dynamic fixup for them.
- - `<reloc-symbol>` (undefined external, i.e. FFI): never
+ - `<undefined-symbol>` (undefined external, i.e. FFI): never
    self-patchable; always recorded, placeholder emitted.
  - raw `<long>`: carries no referential intent; nothing recorded.
 

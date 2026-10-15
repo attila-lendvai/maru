@@ -108,7 +108,7 @@
       target/arch=aarch64 bootstrap arm libc
 *** i686 c-obj -> pie (option B)
     - emit-i686.l: compile-call-to <C-function> currently emits
-      CALL (reloc-symbol name) for c-obj (the plt); make it use
+      CALL (undefined-symbol name) for c-obj (the plt); make it use
       external-trampoline-label for c-obj too
     - cffi-late.l: emit-external-got-cell writes .u64 for c-obj; for
       Elf32 write a .u32 cell (records the 32-bit symbol reloc) so the

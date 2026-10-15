@@ -199,7 +199,7 @@ byte-identical to eval2) implicitly; no separate step needed.
 
 - Prefer verifying through ./build.sh targets (bootstrap, test-*) over ad-hoc repro setups and manual artifact inspection. Stale or partially built trees and hand-rolled invocations mislead into chasing nonexistent bugs; rerun the canonical command clean before diagnosing any failure.
 
-- Two `define-instruction` flavors: `elf-early.l`'s is factory-style (operand cases dispatch by type name, e.g. `((reloc-symbol) (CALLQrel32 $1))`; `%emit` calls it with `()` first to get the singleton); `arm-instructions.l`'s defines plain functions called directly (`(BL label)`). Routing an arm-style instruction through `(emit ...)` fails with "unexpected: ()" — wrap it (see `CALL` in `emit-arm.l`).
+- Two `define-instruction` flavors: `elf-early.l`'s is factory-style (operand cases dispatch by type name, e.g. `((undefined-symbol) (CALLQrel32 $1))`; `%emit` calls it with `()` first to get the singleton); `arm-instructions.l`'s defines plain functions called directly (`(BL label)`). Routing an arm-style instruction through `(emit ...)` fails with "unexpected: ()" — wrap it (see `CALL` in `emit-arm.l`).
 
 - Compiler-level `op/` registers are `<REGISTER>` records; emit-forms unwrap them via `(<REGISTER>-name $1)`. Raw arm instructions take the register symbols (`X16`, ...) whose value is the encoded number (X = 32+i, W = i).
 
