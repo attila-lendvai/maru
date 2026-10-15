@@ -642,6 +642,13 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
        ;; posix "extends" the libc platform, so it also needs the libc cgrov entries.
        (compile-cgrov-file (concat-strings slave-dir "/source/platforms/libc/libc.cgrov")))))
 
+  (when (or (= backend x86)
+            (= backend arm))
+    ;; KLUDGE An ELF emitter will want to load the linux cgrov files...
+    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/linux.cgrov"))
+    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/elf.cgrov"))
+    )
+
   (let ((output (build-output backend platform output-name)))
 
     (run-maru-compiler
