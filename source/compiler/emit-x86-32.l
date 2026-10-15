@@ -71,7 +71,7 @@
 (define-instruction CALL	(false 0 true)
   ((label)			(CALLrel32 $1))
   ((REGISTER)			(CALLr (<REGISTER>-name $1)))
-  ((reloc-symbol)		(CALLrel32 $1)))
+  ((undefined-symbol)		(CALLrel32 $1)))
 
 (define-instruction ADD		(true 0 true)
   ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
@@ -563,7 +563,7 @@
   ;; static linker ('c-obj); 'load-time: through the GOT-cell
   ;; trampoline, resolved by ld.so ('standalone)
   (if (= "c-obj" elf-emission-type)
-      (emit CALL (reloc-symbol (<C-function>-name self)))
+      (emit CALL (undefined-symbol (<C-function>-name self)))
     (emit CALL (external-trampoline-label self -c-)))
   ;; a 32-bit int return already fills the accumulator
   (set (<compiler>-current-value -c-) +op/accumulator+)

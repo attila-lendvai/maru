@@ -613,7 +613,7 @@
     ;; FFI: a direct call against the UND symbol; ld resolves it
     ;; through its PLT (the R_AARCH64_CALL26 against an external
     ;; symbol implies a PLT stub)
-    (<reloc-symbol>
+    (<undefined-symbol>
      (%record-relocation designator 'call26 4 0)
      (%emit-b-imm26 0x94000000 0))
     (else     (error "BL: unexpected: " designator))))

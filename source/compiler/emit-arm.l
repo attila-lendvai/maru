@@ -68,7 +68,7 @@
 (define-instruction CALL	(false 0 true)
   ((label)			(BL $1))
   ((REGISTER)			(BLR (<REGISTER>-name $1)))
-  ((reloc-symbol)		(BL $1)))
+  ((undefined-symbol)		(BL $1)))
 
 (define-instruction ADD		(true 0 true)
   ((R64 STACK-CELL)		(LDUR X16 FP (<STACK-CELL>-offset $2))
@@ -725,7 +725,7 @@
   ;; static linker ('c-obj); 'load-time: through the GOT-cell
   ;; trampoline, resolved by ld.so ('standalone)
   (if (= "c-obj" elf-emission-type)
-      (emit CALL (reloc-symbol (<C-function>-name self)))
+      (emit CALL (undefined-symbol (<C-function>-name self)))
     (emit CALL (external-trampoline-label self -c-)))
   (case (<C-function>-return-type self)
     ;; TODO introduce a proper infrastructure for this

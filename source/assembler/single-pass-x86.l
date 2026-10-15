@@ -7,7 +7,7 @@
   (typecase value
     (<long>	(emit-i8 value))
     (<label>	(emit-label value emit-rel8 1 (- 0 (current-laddress) 1)))
-    (<reloc-symbol>	(error "emit-rel8: pc8 relocations against symbols are not supported: "(<reloc-symbol>-name value)))
+    (<undefined-symbol>	(error "emit-rel8: pc8 relocations against symbols are not supported: "(<undefined-symbol>-name value)))
     (<symbol>	(emit-rel8 (%ensure-label value)))
     (else	(error "emit-rel8: called with unexpected value: "value", type: "(type-of value)))))
 
@@ -16,7 +16,7 @@
   (typecase value
     (<long>	(emit-i32 value))
     (<label>	(emit-label value emit-rel32 4 (- 0 (current-laddress) 4) 'pc32))
-    (<reloc-symbol>	(%record-relocation value 'plt32 4 0)
+    (<undefined-symbol>	(%record-relocation value 'plt32 4 0)
                  (emit-i32 -4))
     (<symbol>	(emit-rel32 (%ensure-label value)))
     (else	(error "emit-rel32: called with unexpected value: "value", type: "(type-of value)))))

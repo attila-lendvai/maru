@@ -209,8 +209,8 @@
   (let ((und-alist ()))
     (list-do entry (list-reverse (<assembler>-relocations *assembler*))
       (let ((target (third entry)))
-        (when (is <reloc-symbol> target)
-          (let ((name (<reloc-symbol>-name target)))
+        (when (is <undefined-symbol> target)
+          (let ((name (<undefined-symbol>-name target)))
             (unless (list-find-if (lambda (entry)
                                     (= name (first entry)))
                                   und-alist)
@@ -239,12 +239,12 @@
                                    (else	(error "relocation hole in an unexpected segment: "hole-segment))))
              (symbol-index
                (typecase target
-                 (<reloc-symbol>
+                 (<undefined-symbol>
                   (let ((entry (list-find-if (lambda (entry)
-                                               (= (<reloc-symbol>-name target) (first entry)))
+                                               (= (<undefined-symbol>-name target) (first entry)))
                                              und-alist)))
                     (or (and entry (cdr entry))
-                        (error "UND symbol not found in the symbol table: "(<reloc-symbol>-name target)))))
+                        (error "UND symbol not found in the symbol table: "(<undefined-symbol>-name target)))))
                  (<label>
                   (assert (<label>-laddress target)
                           "unresolved label in a relocation: "(<label>-%name target))
@@ -260,7 +260,7 @@
                ;; addend only holds the RIP adjustment (and zero for
                ;; the aarch64 pc-relative forms).
                (typecase target
-                 (<reloc-symbol>
+                 (<undefined-symbol>
                   (case type
                     (plt32		-4)
                     ((adr-prel-lo21 jump26 call26 condbranch19 symbol32 symbol64) 0)
