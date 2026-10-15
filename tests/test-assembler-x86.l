@@ -132,7 +132,7 @@ _start:
   ;; CALL: register
   (CALLQr RAX)
   ;; RET
-  (RETQ)
+  (RET)
   )
 
 ;; ============================================================================
@@ -157,7 +157,7 @@ _start:
   callq *0x0(,%r12,8)
 "
   ;; direct relative calls/jumps
-  (CALLQrel32 0)
+  (CALLrel32 0)
   (JMPrel32 0)
   ;; dispatcher: (D 0 0 0) selects rip+disp32
   (CALLQm 0 0 0 0)

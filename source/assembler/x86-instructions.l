@@ -731,6 +731,7 @@
 (define-function BTSLrm (RS MD MB MI MS)	(_OO_r_X  4011		(rindex/32 RS) MD MB MI MS))
 
 (define-function BSWAPLr (R)			(_OOr 0x0fc8 (rindex/32 R)))
+(define-function CALLrel32 (D)			(_O_rel32 232 D))
 (define-function CALLr (RD)			(_O_Mrm 255 _b11 _b010 (rindex/32 RD)))
 (define-function CALLm (MD MB MI MS)		(_O_r_X 255 _b010 MD MB MI MS))
 (define-function CMPXCHGBrr (RS RD)		(_OO_Mrm 4016 _b11 (rindex/8 RS) (rindex/8 RD)))
@@ -960,14 +961,12 @@
 
 (define-function CALLQr (R) (let () (_REX 0 R 0 0) (CALLr (to-r32 R))))
 (define-function CALLQm (D B I S) (let () (_REX 0 0 I B) (CALLm D (to-r32 B) (to-r32 I) S)))
-(define-function CALLQrel32 (D)			(_O_rel32 232 D))
 (define-function CALLQrip (D)			(_O_r_X 255 _b010 D 0 0 0))
 (define-function INCQr (R) (let () (_REX 1 0 0 R) (_O_Mrm 255 _b11 _b000 (rindex (to-r32 R)))))
 (define-function JMPQr (R) (let () (_REX 0 R 0 0) (JMPr (to-r32 R))))
 (define-function JMPQm (D B I S) (let () (_REX 0 0 I B) (JMPm D (to-r32 B) (to-r32 I) S)))
 (define-function JMPQrip (D)			(_O_r_X 255 _b100 D 0 0 0))
 (define-function LEAQmr (D B I S R) (let () (_REX 1 R I B) (LEALmr D (to-r32 B) (to-r32 I) S (to-r32 R))))
-(define-function LEAVEQ () (LEAVE))
 
 (define-function MOVSBQrr (S D) (let () (_REX 1 S 0 D) (MOVSBLrr S (to-r32 D))))
 ;; movsxd (a.k.a. movslq): unlike MOV, ModRM.reg is the r64 destination
@@ -978,7 +977,6 @@
 (define-function POPQr (R) (let () (_REX 0 0 0 R) (POPLr (to-r32 R))))
 (define-function PUSHQr (R) (let () (_REX 0 0 0 R) (PUSHLr (to-r32 R))))
 (define-function PUSHQi (L) (let () (_REX 1 0 0 0) (PUSHLi L)))
-(define-function RETQ () (RET))
 
 (define-function SALQir (L R)		(_REX 1 0 0 R) (SALLir L (to-r32 R)))
 (define-function SALQrr (S D)		(_REX 1 S 0 D) (SALLrr S (to-r32 D)))

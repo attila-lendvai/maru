@@ -50,9 +50,9 @@
                                 (JNE $2)))
 
 (define-instruction CALL	(false 0 true)
-  ((label)			(CALLQrel32 $1))
+  ((label)			(CALLrel32 $1))
   ((REGISTER)			(CALLQr (<REGISTER>-name $1)))
-  ((reloc-symbol)		(CALLQrel32 $1)))
+  ((reloc-symbol)		(CALLrel32 $1)))
 
 (define-instruction ADD		(true 0 true)
   ;; ((R32 STACK-CELL)		(ADDLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
