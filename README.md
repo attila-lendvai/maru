@@ -42,6 +42,37 @@ useless.
 
 Maru's architecture is described in [doc/how.md](doc/how.md).
 
+#### Compiler-source image (experimental, LLVM/Linux x86-64)
+
+With an existing current-stage evaluator:
+
+```sh
+./build.sh compiler-image
+# First image from ordinary evaluator (Python 3 used once):
+./build.sh compiler-image /path/to/eval1 /path/to/maru0
+# Next generations: embedded Maru generator, no Python/source tree required:
+./build.sh compiler-image --self /path/to/maru0 /path/to/maru1
+./build.sh compiler-image --self /path/to/maru1 /path/to/maru2
+# Three-generation regression:
+./tools-for-build/test-compiler-image.sh /path/to/eval1
+```
+
+Default output: `build/compiler-image/maru-compiler`. The initial image requires
+Python 3 for payload assembly, plus clang and a linker. `--self` uses the previous
+image's embedded Maru generator; only shell tooling and clang/linker are required.
+No historical bootstrap stages are used. The initial build embeds current
+`boot.l`, `source/**/*.l`, generator, manifest and a loader template.
+The image can load these relative paths without external Lisp files; unknown
+paths fall back to ordinary file loading. Embedded paths take precedence.
+
+This interprets compiler Lisp from embedded source, not native compilation of
+the compiler. The embedded Maru generator regenerates the native loader and its
+payload table so each generation retains compiler-image functionality. `--self`
+reproduces the embedded snapshot, NOT current external edits. To incorporate
+working-tree changes use the initial build command with an ordinary evaluator.
+Automatic source-patch admission is not implemented. Original runtime sources
+are not modified during image generation.
+
 #### Build instructions
 
 Table of supported (tested) environments:

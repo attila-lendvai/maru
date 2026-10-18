@@ -10,6 +10,12 @@ echo '******'
 
 set -eu
 
+# Build directly with an existing current-stage evaluator, without historical stages.
+if [ "${1:-}" = "compiler-image" ]; then
+    shift
+    exec "$(dirname "$0")/tools-for-build/build-compiler-image.sh" "$@"
+fi
+
 PREVIOUS_STAGE_BACKEND="-llvm"
 PREVIOUS_STAGE="maru.10"
 BUILD="build"
