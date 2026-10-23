@@ -5,6 +5,12 @@
 
 ;; TODO run-with-stage-1 and the run-with-* is ripe for a cleanup
 
+;; TODO ? introduce some mechanism to set target/arch & co but only
+;; for eval0. rationale: to also be able to test cross-compilation
+;; from an i686 eval0 -> x86_64 eval1. the opposite is already
+;; testable with a simple ./build.sh target/arch=i686 bootstrap x86
+;; linux. see compile-maru/stage-0
+
 (require "source/env-min.l")
 (require "source/sequences.l")
 (require "source/selector.l")

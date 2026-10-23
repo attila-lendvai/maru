@@ -18,3 +18,21 @@
 ;; seems to be broken in maru.9, and the --define interface is not
 ;; compatible (maru.9 lacks the true/false recognition). (evolving)
 (define feature/profiler/build false)
+
+(define-boxed-word <u64>)
+(define-boxed-word <u32>)
+
+(define u8-at memory-block/at)
+(define set-u8-at set-memory-block/at)
+
+(define-function u32-at (obj idx)
+  (error "dummy u32-at called"))
+
+(define-function set-u32-at (obj idx value)
+  (error "dummy set-u32-at called"))
+
+(define-function u64-at (obj idx)
+  (error "dummy u64-at called"))
+
+(define-function set-u64-at (obj idx value)
+  (error "dummy set-u64-at called"))

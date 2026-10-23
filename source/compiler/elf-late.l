@@ -268,16 +268,14 @@
               (char-at		,LOAD-U8)
               (u8-at		,LOAD-U8)
               (u32-at		,LOAD-U32)
-              ,(when-at-expand (feature memory-block)
-                 `(cell-at	,LOAD-CELL))
+              (u64-at		,LOAD-U64)
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
              ((set-char-at	,STORE-U8)
               (set-u8-at	,STORE-U8)
               (set-u32-at	,STORE-U32)
-              ,(when-at-expand (feature memory-block)
-                 `(set-cell-at ,STORE-CELL))
+              (set-u64-at	,STORE-U64)
               (set-oop-at	,STORE-OOP)
              ))))
       (list->array

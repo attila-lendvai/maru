@@ -24,7 +24,7 @@
 ;; Output buffer writers used by the assembler instructions.
 (define-function emit-i8  (value)
   (let ((buf (<assembler>-buffer *assembler*)))
-    (set (memory-block/at buf (memory-block/length buf)) value))
+    (set (u8-at buf (memory-block/length buf)) value))
   (let* ((env (<assembler>-env *assembler*))
          (current (variable-value env '$)))
     (environment-define env '$ (+ 1 current))))

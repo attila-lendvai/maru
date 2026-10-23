@@ -645,13 +645,16 @@
 				(println "	"$reg4" = bitcast i8* "$reg3" to i32*")
 				(println "	"$reg5" = load i32, i32* "$reg4", align 1")
 				(println "	"$reg6" = inttoptr i32 "$reg5" to %oop")))
+
+;; TODO same as LOAD-U32 except the i64
 ;; args: ptr, byteoffset
-(when-at-expand (feature memory-block)
- (define-instruction LOAD-CELL	(true 4 true)
-   ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+(define-instruction LOAD-U64	(true 6 true)
+  ((LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
-				(println "	"$reg4" = load %oop, %oop* "$reg3))))
+				(println "	"$reg4" = bitcast i8* "$reg3" to i64*")
+				(println "	"$reg5" = load i64, i64* "$reg4", align 1")
+				(println "	"$reg6" = inttoptr i64 "$reg5" to %oop")))
 
 ;; args: ptr, celloffset
 (define-instruction LOAD-OOP	(true 4 true)
@@ -683,14 +686,16 @@
 				(println "	store i32 "$reg5", i32* "$reg4", align 1")
 				(println "	"$reg6" = inttoptr i32 "$reg5" to %oop")))
 
+;; TODO same as STORE-U32 except the i64
 ;; args: ptr, byteoffset, value
-(when-at-expand (feature memory-block)
-  (define-instruction STORE-CELL	(true 4 true)
-   ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
+(define-instruction STORE-U64	(true 6 true)
+  ((LOCAL LOCAL LOCAL)		(println "	"$reg1" = bitcast %oop "$1" to [0 x i8]*")
 				(println "	"$reg2" = ptrtoint %oop "$2" to %word")
 				(println "	"$reg3" = getelementptr [0 x i8], [0 x i8]* "$reg1", %word 0, %word "$reg2)
-				(println "	store %oop "$3", %oop* "$reg3)
-				(println "	"$reg4" = bitcast %oop "$3" to %oop"))))
+				(println "	"$reg4" = bitcast i8* "$reg3" to i64*")
+				(println "	"$reg5" = ptrtoint %oop "$3" to i64")
+				(println "	store i64 "$reg5", i64* "$reg4", align 1")
+				(println "	"$reg6" = inttoptr i64 "$reg5" to %oop")))
 
 ;; args: ptr, celloffset, value
 (define-instruction STORE-OOP	(true 4 true)
@@ -1174,16 +1179,14 @@
               (char-at		,LOAD-U8)
               (u8-at		,LOAD-U8)
               (u32-at		,LOAD-U32)
-              ,(when-at-expand (feature memory-block)
-                 `(cell-at	,LOAD-CELL))
+              (u64-at		,LOAD-U64)
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
              ((set-char-at	,STORE-U8)
               (set-u8-at	,STORE-U8)
               (set-u32-at	,STORE-U32)
-              ,(when-at-expand (feature memory-block)
-                 `(set-cell-at ,STORE-CELL))
+              (set-u64-at	,STORE-U64)
               (set-oop-at	,STORE-OOP)
              ))))
       (list->array
