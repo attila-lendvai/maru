@@ -470,13 +470,13 @@
        (assert (<= -0x80000000 value 0xffffffff) "emit-u32: out of range: "value))
      (emit-u16 (bitwise-and 0xffff value))
      (emit-u16 (bitwise-and 0xffff (bitwise-shift value -16))))
-    (<cell-32>
-     (let ((segment (current-segment)))
-       (set (memory-block/at (<segment>-buffer segment)
-                             (<segment>-paddress segment))
-            value)
-       (incr (<segment>-paddress segment) 4)
-       (incr (<segment>-laddress segment) 4)))
+    ;; (<cell-32>
+    ;;  (let ((segment (current-segment)))
+    ;;    (set (memory-block/at (<segment>-buffer segment)
+    ;;                          (<segment>-paddress segment))
+    ;;         value)
+    ;;    (incr (<segment>-paddress segment) 4)
+    ;;    (incr (<segment>-laddress segment) 4)))
     (<label>	(emit-label value emit-u32 4 'abs32))
     (<undefined-symbol>	(%record-relocation value 'symbol32 4 0)
                  (emit-u32 0))
@@ -499,15 +499,15 @@
     (<long>
      (emit-u32 (bitwise-and 0xffffffff value))
      (emit-u32 (bitwise-and 0xffffffff (bitwise-shift value -32))))
-    (<cell-64>
-     ;; (print-all *debug-output* "emit-u64 is storing a <cell-64>: "value
-     ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
-     (let ((segment (current-segment)))
-       (set (memory-block/at (<segment>-buffer segment)
-                             (<segment>-paddress segment))
-            value)
-       (incr (<segment>-paddress segment) 8)
-       (incr (<segment>-laddress segment) 8)))
+    ;; (<cell-64>
+    ;;  ;; (print-all *debug-output* "emit-u64 is storing a <cell-64>: "value
+    ;;  ;;            ", at position: "(<assembler>-paddress *assembler*)"\n")
+    ;;  (let ((segment (current-segment)))
+    ;;    (set (memory-block/at (<segment>-buffer segment)
+    ;;                          (<segment>-paddress segment))
+    ;;         value)
+    ;;    (incr (<segment>-paddress segment) 8)
+    ;;    (incr (<segment>-laddress segment) 8)))
     (<label>	(emit-label value emit-u64 8 'abs64))
     (<undefined-symbol>	(%record-relocation value 'symbol64 8 0)
                  (emit-u64 0))

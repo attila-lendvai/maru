@@ -105,11 +105,12 @@
      ;; TODO add error reporting? this only writes out the lowest
      ;; byte of the value.
      (set (memory-block/at array byteindex) (unbox <long> value)))
-    (<lower-cell>
-     ;; ensure the array has enough capacity
-     (set (memory-block/at array (+ byteindex target/cell-size/bytes)) 0)
-     (set (cell-at (<memory-block>-elements array) byteindex)
-          (unbox <lower-cell> value)))
+    ;; (<lower-cell>
+    ;;  ;; FIXME what is this anomaly?!
+    ;;  ;; ensure the array has enough capacity
+    ;;  (set (memory-block/at array (+ byteindex target/cell-size/bytes)) 0)
+    ;;  (set (cell-at (<memory-block>-elements array) byteindex)
+    ;;       (unbox <lower-cell> value)))
     (else
      (error "set-memory-block/at doesn't know how to handle value: "value)))
   value)
@@ -139,16 +140,16 @@
                (<long>		(unbox <long> value))
                (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
 
-(when-at-expand (feature memory-block)
+;; (when-at-expand (feature memory-block)
 
-;; Read/write a raw arena cell as a boxed <cell-64>. Byte indexed like
-;; [SET-]CELL-AT, and operating on the memory-block's element buffer.
-(define-vm-function (cell-64-at ()) ((array <memory-block>) (byteindex <long>))
-  (box <cell-64> (cell-at (<memory-block>-elements array) byteindex)))
+;; ;; Read/write a raw arena cell as a boxed <cell-64>. Byte indexed like
+;; ;; [SET-]CELL-AT, and operating on the memory-block's element buffer.
+;; (define-vm-function (cell-64-at ()) ((array <memory-block>) (byteindex <long>))
+;;   (box <cell-64> (cell-at (<memory-block>-elements array) byteindex)))
 
-(define-vm-function (set-cell-64-at ()) ((array <memory-block>) (byteindex <long>) (value <cell-64>))
-  (set (cell-at (<memory-block>-elements array) byteindex) (unbox <cell-64> value))
-  value))
+;; (define-vm-function (set-cell-64-at ()) ((array <memory-block>) (byteindex <long>) (value <cell-64>))
+;;   (set (cell-at (<memory-block>-elements array) byteindex) (unbox <cell-64> value))
+;;   value))
 
 (define-function memory-block/ensure-capacity/cell (array cell-index)
   (set (memory-block/at array (- (* (+ cell-index 1) target/cell-size/bytes)
