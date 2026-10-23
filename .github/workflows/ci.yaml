@@ -170,6 +170,9 @@ jobs:
         shell: bash
     env:
       TERM: xterm
+      # Ignore Homebrew's clang config, which pins the CLT SDK. See the
+      # "Align the SDK with the active toolchain" step below.
+      CLANG_NO_DEFAULT_CONFIG: "1"
 
     steps:
       - name: System info
@@ -226,6 +229,18 @@ jobs:
 
       - name: Add Homebrew LLVM to PATH
         run: echo "$(brew --prefix llvm)/bin:$(brew --prefix coreutils)/bin" >> $GITHUB_PATH
+
+      - name: Align the SDK with the active toolchain
+        # Homebrew's clang config pins the CommandLineTools SDK, while
+        # the linker comes from the developer dir selected by
+        # xcode-select. A fresh CLT can therefore ship an SDK that the
+        # selected Xcode's ld cannot read (e.g. macOS 27's arm64e.x1
+        # stubs with Xcode 26). Let clang use the active SDK instead,
+        # as Apple clang does.
+        run: |
+          xcode-select -p
+          sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          echo "SDKROOT=$sdk" | tee -a "$GITHUB_ENV"
 
       - run:  clang --version || true
       - run:  cc --version || true
