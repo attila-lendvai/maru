@@ -59,7 +59,7 @@
   ;; ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
   ;;                                 (unless (= lit 0)
   ;;       			    (ADDLir lit (<REGISTER>-name $1)))))
-  ((R64 STACK-CELL)		(ADDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(ADDQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -73,12 +73,12 @@
                                      (ADDQrr RBX reg))))))
 
 (define-instruction SUB		(true 0 true)
-  ;; ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ;; ((R32 STACK-CELL)		(SUBLmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ;; ;; TODO wtf? the order...
   ;; ((R32 LI32)			(let ((lit (<LITERAL>-value $2)))
   ;;                                 (unless (= lit 0)
   ;;       			    (SUBLir lit (<REGISTER>-name $1)))))
-  ((R64 STACK-CELL)		(SUBQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(SUBQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ;; TODO wtf? the order...
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
@@ -93,7 +93,7 @@
                                      (SUBQrr RBX reg))))))
 
 (define-instruction MULTIPLY	(true 0 true)
-  ((R64 STACK-CELL)		(MULQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(MULQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(cond
                                   ((= 1 (<LITERAL>-value $2))) ; nothing to do
                                   ;; TODO emit shifts when possible
@@ -104,7 +104,7 @@
 ;; the x86 div instruction is unsigned division
 (define-instruction DIVIDE	(true 0 true)
   ((R64 STACK-CELL)		(CQO)
-                                (IDIVQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+                                (IDIVQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(CQO)
                                 (cond
                                   ((= 1 (<LITERAL>-value $2))
@@ -116,7 +116,7 @@
                                    (IDIVQrr RCX (<REGISTER>-name $1))))))
 
 (define-instruction AND		(true 0 true)
-  ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(ANDQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -132,7 +132,7 @@
                                      (ANDQrr RBX reg))))))
 
 (define-instruction OR		(true 0 true)
-  ((R64 STACK-CELL)		(ORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(ORQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -149,7 +149,7 @@
 
 ;; TODO could be simplified with LI and TI base classes
 (define-instruction XOR		(true 0 true)
-  ((R64 STACK-CELL)		(XORQmr (<STACK-CELL>-offset $2) RBP 0 0 (<REGISTER>-name $1)))
+  ((R64 STACK-CELL)		(XORQmr (<STACK-CELL>-offset $2) RBP 0 1 (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2))
                                       (reg (<REGISTER>-name $1)))
                                   (cond
@@ -176,34 +176,34 @@
   ((REGISTER)			(NEGQr (<REGISTER>-name $1))))
 
 (define-instruction ASL		(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 0 RCX)
+  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (SALQrr CL (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
                                   (unless (= 0 lit)
                                     (SALQir lit (<REGISTER>-name $1))))))
 
 (define-instruction ASR		(true 0 true)
-  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 0 RCX)
+  ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (SARQrr CL (<REGISTER>-name $1)))
   ((R64 LI64)			(let ((lit (<LITERAL>-value $2)))
                                   (unless (= 0 lit)
                                     (SARQir lit (<REGISTER>-name $1))))))
 
 (define-instruction ADDR	(false 0 true)
-  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RAX))
+  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 1 RAX))
   ;;((label)			(LEAQmr	$1 0 0 0 RAX))
-  ((STACK-CELL)			(LEAQmr	(<STACK-CELL>-offset $1) RBP 0 0 RAX)))
+  ((STACK-CELL)			(LEAQmr	(<STACK-CELL>-offset $1) RBP 0 1 RAX)))
 
 (define-instruction MOVE	()
-  ((LI64 STACK-CELL)		(MOVQim (<LITERAL>-value $1) (<STACK-CELL>-offset $2) RBP 0 0))
+  ((LI64 STACK-CELL)		(MOVQim (<LITERAL>-value $1) (<STACK-CELL>-offset $2) RBP 0 1))
   ((LI64 R64)			(MOVQir (<LITERAL>-value $1) (<REGISTER>-name $2)))
   ((STACK-CELL STACK-CELL)	(let ((off1 (<STACK-CELL>-offset $1))
                                       (off2 (<STACK-CELL>-offset $2)))
                                   (unless (= off1 off2)
-                                    (MOVQmr off1 RBP 0 0 RCX)
-                                    (MOVQrm RCX off2 RBP 0 0))))
-  ((R64 STACK-CELL)		(MOVQrm (<REGISTER>-name $1) (<STACK-CELL>-offset $2) RBP 0 0))
-  ((STACK-CELL R64)		(MOVQmr (<STACK-CELL>-offset $1) RBP 0 0 (<REGISTER>-name $2)))
+                                    (MOVQmr off1 RBP 0 1 RCX)
+                                    (MOVQrm RCX off2 RBP 0 1))))
+  ((R64 STACK-CELL)		(MOVQrm (<REGISTER>-name $1) (<STACK-CELL>-offset $2) RBP 0 1))
+  ((STACK-CELL R64)		(MOVQmr (<STACK-CELL>-offset $1) RBP 0 1 (<REGISTER>-name $2)))
   ((R64 R64)			(let ((src (<REGISTER>-name $1))
                                       (dst (<REGISTER>-name $2)))
                                   (unless (= src dst)
@@ -214,17 +214,17 @@
   ((LI64)			(if (= 0 (<LITERAL>-value $1))
                                     (XORQrr RAX RAX)
                                   (MOVQir (<LITERAL>-value $1) RAX)))
-  ((STACK-CELL)			(MOVQmr (<STACK-CELL>-offset $1) RBP 0 0 RAX))
+  ((STACK-CELL)			(MOVQmr (<STACK-CELL>-offset $1) RBP 0 1 RAX))
   ((R64)			(MOVQrr (<REGISTER>-name $1) RAX))
-  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RAX)
-                                (MOVQmr 0 RAX 0 0 RAX))
-  ((GLOBAL-ADDR)		(LEAQmr	(<GLOBAL-ADDR>-address $1) 0 0 0 RAX))
+  ((GLOBAL-CELL)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 1 RAX)
+                                (MOVQmr 0 RAX 0 1 RAX))
+  ((GLOBAL-ADDR)		(LEAQmr	(<GLOBAL-ADDR>-address $1) 0 0 1 RAX))
   ;; ((GOT64)			(println "	mov	"$1"@GOTPCREL(%rip), %rax")
   ;;       			(println "	mov	(%rax), %rax"))
   )
 ;; args: dest, value
 (define-instruction STORE	(true 0 false)
-  ((GLOBAL-CELL R64)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 0 RBX)
+  ((GLOBAL-CELL R64)		(LEAQmr	(<GLOBAL-CELL>-address $1) 0 0 1 RBX)
                                 (MOVQrm (<REGISTER>-name $2) 0 RBX 0 1))
   ;; ((GOT64 R64)			(println "	mov	"$1"@GOTPCREL(%rip), %rbx")
   ;;                               (println "	mov	"$2", (%rbx)"))
@@ -280,12 +280,12 @@
 (define-instruction LOAD-U32	(true 0 true)
   ((R64 STACK-CELL)		(MOVQmr (<STACK-CELL>-offset $2) RBP 0 1 RCX)
                                 (LEAQmr 0 (<REGISTER>-name $1) RCX 1 RCX)
-                                (MOVLmr 0 RCX 0 0 EAX))
+                                (MOVLmr 0 RCX 0 1 EAX))
   ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
                                   (if (= 0 offset)
-                                      (MOVLmr 0 (<REGISTER>-name $1) 0 0 EAX)
-                                    (LEAQmr offset (<REGISTER>-name $1) 0 0 RCX)
-                                    (MOVLmr 0 RCX 0 0 EAX)))))
+                                      (MOVLmr 0 (<REGISTER>-name $1) 0 1 EAX)
+                                    (LEAQmr offset (<REGISTER>-name $1) 0 1 RCX)
+                                    (MOVLmr 0 RCX 0 1 EAX)))))
 
 ;; args: ptr, byteoffset, value
 (define-instruction STORE-U32	(true 0 true)
@@ -295,7 +295,7 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
   ((R64 LI64 LI64)		(MOVQir	(<LITERAL>-value $3) RDX)
-                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 0)
+                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
   ((R64 STACK-CELL LI64)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
@@ -304,7 +304,7 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
   ((R64 LI64 STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX)
-                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 0)
+                                (MOVLrm	EDX (<LITERAL>-value $2) (<REGISTER>-name $1) 0 1)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX))))
 
@@ -313,8 +313,8 @@
 (define-instruction LOAD-U64	(true 0 true)
   ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
 				(MOVQmr 0 (<REGISTER>-name $1) RCX 1 RAX))
-  ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX)
-				(MOVQmr 0 RAX 0 0 RAX)))
+  ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 1 RAX)
+				(MOVQmr 0 RAX 0 1 RAX)))
 
 ;; args: ptr, byteoffset, value
 (define-instruction STORE-U64	(true 0 true)
@@ -328,9 +328,9 @@
 				(MOVQmr 0 (<REGISTER>-name $1) RCX 8 RAX))
   ((R64 LI64)			(let ((offset (<LITERAL>-value $2)))
                                   (if (= 0 offset)
-                                      (MOVQmr 0 (<REGISTER>-name $1) 0 0 RAX)
-                                    (LEAQmr (* offset 8) (<REGISTER>-name $1) 0 0 RCX)
-                                    (MOVQmr 0 RCX 0 0 RAX)))))
+                                      (MOVQmr 0 (<REGISTER>-name $1) 0 1 RAX)
+                                    (LEAQmr (* offset 8) (<REGISTER>-name $1) 0 1 RCX)
+                                    (MOVQmr 0 RCX 0 1 RAX)))))
 
 ;; args: ptr, celloffset, value
 (define-instruction STORE-OOP	(true 0 true)
@@ -342,7 +342,7 @@
                                   ;; instead of move'ing into RAX
                                   (MOVQrr	RDX RAX)))
   ((R64 LI64 LI64)		(MOVQir	(<LITERAL>-value $3) RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 0)
+                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 1)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
   ((R64 STACK-CELL LI64)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
@@ -351,7 +351,7 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX)))
   ((R64 LI64 STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RDX) ; value
-                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 0)
+                                (MOVQrm	RDX (* (<LITERAL>-value $2) 8) (<REGISTER>-name $1) 0 1)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX))))
 
@@ -428,7 +428,7 @@
   ;; so, the 8(%rbp) is to undo the push %rbp, so that we
   ;; regain the %rsp value at the entry point to the function.
 
-  (LEAQmr	target/cell-size/bytes RBP 0 0 RAX)
+  (LEAQmr	target/cell-size/bytes RBP 0 1 RAX)
   (set (<compiler>-current-value -c-) op/RAX))
 
 (require "source/compiler/elf-late.l")
