@@ -1000,7 +1000,7 @@ git --no-pager log --pretty=oneline -1")))
            (host-eval	(pop stage0)))
 
       (let ((binary (compile-maru backend platform host-dir host-eval *slave-dir*
-                                  input-file output-name true)))
+                                  input-file output-name false)))
         ($ binary)))))
 
 ;; The standalone ET_DYN emission of the elf backends: it has no link
@@ -1023,7 +1023,7 @@ git --no-pager log --pretty=oneline -1")))
       (let ((prev-emission-type elf-emission-type))
         (set elf-emission-type "standalone")
         (let ((binary (compile-maru backend platform host-dir host-eval *slave-dir*
-                                    input-file output-name true)))
+                                    input-file output-name false)))
           (set elf-emission-type prev-emission-type)
           ($ binary))))))
 
