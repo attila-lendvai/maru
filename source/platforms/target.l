@@ -75,7 +75,7 @@
 
 ;; install stubs for the +special-forms+, and also for some primitive functions,
 ;; so that any accidental use of them will result in an early and useful error message.
-(list-do name '(return address-of u8-at set-u8-at u32-at set-u32-at
+(list-do name '(return address-of u8-at set-u8-at u32-at set-u32-at u64-at set-u64-at
                 arithmethic-shift-left arithmethic-shift-right
                 stack-pointer-on-entry
                 C-string                ; zero terminated C string

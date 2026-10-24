@@ -27,7 +27,8 @@
       (cond
         ((= type <undefined>)		($put-all stream "()"))
         ((= type <long>)		($put-all stream (long->string (unbox <long> obj))))
-        ((= type <lower-cell>)		($put-all stream "0x"(long->string* (unbox <lower-cell> obj) 16)))
+        ((= type <u32>)			($put-all stream "0x"(long->string* (unbox <u32> obj) 16)))
+        ((= type <u64>)			($put-all stream "0x"(long->string* (unbox <u64> obj) 16)))
         ((= type <symbol>)		($put-all stream (<symbol>-name obj)))
 
         ((= type <string>)

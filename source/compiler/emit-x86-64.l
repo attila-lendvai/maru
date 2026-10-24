@@ -308,23 +308,19 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVQrr	RDX RAX))))
 
-(when-at-expand (feature memory-block)
-
-;; TODO these two are the same as the -OOP versions, except the MOV's scale
+;; TODO? these two are the same as the -OOP versions, except the MOV's scale
 ;; args: ptr, byteoffset
-(define-instruction LOAD-CELL	(true 0 true)
+(define-instruction LOAD-U64	(true 0 true)
   ((R64 STACK-CELL)		(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
 				(MOVQmr 0 (<REGISTER>-name $1) RCX 1 RAX))
   ((R64 LI64)			(LEAQmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 RAX)
 				(MOVQmr 0 RAX 0 0 RAX)))
 
 ;; args: ptr, byteoffset, value
-(define-instruction STORE-CELL	(true 0 true)
+(define-instruction STORE-U64	(true 0 true)
   ((R64 STACK-CELL STACK-CELL)	(MOVQmr	(<STACK-CELL>-offset $2) RBP 0 1 RCX)
 				(MOVQmr	(<STACK-CELL>-offset $3) RBP 0 1 RBX)
 				(MOVQrm	RBX 0 (<REGISTER>-name $1) RCX 1)))
-
-) ; (feature memory-block)
 
 ;; args: ptr, celloffset
 (define-instruction LOAD-OOP	(true 0 true)

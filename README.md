@@ -99,13 +99,19 @@ See [the Docker files](tools-for-build/) that are used in the
 CI. Otherwise:
 
 ```
-sudo apt install make time rlwrap
+sudo apt install make time rlwrap diffoscope-minimal
 ```
 
 You will need LLVM, and/or a C compiler:
 
 ```
 sudo apt install llvm clang
+```
+
+32 bit support on an x86_64 host:
+
+```
+sudo apt install libc6-i386 gcc-multilib
 ```
 
 #### MacOS (Darwin)

@@ -281,21 +281,13 @@
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVLrr EDX EAX))))
 
-(when-at-expand (feature memory-block)
+(define-instruction LOAD-U64	(true 0 true)
+  ;; TODO
+  )
 
-;; TODO these two are the same as the -OOP versions, except the MOV's scale
-(define-instruction LOAD-CELL	(true 0 true)
-  ((R32 STACK-CELL)		(MOVLmr	(<STACK-CELL>-offset $2) RBP 0 1 ECX) ; index
-				(MOVLmr 0 (reg64 (<REGISTER>-name $1)) RCX 1 EAX))
-  ((R32 LI64)			(LEALmr	(<LITERAL>-value $2) (<REGISTER>-name $1) 0 0 EAX) ; index
-				(MOVLmr 0 RAX 0 0 EAX)))
-
-(define-instruction STORE-CELL	(true 0 true)
-  ((R32 STACK-CELL STACK-CELL)	(MOVLmr	(<STACK-CELL>-offset $2) RBP 0 1 ECX) ; index
-				(MOVLmr	(<STACK-CELL>-offset $3) RBP 0 1 EBX) ; value
-				(MOVLrm	EBX 0 (reg64 (<REGISTER>-name $1)) RCX 1)))
-
-) ; (feature memory-block)
+(define-instruction STORE-U64	(true 0 true)
+  ;; TODO
+  )
 
 (define-instruction LOAD-OOP	(true 0 true)
   ((R32 STACK-CELL)		(MOVLmr	(<STACK-CELL>-offset $2) RBP 0 1 ECX) ; index

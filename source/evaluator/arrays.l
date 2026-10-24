@@ -9,6 +9,7 @@
         (length-name (concat-symbol basename 'length))
         (append-name (concat-symbol basename 'append))
         (insert-name (concat-symbol basename 'insert))
+        (ensize-name (concat-symbol basename 'ensure-size))
         (zeroed-name (concat-symbol basename 'ensure-zero-terminated)))
     `(let ()
 
@@ -22,27 +23,33 @@
            (and (< idx size)
                 (,accessor elements idx))))
 
-       (define-function ,setter-name (obj idx val)
-         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal (string ,(symbol->string setter-name)) ": called with object of type " (type-of obj) ", index " idx)))
-         (let* ((elements	(slot-value ,type-name elements obj))
+       (define-function ,ensize-name (obj needed-size)
+         (safety 2 (or (is ,type-name obj) (fatal (string ,(symbol->string ensize-name)) ": called with object of type " (type-of obj) ", needed-size " needed-size)))
+         (let* ((needed-capacity (* needed-size ,element-size-in-bytes))
+                (elements	(slot-value ,type-name elements obj))
                 (size		(,length-name obj))
                 (capacity	(if elements
                                     (/ (gc/object-size elements)
                                        ,element-size-in-bytes)
                                   0)))
-           (unless (< idx capacity)
-             (when (= 0 capacity)
+           (unless (<= needed-capacity capacity)
+             (when (zero? capacity)
                (set capacity 4)) ; start from a reasonably not-small number
-             (while (not (< idx capacity))
+             (until (<= needed-capacity capacity)
                (set capacity (* capacity 2)))
              (gc/let* ((new-elements (,@(if elements-are-pointers? '(allocate <data>) '(allocate-data))
-                                        (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
+                                      (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
                (,copier elements new-elements size)
                (set elements (set (slot-value ,type-name elements obj) new-elements))))
-           (when (<= size idx)
-             ;; record the largest ever written index + 1 (aka size) in the size slot
-             (set (slot-value ,type-name size obj) (box <long> (+ 1 idx))))
-           (set (,accessor elements idx) val)))
+           (when (<= size needed-size)
+             ;; we are growing it beyond the current size
+             (set (slot-value ,type-name size obj) (box <long> needed-size)))
+           obj))
+
+       (define-function ,setter-name (obj idx val)
+         (safety 2 (or (and (is ,type-name obj) (<= 0 idx)) (fatal (string ,(symbol->string setter-name)) ": called with object of type " (type-of obj) ", index " idx)))
+         (,ensize-name obj (+ idx 1))  ; ensure space for it
+         (set (,accessor (slot-value ,type-name elements obj) idx) val))
 
        (define-function ,append-name (obj val)
          (,setter-name obj (,length-name obj) val))
@@ -95,66 +102,48 @@
 (define-vm-function (memory-block/length ()) ((array <memory-block>))
   (box <long> (memory-block/length array)))
 
-;; memory-block/at accessor is byte sized, and byte indexed
-(define-vm-function (memory-block/at ()) ((array <memory-block>) (byteindex <long>))
+;; memory-block accessors are byte indexed
+;; TODO memory-block/at should be called u8-at, but the macrology above doesn't allow
+(define-vm-function (u8-at ()) ((array <memory-block>) (byteindex <long>))
   (box <long> (memory-block/at array byteindex)))
 
-(define-vm-function (set-memory-block/at ()) ((array <memory-block>) (byteindex <long>) value)
+(define-vm-function (set-u8-at ()) ((array <memory-block>) (byteindex <long>) (value <long>))
+  ;; TODO? add error reporting for out of range values
+  (set (memory-block/at array byteindex) value)
+  (box <long> value))
+
+(define-vm-function (u32-at ()) ((array <memory-block>) (byteindex <long>))
+  (box <u32> (u32-at (<memory-block>-elements array) byteindex)))
+
+(define-vm-function (set-u32-at ()) ((array <memory-block>) (byteindex <long>) value)
+  (memory-block/ensure-size array (+ byteindex 4))
   (typecase value
     (<long>
-     ;; TODO add error reporting? this only writes out the lowest
-     ;; byte of the value.
-     (set (memory-block/at array byteindex) (unbox <long> value)))
-    ;; (<lower-cell>
-    ;;  ;; FIXME what is this anomaly?!
-    ;;  ;; ensure the array has enough capacity
-    ;;  (set (memory-block/at array (+ byteindex target/cell-size/bytes)) 0)
-    ;;  (set (cell-at (<memory-block>-elements array) byteindex)
-    ;;       (unbox <lower-cell> value)))
+     ;; TODO? add error reporting for out of range values
+     (set (u32-at (<memory-block>-elements array) byteindex) (unbox <long> value)))
+    (<u32>
+     (set (u32-at (<memory-block>-elements array) byteindex) (unbox <u32> value)))
     (else
-     (error "set-memory-block/at doesn't know how to handle value: "value)))
+     (error "set-u32-at: don't know how to handle value: "value)))
   value)
 
-;; cell-at accessor is target cell sized, and byte indexed
-(with-forms
-    ((with-bounds-checking
-         (body
-          `(begin
-             (safety 2 (let ((header (gc/header-of base)))
-                         (assert (and (gc/valid-header-canary? header)
-                                      (<= 0 byteindex)
-                                      (<= (+ byteindex target/cell-size/bytes) (<header>-size header)))
-                                 "[set-]cell-at: trying to access beyond the gc chunk boundaries")))
-             ,@body))))
+(define-vm-function (u64-at ()) ((array <memory-block>) (byteindex <long>))
+  (box <u64> (u64-at (<memory-block>-elements array) byteindex)))
 
-  (define-vm-function (cell-at ()) (base (byteindex <long>))
-    (with-bounds-checking
-        (box <lower-cell> (cell-at base byteindex))))
+(define-vm-function (set-u64-at ()) ((array <memory-block>) (byteindex <long>) value)
+  (memory-block/ensure-size array (+ byteindex 8))
+  (typecase value
+    (<long>
+     ;; TODO? add error reporting for out of range values
+     (set (u64-at (<memory-block>-elements array) byteindex) (unbox <long> value)))
+    (<u64>
+     (set (u64-at (<memory-block>-elements array) byteindex) (unbox <u64> value)))
+    (else
+     (error "set-u64-at: don't know how to handle value: "value)))
+  value)
 
-  (define-vm-function (set-cell-at ()) (base (byteindex <long>) value)
-    (with-bounds-checking
-        (set (cell-at base byteindex)
-             (typecase value
-               (<lower-cell>	(unbox <lower-cell> value))
-               ;; FIXME should it allow <long> at all?
-               (<long>		(unbox <long> value))
-               (else (error "set-cell-at called with an unexpected type: "(type-of value))))))))
-
-;; (when-at-expand (feature memory-block)
-
-;; ;; Read/write a raw arena cell as a boxed <cell-64>. Byte indexed like
-;; ;; [SET-]CELL-AT, and operating on the memory-block's element buffer.
-;; (define-vm-function (cell-64-at ()) ((array <memory-block>) (byteindex <long>))
-;;   (box <cell-64> (cell-at (<memory-block>-elements array) byteindex)))
-
-;; (define-vm-function (set-cell-64-at ()) ((array <memory-block>) (byteindex <long>) (value <cell-64>))
-;;   (set (cell-at (<memory-block>-elements array) byteindex) (unbox <cell-64> value))
-;;   value))
-
-(define-function memory-block/ensure-capacity/cell (array cell-index)
-  (set (memory-block/at array (- (* (+ cell-index 1) target/cell-size/bytes)
-                                1))
-       0))
+(define-function memory-block/ensure-size/cell (array cell-index)
+  (memory-block/ensure-size array (* (+ cell-index 1) target/cell-size/bytes)))
 
 (define-function to-C-strings (obj offset)
   (let ((lower-array (memory-block 4))
@@ -164,7 +153,7 @@
       (<array>
        (let ((limit (+ 1 (array-length obj))))
          (while (< i limit)
-           (memory-block/ensure-capacity/cell lower-array i)
+           (memory-block/ensure-size/cell lower-array i)
            ;; NOTE: we can't cache the elements slot, because it's
            ;; changing when the array grows.
            (set (oop-at (<memory-block>-elements lower-array) i)
@@ -172,7 +161,7 @@
            (incr i))))
       (<pair>
        (while (pair? obj)
-         (memory-block/ensure-capacity/cell lower-array i)
+         (memory-block/ensure-size/cell lower-array i)
          (set (oop-at (<memory-block>-elements lower-array) i)
               (string->C-string (pop obj)))
          (incr i)))

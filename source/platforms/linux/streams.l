@@ -92,13 +92,16 @@
 (define-constant linux/sizeof-statx 256)
 
 (define-vm-function file-modification-time ((path <string>))
+  ;; NOTE: struct statx has the same 256-byte UAPI layout on all
+  ;; arch's where the statx syscall is supported.
   ;; TODO use stack allocation
   (let ((st (allocate-data linux/sizeof-statx)))
     (syscall* linux/SYS_statx linux/AT_FDCWD (string->C-string path) 0
               linux/STATX_BASIC_STATS st)
     ;; KLUDGE FIXME this should be groveled
-    ;; 0x70 is st.stx_mtime.tv_sec, the value is i64
-    (box <long> (cell-at st 0x70))))
+    (let ((mtime-ptr (+ st 0x70)))      ; 0x70 is st.stx_mtime.tv_sec
+      ;; FIXME this is broken on 32 bits
+      (box <long> (u64-at mtime-ptr 0)))))
 
 ;;;
 ;;; <fd-stream> used in the lower (i.e. only the vm-function's need to

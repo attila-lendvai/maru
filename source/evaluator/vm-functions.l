@@ -386,7 +386,8 @@
     (set (oop-at (<memory-block>-elements argv/lower) 0) path/lower)
     ;; NULL terminated
     (let ((i (bytes-to-words (memory-block/length argv/lower))))
-      (memory-block/ensure-capacity/cell argv/lower i)
+      ;; TODO use cell-at here
+      (memory-block/ensure-size/cell argv/lower i)
       (set (oop-at (<memory-block>-elements argv/lower) i) 0))
 
     (box <long> (posix/spawn-program path/lower
