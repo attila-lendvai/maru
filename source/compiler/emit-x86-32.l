@@ -253,6 +253,7 @@
                                      (MOVLrr	EBX EAX))
                                   (MOVBim	(<LITERAL>-value $3) (<LITERAL>-value $2) (reg64 (<REGISTER>-name $1)) 0 1))))
 
+;; TODO? these two are the same as the -OOP versions, except the MOV's scale
 ;; args: ptr, byteoffset
 (define-instruction LOAD-U32	(true 0 true)
   ((R32 STACK-CELL)		(MOVLmr (<STACK-CELL>-offset $2) RBP 0 1 ECX)

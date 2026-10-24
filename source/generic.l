@@ -23,6 +23,8 @@
   `(define ,name (generic ',name (lambda ,@default))))
 
 ;; we store the no-dispatch case at index 0
+;; TODO maybe use/introduce the top type for this and delete the
+;; offsetting complexity?
 (define-constant +multimethod-type-id-offset+ 1)
 
 (define-method add-method <generic> (types method)

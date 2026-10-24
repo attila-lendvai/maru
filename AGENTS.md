@@ -135,27 +135,6 @@ byte-identical to eval2) implicitly; no separate step needed.
 
 - If the prompt indicates that a bug is being fixed, don't write the fix right away. First write the test. Observe it failing. Then write the fix. And observe the test passing.
 
-- When you write a commit message, follow these 7 rules:
- 1) Separate the subject line from the body with a single blank line.
-
- 2) Limit the subject line to 50 characters (72 is the absolute hard limit).
-
- 3) Capitalize the first letter of the subject line.
-
- 4) Do not end the subject line with a period.
-
- 5) Use the following prefixes when appropriate:
-   - CI:
-   - build:
-   - tests:
-   - x86:
-   - arm:
-   - housekeeping - only for trivial changes that cannot break anything, e.g. renames, comments, readme. Do NOT use it for code changes that may break behavior (e.g. reordering compiler internals), even when they are meant to be semantics-preserving; use a subsystem prefix instead.
-
- 6) Wrap the body text manually at 72 characters to prevent Git formatting issues.
-
- 7) Use the body to explain what and why, not the how. Assume the code explains the how; the message must explain the context and reasoning.
-
 - Tests require `tests/infra.l` (or `tests/assembler-infra.l`) and end with `(run-tests)`
 
 - Assembler tests use `verify-encoding` which compares emitted bytes against clang-built references byte-for-byte

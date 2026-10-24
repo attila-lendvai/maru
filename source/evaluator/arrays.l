@@ -1,5 +1,7 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
+;; TODO introduce an array-kind type and turn most of this into mere functions
+;; TODO audit this for the two use-cases: idx is bytes or cells
 ;; TODO this has no proper bounds checking. decide whether it's really a good idea to just return nil when index is out of range
 (define-form define-vector-accessors (type-name basename elements-are-pointers? accessor copier mover element-size-in-bytes)
   ;; TODO this assert itself is broken, probably due to some peciuliarity of define-form/target
