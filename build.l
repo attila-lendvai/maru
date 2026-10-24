@@ -862,10 +862,11 @@ git --no-pager log --pretty=oneline -1")))
     (assert (subtype? (type-of platform) <platform>))
     (let ((eval1 (compile-maru/stage-1 backend platform))
           (eval2 (compile-maru/stage-2 backend platform)))
-      ;; TODO add same-file-contents-or-die for the sources
+      ;; TODO add same-file-contents-or-die for the sources instead of
+      ;; the binaries.
 
       ;; Newer darwin refuses to run binaries without an uuid, so they
-      ;; will never by byte-identical.
+      ;; will never be byte-identical.
       (unless (= host/os "darwin")
         (same-file-contents-or-die eval1 eval2)))))
 
