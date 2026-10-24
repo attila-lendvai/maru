@@ -219,14 +219,15 @@
 ;; ('static), or dynamically against libc.so.6 ('dynamic; the
 ;; default). Only meaningful for C-based platforms; the linux platform
 ;; links freestanding (-nostdlib) regardless.
-(define C-obj/link-type "dynamic")
+;; TODO rename to C-obj/binary-link-type
+(define C-obj/static-linking? false)
 
 (define *input-variables-for-build*
   ;; NOTE: default-backend and default-platform should not matter,
   ;; because they get encoded into the build output path.
   ;; Candidates:
   ;;  - ld.so but that gets set in effective-ld.so, leading to recompiles
-  '(profiler elf-emission-type C-obj/link-type))
+  '(profiler elf-emission-type C-obj/static-linking?))
 
 (define-function save-dep-vars (output-file variables)
   (let ((result ()))
@@ -409,7 +410,7 @@
 (define-function elf-cflags ()
   (concat-strings cflags
                   " -fno-pie -no-pie"
-                  (if (= C-obj/link-type "static") " -static" "")))
+                  (if C-obj/static-linking? " -static" "")))
 
 (define-multimethod cflags-for ((<x86> backend) (<libc> platform))
   (elf-cflags))

@@ -4,7 +4,8 @@
 ;;; relocation ecosystem (the relocatable-elf feature): the ET_DYN
 ;;; standalone image (externals resolved by ld.so at load time), and
 ;;; the ET_REL c-obj object file (externals and internal references
-;;; resolved by the static linker; see C-obj/link-type in build.l).
+;;; resolved by the static linker; see C-obj/static-linking? in
+;;; build.l).
 ;;;
 ;;; Dispatch between the two happens at expansion time on
 ;;; elf-emission-type, which load-platform.l defines before this
