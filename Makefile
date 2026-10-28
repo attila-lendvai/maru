@@ -175,6 +175,15 @@ BACKDATE_FILE	= touch --no-create -t 200012312359
 
 LLC		= llc$(LLVM_VERSION)
 CLANG		= clang$(LLVM_VERSION)
+# The C compiler that grovels $(TARGET)'s ABI (sizes, alignment, and the
+# integer constants of the target's headers) for the cgrov files. Any C99
+# compiler works when it already targets $(TARGET); otherwise fall back to
+# clang's --target, or override CC_FOR_TARGET with a cross toolchain (e.g.
+# CC_FOR_TARGET=aarch64-linux-gnu-gcc).
+CC_DEFAULT_TARGET	= $(shell $(CC) -dumpmachine | sed -e 's/arm64/aarch64/g')
+CC_IS_NATIVE		= $(and $(filter $(TARGET_ARCH)-%,$(CC_DEFAULT_TARGET)),\
+                               $(shell echo $(CC_DEFAULT_TARGET) | grep -q -- -$(TARGET_OS) && echo yes))
+CC_FOR_TARGET		?= $(if $(CC_IS_NATIVE),$(CC),$(CLANG) --target=$(TARGET))
 DIFF		= :
 STRIP		= strip
 
@@ -524,7 +533,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 #	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CGROV_PREPARE)
 	./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
-	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
+	$(CC_FOR_TARGET) -o $<.exe $<.c
 	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
 	./$<.exe >> $@.new
 	mv $@.new $@
