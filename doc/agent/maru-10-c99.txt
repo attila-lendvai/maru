@@ -1,0 +1,512 @@
+# -*- mode: outline; coding: utf-8-unix -*-
+#
+# maru.10.c99: a C implementation of the maru.10 VM, good enough to
+# bootstrap maru.10.
+#
+# Status: in progress. Decisions A3 and B1 are accepted (see below).
+# Driver changes live in the maru.10 branch, everything else here.
+
+* Meta
+
+** Branches
+
+   - maru.10.c99    the C implementation (this project)
+   - maru.10        the stage the C VM must animate; also its own slave
+
+   maru.11 is out of scope: once maru.10 can be built by the C VM, the
+   resulting maru.10 eval is a normal maru.10 host and can bootstrap
+   maru.11 the usual way.
+
+** Definition of done
+
+   M1a (early feedback): maru.10's x86/linux bootstrap runs to a
+   byte-identical fixed point with the C VM as the host, with the
+   generated cgrov .l files pre-seeded as a cache.
+
+   M1b (real definition of done): the same, from a clean maru.10
+   checkout, with the C VM also generating the cgrov .l files. No
+   pre-seeded lisp/data, no maru.10 eval anywhere in the chain.
+
+       cd maru.10
+       make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
+            test-bootstrap-x86
+
+** Why x86/linux
+
+   The linux platform has no define-C-functions (the emitted ELF uses
+   direct syscalls), so no C-function/libffi machinery is needed.
+   The remaining backend (llvm, used for eval0) and the compiler are
+   pure lisp.
+
+** What dropping maru.11 removes
+
+   - no build.l on the C host: no run-program/spawn/fork/exec/pipe,
+     no git/file-mtime dependency tracking, no sequences/files/
+     ansiterm surface for the build system
+   - no previous-stage= plumbing in maru.11
+   - the host never has to print anything but diagnostics (until the
+     cgrov generation step, see P5)
+
+* Design invariants
+
+** I1: the C VM implements maru.10's evaluator natively
+
+   eval/expand/encode/apply cannot come from lisp: at the bottom of the
+   chain there is no compiler for it. C owns exactly what maru.10's
+   compiled `eval` owns:
+
+   - reader (C), printer (C, diagnostics only; lisp printing.l does the
+     real printing)
+   - heap + GC
+   - the type-object machinery primitives (allocate, type-id-of, slots)
+   - expand / encode / eval / apply
+   - the primitives of source/evaluator/vm-functions.l
+   - the few platform primitives that host-executed lisp calls
+
+   Everything else is lisp loaded from the maru.10 checkout: types.l,
+   selector.l, generic.l, printing.l, the compiler, cgrov.
+
+** I2: the branch contains only C (ideal, not dogma)
+
+   eval.c, gc.c, gc.h, buffer.c, chartab.h, mkosdefs.c (+ Makefile,
+   README.md). No lisp copies: drift against maru.10 would be the
+   nastiest bug class here.
+
+** I3: the host dir is a verbatim maru.10 checkout
+
+   For a same-stage bootstrap the host lisp IS the slave lisp, so the
+   host dir can be the maru.10 tree being built (HOST_DIR=$(CURDIR)),
+   with the C-built `eval` copied in as ./eval. No second worktree, no
+   overlay of sources. Details in the decisions section.
+
+** I4: host vs slave type ids
+
+   Only the *mapping* matters between host and slave
+   (%type-id-map/host->slave, register-type, type-object-for-id).
+   Within the host, `type-id-of` (a C primitive) must agree with the
+   ids that the host's types.l assigns, because type-of is
+   `(type-object-for-id (type-id-of obj))` and %types is indexed by it,
+   and because the reader needs <long>/<pair>/<string>/<symbol>/
+   <undefined> ids before types.l runs. So mirror the host types.l
+   allocation order for the builtins and assert the agreement at
+   startup.
+
+** I5: object layout parity (the real contract)
+
+   Only for types that the host instantiates and that the slave's
+   macroexpansion touches:
+
+     type             layout
+     <type>           (id name)
+     <record>         (super direct-slots effective-slots)
+     <immediate-type> <type> + (tag-value tag-width)
+     <boxed-type>     <type> + (one-word?)
+     <data>           ()
+     <undefined>      immediate, whole word 0             => ()
+     <long>           immediate, tag-value 1, tag-width 1
+     <fixed>          (function)
+     <symbol>         (name)                    name is <string>
+     <array>          (size elements)           size boxed <long>,
+                                                elements <data> of oops
+                                                (scanned, not opaque)
+     <memory-block>   (size elements)           elements opaque bytes
+     <string>         (size elements)           size boxed <long>,
+                                                elements opaque bytes
+     <expr>           (parameters body env ctx) [+name, +profiler]
+     <form>           (function symbol)
+     <variable>       (name value env index)
+     <env>            (parent level offset bindings stable) [+name]
+     <context>        (home env bindings callee)
+     <pair>           (head tail)               C may keep a trailing
+                                                source slot for diags
+     <target-function> (program-code)           [+name, +profiler]
+     <lower-cell>     boxed-word (raw payload word)
+
+   Feature flags that change layouts, all on by default in boot.l:
+   debug-info (env.name), track-expr-names (expr.name,
+   target-function.name), profiler (profiler counters). The C side
+   must produce the same slot counts as the lisp side at bootstrap
+   time.
+
+** I6: C mirrors the lisp shape
+
+   Port function by function, keeping the lisp names (expand/pair,
+   encode/pair, apply/expr, find-local-variable, new-variable, ...).
+   eval.l and eval.c must be readable side by side: same argument
+   order, same guard clauses, same comments where they carry meaning.
+
+** I7: the environment topology of maru.10
+
+   - *maru*        primitive env, level 0; parent of maru-user
+   - maru-user     host globals, level 0, name "maru-user"
+   - slave env     created by host-ready.l with parent *maru*,
+                   i.e. the slave does NOT inherit the host's boot.l
+                   definitions; it redefines/borrows explicitly
+   - expand-encode-eval uses (environment *globals* 1 0) per toplevel
+     form, expand/encode/eval with a base-context
+   - `define` encodes into the *dynamic* *globals*, not a C global;
+     host-ready.l and the bootstrapping files depend on that
+
+** I8: the C host is a same-stage host, so the compile is non-evolving
+
+   maru.10's host-extras.l/slave-extras.l exist to bridge from a
+   *maru.9* host: <module>-globals kludges, begin/print-list/
+   lower-cell->long stubs, repl-stream/cell-at stubs. A maru.10-
+   semantics C host must not load them; the compile runs with
+   evolving? = () (default). Only boot.l's verbose message and
+   run-compiler.l's disabled stats mention evolving?, so this is
+   safe. The driver must drop those two files from the file list.
+
+** I9: simplify aggressively
+
+   Delete from the C side everything not needed to animate the lisp:
+
+   - all wchar_t machinery (wcs.c, wcs2mbs/mbs2wcs, locale); strings
+     are byte strings, paths are char*
+   - <double> and the double/float family, long->double,
+     string->double, double->long
+   - <_array>, <subr>
+   - byte-at/short-at/int-at/int32-at/int64-at/long-at/longlong-at/
+     pointer-at/float-at/double-at/longdouble-at/wchar-at + setters
+     (note: char-at/set-char-at are *string* ops in maru.10)
+   - native-call/ffcall/libffi (the x86/linux path never needs them)
+   - save / -l images, -p profiler, `times`
+   - the bracket/brace reader wrappers
+   - the old maru.1 boot.l (deleted; the prelude is maru.10's)
+
+* What the gap actually is (evidence, 2026-10-28)
+
+** First failure
+
+     cd maru.10 && make TEST_EVAL=.../maru.10.c99/eval test-evaluator
+     error: undefined variable: set-if     (boot.l:257)
+
+   boot.l:257 is `(set (feature profiler) (when ...))`. maru.10's
+   expand tries `set-<place-head>` *before* expanding the place, only
+   if the setter exists (as a function or a <form>; here
+   `set-feature`), and descends one step at a time. eval.c still does
+   the maru.1 thing: expand the args, then blindly rewrite the head, so
+   `(when ...)` becomes `(if ...)` and then `set-if`.
+   Port target: eval.l:480-590.
+
+** Other known residue in eval.c
+
+   - expand: no one-step?, no <form> setters, no symbol forms
+     (define-symbol-form / *symform*), no if-at-expand hook, maru.1 let
+     handling
+   - encode: no idempotency, `define` uses a C global instead of
+     *globals*, `set` takes only a symbol, old let env/offset dance, no
+     <form>/<fixed> re-return
+   - eval: no <fixed>-primitive cache, no <context> home/callee
+     discipline, no <target-function>, no <form>
+   - apply: <expr> is (name defn ctx profile) instead of
+     (parameters body env ctx); no apply/expr
+   - types: 16 fixed ids incl. <double>/<_array>/<subr>; maru.1-era
+     define-structure type system
+   - strings: wchar_t; arrays: inline payload, no <data>, no opaque flag
+   - primitives: see inventory
+
+** Special forms are exactly maru.10's <fixed> set
+
+     define lambda let set while if or and quote
+
+   Everything else (car, +, =, not, ...) is an ordinary function.
+   quasiquote/unquote/unquote-splicing are NOT special: boot.l binds
+   quasiquote to a <form>, found by maybe-form-in-env/symbol.
+
+** Primitive delta (109 define-vm-functions vs eval.c)
+
+   keep (verify semantics): car cdr cons set-car set-cdr pair? symbol?
+   string? array? string-length string-at set-string-at array-length
+   array-at set-array-at string-compare string->symbol symbol->string
+   = not + - * / define lambda let set while if and or quote apply
+   eval encode expand defined? type-of read print print-all dump
+   dump-all warn exit abort load allocate oop-at set-oop-at address-of
+   set-working-directory current-globals set-current-globals form
+
+   change: fixed (-> <target-function>), array (-> <array>+<data>),
+   string (same), allocate (dynamic type id + slot count), set
+   (accept <variable>), char-at/set-char-at (string ops in maru.10)
+
+   add: environment environment-define variable allocate-data
+        array-append array-insert
+        string-append string-insert string-insert-all set-string-length
+        number->string integer->string string->number string->integer
+        bitwise-and bitwise-or bitwise-xor bitwise-not bitwise-shift
+        < <= > >= cell-at set-cell-at (stubs ok) copy-oops
+        long->lower-cell lower-cell->long lower/$put-all
+        pointer->target-function
+        memory-block memory-block/at set-memory-block/at
+        memory-block/length memory-block->lower/function
+        working-directory enable-debug-output disable-debug-output
+        call-x86-64-machine-code (JIT only, NOP for M1)
+
+   platform (host side, P5): file-open file-close file-read-byte
+        file-write-byte file-flush file-modification-time file-stream
+        (plus whatever the file/stream lisp needs)
+
+   drop: double/float family, byte-at/int-at family, native-call, subr,
+         subr-name, save, -l, data/data-length, wchar-at, open/close/
+         getb/getc/putb/putc, times, symbol-compare, array-compare,
+         string-copy, allocate-atomic, bracket/brace, format?
+
+* Object model (C side)
+
+** Type ids
+
+   Replace the 16-entry enum with the host types.l order for the
+   builtins (with unused holes where the C side has no such type, and a
+   startup assertion that the lisp side agrees). Keep the C enum as the
+   C-side source of truth; document that the ids are a *host* contract,
+   not a host/slave one.
+
+** Immediates and tagging
+
+   Host side tagging stays: oop = even/aligned pointer, odd = immediate.
+   <long> = (n << 1) | 1 (63 bit on x86_64), () = 0. No boxing of
+   overflow: m10 has no boxed <long>; overflow is a bug.
+   <lower-cell> = boxed-word with a raw payload word.
+
+** Strings
+
+   <string> = <record>(size <long>, elements <data>|()). Byte strings.
+   string(capacity) -> empty string with a data blob of that capacity;
+   growing ops reallocate the blob. string-length reads
+   <string>-size. string->symbol/->string go through <symbol>-name.
+   The C reader produces byte strings; \uXXXX-style escapes are stored
+   as their code point value (maru.10 sources are ASCII).
+
+** Arrays and data blobs
+
+   <array> = <record>(size <long>, elements <data> of oop slots), the
+   blob is *scanned* (that is how array elements stay alive).
+   allocate-data(bytes) allocates an *opaque* <data> blob. The GC
+   branches on the header's opaque flag, not on the type.
+
+** Primitives
+
+   Each primitive is a <target-function>: program-code = <lower-cell>
+   holding a pointer to a C function with signature oop f(oop args, oop
+   ctx). apply() dispatches on <target-function> and calls through it.
+   The nine special forms are wrapped in <fixed>.
+
+* Evaluator port map (lisp -> C), tick as done
+
+   eval.l
+     [ ] setter-name-for, maybe-fn-name-from-expr, attempt-set-convert
+     [ ] expand/pair (let, quote, set, define, lambda, form dispatch)
+     [ ] expand/symbol, expand-all, expand (one-step?, *expanders*)
+     [ ] encode/pair (let two-phase + offsets, lambda, define, set,
+         quote), encode-all, encode/symbol (<form>/<fixed> return,
+         <env>-stable), encode (*encoders*)
+     [ ] eval/pair, eval-all, eval (*evaluators*, <fixed>, variable
+         level delta)
+     [ ] apply, apply/expr (*applicators*, <target-function>,
+         <context>), context, base-context
+     [ ] %new-call-frame / *call-stack* (optional; do not break
+         print-backtrace)
+   env-lower.l
+     [ ] find-local-variable, new-variable, environment-define,
+         defined?, maybe-object-in-variable/env, global-variable?,
+         current-globals, set-current-globals,
+         capture-well-known-globals
+   vm-functions.l
+     [ ] define lambda let set while if or and quote
+     [ ] apply eval expand encode read load
+     [ ] car cdr cons set-car set-cdr pair? symbol? string? array?
+     [ ] + - * / = < <= > >= not bitwise-*
+     [ ] string ops, array ops, string->symbol, symbol->string
+     [ ] allocate allocate-data oop-at set-oop-at copy-oops
+     [ ] memory-block family, lower-cell family, cell-at
+     [ ] environment variable form fixed vm-function
+     [ ] warn print print-all dump dump-all abort exit
+     [ ] current-globals set-current-globals defined?
+     [ ] call-x86-64-machine-code, enable/disable-debug-output
+   vm-early.l / vm-late.l
+     [ ] populate-env-with-maru-primitives equivalent
+     [ ] capture-well-known-globals
+     [ ] initialize-vm / main/common equivalent
+   types.l
+     [ ] host-side <type>/<record>/<immediate-type>/<boxed-type>
+         machinery runs on the C heap (it is lisp; C only provides
+         allocate/type-id-of/slot access)
+   reader
+     [ ] parity with reader.l: [ ] and { } are plain lists, ?c, escapes
+         (\a \b \e \f \n \r \t \v \uXXXX \xHH \ooo), 0x, leading -,
+         |sym|, dot, comments
+   platform (P5)
+     [ ] file-*, working-directory, set-working-directory
+     [ ] streams: <string-stream>, <file-input-stream>, $put/$next/
+         peek/at-end?, stdout printing via lisp println
+
+* Phases and commits
+
+   One commit per phase; intermediate commits need not bootstrap.
+
+** P0 harness    commit: build: add a maru.10.c99 host target
+
+   - Makefile: eval, eval-llvm (maru.10 calls it), eval-ffi? no:
+     minimal: `eval` + `clean` + `test-evaluator`
+   - drop the stale emit.l/eval.l/eval2/eval3 rules
+   - maru.10/Makefile: PREVIOUS_STAGE=maru.10.c99 => HOST_DIR=$(CURDIR),
+     non-evolving file list (drop host-extras.l/slave-extras.l)
+   - fast loop: cd maru.10 && make TEST_EVAL=.../eval test-evaluator
+   - gate: `make` builds; the loop reaches the first semantic gap
+
+** P1 object model    commit: types: adopt the maru.10 object layout
+
+   - drop wchar; byte strings; char* paths
+   - renumber native type ids to the host types.l order + startup
+     assertion (needs P2's prelude to run types.l, so the assertion
+     lands with P2)
+   - layouts per I5; opaqueness flag; allocate/allocate-data/copy-oops
+   - primitives become <target-function>; <fixed> for the nine forms
+   - strings/arrays/target-function rework
+   - gate: eval loads maru.10's boot.l closure (list-min,
+     control-structures, list-basic, destructuring, iteration-min,
+     sequences-basic, types, selector, printing, generic)
+
+** P2 evaluator core    commits (split for reviewability):
+     eval: port maru.10's expander
+     eval: port maru.10's encoder
+     eval: port maru.10's evaluator and apply
+     eval: port the maru.10 vm-functions
+
+   - env-lower.l, then expand, encode, eval/apply, then the primitives
+   - gate: the evaluator-tests that cover expand/encode/let/closures
+
+** P3 tests green    commit: tests: re-enable the remaining evaluator tests
+
+   cd maru.10 && make TEST_EVAL=.../eval test-evaluator
+   Re-enable the commented-out tests as they pass (bitwise-shift,
+   string-insert, array-insert, output-stream, let/bug/2).
+   Do not start P4 before this is green.
+
+** P4 bootstrap maru.10 (M1a)    commit: build: maru.10 x86 linux via the C VM
+
+   make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
+        test-bootstrap-x86
+   with the cgrov .l files pre-seeded (see decision A).
+
+** P5 host file/stream layer (M1b)    commits:
+     platform: file and stream primitives for the host
+     build: generate the cgrov files with the C VM
+
+   - file-open/close/read-byte/write-byte/flush/file-stream
+   - load maru.10's own streams.l/files.l/parser.l in the host, not
+     copies
+   - regenerate the cgrov .l files with the C VM, drop the pre-seed
+   - gate: M1b (clean checkout, no pre-seeded data)
+
+* Decisions (ACCEPTED)
+
+** A = A3: cgrov files, staged
+
+   P4 pre-seeds them so that the evaluator can be validated early; P5
+   implements generation with the C host and deletes the crutch. P5 is
+   part of the definition of done (M1b).
+
+** B = B1: the maru.10 tree is its own host dir
+
+   The C eval is built here and copied into the maru.10 tree as
+   ./eval; HOST_DIR=$(CURDIR) for PREVIOUS_STAGE=maru.10.c99. The
+   maru.10 branch gets the guarded driver change (build ./eval from
+   C99_DIR, and drop host-extras.l/slave-extras.l from the eval0 rules
+   because the C host is a same-stage host, see I8).
+
+** A: options considered
+
+   Background: maru.10 does not check in
+   source/platforms/linux/linux.cgrov.<triple>.l. The Makefile rule
+   runs the host on source/c/compile-cgrov.l, which needs the PEG
+   parser (source/c/cgrov.g.l *is* checked in), parser.l, streams.l,
+   files.l: file-open + <file-input-stream> + stdout println. No
+   process spawning, no libffi.
+
+   A1 pre-seed: drop the generated .l files into the maru.10 checkout
+      once (produced by any working maru.10, e.g. the checked-in
+      eval1.ll).
+      + immediate feedback on the evaluator; smallest P4
+      - the chain is not self-contained; needs a maru.10 binary or
+        committed data; a "clean checkout" bootstrap is impossible
+   A2 implement: make the C host run compile-cgrov.l (P5 work).
+      + M1b is genuinely self-contained; also the first end-to-end
+        exercise of records/generics/closures/streams
+      - pulls a chunk of the host runtime into the critical path
+   A3 (recommended) both, staged: P4 uses A1 to get the fixed point
+      early; P5 implements A2 and deletes the crutch, with a test that
+      regenerates the files from scratch.
+
+** B: options considered
+
+   For M1 host and slave are the same stage, so the host lisp is the
+   slave lisp.
+
+   B1 (recommended) build in the c99 checkout, copy the binary into the
+      maru.10 tree as ./eval, and set HOST_DIR=$(CURDIR) for
+      PREVIOUS_STAGE=maru.10.c99.
+      + no second worktree, no duplicated lisp, no source overlay
+      + the host prelude is by construction the tree under test
+      + the recipe is two commands
+      - the maru.10 tree gains an untracked ./eval (already true of the
+        normal flow: maru.10's own `make` leaves ./eval there)
+      - "host dir == slave dir" is a special case in the Makefile
+        (compile-host in build.l assumes a separate dir; irrelevant now)
+   B2 separate worktree: git worktree add build/maru.10.c99 maru.10,
+      install the C eval there, HOST_DIR=build/maru.10.c99.
+      + exactly mirrors the usual two-tree bootstrap; catches
+        accidental reliance on slave state
+      - one more tree to keep in sync; for a same-stage host it is
+        duplicated lisp
+   B3 overlay the C sources into the host worktree and build in place.
+      + self-contained host dir, no cross-tree path variable
+      - pollutes the maru.10 checkout with untracked C sources, two
+        copies of the C code that can go stale
+      recommended against
+
+   Fallback: if B1 ever causes confusion (e.g. the host picking up
+   half-written slave artifacts), switch to B2; the Makefile change is
+   a two-line variable.
+
+* Verification and debugging toolbox
+
+   - maru.10's own gates: test-evaluator, test-bootstrap-x86 (eval1 vs
+     eval2 .s and stripped binaries), test-parser, test-elf
+   - --define *verbosity* N, -O, expand/encode dumps at verbosity 2
+     (the `;;; expd-->` / `;;; encd-->` prints already exist in eval.l;
+     mirror them in C)
+   - source position tracking on pairs (keep the trailing slot) and in
+     fatal/backtrace, printing the offending form
+   - a C-side trace switch for expand/encode/eval/apply entry
+   - startup self-checks: native type-id vs host types.l <type>-id;
+     slot counts for the I5 table
+   - keep m10's asserts at the host/slave boundary; do not "fix" them
+     in C
+
+* Risks
+
+   - semantic drift between eval.c and eval.l: literal porting (I6) +
+     the test suite + the checklist
+   - bootstrap leakage (type-id map, *globals* switching, <form>
+     objects): keep m10's asserts
+   - performance: the C VM interprets the whole compiler; 10-30x slower
+     than compiled maru is expected. Measure early (eval1.ll / eval1.s
+     wall time)
+   - scope creep into streams/FFI before P4: P4 must only depend on P5
+     for the cgrov crutch
+   - 32-bit immediate <long> is 31 bits; M1 targets x86_64
+
+* Open items
+
+   - keep the trailing <pair> source slot even though maru.10 removed
+     it? (recommend: keep, host-only, for diagnostics)
+   - delete the -p/profiler and save/-l code paths outright?
+     (recommend: delete)
+   - decision A and B above
+   - where the non-evolving file list edit lives: maru.10/Makefile
+     only, or also in a way that build.l would inherit later? (M1:
+     Makefile only)
+
+* Work log
+
+   (append dated notes here while carrying out the phases)

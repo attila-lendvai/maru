@@ -1,7 +1,9 @@
 # Maru (stage 10; written in C)
 
-> **NOTE:** This readme focuses on the aspects of this stage that are relevant for bootstrapping the next stage.
-> The full README.md file can be found in the git branch of the [latest stage](https://github.com/attila-lendvai/maru/).
+> **NOTE:** This readme focuses on the aspects of this stage that are
+> relevant for bootstrapping maru.10. The full README.md file can be
+> found in the git branch of the [latest
+> stage](https://github.com/attila-lendvai/maru/).
 
 ## Reason for this stage
 
@@ -12,36 +14,43 @@ enough to `maru.10` so that it can once again bootstrap the `maru.10`
 stage.
 
 Once it's done it will be possible to bootstrap `maru.10` from
-`maru.9` (and recursively all the way from `maru.0.c99`), **and** also
-in one step from `maru.10.c99`.
+`maru.1.c99` (and recursively all the way from the initial `eval.c`),
+**and** also in one step from `maru.10.c99`.
 
-## Status: WIP
+## Strategy
 
-It's work in progress. It requires complex enough work in C that I
-became uninterested in it for now. I'd much rather work on
-`maru.10.common-lisp` instead.
+This branch is the bottom of the bootstrap chain, so it holds only the
+C implementation of the VM. The lisp that the VM animates (`boot.l`,
+the type system, the compiler, the platform layer, cgrov) is *not*
+copied here on purpose; it is taken from a `maru.10` checkout. Hence:
 
-The TODO is **at least** the following:
+  - the C VM must implement exactly what maru.10's compiled `eval`
+    implements: the reader, the heap/GC, `expand`/`encode`/`eval`/
+    `apply`, and the primitives of
+    `source/evaluator/vm-functions.l`
+  - host and slave may use different type ids, `source/types.l` maps
+    them (`%type-id-map/host->slave`), but the object layout of the
+    types the host instantiates must match the slave's
+  - the C code mirrors the shape of the corresponding lisp, function by
+    function, so that the two can be read side by side
 
-- a potential showstopper: maru.10 sets `*debug-output*`,
-  `*standard-output*`, `*error-output*` to FILE-STREAM instances (that
-  use selectors that get compiled to the lower). What does that mean
-  for eval.c? Is that an opaque enough value that the bootstrap could
-  work with fd's in those variables?
+## Status
 
-- introduce the `[set-]current-globals` primitive functions
+WIP. The milestone is the x86/linux bootstrap of maru.10:
 
-- fix `expand`; see the bug documented in `eval/expand/bug/1` in
-  `tests/evaluator-tests.l`. To run the tests you can use:
-  `make TEST_EVAL=../maru.10.c99/eval test-evaluator`
+    cd ../maru.10
+    make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
+         test-bootstrap-x86
 
-- look through `tests/evaluator-tests.l` and fix tests that turn out
-  to be essential for a successful bootstrap
-  (e.g. `eval/closures/bug/1`?). Hopefully not all of those are
-  essential, because some of the fixes are non-trivial that then need
-  to be backported into the C code, which has substantial differences
-  from `eval.l` in the `maru.10` branch. Consider copying the maru
-  sources into `maru.10.c99`, including the compiler, and patch the
-  maru code with some kludges, instead of backporting non-trivial
-  fixes from `eval.l` into `eval.c`. Whichever is less headache,
-  because `maru.10.c99` is throwaway code.
+x86/linux comes first because its target pipeline has no C FFI.
+
+See `doc/agent/maru-10-c99.txt` for the plan, the porting checklist and
+the debugging notes.
+
+## Usage
+
+    make                                        # builds ./eval
+    make test-evaluator MARU10=/path/to/maru.10
+
+`make test-evaluator` runs maru.10's evaluator tests with this eval,
+and is the semantic gate while porting.
