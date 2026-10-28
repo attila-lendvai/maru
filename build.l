@@ -855,20 +855,31 @@ git --no-pager log --pretty=oneline -1")))
                   *slave-dir* eval1
                   *slave-dir* input-file "eval2" false)))
 
+(define-function %format-duration (ms)
+  (let* ((seconds	(/ ms 1000))
+         (fraction	(number->string (- ms (* seconds 1000)))))
+    (while (< (string-length fraction) 3)
+      (string-insert fraction 0 ?0))
+    (concat-strings (number->string seconds) "." fraction " s")))
+
 (define-function bootstrap args
   (let ((backend  (or (pop args) default-backend))
         (platform (or (pop args) default-platform)))
     (assert (subtype? (type-of backend) <backend>))
     (assert (subtype? (type-of platform) <platform>))
-    (let ((eval1 (compile-maru/stage-1 backend platform))
-          (eval2 (compile-maru/stage-2 backend platform)))
-      ;; TODO add same-file-contents-or-die for the sources instead of
-      ;; the binaries.
+    (let ((start (now/monotonic)))
+      (let ((eval1 (compile-maru/stage-1 backend platform))
+            (eval2 (compile-maru/stage-2 backend platform)))
+        ;; TODO add same-file-contents-or-die for the sources instead of
+        ;; the binaries.
 
-      ;; Newer darwin refuses to run binaries without an uuid, so they
-      ;; will never be byte-identical.
-      (unless (= host/os "darwin")
-        (same-file-contents-or-die eval1 eval2)))))
+        ;; Newer darwin refuses to run binaries without an uuid, so they
+        ;; will never be byte-identical.
+        (unless (= host/os "darwin")
+          (same-file-contents-or-die eval1 eval2)))
+      (print-all *debug-output*
+                 "bootstrap " (to-string backend) " " (to-string platform)
+                 ": " (%format-duration (- (now/monotonic) start)) "\n"))))
 
 (define-function bootstrap-matrix ()
   ;; TODO finish it... it needs to skip cross compilation, etc. this
