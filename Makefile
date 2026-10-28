@@ -43,13 +43,14 @@ test-evaluator : eval
 
 test : test-evaluator
 
-# Reader gate: every lisp file the bootstrap can see must be readable.
+# Reader gate: every lisp file the bootstrap can see must be readable
+# (and printable: -r reads and echoes without evaluating).
 # gen-x86-instructions.l is a stale leftover in maru.10 whose embedded
 # grammar is not lisp; upstream's reader rejects it too.
 test-reader : eval
 	cd $(MARU10) && for f in `git ls-files '*.l'`; do \
 	  case $$f in source/assembler/gen-x86-instructions.l) continue;; esac; \
-	  $(abspath $<) -v $$f >/dev/null || exit 1; \
+	  $(abspath $<) -r $$f >/dev/null || exit 1; \
 	done
 	@echo "reader: ok"
 

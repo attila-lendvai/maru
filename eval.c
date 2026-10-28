@@ -418,6 +418,7 @@ static oop	s_quote, s_quasiquote, s_unquote, s_unquote_splicing, s_dot;
 
 static int	verbosity= 0;
 static int	optimize= 0;
+static int	parseOnly= 0;		/* -r: read and print forms, do not eval */
 
 static void fdump_(FILE *stream, oop obj, int storing);
 
@@ -2532,6 +2533,7 @@ static void processStream(FILE *stream, const char *path, int echoForms)
     if (END == form) break;
     GC_PROTECT(form);
     if (echoForms) { dumplno(form);  fflush(stdout); }
+    if (parseOnly) { GC_UNPROTECT(form);  continue; }
     {
       oop result= expandEncodeEval(form);		GC_PROTECT(result);
       if (echoForms) { printf(" => ");  dumplno(result); }
@@ -2702,6 +2704,7 @@ int main(int argc, char **argv)
     }
     else if (!strcmp(stringCString(arg), "-g"))	optimize= 0;
     else if (!strcmp(stringCString(arg), "-d"))	;
+    else if (!strcmp(stringCString(arg), "-r"))	{ parseOnly= 1;  verbosity= 1; }
     else if (!strcmp(stringCString(arg), "-p"))	;
     else if (!strcmp(stringCString(arg), "--define")) {
       oop name= claPop("--define");
