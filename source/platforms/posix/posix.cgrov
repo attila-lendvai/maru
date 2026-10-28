@@ -16,6 +16,14 @@ integer MAP_FAILED MAP_PRIVATE MAP_ANONYMOUS PROT_READ PROT_WRITE PROT_EXEC
 
 sizes	pid_t
 
+header	time.h
+
+integer CLOCK_MONOTONIC
+
+// needed for sizeof-timespec; C only defines struct timespec
+type	timespec struct timespec
+sizes	timespec
+
 // less $(guix build glibc | tail -n 2 | head -n 1)/include/bits/fcntl-linux.h
 header	fcntl.h
 

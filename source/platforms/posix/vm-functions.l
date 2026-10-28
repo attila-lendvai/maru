@@ -2,6 +2,15 @@
 
 (load (concat-strings "source/platforms/libc/vm-functions.l"))
 
+;; struct timespec is {long tv_sec; long tv_nsec} on all our targets,
+;; i.e. two cells. MS are enough: a 31-bit boxed <long> would overflow
+;; in nanoseconds on i686.
+(define-vm-function now/monotonic ()
+  (let ((ts (allocate-data posix/sizeof-timespec)))
+    (posix/clock_gettime posix/CLOCK_MONOTONIC ts)
+    (box <long> (+ (* (cell-at ts 0) 1000)
+                   (/ (cell-at ts +word-size-in-bytes+) 1000000)))))
+
 (define-function posix/read-byte (fd)
   (let ((byte 0)
         rc)

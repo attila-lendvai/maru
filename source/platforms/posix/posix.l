@@ -6,6 +6,7 @@
 ;;;
 
 (set (feature platform/posix) true)
+(set (feature clock/monotonic) true)
 
 (require "source/platforms/libc/libc.l")
 
@@ -27,6 +28,7 @@
   (pid_t waitpid (pid_t * int))
   (* dlsym (* *))
   (int pipe (*))
+  (int clock_gettime (int *))
   )
 
 ;; functions implemented in posix.c
