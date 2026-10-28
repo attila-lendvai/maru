@@ -187,7 +187,13 @@ CC_DEFAULT_TARGET	= $(shell $(CC) -dumpmachine | sed -e 's/arm64/aarch64/g')
 CC_IS_NATIVE		= $(and $(filter $(TARGET_ARCH)-%,$(CC_DEFAULT_TARGET)),\
                                $(shell echo $(CC_DEFAULT_TARGET) | grep -q -- -$(TARGET_OS) && echo yes))
 CC_FOR_TARGET		?= $(if $(CC_IS_NATIVE),$(CC),$(CLANG) --target=$(TARGET))
+ifeq ($(TARGET_OS),darwin)
+# the darwin linker embeds a random uuid, so the linked binaries are never
+# byte identical; see the -no_uuid note above
 DIFF		= :
+else
+DIFF		= diff --brief --ignore-all-space
+endif
 STRIP		= strip
 
 ASM_FILE_EXT_x86	= s
