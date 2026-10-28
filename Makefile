@@ -120,8 +120,7 @@ TEST_EVAL	= $(GEN_EVAL)
 ##
 ## internal variables
 ##
-PREVIOUS_STAGE	= maru.9
-#PREVIOUS_STAGE	= maru.10.c99
+PREVIOUS_STAGE	= maru.10.c99
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
@@ -134,6 +133,10 @@ C99_DIR		?= $(BUILD)/$(C99_BRANCH)
 ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
   HOST_EXTRAS		=
   SLAVE_EXTRAS		=
+# No point caching eval0 in a build/eval0 worktree: eval0 would be the same
+# stage compiled by the same stage, and the worktree's makefile would still
+# ask for the previous stage as its own host.
+  EVAL0_PHASE		= 1
 # The x86 backend is enough for an x86 target, and it keeps the bootstrap
 # free of an LLVM toolchain. Cross targets still need the llvm backend.
   EVAL0_BACKEND		?= $(if $(filter x86_64 i686,$(TARGET_ARCH)),x86,llvm)
