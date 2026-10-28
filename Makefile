@@ -134,9 +134,15 @@ C99_DIR		?= $(BUILD)/$(C99_BRANCH)
 ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
   HOST_EXTRAS		=
   SLAVE_EXTRAS		=
+# The C host can run the cgrov compiler itself, so there is no need to
+# bootstrap a posix eval (which would recurse back into this rule).
+  CGROV_PREPARE		= $(call ensure-built,$(HOST_DIR)/eval)
+  PEG_PREPARE		= $(call ensure-built,$(HOST_DIR)/eval)
 else
   HOST_EXTRAS		= source/bootstrapping/host-extras.l
   SLAVE_EXTRAS		= source/bootstrapping/slave-extras.l
+  CGROV_PREPARE		= $(MAKE) PLATFORM=posix eval-llvm source/c/cgrov.g.l
+  PEG_PREPARE		= $(MAKE) PLATFORM=posix eval-llvm
 endif
 
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
@@ -498,7 +504,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 
 # compile *.g PEG rules into maru parser implementations
 %.g.l: %.g source/parsing/parser.l source/parsing/peg.g.l source/parsing/compile-peg-grammar.l
-	$(MAKE) PLATFORM=posix eval-llvm
+	$(PEG_PREPARE)
 	./eval -O boot.l source/parsing/compile-peg-grammar.l $< >$@ \
 		|| { $(BACKDATE_FILE) $@; exit 42; }
 
@@ -508,7 +514,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 # KLUDGE do not call the host, use the checked-in eval1.ll to generate the cgrov files
 #	@$(call ensure-built,$(HOST_DIR)/eval)
 #	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
-	$(MAKE) PLATFORM=posix eval-llvm source/c/cgrov.g.l
+	$(CGROV_PREPARE)
 	./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CLANG) --target=$(TARGET) -o $<.exe $<.c
 	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
