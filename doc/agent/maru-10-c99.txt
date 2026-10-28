@@ -538,6 +538,40 @@
        not bootstrap a posix eval when the host is maru.10.c99, and the
        eval0 rules must skip host-extras.l/slave-extras.l.
 
+** Driver cleanups and a one command bootstrap
+
+   - maru.10, four commits:
+     * CC_FOR_TARGET: the groveler no longer hardcodes
+       `clang --target=$(TARGET)`. It asks $(CC) -dumpmachine and only
+       falls back to clang when the compiler does not already target the
+       target's arch and OS. Native builds on any arch now use $(CC).
+     * the `;; target triple:` line is gone: the file name already has the
+       triple, the value disagreed with it, and maru.11 never emitted it.
+     * EVAL0_BACKEND: eval0 can be built by the x86 backend, which makes a
+       native x86 bootstrap free of clang. Only x86 targets, because the
+       x86 backend cannot emit anything else. Defaults to llvm; the c99
+       host switches it to x86 for x86 targets.
+     * the reproducibility check is back on (DIFF = diff --brief
+       --ignore-all-space), except on darwin, where the linker embeds a
+       random uuid (the same reason maru.11 skips the binary comparison).
+   - the c99 branch: `make bootstrap MARU10=...` installs the eval,
+     refreshes the recipe timestamps (so the artifacts that maru.10 ships
+     cannot shortcut the build), and runs test-bootstrap-x86.
+   - verified from a plain maru.10 checkout with CLANG=/nonexistent/clang:
+     five cc calls, no clang, the fixed point passes, and the regenerated
+     eval1.s is byte identical to the committed one.
+
+   Audit of the two older makefile kludges:
+
+   - d302774b (generate cgrov with the checked-in eval1.ll instead of the
+     host) cannot be undone for the maru.9 chain: maru.9's groveler is
+     broken by its own admission (see the TODO above its cgrov rule) and
+     its cgrov.g differs from maru.10's. It is unnecessary for the c99
+     host, where the C eval is exactly the missing current-stage eval.
+   - 38e1ac42 (DIFF=:) was darwin's uuid problem leaking into the linux
+     configuration: both linux chains reproduce themselves byte for byte
+     with either backend.
+
 ** Next
 
    - llvm and libc/posix targets: need C-function/C-variable expansion

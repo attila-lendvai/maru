@@ -36,22 +36,28 @@ copied here on purpose; it is taken from a `maru.10` checkout. Hence:
 
 ## Status
 
-It bootstraps. With the C `eval` installed in a `maru.10` checkout as
-`./eval`:
+It bootstraps maru.10 on x86/linux with nothing but a C99 compiler:
 
-    cd ../maru.10
-    make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
-         DIFF=diff test-bootstrap-x86
+    make bootstrap MARU10=/path/to/maru.10
 
-The C host compiles eval0 (and generates the cgrov constants), eval0
-compiles eval1, eval1 compiles eval2, and eval1 and eval2 are byte
-identical. Note that `DIFF` defaults to `:`, i.e. no comparison.
+`MARU10` must be a maru.10 checkout that knows
+`PREVIOUS_STAGE=maru.10.c99`. The target installs `./eval`, refreshes the
+recipe timestamps so that the generated artifacts that maru.10 ships
+cannot shortcut the build, and runs `test-bootstrap-x86`, whose fixed
+point check is on by default (except on darwin, where the linker embeds a
+random uuid).
 
-x86/linux came first because its target pipeline has no C FFI.
+What happens: the C host compiles eval0, and generates both the cgrov
+constants and the parser sources; eval0 compiles eval1; eval1 compiles
+eval2; eval1 and eval2 come out byte identical. The result is also
+identical to the `eval1.s` that maru.10 has committed.
 
-Still missing: the llvm and libc/posix targets (they need the
-`C-function` machinery), i686/aarch64, the profiler, and
-`make test-bootstrap` in the wider sense.
+Other hosts and cross targets need the llvm backend, and with it clang:
+
+    make bootstrap MARU10=/path/to/maru.10 BOOTSTRAP_TARGETS=test-bootstrap-llvm
+
+Still missing: the libc/posix platforms (they need the `C-function`
+machinery), i686/aarch64, and the profiler.
 
 See `doc/agent/maru-10-c99.txt` for the plan, the porting checklist and
 the debugging notes.
