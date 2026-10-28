@@ -29,10 +29,12 @@
 #define GC_ALIGN	sizeof(long)
 #define GC_MEMORY	0x7fffffff
 #define GC_QUANTUM	50*1024
-#if defined(DEBUGGC)
-# define ALLOCS_PER_GC	1
-#else
-# define ALLOCS_PER_GC	32768
+#ifndef ALLOCS_PER_GC
+# if defined(DEBUGGC)
+#  define ALLOCS_PER_GC	1
+# else
+#  define ALLOCS_PER_GC	32768
+# endif
 #endif
 
 #define VERBOSE		0
@@ -91,6 +93,8 @@ typedef struct _gcfinaliser
 } gcfinaliser;
 
 static gcheader  gcbase= { 0, { -1 }, &gcbase };
+static char	*gcHeapLow= 0, *gcHeapHigh= 0;
+static char	*gcStackBottom= 0;
 static gcheader *gcnext= &gcbase;
 
 static size_t	gcQuantum= GC_QUANTUM;
@@ -175,6 +179,8 @@ GC_API void *GC_malloc(size_t lbs)
     while (incr <= req) incr *= 2;
     //fprintf(stderr, "extending by %ld => %ld @ %d\n", req, incr, (int)(gcCount - gcAllocs));
     hdr= (gcheader *)malloc(incr);
+    if (!gcHeapLow || ((char *)hdr) < gcHeapLow)			gcHeapLow= (char *)hdr;
+    if (!gcHeapHigh || ((char *)hdr + incr) > gcHeapHigh)	gcHeapHigh= (char *)hdr + incr;
     //fprintf(stderr, "buffer at %x\n", (int)hdr);
     if (hdr != (gcheader *)-1)
       {
@@ -348,6 +354,36 @@ GC_API void GC_delete_root(void *root)
 
 GC_API long GC_collections= 0;
 
+/* The host's C code does not maintain precise roots for every local, so
+ * the C stack is scanned conservatively. This is a host-only concession:
+ * the GC of the bootstrapped binary is the precise one in
+ * source/evaluator/gc.l. Candidates are validated against the heap
+ * bounds before they are trusted, so a false positive can only retain
+ * memory, never corrupt anything.
+ */
+GC_API void GC_set_stack_bottom(void *bottom)	{ gcStackBottom= (char *)bottom; }
+
+static void gcScanStack(void)
+{
+  void **cursor, **top;
+  if (!gcStackBottom || !gcHeapLow) return;
+  __builtin_unwind_init();		/* spill callee saved registers */
+  cursor= (void **)&cursor;
+  top= (void **)gcStackBottom;
+  for (; cursor < top; ++cursor) {
+    char	*candidate= (char *)*cursor;
+    gcheader	*header;
+    if (!candidate) continue;
+    if ((uintptr_t)candidate & (GC_ALIGN - 1)) continue;
+    if ((candidate < gcHeapLow + sizeof(gcheader)) || (candidate >= gcHeapHigh)) continue;
+    header= ptr2hdr(candidate);
+    if (((char *)header < gcHeapLow) || ((char *)header >= gcHeapHigh)) continue;
+    if (!header->used) continue;
+    if (header->size > (size_t)(gcHeapHigh - candidate)) continue;
+    GC_mark(candidate);
+  }
+}
+
 GC_API void GC_gcollect(void)
 {
   int i;
@@ -369,6 +405,7 @@ GC_API void GC_gcollect(void)
   }
 #endif
   GC_pre_mark_function();
+  gcScanStack();
 #if VERBOSE >= 1
   fprintf(stderr, "*** GC: mark roots\n");
 #endif

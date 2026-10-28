@@ -35,6 +35,7 @@ GC_API	void   *GC_realloc(void *ptr, size_t lbs);
 GC_API	void   	GC_free(void *ptr);
 GC_API	size_t 	GC_size(void *ptr);
 GC_API	void   	GC_add_root(void *root);
+GC_API	void	GC_set_stack_bottom(void *bottom);
 GC_API	void   	GC_delete_root(void *root);
 GC_API	void   	GC_mark(void *ptr);
 GC_API	void   	GC_mark_leaf(void *ptr);
@@ -111,6 +112,11 @@ extern struct GC_StackRoot *GC_stack_roots;
   static inline void GC_pop_root(struct GC_StackRoot *sr, const char *name, const char *file, int line)
   {
     struct GC_StackRoot *nr= sr->next;
+    if (GC_stack_roots != sr) {
+      fprintf(stderr, "*** %s %d %s: OUT OF ORDER POP (top is %s at %s:%ld)\n",
+	      file, line, name, GC_stack_roots ? GC_stack_roots->name : "?", GC_stack_roots ? GC_stack_roots->file : "?", GC_stack_roots ? GC_stack_roots->line : 0);
+      abort();
+    }
     struct GC_StackRoot *gr= GC_stack_roots;
     if (!sr->live)			{ fprintf(stderr, "*** %s %d %s: STALE POP IN GC_pop_root\n", file, line, name);  goto die; }
     sr->live= 0;
