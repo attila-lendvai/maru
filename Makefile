@@ -134,15 +134,23 @@ C99_DIR		?= $(BUILD)/$(C99_BRANCH)
 ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
   HOST_EXTRAS		=
   SLAVE_EXTRAS		=
-# The C host can run the cgrov compiler itself, so there is no need to
+# The C host runs the cgrov compiler itself, so there is no need to
 # bootstrap a posix eval (which would recurse back into this rule).
   CGROV_PREPARE		= $(call ensure-built,$(HOST_DIR)/eval)
   PEG_PREPARE		= $(call ensure-built,$(HOST_DIR)/eval)
+# The C host also generates the parser sources, so the bootstrap does
+# not depend on the checked in copies of peg.g.l and cgrov.g.l. Using
+# the host eval for that is what keeps %.cgrov.*.l out of a cycle: it
+# needs cgrov.g.l, whose generation would otherwise need eval1, which
+# is what we are building.
+  GEN_EVAL		= $(HOST_DIR)/eval
+  CGROV_DEPS		= source/c/cgrov.g.l
 else
   HOST_EXTRAS		= source/bootstrapping/host-extras.l
   SLAVE_EXTRAS		= source/bootstrapping/slave-extras.l
   CGROV_PREPARE		= $(MAKE) PLATFORM=posix eval-llvm source/c/cgrov.g.l
   PEG_PREPARE		= $(MAKE) PLATFORM=posix eval-llvm
+  CGROV_DEPS		=
 endif
 
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
@@ -510,7 +518,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 
 # compile *.cgrov files into *.cgrov.l
 # Must use the host eval if we want to use its output while building this stage.
-%.cgrov.$(TARGET).l: %.cgrov
+%.cgrov.$(TARGET).l: %.cgrov $(CGROV_DEPS)
 # KLUDGE do not call the host, use the checked-in eval1.ll to generate the cgrov files
 #	@$(call ensure-built,$(HOST_DIR)/eval)
 #	cd $(HOST_DIR) && make TARGET_ARCH=$(shell uname -m) PLATFORM=libc source/c/cgrov.g.l && ./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
