@@ -11,9 +11,11 @@
 CC	?= cc
 BUILD	?= build
 
-OFLAGS	?= -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS	?= -std=c99 -Wall -Wno-comment -g $(OFLAGS)
-LIBS	?= -lm -lffi -ldl
+# NOTE no -DNDEBUG: the typechecking accessors are the main safety net
+# while the object layout is being ported.
+OFLAGS	?= -O2
+# -Wdangling-pointer misfires on the GC_PROTECT/GC_UNPROTECT pattern
+CFLAGS	?= -std=c99 -Wall -Wno-comment -Wno-dangling-pointer -g $(OFLAGS)
 
 # a maru.10 checkout, used by the tests
 MARU10	?= ../maru.10
@@ -25,7 +27,7 @@ all : eval
 eval : $(BUILD)/eval1
 	cp $< $@
 
-$(BUILD)/eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
+$(BUILD)/eval1 : eval.c gc.c gc.h buffer.c chartab.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
@@ -40,6 +42,16 @@ test-evaluator : eval
 	cd $(MARU10) && $(abspath $<) boot.l tests/evaluator-tests.l
 
 test : test-evaluator
+
+# Reader gate: every lisp file the bootstrap can see must be readable.
+# gen-x86-instructions.l is a stale leftover in maru.10 whose embedded
+# grammar is not lisp; upstream's reader rejects it too.
+test-reader : eval
+	cd $(MARU10) && for f in `git ls-files '*.l'`; do \
+	  case $$f in source/assembler/gen-x86-instructions.l) continue;; esac; \
+	  $(abspath $<) -v $$f >/dev/null || exit 1; \
+	done
+	@echo "reader: ok"
 
 clean :
 	rm --force $(BUILD)/eval1 eval

@@ -71,13 +71,13 @@ extern struct GC_StackRoot *GC_stack_roots;
 
 #if defined(NDEBUG)
 
-  GC_API inline void GC_push_root(struct GC_StackRoot *sr)
+  static inline void GC_push_root(struct GC_StackRoot *sr)
   {
     sr->next= GC_stack_roots;
     GC_stack_roots= sr;
   }
 
-  GC_API inline void GC_pop_root(struct GC_StackRoot *sr)
+  static inline void GC_pop_root(struct GC_StackRoot *sr)
   {
 #  if 0
     GC_stack_roots= sr->next;
@@ -89,7 +89,7 @@ extern struct GC_StackRoot *GC_stack_roots;
 
 #else
 
-  GC_API inline void GC_push_root(struct GC_StackRoot *sr, const char *name, const char *file, int line)
+  static inline void GC_push_root(struct GC_StackRoot *sr, const char *name, const char *file, int line)
   {
     sr->next= GC_stack_roots;
     sr->name= name;
@@ -108,7 +108,7 @@ extern struct GC_StackRoot *GC_stack_roots;
     return 0;
   }
 
-  GC_API inline void GC_pop_root(struct GC_StackRoot *sr, const char *name, const char *file, int line)
+  static inline void GC_pop_root(struct GC_StackRoot *sr, const char *name, const char *file, int line)
   {
     struct GC_StackRoot *nr= sr->next;
     struct GC_StackRoot *gr= GC_stack_roots;
