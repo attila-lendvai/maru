@@ -509,4 +509,39 @@
 
 * Work log
 
-   (append dated notes here while carrying out the phases)
+** 2026-10-28: M1 done
+
+   - P0-P3 done: the C VM runs boot.l's closure and the whole evaluator
+     test suite (also with a collection every 97 allocations).
+   - P4/P5 done, and P5 is not a crutch: the C host generates the cgrov
+     constants itself (it needed the file/stream lisp and a few raw
+     accessors), so M1b is the state of the tree.
+   - The fixed point holds on x86/linux:
+
+       cd maru.10
+       make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
+            DIFF=diff test-bootstrap-x86
+       cmp build/x86-linux/*/eval1.s build/x86-linux/*/eval2.s
+
+     eval1 also runs the evaluator test suite.
+   - Things worth remembering:
+     * the host GC scans the C stack conservatively (the precise GC is
+       the target's); see the note in gc.c
+     * `-v` must not echo forms to stdout when compiling: the compiler's
+       output goes there. the echo is interactive-repl only now.
+     * process-command-line-arguments captures the CLA *variable*: the
+       globals env switches while an argument is being processed.
+     * the target env resolves operator names (cell-at, byte-at, ...)
+       through the slave env down to the host *maru*, so the host must
+       provide the raw accessors the compiler looks up.
+     * the maru.10 makefile gets two guarded changes: the cgrov rule must
+       not bootstrap a posix eval when the host is maru.10.c99, and the
+       eval0 rules must skip host-extras.l/slave-extras.l.
+
+** Next
+
+   - llvm and libc/posix targets: need C-function/C-variable expansion
+     time support and a <C-function> applicator (libffi or direct).
+   - i686 / aarch64 cross.
+   - `target/arch=aarch64 test-compiler arm linux` style checks.
+   - decide whether the C side keeps its own `t`/`true` handling etc.

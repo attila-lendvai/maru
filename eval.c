@@ -775,6 +775,7 @@ static void dumplno(oop obj)			{ dump_(stdout, obj);  putchar('\n');  fflush(std
 
 static oop	theMaru= nil;		/* *maru*: the primitive env, level 0 */
 static oop	theGlobals= nil;	/* *globals*: the current global env */
+static oop	claVariable= nil;	/* the *command-line-arguments* variable */
 static oop	theEnd= nil;		/* +end+: an uninterned symbol */
 
 static oop	expandersVar= nil, encodersVar= nil, evaluatorsVar= nil, applicatorsVar= nil;
@@ -798,7 +799,7 @@ static oop eval(oop exp, oop ctx);
 static oop apply(oop fun, oop args, oop ctx);
 static oop expandEncodeEvalIn(oop form, oop env);
 static oop expandEncodeEval(oop form);
-static void processStream(FILE *stream, const char *path);
+static void processStream(FILE *stream, const char *path, int echoForms);
 
 static oop newEnvironment(oop parent, long level, long offset)
 {
@@ -1727,6 +1728,46 @@ static oop prim_copy_oops(oop args, oop ctx)
   return nil;
 }
 
+/* source/evaluator/arrays.l: raw cell access (the host's counterpart of
+ * the compiler's LOAD-CELL/STORE-CELL operators) */
+static oop prim_cell_at(oop args, oop ctx)
+{
+  oop	 base= car(args);
+  size_t byteIndex= getLong(car(cdr(args)));
+  (void)ctx;
+  return newLowerCell(*(void **)((char *)base + byteIndex));
+}
+
+static oop prim_set_cell_at(oop args, oop ctx)
+{
+  oop	 base= car(args);
+  size_t byteIndex= getLong(car(cdr(args)));
+  oop	 value= car(cdr(cdr(args)));
+  void **cell= (void **)((char *)base + byteIndex);
+  (void)ctx;
+  if (is(LowerCell, value))	*cell= get(value, LowerCell,word);
+  else				*cell= (void *)(uintptr_t)getLong(value);
+  return value;
+}
+
+static oop prim_byte_at(oop args, oop ctx)
+{
+  oop	 base= car(args);
+  size_t index= getLong(car(cdr(args)));
+  (void)ctx;
+  return newLong((unsigned char)((char *)base)[index]);
+}
+
+static oop prim_set_byte_at(oop args, oop ctx)
+{
+  oop	 base= car(args);
+  size_t index= getLong(car(cdr(args)));
+  oop	 value= car(cdr(cdr(args)));
+  (void)ctx;
+  ((char *)base)[index]= (char)getLong(value);
+  return value;
+}
+
 /*; strings */
 static oop prim_string(oop args, oop ctx)
 {
@@ -2221,7 +2262,7 @@ static oop prim_load(oop args, oop ctx)
   if (!is(String, path)) fatal("load: not a string");
   stream= fopen(cpath, "r");
   if (!stream) fatal("load: cannot open %s", cpath);
-  processStream(stream, cpath);
+  processStream(stream, cpath, 0);
   fclose(stream);
   currentPath= prevPath;
   sourceLine= prevLine;
@@ -2373,6 +2414,10 @@ static primitive_t primitives[]= {
   { "oop-at",			prim_oop_at,			0 },
   { "set-oop-at",		prim_set_oop_at,		0 },
   { "copy-oops",		prim_copy_oops,			0 },
+  { "cell-at",			prim_cell_at,			0 },
+  { "set-cell-at",		prim_set_cell_at,		0 },
+  { "byte-at",			prim_byte_at,			0 },
+  { "set-byte-at",		prim_set_byte_at,		0 },
 
   { "string",			prim_string,			0 },
   { "string-length",		prim_string_length,		0 },
@@ -2477,17 +2522,19 @@ static void instantiatePrimitives(void)
 ;;; main
 */
 
-static void processStream(FILE *stream, const char *path)
+/* echoForms mirrors the interactive repl-stream: the echoed forms must
+ * never pollute stdout, which is where the compiler's output goes. */
+static void processStream(FILE *stream, const char *path, int echoForms)
 {
   setCurrentSource(path);
   for (;;) {
     oop form= readForm(stream);
     if (END == form) break;
     GC_PROTECT(form);
-    if (verbosity) { dumplno(form);  fflush(stdout); }
+    if (echoForms) { dumplno(form);  fflush(stdout); }
     {
       oop result= expandEncodeEval(form);		GC_PROTECT(result);
-      if (verbosity) { printf(" => ");  dumplno(result); }
+      if (echoForms) { printf(" => ");  dumplno(result); }
       GC_UNPROTECT(result);
     }
     GC_UNPROTECT(form);
@@ -2504,7 +2551,7 @@ static void processFile(const char *path)
     perror(path);
     exit(1);
   }
-  processStream(stream, path);
+  processStream(stream, path, 0);
   fclose(stream);
 }
 
@@ -2529,6 +2576,7 @@ static void initialize(void)
   GC_add_root(&theMaru);
   GC_add_root(&theGlobals);
   GC_add_root(&theEnd);
+  GC_add_root(&claVariable);
 
   END= _newBits(Data, 8, __FILE__, __LINE__);
   END_OF_LIST= _newBits(Data, 8, __FILE__, __LINE__);
@@ -2561,7 +2609,9 @@ static void initialize(void)
 
   {
     oop name= newString("+end+");			GC_PROTECT(name);
-    theEnd= newSymbol(name);
+    environmentDefine(theMaru, intern("*maru*"), theMaru);
+
+  theEnd= newSymbol(name);
     GC_UNPROTECT(name);
   }
   environmentDefine(theMaru, intern("+end+"), theEnd);
@@ -2602,38 +2652,73 @@ static void initialize(void)
     fatal("initialize: failed to instantiate the fixed vm-functions");
 }
 
+/* see claVariable: process-command-line-arguments captures the variable,
+ * because the *globals* env may switch while an argument is processed */
+static oop claValue(void)	{ return get(claVariable, Variable,value); }
+
+static oop claPop(const char *who)
+{
+  oop variable= claVariable;
+  oop list= get(variable, Variable,value);
+  oop arg;
+  if (!isPair(list)) fatal("%s: missing command line argument", who);
+  arg= car(list);
+  if (!is(String, arg)) fatal("%s: command line argument is not a string", who);
+  set(variable, Variable,value, cdr(list));
+  return arg;
+}
+
+/* source/evaluator/vm-with-file-support.l: process-command-line-arguments.
+ * NOTE the loop reads the variable every round: the lisp that runs while
+ * an argument is being processed may consume further arguments from it.
+ */
 int main(int argc, char **argv)
 {
   GC_set_stack_bottom(&argc);
   initialize();
   signal(SIGINT, sigint);
 
-  while (--argc) {
-    char *arg= *++argv;
-    if      (!strcmp(arg, "-v"))	{ ++verbosity;  set(environmentDefine(theMaru, intern("*verbosity*"), nil), Variable,value, newLong(verbosity)); }
-    else if (!strcmp(arg, "-O"))	{ ++optimize;   set(environmentDefine(theMaru, intern("*optimised*"), nil), Variable,value, newLong(optimize)); }
-    else if (!strcmp(arg, "-g"))	optimize= 0;
-    else if (!strcmp(arg, "-d"))	;
-    else if (!strcmp(arg, "-p"))	;
-    else if (!strcmp(arg, "--define")) {
-      if (argc < 3) fatal("--define requires two arguments");
-      defineCLArgument(argv[1], argv[2]);
-      argv+= 2;  argc-= 2;
+  {
+    oop arguments= nil;					GC_PROTECT(arguments);
+    int index;
+    for (index= argc - 1; 0 < index; --index)
+      arguments= newPair(newString(argv[index]), arguments);
+    claVariable= environmentDefine(theGlobals, intern("*command-line-arguments*"), arguments);
+    GC_UNPROTECT(arguments);
+  }
+
+  for (;;) {
+    oop arg;
+    if (!isPair(claValue())) break;
+    arg= claPop("main");
+
+    if      (!strcmp(stringCString(arg), "-v")) {
+      ++verbosity;
+      set(environmentDefine(theMaru, intern("*verbosity*"), nil), Variable,value, newLong(verbosity));
     }
-    else if (!strcmp(arg, "--call")) {
-      if (argc < 2) fatal("--call requires an argument");
-      {
-	oop form= newPair(intern(*++argv), nil);	GC_PROTECT(form);
-	expandEncodeEval(form);
-	GC_UNPROTECT(form);
-      }
-      --argc;
+    else if (!strcmp(stringCString(arg), "-O")) {
+      ++optimize;
+      set(environmentDefine(theMaru, intern("*optimised*"), nil), Variable,value, newLong(optimize));
     }
-    else if (!strcmp(arg, "-")) {
+    else if (!strcmp(stringCString(arg), "-g"))	optimize= 0;
+    else if (!strcmp(stringCString(arg), "-d"))	;
+    else if (!strcmp(stringCString(arg), "-p"))	;
+    else if (!strcmp(stringCString(arg), "--define")) {
+      oop name= claPop("--define");
+      oop value= claPop("--define");
+      defineCLArgument(stringCString(name), stringCString(value));
+    }
+    else if (!strcmp(stringCString(arg), "--call")) {
+      oop name= claPop("--call");
+      oop form= newPair(intern(stringCString(name)), nil);	GC_PROTECT(form);
+      expandEncodeEval(form);
+      GC_UNPROTECT(form);
+    }
+    else if (!strcmp(stringCString(arg), "-")) {
       if (isatty(0)) printf("maru> ");
-      processStream(stdin, "<stdin>");
+      processStream(stdin, "<stdin>", 1);
     }
-    else processFile(arg);
+    else processFile(stringCString(arg));
   }
   return 0;
 }

@@ -36,13 +36,22 @@ copied here on purpose; it is taken from a `maru.10` checkout. Hence:
 
 ## Status
 
-WIP. The milestone is the x86/linux bootstrap of maru.10:
+It bootstraps. With the C `eval` installed in a `maru.10` checkout as
+`./eval`:
 
     cd ../maru.10
     make PLATFORM=linux PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
-         test-bootstrap-x86
+         DIFF=diff test-bootstrap-x86
 
-x86/linux comes first because its target pipeline has no C FFI.
+The C host compiles eval0 (and generates the cgrov constants), eval0
+compiles eval1, eval1 compiles eval2, and eval1 and eval2 are byte
+identical. Note that `DIFF` defaults to `:`, i.e. no comparison.
+
+x86/linux came first because its target pipeline has no C FFI.
+
+Still missing: the llvm and libc/posix targets (they need the
+`C-function` machinery), i686/aarch64, the profiler, and
+`make test-bootstrap` in the wider sense.
 
 See `doc/agent/maru-10-c99.txt` for the plan, the porting checklist and
 the debugging notes.
