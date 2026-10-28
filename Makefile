@@ -134,6 +134,9 @@ C99_DIR		?= $(BUILD)/$(C99_BRANCH)
 ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
   HOST_EXTRAS		=
   SLAVE_EXTRAS		=
+# The x86 backend is enough for an x86 target, and it keeps the bootstrap
+# free of an LLVM toolchain. Cross targets still need the llvm backend.
+  EVAL0_BACKEND		?= $(if $(filter x86_64 i686,$(TARGET_ARCH)),x86,llvm)
 # The C host runs the cgrov compiler itself, so there is no need to
 # bootstrap a posix eval (which would recurse back into this rule).
   CGROV_PREPARE		= $(call ensure-built,$(HOST_DIR)/eval)
@@ -201,12 +204,19 @@ SLAVE_DIR	= $(CURDIR)
 # $(info $$BUILD_llvm is [${BUILD_llvm}])
 # $(info $$BITCODE_DIR is [${BITCODE_DIR}])
 
+# The backend of eval0, the binary that the previous stage compiles. It
+# runs on the host, so it must be built for the host's architecture, and it
+# compiles for the target, so the backend must support the target's
+# architecture too. Only the llvm backend can emit anything other than x86,
+# hence the x86 backend is only an option for x86 targets.
+EVAL0_BACKEND	?= llvm
+
 #EVAL0_PHASE=1
 ifdef EVAL0_PHASE
   # This way eval0 is built each time
   EVAL0_DIR	?= $(SLAVE_DIR)
-  EVAL0_BINARY	?= eval0-llvm
-  EVAL0		?= $(BUILD_llvm)/eval0
+  EVAL0_BINARY	?= eval0-$(EVAL0_BACKEND)
+  EVAL0		?= $(BUILD_$(EVAL0_BACKEND))/eval0
 else
   # This way eval0 is built from the latest commit, checked out as a
   # working dir in build/eval0 and 'make update-eval0' must be used to
@@ -214,7 +224,7 @@ else
   # dealing with sensitive bootstrapping issues, but then you can just
   # switch to build eval0 each time.
   EVAL0_DIR	?= $(CURDIR)/$(BUILD)/eval0
-  EVAL0_BINARY	?= eval0-llvm
+  EVAL0_BINARY	?= eval0-$(EVAL0_BACKEND)
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
