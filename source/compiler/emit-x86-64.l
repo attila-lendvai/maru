@@ -57,8 +57,9 @@
   ((STACK-CELL)			(println "	mulq	"$1)))
 
 (define-instruction/emit-forms DIV 0
-  ((STACK-CELL)			(println "	xor	%rdx, %rdx")
-                                (println "	divq	"$1)))
+  ;; sign extend the dividend in %rax into %rdx:%rax
+  ((STACK-CELL)			(println "	cqto")
+                                (println "	idivq	"$1)))
 
 (define-instruction ADDR	(false 0 true)
   ((GLOBAL-CELL)		(println "	lea	"$1"(%rip), %rax"))
