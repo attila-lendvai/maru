@@ -17,8 +17,13 @@ OFLAGS	?= -O2
 # -Wdangling-pointer misfires on the GC_PROTECT/GC_UNPROTECT pattern
 CFLAGS	?= -std=c99 -Wall -Wno-comment -Wno-dangling-pointer -g $(OFLAGS)
 
-# a maru.10 checkout, used by the tests
+# a maru.10 checkout, used by the tests and by the bootstrap
 MARU10	?= ../maru.10
+
+# The bootstrap runs a maru.10 makefile target. linux is the platform that
+# is verified to work without C FFI; see doc/agent/maru-10-c99.txt.
+PLATFORM	?= linux
+BOOTSTRAP_TARGETS ?= test-bootstrap-x86
 
 .SUFFIXES :
 
@@ -42,6 +47,21 @@ test-evaluator : eval
 	cd $(MARU10) && $(abspath $<) boot.l tests/evaluator-tests.l
 
 test : test-evaluator
+
+# Bootstrap maru.10 with this eval as the host. MARU10 must point at a
+# maru.10 checkout that knows PREVIOUS_STAGE=maru.10.c99. On x86 this needs
+# nothing but a C compiler; other hosts and cross targets need clang for
+# the llvm backend:
+#
+#   make bootstrap MARU10=/path/to/maru.10
+#   make bootstrap MARU10=/path/to/maru.10 BOOTSTRAP_TARGETS=test-bootstrap-llvm
+bootstrap : eval
+	cp eval $(MARU10)/eval
+# refresh the recipe timestamps: maru.10 ships generated artifacts (eval1.s,
+# eval1.ll, cgrov.g.l) that would otherwise shortcut the bootstrap
+	cd $(MARU10) && find source boot.l -type f -exec touch {} +
+	cd $(MARU10) && $(MAKE) PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
+		PLATFORM=$(PLATFORM) $(BOOTSTRAP_TARGETS)
 
 # Reader gate: every lisp file the bootstrap can see must be readable
 # (and printable: -r reads and echoes without evaluating).
