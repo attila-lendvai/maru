@@ -14525,8 +14525,8 @@ m_L1197:
 	mov	-16(%rbp), %rax
 	mov	%rax, -32(%rbp)
 	mov	-8(%rbp), %rax
-	xor	%rdx, %rdx
-	divq	-32(%rbp)
+	cqto
+	idivq	-32(%rbp)
 	mov	%rax, -32(%rbp)
 	movq	-32(%rbp), %rdi
 	movq	-16(%rbp), %rsi
@@ -32558,8 +32558,8 @@ m_L2810:
 	sar	$1, %rax
 	mov	%rax, -32(%rbp)
 	mov	-24(%rbp), %rax
-	xor	%rdx, %rdx
-	divq	-32(%rbp)
+	cqto
+	idivq	-32(%rbp)
 	mov	%rax, -24(%rbp)
 m_L2811:
 	movq	-8(%rbp), %rdi
