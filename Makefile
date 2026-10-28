@@ -1,79 +1,46 @@
-BUILD = build
+# -*- makefile -*-
+#
+# The C implementation of the maru.10 VM.
+#
+# This is the bottom of the bootstrap chain: `make` produces an `eval`
+# binary that animates maru.10's lisp sources (its type system, its
+# compiler, its platform layer). The lisp is deliberately not copied
+# into this branch: point the build at a maru.10 checkout instead. See
+# README.md and doc/agent/maru-10-c99.txt.
 
-NOW = $(shell date '+%Y%m%d.%H%M')
-SYS = $(shell uname)
+CC	?= cc
+BUILD	?= build
 
-OFLAGS = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS = -std=c99 -Wall -Wno-comment -g $(OFLAGS)
-CC32 = $(CC) -m32
+OFLAGS	?= -O3 -fomit-frame-pointer -DNDEBUG
+CFLAGS	?= -std=c99 -Wall -Wno-comment -g $(OFLAGS)
+LIBS	?= -lm -lffi -ldl
 
-ifeq ($(findstring MINGW32,$(SYS)),MINGW32)
-LIBS = -lm -lffi libw32dl.a
-TIME =
-else
-LIBS = -lm -lffi -ldl
-TIME = time
-endif
-
-ifeq ($(findstring Darwin,$(SYS)),Darwin)
-SO = dylib
-SOCFLAGS = -dynamiclib -Wl,-headerpad_max_install_names,-undefined,dynamic_lookup,-flat_namespace
-else
-SO = so
-SOCFLAGS = -shared -msse -msse2
-endif
-
-TEST_EVAL	= $(BUILD)/eval1
+# a maru.10 checkout, used by the tests
+MARU10	?= ../maru.10
 
 .SUFFIXES :
 
 all : eval
 
 eval : $(BUILD)/eval1
-	cp $(BUILD)/eval1 eval
+	cp $< $@
 
-run : eval
-	rlwrap ./eval boot.l -
-
-test-bootstrap : $(BUILD)/eval3 .force
-	diff $(BUILD)/eval2.s $(BUILD)/eval3.s
-
-$(BUILD)/eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c osdefs.k
+$(BUILD)/eval1 : eval.c gc.c gc.h buffer.c chartab.h wcs.c
 	mkdir -p $(BUILD)
-	$(CC) -g $(CFLAGS) -o $(BUILD)/eval1 eval.c $(LIBS)
+	$(CC) $(CFLAGS) -o $@ eval.c $(LIBS)
 	@-test ! -x /usr/sbin/execstack || /usr/sbin/execstack -s $@
 
-osdefs.k : $(BUILD)/mkosdefs
-	$(BUILD)/mkosdefs > $@
+run : eval
+	rlwrap --no-warning ./eval $(MARU10)/boot.l -
 
-$(BUILD)/mkosdefs : mkosdefs.c
-	mkdir -p $(BUILD)
-	$(CC) -o $@ $<
+# The semantic gate while porting: run maru.10's evaluator tests with
+# this eval. The cwd matters, maru.10's boot.l and its requires are
+# resolved relative to it.
+test-evaluator : eval
+	cd $(MARU10) && $(abspath $<) boot.l tests/evaluator-tests.l
 
-$(BUILD)/eval2 : $(BUILD)/eval1 emit.l eval.l osdefs.k
-	$(TIME) $(BUILD)/eval1 -O emit.l eval.l > $(BUILD)/eval2.s && $(CC32) -c -o $(BUILD)/eval2.o $(BUILD)/eval2.s && size $(BUILD)/eval2.o && $(CC32) -o $(BUILD)/eval2 $(BUILD)/eval2.o
+test : test-evaluator
 
-time : .force
-	$(TIME) $(BUILD)/eval1 -O emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
-
-$(BUILD)/eval3 : $(BUILD)/eval2
-	$(TIME) $(BUILD)/eval2 -O boot.l emit.l eval.l > $(BUILD)/eval3.s
-
-time2 : .force
-	$(TIME) $(BUILD)/eval2 boot.l emit.l eval.l eval.l eval.l eval.l eval.l > /dev/null
-
-stats : .force
-	cat boot.l emit.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-	cat boot.l emit.l eval.l | sed 's/.*debug.*//;s/;.*//' | sort -u | wc -l
-
-clean : .force
-	rm --force $(BUILD)/eval* $(BUILD)/mkosdefs osdefs.k eval
+clean :
+	rm --force $(BUILD)/eval1 eval
 	rm --dir --force $(BUILD) || true
-
-test-evaluator: $(TEST_EVAL) boot.l tests/evaluator-tests.l
-	$(TEST_EVAL) boot.l tests/evaluator-tests.l
-
-test: test-evaluator
-
-.force :
