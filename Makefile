@@ -534,8 +534,7 @@ source/parsing/peg.g.l: $(BUILD)/generated/peg.g.l
 	$(CGROV_PREPARE)
 	./eval boot.l source/c/compile-cgrov.l $(SLAVE_DIR)/$< > $(SLAVE_DIR)/$<.c
 	$(CC_FOR_TARGET) -o $<.exe $<.c
-	echo ";; target triple: $$($(CC) -dumpmachine)" > $@.new
-	./$<.exe >> $@.new
+	./$<.exe > $@.new
 	mv $@.new $@
 	rm -f $<.exe $<.c
 
