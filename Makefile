@@ -125,6 +125,20 @@ PREVIOUS_STAGE	= maru.9
 
 PREVIOUS_STAGE_EXTRA_TARGETS ?=
 
+# The C implementation of this stage (the maru.10.c99 branch). When it
+# is the previous stage it only provides the eval binary; the lisp
+# comes from this tree, because the host is stage 10 itself, not an
+# earlier stage. Hence no host-extras.l/slave-extras.l either.
+C99_BRANCH	= maru.10.c99
+C99_DIR		?= $(BUILD)/$(C99_BRANCH)
+ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
+  HOST_EXTRAS		=
+  SLAVE_EXTRAS		=
+else
+  HOST_EXTRAS		= source/bootstrapping/host-extras.l
+  SLAVE_EXTRAS		= source/bootstrapping/slave-extras.l
+endif
+
 MAKEFLAGS	+= --warn-undefined-variables --output-sync
 
 TARGET_ARCH	?= $(word 1, $(subst -, ,$(TARGET)))
@@ -158,7 +172,7 @@ BUILD		= build
 BUILD_x86	= $(BUILD)/x86-$(PLATFORM)/$(TARGET)
 BUILD_llvm	= $(BUILD)/llvm-$(PLATFORM)/$(TARGET)
 BITCODE_DIR	= $(BUILD_llvm)
-HOST_DIR	= $(BUILD)/$(PREVIOUS_STAGE)
+HOST_DIR	= $(if $(filter $(C99_BRANCH),$(PREVIOUS_STAGE)),$(CURDIR),$(BUILD)/$(PREVIOUS_STAGE))
 SLAVE_DIR	= $(CURDIR)
 
 # $(info $$BUILD_llvm is [${BUILD_llvm}])
@@ -289,12 +303,21 @@ $(foreach backend,${BACKENDS},stats-$(backend)): stats-%:
 $(HOST_DIR)/eval:
 	echo Building $@
 	@mkdir -p $(BUILD)
+ifeq ($(PREVIOUS_STAGE),$(C99_BRANCH))
+# The C implementation of this stage trades the compiled evaluator for
+# a C one; it is built in its own checkout and installed here.
+	@git show-ref --verify --quiet refs/heads/$(C99_BRANCH) || git branch --quiet --track $(C99_BRANCH) remotes/origin/$(C99_BRANCH)
+	test -d $(C99_DIR) || git worktree add --detach --force $(C99_DIR) $(C99_BRANCH)
+	$(MAKE) --directory=$(C99_DIR) eval
+	cp $(C99_DIR)/eval $@
+else
 # after cloning, we must create the local branches ourselves; the issue in detail: https://stackoverflow.com/questions/40310932/git-hub-clone-all-branches-at-once
 	@git show-ref --verify --quiet refs/heads/$(PREVIOUS_STAGE) || git branch --quiet --track $(PREVIOUS_STAGE) remotes/origin/$(PREVIOUS_STAGE)
 	test -d $(BUILD)/$(PREVIOUS_STAGE) || git worktree add --detach --force $(BUILD)/$(PREVIOUS_STAGE) $(PREVIOUS_STAGE)
 # a git checkout doesn't do anything to file modification times, so we just touch everything that happens to be checked in under build/ to avoid unnecessary rebuilds
 	-find $(BUILD)/$(PREVIOUS_STAGE)/$(BUILD) -type f -exec touch {} \;
 	$(MAKE) --directory=$(BUILD)/$(PREVIOUS_STAGE) PLATFORM=libc $(PREVIOUS_STAGE_EXTRA_TARGETS) eval$(PREVIOUS_STAGE_BACKEND)
+endif
 
 update-eval0: $(EVAL0_DIR)
 	cd $(EVAL0_DIR) && git reset --hard HEAD~30 && git pull ../.. && make clean
@@ -347,10 +370,10 @@ $(BUILD_x86)/eval0.s: $(EVAL_OBJ_x86) source/bootstrapping/*.l $(EVALUATOR_FILES
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
-		source/bootstrapping/host-extras.l				\
+		$(HOST_EXTRAS)							\
 		source/bootstrapping/early.l					\
 		boot.l								\
-		source/bootstrapping/slave-extras.l				\
+		$(SLAVE_EXTRAS)							\
 		source/bootstrapping/late.l					\
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
@@ -376,10 +399,10 @@ $(BITCODE_DIR)/eval0.ll: source/bootstrapping/*.l $(EVALUATOR_FILES) $(EMIT_FILE
 		source/bootstrapping/prepare.l					\
 		boot.l								\
 		$(SLAVE_DIR)/source/bootstrapping/host-ready.l			\
-		source/bootstrapping/host-extras.l				\
+		$(HOST_EXTRAS)							\
 		source/bootstrapping/early.l					\
 		boot.l								\
-		source/bootstrapping/slave-extras.l				\
+		$(SLAVE_EXTRAS)							\
 		source/bootstrapping/late.l					\
 		source/platforms/load-platform.l				\
 		source/platforms/$(PLATFORM)/eval.l				\
