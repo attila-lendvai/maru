@@ -60,6 +60,9 @@ bootstrap : eval
 # refresh the recipe timestamps: maru.10 ships generated artifacts (eval1.s,
 # eval1.ll, cgrov.g.l) that would otherwise shortcut the bootstrap
 	cd $(MARU10) && find source boot.l -type f -exec touch {} +
+# eval0 is only ever "ensured to exist", so a leftover one from an earlier
+# run would survive the timestamp refresh and compile eval1
+	find $(MARU10)/build -name 'eval0*' -delete
 	cd $(MARU10) && $(MAKE) PREVIOUS_STAGE=maru.10.c99 EVAL0_PHASE=1 \
 		PLATFORM=$(PLATFORM) $(BOOTSTRAP_TARGETS)
 
