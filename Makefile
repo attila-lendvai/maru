@@ -237,8 +237,12 @@ else
   EVAL0		?= $(EVAL0_DIR)/$(EVAL0_BINARY)
 endif
 
-EMIT_FILES_x86	= $(addprefix source/compiler/,emit-early.l emit-x86-common.l emit-objects-x86.l emit-i686.l emit-x86-64.l emit-late.l) source/platforms/run-compiler.l
-EMIT_FILES_llvm	= $(addprefix source/compiler/,emit-early.l emit-llvm.l emit-objects-llvm.l emit-late.l) source/platforms/run-compiler.l
+EMIT_FILES_common = $(addprefix source/compiler/,emit-early.l emit-late.l target.l) \
+ source/conversion.l source/platforms/run-compiler.l $(addprefix source/c/,cffi.l cgrov.l)
+EMIT_FILES_x86	= $(EMIT_FILES_common) $(addprefix source/compiler/,emit-x86-common.l emit-objects-x86.l emit-i686.l emit-x86-64.l emit-x86-late.l) \
+ $(addprefix source/platforms/linux/,syscall-i686.l syscall-x86-64.l)
+EMIT_FILES_llvm	= $(EMIT_FILES_common) $(addprefix source/compiler/,emit-llvm.l emit-objects-llvm.l) \
+ source/platforms/linux/syscall-llvm.l
 
 GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions.l)
 
@@ -246,8 +250,14 @@ GENERATED_FILES = $(addprefix source/,parsing/peg.g.l assembler/x86-instructions
 # universally available in each platform.
 EVALUATOR_FILES = $(addprefix source/platforms/$(PLATFORM)/,$(PLATFORM).l eval.l vm-functions.l) \
  $(addprefix source/platforms/,load-platform.l platform-c-based.l platform-common.l) \
+ $(addprefix source/platforms/libc/,eval.l streams.l) \
+ $(addprefix source/platforms/linux/,streams.l syscall.l vm-functions.l) \
  $(addprefix source/evaluator/,eval.l gc.l printer.l reader.l vm-functions.l arrays.l vm-early.l vm.l vm-late.l vm-with-file-support.l types.l) \
- $(addprefix source/,list-min.l env-min.l sequences-min.l selector.l generic.l types.l debug-min.l)
+ $(addprefix source/,ansiterm.l control-structures.l conversion-lower.l conversion-min.l \
+              debug-min.l destructuring.l env-lower.l env-min.l files.l generic.l \
+              iteration-min.l list-basic.l list-min.l math-min.l printing.l \
+              selector.l sequences-basic.l sequences-min.l sequences.l streams-min-late.l \
+              streams-min.l streams.l types.l unit-test.l)
 
 CGROV_FILES = source/platforms/$(PLATFORM)/$(PLATFORM).cgrov.$(TARGET).l \
  $(if $(filter posix,$(PLATFORM)),source/platforms/libc/libc.cgrov.$(TARGET).l)
