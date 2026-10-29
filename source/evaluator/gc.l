@@ -153,11 +153,11 @@
   (<header>-size (gc/header-of obj)))
 
 (define-function %next-object-from-header (header)
-  (until (gc/live-chunk? header)
-    (set header (<header>-next header))
-    (when (= header gc/memory-base)
-      (return 0)))
-  (gc/payload-of header))
+  (until (or (= header gc/memory-base)
+             (gc/live-chunk? header))
+    (set header (<header>-next header)))
+  (unless (= header gc/memory-base)
+    (gc/payload-of header)))
 
 (define-function gc/first-object ()
   (%next-object-from-header (<header>-next gc/memory-base)))
