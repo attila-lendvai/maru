@@ -115,6 +115,16 @@
 (define gc/allocation-cursor     0)
 (define gc/alloc-count          0)
 (define gc/collection-count     0)
+;; incremented by without-gcing; while positive, allocation cannot
+;; collect, and gc/collect is a no-op.
+(define gc/disable-count        0)
+
+(define-form without-gcing body
+  `(let ()
+     (incr gc/disable-count)
+     (let ((__result__ (let () ,@body)))
+       (decr gc/disable-count)
+       __result__)))
 
 (define-function gc/acquire-new-heap-space (size)
   (let ((ptr (platform/acquire-memory size)))
@@ -220,26 +230,30 @@
                        (gc/mark-and-trace (oop-at obj index))))))))))
 
 (define-function gc/collect ()
-  (set gc/collection-count (+ gc/collection-count 1))
-  (gc/debug
-   (or (bitwise-and 1023 gc/collection-count)
-       (platform/diag-print gc/collection-count " collections")))
-  (gc/debug (platform/diag-print "about to mark "gc/root-count" gc roots stored at "(pointer gc/roots)"\n"))
-  (gc/mark-and-trace gc/roots) ; even though it's an opaque, we still need to mark the vector itself
-  (for (i 0 gc/root-count)
-    (let* ((root-ptr	(oop-at gc/roots i))
-           (root	(oop-at root-ptr 0)))
-      (gc/debug (platform/diag-print "mark gc root "i" : "(pointer root-ptr)" -> "(pointer root)" ("(pointer (gc/header-of root))")\n"))
-      (gc/mark-and-trace root)))
-  (gc/debug (platform/diag-print "finished marking gc roots\n"))
-  (gc/sweep)
-  (set gc/alloc-count 0))
+  (unless (< 0 gc/disable-count)
+    (set gc/collection-count (+ gc/collection-count 1))
+    (gc/debug
+     (or (bitwise-and 1023 gc/collection-count)
+         (platform/diag-print gc/collection-count " collections")))
+    (gc/debug (platform/diag-print "about to mark "gc/root-count" gc roots stored at "(pointer gc/roots)"\n"))
+    (gc/mark-and-trace gc/roots) ; even though it's an opaque, we still need to mark the vector itself
+    (for (i 0 gc/root-count)
+      (let* ((root-ptr	(oop-at gc/roots i))
+             (root	(oop-at root-ptr 0)))
+        (gc/debug (platform/diag-print "mark gc root "i" : "(pointer root-ptr)" -> "(pointer root)" ("(pointer (gc/header-of root))")\n"))
+        (gc/mark-and-trace root)))
+    (gc/debug (platform/diag-print "finished marking gc roots\n"))
+    (gc/sweep)
+    (set gc/alloc-count 0)))
 
 (define-function gc/allocate (type requested-size)
   (gc/debug (platform/diag-print "gc/allocate type "type" "requested-size"\n"))
   (safety 2 (assert type "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; only allow cell-sized allocation
-  (and (= gc/alloc-count gc/allocations-until-gc)
+  ;; the count can pass the threshold while collection is disabled, so
+  ;; compare with <= instead of waiting for it to be hit exactly again
+  (and (= 0 gc/disable-count)
+       (<= gc/allocations-until-gc gc/alloc-count)
        (gc/collect))
   (let* ((first (<header>-next gc/allocation-cursor))
          (chunk first)
