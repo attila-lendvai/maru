@@ -771,24 +771,24 @@
     (when (< 0 profiler/sample-counter)
       (print-all *debug-output* "Profiler took "(box <long> profiler/sample-counter)" samples:\n")
       (gc/collect) ; make some room for the walk
-      ;; FIXME the GC should be disabled while walking the heap
-      ;; Walk the entire heap and print the profiler counters for
-      ;; whichever functions we can find.
-      (let ((obj (gc/first-object)))
-        (while obj
-          (let ((type (type-of obj))
-                (name ())
-                (counter ()))
-            (cond
-              ((= type <expr>)
-               (set counter (unbox <long> (<expr>-profiler-counter obj)))
-               (set name (<expr>-name obj)))
-              ;; ((= type <target-function>)
-              ;;  (set name (<target-function>-name obj)))
-              )
-            (when counter
-              (if (< 0 counter)
-                  (print-all *debug-output* (box <long> counter)"\t"(or name "?")"\n")
-                ;;(print-all *debug-output* "!!! never called: "(or name "?")"\n")
-                )))
-          (set obj (gc/next-object obj)))))))
+      ;; the walk allocates while printing, and its locals are not
+      ;; roots; without-gcing keeps the collector out of it.
+      (without-gcing
+        (let ((obj (gc/first-object)))
+          (while obj
+            (let ((type (type-of obj))
+                  (name ())
+                  (counter ()))
+              (cond
+                ((= type <expr>)
+                 (set counter (unbox <long> (<expr>-profiler-counter obj)))
+                 (set name (<expr>-name obj)))
+                ;; ((= type <target-function>)
+                ;;  (set name (<target-function>-name obj)))
+                )
+              (when counter
+                (if (< 0 counter)
+                    (print-all *debug-output* (box <long> counter)"\t"(or name "?")"\n")
+                  ;;(print-all *debug-output* "!!! never called: "(or name "?")"\n")
+                  )))
+            (set obj (gc/next-object obj))))))))
