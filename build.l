@@ -806,6 +806,11 @@ git --no-pager log --pretty=oneline -1")))
     (if eval0-phase
         (let ((eval0-backend	llvm)
               (eval0-platform	libc))
+          ;; the fork runs its own build.sh, which would bootstrap
+          ;; another maru.10 host; point its host dir at the one we
+          ;; already have.
+          ($ "mkdir -p '" eval0-dir "/build' && rm -rf '" eval0-dir "/build/maru.10' &&
+ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
           (debug-log "compile-maru/stage-0: forking the eval0 build")
           ;; All we want here is an eval0 binary compiled from a
           ;; reasonably recent commit that works fast on the host to
