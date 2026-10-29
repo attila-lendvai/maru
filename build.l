@@ -549,24 +549,39 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
     ($ "cd '"slave-dir"' && chmod +x '"binary"'"))
   binary)
 
-(define-function compile-cgrov-file (file-path)
+(define-function %ensure-cgrov-grammar (slave-dir)
+  ;; the slave owns the grammar and the cgrov actions, but not the PEG
+  ;; parser generator; let the host compile the grammar, so that the
+  ;; generator matches the slave's .cgrov files.
+  (let ((grammar (concat-strings slave-dir "/source/c/cgrov.g"))
+        (parser  (concat-strings slave-dir "/source/c/cgrov.g.l")))
+    (when (needs-recompile? parser (list grammar))
+      (run-with-host/shell " -O boot.l source/parsing/compile-peg-grammar.l '"
+                           grammar "' >'"parser"'"))))
+
+(define-function compile-cgrov-file (file-path host-dir host-eval slave-dir evolving?)
   (assert (absolute-path? file-path))
   ;; NOTE if we call (compile-host) here, then it'll get triggered
   ;; while we are compiling eval0 in the build/eval0 dir; i.e. it
   ;; would unnecessarily compile the previous stage one more time.
   (let* ((c-file     (concat-strings file-path "." (target-triple) ".c"))
          (exe-file   (concat-strings c-file ".exe"))
-         (final-file (concat-strings file-path "." (target-triple) ".l")))
-    (when (needs-recompile? final-file (list file-path))
-      ;; this is not ok, because this doesn't cd into the host-dir, so
-      ;; the host loads slave source code.
-      ;; (run-with-host
-      ;;  *host-dir* "eval"
-      ;;  (list (host-path "boot.l") (host-path "source/c/compile-cgrov.l") file-path)
-      ;;  () () c-file)
+         (final-file (concat-strings file-path "." (target-triple) ".l"))
+         ;; stage-0 has no eval0 yet, so it keeps using the host's tool;
+         ;; later stages use the slave's tool, run by their compiler.
+         (tool-dir   (if evolving? host-dir slave-dir))
+         (tool-eval  (concat-strings host-dir "/" host-eval))
+         (tool-deps  (unless evolving?
+                       (list (concat-strings slave-dir "/source/c/compile-cgrov.l")
+                             (concat-strings slave-dir "/source/c/cgrov.g.l")
+                             (concat-strings slave-dir "/source/parsing/parser.l")))))
 
-      (run-with-host/shell " boot.l source/c/compile-cgrov.l '"
-                           file-path "' >'"c-file"'")
+    (unless evolving?
+      (%ensure-cgrov-grammar slave-dir))
+
+    (when (needs-recompile? final-file (concat-list (list file-path) tool-deps))
+      ($ "cd '" tool-dir "' && '" tool-eval
+         "' boot.l source/c/compile-cgrov.l '" file-path "' >'" c-file "'")
 
       (compile-C-file cflags c-file exe-file ())
       ($ exe-file" >"final-file)
@@ -640,20 +655,25 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 (define-function %compile-maru (backend platform host-dir host-eval slave-dir
                                         input-file output-name evolving?)
   (let ((platform-name (to-string platform)))
-    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/"platform-name"/"platform-name".cgrov"))
+    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/"platform-name"/"platform-name".cgrov")
+                        host-dir host-eval slave-dir evolving?)
     (cond
       ((= platform linux)
        ;; TODO maybe merge the elf/ and linux/ namespaces?
-       (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/elf.cgrov")))
+       (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/elf.cgrov")
+                           host-dir host-eval slave-dir evolving?))
       ((= platform posix)
        ;; posix "extends" the libc platform, so it also needs the libc cgrov entries.
-       (compile-cgrov-file (concat-strings slave-dir "/source/platforms/libc/libc.cgrov")))))
+       (compile-cgrov-file (concat-strings slave-dir "/source/platforms/libc/libc.cgrov")
+                           host-dir host-eval slave-dir evolving?))))
 
   (when (or (= backend x86)
             (= backend arm))
     ;; KLUDGE An ELF emitter will want to load the linux cgrov files...
-    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/linux.cgrov"))
-    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/elf.cgrov"))
+    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/linux.cgrov")
+                        host-dir host-eval slave-dir evolving?)
+    (compile-cgrov-file (concat-strings slave-dir "/source/platforms/linux/elf.cgrov")
+                        host-dir host-eval slave-dir evolving?)
     )
 
   (let ((output (build-output backend platform output-name)))
