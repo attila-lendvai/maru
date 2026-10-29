@@ -83,6 +83,13 @@
                                    (concat-string separator (car args))))))
     result))
 
+(define-function format-duration (ms)
+  (let* ((seconds	(/ ms 1000))
+         (fraction	(number->string (- ms (* seconds 1000)))))
+    (while (< (string-length fraction) 3)
+      (string-insert fraction 0 ?0))
+    (concat-strings (number->string seconds) "." fraction " s")))
+
 (define-function absolute-path? (path)
   (= ?/ (string-at path 0)))
 
@@ -650,7 +657,8 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
          ,source
          "source/platforms/run-compiler.l"
          ,output-path
-         ))))))
+         ))))
+    true))
 
 (define-function %compile-maru (backend platform host-dir host-eval slave-dir
                                         input-file output-name evolving?)
@@ -677,11 +685,15 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
     )
 
   (let ((output (build-output backend platform output-name)))
-
-    (run-maru-compiler
-     host-dir host-eval slave-dir backend platform
-     input-file output evolving?)
-
+    (let ((start (now/monotonic)))
+      (when (run-maru-compiler
+             host-dir host-eval slave-dir backend platform
+             input-file output evolving?)
+        (print-all *debug-output*
+                   "compile " output " (" backend " " platform "): "
+                   term/FG-GREEN
+                   (format-duration (- (now/monotonic) start))
+                   term/RESET "\n")))
     output))
 
 (define-function platform-source-file (platform filename)
@@ -880,13 +892,6 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
                   *slave-dir* eval1
                   *slave-dir* input-file "eval2" false)))
 
-(define-function %format-duration (ms)
-  (let* ((seconds	(/ ms 1000))
-         (fraction	(number->string (- ms (* seconds 1000)))))
-    (while (< (string-length fraction) 3)
-      (string-insert fraction 0 ?0))
-    (concat-strings (number->string seconds) "." fraction " s")))
-
 (define-function bootstrap args
   (let ((backend  (or (pop args) default-backend))
         (platform (or (pop args) default-platform)))
@@ -904,7 +909,9 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
           (same-file-contents-or-die eval1 eval2)))
       (print-all *debug-output*
                  "bootstrap " (to-string backend) " " (to-string platform)
-                 ": " (%format-duration (- (now/monotonic) start)) "\n"))))
+                 ": " term/FG-GREEN
+                 (format-duration (- (now/monotonic) start))
+                 term/RESET "\n"))))
 
 (define-function bootstrap-matrix ()
   ;; TODO finish it... it needs to skip cross compilation, etc. this
