@@ -50,9 +50,12 @@ jobs:
   build-linux-amd64-cross:
     name: "linux x86_64 -> aarch64"
     runs-on: ubuntu-24.04
+    # --privileged is needed to mount binfmt_misc and register qemu at
+    # runtime. It also gives the job access to the runner host: keep
+    # that in mind for pull_request workflows.
     container:
       image: ghcr.io/attila-lendvai/maru-ci:amd64
-      options: --init
+      options: --init --privileged
     env:
       BUILD_TIMEOUT: 10m
 
@@ -65,6 +68,19 @@ jobs:
         with:
           fetch-depth: 0
           show-progress: false
+
+      # binfmt_misc is host-global: registering qemu in the image at
+      # build time does not survive into the container.
+      - name: Register qemu binfmt
+        run: |
+          if [ ! -e /proc/sys/fs/binfmt_misc/register ]; then
+            mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+          fi
+          if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+            cat /usr/share/qemu/binfmt.d/qemu-aarch64.conf \
+              > /proc/sys/fs/binfmt_misc/register
+          fi
+          test -e /proc/sys/fs/binfmt_misc/qemu-aarch64
 
       - run: tools-for-build/ci-linux.sh --cross
 
