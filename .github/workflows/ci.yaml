@@ -30,25 +30,10 @@ jobs:
     container:
       image: ghcr.io/attila-lendvai/maru-ci:amd64
       options: --init
-    env:
-      TERM: xterm
 
     steps:
-      - name: System info
-        run: |
-          echo "===== OS Info ====="
-          echo "CI image version: $CI_IMAGE_VERSION"
-          uname -a
-          echo Kernel page size: $(getconf PAGE_SIZE)
-          sw_vers || lsb_release -a || cat /etc/os-release || true
-          echo "===== CPU Info ====="
-          uname -m
-          sysctl -n machdep.cpu.brand_string || lscpu || true
-          echo "===== Environment ====="
-          env
-
       - name: Calm down Git
-        run: git config --global --add safe.directory /__w/maru/maru
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,46 +41,32 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version || true
-      - run:  cc --version || true
-      - run:  ld.lld --version || true
+      - run: tools-for-build/ci-linux.sh --native
 
-      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
+###
+# aarch64 Linux, cross-built from x86_64
+###
 
-      # test-compiler runs first: it fails faster than a full bootstrap
-      - run:  timeout 5m ./build.sh target/arch=i686 test-compiler x86  linux
-      - run:  timeout 5m ./build.sh target/arch=i686 test-compiler x86  posix
-      - run:  timeout 5m ./build.sh C-obj/link-type=static test-compiler x86 libc
+  build-linux-amd64-cross:
+    name: "linux x86_64 -> aarch64"
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/attila-lendvai/maru-ci:amd64
+      options: --init
+    env:
+      BUILD_TIMEOUT: 10m
 
-      - run:  timeout 5m ./build.sh bootstrap llvm linux
-      - run:  timeout 5m ./build.sh bootstrap llvm posix
-      - run:  timeout 5m ./build.sh bootstrap llvm libc
+    steps:
+      - name: Calm down Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - run:  timeout 5m ./build.sh bootstrap x86  linux
-      - run:  timeout 5m ./build.sh bootstrap x86  posix
-      - run:  timeout 5m ./build.sh bootstrap x86  libc
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          show-progress: false
 
-      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm posix
-      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap llvm libc
-
-      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  linux
-      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  posix
-      - run:  timeout 5m ./build.sh target/arch=i686 bootstrap x86  libc
-
-      # the self-contained x86 binaries are mapped/run through musl's
-      # ELF interpreter instead of glibc's
-      - run:  timeout 5m ./build.sh ld.so=/lib/ld-musl-x86_64.so.1 bootstrap x86 linux
-
-      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
-      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
-
-      - run:  timeout 5m ./build.sh test
-
-      - name: Bootstrap with *safety* set to 3
-        run: |
-          sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
-          timeout 5m ./build.sh bootstrap llvm linux
-          timeout 5m ./build.sh bootstrap x86  linux
+      - run: tools-for-build/ci-linux.sh --cross
 
 ###
 # aarch64 Linux
@@ -107,25 +78,10 @@ jobs:
     container:
       image: ghcr.io/attila-lendvai/maru-ci:arm64
       options: --init
-    env:
-      TERM: xterm
 
     steps:
-      - name: System info
-        run: |
-          echo "===== OS Info ====="
-          echo "CI image version: $CI_IMAGE_VERSION"
-          uname -a
-          echo Kernel page size: $(getconf PAGE_SIZE)
-          sw_vers || lsb_release -a || cat /etc/os-release || true
-          echo "===== CPU Info ====="
-          uname -m
-          sysctl -n machdep.cpu.brand_string || lscpu || true
-          echo "===== Environment ====="
-          env
-
       - name: Calm down Git
-        run: git config --global --add safe.directory /__w/maru/maru
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -133,30 +89,7 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - run:  clang --version || true
-      - run:  cc --version || true
-      - run:  ld.lld --version || true
-
-      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
-
-      - run:  timeout 5m ./build.sh test-compiler arm libc
-
-      - run:  timeout 5m ./build.sh bootstrap llvm libc
-      - run:  timeout 5m ./build.sh bootstrap llvm posix
-      - run:  timeout 5m ./build.sh bootstrap llvm linux
-
-      - run:  timeout 5m ./build.sh bootstrap arm  linux
-      - run:  timeout 5m ./build.sh bootstrap arm  posix
-      - run:  timeout 5m ./build.sh bootstrap arm  libc
-
-      # same as above on amd64: only the arm backend embeds an ELF
-      # interpreter, so llvm would silently not exercise musl here
-      - run:  timeout 5m ./build.sh ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
-
-      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm posix
-      - run:  timeout 5m ./build.sh profiler=1 bootstrap llvm linux
-
-      - run:  timeout 5m ./build.sh test
+      - run: tools-for-build/ci-linux.sh --native
 
 ###
 # Darwin
@@ -168,26 +101,10 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      TERM: xterm
-      # Ignore Homebrew's clang config, which pins the CLT SDK. See the
-      # "Align the SDK with the active toolchain" step below.
-      CLANG_NO_DEFAULT_CONFIG: "1"
 
     steps:
-      - name: System info
-        run: |
-          echo "===== OS Info ====="
-          uname -a
-          sw_vers || lsb_release -a || cat /etc/os-release || true
-          echo "===== CPU Info ====="
-          uname -m
-          sysctl -n machdep.cpu.brand_string || lscpu || true
-          echo "===== Environment ====="
-          env
-
       - name: Calm down Git
-        run: git config --global --add safe.directory /__w/maru/maru
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -195,66 +112,18 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - name: Install clang
-        # this action caches the archives, but not the install
-        # itself. it's simpler this way, but it takes about a minute.
-        uses: gerlero/brew-install@v1
+      - name: Cache Homebrew downloads
+        uses: actions/cache@v4
         with:
-          packages: llvm coreutils
+          path: ~/Library/Caches/Homebrew
+          key: macos-brew-${{ hashFiles('tools-for-build/install-macos-deps.sh') }}
+          restore-keys: macos-brew-
 
-      # - name: Cache Homebrew packages
-      #   uses: actions/cache@v4
-      #   with:
-      #     # Paths to cache:
-      #     # /usr/local/Homebrew - installation folder of Homebrew
-      #     # /usr/local/Cellar - installation folder of Homebrew formulae
-      #     # /usr/local/Frameworks, /usr/local/bin, /usr/local/opt - contain (links to) binaries installed by Homebrew formulae
-      #     # /usr/local/lib/python3.12 - Python3 packages installation
-      #     # /opt/homebrew - Apple Silicon path
-      #     path: |
-      #       /usr/local/Homebrew
-      #       /usr/local/Cellar
-      #       /usr/local/Frameworks
-      #       /usr/local/bin
-      #       /usr/local/opt
-      #       /opt/homebrew
+      - name: Install dependencies
+        run: tools-for-build/install-macos-deps.sh
 
-      #     key: macos-build-cache-${{ hashFiles('**/Brewfile') }}
-      #     restore-keys: macos-build-cache-
-
-      # - name: Install packages from Homebrew
-      #   run: |
-      #     brew update
-      #     brew install llvm || echo "clang already installed from cache"
-
-      - name: Add Homebrew LLVM to PATH
-        run: echo "$(brew --prefix llvm)/bin:$(brew --prefix coreutils)/bin" >> $GITHUB_PATH
-
-      - name: Align the SDK with the active toolchain
-        # Homebrew's clang config pins the CommandLineTools SDK, while
-        # the linker comes from the developer dir selected by
-        # xcode-select. A fresh CLT can therefore ship an SDK that the
-        # selected Xcode's ld cannot read (e.g. macOS 27's arm64e.x1
-        # stubs with Xcode 26). Let clang use the active SDK instead,
-        # as Apple clang does.
-        run: |
-          xcode-select -p
-          sdk="$(xcrun --sdk macosx --show-sdk-path)"
-          echo "SDKROOT=$sdk" | tee -a "$GITHUB_ENV"
-
-      - run:  clang --version || true
-      - run:  cc --version || true
-      - run:  lld --version || true
-
-      - run:  test -d build/ && find build/ -type f -exec touch '{}' + || true
-
-      - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm libc
-
-      - run:  timeout 3m arch -arm64  ./build.sh bootstrap llvm posix
-
-      - run:  timeout 3m arch -arm64  ./build.sh profiler=1 bootstrap llvm posix
-
-      - run:  timeout 3m ./build.sh test
+      - name: Run CI
+        run: tools-for-build/ci-macos.sh
 
 ###
 # Full bootstrap

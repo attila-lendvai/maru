@@ -44,40 +44,47 @@ Maru's architecture is described in [doc/how.md](doc/how.md).
 
 #### Build instructions
 
-Table of supported (tested) environments:
+Table of environments tested by the [GitHub CI](.github/workflows/ci.yaml):
 
-| Backend↓ Platform→   | libc         | Posix          | Linux kernel    |
-|:---------------------|:------------:|:--------------:|:---------------:|
-| LLVM          | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc | Darwin (`arm64`, `x86-64`)<br>Linux (`i686`, `x86-64`)<br>etc | `i686`<br>`x86-64`<br>etc |
-| x86                  |  ❌ (planned) |  ❌ (planned)  |  `x86-64` Elf64: glibc, musl  |
-| Arm                  |  ❌ (planned) |  ❌ (planned)  |  `aarch64` Elf64: glibc, musl |
+| Backend↓ Platform→ | libc | Posix | Linux kernel |
+|:-------------------|:-----|:------|:-------------|
+| LLVM | Darwin `arm64`<br>Linux `i686`, `x86-64`, `aarch64` | Darwin `arm64`<br>Linux `i686`, `x86-64`, `aarch64` | Linux `i686`, `x86-64`, `aarch64` |
+| x86 | Linux `i686`, `x86-64` | Linux `i686`, `x86-64` | Linux `i686`, `x86-64`<br>glibc; `x86-64` also musl |
+| Arm | Linux `aarch64` | Linux `aarch64` | Linux `aarch64`<br>glibc, musl |
+
+`aarch64` builds also run cross-compiled from `x86-64`.
+
+These work but are not covered by the GitHub CI:
+
+| Backend↓ Platform→ | libc | Posix | Linux kernel |
+|:-------------------|:-----|:------|:-------------|
+| LLVM | Darwin `x86-64` | Darwin `x86-64` | |
 
 To test a bootstrap cycle:
 
 ```
 ./build.sh bootstrap llvm linux
 ./build.sh bootstrap [llvm,arm,x86] [libc,posix,linux]
+./build.sh test
 ```
 
-To cross compile to an `aarch64` OpenWrt:
+To run the full Linux CI matrix locally (re-execs in the CI image):
 
 ```
-./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
+tools-for-build/ci-linux.sh
 ```
 
-This should even run on an `x86_64` host through qemu-user with binfmt misc:
+To cross compile to `aarch64` (`x86-64` hosts run it through qemu-user):
 
 ```
-apt install qemu-user-static gcc-aarch64-linux-gnu
 ./build.sh target/arch=aarch64 bootstrap arm linux
 ```
 
-And even with aarch64 musl libc inside qemu (`build.sh` sets a
-reasonable `QEMU_LD_PREFIX`):
+The same binaries can run through musl's ELF interpreter instead of glibc's:
 
 ```
-apt install qemu-user-static gcc-aarch64-linux-gnu musl
-./build.sh target/arch=aarch64 ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux
+./build.sh ld.so=/lib/ld-musl-x86_64.so.1 bootstrap x86 linux
+./build.sh ld.so=/lib/ld-musl-aarch64.so.1 bootstrap arm linux   # aarch64 host
 ```
 
 Note that `build.sh` is just a thin wrapper for calling functions
@@ -93,35 +100,24 @@ can run `guix shell` to enter into the same environment that I use
 when I work on Maru. Guix can also be used as a simple per-user
 package manager on top of any Linux distro.
 
-#### Debian, and derivatives
+#### Ubuntu, and Debian derivatives
 
-See [the Docker files](tools-for-build/) that are used in the
-CI. Otherwise:
-
-```
-sudo apt install make time rlwrap diffoscope-minimal
-```
-
-You will need LLVM, and/or a C compiler:
+CI builds on Ubuntu 26.04. Install the same dependencies with:
 
 ```
-sudo apt install llvm clang
+sudo tools-for-build/install-ubuntu-deps.sh
 ```
 
-32 bit support on an x86_64 host:
+On derivatives without `clang-22`, override the version:
 
 ```
-sudo apt install libc6-i386 gcc-multilib
+sudo CLANG_VERSION=21 tools-for-build/install-ubuntu-deps.sh
 ```
 
-#### MacOS (Darwin)
+#### macOS (Darwin)
 
-As of 2026-08 the LLVM backend can bootstrap on recent MacOS versions,
-both on `x86-64` and `arm64` (Apple silicon). There's
-[CI](.github/workflows/ci.yaml) set up for testing in an `arm64`
-runner.
-
-The following instructions worked in an x86-64 kvm setup:
+CI tests on an `arm64` runner; the LLVM backend also bootstraps on
+`x86-64`.
 
 1. Make sure XCode is installed. In a Terminal:
 ```
@@ -133,12 +129,15 @@ xcode-select --install
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
-3. [Install LLVM using Homebrew](https://embeddedartistry.com/blog/2017/02/24/installing-llvm-clang-on-osx/)
+3. Install the dependencies and run the CI matrix:
 ```
-brew install llvm
-echo export PATH="$(brew --prefix llvm)/bin:$PATH" >> ~/.bash_profile
-source ~/.bash_profile
+tools-for-build/install-macos-deps.sh
+tools-for-build/ci-macos.sh
 ```
+
+`ci-macos.sh` puts Homebrew's LLVM and coreutils on `PATH`, and aligns
+`SDKROOT` with the active toolchain, like CI does. Use the same
+environment for manual `./build.sh` runs.
 
 #### Guix on top of OpenWRT running on aarch64 hardware
 
