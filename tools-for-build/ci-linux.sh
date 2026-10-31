@@ -178,6 +178,11 @@ native_arm64() {
 }
 
 cross_aarch64() {
+    # qemu loads the guest image above libc's malloc arena, which breaks
+    # gc/read-only-object?'s heap-above-image invariant. Keep malloc on
+    # brk so the heap stays above the image.
+    export MALLOC_MMAP_THRESHOLD_="${MALLOC_MMAP_THRESHOLD_:-67108864}"
+
     step target/arch=aarch64 bootstrap arm linux
     step target/arch=aarch64 bootstrap arm posix
     step target/arch=aarch64 bootstrap arm libc
