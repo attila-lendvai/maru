@@ -39,6 +39,10 @@
   (test-assert (= -24  (* 1 -2 3 4)))
   )
 
+(define-test lower/cell-size/bits/1 ()
+  (test-assert (or (= 32 lower/cell-size/bits)
+                   (= 64 lower/cell-size/bits))))
+
 (define-test eval/arithmetic/logic ()
   (test-assert (= 42		(bitwise-or 42)))
   (test-assert (= 3		(bitwise-or 1 2 3)))

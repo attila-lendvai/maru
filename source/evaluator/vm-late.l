@@ -35,6 +35,10 @@
   (gc/let* ((tmp))
     (set tmp (box <long> *verbosity*)) (environment-define env symbol/*verbosity* tmp)
     (set tmp (box <long> *optimised*)) (environment-define env symbol/*optimised* tmp)
+    ;; The lower realm's cell size, for code loaded into a running image
+    ;; (e.g. the assembler). +word-size-in-bits+ is compile-time only.
+    (set tmp (box <long> +word-size-in-bits+))
+    (environment-define env (string->symbol "lower/cell-size/bits") tmp)
     ;; create an uninterned singleton symbol (i.e. a unique identity that cannot be recreated in any other way)
     (set +end+ (or +end+ (set tmp (symbol "+end+"))))
     ;; then define this value in the global env under the +end+ name, which is a normal, interned symbol.
