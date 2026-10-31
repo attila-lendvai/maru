@@ -417,9 +417,7 @@
 ;; The compiler host may itself be a 32-bit build (self-hosting i686),
 ;; where a tagged <long> has only 31 bits of magnitude. The 32-bit
 ;; range checks below can then neither be expressed as literals nor
-;; ever fail, so gate them on a wide host.
-(define-function wide-cell? ()
-  (< 0 (bitwise-shift 1 32)))
+;; ever fail, so they are compiled out on such images.
 
 (define-function emit-u8 (value)
   (typecase value
@@ -466,7 +464,7 @@
 (define-function emit-u32 (value)
   (typecase value
     (<long>
-     (when (wide-cell?)
+     (when-at-expand (< 32 lower/cell-size/bits)
        (assert (<= -0x80000000 value 0xffffffff) "emit-u32: out of range: "value))
      (if (not evolving?)
          (let ((segment (current-segment)))
@@ -493,7 +491,7 @@
 (define-function emit-i32 (value)
   (typecase value
     (<long>
-     (when (wide-cell?)
+     (when-at-expand (< 32 lower/cell-size/bits)
        (assert (if (<= 0 value) (<= value 0x7fffffff) (<= -0x80000000 value 0))
                "emit-i32: out of range: "value))
      (emit-u32 (bitwise-and value 0xffffffff)))
@@ -501,25 +499,32 @@
     (<symbol>	(emit-i32 (%ensure-label value)))
     (else	(error "emit-i32: called with unexpected value: "value", type: "(type-of value)))))
 
+;; The assembler buffer is byte-addressed and the paddress can be odd, so
+;; the accessor writes an unaligned 64-bit word. All our targets
+;; tolerate that.
 (define-function emit-u64 (value)
   (typecase value
     (<long>
-     (if (not evolving?)
-         (let ((segment (current-segment)))
-           (set (u64-at (<segment>-buffer segment)
-                        (<segment>-paddress segment))
-                value)
-           (incr (<segment>-paddress segment) 8)
-           (incr (<segment>-laddress segment) 8))
-       (emit-u32 (bitwise-and 0xffffffff value))
-       (emit-u32 (bitwise-and 0xffffffff (bitwise-shift value -32)))))
-    (<u64>
-     (let ((segment (current-segment)))
-       (set (u64-at (<segment>-buffer segment)
-                    (<segment>-paddress segment))
-            value)
-       (incr (<segment>-paddress segment) 8)
-       (incr (<segment>-laddress segment) 8)))
+     (if-at-expand (or evolving? (not (defined? 'u64-at)))
+         (begin
+           (emit-u32 (bitwise-and 0xffffffff value))
+           (emit-u32 (bitwise-and 0xffffffff (bitwise-shift value -32))))
+       (let ((segment (current-segment)))
+         (set (u64-at (<segment>-buffer segment)
+                      (<segment>-paddress segment))
+              value)
+         (incr (<segment>-paddress segment) 8)
+         (incr (<segment>-laddress segment) 8))))
+    ;; A boxed <u64> only exists on 64-bit images; the accessor unboxes
+    ;; its argument.
+    (when-at-expand (defined? '<u64>)
+      (<u64>
+       (let ((segment (current-segment)))
+         (set (u64-at (<segment>-buffer segment)
+                      (<segment>-paddress segment))
+              value)
+         (incr (<segment>-paddress segment) 8)
+         (incr (<segment>-laddress segment) 8))))
     (<label>	(emit-label value emit-u64 8 'abs64))
     (<undefined-symbol>	(%record-relocation value 'symbol64 8 0)
                  (emit-u64 0))

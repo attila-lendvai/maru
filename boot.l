@@ -264,6 +264,21 @@
                                             (and (<= 2 *safety*) (<= *optimised* 0))))
 (set (feature debug-output)		(or () (<= 3 *safety*)))
 
+(when-at-expand bootstrapping?
+  ;; FIXME: this belongs in setup-target.l, next to the other target
+  ;; parameters. It has to be defined earlier because source/types.l
+  ;; gates <u64> on the target's word size.
+  (define-constant target/cell-size/bits
+    (eval-in-host '(case target/arch
+                     (("x86_64" "aarch64")	64)
+                     (("i686" "i386")	32)
+                     (else			(error "unknown target/arch: "target/arch)))))
+  (define-constant target/cell-size/bytes
+    (eval-in-host '(case target/arch
+                     (("x86_64" "aarch64")	8)
+                     (("i686" "i386")	4)
+                     (else			(error "unknown target/arch: "target/arch))))))
+
 (require "source/types.l")
 
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible

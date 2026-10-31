@@ -268,14 +268,16 @@
               (char-at		,LOAD-U8)
               (u8-at		,LOAD-U8)
               (u32-at		,LOAD-U32)
-              (u64-at		,LOAD-U64)
+              ,@(when-at-expand (= 64 (target-value target/cell-size/bits))
+                  `((u64-at ,LOAD-U64)))
               (oop-at		,LOAD-OOP)
              )
              ;; ternary
              ((set-char-at	,STORE-U8)
               (set-u8-at	,STORE-U8)
               (set-u32-at	,STORE-U32)
-              (set-u64-at	,STORE-U64)
+              ,@(when-at-expand (= 64 (target-value target/cell-size/bits))
+                  `((set-u64-at ,STORE-U64)))
               (set-oop-at	,STORE-OOP)
              ))))
       (list->array

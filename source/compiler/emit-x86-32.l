@@ -3,9 +3,9 @@
 ;;; This is a compiler that emits i686 (IA-32) machine code directly
 ;;; into an Elf32 executable.
 ;;;
-;;; It runs on a 64-bit host and targets 32-bit x86. The assembler
-;;; encodes the "L" (32-bit operand) forms; see reg64 below for the
-;;; base/index register convention.
+;;; It runs on a 32- or 64-bit host and targets 32-bit x86. The
+;;; assembler encodes the "L" (32-bit operand) forms; see reg64 below for
+;;; the base/index register convention.
 ;;;
 
 (require "source/assembler/single-pass-x86.l")
@@ -281,14 +281,6 @@
                                 (MOVLrm EDX (<LITERAL>-value $2) (reg64 (<REGISTER>-name $1)) 0 0)
                                 (when-at-expand (feature strict-semantics-for-compiled-set)
                                   (MOVLrr EDX EAX))))
-
-(define-instruction LOAD-U64	(true 0 true)
-  ;; TODO
-  )
-
-(define-instruction STORE-U64	(true 0 true)
-  ;; TODO
-  )
 
 (define-instruction LOAD-OOP	(true 0 true)
   ((R32 STACK-CELL)		(MOVLmr	(<STACK-CELL>-offset $2) RBP 0 1 ECX) ; index
