@@ -4,25 +4,22 @@
 ;;; target env setup
 ;;;
 
-(let (arch word-size)
+(let (arch)
   ;; normalize arch into a symbol
   (case target/arch
     ("x86_64"
-     (set arch		'x86-64)
-     (set word-size	64))
+     (set arch		'x86-64))
 
     (("i686" "i386")
      ;; Intel's official name for this architecture is IA-32; we
      ;; normalize it to x86-32 to match the x86-64 of the 64-bit case.
-     (set arch		'x86-32)
-     (set word-size	32))
+     (set arch		'x86-32))
 
     (("aarch64")
-     (set arch		'aarch64)
-     (set word-size	64))
+     (set arch		'aarch64))
 
     (else
-     (error "Couldn't identify architecture and word size from target/arch: "target/arch)))
+     (error "Couldn't identify architecture from target/arch: "target/arch)))
 
   ;; define in the host to be able to load cgrov.l
   (define-constant target/triple		(concat-strings target/arch "-" target/vendor "-" target/os
@@ -38,9 +35,7 @@
       ;; we need the eval here because constants are <form> objects,
       ;; and without the eval we would pass a form object between the
       ;; host and the slave, but we want to pass the value.
-      (define-constant target/triple		,(eval 'target/triple))
-      (define-constant target/cell-size/bits	,word-size)
-      (define-constant target/cell-size/bytes	,(/ word-size 8)))))
+      (define-constant target/triple		,(eval 'target/triple)))))
 
 (switch-to-slave-env)
 

@@ -100,8 +100,11 @@
               linux/STATX_BASIC_STATS st)
     ;; KLUDGE FIXME this should be groveled
     (let ((mtime-ptr (+ st 0x70)))      ; 0x70 is st.stx_mtime.tv_sec
-      ;; FIXME this is broken on 32 bits
-      (box <long> (u64-at mtime-ptr 0)))))
+      (box <long>
+           (if-at-expand (= 64 target/cell-size/bits)
+               (u64-at mtime-ptr 0)
+             ;; TODO: a 31-bit <long> cannot hold the full statx tv_sec.
+             (u32-at mtime-ptr 0))))))
 
 ;;;
 ;;; <fd-stream> used in the lower (i.e. only the vm-function's need to

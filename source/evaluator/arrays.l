@@ -129,6 +129,8 @@
      (error "set-u32-at: don't know how to handle value: "value)))
   value)
 
+(when-at-expand (= 64 target/cell-size/bits)
+
 (define-vm-function (u64-at ()) ((array <memory-block>) (byteindex <long>))
   (box <u64> (u64-at (<memory-block>-elements array) byteindex)))
 
@@ -143,6 +145,8 @@
     (else
      (error "set-u64-at: don't know how to handle value: "value)))
   value)
+
+) ; (= 64 target/cell-size/bits)
 
 (define-function memory-block/ensure-size/cell (array cell-index)
   (memory-block/ensure-size array (* (+ cell-index 1) target/cell-size/bytes)))

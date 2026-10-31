@@ -515,12 +515,21 @@
    (when-at-expand (feature track-expr-names)	name)
    (when-at-expand (feature profiler)		profiler-counter)))
 
-(define-boxed-word <u64>)
 (define-boxed-word <u32>)
 
 ;; a word/cell/pointer in the lower realm, boxed, so that it can be
-;; stored in the maru heap. sized like the running arch's natural word.
-(define <lower-cell> <u64>)
+;; stored in the maru heap. sized like the running image's natural word.
+(if-at-expand bootstrapping?
+    (if-at-expand (= 64 target/cell-size/bits)
+        (begin
+          (define-boxed-word <u64>)
+          (define <lower-cell> <u64>))
+      (define <lower-cell> <u32>))
+  (if-at-expand (= 64 lower/cell-size/bits)
+      (begin
+        (define-boxed-word <u64>)
+        (define <lower-cell> <u64>))
+    (define <lower-cell> <u32>)))
 
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 ;;(define-function undefined?	(obj)	(= <undefined>	(type-of obj)))
