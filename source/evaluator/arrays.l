@@ -71,8 +71,8 @@
 
        (define-function ,zeroed-name (obj)
          (safety 2 (or (is ,type-name obj) (fatal (string ,(symbol->string zeroed-name)) ": called with object of type " (type-of obj))))
-         (if (gc/read-only-object? obj)
-             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) ": an ensure-zero-terminated function was called on a read-only object that is not zero terminated")))
+         (if (gc/in-static-space? obj)
+             (safety 3 (or (and (is ,type-name obj) (not (,getter-name obj (,length-name obj)))) (fatal (string ,(symbol->string zeroed-name)) ": an ensure-zero-terminated function was called on an object in the static space that is not zero terminated")))
            (let ((size (,length-name obj)))
              (,setter-name obj size 0)
              ;; reset back the length

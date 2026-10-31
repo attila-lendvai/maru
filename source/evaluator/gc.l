@@ -58,11 +58,14 @@
          (< __a__ __b__)
        (< __b__ 0))))
 
-;; TODO this assumes that the read-only data segment is loaded/mapped
-;; before the .data segment. it works on linux/elf, but may require
-;; more care on other platforms.
-(define-form gc/read-only-object? (obj)
-  `(gc/unsigned-< ,obj gc/lowest-memory-address))
+;; The static space holds the code, read-only data, data and bss
+;; emitted into the image; those objects are not managed by the GC and
+;; must not be mutated. Both bounds are emitted by the compiler: the
+;; lowest code address and the end of the image's bss.
+(define-form gc/in-static-space? (obj)
+  `(let ((__obj__ ,obj))
+     (and (not (gc/unsigned-< __obj__ (address-of-location 'image-start)))
+          (gc/unsigned-< __obj__ (address-of-location 'image-end)))))
 
 ;;;
 ;;; tagging
@@ -130,10 +133,9 @@
   (let ((ptr (platform/acquire-memory size)))
     (or ptr (fatal "out of memory"))
     ;; keep gc/lowest-memory-address as the lowest address across all
-    ;; heap blocks so that gc/read-only-object?'s check works regardless
-    ;; of whether the allocator grows upward or downward (e.g. mmap
-    ;; allocates from the top of the address space downward, while brk
-    ;; grows upward).
+    ;; heap blocks, regardless of whether the allocator grows upward or
+    ;; downward (e.g. mmap allocates from the top of the address space
+    ;; downward, while brk grows upward).
     (when (gc/unsigned-< ptr gc/lowest-memory-address)
       (set gc/lowest-memory-address ptr))
     (set (<header>-size  ptr) (- size size-of-<header>))
@@ -197,7 +199,7 @@
 (define-function gc/mark-and-trace (obj)
   ;; (safety 3 (or (immediate? obj) (< 1000 obj) (fatal "gc/mark-and-trace: encountered a low pointer: " (pointer obj))))
   (and (not (immediate? obj))
-       (not (gc/read-only-object? obj))
+       (not (gc/in-static-space? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (platform/diag-print "mark and trace "(pointer obj)" ("(pointer header)") flags "flags" size "(<header>-size header)" type "(<header>-type header)"\n"))

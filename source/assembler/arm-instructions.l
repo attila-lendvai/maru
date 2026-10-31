@@ -578,6 +578,9 @@
                           (lambda (v) (%emit-adr rd v))
                           4 (- 0 (current-laddress)) 'adr-prel-lo21))
     (<symbol> (ADR rd (%ensure-label designator)))
+    (<unresolved-symbol>
+     (%record-relocation designator 'adr-prel-lo21 4 0)
+     (%emit-adr rd 0))
     (else     (error "ADR: unexpected: " designator))))
 
 ;;;

@@ -40,12 +40,8 @@
   (* posix/envp ())
   )
 
-;; KLUDGE whose only role is to keep gc/read-only-object?
-;; working. it requires the heap to lie above the static image,
-;; but mmap(0) picks from the top of the address space, which on
-;; 32-bit targets lies above 2^31, i.e. it compares negative against
-;; the image. hence the hint: right above the image (the program
-;; break), grown as we allocate. it's a delme...
+;; The mmap based allocator hands out contiguous chunks right above
+;; the program break, grown as we allocate.
 (define *mmap-hint* ())
 
 (define-function platform/acquire-memory (size)

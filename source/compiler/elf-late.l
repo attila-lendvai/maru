@@ -119,6 +119,25 @@
       (else
        (emit STORE (GLOBAL-CELL (label (<variable>-name var))) $)))))
 
+(define-function sf/address-of-location (expr -c-)
+  (let ((quoted (second expr)))
+    (when (or (not (pair? quoted))
+              (not (= (first quoted) (target-value quote))))
+      (error "address-of-location: expected a quoted name: "expr))
+    (let ((name (second quoted)))
+      (emit LOAD
+            (GLOBAL-ADDR
+             ;; A maru definition resolves to its code label: under
+             ;; emit-with-object-headers the plain name binds the
+             ;; closure cell in .data (emit-objects.l), which sits above
+             ;; some literals and must not be the lower bound. A
+             ;; compiler-declared location (the image bounds) is a label
+             ;; already; anything else is external.
+             (or (and (defined? name *target-env*)
+                      (label (closure-code-label-desig name)))
+                 (%find-label name)
+                 (unresolved-symbol/typed (symbol->string name) 'notype)))))))
+
 (define-function sf/address-of (expr -c-)
   (let ((var (cadr expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
@@ -211,6 +230,7 @@
   (cons (target-value lambda)		sf/lambda)
   (cons (target-value return)		sf/return)
   (cons (target-value address-of)	sf/address-of)
+  (cons (target-value address-of-location) sf/address-of-location)
   (cons (target-value C-string)		sf/C-string)
   (cons (target-value stack-pointer-on-entry) sf/stack-pointer-on-entry)
   ))
@@ -645,6 +665,12 @@
     ;; WITH-NEW-LABEL, or similar constructs.
     (.segment 'code)
 
+    ;; ADDRESS-OF-LOCATION resolves names through the assembler env, so
+    ;; both image bounds must exist before the definitions can
+    ;; reference them.
+    (label! 'image-start)
+    (label 'image-end)    ; a forward label defined later
+
     ;; Make space for the ELF header; it will be emitted as the final step.
     (.i8/times 0 +ehdr-size+)
 
@@ -659,6 +685,10 @@
           (verbosity 1 (warn name ", "))
           (compile-definition value name -c-))))
     (verbosity 1 (warn "\n"))
+
+    ;; The static image ends here; the heap image follows it.
+    (with-current-segment 'bss
+      (label! 'image-end))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))

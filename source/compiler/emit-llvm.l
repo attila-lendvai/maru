@@ -539,6 +539,7 @@
                                        (length (array-length arr)))
                                   (println "	"$reg1" = getelementptr [" length " x %oop], [" length " x %oop]* "$1", %word 0, %word 0")
                                   (println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
+  ((GLOBAL _)			(println "	"$reg2" = bitcast ptr "$1" to %oop"))
   ((_ _)			(println "	"$reg1" = getelementptr %oop, %oop* "$1", %word 0")
 				(println "	"$reg2" = bitcast %oop* "$reg1" to %oop")))
 
@@ -1098,6 +1099,13 @@
     (comp value)
     (gen RET (<compiler>-current-value -c-))))
 
+(define-function compile/address-of-location (expr -c-)
+  (let ((quoted (second expr)))
+    (when (or (not (pair? quoted))
+              (not (= (first quoted) (target-value quote))))
+      (error "address-of-location: expected a quoted name: "expr))
+    (gen ADDR (GLOBAL (second quoted)) ())))
+
 (define-function compile/address-of (expr -c-)
   (let ((var (second expr)))
     (or (variable? var) (error "address-of: non-variable argument: "var))
@@ -1128,6 +1136,7 @@
   (cons (target-value lambda)		compile/lambda)
   (cons (target-value return)		compile/return)
   (cons (target-value address-of)	compile/address-of)
+  (cons (target-value address-of-location) compile/address-of-location)
   (cons (target-value C-string)		compile/C-string)
   (cons (target-value stack-pointer-on-entry)	(lambda (expr -c-) (gen SPONENTRY)))
   ))
@@ -1366,6 +1375,11 @@
            )))
   (comment-features)
   (emit-prelude -c-)
+
+  ;; The lower bound of the static image: any code address is below
+  ;; every data section. Never called.
+  (print "define void "(GLOBAL 'image-start)"() { ret void }\n")
+
   ;; NOTE this array-do will not pick up any new definitions added to
   ;; the env after the iterations has begun (see e.g. the
   ;; COMPILE-DEFINITION of <selector>).
@@ -1380,7 +1394,12 @@
         (verbosity 1 (warn name ", "))
         (compile-definition value name -c-))))
   (verbosity 1 (warn "\n"))
-  (emit-gen-buffer -c-))
+
+  (emit-gen-buffer -c-)
+
+  ;; Emitted last, so that it is also laid out last: a zero initialized
+  ;; global lands in bss, after everything else this module defines.
+  (print (GLOBAL 'image-end) " = global [1 x i8] zeroinitializer\n"))
 
 (define-function run-compiler (env output-path)
   (with-open-stream (stream output-path "w")

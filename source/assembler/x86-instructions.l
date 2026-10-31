@@ -281,7 +281,7 @@
 
 (define-function _r_D (R D)
   (_Mrm _b00 (rindex R) _b101)
-  (emit-rel32 D))
+  (emit-rel32/pc32 D))
 
 (define-function _r_0B (R B)
   (_Mrm _b00 (rindex R) (rindex/32 B)))
@@ -425,11 +425,11 @@
 
 (define-function _O_rel32 (OP D)
   (_O OP)
-  (emit-rel32 D))
+  (emit-rel32/plt32 D))
 
 (define-function _OO_rel32 (OP D)
   (_OO OP)
-  (emit-rel32 D))
+  (emit-rel32/plt32 D))
 
 (define-function _Os_sW (OP W)
   (_Os OP W)

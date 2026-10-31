@@ -171,12 +171,17 @@
      __result))
 
 ;; A relocation target that the static linker resolves by name (e.g.
-;; an imported C symbol). Unlike a <label>, it never gets defined.
+;; an imported C symbol). Unlike a <label>, it never gets defined. KIND
+;; selects the ELF symbol type: function, object, or notype.
 (define-record <unresolved-symbol> ()
-  (name))
+  (name
+   kind))
 
 (define-function unresolved-symbol (name)
-  (make <unresolved-symbol> (name name)))
+  (make <unresolved-symbol> (name name) (kind 'function)))
+
+(define-function unresolved-symbol/typed (name kind)
+  (make <unresolved-symbol> (name name) (kind kind)))
 
 (define-record <label> ()
   (segment

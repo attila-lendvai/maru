@@ -177,11 +177,15 @@
 ;; Appends a GLOBAL UND Elf64_Sym for NAME, and returns its .symtab
 ;; index (0-based; the count *before* the append is the new symbol's
 ;; index).
-(define-function %c-obj-emit-und-symbol (name)
+(define-function %c-obj-emit-und-symbol (name kind)
   (let ((index (%c-obj-symbol-count)))
     (emit-symtab-entry (emit-strtab-entry name)
                        (+ (bitwise-shift elf/STB_GLOBAL 4)
-                          elf/STT_FUNC)
+                          (case kind
+                            (function	elf/STT_FUNC)
+                            (object	elf/STT_OBJECT)
+                            (notype	elf/STT_NOTYPE)
+                            (else	(error "unexpected unresolved-symbol kind: "kind))))
                        0
                        elf/SHN_UNDEF
                        0
@@ -204,18 +208,22 @@
                          (<label>-laddress it)
                          0))))
 
-;; Appends one GLOBAL UND symbol per distinct external name recorded
-;; in the fixup holes, and returns an alist of (name . symtab-index).
+;; Appends one GLOBAL UND symbol per distinct external (name, kind)
+;; recorded in the fixup holes, and returns a list of
+;; (name kind symtab-index) entries.
 (define-function %c-obj-emit-und-symbols ()
   (let ((und-alist ()))
     (list-do entry (list-reverse (<assembler>-relocations *assembler*))
       (let ((target (third entry)))
         (when (is <unresolved-symbol> target)
-          (let ((name (<unresolved-symbol>-name target)))
+          (let ((name	(<unresolved-symbol>-name target))
+                (kind	(<unresolved-symbol>-kind target)))
             (unless (list-find-if (lambda (entry)
-                                    (= name (first entry)))
+                                    (and (= name (first entry))
+                                         (= kind (second entry))))
                                   und-alist)
-              (set und-alist (cons (cons name (%c-obj-emit-und-symbol name))
+              (set und-alist (cons (list name kind
+                                         (%c-obj-emit-und-symbol name kind))
                                    und-alist)))))))
     und-alist))
 
@@ -241,10 +249,12 @@
              (symbol-index
                (typecase target
                  (<unresolved-symbol>
-                  (let ((entry (list-find-if (lambda (entry)
-                                               (= (<unresolved-symbol>-name target) (first entry)))
-                                             und-alist)))
-                    (or (and entry (cdr entry))
+                  (let ((entry (list-find-if
+                                (lambda (entry)
+                                  (and (= (<unresolved-symbol>-name target) (first entry))
+                                       (= (<unresolved-symbol>-kind target) (second entry))))
+                                und-alist)))
+                    (or (and entry (third entry))
                         (error "UND symbol not found in the symbol table: "(<unresolved-symbol>-name target)))))
                  (<label>
                   (assert (<label>-laddress target)
@@ -263,12 +273,12 @@
                (typecase target
                  (<unresolved-symbol>
                   (case type
-                    (plt32		-4)
+                    ((plt32 pc32)	-4)
                     ((adr-prel-lo21 jump26 call26 condbranch19 symbol32 symbol64) 0)
                     (else		(error "unexpected relocation type against an external: "type))))
                  (<label>
                   (case type
-                    (pc32		(- (<label>-laddress target) 4))
+                    ((plt32 pc32)	(- (<label>-laddress target) 4))
                     ((adr-prel-lo21 jump26 call26 condbranch19)
                      (<label>-laddress target))
                     ((abs32 abs64 symbol64)	(<label>-laddress target))

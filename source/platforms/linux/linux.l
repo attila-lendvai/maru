@@ -142,12 +142,8 @@
                 linux/PROT_EXEC))
     result))
 
-;; KLUDGE whose only role is to keep gc/read-only-object?
-;; working. it requires the heap to lie above the static image,
-;; but mmap(0) picks from the top of the address space, which on
-;; 32-bit targets lies above 2^31, i.e. it compares negative against
-;; the image. hence the hint: right above the image (the program
-;; break), grown as we allocate. it's a delme...
+;; The mmap based allocator hands out contiguous chunks right above
+;; the program break, grown as we allocate.
 (define *mmap-hint* 0)
 
 ;; the kernel hands us the page size in the auxv; parsed in _start
@@ -166,14 +162,10 @@
   ;; KLUDGE we make all allocated memory executable.
   ;; `make test-elf` generates machine code and wants to call it...
   ;;
-  ;; We don't let the kernel choose the address (it would map us into
-  ;; its mmap area, which can lie below our static image, e.g. under
-  ;; qemu-user with a guest ld.so), but hand out consecutive chunks
-  ;; starting right above the binary's break. this way all heap memory
-  ;; stays above the static image, keeping the invariant of
-  ;; gc/read-only-object? intact. MAP_FIXED_NOREPLACE ensures that we
-  ;; don't clobber anything that might have been mapped there in the
-  ;; meantime (needs linux 4.17+).
+  ;; We don't let the kernel choose the address, but hand out
+  ;; consecutive chunks starting right above the binary's break.
+  ;; MAP_FIXED_NOREPLACE ensures that we don't clobber anything that
+  ;; might have been mapped there in the meantime (needs linux 4.17+).
   (unless *mmap-hint*
     (set *mmap-hint* (align-address-up (syscall linux/SYS_brk 0)
                                        *kernel-page-size*)))
@@ -197,11 +189,8 @@
 
 (define-function platform/acquire-memory (size)
   ;; the brk based allocator remains the default: it grows the heap
-  ;; right above the binary's static image, which keeps the assumption
-  ;; of gc/read-only-object? (all heap memory lies above the static
-  ;; image) true even in environments where the mmap area is not (see
-  ;; via-mmap's comment). swap the call below to try the mmap based
-  ;; allocator.
+  ;; right above the binary's static image. swap the call below to try
+  ;; the mmap based allocator.
   (platform/acquire-memory/via-brk size))
 
 (eval-in-host '(load "source/platforms/linux/syscall.l"))
