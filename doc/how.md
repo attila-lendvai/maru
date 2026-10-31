@@ -42,7 +42,7 @@ The `arm` backend (source/compiler/emit-arm.l) can fully bootstrap on
 Even on an x86_64 host through qemu-user with binfmt misc:
 
 ```
-apt install qemu-user-static gcc-aarch64-linux-gnu
+sudo tools-for-build/install-ubuntu-deps.sh
 ./build.sh target/arch=aarch64 bootstrap arm linux
 ```
 
@@ -69,7 +69,7 @@ There is no native IA-32 assembler backend, so we must use the `llvm`
 backend:
 
 ```
-apt install clang gcc-multilib
+sudo tools-for-build/install-ubuntu-deps.sh
 ./build.sh target/arch=i686 bootstrap llvm linux
 ```
 

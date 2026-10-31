@@ -1,3 +1,4 @@
+# run from tools-for-build/ (the context must contain install-ubuntu-deps.sh)
 # podman build --platform linux/amd64 -t ghcr.io/attila-lendvai/maru-ci:amd64 --build-arg CI_IMAGE_VERSION=$(date --rfc-3339 date) -f Dockerfile .
 # podman build --platform linux/arm64 -t ghcr.io/attila-lendvai/maru-ci:arm64 --build-arg CI_IMAGE_VERSION=$(date --rfc-3339 date) -f Dockerfile .
 
@@ -26,50 +27,15 @@ ENV CI_IMAGE_VERSION=$CI_IMAGE_VERSION
 RUN echo TARGETARCH="$TARGETARCH"
 RUN echo CI_IMAGE_VERSION="$CI_IMAGE_VERSION"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        bash \
-        make \
-        llvm \
-        clang-22 \
-        lld \
-        libc6-dev \
-        libffi-dev \
-        binutils \
-        binutils-i686-linux-gnu \
-        binutils-x86-64-linux-gnu \
-        binutils-aarch64-linux-gnu \
-        strace \
-        git \
-        rsync \
-        time \
-        less \
-        diffoscope \
-        lsb-release software-properties-common gnupg \
-        wget \
-        curl \
-        ca-certificates \
-        qemu-user \
-        qemu-user-binfmt \
-        musl \
-        musl-dev \
-    # Conditional packages per host arch: the cross gcc's of the
-    # foreign targets. clang needs them for its gcc installation
-    # detection to find crtbegin et al (the native libgcc comes with
-    # clang itself). build.l points clang at the cross sysroot
-    # /usr/<triple> that they provide (clang does not adopt it on its
-    # own). NB: the cross libc-dev packages are only Recommends, so
-    # they must stay explicit under --no-install-recommends.
-    && if [ "$TARGETARCH" = "amd64" ]; then \
-      apt-get install -y --no-install-recommends \
-        gcc-aarch64-linux-gnu gcc-i686-linux-gnu \
-        libc6-dev-i386 libc6-dev-arm64-cross libc6-dev-i386-cross; \
-    fi \
-    && if [ "$TARGETARCH" = "aarch64" ]; then \
-      apt-get install -y --no-install-recommends \
-        gcc-x86-64-linux-gnu gcc-i686-linux-gnu \
-        libc6-dev-amd64-cross libc6-dev-i386-cross; \
-    fi \
+# Conditional packages per host arch: the cross gcc's of the foreign
+# targets. clang needs them for its gcc installation detection to find
+# crtbegin et al (the native libgcc comes with clang itself). build.l
+# points clang at the cross sysroot /usr/<triple> that they provide
+# (clang does not adopt it on its own). NB: the cross libc-dev packages
+# are only Recommends, so they must stay explicit under
+# --no-install-recommends.
+COPY install-ubuntu-deps.sh /tmp/
+RUN /tmp/install-ubuntu-deps.sh --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # if/when we need the latest llvm...
@@ -77,11 +43,6 @@ RUN apt-get update && \
 
 # Ensure bash is the default shell
 # SHELL ["/bin/bash", "-c"]
-
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100 && \
-    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100 && \
-    update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 && \
-    update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
 # Enable bash-completion for root
 RUN echo 'if [ -f /usr/share/bash-completion/bash_completion ]; then' >> /root/.bashrc \
