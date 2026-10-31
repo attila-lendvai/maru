@@ -46,23 +46,30 @@
       (cons 'let (cons '() prog))
     (car prog)))
 
-(define-function %cond (clauses)
-  (if (pair? clauses)
-      (let* ((clause (car clauses))
-             (test   (car clause))
-             (body   (cdr clause)))
-        (if (= 'else test)
-            (%maybe-progn body)
-          (if (= '=> (car body)) ; scheme syntax to funcall the body
-              `(let ((_ ,test))
-                 (if _
-                     (,(%maybe-progn (cdr body)) _)
-                   ,(%cond (cdr clauses))))
-            `(if ,test
-                 ,(%maybe-progn body)
-               ,(%cond (cdr clauses))))))))
+;; Clauses are expanded before dispatch: a clause whose head is a form
+;; (e.g. WHEN-AT-EXPAND or IF-AT-EXPAND) expands to a clause, or to ()
+;; when it is compiled out. This allows dispatching on types that are
+;; not defined in every image. A conditional must yield at most one
+;; clause; WHEN-AT-EXPAND with multiple forms wraps them in a LET.
+(define-function %cond (clauses env)
+  (when (pair? clauses)
+    (let ((clause (expand (car clauses) env)))
+      (if (not clause)
+          (%cond (cdr clauses) env)
+        (let ((test (car clause))
+              (body (cdr clause)))
+          (if (= 'else test)
+              (%maybe-progn body)
+            (if (= '=> (car body)) ; scheme syntax to funcall the body
+                `(let ((_ ,test))
+                   (if _
+                       (,(%maybe-progn (cdr body)) _)
+                     ,(%cond (cdr clauses) env)))
+              `(if ,test
+                   ,(%maybe-progn body)
+                 ,(%cond (cdr clauses) env)))))))))
 
-(define-form cond clauses (%cond clauses))
+(define-form cond clauses (%cond clauses *env*))
 
 ;;; case
 
@@ -95,15 +102,17 @@
 
 (define-function %typecase (clauses env)
   (when (pair? clauses)
-    (let* ((clause	(expand (car clauses) env))
-           (type	(car clause))
-           (body	(cdr clause)))
-      (if (= 'else type)
-          (%maybe-progn body)
-        `(if (is ,type __value__)
-             (let ()
-               ,@body)
-           ,(%typecase (cdr clauses) env))))))
+    (let ((clause (expand (car clauses) env)))
+      (if (not clause)
+          (%typecase (cdr clauses) env)
+        (let ((type (car clause))
+              (body (cdr clause)))
+          (if (= 'else type)
+              (%maybe-progn body)
+            `(if (is ,type __value__)
+                 (let ()
+                   ,@body)
+               ,(%typecase (cdr clauses) env))))))))
 
 (define-form typecase (value . clauses)
   `(let ((__value__ ,value))

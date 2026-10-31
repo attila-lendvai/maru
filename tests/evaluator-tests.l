@@ -43,6 +43,51 @@
   (test-assert (or (= 32 lower/cell-size/bits)
                    (= 64 lower/cell-size/bits))))
 
+(define-test typecase/conditional-clause/false ()
+  (test-assert (= 'long
+                  (typecase 42
+                    (when-at-expand () (<not-a-type> 'no))
+                    (<long> 'long)
+                    (else 'other)))))
+
+(define-test typecase/conditional-clause/true ()
+  (test-assert (= 'long
+                  (typecase 42
+                    (when-at-expand (= 1 1) (<long> 'long))
+                    (else 'other)))))
+
+;; a skipped clause must not match just because the value is false
+(define-test typecase/conditional-clause/false-value ()
+  (test-assert (= 'other
+                  (typecase ()
+                    (when-at-expand () (<not-a-type> 'no))
+                    (else 'other)))))
+
+(define-test typecase/conditional-clause/if-at-expand ()
+  (test-assert (= 'long
+                  (typecase 42
+                    (if-at-expand (= 1 2) (<not-a-type> 'no) (<long> 'long))))))
+
+(define-test cond/conditional-clause/false ()
+  (test-assert (= 'yes
+                  (cond
+                    (when-at-expand () ((= 1 <not-a-type>) 'no))
+                    ((= 1 1) 'yes)
+                    (else 'no)))))
+
+(define-test cond/conditional-clause/true ()
+  (test-assert (= 'yes
+                  (cond
+                    (when-at-expand (= 1 1) ((= 1 1) 'yes))
+                    (else 'no)))))
+
+(define-test cond/conditional-clause/if-at-expand ()
+  (test-assert (= 'yes
+                  (cond
+                    (if-at-expand (= 1 2)
+                        ((= 1 <not-a-type>) 'no)
+                      ((= 1 1) 'yes))))))
+
 (define-test eval/arithmetic/logic ()
   (test-assert (= 42		(bitwise-or 42)))
   (test-assert (= 3		(bitwise-or 1 2 3)))
