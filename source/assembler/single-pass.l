@@ -172,11 +172,11 @@
 
 ;; A relocation target that the static linker resolves by name (e.g.
 ;; an imported C symbol). Unlike a <label>, it never gets defined.
-(define-record <undefined-symbol> ()
+(define-record <unresolved-symbol> ()
   (name))
 
-(define-function undefined-symbol (name)
-  (make <undefined-symbol> (name name)))
+(define-function unresolved-symbol (name)
+  (make <unresolved-symbol> (name name)))
 
 (define-record <label> ()
   (segment
@@ -198,7 +198,7 @@
 
 ;; Records a relocation against the fixup hole at the current
 ;; position. TARGET is either a <label> (resolved to a section symbol
-;; + offset at serialization time) or a <undefined-symbol>.
+;; + offset at serialization time) or a <unresolved-symbol>.
 ;;
 ;; No relocation is recorded when TYPE is absent (the fixup has no
 ;; relocation mapping, e.g. an absolute imm field), or when TARGET is a
@@ -483,7 +483,7 @@
        (incr (<segment>-paddress segment) 4)
        (incr (<segment>-laddress segment) 4)))
     (<label>	(emit-label value emit-u32 4 'abs32))
-    (<undefined-symbol>	(%record-relocation value 'symbol32 4 0)
+    (<unresolved-symbol>	(%record-relocation value 'symbol32 4 0)
                  (emit-u32 0))
     (<symbol>	(emit-u32 (%ensure-label value)))
     (else	(error "emit-u32: called with unexpected value: "value", type: "(type-of value)))))
@@ -526,7 +526,7 @@
          (incr (<segment>-paddress segment) 8)
          (incr (<segment>-laddress segment) 8))))
     (<label>	(emit-label value emit-u64 8 'abs64))
-    (<undefined-symbol>	(%record-relocation value 'symbol64 8 0)
+    (<unresolved-symbol>	(%record-relocation value 'symbol64 8 0)
                  (emit-u64 0))
     (<symbol>	(emit-u64 (%ensure-label value)))
     (else	(error "emit-u64: called with unexpected value: "value", type: "(type-of value)))))
