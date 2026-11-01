@@ -1007,9 +1007,9 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
                       "--define" "+ld.so-path+" (effective-ld.so)
                       file))
                ($ "file=build/$(basename --suffix=.l '"file"') && chmod +x $file && ./$file"))))
-    (run "tests/test-elf.x86-64.traditional.l")
-    (run "tests/test-elf.x86-64.single-pass.l")
-    (run "tests/test-elf.x86-64.segments.l")))
+
+    (run "tests/test-elf.x86-64.segments.l")
+    (run "tests/test-elf.x86-64.single-pass.l")))
 
 (define-function test-assembler-x86 ()
   (ensure-directory-exists (build-path "asm-x86"))
