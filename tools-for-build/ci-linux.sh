@@ -118,6 +118,13 @@ step() {
     return "$status"
 }
 
+check_elf_class() {
+    if ! readelf -h "$1" | grep -q "Class:.*$2"; then
+	echo "$1 is not $2" >&2
+	return 1
+    fi
+}
+
 native_amd64() {
     # test-compiler first: it fails faster than a full bootstrap
     step target/arch=i686 test-compiler x86 linux
@@ -137,6 +144,21 @@ native_amd64() {
     step target/arch=i686 bootstrap llvm libc
 
     step target/arch=i686 bootstrap x86 linux
+
+    # a 32-bit compiler host targeting x86_64; the i686 eval1 below was
+    # built by the previous step. remove the target artifacts so the
+    # override cannot silently reuse the 64-bit host's output.
+    check_elf_class build/x86-linux/i686-unknown-linux-gnu/eval1 ELF32
+    rm -rf build/x86-linux/x86_64-unknown-linux-gnu \
+	   build/x86-libc/x86_64-unknown-linux-gnu \
+	   build/llvm-linux/x86_64-unknown-linux-gnu
+    step eval0-binary=build/x86-linux/i686-unknown-linux-gnu/eval1 bootstrap x86 linux
+    step eval0-binary=build/x86-linux/i686-unknown-linux-gnu/eval1 bootstrap x86 libc
+    step eval0-binary=build/x86-linux/i686-unknown-linux-gnu/eval1 bootstrap llvm linux
+    step eval0-binary=build/x86-linux/i686-unknown-linux-gnu/eval1 test-compiler x86 linux
+    step eval0-binary=build/x86-linux/i686-unknown-linux-gnu/eval1 test-standalone-elf x86 libc
+    check_elf_class build/x86-linux/x86_64-unknown-linux-gnu/eval1 ELF64
+
     step target/arch=i686 bootstrap x86 posix
     step target/arch=i686 bootstrap x86 libc
 
