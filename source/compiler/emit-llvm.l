@@ -1378,7 +1378,7 @@
 
   ;; The lower bound of the static image: any code address is below
   ;; every data section. Never called.
-  (print "define void "(GLOBAL 'image-start)"() { ret void }\n")
+  (print "define void "(GLOBAL 'static-space-start)"() { ret void }\n")
 
   ;; NOTE this array-do will not pick up any new definitions added to
   ;; the env after the iterations has begun (see e.g. the
@@ -1399,7 +1399,7 @@
 
   ;; Emitted last, so that it is also laid out last: a zero initialized
   ;; global lands in bss, after everything else this module defines.
-  (print (GLOBAL 'image-end) " = global [1 x i8] zeroinitializer\n"))
+  (print (GLOBAL 'static-space-end) " = global [1 x i8] zeroinitializer\n"))
 
 (define-function run-compiler (env output-path)
   (with-open-stream (stream output-path "w")

@@ -668,8 +668,8 @@
     ;; ADDRESS-OF-LOCATION resolves names through the assembler env, so
     ;; both image bounds must exist before the definitions can
     ;; reference them.
-    (label! 'image-start)
-    (label 'image-end)    ; a forward label defined later
+    (label! 'static-space-start)
+    (label 'static-space-end)    ; a forward label defined later
 
     ;; Make space for the ELF header; it will be emitted as the final step.
     (.i8/times 0 +ehdr-size+)
@@ -688,7 +688,7 @@
 
     ;; The static image ends here; the heap image follows it.
     (with-current-segment 'bss
-      (label! 'image-end))
+      (label! 'static-space-end))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))

@@ -64,8 +64,8 @@
 ;; lowest code address and the end of the image's bss.
 (define-form gc/in-static-space? (obj)
   `(let ((__obj__ ,obj))
-     (and (not (gc/unsigned-< __obj__ (address-of-location 'image-start)))
-          (gc/unsigned-< __obj__ (address-of-location 'image-end)))))
+     (and (not (gc/unsigned-< __obj__ (address-of-location 'static-space-start)))
+          (gc/unsigned-< __obj__ (address-of-location 'static-space-end)))))
 
 ;;;
 ;;; tagging
