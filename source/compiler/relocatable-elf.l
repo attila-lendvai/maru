@@ -102,9 +102,10 @@
         (list-do entry *external-symbols*
           (.u64 (+ +data-segment-address+
                    (<label>-paddress (<external-symbol>-got-label entry))))
-          ;; r_info = (dynsym-index << 32) | glob-dat-type
-          (.u64 (bitwise-or (bitwise-shift (<external-symbol>-dynsym-index entry) 32)
-                            glob-dat-type))
+          ;; r_info = (dynsym-index << 32) | glob-dat-type; emit the
+          ;; halves so a 32-bit host never shifts by 32.
+          (.u32 glob-dat-type)
+          (.u32 (<external-symbol>-dynsym-index entry))
           (.u64 0)                ; r_addend
           (incr rela-count)))
       (label! '.rela.dyn-end)
@@ -287,10 +288,13 @@
         (with-current-segment rela-segment
           (.cell hole-paddress)
           ;; Elf32_Rel packs r_info as (sym << 8 | type); Elf64_Rela as
-          ;; (sym << 32 | type).
-          (.cell (bitwise-or (bitwise-shift symbol-index
-                                            (if (= +elf-class+ elf/ELFCLASS32) 8 32))
-                             (arch-reloc-type arch type))))
+          ;; (sym << 32 | type). Emit the Elf64 halves separately so a
+          ;; 32-bit host never shifts by 32.
+          (if (= +elf-class+ elf/ELFCLASS32)
+              (.u32 (bitwise-or (bitwise-shift symbol-index 8)
+                                (arch-reloc-type arch type)))
+            (.u32 (arch-reloc-type arch type))
+            (.u32 symbol-index)))
         ;; Elf64_Rela carries the addend out of band; Elf32 is SHT_REL,
         ;; where the addend lives in the fixup field instead.
         (if (= +elf-class+ elf/ELFCLASS32)

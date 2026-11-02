@@ -66,7 +66,7 @@
                                     ((= 0 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
+                                    ((i32? lit)
                                      (ADDQi32r lit reg))
                                     (else
                                      (MOVQi64r lit RBX)
@@ -86,7 +86,7 @@
                                     ((= 0 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
+                                    ((i32? lit)
                                      (SUBQi32r lit reg))
                                     (else
                                      (MOVQi64r lit RBX)
@@ -125,7 +125,7 @@
                                     ((= -1 lit)
                                      ;; NOP
                                      )
-                                    ((< -0x80000000 lit 0x80000000)
+                                    ((i32? lit)
                                      (ANDQi32r lit reg))
                                     (else
                                      (MOVQi64r lit RBX)
@@ -141,7 +141,7 @@
                                      )
                                     ((= -1 lit)
                                      (MOVQi32r -1 reg))
-                                    ((< -0x80000000 lit 0x80000000)
+                                    ((i32? lit)
                                      (ORQi32r lit reg))
                                     (else
                                      (MOVQi64r lit RBX)
@@ -158,7 +158,7 @@
                                      )
                                     ((= -1 lit)
                                      (NOTQr reg))
-                                    ((< -0x80000000 lit 0x80000000)
+                                    ((i32? lit)
                                      (XORQi32r lit reg))
                                     (else
                                      (MOVQi64r lit RBX)

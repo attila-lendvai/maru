@@ -213,8 +213,11 @@
 
 (define-function i32? (I)
   (and (long? I)
-       ;; -2147483648 2147483647
-       (<= -0x80000000 I 0x7fffffff)))
+       ;; a 31-bit <long> of a 32-bit host always fits in an int32
+       (if-at-expand (< 32 lower/cell-size/bits)
+           ;; -2147483648 2147483647
+           (<= -0x80000000 I 0x7fffffff)
+         true)))
 
 (define-function _mod (M)
   (assert (<= M 3) "illegal mod: "M)
