@@ -6,10 +6,11 @@
 ;; TODO run-with-stage-1 and the run-with-* is ripe for a cleanup
 
 ;; TODO ? introduce some mechanism to set target/arch & co but only
-;; for eval0. rationale: to also be able to test cross-compilation
-;; from an i686 eval0 -> x86_64 eval1. the opposite is already
-;; testable with a simple ./build.sh target/arch=i686 bootstrap x86
-;; linux. see compile-maru/stage-0
+;; for eval0. in the meantime the cross host direction (i686 eval ->
+;; x86_64 target) is tested by pointing EVAL0-BINARY at an i686 eval1;
+;; see compile-maru/stage-0 and tools-for-build/ci-linux.sh. the
+;; opposite is already testable with a simple ./build.sh target/arch=i686
+;; bootstrap x86 linux.
 
 (require "source/env-min.l")
 (require "source/sequences.l")
@@ -234,7 +235,7 @@
   ;; because they get encoded into the build output path.
   ;; Candidates:
   ;;  - ld.so but that gets set in effective-ld.so, leading to recompiles
-  '(profiler elf-emission-type C-obj/static-linking?))
+  '(profiler elf-emission-type C-obj/static-linking? eval0-binary))
 
 (define-function save-dep-vars (output-file variables)
   (let ((result ()))
@@ -396,6 +397,12 @@
 ;; benefits of the our most recent commits, plus the flexibility to
 ;; temporarily break stuff while making progress.
 (define eval0-phase	true)
+
+;; An explicit eval binary to use as the stage-0 host, relative to the
+;; slave directory. It lets a foreign-arch build act as the compiler
+;; host, e.g. an i686 eval1 targeting x86_64. See
+;; tools-for-build/ci-linux.sh.
+(define eval0-binary ())
 
 (define profiler	false)
 
@@ -829,46 +836,52 @@ git --no-pager log --pretty=oneline -1")))
 ;; stage, and then use that in the rest of the build.
 (define-function compile-maru/stage-0 (backend platform)
   (debug-log "compile-maru/stage-0: "backend" "platform)
-  (let* ((host		(compile-host))
-         (host-dir 	(pop host))
-         (host-eval	(pop host))
-         (input-file	(concat-strings* "source/platforms/"platform"/eval.l"))
-         (eval0-dir	(checkout-eval0)))
+  (if eval0-binary
+      (let ((path (slave-path eval0-binary)))
+        (or (file-exists? path)
+            (error "eval0-binary does not exist: "path))
+        (debug-log "compile-maru/stage-0: using eval0-binary "path)
+        (list *slave-dir* eval0-binary))
+    (let* ((host		(compile-host))
+           (host-dir 	(pop host))
+           (host-eval	(pop host))
+           (input-file	(concat-strings* "source/platforms/"platform"/eval.l"))
+           (eval0-dir	(checkout-eval0)))
 
-    (if eval0-phase
-        (let ((eval0-backend	llvm)
-              (eval0-platform	libc))
-          ;; the fork runs its own build.sh, which would bootstrap
-          ;; another maru.10 host; point its host dir at the one we
-          ;; already have.
-          ($ "mkdir -p '" eval0-dir "/build' && rm -rf '" eval0-dir "/build/maru.10' &&
+      (if eval0-phase
+          (let ((eval0-backend	llvm)
+                (eval0-platform	libc))
+            ;; the fork runs its own build.sh, which would bootstrap
+            ;; another maru.10 host; point its host dir at the one we
+            ;; already have.
+            ($ "mkdir -p '" eval0-dir "/build' && rm -rf '" eval0-dir "/build/maru.10' &&
 ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
-          (debug-log "compile-maru/stage-0: forking the eval0 build")
-          ;; All we want here is an eval0 binary compiled from a
-          ;; reasonably recent commit that works fast on the host to
-          ;; exercise the rest of the machinery. In some way it's a
-          ;; cache or workflow optimization: we get to enjoy the new
-          ;; features without opening a new branch, or evolutionary
-          ;; stage. Downside: delayed feedback when something breaks
-          ;; the bootstrap when the host is the previous stage.
-          (let* ((output (run-program/shell "cd '"eval0-dir"' &&
+            (debug-log "compile-maru/stage-0: forking the eval0 build")
+            ;; All we want here is an eval0 binary compiled from a
+            ;; reasonably recent commit that works fast on the host to
+            ;; exercise the rest of the machinery. In some way it's a
+            ;; cache or workflow optimization: we get to enjoy the new
+            ;; features without opening a new branch, or evolutionary
+            ;; stage. Downside: delayed feedback when something breaks
+            ;; the bootstrap when the host is the previous stage.
+            (let* ((output (run-program/shell "cd '"eval0-dir"' &&
                            ./build.sh eval0-phase=false compile-maru/stage-0 "
                                             eval0-backend" "eval0-platform
                                             " | tail -2"))
-                 ;; TODO read the path's from the fork's actual output
-                 ;; (input (string-stream output))
-                 ;; (results (read input))
-                 (eval0 (concat-strings* *build* "/" eval0-backend "-" eval0-platform
-                                         "/" (host-triple) "/eval0")))
-            (debug-log "compile-maru/stage-0 is returning from the fork: "eval0-dir eval0)
-            (list eval0-dir eval0)))
-      (let ((eval0 (compile-maru backend platform host-dir host-eval *slave-dir*
-                                 input-file "eval0" true)))
-        ;; API: we print two specific lines as the last output to stdout
-        ;; TODO pass the values to the parent
-        ;;(println *slave-dir*)
-        ;;(println eval0)
-        (list *slave-dir* eval0)))))
+                   ;; TODO read the path's from the fork's actual output
+                   ;; (input (string-stream output))
+                   ;; (results (read input))
+                   (eval0 (concat-strings* *build* "/" eval0-backend "-" eval0-platform
+                                           "/" (host-triple) "/eval0")))
+              (debug-log "compile-maru/stage-0 is returning from the fork: "eval0-dir eval0)
+              (list eval0-dir eval0)))
+        (let ((eval0 (compile-maru backend platform host-dir host-eval *slave-dir*
+                                   input-file "eval0" true)))
+          ;; API: we print two specific lines as the last output to stdout
+          ;; TODO pass the values to the parent
+          ;;(println *slave-dir*)
+          ;;(println eval0)
+          (list *slave-dir* eval0))))))
 
 (define-function compile-maru/stage-1 (backend platform)
   ;; eval0 is either in build/eval0/build/... or in our own build/
