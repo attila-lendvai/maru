@@ -248,7 +248,7 @@
     (gc/sweep)
     (set gc/alloc-count 0)))
 
-(define-function gc/allocate (type requested-size)
+(define-function gc/allocate (type requested-size opaque?)
   (gc/debug (platform/diag-print "gc/allocate type "type" "requested-size"\n"))
   (safety 2 (assert type "gc/allocate: type is 0"))
   (set requested-size (oop/align requested-size)) ; only allow cell-sized allocation
@@ -294,7 +294,10 @@
                 ;; initialize the freshly reserved chunk
                 (let* ((header chunk)
                        (obj (gc/payload-of header)))
-                  (set (<header>-flags header) <header>-flags/used)
+                  (set (<header>-flags header)
+                       (if opaque?
+                           (bitwise-or <header>-flags/used <header>-flags/opaque)
+                         <header>-flags/used))
                   (set (<header>-type header) type)
                   (platform/clear-cells obj (/ chunk-size target/cell-size/bytes))
                   (safety 4 (assert (= (gc/object-size obj) requested-size) "gc/allocate: was about to return with an object whose size in the header is not equal to the requested size"))
@@ -306,15 +309,9 @@
       (gc/grow-heap (max (+ size-of-<header> requested-size)
                          gc/minimum-growth-unit)))))
 
-(define-function gc/allocate-opaque (type requested-size)
-  (let* ((obj (gc/allocate type requested-size))
-         (header (gc/header-of obj)))
-    (set (<header>-flags header) (bitwise-or (<header>-flags header) <header>-flags/opaque))
-    obj))
-
 (define-function gc/grow-root-vector ()
   (set gc/root-max (max 32 (* 2 gc/root-max)))
-  (let ((new-roots (gc/allocate-opaque <data> (words-to-bytes gc/root-max))))
+  (let ((new-roots (gc/allocate <data> (words-to-bytes gc/root-max) true)))
     (copy-oops gc/roots new-roots gc/root-count)
     (set gc/roots new-roots)))
 

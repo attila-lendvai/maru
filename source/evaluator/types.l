@@ -59,7 +59,7 @@
          `(= ,type-name (type-of ,obj)))))))
 
 (define-function %allocate-boxed-word (type-id payload)
-  (let ((obj (gc/allocate-opaque type-id (words-to-bytes 1))))
+  (let ((obj (gc/allocate type-id (words-to-bytes 1) true)))
     (set (oop-at obj 0) payload)
     obj))
 

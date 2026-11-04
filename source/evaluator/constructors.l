@@ -13,7 +13,7 @@
 ;; TODO try to eliminate this opaque anomaly leaking here... maybe by annotating this on the type?
 (define-form make/opaque (type-name . inits)
   (let ((type (eval type-name)))
-    `(gc/let* ((self (gc/allocate-opaque ,type-name ,(words-to-bytes (record/effective-slot-count type)))))
+    `(gc/let* ((self (gc/allocate ,type-name ,(words-to-bytes (record/effective-slot-count type)) true)))
        (with-instance-accessors self ,type-name
          ,@(%make-make-inits *env* 'self. inits)
          self))))
@@ -21,11 +21,11 @@
 ;; TODO ? rename to allocate-object/heap
 ;; TODO introduce allocate-object/stack
 (define-vm-function allocate ((type <long>) (slot-count <long>))
-  (gc/allocate type (words-to-bytes slot-count)))
+  (gc/allocate type (words-to-bytes slot-count) false))
 
 ;; TODO rename to allocate-opaque-data or something else; ? allocate-memory/opaque
 (define-vm-function allocate-data ((byte-size <long>))
-  (gc/allocate-opaque <data> byte-size))
+  (gc/allocate <data> byte-size true))
 
 (define-vm-function cons ((head () ()) (tail () ()))
   (make <pair>
