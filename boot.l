@@ -279,6 +279,12 @@
                      (("i686" "i386")	4)
                      (else			(error "unknown target/arch: "target/arch))))))
 
+;; The previous stage predates the allocation vocabulary; the target's
+;; constructors.l defines the real one. Keep the tree bootable until the
+;; host is rebuilt from the cherry-picked cleanup.
+(if (not (defined? 'allocate-object/heap))
+    (eval '(define allocate-object/heap allocate)))
+
 (require "source/types.l")
 
 ;; KLUDGE fake defunct slot accessors for source position to remain compatible

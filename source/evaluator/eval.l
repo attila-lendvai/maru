@@ -223,7 +223,7 @@
     (let ((frame (array-at *call-stack* *call-stack-index*)))
       (if frame
           (safety 3 (assert (is <call-frame> frame) "new-call-frame: found a non-<call-frame> in the *call-stack*, type: " (type-of frame)))
-        (gc/let* ((new-frame (make <call-frame>)))
+        (gc/let* ((new-frame (make/heap <call-frame>)))
           (set (array-at *call-stack* *call-stack-index*) new-frame)
           (set frame new-frame)))
       (with-instance-accessors frame <call-frame>

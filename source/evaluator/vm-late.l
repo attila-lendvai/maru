@@ -112,7 +112,7 @@
 
   (debug (platform/diag-print "gc roots registered\n"))
 
-  (set *symbols* (array 32))
+  (set *symbols* (array/heap 32))
   (initialize-symbol-cache)
   (debug (platform/diag-print "initialized *symbols*\n"))
 
@@ -125,7 +125,7 @@
   (when-at-expand (feature backtrace)
     (debug (platform/diag-print "initializing *call-stack*\n"))
     (gc/push-root (address-of *call-stack*))
-    (set *call-stack* (array 32)))
+    (set *call-stack* (array/heap 32)))
 
   (set *maru* (environment () 0 0))                            (when-at-expand (feature debug-info) (set (<env>-name *maru*) "maru"))
   (populate-env-with-maru-primitives *maru*)

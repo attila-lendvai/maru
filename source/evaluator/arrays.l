@@ -39,7 +39,7 @@
                (set capacity 4)) ; start from a reasonably not-small number
              (until (<= needed-capacity capacity)
                (set capacity (* capacity 2)))
-             (gc/let* ((new-elements (,@(if (= element-type '<oop-vector>) '(allocate <oop-vector>) '(allocate-data))
+             (gc/let* ((new-elements (,@(if (= element-type '<oop-vector>) '(allocate-oop-vector) '(allocate-bytes))
                                       (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
                (,copier elements new-elements size)
                (set elements (set (slot-value ,type-name elements obj) new-elements))))
@@ -95,7 +95,7 @@
   (make <memory-block>
     (size	(box <long> 0))
     (elements	(when (> capacity 0)
-                  (allocate-data capacity)))))
+                  (allocate-bytes capacity)))))
 
 (define-vm-function memory-block->lower/function ((array <memory-block>))
   (make <target-function>

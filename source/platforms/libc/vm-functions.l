@@ -14,7 +14,7 @@
 ;;           (result ()))
 ;;       (gc/let* ((buf ()))
 ;;         (while (not result)
-;;           (set buf (allocate-data size))
+;;           (set buf (allocate-bytes size))
 ;;           (let ((n (libc/snprintf buf size fmt arg)))
 ;;             (if (and (<= 0 n)
 ;;                      (< n size))
@@ -26,7 +26,7 @@
 ;; standard, but that makes the libc platform unable to bootstrap, so
 ;; we cheat and "introduce" it through a C wrapper function.
 (define-vm-function working-directory ()
-  (gc/let* ((buffer (allocate-data libc/PATH_MAX)))
+  (gc/let* ((buffer (allocate-bytes libc/PATH_MAX)))
     (C-string->string (or (libc/getcwd buffer libc/PATH_MAX)
                           (error "libc/getcwd failed")))))
 

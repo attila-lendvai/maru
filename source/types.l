@@ -132,7 +132,7 @@
         (error "type-object-for-id has failed for type id "type-id", known types are: "%types)))
 
   (define-function %bootstrap-type (type-name type-id type-type-id slot-count)
-    (let ((type-obj (allocate type-type-id slot-count)))
+    (let ((type-obj (allocate-object/heap type-type-id slot-count)))
       (set (<type>-id	type-obj)	type-id)
       (set (<type>-name	type-obj)	type-name)
       (register-type type-obj)
@@ -307,7 +307,7 @@
 (define-function new-type-instance (name type)
   (assert (subtype? type <type>))
   (let ((id (allocate-type-id))
-        (result (allocate (<type>-id type) (type/slot-count-of-instances type))))
+        (result (allocate-object/heap (<type>-id type) (type/slot-count-of-instances type))))
     (verbosity 3 (warn "new <type> instance: " name ", id: " id"\n"))
     (set (<type>-name	result) name)
     (set (<type>-id	result) id)
@@ -430,7 +430,7 @@
 (define-form new (type-name . inits)
   (let* ((i -1)
          (type (eval type-name *env*))
-         (allocate-form `(allocate ,(<type>-id type) ,(type/slot-count-of-instances type))))
+         (allocate-form `(allocate-object/heap ,(<type>-id type) ,(type/slot-count-of-instances type))))
     ;; TODO singletons for types whose instances have no slots?
     (if inits
         `(let ((_self_ ,allocate-form))
@@ -445,8 +445,8 @@
   ;; this one doesn't need to know the type at expand-time
   (let ((i -1))
     `(let* ((_type_ ,type)
-            (_self_ (allocate (<type>-id _type_)
-                              (type/slot-count-of-instances _type_))))
+            (_self_ (allocate-object/heap (<type>-id _type_)
+                                          (type/slot-count-of-instances _type_))))
        ,@(map (lambda (_init_) (list 'set-oop-at '_self_ (set i (+ i 1)) _init_)) inits)
        _self_)))
 

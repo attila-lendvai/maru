@@ -5,11 +5,19 @@
 
 (define-form make (type-name . inits)
   (let ((type (eval type-name *env*)))
-    `(gc/let* ((self (allocate ,(<type>-slave-id type)
-                               ,(type/slot-count-of-instances type))))
+    `(gc/let* ((self (allocate-object ,(<type>-slave-id type)
+                                      ,(type/slot-count-of-instances type))))
        (with-instance-accessors self ,type-name
-         ,@(%make-make-inits *env* 'self. inits)
-         self))))
+         ,@(%make-make-inits *env* 'self. inits))
+       self)))
+
+(define-form make/heap (type-name . inits)
+  (let ((type (eval type-name *env*)))
+    `(gc/let* ((self (allocate-object/heap ,(<type>-slave-id type)
+                                           ,(type/slot-count-of-instances type))))
+       (with-instance-accessors self ,type-name
+         ,@(%make-make-inits *env* 'self. inits))
+       self)))
 
 ;; TODO this should be done cleaner/nicer than a single-use macro
 (define-form define-type-of ()

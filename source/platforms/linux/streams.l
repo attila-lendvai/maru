@@ -95,7 +95,7 @@
   ;; NOTE: struct statx has the same 256-byte UAPI layout on all
   ;; arch's where the statx syscall is supported.
   ;; TODO use stack allocation
-  (let ((st (allocate-data linux/sizeof-statx)))
+  (let ((st (allocate-bytes linux/sizeof-statx)))
     (syscall* linux/SYS_statx linux/AT_FDCWD (string->C-string path) 0
               linux/STATX_BASIC_STATS st)
     ;; KLUDGE FIXME this should be groveled

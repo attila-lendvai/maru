@@ -44,13 +44,13 @@
 ;; Read them with U32-AT (word-width independent, so this also holds on
 ;; i686) and return them as a pair of boxed <long>s, hiding the int[2].
 (define-vm-function posix/pipe* ()
-  (let ((fds (allocate-data (* 2 linux/sizeof-int))))
+  (let ((fds (allocate-bytes (* 2 linux/sizeof-int))))
     (posix/pipe fds)
     (cons (box <long> (u32-at fds 0))
           (box <long> (u32-at fds linux/sizeof-int)))))
 
 (define-vm-function working-directory ()
-  (gc/let* ((buffer (allocate-data linux/PATH_MAX)))
+  (gc/let* ((buffer (allocate-bytes linux/PATH_MAX)))
     (let ((len (syscall* linux/SYS_getcwd buffer linux/PATH_MAX)))
       ;; len contains the terminating zero byte
       (C-string->string* buffer (- len 1)))))

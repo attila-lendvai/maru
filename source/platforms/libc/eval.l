@@ -14,7 +14,7 @@
 ;; (define-function long->string (num radix)
 ;;   ;; TODO introduce alloca?
 ;;   ;; TODO handle radix
-;;   (let ((buf (allocate-data 32)))       ; safe up until 64 bits
+;;   (let ((buf (allocate-bytes 32)))       ; safe up until 64 bits
 ;;     (libc/sprintf buf "%ld" num)
 ;;     (C-string->string buf)))
 

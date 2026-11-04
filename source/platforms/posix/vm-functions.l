@@ -6,7 +6,7 @@
 ;; Read them with U32-AT (word-width independent, so this also holds on
 ;; i686) and return them as a pair of boxed <long>s, hiding the int[2].
 (define-vm-function posix/pipe* ()
-  (let ((fds (allocate-data (* 2 libc/sizeof-int))))
+  (let ((fds (allocate-bytes (* 2 libc/sizeof-int))))
     (posix/pipe fds)
     (cons (box <long> (u32-at fds 0))
           (box <long> (u32-at fds libc/sizeof-int)))))
@@ -15,7 +15,7 @@
 ;; i.e. two cells. MS are enough: a 31-bit boxed <long> would overflow
 ;; in nanoseconds on i686.
 (define-vm-function now/monotonic ()
-  (let ((ts (allocate-data posix/sizeof-timespec)))
+  (let ((ts (allocate-bytes posix/sizeof-timespec)))
     (posix/clock_gettime posix/CLOCK_MONOTONIC ts)
     (box <long>
          (if-at-expand (= 64 target/cell-size/bits)
