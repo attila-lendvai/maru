@@ -24,9 +24,11 @@ esac
 
 if [ -z "${CI_IMAGE_VERSION:-}" ]; then
     cd "$(readlink -f "$(dirname "$0")")/.."
+    # Image tags follow the OCI platform names (amd64, arm64), not the
+    # canonical uname -m ones. A 32-bit host runs the 64-bit x86_64 image.
     case "$(uname -m)" in
 	x86_64|i686|i386)	image=ghcr.io/attila-lendvai/maru-ci:amd64 ;;
-	aarch64|arm64)		image=ghcr.io/attila-lendvai/maru-ci:arm64 ;;
+	aarch64)		image=ghcr.io/attila-lendvai/maru-ci:arm64 ;;
 	*)			echo "unsupported host arch: $(uname -m)" >&2; exit 1 ;;
     esac
     echo "Starting $image"
@@ -125,7 +127,7 @@ check_elf_class() {
     fi
 }
 
-native_amd64() {
+native_x86_64() {
     # test-compiler first: it fails faster than a full bootstrap
     step target/arch=i686 test-compiler x86 linux
     step target/arch=i686 test-compiler x86 posix
@@ -180,7 +182,7 @@ native_amd64() {
     mv boot.l.orig boot.l
 }
 
-native_arm64() {
+native_aarch64() {
     step test-compiler arm libc
 
     step bootstrap llvm libc
@@ -211,19 +213,19 @@ cross_aarch64() {
 
 echo CI begins
 
-host_arch=$(dpkg --print-architecture)
+host_arch=$(uname -m)
 case "$host_arch" in
-    amd64)
+    x86_64)
 	case "$mode" in
-	    native)	native_amd64 ;;
+	    native)	native_x86_64 ;;
 	    cross)	cross_aarch64 ;;
-	    all)	native_amd64; cross_aarch64 ;;
+	    all)	native_x86_64; cross_aarch64 ;;
 	esac
 	;;
-    arm64)
+    aarch64)
 	case "$mode" in
-	    native|all)	native_arm64 ;;
-	    cross)	echo "no cross matrix on arm64" >&2; exit 1 ;;
+	    native|all)	native_aarch64 ;;
+	    cross)	echo "no cross matrix on aarch64" >&2; exit 1 ;;
 	esac
 	;;
     *)

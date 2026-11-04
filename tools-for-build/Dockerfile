@@ -19,12 +19,9 @@ FROM docker.io/ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG TARGETARCH
-
 ARG CI_IMAGE_VERSION=dev
 ENV CI_IMAGE_VERSION=$CI_IMAGE_VERSION
 
-RUN echo TARGETARCH="$TARGETARCH"
 RUN echo CI_IMAGE_VERSION="$CI_IMAGE_VERSION"
 
 # Conditional packages per host arch: the cross gcc's of the foreign

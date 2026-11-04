@@ -24,7 +24,7 @@ jobs:
 ###
 # x86_64 Linux
 ###
-  build-linux-amd64:
+  build-linux-x86_64:
     name: "linux x86_64"
     runs-on: ubuntu-24.04
     container:
@@ -47,7 +47,7 @@ jobs:
 # aarch64 Linux, cross-built from x86_64
 ###
 
-  build-linux-amd64-cross:
+  build-linux-x86_64-cross:
     name: "linux x86_64 -> aarch64"
     runs-on: ubuntu-24.04
     # --privileged is needed to mount binfmt_misc and register qemu at
@@ -88,7 +88,7 @@ jobs:
 # aarch64 Linux
 ###
 
-  build-linux-arm64:
+  build-linux-aarch64:
     name: "linux aarch64"
     runs-on: ubuntu-24.04-arm
     container:
@@ -112,7 +112,7 @@ jobs:
 ###
 
   build-darwin:
-    name: "darwin aarch64"
+    name: "darwin arm64"
     runs-on: macos-latest
     defaults:
       run:
@@ -146,7 +146,7 @@ jobs:
 ###
 
 # TODO fix and reenable
-  build-linux-amd64-full-bootstrap:
+  build-linux-x86_64-full-bootstrap:
     if: false && github.ref != 'refs/heads/staging'
     name: "linux x86_64 full bootstrap"
     runs-on: ubuntu-24.04
