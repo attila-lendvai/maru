@@ -1,0 +1,344 @@
+# -*- mode: outline; coding: utf-8-unix -*-
+
+* Goal
+  Add a dynamic-extent (stack/arena) allocator on top of the GC, so
+  objects can be allocated in an arena and dropped together when the
+  dynamic extent exits.
+
+  A CPU-stack arena must be possible: the caller reserves a buffer in
+  its own frame, passes the arena to an algorithm (e.g. the reader),
+  and all allocations land there. When the caller returns the memory
+  dies with the frame.
+
+  The design must leave room for non-local exits (unwind) and
+  Common-Lisp-style special variables.
+
+* Model
+  Three lifetime classes:
+
+    heap      GC chunk chain, freed by mark-sweep
+    extent    arena (heap chunk or CPU-stack buffer), freed by cursor reset
+    static    read-only image segment, never freed
+
+  Arenas hold full objects with the same <header> and payload layout as
+  heap objects, so type-of, accessors, gc/object-size, array growth and
+  precise tracing work unchanged. An OOP-only arena is a root stack,
+  not stack allocation.
+
+  One dynamic allocator:
+
+    *allocator* = ()       -> heap
+    *allocator* = <arena>  -> bump allocation in that arena
+
+  make follows *allocator*. make/heap pins. A function receives an
+  allocator by binding it, not by threading a parameter through every
+  call.
+
+* Landed (maru.11)
+** 9b3c7655 gc: Take opacity as an argument to allocate
+   gc/allocate takes an opaque? argument; gc/allocate-opaque is gone.
+** 6bb877fb types: Introduce <oop-vector>
+   <oop-vector> is the traced vector of OOPs (array elements).
+   <data> is the opaque blob (strings, memory-blocks, buffers, gc roots).
+   define-vector-accessors takes the element type, not a boolean.
+   New types are appended after the existing ones to keep the prebuilt
+   host's type ids stable.
+** 1d8897c5 alloc: Name allocators by region and opacity
+   Public allocation vocabulary:
+
+     allocate-object            allocate-object/heap
+     allocate-object/opaque     allocate-object/opaque/heap
+     allocate-bytes             allocate-bytes/heap
+     allocate-oop-vector        allocate-oop-vector/heap
+
+   allocate/allocate-data are gone. make follows allocate-object;
+   make/heap uses allocate-object/heap. make/opaque remains, pinned on
+   allocate-object/opaque/heap, until type kinds can annotate opacity.
+   Permanent constructors are pinned (symbols, envs, variables, exprs,
+   forms, fixed functions, target functions, call frames, symbol and
+   call-stack arrays, environment bindings).
+   The dynamic allocators are still heap-only; the arena work changes
+   only their bodies.
+** b4b2b694 doc: Record the evolving? bootstrapping rule
+   When a code path exists solely because the previous evolutionary
+   stage is bootstrapping us, dispatch on evolving?. It is true during
+   that bootstrap and false in the target's own builds; it is also a
+   grep target for cleanup in the next evolutionary stage.
+** make/make/heap are still inline
+   The shared-expansion experiment (a %make-record helper beside make,
+   then in source/types.l under (when-at-expand bootstrapping? ...))
+   passed test-evaluator and bootstrap x86 linux locally, but is not on
+   this branch. See "Deferred: make expansion helper" below.
+** Temporary bootstrap bridge
+   boot.l has:
+
+     (if (not (defined? 'allocate-object/heap))
+         (eval '(define allocate-object/heap allocate)))
+
+   It runs before host-extras.l sets evolving?, so it is a capability
+   check, not an evolving? branch. Remove it once the previous stage is
+   rebuilt from the cherry-picked allocator commits.
+
+* Remaining: arena infrastructure
+** <arena> handle
+   (define-record <arena> () (base cursor limit scan-id))
+   Created with make/opaque. base/cursor/limit are raw pointers; the
+   handle is opaque so the GC does not trace them. scan-id deduplicates
+   GC scans.
+
+   Backing memory:
+     default arena       rooted heap chunk
+     CPU-stack arena     caller's frame
+     explicit heap arena caller keeps the block alive
+** Dispatch
+   allocate-object, allocate-object/opaque, allocate-bytes and
+   allocate-oop-vector consult *allocator* and call arena/allocate or
+   gc/allocate with the same opaque? flag. Arena exhaustion is fatal;
+   do not add a heap fallback without a region rule.
+** Binding stack
+   Fixed-capacity, heap-pinned array; four slots per entry:
+
+     kind=arena:    kind  arena  mark  old-allocator
+     kind=special:  kind  variable  old-value  -        ; future
+
+   mark is a tagged offset (cursor - base), safe on 32-bit. The array
+   is traced, so every slot is an OOP or an immediate.
+   Functions: allocator/push, allocator/pop, allocator/unwind-to depth.
+   with-allocator is a macro over push/pop; under safety it checks that
+   the result does not point into the released range.
+   A fixed capacity (e.g. 1024) with a clear fatal is enough for the
+   first cut; no allocation during push/pop.
+   Future non-local exits pop to a saved depth and dispatch on kind;
+   future special variables use kind=special.
+** Default arena
+   *default-arena* over a rooted heap chunk (1-4 MiB), created at init.
+   Not active by default. with-stack-allocation is shorthand for
+   (with-allocator *default-arena* ...).
+** GC integration
+   At gc/collect:
+     1. Build a deduped active-arena list from the binding stack,
+        using scan-id.
+     2. Scan each active arena [base, cursor) header by header:
+        trace payload cells of non-opaque objects; skip opaque payload.
+     3. Mark roots as today.
+     4. In gc/mark-and-trace, before the heap path:
+          [base + header, cursor)  live arena object; mark and trace
+          [cursor, limit)          fatal: dangling extent pointer
+          otherwise                heap path
+     5. After sweep, clear mark bits over each active arena.
+   The arena chunk is opaque; the heap walker never descends into it.
+   The chunk pointer equals base; stack-object detection starts at
+   base + size-of-<header>, so rooting the chunk is safe.
+** Escape verification
+   Under safety, allocator/pop scans the root vector and outer active
+   arenas for pointers into the released [mark, cursor) range; fatal on
+   a hit. with-allocator checks its result value. mark-and-trace catches
+   heap-to-dead-arena pointers while the arena is active. A full-heap
+   scan is an opt-in test feature, not a normal safety cost.
+** Tests
+   - allocate/read/write/type in an arena
+   - GC during a live extent with arena-to-heap references
+   - nested extents, release, reuse
+   - overflow fatal
+   - dead-pointer detection
+   - unwind-to restores allocator and cursor
+   - heap-pinned object survives arena release
+   No active arenas by default; behavior unchanged.
+
+* Remaining: first users
+** statx buffer
+   source/platforms/linux/streams.l: the 256-byte statx buffer is used
+   across one syscall. Wrap in with-stack-allocation and allocate-bytes.
+** Contexts
+   apply/expr currently allocates <context> + <array> per call:
+     - stable env (<env>-stable) -> make/heap
+     - non-stable -> follow *allocator*
+     - pre-size bindings to (<env>-offset env)
+     - encode/symbol: propagate stable through ancestors at the same
+       level, because a let env shares its context with the function env
+     - eval/variable and set: walk by level comparison, not a fixed
+       delta:
+         while (< var-level (env-level (context-env ctx)))
+           ctx = (context-home ctx)
+     - lambda stores the nearest heap context in <expr>-ctx; never a
+       context that dies with an arena
+     - context must not store an arena child in a heap parent's callee
+       slot (the slot is never read; skip it for arena contexts)
+     - <call-frame> stays heap
+   This is correctness work, not an optimization.
+
+* Remaining: CPU-stack arena
+  Compiler primitive allocate-cpu-stack-space:
+    - literal size first: reserve ceil(size / cell-size) contiguous
+      STACK-CELLs in the current frame; temp-limit covers them
+    - return the address of the lowest cell via ADDR; no new machine
+      instruction on x86-64/x86-32/arm; LLVM needs a small alloca handler
+    - lifetime is the function frame; compiled-only; interpreted use
+      hits the usual primitive error stub
+    - runtime size later via sub rsp/sp or LLVM alloca
+  with-cpu-stack-arena expands to reserve the buffer, make-arena the
+  opaque handle over it (heap handle, gc/let*-protected), and
+  with-allocator around the body. Tests belong in tests/compiler-test.l.
+  Example:
+    (with-cpu-stack-arena (arena 65536)
+      (with-allocator arena
+        (read stream)))
+
+* Remaining: composite objects
+  Parent and owned children must use the same region. Intended
+  mechanism, deferred:
+
+    arena-of(obj):
+      for arena in active-arenas:        ; distinct, disjoint, usually 1
+        if arena.base <= obj < arena.limit:
+          return arena
+      return heap
+
+  Range scan; no per-object region word and no header change. If the
+  parent is not in a live arena, use heap. /like variants
+  (allocate-object/like, allocate-bytes/like,
+  allocate-oop-vector/like) would use it.
+
+  Alternative if /like is not wanted: growth always allocates on the
+  heap. Heap outlives arena, so it is safe; the cost is loss of arena
+  locality for growing arrays/strings.
+
+  Decision deferred; the cleanup and arena infrastructure do not need it.
+
+* Remaining: reader
+  Use a CPU-stack arena around the caller's use:
+    (with-cpu-stack-arena (arena 65536)
+      (with-allocator arena
+        (read stream)))
+  Pairs, strings and arrays live in the arena; interned symbols, envs,
+  variables, exprs and call frames stay heap.
+
+  Caveats:
+    - symbol is pinned; the symbol table must never point into a
+      transient arena
+    - do not eval/encode inside a transient arena: expanded/encoded
+      trees can escape into heap <expr>s
+    - arena data must not escape the extent: no returns, globals, heap
+      slots, closure captures, or FFI retention
+    - the caller keeps the arena's use inside the binding extent
+
+* Deferred: make expansion helper
+  Current state: make and make/heap duplicate the record-construction
+  expansion in source/evaluator/types.l.
+
+  What was tried:
+    - %make-record beside make in evaluator/types.l: the bootstrap
+      encoder fails with "encode/symbol: failed for %make-record"
+    - the same helper in source/evaluator/gc.l: same failure
+    - switching the inline/helper choice on evolving?: does not help,
+      because the problem is the helper's env, not the evolutionary
+      stage
+  What worked locally:
+    - define %make-record at the end of source/types.l under
+      (when-at-expand bootstrapping? ...), because make is expanded in
+      the slave env and <type>-slave-id exists only on the
+      bootstrapping side
+    - make and make/heap delegate to (%make-record *env* type-name
+      inits 'allocate-object) and '.../heap
+    - test-evaluator and bootstrap x86 linux passed, fixed point held
+  Why it is not on the branch: the commit was dropped in a branch
+  rewrite. Reapply deliberately after deciding on the placement.
+
+* Later
+  - arena growth via chained blocks if fatal overflow is too restrictive
+  - runtime-size allocate-cpu-stack-space
+  - static escape/region annotations over encoded forms
+  - write-barrier promotion for automatic stack allocation
+  - special variables on the binding stack
+  - non-local exits (unwind-to) and unwind-protect-style cleanups
+  - type kinds; derive opacity from the type and drop the gc/allocate
+    opaque? argument; fold make/opaque into make
+  - compiler-record and compiler-operand extents
+  - sync doc/gc.md with the final design
+
+* Locked decisions
+  - make follows *allocator*; make/heap pins.
+  - Binding stack from day one, kind-tagged, for unwind/special vars.
+  - CPU-stack buffer via allocate-cpu-stack-space.
+  - No aliases in the allocation API. The allocation cleanup is
+    cherry-picked into the previous stage (maru.10); a temporary
+    capability bridge in boot.l covers the old host until then. Use
+    source/bootstrapping/ for further bridges if needed.
+  - make/opaque stays until type kinds.
+  - Arena overflow is fatal.
+  - Full objects in arenas; no second representation.
+  - No write barrier, no promotion, no static escape analysis yet.
+  - No /like in the cleanup; revisit at the arena phase.
+  - No push; commits are local and often amended.
+
+* Open questions
+  - Binding stack fixed capacity vs growable; 1024 is enough for the
+    first cut.
+  - Default arena eager at init vs lazy on first use.
+  - /like range scan vs heap-only growth for arena composites.
+  - Arena growth policy if fatal overflow hurts.
+  - Whether interpreted contexts should use a dedicated context arena;
+    the current plan lets them follow *allocator* with stable contexts
+    pinned to heap.
+  - Whether to add a per-type allocation counter while touching
+    gc/allocate (see doc/agent/bootstrap-perf.txt).
+
+* Invariants and gotchas
+  - Raw pointers never live in GC-scanned globals/slots. Arena bounds
+    live in the opaque handle; marks are tagged offsets.
+  - Arena ranges are disjoint.
+  - The chunk root is not a stack object: detection starts at
+    base + size-of-<header>.
+  - Dedupe arena scans by scan-id.
+  - Pinned constructors are load-bearing; a permanent object allocated
+    in an arena becomes a dangling heap pointer.
+  - Arena overflow is fatal until a region rule exists.
+  - make follows *allocator*: do not encode/eval inside a transient
+    arena.
+  - FFI retention is opaque: do not pass arena objects to foreign code
+    that may retain them.
+  - Bootstrapping order: the host GC must understand arenas before
+    host-executed paths use them.
+  - Context capture: stable contexts are heap; lambdas in arena
+    contexts take the nearest heap context as home.
+  - CPU-stack arenas are frame-scoped; large sizes risk stack overflow.
+  - allocate-oop-vector naming: <oop-vector> is the type; the allocator
+    takes a cell count.
+  - arrays.l TODO: define-vector-accessors mixes bytes and cells in
+    ensure-size; it appears to over-allocate <array> growth by the cell
+    size. Audit separately; do not change it as part of the arena work
+    without a test.
+  - boot.l capability alias for allocate-object/heap: remove after the
+    previous stage is rebuilt; it runs before evolving? is set, so it
+    cannot be gated on evolving?.
+  - make/make/heap currently inline the record construction. A shared
+    %make-record helper beside make, in gc.l, or in evaluator/types.l
+    is not resolvable by the bootstrap encoder. The placement that
+    worked locally is source/types.l under (when-at-expand
+    bootstrapping? ...); see "Deferred: make expansion helper".
+
+* Cleanup targets for the next evolutionary stage
+  - grep evolving? for bootstrap-only paths
+  - remove the boot.l allocate-object/heap alias
+  - remove type-kind workaround in make/opaque when type kinds land
+  - drop gc/allocate's opaque? argument once opacity is a type property
+  - re-evaluate /like and arena growth
+  - sync doc/gc.md
+
+* Verification
+  Cleanup phase (already done):
+    test-evaluator
+    bootstrap x86 linux (fixed point)
+    run the full gate before declaring the cleanup done
+  Arena phases:
+    test-evaluator
+    bootstrap x86 linux
+    bootstrap llvm libc, llvm posix, llvm linux
+    test-compiler x86 linux, test-compiler llvm ...
+    one cross target (aarch64 or i686)
+    safety 3 (canary) and safety 4 (GC before every allocation) for the
+    new tests
+    allocation counters: total allocations, GC runs, arena bytes, max
+    extent depth, overflow
+    bootstrap timing before/after once contexts or the reader are
+    arena-allocated
