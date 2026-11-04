@@ -35,16 +35,20 @@ i686_packages="
   libc6-dev-i386-cross
 "
 
-case "$(dpkg --print-architecture)" in
-    amd64)
+# Host arch in the canonical uname -m spelling. The package names below
+# are Debian's and do not follow it (libc6-dev-arm64-cross provides the
+# aarch64 libc), so they stay literal.
+host_arch=$(uname -m)
+case "$host_arch" in
+    x86_64)
 	cross_packages="gcc-aarch64-linux-gnu libc6-dev-arm64-cross"
 	i686_packages="$i686_packages libc6-dev-i386"	# native 32-bit runtime
 	;;
-    arm64)
+    aarch64)
 	cross_packages="gcc-x86-64-linux-gnu libc6-dev-amd64-cross"
 	;;
     *)
-	echo "unsupported host architecture: $(dpkg --print-architecture)" >&2
+	echo "unsupported host architecture: $host_arch" >&2
 	exit 1
 	;;
 esac

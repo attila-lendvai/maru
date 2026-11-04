@@ -48,17 +48,17 @@ Table of environments tested by the [GitHub CI](.github/workflows/ci.yaml):
 
 | Backend↓ Platform→ | libc | Posix | Linux kernel |
 |:-------------------|:-----|:------|:-------------|
-| LLVM | Darwin `arm64`<br>Linux `i686`, `x86-64`, `aarch64` | Darwin `arm64`<br>Linux `i686`, `x86-64`, `aarch64` | Linux `i686`, `x86-64`, `aarch64` |
-| x86 | Linux `i686`, `x86-64` | Linux `i686`, `x86-64` | Linux `i686`, `x86-64`<br>glibc; `x86-64` also musl |
+| LLVM | Darwin `arm64`<br>Linux `i686`, `x86_64`, `aarch64` | Darwin `arm64`<br>Linux `i686`, `x86_64`, `aarch64` | Linux `i686`, `x86_64`, `aarch64` |
+| x86 | Linux `i686`, `x86_64` | Linux `i686`, `x86_64` | Linux `i686`, `x86_64`<br>glibc; `x86_64` also musl |
 | Arm | Linux `aarch64` | Linux `aarch64` | Linux `aarch64`<br>glibc, musl |
 
-`aarch64` builds also run cross-compiled from `x86-64`.
+`aarch64` builds also run cross-compiled from `x86_64`.
 
 These work but are not covered by the GitHub CI:
 
 | Backend↓ Platform→ | libc | Posix | Linux kernel |
 |:-------------------|:-----|:------|:-------------|
-| LLVM | Darwin `x86-64` | Darwin `x86-64` | |
+| LLVM | Darwin `x86_64` | Darwin `x86_64` | |
 
 To test a bootstrap cycle:
 
@@ -74,7 +74,7 @@ To run the full Linux CI matrix locally (re-execs in the CI image):
 tools-for-build/ci-linux.sh
 ```
 
-To cross compile to `aarch64` (`x86-64` hosts run it through qemu-user):
+To cross compile to `aarch64` (`x86_64` hosts run it through qemu-user):
 
 ```
 ./build.sh target/arch=aarch64 bootstrap arm linux
@@ -117,7 +117,7 @@ sudo CLANG_VERSION=21 tools-for-build/install-ubuntu-deps.sh
 #### macOS (Darwin)
 
 CI tests on an `arm64` runner; the LLVM backend also bootstraps on
-`x86-64`.
+`x86_64`.
 
 1. Make sure XCode is installed. In a Terminal:
 ```
