@@ -4,6 +4,42 @@
 ;;; Compiling lambdas
 ;;;
 
+;; serious KLUDGE: use a global instead of a slot on <compiler> fixing
+;; it is not trivial because compiler objects get nested and at this
+;; point we are already nested, and we should push into the parent.
+(define expr-queue ())
+
+(define-function compiled-expr-wrapper (name entry-point -c-)
+  entry-point)
+
+;; even when emitting is deferred into the queue we still create,
+;; register, and return a label. it gets its value set when the queue
+;; is eventually emitted.
+(define-function compile-expr (self name -c-)
+  (emit-comment 2 "0x" (integer->string (current-laddress) 16)
+                ": compiling fn "term/FG-GREEN (or name "/unnamed/") term/RESET", "self", level " (<compiler>-level -c-))
+  (let ((entry-point (if name
+                         (closure-code-label name)
+                       (label))))
+    (if (< 1 (<compiler>-level -c-))
+        ;; a lambda inside a lambda : save it for later
+        (begin
+         (emit-comment 2 "queueing fn for later: "(or name "/unnamed/")", "self", level " (<compiler>-level -c-))
+         (push expr-queue (cons entry-point self)))
+
+      ;; we are at the toplevel, emit ourselves first
+      (emit-expr-code self entry-point -c-)
+      ;; then emit the queue, if any
+      (let (el)
+        (while (set el (pop expr-queue))
+          (let ((entry-point	(car el))
+                (expr		(cdr el)))
+            (emit-comment 2 "compiling queued fn "expr", entry-point "entry-point)
+            (emit-expr-code expr entry-point -c-)))))
+
+    ;; TODO this compiled-expr-wrapper thing is calling for a cleanup...
+    (GLOBAL-ADDR (compiled-expr-wrapper name entry-point -c-))))
+
 (define-function compile/expression-to-operand (expr -c-)
   (cond
     ((and (variable? expr)
