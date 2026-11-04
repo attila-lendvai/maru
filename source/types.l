@@ -483,7 +483,7 @@
 ;; these and bringing it out of sync with the level-shifted binary is
 ;; not an option without grave consequences. such a setup would
 ;; hopefully also simplify the bootstrapping dance above.
-(define-type		<data>)					; some blob; used for stuff like the elements of <string> and <array>
+(define-type		<data>)					; opaque blob; string/memory-block elements, buffers, the gc root vector
 
 (define-immediate	<undefined>		0 ())		; nil tag-width means that it's an entire word of a well-known value; in this case zero
 (if-at-expand true
@@ -530,6 +530,10 @@
         (define-boxed-word <u64>)
         (define <lower-cell> <u64>))
     (define <lower-cell> <u32>)))
+
+;; New types go at the end: the host binary's type ids must keep
+;; matching the types that this source redefines while it evolves.
+(define-type		<oop-vector>)				; N cells of oop's, traced by the GC
 
 ;; TODO why are some of these here, and some are vm-functions? unify one way or another!
 ;;(define-function undefined?	(obj)	(= <undefined>	(type-of obj)))

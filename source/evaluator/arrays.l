@@ -3,9 +3,9 @@
 ;; TODO introduce an array-kind type and turn most of this into mere functions
 ;; TODO audit this for the two use-cases: idx is bytes or cells
 ;; TODO this has no proper bounds checking. decide whether it's really a good idea to just return nil when index is out of range
-(define-form define-vector-accessors (type-name basename elements-are-pointers? accessor copier mover element-size-in-bytes)
+(define-form define-vector-accessors (type-name basename element-type accessor copier mover element-size-in-bytes)
   ;; TODO this assert itself is broken, probably due to some peciuliarity of define-form/target
-  ;;(assert (or (not elements-are-pointers?) (= element-size-in-bytes target/cell-size/bytes)))
+  ;;(assert (or (not (= element-type '<oop-vector>)) (= element-size-in-bytes target/cell-size/bytes)))
   (let ((setter-name (concat-symbols 'set- basename 'at))
         (getter-name (concat-symbol basename 'at))
         (length-name (concat-symbol basename 'length))
@@ -39,7 +39,7 @@
                (set capacity 4)) ; start from a reasonably not-small number
              (until (<= needed-capacity capacity)
                (set capacity (* capacity 2)))
-             (gc/let* ((new-elements (,@(if elements-are-pointers? '(allocate <data>) '(allocate-data))
+             (gc/let* ((new-elements (,@(if (= element-type '<oop-vector>) '(allocate <oop-vector>) '(allocate-data))
                                       (* capacity ,element-size-in-bytes)))) ; note: gc/protect is not strictly necessary here, because we store it before any new allocation
                (,copier elements new-elements size)
                (set elements (set (slot-value ,type-name elements obj) new-elements))))
@@ -79,14 +79,14 @@
              (set (slot-value ,type-name size obj) (box <long> size))))
          obj))))
 
-(define-vector-accessors <array>	array-		true	oop-at		copy-oops	platform/move-oops	target/cell-size/bytes)
-(define-vector-accessors <string>	string-		()	u8-at		copy-bytes	platform/move-bytes	1)
+(define-vector-accessors <array>	array-		<oop-vector>	oop-at		copy-oops	platform/move-oops	target/cell-size/bytes)
+(define-vector-accessors <string>	string-		<data>		u8-at		copy-bytes	platform/move-bytes	1)
 
 (when-at-expand (feature memory-block)
   ;; FIXME: if these two when-at-expand's are merged, then a set form
   ;; transform (expand/encode/etc) happens differently and it fails to
   ;; load.
-  (define-vector-accessors <memory-block>	memory-block/	()	u8-at		copy-bytes	platform/move-bytes	1))
+  (define-vector-accessors <memory-block>	memory-block/	<data>	u8-at		copy-bytes	platform/move-bytes	1))
 
 (when-at-expand (feature memory-block)
 

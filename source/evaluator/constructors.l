@@ -52,7 +52,7 @@
   (make <array>
     (size	(box <long> 0))
     (elements	(when (> capacity 0)
-                  (allocate <data> capacity)))))
+                  (allocate <oop-vector> capacity)))))
 
 (define-function expr (parameters body env ctx)
   (make <expr>
