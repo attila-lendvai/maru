@@ -166,6 +166,11 @@ byte-identical to eval2) implicitly; no separate step needed.
 
 - The `bootstrapping?` flag controls conditional compilation paths
 
+- When a code path exists solely because the previous evolutionary stage
+  is bootstrapping us, dispatch on `evolving?`. It is true during that
+  bootstrap and false in the target's own builds. It also serves as a
+  grep target to clean up in the next evolutionary stage.
+
 - Register names: `RAX`, `RBX`, `RCX`, `RDX`, `R8`–`R15`, `ESP`, `EAX`, `AL`, etc.
 
 - aarch64 register names: `X0`–`X30`, `W0`–`W30`, `SP`, `XZR`/`WZR`; the sf bit of data processing instructions comes from register width (`sf-check`)
