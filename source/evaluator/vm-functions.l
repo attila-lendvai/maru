@@ -110,101 +110,412 @@
 (define-vm-function (not ()) (thing)
   (if thing () symbol/true))
 
+;;;
+;;; boxed words
+;;;
+;;; <u64> has a single cell on a 64-bit image, and two cells on a 32-bit
+;;; one (low half first), so that a 32-bit image can carry the target's
+;;; 64-bit words. The helpers below are compiled into the image; their
+;;; bodies are lower-realm code, hence the raw operators.
+
+;; unsigned comparison in the lower realm, where < is signed
+(define-function %unsigned-< (a b)
+  (let ((sign-bit (bitwise-shift 1 (- target/cell-size/bits 1))))
+    (< (bitwise-xor a sign-bit) (bitwise-xor b sign-bit))))
+
+(define-function %u64-lo (x)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (unbox <u64> x)
+    (oop-at x 0)))
+
+(define-function %u64-hi (x)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (error "%u64-hi: called on a single-cell <u64>")
+    (oop-at x 1)))
+
+(define-function %make-u64 (lo hi)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> lo)
+    (%allocate-two-cell-word <u64> lo hi)))
+
+(define-function %u32-mask ()
+  (- (bitwise-shift 1 32) 1))
+
+(define-function %make-u32 (value)
+  (box <u32> (bitwise-and value (%u32-mask))))
+
+(define-function %long->u32 (x)
+  (%make-u32 (unbox <long> x)))
+
+(define-function %long->u64 (x)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (unbox <long> x))
+    (%make-u64 (unbox <long> x) 0)))
+
+(define-function %u32->u64 (x)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (unbox <u32> x))
+    (%make-u64 (unbox <u32> x) 0)))
+
+(define-function %numeric? (x)
+  (or (is <long> x) (is <u32> x) (is <u64> x)))
+
+(define-function %to-u32 (x)
+  (cond
+    ((is <u32> x) x)
+    ((is <long> x) (%long->u32 x))
+    (else (error "%to-u32: not a number: " x))))
+
+(define-function %to-u64 (x)
+  (cond
+    ((is <u64> x) x)
+    ((is <u32> x) (%u32->u64 x))
+    ((is <long> x) (%long->u64 x))
+    (else (error "%to-u64: not a number: " x))))
+
+;; interpreter-facing constructors; the high half is ignored on a
+;; 64-bit image, where a single cell holds the whole word.
+(define-vm-function (make-u32 ()) ((value <long>))
+  (%make-u32 value))
+
+(define-vm-function (make-u64 ()) ((lo <long>) (hi <long> 0))
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (bitwise-or lo (bitwise-shift hi 32)))
+    (%allocate-two-cell-word <u64> lo hi)))
+
+;;; u32 (one cell)
+
+(define-function %u32-add (a b)
+  (%make-u32 (bitwise-and (+ (unbox <u32> a) (unbox <u32> b))
+                          (%u32-mask))))
+
+(define-function %u32-sub (a b)
+  (%make-u32 (bitwise-and (- (unbox <u32> a) (unbox <u32> b))
+                          (%u32-mask))))
+
+(define-function %u32-mul (a b)
+  (%make-u32 (bitwise-and (* (unbox <u32> a) (unbox <u32> b))
+                          (%u32-mask))))
+
+;; NOTE signed division: exact only while the operands fit in a signed
+;; word; the interpreter's uses are small counts.
+(define-function %u32-div (a b)
+  (%make-u32 (/ (unbox <u32> a) (unbox <u32> b))))
+
+(define-function %u32-and (a b)
+  (%make-u32 (bitwise-and (unbox <u32> a) (unbox <u32> b))))
+
+(define-function %u32-or (a b)
+  (%make-u32 (bitwise-or (unbox <u32> a) (unbox <u32> b))))
+
+(define-function %u32-xor (a b)
+  (%make-u32 (bitwise-xor (unbox <u32> a) (unbox <u32> b))))
+
+(define-function %u32-not (a)
+  (%make-u32 (bitwise-and (bitwise-not (unbox <u32> a))
+                          (%u32-mask))))
+
+(define-function %u32-= (a b)
+  (= (unbox <u32> a) (unbox <u32> b)))
+
+(define-function %u32-unsigned-< (a b)
+  (%unsigned-< (unbox <u32> a) (unbox <u32> b)))
+
+;;; u64 (one or two cells)
+
+(define-function %u64-add (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (+ (unbox <u64> a) (unbox <u64> b)))
+    (let* ((alo	(%u64-lo a))
+           (blo	(%u64-lo b))
+           (lo	(+ alo blo))
+           (carry	(if (%unsigned-< lo alo) 1 0)))
+      (%make-u64 lo (+ (%u64-hi a) (+ (%u64-hi b) carry))))))
+
+(define-function %u64-sub (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (- (unbox <u64> a) (unbox <u64> b)))
+    (let* ((alo	(%u64-lo a))
+           (blo	(%u64-lo b))
+           (borrow	(if (%unsigned-< alo blo) 1 0))
+           (lo	(- alo blo)))
+      (%make-u64 lo (- (%u64-hi a) (+ (%u64-hi b) borrow))))))
+
+(define-function %u64-mul (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (* (unbox <u64> a) (unbox <u64> b)))
+    (let ((alo (%u64-lo a))
+          (blo (%u64-lo b)))
+      (unless (and (= 0 (%u64-hi a)) (= 0 (%u64-hi b)))
+        (error "64-bit multiplication is not supported on a 32-bit image"))
+      ;; NOTE exact only while the product fits in the low cell.
+      (%make-u64 (* alo blo) 0))))
+
+;; NOTE signed division: exact only while the operands fit in a signed
+;; word; the interpreter's uses are small counts.
+(define-function %u64-div (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (/ (unbox <u64> a) (unbox <u64> b)))
+    (let ((alo (%u64-lo a))
+          (blo (%u64-lo b)))
+      (unless (and (= 0 (%u64-hi a)) (= 0 (%u64-hi b)))
+        (error "64-bit division is not supported on a 32-bit image"))
+      (%make-u64 (/ alo blo) 0))))
+
+(define-function %u64-and (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (bitwise-and (unbox <u64> a) (unbox <u64> b)))
+    (%make-u64 (bitwise-and (%u64-lo a) (%u64-lo b))
+               (bitwise-and (%u64-hi a) (%u64-hi b)))))
+
+(define-function %u64-or (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (bitwise-or (unbox <u64> a) (unbox <u64> b)))
+    (%make-u64 (bitwise-or (%u64-lo a) (%u64-lo b))
+               (bitwise-or (%u64-hi a) (%u64-hi b)))))
+
+(define-function %u64-xor (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (bitwise-xor (unbox <u64> a) (unbox <u64> b)))
+    (%make-u64 (bitwise-xor (%u64-lo a) (%u64-lo b))
+               (bitwise-xor (%u64-hi a) (%u64-hi b)))))
+
+(define-function %u64-not (a)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u64> (bitwise-not (unbox <u64> a)))
+    (%make-u64 (bitwise-not (%u64-lo a))
+               (bitwise-not (%u64-hi a)))))
+
+(define-function %u64-= (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (= (unbox <u64> a) (unbox <u64> b))
+    (and (= (%u64-lo a) (%u64-lo b))
+         (= (%u64-hi a) (%u64-hi b)))))
+
+(define-function %u64-unsigned-< (a b)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (%unsigned-< (unbox <u64> a) (unbox <u64> b))
+    (let ((ahi (%u64-hi a))
+          (bhi (%u64-hi b)))
+      (if (= ahi bhi)
+          (%unsigned-< (%u64-lo a) (%u64-lo b))
+        (%unsigned-< ahi bhi)))))
+
+;;; shifts
+
+(define-function %raw-shl32 (x n)
+  (if (<= 32 n)
+      0
+    (bitwise-and (arithmethic-shift-left x n) (%u32-mask))))
+
+(define-function %raw-shr32 (x n)
+  (if (<= 32 n)
+      0
+    (bitwise-and (arithmethic-shift-right x n)
+                 (- (bitwise-shift 1 (- 32 n)) 1))))
+
+(define-function %u32-shift (x n)
+  (%make-u32 (if (< n 0)
+                 (%raw-shr32 (unbox <u32> x) (- n))
+               (%raw-shl32 (unbox <u32> x) n))))
+
+(define-function %u64-shift (x n)
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (let ((raw (unbox <u64> x)))
+        (if (< n 0)
+            (let ((m (- n)))
+              (if (<= 64 m)
+                  (box <u64> 0)
+                (box <u64> (bitwise-and (arithmethic-shift-right raw m)
+                                        (- (bitwise-shift 1 (- 64 m)) 1)))))
+          (if (<= 64 n)
+              (box <u64> 0)
+            (box <u64> (arithmethic-shift-left raw n)))))
+    (let ((lo (%u64-lo x))
+          (hi (%u64-hi x)))
+      (if (< n 0)
+          (let ((m (- n)))
+            (cond
+              ((<= 64 m) (%make-u64 0 0))
+              ((<= 32 m) (%make-u64 (%raw-shr32 hi (- m 32)) 0))
+              (else (%make-u64 (bitwise-or (%raw-shr32 lo m)
+                                           (%raw-shl32 hi (- 32 m)))
+                               (%raw-shr32 hi m)))))
+        (cond
+          ((<= 64 n) (%make-u64 0 0))
+          ((<= 32 n) (%make-u64 0 (%raw-shl32 lo (- n 32))))
+          (else (%make-u64 (%raw-shl32 lo n)
+                           (bitwise-or (%raw-shl32 hi n)
+                                       (%raw-shr32 lo (- 32 n))))))))))
+
+;;; dispatch
+
+(define-function %add (a b)
+  (cond
+    ((is <u64> a) (%u64-add a (%to-u64 b)))
+    ((is <u64> b) (%u64-add (%to-u64 a) b))
+    ((is <u32> a) (%u32-add a (%to-u32 b)))
+    ((is <u32> b) (%u32-add (%to-u32 a) b))
+    (else (box <long> (+ (unbox <long> a) (unbox <long> b))))))
+
+(define-function %sub (a b)
+  (cond
+    ((is <u64> a) (%u64-sub a (%to-u64 b)))
+    ((is <u64> b) (%u64-sub (%to-u64 a) b))
+    ((is <u32> a) (%u32-sub a (%to-u32 b)))
+    ((is <u32> b) (%u32-sub (%to-u32 a) b))
+    (else (box <long> (- (unbox <long> a) (unbox <long> b))))))
+
+(define-function %mul (a b)
+  (cond
+    ((is <u64> a) (%u64-mul a (%to-u64 b)))
+    ((is <u64> b) (%u64-mul (%to-u64 a) b))
+    ((is <u32> a) (%u32-mul a (%to-u32 b)))
+    ((is <u32> b) (%u32-mul (%to-u32 a) b))
+    (else (box <long> (* (unbox <long> a) (unbox <long> b))))))
+
+(define-function %div (a b)
+  (cond
+    ((is <u64> a) (%u64-div a (%to-u64 b)))
+    ((is <u64> b) (%u64-div (%to-u64 a) b))
+    ((is <u32> a) (%u32-div a (%to-u32 b)))
+    ((is <u32> b) (%u32-div (%to-u32 a) b))
+    (else (box <long> (/ (unbox <long> a) (unbox <long> b))))))
+
+(define-function %lt (a b)
+  (cond
+    ((is <u64> a) (%u64-unsigned-< a (%to-u64 b)))
+    ((is <u64> b) (%u64-unsigned-< (%to-u64 a) b))
+    ((is <u32> a) (%u32-unsigned-< a (%to-u32 b)))
+    ((is <u32> b) (%u32-unsigned-< (%to-u32 a) b))
+    (else (< (unbox <long> a) (unbox <long> b)))))
+
+(define-function %eq (a b)
+  (cond
+    ((is <u64> a) (%u64-= a (%to-u64 b)))
+    ((is <u64> b) (%u64-= (%to-u64 a) b))
+    ((is <u32> a) (%u32-= a (%to-u32 b)))
+    ((is <u32> b) (%u32-= (%to-u32 a) b))
+    ((and (is <long> a) (is <long> b)) (= (unbox <long> a) (unbox <long> b)))
+    (else ())))
+
+(define-function %le (a b) (or (%lt a b) (%eq a b)))
+(define-function %gt (a b) (%lt b a))
+(define-function %ge (a b) (%le b a))
+
+(define-function %bitand (a b)
+  (cond
+    ((is <u64> a) (%u64-and a (%to-u64 b)))
+    ((is <u64> b) (%u64-and (%to-u64 a) b))
+    ((is <u32> a) (%u32-and a (%to-u32 b)))
+    ((is <u32> b) (%u32-and (%to-u32 a) b))
+    (else (box <long> (bitwise-and (unbox <long> a) (unbox <long> b))))))
+
+(define-function %bitor (a b)
+  (cond
+    ((is <u64> a) (%u64-or a (%to-u64 b)))
+    ((is <u64> b) (%u64-or (%to-u64 a) b))
+    ((is <u32> a) (%u32-or a (%to-u32 b)))
+    ((is <u32> b) (%u32-or (%to-u32 a) b))
+    (else (box <long> (bitwise-or (unbox <long> a) (unbox <long> b))))))
+
+(define-function %bitxor (a b)
+  (cond
+    ((is <u64> a) (%u64-xor a (%to-u64 b)))
+    ((is <u64> b) (%u64-xor (%to-u64 a) b))
+    ((is <u32> a) (%u32-xor a (%to-u32 b)))
+    ((is <u32> b) (%u32-xor (%to-u32 a) b))
+    (else (box <long> (bitwise-xor (unbox <long> a) (unbox <long> b))))))
+
 ;; -, +, *, and / all have some peculiarities that makes them somewhat resistant to macrology
 ;; TODO these silently ignore non-pair values in cdr position
 (define-vm-function (- ()) _
-  (let ((value	(if (and -args-
-                         (pair? (get/tail -args-)))
-                    ;; >= 2 args
-                    (unbox <long> (pop -args-))
-                  ;; <= 1 arg
-                  0)))
-    (while (pair? -args-)
-      (set value (- value (unbox <long> (pop -args-)))))
-    (box <long> value)))
+  (cond
+    ((and -args- (pair? (get/tail -args-)))
+     (let ((value (pop -args-)))
+       (while -args-
+         (set value (%sub value (pop -args-))))
+       value))
+    (-args-	(%sub (box <long> 0) (pop -args-)))
+    (else	(box <long> 0))))
 
 (define-vm-function (+ ()) _
-  (let ((value	0))
+  (let ((value (box <long> 0)))
     (while -args-
-      (set value (+ value (unbox <long> (pop -args-)))))
-    (box <long> value)))
+      (set value (%add value (pop -args-))))
+    value))
 
 (define-vm-function (/ ()) _
   (if -args-
-      (let ((value	(unbox <long> (pop -args-))))
+      (let ((value (pop -args-)))
         (while -args-
-          (set value (/ value (unbox <long> (pop -args-)))))
-        (box <long> value))
+          (set value (%div value (pop -args-))))
+        value)
     (error "operator '/' needs at least one argument")))
 
 (define-vm-function (* ()) _
-  (let ((value	1))
+  (let ((value (box <long> 1)))
     (while -args-
-      (set value (* value (unbox <long> (pop -args-)))))
-    (box <long> value)))
+      (set value (%mul value (pop -args-))))
+    value))
 
-(define-form define-bitwise-operator (op)
+(define-form define-bitwise-operator (op helper)
   `(define-vm-function (,op ()) _
      (or -args- (error ,(concat-strings "operator '"(symbol->string op)"': called with zero arguments")))
-     (let ((value (unbox <long> (pop -args-))))
+     (let ((value (pop -args-)))
        (while -args-
-         (set value (,op value (unbox <long> (pop -args-)))))
-       (box <long> value))))
+         (set value (,helper value (pop -args-))))
+       value)))
 
-(define-bitwise-operator bitwise-and)
-(define-bitwise-operator bitwise-or)
-(define-bitwise-operator bitwise-xor)
+(define-bitwise-operator bitwise-and %bitand)
+(define-bitwise-operator bitwise-or %bitor)
+(define-bitwise-operator bitwise-xor %bitxor)
 
-(define-vm-function (bitwise-not ()) ((value <long>))
-  (box <long> (bitwise-not value)))
+(define-vm-function (bitwise-not ()) _
+  (or -args- (error "operator 'bitwise-not': called with zero arguments"))
+  (let ((value (pop -args-)))
+    (cond
+      ((is <u64> value) (%u64-not value))
+      ((is <u32> value) (%u32-not value))
+      (else (box <long> (bitwise-not (unbox <long> value)))))))
 
-(define-vm-function (bitwise-shift ()) ((value <long>) (shift <long>))
-  (box <long> (bitwise-shift value shift)))
+(define-vm-function (bitwise-shift ()) ((value _) (shift <long>))
+  (cond
+    ((is <u64> value) (%u64-shift value shift))
+    ((is <u32> value) (%u32-shift value shift))
+    (else (box <long> (bitwise-shift (unbox <long> value) shift)))))
 
-(define-form define-relation (op)
+(define-form define-relation (op helper)
   `(define-vm-function (,op ()) _
      (unless -args-
        (return symbol/true))
-     (let ((current	(unbox <long> (pop -args-)))
+     (let ((current	(pop -args-))
            next)
        (while -args-
-         ;; TODO this could use (set current (unbox <long> (pop
-         ;; -args-))) but that heavily relies on the specifics of
-         ;; compiler semantics (and doesn't work currently)
-         (let ((next (unbox <long> (pop -args-))))
-           (unless (,op current next)
+         (let ((next (pop -args-)))
+           (unless (,helper current next)
              (return false))
            (set current next)))
        symbol/true)))
 
-(define-relation <)
-(define-relation <=)
-(define-relation >=)
-(define-relation >)
+(define-relation < %lt)
+(define-relation <= %le)
+(define-relation >= %ge)
+(define-relation > %gt)
 
 ;; FIXME restore arity check
 (define-vm-function (= ()) _
   (let* ((lhs  (get/head -args-))
          (rhs  (get/head (get/tail -args-))))
-    (typecase lhs
-      ;; TODO dispatch on the meta-type and handle entire
-      ;; classes. there's no point in a separate <long> and
-      ;; <lower-cell> case when both can be covered by e.g. a boxed
-      ;; word branch.
-      ;; TODO long-lower-cell comparison? in both direction
-      (<long>		(to-upper-boolean
-                         (and (long? rhs)
-                              (= (unbox <long> lhs)
-                                 (unbox <long> rhs)))))
-      (<string>		(to-upper-boolean
-                         (and (string? rhs)
-                              (= 0 (string-compare lhs rhs)))))
-      (<lower-cell>	(to-upper-boolean
-                         (and (is <lower-cell> rhs)
-                              (= (unbox <lower-cell> lhs)
-                                 (unbox <lower-cell> rhs)))))
-      (else		(to-upper-boolean
-                         (= lhs rhs))))))
+    (to-upper-boolean
+     (cond
+       ((is <u64> lhs) (and (%numeric? rhs) (%u64-= lhs (%to-u64 rhs))))
+       ((is <u64> rhs) (and (%numeric? lhs) (%u64-= (%to-u64 lhs) rhs)))
+       ((is <u32> lhs) (and (%numeric? rhs) (%u32-= lhs (%to-u32 rhs))))
+       ((is <u32> rhs) (and (%numeric? lhs) (%u32-= (%to-u32 lhs) rhs)))
+       ((is <long> lhs) (and (long? rhs) (= (unbox <long> lhs) (unbox <long> rhs))))
+       ((is <string> lhs) (and (string? rhs) (= 0 (string-compare lhs rhs))))
+       (else (= lhs rhs))))))
 
 (define-vm-function (exit ()) ((exit-code <long> 0))
   (when-at-expand (feature profiler)

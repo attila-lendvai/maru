@@ -85,6 +85,14 @@
               (type-of payload))))
     obj))
 
+;; A two-cell boxed word, used by the interpreter for <u64> on a 32-bit
+;; image. The payload is raw; the low half goes into cell 0.
+(define-function %allocate-two-cell-word (type-id lo hi)
+  (let ((obj (gc/allocate type-id (words-to-bytes 2) true)))
+    (set (oop-at obj 0) lo)
+    (set (oop-at obj 1) hi)
+    obj))
+
 (define-form box (type-name payload)
   (let ((type (eval type-name)))
     (cond
