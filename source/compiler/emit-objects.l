@@ -81,8 +81,7 @@
      (define-method compile-object <long> (-c-)
        (LI32 (eval-in-slave `(box <long> ,self))))))
 
-  ((slave-value (and (is <boxed-type> <long>)
-                     (<boxed-type>-one-word? <long>)))
+  ((slave-value (single-cell-boxed-type? <long>))
    (if-at-expand (feature emit-with-object-headers)
        (let ((type-id (slave-value (<type>-slave-id <long>))))
 

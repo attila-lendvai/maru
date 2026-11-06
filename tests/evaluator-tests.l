@@ -507,6 +507,16 @@
   ;;       (test-assert (= (cell-at x 0) (cell-at x 8))))))
   )
 
+(define-test lower/boxed-cell-count ()
+  (test-assert (= 1 (<boxed-type>-payload-cell-count <u32>)))
+  (test-assert (single-cell-boxed-type? <u32>))
+  (when-at-expand (= 64 lower/cell-size/bits)
+    (test-assert (= 1 (<boxed-type>-payload-cell-count <u64>)))
+    (test-assert (single-cell-boxed-type? <u64>)))
+  (when-at-expand (= 32 lower/cell-size/bits)
+    (test-assert (= 2 (<boxed-type>-payload-cell-count <u64>)))
+    (test-assert (not (single-cell-boxed-type? <u64>)))))
+
 (define-function many-args (x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16)
   (+ x1 x10 x16))
 

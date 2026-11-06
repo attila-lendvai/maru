@@ -58,8 +58,7 @@
    (define-method compile-object <long> (-c-)
      (LITERAL (eval-in-slave `(box <long> ,self)))))
 
-  ((slave-value (and (is <boxed-type> <long>)
-                     (<boxed-type>-one-word? <long>)))
+  ((slave-value (single-cell-boxed-type? <long>))
    (let ((type-id (slave-value (<type>-slave-id <long>))))
 
      (if-at-expand (feature emit-with-object-headers)

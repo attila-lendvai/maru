@@ -66,17 +66,33 @@
         (else
          `(= ,type-name (type-of ,obj)))))))
 
-(define-function %allocate-boxed-word (type-id payload)
-  (let ((obj (gc/allocate type-id (words-to-bytes 1) true)))
-    (set (oop-at obj 0) payload)
+(define-function %allocate-boxed-cells (type-id cell-count payload)
+  (let ((obj (gc/allocate type-id (words-to-bytes cell-count) true)))
+    (cond
+      ((= 1 cell-count)
+       (set (oop-at obj 0) payload))
+      ((is <array> payload)
+       ;; NOTE avoid ARRAY-AT: this file is compiled before the array
+       ;; vm-functions exist in the target, so a call would resolve to
+       ;; the host's <target-function> and fail to compile.
+       (let ((elements	(<array>-elements payload))
+             (index	0))
+         (while (< index cell-count)
+           (set (oop-at obj index) (oop-at elements index))
+           (incr index))))
+      (else
+       (error "%allocate-boxed-cells: a multi-cell payload must be an <array>, got "
+              (type-of payload))))
     obj))
 
 (define-form box (type-name payload)
   (let ((type (eval type-name)))
     (cond
       ((is <boxed-type> type)
-       (assert (<boxed-type>-one-word? (eval type-name)) "cannot know how to allocate a boxed type that is not one-word?")
-       `(%allocate-boxed-word ,type-name ,payload))
+       (let ((cell-count (<boxed-type>-payload-cell-count type)))
+         (if (long? cell-count)
+             `(%allocate-boxed-cells ,type-name ,cell-count ,payload)
+           (error "box: " type-name " has a variable payload; allocate and fill it directly"))))
       ((is <immediate-type> type)
        ;; TODO error when overflow
        `(bitwise-or (bitwise-shift ,payload ,(<immediate-type>-tag-width type))
@@ -88,15 +104,12 @@
   (let ((type (eval type-name)))
     (cond
       ((is <boxed-type> type)
-       (if (<boxed-type>-one-word? type)
+       (if (single-cell-boxed-type? type)
            `(oop-at ,(if (feature typecheck-slot-access)
                          `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
                        obj)
                     0)
-         ;; then we just return its address, the payload is right there inlined
-         (if (feature typecheck-slot-access)
-             `(%accessor-typecheck ,(<type>-slave-id type) ,obj)
-           obj)))
+         (error "unbox: " type-name " does not have a single-cell payload; use its accessors")))
 
       ((is <immediate-type> type)
        (if (< *safety* 2)

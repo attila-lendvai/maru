@@ -373,25 +373,29 @@
   ;; e.g. allocate a large opaque object, put <symbol> as its type,
   ;; and memcpy an arbitrary long cstring into the object payload.
 
-  ;; TODO this ONE-WORD? thing is silly. either rename to
-  ;; SINGLE-WORD?, or come up with some alternative that generalizes
-  ;; better. how could (box <some-boxed-type> payload) work when the
-  ;; payload is not a single word, but something longer that needs to
-  ;; be memcpy'd into the object's body? maybe payload should then be
-  ;; a lisp <array> whose elements get copied?
-  (one-word?))
+  ;; The fixed number of cells in the payload, or () for a variable
+  ;; body whose size is chosen at allocation time. A multi-cell payload
+  ;; (e.g. <u64> on a 32-bit image) is copied in from an <array>.
+  (payload-cell-count))
 
-(define-function new-<boxed-type> (name one-word?)
+(define-function new-<boxed-type> (name payload-cell-count)
   (let ((type (new-type-instance name <boxed-type>)))
-    (set (<boxed-type>-one-word? type) one-word?)
+    (set (<boxed-type>-payload-cell-count type) payload-cell-count)
     type))
 
+(define-function single-cell-boxed-type? (type)
+  (and (is <boxed-type> type)
+       (= 1 (<boxed-type>-payload-cell-count type))))
+
 ;; TODO rename to define-boxed-cell, or maybe define-boxed-cell-type
-(define-form define-boxed-word (name)
-  `(define ,name ,(new-<boxed-type> name true)))
+(define-form define-boxed-word (name . cell-count)
+  `(define ,name ,(new-<boxed-type> name
+                                    (if (pair? cell-count)
+                                        (eval (car cell-count) *env*)
+                                      1))))
 
 (define-form define-boxed (name)
-  `(define ,name ,(new-<boxed-type> name false)))
+  `(define ,name ,(new-<boxed-type> name ())))
 
 ;;; classes
 
@@ -516,19 +520,21 @@
    (when-at-expand (feature profiler)		profiler-counter)))
 
 (define-boxed-word <u32>)
+;; A 64-bit word is one cell on a 64-bit image and two on a 32-bit one,
+;; so that a 32-bit host can carry the target's words. Target code only
+;; sees this on 64-bit targets.
+(if-at-expand bootstrapping?
+    (define-boxed-word <u64> (if (= 64 target/cell-size/bits) 1 2))
+  (define-boxed-word <u64> (if (= 64 lower/cell-size/bits) 1 2)))
 
 ;; a word/cell/pointer in the lower realm, boxed, so that it can be
 ;; stored in the maru heap. sized like the running image's natural word.
 (if-at-expand bootstrapping?
     (if-at-expand (= 64 target/cell-size/bits)
-        (begin
-          (define-boxed-word <u64>)
-          (define <lower-cell> <u64>))
+        (define <lower-cell> <u64>)
       (define <lower-cell> <u32>))
   (if-at-expand (= 64 lower/cell-size/bits)
-      (begin
-        (define-boxed-word <u64>)
-        (define <lower-cell> <u64>))
+      (define <lower-cell> <u64>)
     (define <lower-cell> <u32>)))
 
 ;; New types go at the end: the host binary's type ids must keep

@@ -1331,8 +1331,7 @@
     (cond
       ((slave-value (is <immediate-type> <long>))
        ())
-      ((slave-value (and (is <boxed-type> <long>)
-                         (<boxed-type>-one-word? <long>)))
+      ((slave-value (single-cell-boxed-type? <long>))
        (emit INLINE
              (list "%\"<long>\" = type { %word }\n"
                    "%\"<long-h>\" = type { %\"<header>\", %\"<long>\" }\n")))

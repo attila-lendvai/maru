@@ -520,9 +520,9 @@
               value)
          (incr (<segment>-paddress segment) 8)
          (incr (<segment>-laddress segment) 8))))
-    ;; A boxed <u64> only exists on 64-bit images; the accessor unboxes
-    ;; its argument.
-    (when-at-expand (defined? '<u64>)
+    ;; A boxed <u64> is unboxable only when the host image itself is
+    ;; 64-bit; on a 32-bit host it is a two-cell carrier.
+    (when-at-expand (= 64 lower/cell-size/bits)
       (<u64>
        (let ((segment (current-segment)))
          (set (u64-at (<segment>-buffer segment)
