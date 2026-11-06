@@ -58,10 +58,20 @@
          (< __a__ __b__)
        (< __b__ 0))))
 
-;; The static space holds the code, read-only data, data and bss
+;; The read-only space holds the code, read-only data, data and bss
 ;; emitted into the image; those objects are not managed by the GC and
 ;; must not be mutated. Both bounds are emitted by the compiler: the
 ;; lowest code address and the end of the image's bss.
+(define-form gc/in-read-only-space? (obj)
+  `(let ((__obj__ ,obj))
+     (and (not (gc/unsigned-< __obj__ (address-of-location 'read-only-space-start)))
+          (gc/unsigned-< __obj__ (address-of-location 'read-only-space-end)))))
+
+;; The static space is a contiguous part of the heap image whose
+;; objects are referenced by machine code. We punt on an exact root set
+;; for them: they are never collected or allocated, and the whole space
+;; is treated as a root at every collection. Both bounds are emitted by
+;; the compiler; an empty interval disables the space.
 (define-form gc/in-static-space? (obj)
   `(let ((__obj__ ,obj))
      (and (not (gc/unsigned-< __obj__ (address-of-location 'static-space-start)))
@@ -177,16 +187,27 @@
     (while ptr
       (gc/debug (platform/diag-print "sweep? "(<header>-flags ptr)" "(pointer ptr)" + "(pointer (<header>-size ptr))"\n"))
       (let ((flags (<header>-flags ptr)))
-        (if (bitwise-and flags <header>-flags/mark)
+        (if (gc/in-static-space? (gc/payload-of ptr))
+            ;; Static-space chunks are never collected; keep used/type, but
+            ;; clear the mark bit so the next collection traces them again.
             (let ()
-              (safety 3 (and (= 0 (<header>-type ptr)) (fatal "gc/sweep: encountered an object with zero type: " (pointer ptr))))
-              (set nused (+ nused (<header>-size ptr)))
-              (set nobjs (+ nobjs 1))
-              (set (<header>-flags ptr) (bitwise-xor flags <header>-flags/mark)))
-          (gc/debug (platform/diag-print "collect "(pointer ptr)" size "(<header>-size ptr)"\n"))
-          (set nfree (+ nfree (<header>-size ptr)))
-          (set (<header>-flags ptr) 0)
-          (set (<header>-type ptr) 0)))
+              (if (bitwise-and flags <header>-flags/used)
+                  (let ()
+                    (set nused (+ nused (<header>-size ptr)))
+                    (set nobjs (+ nobjs 1)))
+                (set nfree (+ nfree (<header>-size ptr))))
+              (set (<header>-flags ptr)
+                   (bitwise-and flags (bitwise-not <header>-flags/mark))))
+          (if (bitwise-and flags <header>-flags/mark)
+              (let ()
+                (safety 3 (and (= 0 (<header>-type ptr)) (fatal "gc/sweep: encountered an object with zero type: " (pointer ptr))))
+                (set nused (+ nused (<header>-size ptr)))
+                (set nobjs (+ nobjs 1))
+                (set (<header>-flags ptr) (bitwise-xor flags <header>-flags/mark)))
+            (gc/debug (platform/diag-print "collect "(pointer ptr)" size "(<header>-size ptr)"\n"))
+            (set nfree (+ nfree (<header>-size ptr)))
+            (set (<header>-flags ptr) 0)
+            (set (<header>-type ptr) 0))))
       (set ptr (<header>-next ptr))
       (when (= ptr gc/memory-base)
         (set ptr 0)))
@@ -199,7 +220,7 @@
 (define-function gc/mark-and-trace (obj)
   ;; (safety 3 (or (immediate? obj) (< 1000 obj) (fatal "gc/mark-and-trace: encountered a low pointer: " (pointer obj))))
   (and (not (immediate? obj))
-       (not (gc/in-static-space? obj))
+       (not (gc/in-read-only-space? obj))
        (let* ((header (gc/header-of obj))
               (flags  (<header>-flags header)))
          (gc/debug (platform/diag-print "mark and trace "(pointer obj)" ("(pointer header)") flags "flags" size "(<header>-size header)" type "(<header>-type header)"\n"))
@@ -245,6 +266,18 @@
         (gc/debug (platform/diag-print "mark gc root "i" : "(pointer root-ptr)" -> "(pointer root)" ("(pointer (gc/header-of root))")\n"))
         (gc/mark-and-trace root)))
     (gc/debug (platform/diag-print "finished marking gc roots\n"))
+    ;; Machine code references the static space directly, and we don't
+    ;; maintain an exact root set for it: treat every live static-space
+    ;; chunk as a root so its dynamic referents stay alive.
+    (let ((chunk gc/memory-base))
+      (while chunk
+        (let ((obj (gc/payload-of chunk)))
+          (when (and (gc/live-chunk? chunk)
+                     (gc/in-static-space? obj))
+            (gc/mark-and-trace obj)))
+        (set chunk (<header>-next chunk))
+        (when (= chunk gc/memory-base)
+          (set chunk 0))))
     (gc/sweep)
     (set gc/alloc-count 0)))
 
@@ -264,7 +297,9 @@
       (while
         (let ()
           (gc/debug (platform/diag-print "alloc? "(<header>-flags chunk)" "(pointer chunk)" "(pointer (<header>-next chunk))" ["(pointer first)"] "(<header>-size chunk)" >= "requested-size" "(<= requested-size (<header>-size chunk))"\n"))
-          (when (= 0 (<header>-flags chunk)) ;; i.e. free chunk
+          (when (and (= 0 (<header>-flags chunk)) ;; i.e. free chunk
+                     ;; never allocate inside the static space
+                     (not (gc/in-static-space? (gc/payload-of chunk))))
             (let ((chunk-size (<header>-size chunk)))
               (while (and (= 0 (<header>-flags (<header>-next chunk))) ; free
                           ;; TODO can this ever be false?

@@ -1376,9 +1376,14 @@
   (comment-features)
   (emit-prelude -c-)
 
-  ;; The lower bound of the static image: any code address is below
+  ;; The lower bound of the read-only image: any code address is below
   ;; every data section. Never called.
-  (print "define void "(GLOBAL 'static-space-start)"() { ret void }\n")
+  (print "define void "(GLOBAL 'read-only-space-start)"() { ret void }\n")
+
+  ;; The static space is a (currently empty) sub-range of the heap image.
+  ;; An alias makes both bounds the same address.
+  (print (GLOBAL 'static-space-start) " = global [0 x i8] zeroinitializer\n")
+  (print (GLOBAL 'static-space-end) " = alias [0 x i8], ptr "(GLOBAL 'static-space-start)"\n")
 
   ;; NOTE this array-do will not pick up any new definitions added to
   ;; the env after the iterations has begun (see e.g. the
@@ -1399,7 +1404,7 @@
 
   ;; Emitted last, so that it is also laid out last: a zero initialized
   ;; global lands in bss, after everything else this module defines.
-  (print (GLOBAL 'static-space-end) " = global [1 x i8] zeroinitializer\n"))
+  (print (GLOBAL 'read-only-space-end) " = global [1 x i8] zeroinitializer\n"))
 
 (define-function run-compiler (env output-path)
   (with-open-stream (stream output-path "w")

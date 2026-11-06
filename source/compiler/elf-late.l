@@ -704,8 +704,14 @@
     ;; ADDRESS-OF-LOCATION resolves names through the assembler env, so
     ;; both image bounds must exist before the definitions can
     ;; reference them.
-    (label! 'static-space-start)
-    (label 'static-space-end)    ; a forward label defined later
+    (label! 'read-only-space-start)
+    (label 'read-only-space-end)    ; a forward label defined later
+
+    ;; The static space is a sub-range of the heap image. It is empty for
+    ;; now; its bounds must exist before the definitions are compiled.
+    (with-current-segment 'heap
+      (label! 'static-space-start)
+      (label! 'static-space-end))
 
     ;; Make space for the ELF header; it will be emitted as the final step.
     (.i8/times 0 +ehdr-size+)
@@ -722,9 +728,9 @@
           (compile-definition value name -c-))))
     (verbosity 1 (warn "\n"))
 
-    ;; The static image ends here; the heap image follows it.
+    ;; The read-only image ends here; the heap image follows it.
     (with-current-segment 'bss
-      (label! 'static-space-end))
+      (label! 'read-only-space-end))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))
