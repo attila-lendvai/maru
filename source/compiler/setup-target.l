@@ -115,3 +115,8 @@
 
 (define-form target-value (form)
   `(eval-in-target ',form))
+
+;; The size of the dummy, file-backed initial heap image. The compiler
+;; emits that many zero bytes as the heap segment; gc/initialize stamps a
+;; chunk over it at startup. A placeholder until real content is emitted.
+(define +heap-image-size+ 512)

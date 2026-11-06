@@ -370,10 +370,26 @@
 
 (define-function gc/initialize ()
   (debug (platform/diag-print "gc/initialize is speaking\n"))
-  (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
-    (set gc/memory-base ptr)
-    (set gc/lowest-memory-address ptr)
-    (set gc/allocation-cursor ptr))
+  (if-at-expand (feature relocatable-elf)
+      ;; These emission shapes have no heap image segment yet.
+      (let ((ptr (gc/acquire-new-heap-space gc/minimum-growth-unit)))
+        (set gc/memory-base ptr)
+        (set gc/lowest-memory-address ptr)
+        (set gc/allocation-cursor ptr))
+    ;; The initial heap is the file-backed image emitted by the compiler.
+    ;; It is zeroed; stamp a single free chunk over it.
+    (let* ((start (address-of-location 'heap-image-start))
+           (end   (address-of-location 'heap-image-end))
+           (size  (- end start)))
+      (safety 1 (assert (gc/unsigned-< start end)))
+      (safety 1 (assert (not (gc/in-read-only-space? start))))
+      (set gc/memory-base start)
+      (set gc/lowest-memory-address start)
+      (set gc/allocation-cursor start)
+      (set (<header>-next  start) start)
+      (set (<header>-size  start) (- size size-of-<header>))
+      (set (<header>-flags start) 0)
+      (set (<header>-type  start) 0)))
   (gc/grow-root-vector))
 
 (define-form gc/protect (vars . prog)

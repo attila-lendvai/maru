@@ -595,14 +595,6 @@
   (.segment	'ro-data)
   (.align	elf/page-size)
 
-  ;; Initialize the empty heap image. It is the last loaded segment;
-  ;; later stages move literals into it. For now it only holds this
-  ;; placeholder cell so that its PT_LOAD has content.
-  (.segment	'heap)
-  (.align	target/cell-size/bytes)
-  (label!	'heap-start)
-  (.i8/times	0 target/cell-size/bytes)
-
   ;; append the program header table to the text segment, so that
   ;; AT_PHDR (load bias + e_phoff) points into a mapped region.
   (with-current-segment 'code
@@ -710,6 +702,11 @@
     ;; The static space is a sub-range of the heap image. It is empty for
     ;; now; its bounds must exist before the definitions are compiled.
     (with-current-segment 'heap
+      ;; The initial heap image: a file-backed, zeroed region. gc/initialize
+      ;; stamps a chunk over it at startup.
+      (label! 'heap-image-start)
+      (.i8/times 0 +heap-image-size+)
+      (label! 'heap-image-end)
       (label! 'static-space-start)
       (label! 'static-space-end))
 

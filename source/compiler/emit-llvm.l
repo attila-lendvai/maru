@@ -1404,7 +1404,15 @@
 
   ;; Emitted last, so that it is also laid out last: a zero initialized
   ;; global lands in bss, after everything else this module defines.
-  (print (GLOBAL 'read-only-space-end) " = global [1 x i8] zeroinitializer\n"))
+  (print (GLOBAL 'read-only-space-end) " = global [1 x i8] zeroinitializer\n")
+
+  ;; The initial heap image: zeroed; gc/initialize stamps a chunk over it.
+  ;; Emitted after read-only-space-end so it lies outside the read-only
+  ;; space.
+  (print (GLOBAL 'heap-image-start)
+         " = global [" (/ +heap-image-size+ (target-value target/cell-size/bytes))
+         " x %word] zeroinitializer\n")
+  (print (GLOBAL 'heap-image-end) " = global [1 x i8] zeroinitializer\n"))
 
 (define-function run-compiler (env output-path)
   (with-open-stream (stream output-path "w")
