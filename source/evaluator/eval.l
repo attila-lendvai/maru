@@ -3,6 +3,8 @@
 ;;; The Maru VM, written in a dialect of Maru.
 ;;;
 
+(load "source/evaluator/gc.l")
+(load "source/evaluator/types.l")
 (load "source/evaluator/constructors.l")
 
 (when (feature backtrace)

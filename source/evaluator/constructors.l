@@ -3,8 +3,9 @@
 ;;; The Maru VM, written in a dialect of Maru.
 ;;;
 
-(load "source/evaluator/gc.l")
-(load "source/evaluator/types.l")
+;;; The caller loads gc.l and types.l; this file only defines the
+;;; constructors, so a caller can pick the type layer (e.g. the arena
+;;; inherits the target's from the slave env instead of reloading it).
 
 ;;;
 ;;; object instantiation
