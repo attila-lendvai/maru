@@ -33,6 +33,14 @@
                           (= target/platform "posix")
                           (= elf-emission-type "c-obj"))))
 
+;; Build and validate the host-side arena before the compiler starts.
+;; Stage-0 still runs on the previous stage's binary, which predates
+;; the boxed-word arithmetic. The arena is loaded in both later stages
+;; so that its type registration is identical there; the self-check
+;; only runs when the host and target cell widths match.
+(unless evolving?
+  (load "source/compiler/arena.l"))
+
 ;; The x86 backend emits 32- or 64-bit code; which one is a property of
 ;; the target arch, not the backend. The normalized arch symbol already
 ;; spells the suffix (x86-32 / x86-64), matching the emitter file names.
