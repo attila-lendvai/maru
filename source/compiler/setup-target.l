@@ -120,3 +120,18 @@
 ;; emits that many zero bytes as the heap segment; gc/initialize stamps a
 ;; chunk over it at startup. A placeholder until real content is emitted.
 (define +heap-image-size+ 512)
+
+;; The target's cell type, carried by this host image. A 32-bit host
+;; carries a 64-bit target's words in a two-cell <u64>; a 64-bit host
+;; in one cell. This is the host's <u64>/<u32> object, not the slave's:
+;; the slave's <u64> describes the target's layout and a 32-bit host
+;; cannot read it.
+(define <target-cell>
+  (if (= 64 (eval-in-slave 'target/cell-size/bits)) <u64> <u32>))
+
+(assert (is <boxed-type> <target-cell>))
+(when-at-expand (not evolving?)
+  (assert (= (<boxed-type>-payload-cell-count <target-cell>)
+             (if (= 64 (slave-value target/cell-size/bits))
+                 (if (= 64 lower/cell-size/bits) 1 2)
+               1))))
