@@ -292,8 +292,11 @@
        (gc/collect))
   (let* ((first (<header>-next gc/allocation-cursor))
          (chunk first)
-         (total-size (+ requested-size size-of-<header>)))
-    (while 1
+         (total-size (+ requested-size size-of-<header>))
+         (result ()))
+    ;; NOTE no (return): a return is a compiled goto, unavailable to the
+    ;; interpreted arena. the result variable drives both loops.
+    (while (not result)
       (while
         (let ()
           (gc/debug (platform/diag-print "alloc? "(<header>-flags chunk)" "(pointer chunk)" "(pointer (<header>-next chunk))" ["(pointer first)"] "(<header>-size chunk)" >= "requested-size" "(<= requested-size (<header>-size chunk))"\n"))
@@ -339,10 +342,13 @@
                   (safety 4 (assert (gc/live-chunk? header) "gc/allocate: was about to return with an object whose USED flag is unset"))
                   (safety 3 (gc/initialize-header-canary header))
                   (gc/debug (platform/diag-print "gc/allocate: returning with "(pointer obj)" (header: "(pointer header)"), type "(<header>-type header)", size "(gc/object-size obj)"\n"))
-                  (return obj)))))
-          (!= first (set chunk (<header>-next chunk)))))
-      (gc/grow-heap (max (+ size-of-<header> requested-size)
-                         gc/minimum-growth-unit)))))
+                  (set result obj)))))
+          (and (not result)
+               (!= first (set chunk (<header>-next chunk))))))
+      (unless result
+        (gc/grow-heap (max (+ size-of-<header> requested-size)
+                           gc/minimum-growth-unit))))
+    result))
 
 (define-function gc/grow-root-vector ()
   (set gc/root-max (max 32 (* 2 gc/root-max)))
