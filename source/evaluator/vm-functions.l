@@ -571,6 +571,25 @@
 (define-vm-function long->lower-cell ((value <long>))
   (box <lower-cell> value))
 
+;;; Target-typed cell accessors for the bootstrap arena. They preserve
+;;; the target cell width: <u64>-lo/-hi box into <u32>, u32->u64
+;;; widens. The implementation is suppressed (empty impl name) because
+;;; these names follow the generated accessor convention.
+
+(define-vm-function (u32->u64 ()) ((value _))
+  (%u32->u64 value))
+
+(define-vm-function (<u64>-lo ()) ((value _))
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u32> (bitwise-and (unbox <u64> value) 0xffffffff))
+    (box <u32> (oop-at value 0))))
+
+(define-vm-function (<u64>-hi ()) ((value _))
+  (if-at-expand (single-cell-boxed-type? <u64>)
+      (box <u32> (bitwise-and (arithmethic-shift-right (unbox <u64> value) 32)
+                              0xffffffff))
+    (box <u32> (oop-at value 1))))
+
 ;; (define-vm-function (copy-oops ()) (from to (wordcount <long>))
 ;;   (error "copy-oops: who called me in interpreted code?! TODO i need proper bounds checking added.")
 ;;   (copy-oops from to wordcount))

@@ -71,7 +71,9 @@
 (define-function arena/to-host (value)
   (cond
     ((is <long> value) value)
-    ((is <target-cell> value) (lower-cell->long value))
+    ((is <lower-cell> value) (lower-cell->long value))
+    ((is <u32> value) (lower-cell->long (u32->u64 value)))
+    ((is <u64> value) (lower-cell->long (<u64>-lo value)))
     (else
      (error "arena/to-host: unexpected value " value))))
 
@@ -106,13 +108,17 @@
 (define arena/host-set-oop-at set-oop-at)
 
 (define-function arena/write-cell (offset cell)
-  (if-at-expand (= 64 lower/cell-size/bits)
-      (set-u64-at arena/block offset cell)
+  (if arena/target-64-bit?
+      (if-at-expand (= 64 lower/cell-size/bits)
+          (set-u64-at arena/block offset cell)
+        (let ()
+          (set-u32-at arena/block offset (<u64>-lo cell))
+          (set-u32-at arena/block (+ offset 4) (<u64>-hi cell))))
     (set-u32-at arena/block offset cell)))
 
 (define-function arena/set-oop-at (base index value)
   (if (is <target-cell> base)
-      (let ((offset (+ (lower-cell->long base) (* index arena/cell-bytes))))
+      (let ((offset (+ (arena/to-host base) (* index arena/cell-bytes))))
         (cond
           ;; a target <long>: store its raw tagged word
           ((is <long> value)
@@ -152,7 +158,12 @@
 (define-function arena/peek-word (offset)
   (let ((lo (arena/load-u32 offset)))
     (if arena/target-64-bit?
-        (+ lo (bitwise-shift (arena/load-u32 (+ offset 4)) 32))
+        (let ((hi (arena/load-u32 (+ offset 4))))
+          (if-at-expand (= 64 lower/cell-size/bits)
+              (+ lo (bitwise-shift hi 32))
+            (if (= 0 hi)
+                lo
+              (error "arena: peeked word exceeds a 32-bit host"))))
       lo)))
 
 (define-function arena/peek-word-at (offset index)
@@ -338,7 +349,4 @@
 
     (set *globals* prev)))
 
-;; The self-check needs the host's natural word to match the target's
-;; cell; the cross-width path awaits the typed accessors.
-(when (= (eval-in-slave 'target/cell-size/bits) lower/cell-size/bits)
-  (arena/self-check))
+(arena/self-check)
