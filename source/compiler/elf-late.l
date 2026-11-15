@@ -725,6 +725,10 @@
           (compile-definition value name -c-))))
     (verbosity 1 (warn "\n"))
 
+    ;; The arena holds every string literal emitted during compilation.
+    (when-at-expand (defined? 'arena/verify-literals)
+      (arena/verify-literals))
+
     ;; The read-only image ends here; the heap image follows it.
     (with-current-segment 'bss
       (label! 'read-only-space-end))

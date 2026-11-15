@@ -23,7 +23,7 @@
 ;; The initial heap image is the region gc/initialize stamps a free
 ;; chunk over. Heap growth (platform/acquire-memory) is a bump
 ;; allocator above it.
-(define +arena-capacity+   (* 1024 1024))
+(define +arena-capacity+   (* 4 1024 1024))
 (define +arena-heap-start+ 4096)
 (define +arena-image-size+ (* 64 1024))
 
@@ -182,7 +182,7 @@
       (incr i))))
 
 ;;;
-;;; peeking, for the self-check and the scan
+;;; peeking, for the scan and the verification
 ;;;
 
 (define-function arena/peek-word (offset)
@@ -308,6 +308,68 @@
 
 (arena/load-target-file "source/evaluator/constructors.l")
 
+;; The arena starts as a real heap: gc/initialize stamps the initial
+;; chunk and builds the root vector. Everything compiled afterwards
+;; allocates from it.
+(eval-in-heap '(gc/initialize))
+
+;;;
+;;; string literals
+;;;
+;;; compile-object <string> allocates every literal here through the
+;;; target's own string constructor, so the emitted object has the same
+;;; shape as a runtime-constructed string: a full header, a boxed size
+;;; and an opaque <data> body. The body reserves one byte for a NUL, so
+;;; string-ensure-zero-terminated never has to mutate a literal.
+
+(define arena/literals ())
+(define arena/literals-start ())
+(define arena/literal-counter 0)
+
+(define arena/string-size-slot
+  (record/slot-index (eval-in-heap '<string>) 'size))
+(define arena/string-elements-slot
+  (record/slot-index (eval-in-heap '<string>) 'elements))
+
+(define arena/long-tag-width (eval-in-heap '(<immediate-type>-tag-width <long>)))
+(define arena/long-tag-value (eval-in-heap '(<immediate-type>-tag-value <long>)))
+
+(assert (is <long> arena/long-tag-width)
+        "arena: <long> is not an immediate type")
+
+(define-function arena/box-long (value)
+  (bitwise-or (bitwise-shift value arena/long-tag-width)
+              arena/long-tag-value))
+
+(arena/heap-define
+ '(define-function arena/new-string (len)
+    (let ((s (string (+ len 1))))
+      (set (<string>-size s) (box <long> len))
+      s)))
+
+(define-record <arena-literal> () (offset label source))
+
+(define-function arena/string-literal (str)
+  (let* ((len		(string-length str))
+         (label		(string->symbol
+                         (concat-strings "str."
+                                         (integer->string
+                                          (incr arena/literal-counter)))))
+         (obj		(eval-in-heap `(arena/new-string ,len)))
+         (offset	(arena/cell->host obj))
+         (elements	(arena/peek-word-at offset arena/string-elements-slot)))
+    (unless arena/literals-start
+      (set arena/literals-start offset))
+    (for (i 0 len)
+      (arena/store-u8 (+ elements i) (string-at str i)))
+    (arena/store-u8 (+ elements len) 0)
+    (let ((literal (make <arena-literal>
+                         (offset offset)
+                         (label  label)
+                         (source str))))
+      (push arena/literals literal)
+      literal)))
+
 ;;;
 ;;; scan-validate
 ;;;
@@ -367,63 +429,47 @@
     (list-length headers)))
 
 ;;;
-;;; self-check
+;;; verification
 ;;;
 
 (define-function arena/expect (what got want)
   (unless (= got want)
-    (error "arena self-check failed: " what ": got " got ", want " want)))
+    (error "arena check failed: " what ": got " got ", want " want)))
 
-(define-function arena/self-check ()
-  (eval-in-heap '(gc/initialize))
-
+(define-function arena/verify-literals ()
   (let* ((header-size (arena/header-size))
          (cell-bytes  arena/cell-bytes)
+         (string-id   (eval-in-heap '(<type>-slave-id <string>)))
+         (data-id     (eval-in-heap '(<type>-slave-id <data>)))
          (used        (eval-in-heap '<header>-flags/used))
          (opaque      (eval-in-heap '<header>-flags/opaque))
-         (pair        (eval-in-heap '(cons 1 2)))
-         (pair-header (- (arena/cell->host pair) header-size)))
+         (count       0)
+         (bytes       0))
+    (list-do literal arena/literals
+      (let* ((offset   (<arena-literal>-offset literal))
+             (source   (<arena-literal>-source literal))
+             (len      (string-length source))
+             (header   (- offset header-size))
+             (size     (arena/peek-word-at offset arena/string-size-slot))
+             (elements (arena/peek-word-at offset arena/string-elements-slot))
+             (el-header (- elements header-size)))
+        (arena/expect "literal type" (arena/peek-word-at header 3) string-id)
+        (arena/expect "literal flags" (arena/peek-word-at header 2) used)
+        (arena/expect "literal size" size (arena/box-long len))
+        (arena/expect "elements alignment"
+                      (bitwise-and elements (- cell-bytes 1)) 0)
+        (arena/expect "elements type" (arena/peek-word-at el-header 3) data-id)
+        (arena/expect "elements flags" (arena/peek-word-at el-header 2)
+                      (bitwise-or used opaque))
+        (unless (<= (+ len 1) (arena/peek-word-at el-header 1))
+          (error "arena: string literal body is too small for its NUL: " len))
+        (for (i 0 len)
+          (unless (= (arena/load-u8 (+ elements i)) (string-at source i))
+            (error "arena: string literal byte mismatch at " i)))
+        (arena/expect "literal NUL" (arena/load-u8 (+ elements len)) 0)
+        (incr count)
+        (set bytes (+ bytes (+ len 1)))))
+    (arena/scan-validate)
+    (verbosity 1
+      (warn "arena: " count " string literals, " bytes " bytes\n"))))
 
-    ;; a pair: raw head and tail, the target's type id, a live header
-    (arena/expect "pair head" (arena/peek-cell pair 0) 1)
-    (arena/expect "pair tail" (arena/peek-cell pair 1) 2)
-    (arena/expect "pair size" (arena/peek-word-at pair-header 1)
-                  (* 2 cell-bytes))
-    (arena/expect "pair flags" (arena/peek-word-at pair-header 2) used)
-    (arena/expect "pair type" (arena/peek-word-at pair-header 3)
-                  (eval-in-heap '(<type>-slave-id <pair>)))
-
-    ;; a string: its size is the target's boxed zero, its elements an
-    ;; opaque <data> object
-    (let* ((str      (eval-in-heap '(string 4)))
-           (elements (arena/peek-cell str 1))
-           (header   (- elements header-size)))
-      (arena/expect "string size" (arena/peek-cell str 0)
-                    (eval-in-heap '(box <long> 0)))
-      (unless (= 0 (bitwise-and elements (- cell-bytes 1)))
-        (error "arena self-check: string elements is not aligned: " elements))
-      (arena/expect "string elements flags" (arena/peek-word-at header 2)
-                    (bitwise-or used opaque))
-      (arena/expect "string elements type" (arena/peek-word-at header 3)
-                    (eval-in-heap '(<type>-slave-id <data>)))
-      (arena/expect "string elements size" (arena/peek-word-at header 1)
-                    cell-bytes))
-
-    ;; an array: boxed zero size, a cleared <oop-vector> body
-    (let* ((arr      (eval-in-heap '(array 4)))
-           (elements (arena/peek-cell arr 1))
-           (header   (- elements header-size)))
-      (arena/expect "array size" (arena/peek-cell arr 0)
-                    (eval-in-heap '(box <long> 0)))
-      (arena/expect "array elements flags" (arena/peek-word-at header 2) used)
-      (arena/expect "array elements type" (arena/peek-word-at header 3)
-                    (eval-in-heap '(<type>-slave-id <oop-vector>)))
-      (arena/expect "array elements size" (arena/peek-word-at header 1)
-                    (* 4 cell-bytes))
-      (arena/expect "array elements cleared" (arena/peek-cell elements 0) 0))
-
-    (let ((chunks (arena/scan-validate)))
-      (unless (< 0 chunks)
-        (error "arena self-check: the chunk chain is empty")))))
-
-(arena/self-check)

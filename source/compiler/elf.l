@@ -154,6 +154,8 @@
      (.asciiz self))))
 
 (define-method compile-object <string> (-c-)
+  (when-at-expand (defined? 'arena/string-literal)
+    (arena/string-literal self))
   (emit-object/C-string self -c-))
 
 (define-method compile-object <undefined> (-c-)
