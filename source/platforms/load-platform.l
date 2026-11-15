@@ -36,8 +36,7 @@
 ;; Build and validate the host-side arena before the compiler starts.
 ;; Stage-0 still runs on the previous stage's binary, which predates
 ;; the boxed-word arithmetic. The arena is loaded in both later stages
-;; so that its type registration is identical there; the self-check
-;; only runs when the host and target cell widths match.
+;; so that its type registration is identical there.
 (unless evolving?
   (load "source/compiler/arena.l"))
 
