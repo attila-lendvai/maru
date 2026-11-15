@@ -23,9 +23,9 @@
 ;; The initial heap image is the region gc/initialize stamps a free
 ;; chunk over. Heap growth (platform/acquire-memory) is a bump
 ;; allocator above it.
-(define +arena-capacity+   (* 4 1024 1024))
+(define +arena-capacity+   (* 8 1024 1024))
 (define +arena-heap-start+ 4096)
-(define +arena-image-size+ (* 64 1024))
+(define +arena-image-size+ (* 4 1024 1024))
 
 (define arena/target-64-bit? (= 64 (eval-in-slave 'target/cell-size/bits)))
 (define arena/capacity   +arena-capacity+)
@@ -359,7 +359,7 @@
          (offset	(arena/cell->host obj))
          (elements	(arena/peek-word-at offset arena/string-elements-slot)))
     (unless arena/literals-start
-      (set arena/literals-start offset))
+      (set arena/literals-start (- offset (arena/header-size))))
     (for (i 0 len)
       (arena/store-u8 (+ elements i) (string-at str i)))
     (arena/store-u8 (+ elements len) 0)
@@ -393,7 +393,7 @@
         (set done true))
       (when (> count 100000)
         (error "arena scan: the chunk chain does not terminate")))
-    headers))
+    (list-reverse! headers)))
 
 (define-function arena/scan-validate ()
   (let* ((header-size (arena/header-size))
@@ -427,6 +427,36 @@
         (when (= chunk base)
           (set done true))))
     (list-length headers)))
+
+;;;
+;;; the image
+;;;
+
+(define arena/flags-used   (eval-in-heap '<header>-flags/used))
+(define arena/flags-opaque (eval-in-heap '<header>-flags/opaque))
+
+(define-function arena/assoc (key alist)
+  (let ((entry alist)
+        (found ()))
+    (while (and entry (not found))
+      (when (= key (car (car entry)))
+        (set found (cdr (car entry))))
+      (set entry (cdr entry)))
+    found))
+
+;; The used chunks of the image, in address order. The root vector and
+;; the free chunk are outside [literals-start, ...).
+(define-function arena/image-chunks ()
+  (if (not arena/literals-start)
+      ()
+    (let ((chunks ()))
+      (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
+        (when (and (<= arena/literals-start header)
+                   (= arena/flags-used
+                      (bitwise-and arena/flags-used
+                                   (arena/peek-word-at header 2))))
+          (push chunks header)))
+      (list-reverse! chunks))))
 
 ;;;
 ;;; verification

@@ -121,6 +121,11 @@
 ;; chunk over it at startup. A placeholder until real content is emitted.
 (define +heap-image-size+ 512)
 
+;; The free space emitted after the pre-built static image, so the
+;; runtime has a chunk to allocate the root vector and the startup
+;; objects from before the heap grows via brk.
+(define +heap-image-slack+ (* 4 1024))
+
 ;; The target's cell type, carried by this host image. A 32-bit host
 ;; carries a 64-bit target's words in a two-cell <u64>; a 64-bit host
 ;; in one cell. This is the host's <u64>/<u32> object, not the slave's:

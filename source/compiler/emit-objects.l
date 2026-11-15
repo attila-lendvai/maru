@@ -97,22 +97,24 @@
 (let ((type-id (slave-value (<type>-slave-id <string>)))
       (counter 0))
   (define-method compile-object <string> (-c-)
-    (emit-comment 3 "emitting string object: "self)
-    ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
-    (when-at-expand (defined? 'arena/string-literal)
-      (arena/string-literal self))
-    (let ((elements	(emit-object/C-string self -c-))
-          (size		(compile-object (string-length self) -c-)))
-      (emit-object/header <string> type-id -c-)
-      (GLOBAL-ADDR
-       (with-new-label 'data
-         (incr counter)
-         (emit-symtab-entry/variable (concat-string "str" (integer->string counter))
-                                     +.data-section-index+
-                                     (current-laddress)
-                                     target/cell-size/bytes)
-         (emit CELL size)
-         (emit CELL elements))))))
+    (if-at-expand (and (defined? 'arena/string-literal)
+                       (not (eval-in-slave 'feature/relocatable-elf)))
+        (GLOBAL-ADDR (label (<arena-literal>-label (arena/string-literal self))))
+      (let ()
+        (emit-comment 3 "emitting string object: "self)
+        ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
+        (let ((elements	(emit-object/C-string self -c-))
+              (size		(compile-object (string-length self) -c-)))
+          (emit-object/header <string> type-id -c-)
+          (GLOBAL-ADDR
+           (with-new-label 'data
+             (incr counter)
+             (emit-symtab-entry/variable (concat-string "str" (integer->string counter))
+                                         +.data-section-index+
+                                         (current-laddress)
+                                         target/cell-size/bytes)
+             (emit CELL size)
+             (emit CELL elements))))))))
 
 ;;;
 ;;; Function calls

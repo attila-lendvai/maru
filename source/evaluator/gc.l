@@ -383,19 +383,32 @@
         (set gc/lowest-memory-address ptr)
         (set gc/allocation-cursor ptr))
     ;; The initial heap is the file-backed image emitted by the compiler.
-    ;; It is zeroed; stamp a single free chunk over it.
-    (let* ((start (address-of-location 'heap-image-start))
-           (end   (address-of-location 'heap-image-end))
-           (size  (- end start)))
+    ;; A standalone image may already hold the static chunks (literals);
+    ;; in that case the sentinel at start is a free chunk and the free
+    ;; chunk after the static space is stamped here. Otherwise stamp one
+    ;; free chunk over the whole image.
+    (let* ((start	(address-of-location 'heap-image-start))
+           (end		(address-of-location 'heap-image-end))
+           (static-start	(address-of-location 'static-space-start))
+           (static-end	(address-of-location 'static-space-end))
+           (size		(- end start)))
       (safety 1 (assert (gc/unsigned-< start end)))
       (safety 1 (assert (not (gc/in-read-only-space? start))))
       (set gc/memory-base start)
       (set gc/lowest-memory-address start)
-      (set gc/allocation-cursor start)
-      (set (<header>-next  start) start)
-      (set (<header>-size  start) (- size size-of-<header>))
-      (set (<header>-flags start) 0)
-      (set (<header>-type  start) 0)))
+      (if (not (= static-start static-end))
+          (let ()
+            (set gc/allocation-cursor static-end)
+            (set (<header>-next  static-end) start)
+            (set (<header>-size  static-end) (- (- end static-end) size-of-<header>))
+            (set (<header>-flags static-end) 0)
+            (set (<header>-type  static-end) 0))
+        (let ()
+          (set gc/allocation-cursor start)
+          (set (<header>-next  start) start)
+          (set (<header>-size  start) (- size size-of-<header>))
+          (set (<header>-flags start) 0)
+          (set (<header>-type  start) 0)))))
   (gc/grow-root-vector))
 
 (define-form gc/protect (vars . prog)

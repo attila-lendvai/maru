@@ -627,6 +627,88 @@
   (list-do name '(code ro-data data heap) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
+(when-at-expand (defined? 'arena/image-chunks)
+
+  ;; Emit the arena's literals into the heap segment as a pre-built
+  ;; chunk chain: a free sentinel that anchors gc/memory-base, the used
+  ;; chunks in address order, and the slack the runtime stamps its first
+  ;; free chunk over. Pointer words become label references.
+  (define-function emit-heap-image (-c-)
+    (let* ((header-size	(arena/header-size))
+           (cell-bytes	arena/cell-bytes)
+           (chunks	(arena/image-chunks))
+           (literals	())
+           (labels	())
+           (headers	())
+           (counter	0)
+           (start	(current-laddress)))
+      ;; pass 1: labels for every chunk header and payload
+      (list-do literal arena/literals
+        (push literals (cons (<arena-literal>-offset literal)
+                             (<arena-literal>-label literal))))
+      (list-do header chunks
+        (let* ((payload	(+ header header-size))
+               (hlabel	(string->symbol
+                         (concat-strings "heap.hdr."
+                                         (integer->string (incr counter)))))
+               (plabel	(or (arena/assoc payload literals)
+                            (string->symbol
+                             (concat-strings "heap.obj."
+                                             (integer->string counter))))))
+          (push headers (cons header hlabel))
+          (push labels (cons payload plabel))))
+      (set headers (list-reverse! headers))
+      (set labels (list-reverse! labels))
+      ;; the sentinel: a zero-size free chunk
+      (emit CELL (if chunks
+                     (GLOBAL-ADDR (label (cdr (car headers))))
+                   (GLOBAL-ADDR (label 'static-space-end))))
+      (emit CELL 0)
+      (emit CELL 0)
+      (emit CELL 0)
+      (label! 'static-space-start)
+      ;; pass 2: the chunks
+      (list-do header chunks
+        (let* ((payload	(+ header header-size))
+               (hlabel	(arena/assoc header headers))
+               (plabel	(arena/assoc payload labels))
+               (size	(arena/peek-word-at header 1))
+               (flags	(arena/peek-word-at header 2))
+               (type	(arena/peek-word-at header 3))
+               (next	(arena/peek-word-at header 0))
+               (next-label (arena/assoc next headers)))
+          (unless (= (current-laddress)
+                     (+ start header-size (- header arena/literals-start)))
+            (error "emit-heap-image: chunk layout mismatch at " header))
+          (label! hlabel)
+          (emit CELL (if next-label
+                         (GLOBAL-ADDR (label next-label))
+                       (GLOBAL-ADDR (label 'static-space-end))))
+          (emit CELL size)
+          (emit CELL flags)
+          (emit CELL type)
+          (label! plabel)
+          (if (= 0 (bitwise-and arena/flags-opaque flags))
+              (let ((cells	(/ size cell-bytes))
+                    (i		0))
+                (while (< i cells)
+                  (let* ((word	(arena/peek-word-at payload i))
+                         (word-label (and (!= 0 word)
+                                          (= 0 (bitwise-and word
+                                                            (- cell-bytes 1)))
+                                          (arena/assoc word labels))))
+                    (if word-label
+                        (emit CELL (GLOBAL-ADDR (label word-label)))
+                      (emit CELL word)))
+                  (incr i)))
+            (let ((i 0))
+              (while (< i size)
+                (.u8 (arena/load-u8 (+ payload i)))
+                (incr i))))))
+      (label! 'static-space-end)
+      (.i8/times 0 +heap-image-slack+)
+      (label! 'heap-image-end))))
+
 (define-function compile-env (env -c- output-path machine-type reloc-type glob-dat-type)
   (verbosity 1
     (warn "begin compiling env with "(array-length (<env>-bindings env))" definitions\n\n")
@@ -699,16 +781,21 @@
     (label! 'read-only-space-start)
     (label 'read-only-space-end)    ; a forward label defined later
 
-    ;; The static space is a sub-range of the heap image. It is empty for
-    ;; now; its bounds must exist before the definitions are compiled.
+    ;; The heap image is emitted after the definitions are compiled: the
+    ;; string literals are allocated in the arena while compiling them.
+    ;; Without the arena (or for a relocatable shape) fall back to the
+    ;; zeroed placeholder. The bounds must exist before the definitions
+    ;; can reference them.
     (with-current-segment 'heap
-      ;; The initial heap image: a file-backed, zeroed region. gc/initialize
-      ;; stamps a chunk over it at startup.
       (label! 'heap-image-start)
-      (.i8/times 0 +heap-image-size+)
-      (label! 'heap-image-end)
-      (label! 'static-space-start)
-      (label! 'static-space-end))
+      (if-at-expand (and (defined? 'arena/image-chunks)
+                         (not (eval-in-slave 'feature/relocatable-elf)))
+          (label 'heap-image-end)
+        (let ()
+          (.i8/times 0 +heap-image-size+)
+          (label! 'heap-image-end)
+          (label! 'static-space-start)
+          (label! 'static-space-end))))
 
     ;; Make space for the ELF header; it will be emitted as the final step.
     (.i8/times 0 +ehdr-size+)
@@ -732,6 +819,12 @@
     ;; The read-only image ends here; the heap image follows it.
     (with-current-segment 'bss
       (label! 'read-only-space-end))
+
+    (if-feature relocatable-elf
+        ()
+      (when-at-expand (defined? 'arena/image-chunks)
+        (with-current-segment 'heap
+          (emit-heap-image -c-))))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))
