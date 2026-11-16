@@ -260,9 +260,11 @@
 (arena/load-target-file "source/evaluator/gc.l")
 
 ;; No collection runs in the arena, so the root bookkeeping is inert.
-;; gc/let* still pushes and pops; address-of above returns 0.
+;; gc/let* still pushes and pops; address-of above returns 0. Nothing
+;; reads the root vector, so gc/initialize does not allocate it either.
 (environment-define *heap-env* 'gc/push-root (lambda (ptr) ()))
 (environment-define *heap-env* 'gc/pop-root  (lambda (ptr) ()))
+(environment-define *heap-env* 'gc/grow-root-vector (lambda () ()))
 
 (arena/load-target-file "source/evaluator/types.l")
 
@@ -323,7 +325,6 @@
 ;;; string-ensure-zero-terminated never has to mutate a literal.
 
 (define arena/literals ())
-(define arena/literals-start ())
 (define arena/literal-counter 0)
 
 (define arena/string-size-slot
@@ -358,8 +359,6 @@
          (obj		(eval-in-heap `(arena/new-string ,len)))
          (offset	(arena/cell->host obj))
          (elements	(arena/peek-word-at offset arena/string-elements-slot)))
-    (unless arena/literals-start
-      (set arena/literals-start (- offset (arena/header-size))))
     (for (i 0 len)
       (arena/store-u8 (+ elements i) (string-at str i)))
     (arena/store-u8 (+ elements len) 0)
@@ -435,19 +434,23 @@
 (define arena/flags-used   (eval-in-heap '<header>-flags/used))
 (define arena/flags-opaque (eval-in-heap '<header>-flags/opaque))
 
-;; The used chunks of the image, in address order. The root vector and
-;; the free chunk are outside [literals-start, ...).
+;; The used chunks of the image, in address order: everything the chain
+;; holds except the trailing free chunk.
 (define-function arena/image-chunks ()
-  (if (not arena/literals-start)
-      ()
-    (let ((chunks ()))
-      (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
-        (when (and (<= arena/literals-start header)
-                   (= arena/flags-used
-                      (bitwise-and arena/flags-used
-                                   (arena/peek-word-at header 2))))
-          (push chunks header)))
-      (list-reverse! chunks))))
+  (let ((chunks ()))
+    (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
+      (when (= arena/flags-used
+               (bitwise-and arena/flags-used
+                            (arena/peek-word-at header 2)))
+        (push chunks header)))
+    (list-reverse! chunks)))
+
+;; The end of the used region: the free chunk that follows the last
+;; allocated chunk. When nothing was allocated it is the single free
+;; chunk, i.e. the heap start.
+(define-function arena/image-limit ()
+  (arena/peek-word-at
+   (arena/cell->host (eval-in-heap 'gc/allocation-cursor)) 0))
 
 ;;;
 ;;; verification

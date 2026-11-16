@@ -629,35 +629,27 @@
 
 (when-at-expand (defined? 'arena/image-chunks)
 
-  ;; Emit the arena's literals into the heap segment as a pre-built
-  ;; chunk chain: a free sentinel that anchors gc/memory-base, the used
-  ;; chunks in address order, and the slack the runtime stamps its first
-  ;; free chunk over.
-  ;;
-  ;; The image is a byte-for-byte copy of the arena's literal region at
-  ;; a fixed offset in the heap segment, so a pointer word is emitted as
-  ;; the address it will have at runtime; only the string labels the
-  ;; code references need a fixup.
+  ;; Emit the arena's chunk chain into the heap segment verbatim: the
+  ;; used region is copied at a fixed offset, so a pointer word is
+  ;; emitted as the address it will have at runtime. Only the string
+  ;; labels the code references need a fixup. The runtime stamps its
+  ;; first free chunk at static-space-end.
   (define-function emit-heap-image (-c-)
     (let* ((header-size	(arena/header-size))
            (cell-bytes	arena/cell-bytes)
            (chunks	(arena/image-chunks))
            (start	(current-laddress))
-           (labels	(array (+ 1 (/ (- arena/cursor arena/literals-start)
+           (limit	(arena/image-limit))
+           (labels	(array (+ 1 (/ (- limit arena/heap-start)
                                      cell-bytes))))
            (index	(lambda (offset)
-                          (/ (- offset arena/literals-start) cell-bytes)))
+                          (/ (- offset arena/heap-start) cell-bytes)))
            (address	(lambda (offset)
-                          (+ start header-size (- offset arena/literals-start))))
+                          (+ start (- offset arena/heap-start))))
            (rest		chunks))
       (list-do literal arena/literals
         (set (array-at labels (index (<arena-literal>-offset literal)))
              (<arena-literal>-label literal)))
-      ;; the sentinel: a zero-size free chunk
-      (.cell (if chunks (address (car chunks)) (label 'static-space-end)))
-      (.cell 0)
-      (.cell 0)
-      (.cell 0)
       (label! 'static-space-start)
       (while rest
         (let* ((header	(car rest))
@@ -670,7 +662,7 @@
             (error "emit-heap-image: chunk layout mismatch at " header))
           (.cell (if (cdr rest)
                      (address (car (cdr rest)))
-                   (label 'static-space-end)))
+                   (address (+ header header-size size))))
           (.cell size)
           (.cell flags)
           (.cell type)
@@ -681,8 +673,8 @@
                     (j		0))
                 (while (< j cells)
                   (let ((word (arena/peek-word-at payload j)))
-                    (.cell (if (and (<= arena/literals-start word)
-                                    (< word arena/cursor)
+                    (.cell (if (and (<= arena/heap-start word)
+                                    (< word limit)
                                     (= 0 (bitwise-and word
                                                       (- cell-bytes 1))))
                                (address word)
