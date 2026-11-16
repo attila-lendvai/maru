@@ -790,7 +790,13 @@
       (label! 'heap-image-start)
       (if-at-expand (and (defined? 'arena/image-chunks)
                          (not (eval-in-slave 'feature/relocatable-elf)))
-          (label 'heap-image-end)
+          (let ()
+            ;; the static space is defined by emit-heap-image, after the
+            ;; definitions are compiled, but their addresses are
+            ;; referenced while compiling them
+            (label 'heap-image-end)
+            (label 'static-space-start)
+            (label 'static-space-end))
         (let ()
           (.i8/times 0 +heap-image-size+)
           (label! 'heap-image-end)
