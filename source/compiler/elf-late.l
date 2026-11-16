@@ -632,79 +632,67 @@
   ;; Emit the arena's literals into the heap segment as a pre-built
   ;; chunk chain: a free sentinel that anchors gc/memory-base, the used
   ;; chunks in address order, and the slack the runtime stamps its first
-  ;; free chunk over. Pointer words become label references.
+  ;; free chunk over.
+  ;;
+  ;; The image is a byte-for-byte copy of the arena's literal region at
+  ;; a fixed offset in the heap segment, so a pointer word is emitted as
+  ;; the address it will have at runtime; only the string labels the
+  ;; code references need a fixup.
   (define-function emit-heap-image (-c-)
     (let* ((header-size	(arena/header-size))
            (cell-bytes	arena/cell-bytes)
            (chunks	(arena/image-chunks))
-           (literals	())
-           (labels	())
-           (headers	())
-           (counter	0)
-           (start	(current-laddress)))
-      ;; pass 1: labels for every chunk header and payload
+           (start	(current-laddress))
+           (labels	(array (+ 1 (/ (- arena/cursor arena/literals-start)
+                                     cell-bytes))))
+           (index	(lambda (offset)
+                          (/ (- offset arena/literals-start) cell-bytes)))
+           (address	(lambda (offset)
+                          (+ start header-size (- offset arena/literals-start))))
+           (rest		chunks))
       (list-do literal arena/literals
-        (push literals (cons (<arena-literal>-offset literal)
-                             (<arena-literal>-label literal))))
-      (list-do header chunks
-        (let* ((payload	(+ header header-size))
-               (hlabel	(string->symbol
-                         (concat-strings "heap.hdr."
-                                         (integer->string (incr counter)))))
-               (plabel	(or (arena/assoc payload literals)
-                            (string->symbol
-                             (concat-strings "heap.obj."
-                                             (integer->string counter))))))
-          (push headers (cons header hlabel))
-          (push labels (cons payload plabel))))
-      (set headers (list-reverse! headers))
-      (set labels (list-reverse! labels))
+        (set (array-at labels (index (<arena-literal>-offset literal)))
+             (<arena-literal>-label literal)))
       ;; the sentinel: a zero-size free chunk
-      (emit CELL (if chunks
-                     (GLOBAL-ADDR (label (cdr (car headers))))
-                   (GLOBAL-ADDR (label 'static-space-end))))
-      (emit CELL 0)
-      (emit CELL 0)
-      (emit CELL 0)
+      (.cell (if chunks (address (car chunks)) (label 'static-space-end)))
+      (.cell 0)
+      (.cell 0)
+      (.cell 0)
       (label! 'static-space-start)
-      ;; pass 2: the chunks
-      (list-do header chunks
-        (let* ((payload	(+ header header-size))
-               (hlabel	(arena/assoc header headers))
-               (plabel	(arena/assoc payload labels))
+      (while rest
+        (let* ((header	(car rest))
+               (payload	(+ header header-size))
                (size	(arena/peek-word-at header 1))
                (flags	(arena/peek-word-at header 2))
                (type	(arena/peek-word-at header 3))
-               (next	(arena/peek-word-at header 0))
-               (next-label (arena/assoc next headers)))
-          (unless (= (current-laddress)
-                     (+ start header-size (- header arena/literals-start)))
+               (literal	(array-at labels (index payload))))
+          (unless (= (current-laddress) (address header))
             (error "emit-heap-image: chunk layout mismatch at " header))
-          (label! hlabel)
-          (emit CELL (if next-label
-                         (GLOBAL-ADDR (label next-label))
-                       (GLOBAL-ADDR (label 'static-space-end))))
-          (emit CELL size)
-          (emit CELL flags)
-          (emit CELL type)
-          (label! plabel)
+          (.cell (if (cdr rest)
+                     (address (car (cdr rest)))
+                   (label 'static-space-end)))
+          (.cell size)
+          (.cell flags)
+          (.cell type)
+          (when literal
+            (label! literal))
           (if (= 0 (bitwise-and arena/flags-opaque flags))
               (let ((cells	(/ size cell-bytes))
-                    (i		0))
-                (while (< i cells)
-                  (let* ((word	(arena/peek-word-at payload i))
-                         (word-label (and (!= 0 word)
-                                          (= 0 (bitwise-and word
-                                                            (- cell-bytes 1)))
-                                          (arena/assoc word labels))))
-                    (if word-label
-                        (emit CELL (GLOBAL-ADDR (label word-label)))
-                      (emit CELL word)))
-                  (incr i)))
-            (let ((i 0))
-              (while (< i size)
-                (.u8 (arena/load-u8 (+ payload i)))
-                (incr i))))))
+                    (j		0))
+                (while (< j cells)
+                  (let ((word (arena/peek-word-at payload j)))
+                    (.cell (if (and (<= arena/literals-start word)
+                                    (< word arena/cursor)
+                                    (= 0 (bitwise-and word
+                                                      (- cell-bytes 1))))
+                               (address word)
+                             word)))
+                  (incr j)))
+            (let ((j 0))
+              (while (< j size)
+                (.u8 (arena/load-u8 (+ payload j)))
+                (incr j)))))
+        (set rest (cdr rest)))
       (label! 'static-space-end)
       (.i8/times 0 +heap-image-slack+)
       (label! 'heap-image-end))))

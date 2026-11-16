@@ -435,15 +435,6 @@
 (define arena/flags-used   (eval-in-heap '<header>-flags/used))
 (define arena/flags-opaque (eval-in-heap '<header>-flags/opaque))
 
-(define-function arena/assoc (key alist)
-  (let ((entry alist)
-        (found ()))
-    (while (and entry (not found))
-      (when (= key (car (car entry)))
-        (set found (cdr (car entry))))
-      (set entry (cdr entry)))
-    found))
-
 ;; The used chunks of the image, in address order. The root vector and
 ;; the free chunk are outside [literals-start, ...).
 (define-function arena/image-chunks ()
