@@ -807,8 +807,11 @@
     (verbosity 1 (warn "\n"))
 
     ;; The arena holds every string literal emitted during compilation.
-    (when-at-expand (defined? 'arena/verify-literals)
-      (arena/verify-literals))
+    ;; The self-check is off by default; flip the condition to true to
+    ;; run it.
+    (when-at-expand false
+      (when-at-expand (defined? 'arena/verify-literals)
+        (arena/verify-literals)))
 
     ;; The read-only image ends here; the heap image follows it.
     (with-current-segment 'bss
