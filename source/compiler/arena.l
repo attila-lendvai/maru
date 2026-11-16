@@ -213,47 +213,50 @@
 (define-function eval-in-heap (form)
   (eval form *heap-env*))
 
-(define-function arena/header-size ()
-  (eval-in-heap 'size-of-<header>))
+(define-form heap-value (form)
+  `(eval-in-heap ',form))
 
-(environment-define *heap-env* 'oop-at			arena/oop-at)
-(environment-define *heap-env* 'set-oop-at		arena/set-oop-at)
-(environment-define *heap-env* 'address-of-location	arena/address-of-location)
-(environment-define *heap-env* 'address-of		(lambda (value) 0))
-(environment-define *heap-env* 'platform/acquire-memory	arena/acquire)
-(environment-define *heap-env* 'platform/clear-cells	arena/clear-cells)
-(environment-define *heap-env* 'platform/move-oops	arena/copy-cells)
-(environment-define *heap-env* 'platform/move-bytes	arena/copy-bytes)
-(environment-define *heap-env* 'copy-oops		arena/copy-cells)
-(environment-define *heap-env* 'copy-bytes		arena/copy-bytes)
-(environment-define *heap-env* 'arena/acquire		arena/acquire)
-(environment-define *heap-env* 'arena/clear-cells	arena/clear-cells)
-(environment-define *heap-env* 'arena/header-size	arena/header-size)
+(define-function define-in-heap (name value)
+  (environment-define *heap-env* name value))
+
+(define arena/noop-form
+  (form (lambda (*env* . args) ())))
+
+(define arena/noop-function
+  (lambda _ ()))
+
+(list-do entry
+    `((oop-at			,arena/oop-at)
+      (set-oop-at		,arena/set-oop-at)
+      (address-of-location	,arena/address-of-location)
+      (address-of		,(lambda _ 0))
+      (platform/acquire-memory	,arena/acquire)
+      (platform/clear-cells	,arena/clear-cells)
+      (platform/move-oops	,arena/copy-cells)
+      (platform/move-bytes	,arena/copy-bytes)
+      (copy-oops		,arena/copy-cells)
+      (copy-bytes		,arena/copy-bytes)
+      (arena/acquire		,arena/acquire)
+      (arena/clear-cells	,arena/clear-cells)
+      ;;(arena/header-size	,arena/header-size)
+      ;; A debug/fatal shim, so the target sources need no platform layer.
+      (debug			,arena/noop-form)
+      (debug/identities		,arena/noop-form)
+      (gc/debug			,arena/noop-form)
+      (debug-print		,arena/noop-form)
+      (fatal			,(lambda args (error "arena fatal: " args)))
+      (pointer			,(lambda (value) value))
+      )
+
+  (let ((name (first entry))
+        (value (second entry)))
+    (define-in-heap name value)))
 
 (define-function arena/load-target-file (path)
   (let ((prev *globals*))
     (set *globals* *heap-env*)
     (load path)
     (set *globals* prev)))
-
-(define-function arena/heap-define (form)
-  (let ((prev *globals*))
-    (set *globals* *heap-env*)
-    (eval form)
-    (set *globals* prev)))
-
-;;; A debug/fatal shim, so the target sources need no platform layer.
-
-(define arena/noop-form
-  (form (lambda (*env* . args) ())))
-
-(environment-define *heap-env* 'debug		arena/noop-form)
-(environment-define *heap-env* 'debug/identities	arena/noop-form)
-(environment-define *heap-env* 'gc/debug	arena/noop-form)
-(environment-define *heap-env* 'debug-print	arena/noop-form)
-(environment-define *heap-env* 'fatal
-                    (lambda args (error "arena fatal: " args)))
-(environment-define *heap-env* 'pointer (lambda (value) value))
 
 ;;; The header layout, the flags, gc/allocate and gc/initialize.
 
@@ -262,16 +265,15 @@
 ;; No collection runs in the arena, so the root bookkeeping is inert.
 ;; gc/let* still pushes and pops; address-of above returns 0. Nothing
 ;; reads the root vector, so gc/initialize does not allocate it either.
-(environment-define *heap-env* 'gc/push-root (lambda (ptr) ()))
-(environment-define *heap-env* 'gc/pop-root  (lambda (ptr) ()))
-(environment-define *heap-env* 'gc/grow-root-vector (lambda () ()))
+(define-in-heap 'gc/push-root		arena/noop-function)
+(define-in-heap 'gc/pop-root		arena/noop-function)
+(define-in-heap 'gc/grow-root-vector	arena/noop-function)
 
 (arena/load-target-file "source/evaluator/types.l")
 
 ;; the form machinery calls TYPE-OF on host objects; evaluator/types.l
 ;; defines a TYPE-OF that reads arena headers. restore the host's.
-(define arena/host-type-of type-of)
-(environment-define *heap-env* 'type-of arena/host-type-of)
+(define-in-heap 'type-of type-of)
 
 ;;; gc/allocate receives type objects from the constructors (compiled
 ;;; code passes their slave ids instead). Normalize above the shim.
@@ -281,14 +283,15 @@
 (define-function arena/type->id (type)
   (if (is <long> type) type (arena/slave-id-of type)))
 
-(environment-define *heap-env* 'arena/type->id arena/type->id)
+(define-in-heap 'arena/type->id arena/type->id)
 
-(arena/heap-define '(define arena/original-gc-allocate gc/allocate))
+(eval-in-heap
+ '(define arena/original-gc-allocate gc/allocate))
 
-(arena/heap-define
+(eval-in-heap
  '(define-function gc/allocate (type requested-size opaque?)
-    (arena/original-gc-allocate (arena/type->id type)
-                                requested-size opaque?)))
+   (arena/original-gc-allocate (arena/type->id type)
+    requested-size opaque?)))
 
 ;;; constructors.l uses define-vm-function to generate the evaluator
 ;;; stubs. The arena calls the target-domain implementations directly,
@@ -299,14 +302,14 @@
       ()
     (map (lambda (entry) (car (ensure-list entry))) args)))
 
-(environment-define *heap-env* 'define-vm-function
-                    (form (lambda (*env* name-and-props args . body)
-                            (let ((name (if (pair? name-and-props)
-                                            (car name-and-props)
-                                          name-and-props)))
-                              `(define-function ,name
-                                 ,(arena/vmf-arg-names args)
-                                 ,@body)))))
+(define-in-heap 'define-vm-function
+    (form (lambda (*env* name-and-props args . body)
+            (let ((name (if (pair? name-and-props)
+                            (car name-and-props)
+                          name-and-props)))
+              `(define-function ,name
+                   ,(arena/vmf-arg-names args)
+                 ,@body)))))
 
 (arena/load-target-file "source/evaluator/constructors.l")
 
@@ -342,7 +345,7 @@
   (bitwise-or (bitwise-shift value arena/long-tag-width)
               arena/long-tag-value))
 
-(arena/heap-define
+(eval-in-heap
  '(define-function arena/new-string (len)
     (let ((s (string (+ len 1))))
       (set (<string>-size s) (box <long> len))
@@ -394,54 +397,18 @@
         (error "arena scan: the chunk chain does not terminate")))
     (list-reverse! headers)))
 
-(define-function arena/scan-validate ()
-  (let* ((header-size (arena/header-size))
-         (tag-mask    (eval-in-heap 'oop/tag-mask))
-         (used        (eval-in-heap '<header>-flags/used))
-         (opaque      (eval-in-heap '<header>-flags/opaque))
-         (base        (eval-in-heap 'gc/memory-base))
-         (headers     (arena/chain-headers base))
-         (chunk       base)
-         (done        ()))
-    (while (not done)
-      (let ((flags (arena/peek-word-at chunk 2))
-            (size  (arena/peek-word-at chunk 1)))
-        (unless (and (<= 0 size)
-                     (= 0 (bitwise-and size (- arena/cell-bytes 1))))
-          (error "arena scan: bad chunk size at " chunk ": " size))
-        (when (and (= used (bitwise-and used flags))
-                   (= 0 (bitwise-and opaque flags)))
-          (let ((cells (/ size arena/cell-bytes))
-                (obj   (+ chunk header-size))
-                (i     0))
-            (while (< i cells)
-              (let ((word (arena/peek-word-at obj i)))
-                (when (and (!= 0 word)
-                           (= 0 (bitwise-and word tag-mask)))
-                  (unless (member? (- word header-size) headers)
-                    (error "arena scan: dangling pointer " word
-                           " in the payload of " chunk))))
-              (incr i))))
-        (set chunk (arena/peek-word-at chunk 0))
-        (when (= chunk base)
-          (set done true))))
-    (list-length headers)))
-
 ;;;
 ;;; the image
 ;;;
 
-(define arena/flags-used   (eval-in-heap '<header>-flags/used))
-(define arena/flags-opaque (eval-in-heap '<header>-flags/opaque))
-
 ;; The used chunks of the image, in address order: everything the chain
 ;; holds except the trailing free chunk.
 (define-function arena/image-chunks ()
-  (let ((chunks ()))
+  (let ((chunks ())
+        (flags/used (heap-value <header>-flags/used)))
     (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
-      (when (= arena/flags-used
-               (bitwise-and arena/flags-used
-                            (arena/peek-word-at header 2)))
+      (unless (zero? (bitwise-and flags/used
+                                  (arena/peek-word-at header 2)))
         (push chunks header)))
     (list-reverse! chunks)))
 
@@ -451,49 +418,3 @@
 (define-function arena/image-limit ()
   (arena/peek-word-at
    (arena/cell->host (eval-in-heap 'gc/allocation-cursor)) 0))
-
-;;;
-;;; verification
-;;;
-
-(define-function arena/expect (what got want)
-  (unless (= got want)
-    (error "arena check failed: " what ": got " got ", want " want)))
-
-(define-function arena/verify-literals ()
-  (let* ((header-size (arena/header-size))
-         (cell-bytes  arena/cell-bytes)
-         (string-id   (eval-in-heap '(<type>-slave-id <string>)))
-         (data-id     (eval-in-heap '(<type>-slave-id <data>)))
-         (used        (eval-in-heap '<header>-flags/used))
-         (opaque      (eval-in-heap '<header>-flags/opaque))
-         (count       0)
-         (bytes       0))
-    (list-do literal arena/literals
-      (let* ((offset   (<arena-literal>-offset literal))
-             (source   (<arena-literal>-source literal))
-             (len      (string-length source))
-             (header   (- offset header-size))
-             (size     (arena/peek-word-at offset arena/string-size-slot))
-             (elements (arena/peek-word-at offset arena/string-elements-slot))
-             (el-header (- elements header-size)))
-        (arena/expect "literal type" (arena/peek-word-at header 3) string-id)
-        (arena/expect "literal flags" (arena/peek-word-at header 2) used)
-        (arena/expect "literal size" size (arena/box-long len))
-        (arena/expect "elements alignment"
-                      (bitwise-and elements (- cell-bytes 1)) 0)
-        (arena/expect "elements type" (arena/peek-word-at el-header 3) data-id)
-        (arena/expect "elements flags" (arena/peek-word-at el-header 2)
-                      (bitwise-or used opaque))
-        (unless (<= (+ len 1) (arena/peek-word-at el-header 1))
-          (error "arena: string literal body is too small for its NUL: " len))
-        (for (i 0 len)
-          (unless (= (arena/load-u8 (+ elements i)) (string-at source i))
-            (error "arena: string literal byte mismatch at " i)))
-        (arena/expect "literal NUL" (arena/load-u8 (+ elements len)) 0)
-        (incr count)
-        (set bytes (+ bytes (+ len 1)))))
-    (arena/scan-validate)
-    (verbosity 1
-      (warn "arena: " count " string literals, " bytes " bytes\n"))))
-

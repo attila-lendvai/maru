@@ -635,7 +635,7 @@
   ;; labels the code references need a fixup. The runtime stamps its
   ;; first free chunk at static-space-end.
   (define-function emit-heap-image (-c-)
-    (let* ((header-size	(arena/header-size))
+    (let* ((header-size	(heap-value size-of-<header>))
            (cell-bytes	arena/cell-bytes)
            (chunks	(arena/image-chunks))
            (start	(current-laddress))
@@ -646,7 +646,8 @@
                           (/ (- offset arena/heap-start) cell-bytes)))
            (address	(lambda (offset)
                           (+ start (- offset arena/heap-start))))
-           (rest		chunks))
+           (rest		chunks)
+           (flags/opaque (eval-in-heap '<header>-flags/opaque)))
       (list-do literal arena/literals
         (set (array-at labels (index (<arena-literal>-offset literal)))
              (<arena-literal>-label literal)))
@@ -668,7 +669,7 @@
           (.cell type)
           (when literal
             (label! literal))
-          (if (= 0 (bitwise-and arena/flags-opaque flags))
+          (if (zero? (bitwise-and flags/opaque flags))
               (let ((cells	(/ size cell-bytes))
                     (j		0))
                 (while (< j cells)
@@ -797,13 +798,6 @@
           (verbosity 1 (warn name ", "))
           (compile-definition value name -c-))))
     (verbosity 1 (warn "\n"))
-
-    ;; The arena holds every string literal emitted during compilation.
-    ;; The self-check is off by default; flip the condition to true to
-    ;; run it.
-    (when-at-expand false
-      (when-at-expand (defined? 'arena/verify-literals)
-        (arena/verify-literals)))
 
     ;; The read-only image ends here; the heap image follows it.
     (with-current-segment 'bss

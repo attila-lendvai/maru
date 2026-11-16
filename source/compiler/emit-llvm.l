@@ -1399,10 +1399,6 @@
         (compile-definition value name -c-))))
   (verbosity 1 (warn "\n"))
 
-  ;; The arena holds every string literal emitted during compilation.
-  (when-at-expand (defined? 'arena/verify-literals)
-    (arena/verify-literals))
-
   (emit-gen-buffer -c-)
 
   ;; Emitted last, so that it is also laid out last: a zero initialized
