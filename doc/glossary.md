@@ -9,6 +9,9 @@
    that this is different from the GNU build-host-target
    nomenclature).
 
+ - *genesis*: the heap of the next evolutionary stage, called genesis
+   while it is being constructed as part of the bootstrap process.
+
  - *level-shift*: aka compilation; a semantics-preserving "level
    shift" operation turning s-expressions to machine code, letting the
    metacircular evaluator in `eval.l` escape from the "infinite

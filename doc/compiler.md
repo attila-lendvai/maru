@@ -248,9 +248,9 @@ least regarding the types defined in the chaing of files that get
 loaded. Ideally, the compiler should emit enough this-and-that that
 the `eval.exe` recreates all the type related heap objects as part of
 its startup code. This could either be done by the usual way of having
-a separate exe and a heap image file, or by emitting objects into the
-static space, or having also a dynamic space that is relocated into
-the heap at startup.
+a separate exe and the next stage's heap image file, or by emitting
+objects into the static space, or having also a dynamic space that is
+relocated into the heap at startup.
 
 
 ## Knowledge base
