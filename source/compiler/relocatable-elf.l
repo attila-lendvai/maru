@@ -602,8 +602,14 @@
 ;; calls in %c-obj-emit-section-headers (the assert in
 ;; write-elf-to-stream/c-obj checks it). The section indices above
 ;; must follow the same order.
+;; The heap is named .ldata.heap so that the default linker script's
+;; large-data output section picks it up. That section follows .bss and
+;; is the last allocatable data section, so the heap lands outside
+;; [read-only-space-start, read-only-space-end) and runtime heap growth
+;; follows it. A script without .ldata would orphan it next to .data;
+;; gc/initialize's read-only assert catches that once the image lands.
 (define +c-obj/section-names+
-  '(".text" ".rodata" ".data" ".bss" ".heap"
+  '(".text" ".rodata" ".data" ".bss" ".ldata.heap"
     ".rela.text" ".rela.data" ".rela.rodata"
     ".symtab" ".strtab" ".shstrtab"))
 
@@ -689,7 +695,7 @@
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          0 (second (%c-obj-layout-entry layout 'data)) (segment-length 'bss)
                          0 0 16 0)
-    (emit-section-header (name-offset ".heap")
+    (emit-section-header (name-offset ".ldata.heap")
                          elf/SHT_PROGBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          0 (second (%c-obj-layout-entry layout 'heap)) (third (%c-obj-layout-entry layout 'heap))
