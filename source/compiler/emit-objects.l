@@ -40,36 +40,40 @@
        (type-id		(slave-value (<type>-slave-id <target-function>)))
        (emit-name?	(feature track-expr-names))
        (profiler?	(feature profiler)))
-  (define-function emit-object/<target-function> (name entry-label -c-)
-    ;; TODO into data or ro-data? ideally, all literals should go into
-    ;; ro-data, but then e.g. the profiler counter will be read-only.
-    (let ((name-op	(when emit-name?
-                          (compile-object (if name (symbol->string name) ()) -c-)))
-          (counter	(when profiler?
-                          (compile-object 0 -c-))))
-      (emit-object/header type type-id -c-)
-      (with-new-label 'data
-        (when name
-          (emit-symtab-entry/variable name +.data-section-index+
-                                      (current-laddress)
-                                      target/cell-size/bytes)
-          ;; we define the object's address into the assembler env
-          ;; (instead of the entry-point to the actual machine
-          ;; instructions). this is needed so that when a function is
-          ;; used as a variable, then the full object is loaded, not
-          ;; the address of the entry point.
-          (label! name))
-        ;; TODO investigate: it's possible to write an
-        ;; elf-load-address-relative offset here and when reading the
-        ;; slot then just fix it up. that way we could drop all the
-        ;; relocation related complexity. but then all other parts of
-        ;; the codebase (GC, printer, etc?) must be prepared to deal
-        ;; with such slots?
-        (emit CELL (GLOBAL-ADDR entry-label))
-        (when name-op
-          (emit CELL name-op))
-        (when counter
-          (emit CELL counter))))))
+  (if-at-expand (not evolving?)
+      (define-function emit-object/<target-function> (name entry-label -c-)
+        (arena/target-function name entry-label
+                               (if name (label name) (label))))
+    (define-function emit-object/<target-function> (name entry-label -c-)
+      ;; TODO into data or ro-data? ideally, all literals should go into
+      ;; ro-data, but then e.g. the profiler counter will be read-only.
+      (let ((name-op	(when emit-name?
+                            (compile-object (if name (symbol->string name) ()) -c-)))
+            (counter	(when profiler?
+                            (compile-object 0 -c-))))
+        (emit-object/header type type-id -c-)
+        (with-new-label 'data
+          (when name
+            (emit-symtab-entry/variable name +.data-section-index+
+                                        (current-laddress)
+                                        target/cell-size/bytes)
+            ;; we define the object's address into the assembler env
+            ;; (instead of the entry-point to the actual machine
+            ;; instructions). this is needed so that when a function is
+            ;; used as a variable, then the full object is loaded, not
+            ;; the address of the entry point.
+            (label! name))
+          ;; TODO investigate: it's possible to write an
+          ;; elf-load-address-relative offset here and when reading the
+          ;; slot then just fix it up. that way we could drop all the
+          ;; relocation related complexity. but then all other parts of
+          ;; the codebase (GC, printer, etc?) must be prepared to deal
+          ;; with such slots?
+          (emit CELL (GLOBAL-ADDR entry-label))
+          (when name-op
+            (emit CELL name-op))
+          (when counter
+            (emit CELL counter)))))))
 
 (cond
   ((slave-value (is <immediate-type> <long>))

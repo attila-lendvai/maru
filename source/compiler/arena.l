@@ -387,6 +387,37 @@
           (source str))))
 
 ;;;
+;;; function objects
+;;;
+;;; The target's <target-function> object is built in the arena, so the
+;;; runtime reads its code pointer and name from heap cells. The code
+;;; pointer cannot be filled here (the code layout is not known yet), so
+;;; the slot holds a placeholder and the emitter writes the entry label;
+;;; the name is the arena offset of the function's name literal.
+
+(eval-in-heap
+ '(define-function arena/new-target-function (name-offset)
+    (make/heap <target-function>
+      (program-code 0)
+      (when-at-expand (feature track-expr-names)
+        (name name-offset))
+      (when-at-expand (feature profiler)
+        (profiler-counter (box <long> 0))))))
+
+;;; The assembler is not loaded yet when this file is compiled, so the
+;;; object's label comes from the caller.
+(define-function arena/target-function (name entry-label label)
+  (let* ((name-offset (if (and name (feature track-expr-names))
+                          (<arena-literal>-offset
+                           (arena/string-literal (symbol->string name)))
+                        0))
+         (offset (arena/cell->host
+                  (eval-in-heap `(arena/new-target-function ,name-offset)))))
+    (arena/register-code-pointer offset entry-label)
+    (arena/register-label offset label)
+    label))
+
+;;;
 ;;; the chunk chain
 ;;;
 
