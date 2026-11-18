@@ -223,6 +223,31 @@
       (oop-at (address-of x) 0))
   42)
 
+;; The heap image holds pointers that the assembler bakes (ET_EXEC) or
+;; the loader relocates (c-obj, standalone). Walk its chunk chain up to
+;; the free chunk the runtime stamps: every link must stay inside the
+;; image. A zero first link means the image carries no genesis content
+;; (the LLVM backend's heap is a zeroed global, stage-0 emits the seed).
+(define-test compile/genesis/1
+    (let* ((first	(address-of-location 'heap-image-start))
+           (static-end	(address-of-location 'static-space-end))
+           (empty?	(= 0 (oop-at first 0)))
+           (chunk	first)
+           (count	0)
+           (ok		true))
+      (while (and ok (if empty? false (< count 1000))
+                  (if (= chunk static-end) false true))
+        (let ((next (oop-at chunk 0)))
+          (if (and (< chunk static-end) (< next (+ static-end 1)))
+              (let ()
+                (incr count)
+                (set chunk next))
+            (set ok false))))
+      (if empty?
+          true
+        (and ok (< 0 count) (= chunk static-end))))
+  true)
+
 (define-test compile/address-of/2
     (let ((x 42))
       (set (oop-at (address-of x) 0) 43)
