@@ -156,9 +156,10 @@
 (define +c-obj/.rela-text-section-index+	6)
 (define +c-obj/.rela-data-section-index+	7)
 (define +c-obj/.rela-rodata-section-index+	8)
-(define +c-obj/.symtab-section-index+		9)
-(define +c-obj/.strtab-section-index+		10)
-(define +c-obj/.shstrtab-section-index+		11)
+(define +c-obj/.rela-heap-section-index+	9)
+(define +c-obj/.symtab-section-index+		10)
+(define +c-obj/.strtab-section-index+		11)
+(define +c-obj/.shstrtab-section-index+		12)
 
 (define-function %c-obj-symbol-count ()
   (/ (segment-length '.symtab) +sym-size+))
@@ -236,9 +237,11 @@
   (create-segment 'rela-text)
   (create-segment 'rela-data)
   (create-segment 'rela-rodata)
+  (create-segment 'rela-heap)
   (let ((code-segment		(get-segment 'code))
         (ro-data-segment	(get-segment 'ro-data))
-        (data-segment		(get-segment 'data)))
+        (data-segment		(get-segment 'data))
+        (genesis-segment	(get-segment 'genesis)))
     (list-do entry (list-reverse (<assembler>-relocations *assembler*))
       (let* ((hole-segment	(first entry))
              (hole-paddress	(second entry))
@@ -248,6 +251,7 @@
                                    ((= hole-segment code-segment)	'rela-text)
                                    ((= hole-segment data-segment)	'rela-data)
                                    ((= hole-segment ro-data-segment)	'rela-rodata)
+                                   ((= hole-segment genesis-segment)	'rela-heap)
                                    (else	(error "relocation hole in an unexpected segment: "hole-segment))))
              (symbol-index
                (typecase target
@@ -592,6 +596,7 @@
     (rela-text		8)
     (rela-data		8)
     (rela-rodata	8)
+    (rela-heap		8)
     (.symtab		8)
     (.strtab		1)
     (.shstrtab		1)))
@@ -611,7 +616,7 @@
 ;; The section content is emitted from the assembler's genesis segment.
 (define +c-obj/section-names+
   '(".text" ".rodata" ".data" ".bss" ".ldata.heap"
-    ".rela.text" ".rela.data" ".rela.rodata"
+    ".rela.text" ".rela.data" ".rela.rodata" ".rela.heap"
     ".symtab" ".strtab" ".shstrtab"))
 
 (define +c-obj/n-section-headers+
@@ -721,6 +726,13 @@
                          0 (second (%c-obj-layout-entry layout 'rela-rodata)) (third (%c-obj-layout-entry layout 'rela-rodata))
                          +c-obj/.symtab-section-index+
                          +c-obj/.rodata-section-index+
+                         8 +rel-size+)
+    (emit-section-header (name-offset ".rela.heap")
+                         +rel-section-type+
+                         elf/SHF_INFO_LINK
+                         0 (second (%c-obj-layout-entry layout 'rela-heap)) (third (%c-obj-layout-entry layout 'rela-heap))
+                         +c-obj/.symtab-section-index+
+                         +c-obj/.heap-section-index+
                          8 +rel-size+)
     (emit-section-header (name-offset ".symtab")
                          elf/SHT_SYMTAB
