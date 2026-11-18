@@ -330,8 +330,6 @@
 (define arena/literals ())
 (define arena/literal-counter 0)
 
-(define arena/string-size-slot
-  (record/slot-index (eval-in-heap '<string>) 'size))
 (define arena/string-elements-slot
   (record/slot-index (eval-in-heap '<string>) 'elements))
 
@@ -373,12 +371,11 @@
       literal)))
 
 ;;;
-;;; scan-validate
+;;; the chunk chain
 ;;;
 
-;; Walk the circular chunk chain and check that every pointer word in a
-;; live, non-opaque payload points at a live header. Raw numbers and
-;; immediates are skipped (the same oop? test gc.l uses).
+;; Walk the circular chunk chain and return the chunk headers in address
+;; order.
 (define-function arena/chain-headers (base)
   (let ((headers ())
         (header  base)
