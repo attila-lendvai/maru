@@ -740,7 +740,8 @@
       (list-do section-index (list +c-obj/.text-section-index+
                                    +c-obj/.rodata-section-index+
                                    +c-obj/.data-section-index+
-                                   +c-obj/.bss-section-index+)
+                                   +c-obj/.bss-section-index+
+                                   +c-obj/.heap-section-index+)
         (emit-symtab-entry 0
                            (+ (bitwise-shift elf/STB_LOCAL 4)
                               elf/STT_SECTION)

@@ -147,17 +147,18 @@
 ;; Section indices of the c-obj's shdr table: the emission order in
 ;; %c-obj-emit-section-headers must match these. The STT_SECTION
 ;; symbols of compile-env's symtab prologue (elf-late.l) carry the
-;; first four as st_shndx; the two sites must stay in sync.
+;; allocatable sections as st_shndx; the two sites must stay in sync.
 (define +c-obj/.text-section-index+		1)
 (define +c-obj/.rodata-section-index+		2)
 (define +c-obj/.data-section-index+		3)
 (define +c-obj/.bss-section-index+		4)
-(define +c-obj/.rela-text-section-index+	5)
-(define +c-obj/.rela-data-section-index+	6)
-(define +c-obj/.rela-rodata-section-index+	7)
-(define +c-obj/.symtab-section-index+		8)
-(define +c-obj/.strtab-section-index+		9)
-(define +c-obj/.shstrtab-section-index+		10)
+(define +c-obj/.heap-section-index+		5)
+(define +c-obj/.rela-text-section-index+	6)
+(define +c-obj/.rela-data-section-index+	7)
+(define +c-obj/.rela-rodata-section-index+	8)
+(define +c-obj/.symtab-section-index+		9)
+(define +c-obj/.strtab-section-index+		10)
+(define +c-obj/.shstrtab-section-index+		11)
 
 (define-function %c-obj-symbol-count ()
   (/ (segment-length '.symtab) +sym-size+))
@@ -169,6 +170,7 @@
     ((= segment (get-segment 'ro-data))	+c-obj/.rodata-section-index+)
     ((= segment (get-segment 'data))	+c-obj/.data-section-index+)
     ((= segment (get-segment 'bss))	+c-obj/.bss-section-index+)
+    ((= segment (get-segment 'heap))	+c-obj/.heap-section-index+)
     (else (error "relocation against an unexpected segment: "segment))))
 
 ;; The number of GLOBAL symbols in .symtab (the entry points and the
@@ -586,6 +588,7 @@
   '((code		16)
     (ro-data		16)
     (data		16)
+    (heap		16)
     (rela-text		8)
     (rela-data		8)
     (rela-rodata	8)
@@ -600,7 +603,7 @@
 ;; write-elf-to-stream/c-obj checks it). The section indices above
 ;; must follow the same order.
 (define +c-obj/section-names+
-  '(".text" ".rodata" ".data" ".bss"
+  '(".text" ".rodata" ".data" ".bss" ".heap"
     ".rela.text" ".rela.data" ".rela.rodata"
     ".symtab" ".strtab" ".shstrtab"))
 
@@ -685,6 +688,11 @@
                          elf/SHT_NOBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          0 (second (%c-obj-layout-entry layout 'data)) (segment-length 'bss)
+                         0 0 16 0)
+    (emit-section-header (name-offset ".heap")
+                         elf/SHT_PROGBITS
+                         (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                         0 (second (%c-obj-layout-entry layout 'heap)) (third (%c-obj-layout-entry layout 'heap))
                          0 0 16 0)
     (emit-section-header (name-offset ".rela.text")
                          +rel-section-type+
