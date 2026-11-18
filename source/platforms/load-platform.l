@@ -40,13 +40,29 @@
 (unless evolving?
   (load "source/compiler/arena.l"))
 
+;; The normalized target/arch values each backend can emit for. A new
+;; arch in setup-target.l must be paired with the backends implementing
+;; it; otherwise a backend emits code for an ABI/ELF layout it does not
+;; understand (e.g. `./build.sh bootstrap arm linux` on an x86_64 host
+;; emits AArch64 code against x86-64 syscalls: a valid ELF that
+;; segfaults instead of failing to build).
+(define +backend/supported-targets+
+  '(("x86"	(x86-32 x86-64))
+    ("arm"	(aarch64))
+    ("llvm"	(x86-32 x86-64 aarch64))))
+
 ;; The x86 backend emits 32- or 64-bit code; which one is a property of
 ;; the target arch, not the backend. The normalized arch symbol already
 ;; spells the suffix (x86-32 / x86-64), matching the emitter file names.
 (define-function emitter-name (backend-name)
-  (if (= backend-name "x86")
-      (symbol->string (target-value target/arch))
-    backend-name))
+  (let* ((supported	(second (assq backend-name +backend/supported-targets+)))
+         (arch		(target-value target/arch)))
+    (unless (member? arch supported)
+      (error "the "backend-name" backend does not support target/arch="target/arch
+             ", supported: "supported))
+    (if (= backend-name "x86")
+        (symbol->string arch)
+      backend-name)))
 
 (require (concat-strings "source/compiler/emit-" (emitter-name *compiler-backend*) ".l"))
 
