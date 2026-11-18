@@ -360,7 +360,7 @@
 ;; apart. Keep the name list in sync with the emit-section-header
 ;; calls below (the assert at the end of the writer checks it).
 (define +standalone/section-names+
-  '(".text" ".rodata" ".data" ".bss"
+  '(".text" ".rodata" ".data" ".bss" ".ldata.heap"
     ".dynamic" ".rela.dyn" ".dynstr"
     ".symtab" ".strtab" ".shstrtab"))
 
@@ -526,7 +526,16 @@
                              (bss-size)
                              0 0 16 0)
 
-        ;; section #5 (+.dynamic-section-index+): .dynamic
+        ;; section #5 (+.ldata.heap-section-index+): .ldata.heap
+        (emit-section-header (name-offset ".ldata.heap")
+                             elf/SHT_PROGBITS
+                             (+ elf/SHF_ALLOC elf/SHF_WRITE)
+                             +genesis-segment-address+
+                             data-end
+                             (segment-length 'genesis)
+                             0 0 16 0)
+
+        ;; section #6 (+.dynamic-section-index+): .dynamic
         (emit-section-header (name-offset ".dynamic")
                              elf/SHT_DYNAMIC
                              (+ elf/SHF_ALLOC elf/SHF_WRITE)
@@ -536,7 +545,7 @@
                              +.dynstr-section-index+
                              0 8 elf/sizeof-Elf64_Dyn)
 
-        ;; section #6 (+.rela.dyn-section-index+): .rela.dyn
+        ;; section #7 (+.rela.dyn-section-index+): .rela.dyn
         (emit-section-header (name-offset ".rela.dyn")
                              elf/SHT_RELA
                              (+ elf/SHF_ALLOC elf/SHF_WRITE)
@@ -546,7 +555,7 @@
                                 (laddress '.rela.dyn))
                              0 0 8 elf/sizeof-Elf64_Rela)
 
-        ;; section #7 (+.dynstr-section-index+): .dynstr
+        ;; section #8 (+.dynstr-section-index+): .dynstr
         (emit-section-header (name-offset ".dynstr")
                              elf/SHT_STRTAB 0 0
                              (+ text-end (paddress '.dynstr))
@@ -554,7 +563,7 @@
                                 (laddress '.dynstr))
                              0 0 1 0)
 
-        ;; section #8 (+.symtab-section-index+): .symtab
+        ;; section #9 (+.symtab-section-index+): .symtab
         (emit-section-header (name-offset ".symtab")
                              elf/SHT_SYMTAB
                              0 0
@@ -565,13 +574,13 @@
                              8
                              elf/sizeof-Elf64_Sym)
 
-        ;; section #9 (+.strtab-section-index+): .strtab
+        ;; section #10 (+.strtab-section-index+): .strtab
         (emit-section-header (name-offset ".strtab")
                              elf/SHT_STRTAB 0 0
                              strtab-offset
                              size/strtab 0 0 1 0)
 
-        ;; section #10 (+.shstrtab-section-index+): .shstrtab
+        ;; section #11 (+.shstrtab-section-index+): .shstrtab
         (emit-section-header (name-offset ".shstrtab")
                              elf/SHT_STRTAB 0 0
                              shstrtab-offset
