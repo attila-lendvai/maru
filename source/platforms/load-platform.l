@@ -33,6 +33,15 @@
                           (= target/platform "posix")
                           (= elf-emission-type "c-obj"))))
 
+;; Does the runtime anchor its heap on an emitted genesis? The static
+;; ET_EXEC and the c-obj have one; the standalone ET_DYN has no heap
+;; LOAD yet, so it keeps acquiring its heap at runtime. This must be a
+;; feature: the arena reloads gc.l in a child of the slave env, and the
+;; branch has to agree there.
+(eval-in-slave `(set (feature genesis)
+                     ,(or (not (eval-in-slave '(feature relocatable-elf)))
+                          (= elf-emission-type "c-obj"))))
+
 ;; Build and validate the host-side arena before the compiler starts.
 ;; Stage-0 still runs on the previous stage's binary, which predates
 ;; the boxed-word arithmetic. The arena is loaded in both later stages

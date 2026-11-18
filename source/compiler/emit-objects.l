@@ -98,7 +98,7 @@
       (counter 0))
   (define-method compile-object <string> (-c-)
     (if-at-expand (and (defined? 'arena/string-literal)
-                       (not (eval-in-slave 'feature/relocatable-elf)))
+                       (eval-in-slave '(feature genesis)))
         (GLOBAL-ADDR (label (<arena-literal>-label (arena/string-literal self))))
       (let ()
         (emit-comment 3 "emitting string object: "self)

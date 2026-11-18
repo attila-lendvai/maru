@@ -643,6 +643,22 @@
                           (/ (- offset arena/heap-start) cell-bytes)))
            (address	(lambda (offset)
                           (+ start (- offset arena/heap-start))))
+           ;; Emit a cell holding the runtime address of ARENA-OFFSET
+           ;; inside the genesis. ET_EXEC bakes the link-time address;
+           ;; the relocatable shapes emit a hole against
+           ;; heap-image-start plus the offset, which the serializers
+           ;; add to the label's address.
+           (heap-label	(label 'heap-image-start))
+           (heap-pointer	(lambda (arena-offset)
+                                  (let ((offset (- arena-offset
+                                                    arena/heap-start)))
+                                    (if (= 8 cell-bytes)
+                                        (emit-label heap-label emit-u64 8 offset
+                                                    (if-feature relocatable-elf
+                                                        'abs64 ()))
+                                      (emit-label heap-label emit-u32 4 offset
+                                                  (if-feature relocatable-elf
+                                                      'abs32 ()))))))
            (rest		chunks)
            (flags/opaque (eval-in-heap '<header>-flags/opaque)))
       (list-do literal arena/literals
@@ -658,9 +674,9 @@
                (literal	(array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
             (error "emit-genesis: chunk layout mismatch at " header))
-          (.cell (if (cdr rest)
-                     (address (car (cdr rest)))
-                   (address (+ header header-size size))))
+          (heap-pointer (if (cdr rest)
+                            (car (cdr rest))
+                          (+ header header-size size)))
           (.cell size)
           (.cell flags)
           (.cell type)
@@ -671,12 +687,12 @@
                     (j		0))
                 (while (< j cells)
                   (let ((word (arena/peek-word-at payload j)))
-                    (.cell (if (and (<= arena/heap-start word)
-                                    (< word limit)
-                                    (= 0 (bitwise-and word
-                                                      (- cell-bytes 1))))
-                               (address word)
-                             word)))
+                    (if (and (<= arena/heap-start word)
+                             (< word limit)
+                             (= 0 (bitwise-and word
+                                               (- cell-bytes 1))))
+                        (heap-pointer word)
+                      (.cell word)))
                   (incr j)))
             (let ((j 0))
               (while (< j size)
@@ -762,13 +778,13 @@
 
     ;; The genesis is emitted after the definitions are compiled: the
     ;; string literals are allocated in the arena while compiling them.
-    ;; Without the arena (or for a relocatable shape) fall back to the
-    ;; zeroed seed. The bounds must exist before the definitions can
-    ;; reference them.
+    ;; Without the arena, or for a shape whose runtime has no genesis,
+    ;; fall back to the zeroed seed. The bounds must exist before the
+    ;; definitions can reference them.
     (with-current-segment 'genesis
       (label! 'heap-image-start)
       (if-at-expand (and (defined? 'arena/genesis-chunks)
-                         (not (eval-in-slave 'feature/relocatable-elf)))
+                         (feature genesis))
           (let ()
             ;; the static space is defined by emit-genesis, after the
             ;; definitions are compiled, but their addresses are
@@ -801,11 +817,10 @@
     (with-current-segment 'bss
       (label! 'read-only-space-end))
 
-    (if-feature relocatable-elf
-        ()
-      (when-at-expand (defined? 'arena/genesis-chunks)
-        (with-current-segment 'genesis
-          (emit-genesis -c-))))
+    (when-at-expand (and (defined? 'arena/genesis-chunks)
+                         (feature genesis))
+      (with-current-segment 'genesis
+        (emit-genesis -c-)))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))

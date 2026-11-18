@@ -246,6 +246,7 @@
       (let* ((hole-segment	(first entry))
              (hole-paddress	(second entry))
              (target		(third entry))
+             (offset		(car (cddddr entry)))
              (type		(car (cdr (cddddr entry))))
              (rela-segment	(cond
                                    ((= hole-segment code-segment)	'rela-text)
@@ -288,7 +289,11 @@
                     ((plt32 pc32)	(- (<label>-laddress target) 4))
                     ((adr-prel-lo21 jump26 call26 condbranch19)
                      (<label>-laddress target))
-                    ((abs32 abs64 symbol64)	(<label>-laddress target))
+                    ;; a cell inside a section (the genesis) may carry
+                    ;; a positional offset: the addend is the label's
+                    ;; address plus that offset
+                    ((abs32 abs64 symbol64)
+                     (+ (<label>-laddress target) (or offset 0)))
                     (else		(error "unexpected relocation type: "type))))
                  (else		(error "unexpected relocation target: "target)))))
         (with-current-segment rela-segment
