@@ -223,11 +223,20 @@
       (oop-at (address-of x) 0))
   42)
 
+;; The genesis holds the arena's objects only: <string> literals, their
+;; opaque <data> bodies, and <target-function> objects. These are the
+;; ids the target's constructors stamp into the headers.
+(define-constant +genesis/data-type-id+		(<type>-slave-id <data>))
+(define-constant +genesis/string-type-id+	(<type>-slave-id <string>))
+(define-constant +genesis/target-function-type-id+
+  (<type>-slave-id <target-function>))
+
 ;; The heap image holds pointers that the assembler bakes (ET_EXEC) or
 ;; the loader relocates (c-obj, standalone). Walk its chunk chain up to
 ;; the free chunk the runtime stamps: every link must stay inside the
-;; image. A zero first link means the image carries no genesis content
-;; (the LLVM backend's heap is a zeroed global, stage-0 emits the seed).
+;; image, and every chunk must have one of the types the arena emits.
+;; A zero first link means the image carries no genesis content (the
+;; LLVM backend's heap is a zeroed global, stage-0 emits the seed).
 (define-test compile/genesis/1
     (let* ((first	(address-of-location 'heap-image-start))
            (static-end	(address-of-location 'static-space-end))
@@ -237,8 +246,13 @@
            (ok		true))
       (while (and ok (if empty? false (< count 1000))
                   (if (= chunk static-end) false true))
-        (let ((next (oop-at chunk 0)))
-          (if (and (< chunk static-end) (< next (+ static-end 1)))
+        (let ((next	(oop-at chunk 0))
+              (type	(oop-at chunk 3)))
+          (if (and (< chunk static-end)
+                   (< next (+ static-end 1))
+                   (or (= type +genesis/data-type-id+)
+                       (= type +genesis/string-type-id+)
+                       (= type +genesis/target-function-type-id+)))
               (let ()
                 (incr count)
                 (set chunk next))
