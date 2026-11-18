@@ -97,7 +97,7 @@
 (let ((type-id (slave-value (<type>-slave-id <string>)))
       (counter 0))
   (define-method compile-object <string> (-c-)
-    (if-at-expand (and (defined? 'arena/string-literal)
+    (if-at-expand (and (not evolving?)
                        (eval-in-slave '(feature genesis)))
         (GLOBAL-ADDR (label (<arena-literal>-label (arena/string-literal self))))
       (let ()

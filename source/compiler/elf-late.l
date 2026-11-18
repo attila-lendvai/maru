@@ -624,7 +624,7 @@
   (list-do name '(code ro-data data genesis) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
-(when-at-expand (defined? 'arena/genesis-chunks)
+(when-at-expand (not evolving?)
 
   ;; Emit the genesis: the arena's chunk chain, into the heap segment,
   ;; verbatim. The used region is copied at a fixed offset, so a pointer
@@ -783,7 +783,7 @@
     ;; definitions can reference them.
     (with-current-segment 'genesis
       (label! 'heap-image-start)
-      (if-at-expand (and (defined? 'arena/genesis-chunks)
+      (if-at-expand (and (not evolving?)
                          (feature genesis))
           (let ()
             ;; the static space is defined by emit-genesis, after the
@@ -817,7 +817,7 @@
     (with-current-segment 'bss
       (label! 'read-only-space-end))
 
-    (when-at-expand (and (defined? 'arena/genesis-chunks)
+    (when-at-expand (and (not evolving?)
                          (feature genesis))
       (with-current-segment 'genesis
         (emit-genesis -c-)))
