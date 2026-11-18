@@ -479,13 +479,13 @@
 (define-constant +data-segment-space+		0x00020000)
 
 (define-constant +bss-segment-address+		(+ +data-segment-address+	+data-segment-space+))
-(define-constant +bss-segment-space+		0x00020000) ; reserved for bss; the heap image follows
+(define-constant +bss-segment-space+		0x00020000) ; reserved for bss; the heap follows
 
-;; The heap image segment: the initial, pre-initialized heap. It is the
+;; The heap segment: the next stage's pre-initialized heap. It is the
 ;; last loaded segment, so the program break starts right after it and
 ;; brk can grow the heap at runtime (see platform/acquire-memory).
-(define-constant +heap-segment-address+		(+ +bss-segment-address+	+bss-segment-space+))
-(define-constant +heap-segment-space+		0x01000000)
+(define-constant +genesis-segment-address+	(+ +bss-segment-address+	+bss-segment-space+))
+(define-constant +genesis-segment-space+	0x01000000)
 
 ;; The ELF header, shared by the three elf writers. E-PHOFF and E-SHOFF
 ;; accept a number or a section desig; the desig form resolves as a
@@ -567,12 +567,12 @@
       ;; starts right after it: brk grows the heap without a gap.
       (emit-program-header elf/PT_LOAD
                            file-offset
-                           (segment-length 'heap)
-                           (segment-length 'heap)
+                           (segment-length 'genesis)
+                           (segment-length 'genesis)
                            (+ elf/PF_R elf/PF_W)
                            elf/page-size
-                           (segment-base 'heap)
-                           +heap-segment-space+))))
+                           (segment-base 'genesis)
+                           +genesis-segment-space+))))
 
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))
@@ -621,7 +621,7 @@
 
   ;; we can start writing the file. note that the order must be in
   ;; sync with the headers above.
-  (list-do name '(code ro-data data heap) ; bss segment needs no storage
+  (list-do name '(code ro-data data genesis) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
 (when-at-expand (defined? 'arena/image-chunks)
@@ -715,9 +715,9 @@
                      (bss	(if-at-expand (= "c-obj" elf-emission-type)
                                     0
                                   +bss-segment-address+))
-                     (heap	(if-at-expand (= "c-obj" elf-emission-type)
+                     (genesis	(if-at-expand (= "c-obj" elf-emission-type)
                                     0
-                                  +heap-segment-address+))
+                                  +genesis-segment-address+))
                      (.shstrtab	0)
                      (.symtab	0)
                      (.strtab	0)))
@@ -765,7 +765,7 @@
     ;; Without the arena (or for a relocatable shape) fall back to the
     ;; zeroed placeholder. The bounds must exist before the definitions
     ;; can reference them.
-    (with-current-segment 'heap
+    (with-current-segment 'genesis
       (label! 'heap-image-start)
       (if-at-expand (and (defined? 'arena/image-chunks)
                          (not (eval-in-slave 'feature/relocatable-elf)))
@@ -804,7 +804,7 @@
     (if-feature relocatable-elf
         ()
       (when-at-expand (defined? 'arena/image-chunks)
-        (with-current-segment 'heap
+        (with-current-segment 'genesis
           (emit-heap-image -c-))))
 
     (when-feature relocatable-elf

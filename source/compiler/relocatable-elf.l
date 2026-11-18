@@ -170,7 +170,7 @@
     ((= segment (get-segment 'ro-data))	+c-obj/.rodata-section-index+)
     ((= segment (get-segment 'data))	+c-obj/.data-section-index+)
     ((= segment (get-segment 'bss))	+c-obj/.bss-section-index+)
-    ((= segment (get-segment 'heap))	+c-obj/.heap-section-index+)
+    ((= segment (get-segment 'genesis))	+c-obj/.heap-section-index+)
     (else (error "relocation against an unexpected segment: "segment))))
 
 ;; The number of GLOBAL symbols in .symtab (the entry points and the
@@ -588,7 +588,7 @@
   '((code		16)
     (ro-data		16)
     (data		16)
-    (heap		16)
+    (genesis		16)
     (rela-text		8)
     (rela-data		8)
     (rela-rodata	8)
@@ -608,6 +608,7 @@
 ;; [read-only-space-start, read-only-space-end) and runtime heap growth
 ;; follows it. A script without .ldata would orphan it next to .data;
 ;; gc/initialize's read-only assert catches that once the image lands.
+;; The section content is emitted from the assembler's genesis segment.
 (define +c-obj/section-names+
   '(".text" ".rodata" ".data" ".bss" ".ldata.heap"
     ".rela.text" ".rela.data" ".rela.rodata"
@@ -698,7 +699,7 @@
     (emit-section-header (name-offset ".ldata.heap")
                          elf/SHT_PROGBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
-                         0 (second (%c-obj-layout-entry layout 'heap)) (third (%c-obj-layout-entry layout 'heap))
+                         0 (second (%c-obj-layout-entry layout 'genesis)) (third (%c-obj-layout-entry layout 'genesis))
                          0 0 16 0)
     (emit-section-header (name-offset ".rela.text")
                          +rel-section-type+
