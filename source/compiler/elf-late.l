@@ -782,8 +782,7 @@
     ;; definitions can reference them.
     (with-current-segment 'genesis
       (label! 'heap-image-start)
-      (if-at-expand (and (not evolving?)
-                         (feature genesis))
+      (if-at-expand (not evolving?)
           (let ()
             ;; the static space is defined by emit-genesis, after the
             ;; definitions are compiled, but their addresses are
@@ -816,8 +815,7 @@
     (with-current-segment 'bss
       (label! 'read-only-space-end))
 
-    (when-at-expand (and (not evolving?)
-                         (feature genesis))
+    (when-at-expand (not evolving?)
       (with-current-segment 'genesis
         (emit-genesis -c-)))
 

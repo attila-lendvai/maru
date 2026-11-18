@@ -33,12 +33,6 @@
                           (= target/platform "posix")
                           (= elf-emission-type "c-obj"))))
 
-;; Every emission shape anchors its heap on an image: the ELF writers
-;; emit the arena's genesis, and the LLVM backend emits a zeroed global.
-;; This must be a feature: the arena reloads gc.l in a child of the
-;; slave env, and the branch has to agree there.
-(eval-in-slave `(set (feature genesis) true))
-
 ;; Build and validate the host-side arena before the compiler starts.
 ;; Stage-0 still runs on the previous stage's binary, which predates
 ;; the boxed-word arithmetic. The arena is loaded in both later stages
