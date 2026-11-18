@@ -58,7 +58,8 @@
           (relative-count 0))
       (let ((code-segment		(get-segment 'code))
             (data-segment		(get-segment 'data))
-            (ro-data-segment	(get-segment 'ro-data)))
+            (ro-data-segment	(get-segment 'ro-data))
+            (genesis-segment	(get-segment 'genesis)))
         ;; .dynsym indices must be known before the GLOB_DAT relocs below
         (let ((index 1))
           (list-do entry *external-symbols*
@@ -73,6 +74,7 @@
           (let* ((segment	(first entry))
                  (paddress	(second entry))
                  (target	(third entry))
+                 (offset	(car (cddddr entry)))
                  (type	(car (cdr (cddddr entry)))))
             (when (= type 'abs64)
               (assert (is <label> target))
@@ -85,6 +87,7 @@
                         ((= segment code-segment)	+code-segment-address+)
                         ((= segment data-segment)	+data-segment-address+)
                         ((= segment ro-data-segment)	+ro-data-segment-address+)
+                        ((= segment genesis-segment)	+genesis-segment-address+)
                         (else (error "unexpected segment in .rela.dyn emission: "segment)))))
                 ;; Elf64_Rela entry (3 cells):
                 ;; 1. r_offset: byte offset in file where relocation applies (paddress + segment file offset)
@@ -94,8 +97,10 @@
                 ;;    - R_X86_64_RELATIVE = 8     (base-relative)
                 (.u64 reloc-type)
                 ;; 3. r_addend: the addend resolves lazily, all labels
-                ;; are defined by the time this table is emitted
-                (.u64 (<label>-laddress target)))
+                ;; are defined by the time this table is emitted. a
+                ;; cell inside a section (the genesis) carries a
+                ;; positional offset on top of the label's address.
+                (.u64 (+ (<label>-laddress target) (or offset 0))))
               (incr rela-count)
               (incr relative-count))))
         ;; R_*_GLOB_DAT: resolve one imported symbol into its GOT cell
