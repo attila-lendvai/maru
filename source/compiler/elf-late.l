@@ -660,16 +660,15 @@
                                                       'abs32 ()))))))
            (rest		chunks)
            (flags/opaque (eval-in-heap '<header>-flags/opaque)))
-      (list-do literal arena/literals
-        (set (array-at labels (index (<arena-literal>-offset literal)))
-             (<arena-literal>-label literal)))
+      (list-do entry arena/labels
+        (set (array-at labels (index (car entry))) (cdr entry)))
       (label! 'static-space-start)
       (while rest
         (let* ((header	(car rest))
                (payload	(+ header header-size))
                (size	(arena/peek-word-at header 1))
                (flags	(arena/peek-word-at header 2))
-               (literal	(array-at labels (index payload))))
+               (object-label (array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
             (error "emit-genesis: chunk layout mismatch at " header))
           (heap-pointer (if (cdr rest)
@@ -680,8 +679,8 @@
             (while (< j (/ header-size cell-bytes))
               (.cell (arena/peek-word-at header j))
               (incr j)))
-          (when literal
-            (label! literal))
+          (when object-label
+            (label! object-label))
           (if (zero? (bitwise-and flags/opaque flags))
               (let ((cells	(/ size cell-bytes))
                     (j		0))

@@ -327,7 +327,15 @@
 ;;; and an opaque <data> body. The body reserves one byte for a NUL, so
 ;;; string-ensure-zero-terminated never has to mutate a literal.
 
-(define arena/literals ())
+;; The object labels the emitter must place at a payload: (offset .
+;; label). String literals and function objects both need one; the
+;; emitter resolves them when it lays out the genesis.
+(define arena/labels ())
+
+(define-function arena/register-label (offset label)
+  (push arena/labels (cons offset label))
+  label)
+
 (define arena/literal-counter 0)
 
 (define arena/string-elements-slot
@@ -363,12 +371,11 @@
     (for (i 0 len)
       (arena/store-u8 (+ elements i) (string-at str i)))
     (arena/store-u8 (+ elements len) 0)
-    (let ((literal (make <arena-literal>
-                         (offset offset)
-                         (label  label)
-                         (source str))))
-      (push arena/literals literal)
-      literal)))
+    (arena/register-label offset label)
+    (make <arena-literal>
+          (offset offset)
+          (label  label)
+          (source str))))
 
 ;;;
 ;;; the chunk chain
