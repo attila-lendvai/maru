@@ -466,7 +466,7 @@
 
 (define-constant +n-program-headers+
     (if-feature relocatable-elf
-        (if-at-expand (= "c-obj" elf-emission-type) 0 8)
+        (if-at-expand (= "c-obj" elf-emission-type) 0 9)
       5))
 
 (define-constant +code-segment-address+		(if-feature relocatable-elf 0 0x00400000))
@@ -561,18 +561,17 @@
                          (segment-base 'bss)
                          +bss-segment-space+)
 
-    (if-feature relocatable-elf
-        ()
-      ;; The heap is the last loaded segment, so the program break
-      ;; starts right after it: brk grows the heap without a gap.
-      (emit-program-header elf/PT_LOAD
-                           file-offset
-                           (segment-length 'genesis)
-                           (segment-length 'genesis)
-                           (+ elf/PF_R elf/PF_W)
-                           elf/page-size
-                           (segment-base 'genesis)
-                           +genesis-segment-space+))))
+    ;; The heap is the last loaded segment (the c-obj does not call
+    ;; this function). In the ET_EXEC shape the program break starts
+    ;; right after it, so brk grows the heap without a gap.
+    (emit-program-header elf/PT_LOAD
+                         file-offset
+                         (segment-length 'genesis)
+                         (segment-length 'genesis)
+                         (+ elf/PF_R elf/PF_W)
+                         elf/page-size
+                         (segment-base 'genesis)
+                         +genesis-segment-space+)))
 
 (when-feature cffi
   (require "source/compiler/cffi-late.l"))

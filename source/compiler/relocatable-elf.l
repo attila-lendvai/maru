@@ -405,16 +405,23 @@
              (text-end				(segment-length 'code))
              (ro-data-end	(+ text-end	(segment-length 'ro-data)))
              (data-end		(+ ro-data-end	(segment-length 'data)))
+             (heap-end		(+ data-end	(segment-length 'genesis)))
              (size/ro-data	(segment-length 'ro-data))
              (size/.dynamic	(- (laddress '.dynamic-end)
                                    (laddress '.dynamic)))
-             (symtab-offset	data-end)
+             (symtab-offset	heap-end)
              (size/symtab	(segment-length '.symtab))
              (strtab-offset	(+ symtab-offset size/symtab))
              (size/strtab	(segment-length '.strtab))
              (shstrtab-offset	(+ strtab-offset size/strtab))
              (size/shstrtab	(segment-length '.shstrtab))
              (shdr-table-offset	(align 8 (+ shstrtab-offset size/shstrtab))))
+
+        ;; The genesis LOAD is page-aligned in memory, and the loader
+        ;; requires p_offset and p_vaddr to be congruent modulo the
+        ;; page size. The data segment's page padding is what aligns
+        ;; its end, and with it the genesis's file offset.
+        (assert (= 0 (bitwise-and data-end (- elf/page-size 1))))
 
 ;;;
 ;;; Program headers (segment layout)
@@ -583,7 +590,7 @@
 
         ;; we can start writing the file. note that the order must be in
         ;; sync with the headers above.
-        (list-do name '(code ro-data data) ; bss segment needs no storage
+        (list-do name '(code ro-data data genesis) ; bss segment needs no storage
           (write-segment-to-stream name stream))
         (list-do name '(.symtab .strtab .shstrtab shdr-table)
           (write-segment-to-stream name stream))))))
