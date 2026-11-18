@@ -83,6 +83,17 @@ byte-identical to eval2) implicitly; no separate step needed.
 - `source/platforms/` — libc/posix/linux platform layers
 - `tests/` — test files (infra.l, assembler-infra.l, test-assembler-x86.l, evaluator-tests.l, etc.)
 
+## Emission shapes and platforms
+
+- The standalone ET_DYN emission is for the linux platform only. It has no
+  link phase, so external C symbols stay unresolved and ld.so aborts at
+  startup; do not extend the standalone writer to compensate.
+- Deeper C interop goes through the C toolchain: the c-obj emission, linked
+  by the platform's C compiler. That is the only shape that may depend on
+  the platform's C glue.
+- The compiler tests build their standalone image on libc only because they
+  redefine the glue for the test; that is a test workaround, not support.
+
 ## Coding Conventions
 
 - Files start with `;;; -*- mode: lisp; coding: us-ascii -*-`
