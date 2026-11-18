@@ -336,6 +336,15 @@
   (push arena/labels (cons offset label))
   label)
 
+;; Cells that hold a text address: (offset . label). They are not heap
+;; pointers, so the emitter resolves them through the assembler instead
+;; of rebasing them.
+(define arena/code-pointers ())
+
+(define-function arena/register-code-pointer (offset label)
+  (push arena/code-pointers (cons offset label))
+  label)
+
 (define arena/literal-counter 0)
 
 (define arena/string-elements-slot

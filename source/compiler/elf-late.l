@@ -638,30 +638,42 @@
            (limit	(arena/genesis-limit))
            (labels	(array (+ 1 (/ (- limit arena/heap-start)
                                      cell-bytes))))
+           (code-labels	(array (+ 1 (/ (- limit arena/heap-start)
+                                           cell-bytes))))
+           (code-pointers-emitted 0)
            (index	(lambda (offset)
                           (/ (- offset arena/heap-start) cell-bytes)))
            (address	(lambda (offset)
                           (+ start (- offset arena/heap-start))))
-           ;; Emit a cell holding the runtime address of ARENA-OFFSET
-           ;; inside the genesis. ET_EXEC bakes the link-time address;
-           ;; the relocatable shapes emit a hole against
-           ;; heap-image-start plus the offset, which the serializers
-           ;; add to the label's address.
-           (heap-label	(label 'heap-image-start))
-           (heap-pointer	(lambda (arena-offset)
-                                  (let ((offset (- arena-offset
-                                                    arena/heap-start)))
-                                    (if (= 8 cell-bytes)
-                                        (emit-label heap-label emit-u64 8 offset
-                                                    (if-feature relocatable-elf
-                                                        'abs64 ()))
-                                      (emit-label heap-label emit-u32 4 offset
+           ;; Emit a cell holding the runtime address of a label. ET_EXEC
+           ;; bakes the link-time address; the relocatable shapes emit a
+           ;; hole, and the serializers add the target label's address
+           ;; (plus the offset) to it.
+           (pointer	(lambda (label offset)
+                                  (if (= 8 cell-bytes)
+                                      (emit-label label emit-u64 8 offset
                                                   (if-feature relocatable-elf
-                                                      'abs32 ()))))))
+                                                      'abs64 ()))
+                                    (emit-label label emit-u32 4 offset
+                                                (if-feature relocatable-elf
+                                                    'abs32 ())))))
+           (heap-label	(label 'heap-image-start))
+           ;; a heap pointer carries its genesis offset
+           (heap-pointer	(lambda (arena-offset)
+                                  (pointer heap-label
+                                           (- arena-offset arena/heap-start))))
+           ;; a code pointer names a text label; no offset applies
+           (code-pointer	(lambda (label)
+                                  (assert (resolved-label? label)
+                                          "emit-genesis: unresolved code pointer: "
+                                          (<label>-%name label))
+                                  (pointer label 0)))
            (rest		chunks)
            (flags/opaque (eval-in-heap '<header>-flags/opaque)))
       (list-do entry arena/labels
         (set (array-at labels (index (car entry))) (cdr entry)))
+      (list-do entry arena/code-pointers
+        (set (array-at code-labels (index (car entry))) (cdr entry)))
       (label! 'static-space-start)
       (while rest
         (let* ((header	(car rest))
@@ -685,19 +697,28 @@
               (let ((cells	(/ size cell-bytes))
                     (j		0))
                 (while (< j cells)
-                  (let ((word (arena/peek-word-at payload j)))
-                    (if (and (<= arena/heap-start word)
-                             (< word limit)
-                             (= 0 (bitwise-and word
-                                               (- cell-bytes 1))))
-                        (heap-pointer word)
-                      (.cell word)))
+                  (let* ((word	(arena/peek-word-at payload j))
+                         (code-label (array-at code-labels
+                                               (index (+ payload
+                                                         (* j cell-bytes))))))
+                    (if code-label
+                        (let ()
+                          (code-pointer code-label)
+                          (incr code-pointers-emitted))
+                      (if (and (<= arena/heap-start word)
+                               (< word limit)
+                               (= 0 (bitwise-and word
+                                                 (- cell-bytes 1))))
+                          (heap-pointer word)
+                        (.cell word))))
                   (incr j)))
             (let ((j 0))
               (while (< j size)
                 (.u8 (arena/load-u8 (+ payload j)))
                 (incr j)))))
         (set rest (cdr rest)))
+      (assert (= code-pointers-emitted (list-length arena/code-pointers))
+              "emit-genesis: a code pointer was not emitted")
       (label! 'static-space-end)
       (.i8/times 0 +genesis-slack+)
       (label! 'heap-image-end))))
