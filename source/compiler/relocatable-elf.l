@@ -339,6 +339,18 @@
 ;;; ELF writers
 ;;;
 
+;; The .shstrtab names double as the section inventory: the header
+;; count is one NULL entry plus one per name, so the two cannot drift
+;; apart. Keep the name list in sync with the emit-section-header
+;; calls below (the assert at the end of the writer checks it).
+(define +standalone/section-names+
+  '(".text" ".rodata" ".data" ".bss"
+    ".dynamic" ".rela.dyn" ".dynstr"
+    ".symtab" ".strtab" ".shstrtab"))
+
+(define +standalone/n-section-headers+
+    (+ 1 (list-length +standalone/section-names+)))
+
 ;;; Writes an ET_DYN standalone ELF executable. The section contents
 ;;; and the dynamic linking tables are emitted by
 ;;; emit-relocation-tables above.
@@ -368,9 +380,7 @@
       ;; The .shstrtab names are registered before the layout is
       ;; computed, so that its size is final.
       (let* ((shstrtab-alist	(register-shstrtab-names
-                                 '(".text" ".rodata" ".data" ".bss"
-                                   ".dynamic" ".rela.dyn" ".dynstr"
-                                   ".symtab" ".strtab" ".shstrtab")))
+                                 +standalone/section-names+))
              ;; TODO delme
              (name-offset		(lambda (name)
                                           (cdr (list-find-if (lambda (entry)
@@ -442,7 +452,7 @@
                          (paddress 'phdr-table)
                          +n-program-headers+
                          shdr-table-offset
-                         +n-section-headers+
+                         +standalone/n-section-headers+
                          +.shstrtab-section-index+)
 
 ;;;
@@ -545,6 +555,10 @@
                              size/shstrtab
                              0 0 1 0)
 
+        (assert (= (segment-length 'shdr-table)
+                   (* +standalone/n-section-headers+ +shdr-size+))
+                "the section header table does not match +standalone/section-names+")
+
         ;; pad .shstrtab so the section header table lands at its aligned
         ;; file offset; the write loop then runs back to back
         (with-current-segment '.shstrtab
@@ -579,7 +593,22 @@
     (.strtab		1)
     (.shstrtab		1)))
 
-(define +c-obj/shdr-table-size+		(* 11 +shdr-size+))
+;; The .shstrtab names double as the section inventory: the header
+;; count is one NULL entry plus one per name, so the two cannot drift
+;; apart. Keep the name list in sync with the emit-section-header
+;; calls in %c-obj-emit-section-headers (the assert in
+;; write-elf-to-stream/c-obj checks it). The section indices above
+;; must follow the same order.
+(define +c-obj/section-names+
+  '(".text" ".rodata" ".data" ".bss"
+    ".rela.text" ".rela.data" ".rela.rodata"
+    ".symtab" ".strtab" ".shstrtab"))
+
+(define +c-obj/n-section-headers+
+    (+ 1 (list-length +c-obj/section-names+)))
+
+(define +c-obj/shdr-table-size+
+    (* +c-obj/n-section-headers+ +shdr-size+))
 
 (define-function %c-obj-layout-entry (layout name)
   (list-find-if (lambda (entry)
@@ -607,10 +636,7 @@
         (set cursor (+ offset (third entry)))))))
 
 (define-function %c-obj-layout ()
-  (let ((shstrtab-alist	(register-shstrtab-names
-                          '(".text" ".rodata" ".data" ".bss"
-                            ".rela.text" ".rela.data" ".rela.rodata"
-                            ".symtab" ".strtab" ".shstrtab")))
+  (let ((shstrtab-alist	(register-shstrtab-names +c-obj/section-names+))
         (layout		())
         (pos		+ehdr-size+))
     (list-do entry +c-obj/section-layout+
@@ -710,6 +736,9 @@
          (file-position +ehdr-size+))
     (%c-obj-emit-section-headers layout shstrtab-alist)
 
+    (assert (= (segment-length 'shdr-table) +c-obj/shdr-table-size+)
+            "the section header table does not match +c-obj/section-names+")
+
     (create-segment 'elf-prefix)
     (.segment 'elf-prefix)
     (.base 0)
@@ -718,7 +747,7 @@
                      0
                      0 0
                      (second (%c-obj-layout-entry layout 'shdr-table))
-                     +n-section-headers+
+                     +c-obj/n-section-headers+
                      +c-obj/.shstrtab-section-index+)
 
     (assert (= (segment-length 'elf-prefix) +ehdr-size+))

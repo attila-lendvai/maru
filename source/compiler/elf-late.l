@@ -469,9 +469,6 @@
         (if-at-expand (= "c-obj" elf-emission-type) 0 8)
       5))
 
-(define-constant +n-section-headers+
-    (if-feature relocatable-elf 11 0))
-
 (define-constant +code-segment-address+		(if-feature relocatable-elf 0 0x00400000))
 (define-constant +code-segment-space+		0x00040000)
 
