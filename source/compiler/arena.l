@@ -1,6 +1,6 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 ;;;
-;;; A host-side arena for the target's heap.
+;;; A host-side arena for building the next stage's heap (the genesis).
 ;;;
 ;;; The arena is one host <memory-block> addressed by logical byte
 ;;; offsets. It backs a second heap env in which the target's gc.l,
@@ -20,18 +20,18 @@
 ;;; configuration
 ;;;
 
-;; The initial heap image is the region gc/initialize stamps a free
-;; chunk over. Heap growth (platform/acquire-memory) is a bump
-;; allocator above it.
-(define +arena-capacity+   (* 8 1024 1024))
-(define +arena-heap-start+ 4096)
-(define +arena-image-size+ (* 4 1024 1024))
+;; The genesis starts at the arena's heap base; gc/initialize stamps
+;; a free chunk over the region. Heap growth (platform/acquire-memory)
+;; is a bump allocator above it.
+(define +arena-capacity+    (* 8 1024 1024))
+(define +arena-heap-start+  4096)
+(define +arena-region-size+ (* 4 1024 1024))
 
 (define arena/target-64-bit? (= 64 (eval-in-slave 'target/cell-size/bits)))
 (define arena/capacity   +arena-capacity+)
 (define arena/heap-start +arena-heap-start+)
-(define arena/image-end  (+ +arena-heap-start+ +arena-image-size+))
-(define arena/cursor     arena/image-end)
+(define arena/region-end (+ +arena-heap-start+ +arena-region-size+))
+(define arena/cursor     arena/region-end)
 (define arena/cell-bytes (if arena/target-64-bit? 8 4))
 
 (define arena/block (memory-block arena/capacity))
@@ -149,7 +149,7 @@
 (define-function arena/address-of-location (name)
   (cond
     ((= name 'heap-image-start)		arena/heap-start)
-    ((= name 'heap-image-end)		arena/image-end)
+    ((= name 'heap-image-end)		arena/region-end)
     ((= name 'read-only-space-start)	0)
     ((= name 'read-only-space-end)	0)
     ((= name 'static-space-start)	0)
@@ -398,12 +398,12 @@
     (list-reverse! headers)))
 
 ;;;
-;;; the image
+;;; the genesis
 ;;;
 
-;; The used chunks of the image, in address order: everything the chain
-;; holds except the trailing free chunk.
-(define-function arena/image-chunks ()
+;; The used chunks of the genesis, in address order: everything the
+;; chain holds except the trailing free chunk.
+(define-function arena/genesis-chunks ()
   (let ((chunks ())
         (flags/used (heap-value <header>-flags/used)))
     (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
@@ -415,6 +415,6 @@
 ;; The end of the used region: the free chunk that follows the last
 ;; allocated chunk. When nothing was allocated it is the single free
 ;; chunk, i.e. the heap start.
-(define-function arena/image-limit ()
+(define-function arena/genesis-limit ()
   (arena/peek-word-at
    (arena/cell->host (eval-in-heap 'gc/allocation-cursor)) 0))

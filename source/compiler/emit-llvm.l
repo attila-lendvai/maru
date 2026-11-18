@@ -1409,7 +1409,7 @@
   ;; Emitted after read-only-space-end so it lies outside the read-only
   ;; space.
   (print (GLOBAL 'heap-image-start)
-         " = global [" (/ +heap-image-size+ (target-value target/cell-size/bytes))
+         " = global [" (/ +genesis-seed-size+ (target-value target/cell-size/bytes))
          " x %word] zeroinitializer\n")
   (print (GLOBAL 'heap-image-end) " = global [1 x i8] zeroinitializer\n"))
 

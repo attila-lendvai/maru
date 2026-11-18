@@ -116,15 +116,15 @@
 (define-form target-value (form)
   `(eval-in-target ',form))
 
-;; The size of the dummy, file-backed initial heap image. The compiler
-;; emits that many zero bytes as the heap segment; gc/initialize stamps a
-;; chunk over it at startup. A placeholder until real content is emitted.
-(define +heap-image-size+ 512)
+;; The size of the seed genesis: shapes without an arena-built heap get
+;; that many zero bytes as their heap segment, over which gc/initialize
+;; stamps a chunk at startup.
+(define +genesis-seed-size+ 512)
 
-;; The free space emitted after the pre-built static image, so the
-;; runtime has a chunk to allocate the root vector and the startup
-;; objects from before the heap grows via brk.
-(define +heap-image-slack+ (* 4 1024))
+;; The free space emitted after the genesis content, so the runtime has
+;; a chunk to allocate the root vector and the startup objects from
+;; before the heap grows via brk.
+(define +genesis-slack+ (* 4 1024))
 
 ;; The target's cell type, carried by this host image. A 32-bit host
 ;; carries a 64-bit target's words in a two-cell <u64>; a 64-bit host

@@ -563,7 +563,7 @@
 
     (if-feature relocatable-elf
         ()
-      ;; The heap image is the last loaded segment, so the program break
+      ;; The heap is the last loaded segment, so the program break
       ;; starts right after it: brk grows the heap without a gap.
       (emit-program-header elf/PT_LOAD
                            file-offset
@@ -624,19 +624,19 @@
   (list-do name '(code ro-data data genesis) ; bss segment needs no storage
     (write-segment-to-stream name stream)))
 
-(when-at-expand (defined? 'arena/image-chunks)
+(when-at-expand (defined? 'arena/genesis-chunks)
 
-  ;; Emit the arena's chunk chain into the heap segment verbatim: the
-  ;; used region is copied at a fixed offset, so a pointer word is
-  ;; emitted as the address it will have at runtime. Only the string
-  ;; labels the code references need a fixup. The runtime stamps its
-  ;; first free chunk at static-space-end.
-  (define-function emit-heap-image (-c-)
+  ;; Emit the genesis: the arena's chunk chain, into the heap segment,
+  ;; verbatim. The used region is copied at a fixed offset, so a pointer
+  ;; word is emitted as the address it will have at runtime. Only the
+  ;; string labels the code references need a fixup. The runtime stamps
+  ;; its first free chunk at static-space-end.
+  (define-function emit-genesis (-c-)
     (let* ((header-size	(heap-value size-of-<header>))
            (cell-bytes	arena/cell-bytes)
-           (chunks	(arena/image-chunks))
+           (chunks	(arena/genesis-chunks))
            (start	(current-laddress))
-           (limit	(arena/image-limit))
+           (limit	(arena/genesis-limit))
            (labels	(array (+ 1 (/ (- limit arena/heap-start)
                                      cell-bytes))))
            (index	(lambda (offset)
@@ -657,7 +657,7 @@
                (type	(arena/peek-word-at header 3))
                (literal	(array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
-            (error "emit-heap-image: chunk layout mismatch at " header))
+            (error "emit-genesis: chunk layout mismatch at " header))
           (.cell (if (cdr rest)
                      (address (car (cdr rest)))
                    (address (+ header header-size size))))
@@ -684,7 +684,7 @@
                 (incr j)))))
         (set rest (cdr rest)))
       (label! 'static-space-end)
-      (.i8/times 0 +heap-image-slack+)
+      (.i8/times 0 +genesis-slack+)
       (label! 'heap-image-end))))
 
 (define-function compile-env (env -c- output-path machine-type reloc-type glob-dat-type)
@@ -760,24 +760,24 @@
     (label! 'read-only-space-start)
     (label 'read-only-space-end)    ; a forward label defined later
 
-    ;; The heap image is emitted after the definitions are compiled: the
+    ;; The genesis is emitted after the definitions are compiled: the
     ;; string literals are allocated in the arena while compiling them.
     ;; Without the arena (or for a relocatable shape) fall back to the
-    ;; zeroed placeholder. The bounds must exist before the definitions
-    ;; can reference them.
+    ;; zeroed seed. The bounds must exist before the definitions can
+    ;; reference them.
     (with-current-segment 'genesis
       (label! 'heap-image-start)
-      (if-at-expand (and (defined? 'arena/image-chunks)
+      (if-at-expand (and (defined? 'arena/genesis-chunks)
                          (not (eval-in-slave 'feature/relocatable-elf)))
           (let ()
-            ;; the static space is defined by emit-heap-image, after the
+            ;; the static space is defined by emit-genesis, after the
             ;; definitions are compiled, but their addresses are
             ;; referenced while compiling them
             (label 'heap-image-end)
             (label 'static-space-start)
             (label 'static-space-end))
         (let ()
-          (.i8/times 0 +heap-image-size+)
+          (.i8/times 0 +genesis-seed-size+)
           (label! 'heap-image-end)
           (label! 'static-space-start)
           (label! 'static-space-end))))
@@ -803,9 +803,9 @@
 
     (if-feature relocatable-elf
         ()
-      (when-at-expand (defined? 'arena/image-chunks)
+      (when-at-expand (defined? 'arena/genesis-chunks)
         (with-current-segment 'genesis
-          (emit-heap-image -c-))))
+          (emit-genesis -c-))))
 
     (when-feature relocatable-elf
       (finalize-relocatable-emission -c- machine-type reloc-type glob-dat-type))
