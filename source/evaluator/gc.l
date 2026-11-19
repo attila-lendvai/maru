@@ -374,33 +374,31 @@
   (safety 2 (assert (= ptr (oop-at gc/roots gc/root-count)) "non-lifo root"))
   (set (oop-at gc/roots gc/root-count) ()))
 
-(define-function gc/initialize ()
+;; The image carries the heap's trailing free chunk when IMAGE? is true:
+;; validate it and anchor the allocator there. Otherwise (the arena
+;; building the next image, the stage-0 seed, the LLVM global) stamp one
+;; free chunk over the whole image.
+(define-function gc/initialize (image?)
   (debug (platform/diag-print "gc/initialize is speaking\n"))
-  ;; The initial heap is the file-backed genesis emitted by the
-  ;; compiler. A standalone image may already hold the static chunks
-  ;; (literals); in that case the sentinel at start is a free chunk and
-  ;; the free chunk after the static space is stamped here. Otherwise
-  ;; stamp one free chunk over the whole genesis.
   (let* ((start	(address-of-location 'heap-image-start))
          (end	(address-of-location 'heap-image-end))
-         (static-start (address-of-location 'static-space-start))
-         (static-end	(address-of-location 'static-space-end))
-         (size	(- end start)))
+         (free		(address-of-location 'static-space-end))
+         (header-size	size-of-<header>))
     (safety 1 (assert (gc/unsigned-< start end)))
     (safety 1 (assert (not (gc/in-read-only-space? start))))
     (set gc/memory-base start)
     (set gc/lowest-memory-address start)
-    (if (not (= static-start static-end))
+    (if image?
         (let ()
-          (set gc/allocation-cursor static-end)
-          (set (<header>-next  static-end) start)
-          (set (<header>-size  static-end) (- (- end static-end) size-of-<header>))
-          (set (<header>-flags static-end) 0)
-          (set (<header>-type  static-end) 0))
+          ;; the free chunk the image ends with closes the ring
+          (safety 1 (assert (= start (oop-at free 0))))
+          (safety 1 (assert (= (- (- end free) header-size) (oop-at free 1))))
+          (safety 1 (assert (= 0 (oop-at free 2))))
+          (set gc/allocation-cursor free))
       (let ()
         (set gc/allocation-cursor start)
         (set (<header>-next  start) start)
-        (set (<header>-size  start) (- size size-of-<header>))
+        (set (<header>-size  start) (- (- end start) header-size))
         (set (<header>-flags start) 0)
         (set (<header>-type  start) 0))))
   (gc/grow-root-vector))

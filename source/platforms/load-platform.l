@@ -33,6 +33,14 @@
                           (= target/platform "posix")
                           (= elf-emission-type "c-obj"))))
 
+;; Does the image carry the heap's own chunks (the trailing free chunk,
+;; and the root vector)? The ELF writers do. The LLVM backend still
+;; starts from a zeroed global and stage-0 emits the zeroed seed, so both
+;; stamp their first free chunk at startup.
+(eval-in-slave `(set (feature genesis)
+                     ,(and (not evolving?)
+                           (not (= *compiler-backend* "llvm")))))
+
 ;; Build and validate the host-side arena before the compiler starts.
 ;; Stage-0 still runs on the previous stage's binary, which predates
 ;; the boxed-word arithmetic. The arena is loaded in both later stages

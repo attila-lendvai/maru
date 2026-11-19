@@ -635,14 +635,15 @@
 (when-at-expand (not evolving?)
 
   ;; Emit the genesis: the arena's chunk chain, into the heap segment,
-  ;; verbatim. The used region is copied at a fixed offset, so a pointer
-  ;; word is emitted as the address it will have at runtime. Only the
-  ;; string labels the code references need a fixup. The runtime stamps
-  ;; its first free chunk at static-space-end.
+  ;; verbatim. The chain is copied at a fixed offset, so a pointer word is
+  ;; emitted as the address it will have at runtime. Only the object
+  ;; labels the code references need a fixup. The chain includes the
+  ;; trailing free chunk, clipped to the slack, which the runtime adopts
+  ;; as its initial free space.
   (define-function emit-genesis (-c-)
     (let* ((header-size	(heap-value size-of-<header>))
            (cell-bytes	arena/cell-bytes)
-           (chunks	(arena/genesis-chunks))
+           (chunks	(arena/genesis-chain))
            (start	(current-laddress))
            (limit	(arena/genesis-limit))
            (labels	(array (+ 1 (/ (- limit arena/heap-start)
@@ -683,6 +684,7 @@
         (set (array-at labels (index (car entry))) (cdr entry)))
       (list-do entry arena/code-pointers
         (set (array-at code-labels (index (car entry))) (cdr entry)))
+      (arena/clip-genesis-tail!)
       (label! 'static-space-start)
       (while rest
         (let* ((header	(car rest))
@@ -692,9 +694,10 @@
                (object-label (array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
             (error "emit-genesis: chunk layout mismatch at " header))
-          (heap-pointer (if (cdr rest)
-                            (car (cdr rest))
-                          (+ header header-size size)))
+          (unless (cdr rest)
+            (label! 'static-space-end))
+          ;; the chain itself is the source of truth for the ring
+          (heap-pointer (arena/peek-word-at header 0))
           ;; size, flags, type and the optional canary: raw words
           (let ((j 1))
             (while (< j (/ header-size cell-bytes))
@@ -728,8 +731,6 @@
         (set rest (cdr rest)))
       (assert (= code-pointers-emitted (list-length arena/code-pointers))
               "emit-genesis: a code pointer was not emitted")
-      (label! 'static-space-end)
-      (.i8/times 0 +genesis-slack+)
       (label! 'heap-image-end))))
 
 (define-function compile-env (env -c- output-path machine-type reloc-type glob-dat-type)

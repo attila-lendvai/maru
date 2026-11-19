@@ -316,7 +316,7 @@
 ;; The arena starts as a real heap: gc/initialize stamps the initial
 ;; chunk and builds the root vector. Everything compiled afterwards
 ;; allocates from it.
-(eval-in-heap '(gc/initialize))
+(eval-in-heap '(gc/initialize false))
 
 ;;;
 ;;; string literals
@@ -445,16 +445,10 @@
 ;;; the genesis
 ;;;
 
-;; The used chunks of the genesis, in address order: everything the
-;; chain holds except the trailing free chunk.
-(define-function arena/genesis-chunks ()
-  (let ((chunks ())
-        (flags/used (heap-value <header>-flags/used)))
-    (list-do header (arena/chain-headers (eval-in-heap 'gc/memory-base))
-      (unless (zero? (bitwise-and flags/used
-                                  (arena/peek-word-at header 2)))
-        (push chunks header)))
-    (list-reverse! chunks)))
+;; Every chunk of the genesis, in address order: the used chunks and the
+;; trailing free chunk the image ends with.
+(define-function arena/genesis-chain ()
+  (arena/chain-headers (eval-in-heap 'gc/memory-base)))
 
 ;; The end of the used region: the free chunk that follows the last
 ;; allocated chunk. When nothing was allocated it is the single free
@@ -462,3 +456,11 @@
 (define-function arena/genesis-limit ()
   (arena/peek-word-at
    (arena/cell->host (eval-in-heap 'gc/allocation-cursor)) 0))
+
+;; The image ships one free chunk: the arena's trailing chunk, clipped to
+;; the slack. The emitter copies it with the rest of the chain, so the
+;; runtime adopts it instead of stamping one.
+(define-function arena/clip-genesis-tail! ()
+  (let ((size (- +genesis-slack+ (heap-value size-of-<header>))))
+    (assert (< 0 size) "arena: the slack does not hold a free chunk header")
+    (arena/write-long (+ (arena/genesis-limit) arena/cell-bytes) size)))

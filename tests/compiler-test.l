@@ -231,9 +231,13 @@
 (define-constant +genesis/target-function-type-id+
   (<type>-slave-id <target-function>))
 
+;; The header size in bytes, canary slot included.
+(define-constant +genesis/header-bytes+
+  (* (if-at-expand (feature object-canary) 5 4) target/cell-size/bytes))
+
 ;; The heap image holds pointers that the assembler bakes (ET_EXEC) or
 ;; the loader relocates (c-obj, standalone). Walk its chunk chain up to
-;; the free chunk the runtime stamps: every link must stay inside the
+;; the free chunk the image ends with: every link must stay inside the
 ;; image, and every chunk must have one of the types the arena emits.
 ;; A zero first link means the image carries no genesis content (the
 ;; LLVM backend's heap is a zeroed global, stage-0 emits the seed).
@@ -259,7 +263,17 @@
             (set ok false))))
       (if empty?
           true
-        (and ok (< 0 count) (= chunk static-end))))
+        (and ok
+             (< 0 count)
+             (= chunk static-end)
+             ;; the trailing free chunk closes the ring and its payload
+             ;; reaches heap-image-end
+             (= first (oop-at static-end 0))
+             (= 0 (oop-at static-end 2))
+             (< 0 (oop-at static-end 1))
+             (= (address-of-location 'heap-image-end)
+                (+ static-end
+                   (+ +genesis/header-bytes+ (oop-at static-end 1)))))))
   true)
 
 (define-test compile/address-of/2

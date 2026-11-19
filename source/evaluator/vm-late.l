@@ -101,7 +101,7 @@
       (or (string? lit-str)			(fatal "string? for a literal <string> is broken"))
       (or (= 16 (string-length lit-str))	(fatal "string-length broken for a literal <string>"))))
 
-  (gc/initialize)
+  (gc/initialize (if-at-expand (feature genesis) true false))
 
   (safety 4 (set gc/allocations-until-gc 1))
   (debug (platform/diag-print "gc initialized\n"))
