@@ -42,7 +42,7 @@
        (profiler?	(feature profiler)))
   (if-at-expand (not evolving?)
       (define-function emit-object/<target-function> (name entry-label -c-)
-        (arena/target-function name entry-label
+        (genesis/target-function name entry-label
                                (if name (label name) (label))))
     (define-function emit-object/<target-function> (name entry-label -c-)
       ;; TODO into data or ro-data? ideally, all literals should go into
@@ -102,7 +102,7 @@
       (counter 0))
   (define-method compile-object <string> (-c-)
     (if-at-expand (not evolving?)
-        (GLOBAL-ADDR (label (<arena-literal>-label (arena/string-literal self))))
+        (GLOBAL-ADDR (label (<genesis-literal>-label (genesis/string-literal self))))
       (let ()
         (emit-comment 3 "emitting string object: "self)
         ;; NOTE self here is a host string object, i.e. it's not according to the slave layout

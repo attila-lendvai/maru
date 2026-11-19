@@ -571,7 +571,7 @@
 (define-vm-function long->lower-cell ((value <long>))
   (box <lower-cell> value))
 
-;;; Target-typed cell accessors for the bootstrap arena. They preserve
+;;; Target-typed cell accessors for the genesis builder. They preserve
 ;;; the target cell width: <u64>-lo/-hi box into <u32>, u32->u64
 ;;; widens. The implementation is suppressed (empty impl name) because
 ;;; these names follow the generated accessor convention.

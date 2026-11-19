@@ -116,7 +116,7 @@
 (define-form target-value (form)
   `(eval-in-target ',form))
 
-;; The size of the seed genesis: shapes without an arena-built heap get
+;; The size of the seed genesis: shapes without a genesis builder get
 ;; that many zero bytes as their heap segment, over which gc/initialize
 ;; stamps a chunk at startup.
 (define +genesis-seed-size+ 512)

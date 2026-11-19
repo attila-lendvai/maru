@@ -634,27 +634,27 @@
 
 (when-at-expand (not evolving?)
 
-  ;; Emit the genesis: the arena's chunk chain, into the heap segment,
+  ;; Emit the genesis: the genesis's chunk chain, into the heap segment,
   ;; verbatim. The chain is copied at a fixed offset, so a pointer word is
   ;; emitted as the address it will have at runtime. Only the object
   ;; labels the code references need a fixup. The chain includes the
   ;; trailing free chunk, clipped to the slack, which the runtime adopts
   ;; as its initial free space.
   (define-function emit-genesis (-c-)
-    (let* ((header-size	(heap-value size-of-<header>))
-           (cell-bytes	arena/cell-bytes)
-           (chunks	(arena/genesis-chain))
+    (let* ((header-size	(genesis-value size-of-<header>))
+           (cell-bytes	genesis/cell-bytes)
+           (chunks	(genesis/chain))
            (start	(current-laddress))
-           (limit	(arena/genesis-limit))
-           (labels	(array (+ 1 (/ (- limit arena/heap-start)
+           (limit	(genesis/limit))
+           (labels	(array (+ 1 (/ (- limit genesis/heap-start)
                                      cell-bytes))))
-           (code-labels	(array (+ 1 (/ (- limit arena/heap-start)
+           (code-labels	(array (+ 1 (/ (- limit genesis/heap-start)
                                            cell-bytes))))
            (code-pointers-emitted 0)
            (index	(lambda (offset)
-                          (/ (- offset arena/heap-start) cell-bytes)))
+                          (/ (- offset genesis/heap-start) cell-bytes)))
            (address	(lambda (offset)
-                          (+ start (- offset arena/heap-start))))
+                          (+ start (- offset genesis/heap-start))))
            ;; Emit a cell holding the runtime address of a label. ET_EXEC
            ;; bakes the link-time address; the relocatable shapes emit a
            ;; hole, and the serializers add the target label's address
@@ -669,9 +669,9 @@
                                                     'abs32 ())))))
            (heap-label	(label 'heap-image-start))
            ;; a heap pointer carries its genesis offset
-           (heap-pointer	(lambda (arena-offset)
+           (heap-pointer	(lambda (genesis-offset)
                                   (pointer heap-label
-                                           (- arena-offset arena/heap-start))))
+                                           (- genesis-offset genesis/heap-start))))
            ;; a code pointer names a text label; no offset applies
            (code-pointer	(lambda (label)
                                   (assert (resolved-label? label)
@@ -679,29 +679,29 @@
                                           (<label>-%name label))
                                   (pointer label 0)))
            (rest		chunks)
-           (flags/opaque (eval-in-heap '<header>-flags/opaque)))
-      (list-do entry arena/labels
+           (flags/opaque (eval-in-genesis '<header>-flags/opaque)))
+      (list-do entry genesis/labels
         (set (array-at labels (index (car entry))) (cdr entry)))
-      (list-do entry arena/code-pointers
+      (list-do entry genesis/code-pointers
         (set (array-at code-labels (index (car entry))) (cdr entry)))
-      (arena/clip-genesis-tail!)
+      (genesis/clip-tail!)
       (label! 'static-space-start)
       (while rest
         (let* ((header	(car rest))
                (payload	(+ header header-size))
-               (size	(arena/peek-word-at header 1))
-               (flags	(arena/peek-word-at header 2))
+               (size	(genesis/peek-word-at header 1))
+               (flags	(genesis/peek-word-at header 2))
                (object-label (array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
             (error "emit-genesis: chunk layout mismatch at " header))
           (unless (cdr rest)
             (label! 'static-space-end))
           ;; the chain itself is the source of truth for the ring
-          (heap-pointer (arena/peek-word-at header 0))
+          (heap-pointer (genesis/peek-word-at header 0))
           ;; size, flags, type and the optional canary: raw words
           (let ((j 1))
             (while (< j (/ header-size cell-bytes))
-              (.cell (arena/peek-word-at header j))
+              (.cell (genesis/peek-word-at header j))
               (incr j)))
           (when object-label
             (label! object-label))
@@ -709,7 +709,7 @@
               (let ((cells	(/ size cell-bytes))
                     (j		0))
                 (while (< j cells)
-                  (let* ((word	(arena/peek-word-at payload j))
+                  (let* ((word	(genesis/peek-word-at payload j))
                          (code-label (array-at code-labels
                                                (index (+ payload
                                                          (* j cell-bytes))))))
@@ -717,7 +717,7 @@
                         (let ()
                           (code-pointer code-label)
                           (incr code-pointers-emitted))
-                      (if (and (<= arena/heap-start word)
+                      (if (and (<= genesis/heap-start word)
                                (< word limit)
                                (= 0 (bitwise-and word
                                                  (- cell-bytes 1))))
@@ -726,10 +726,10 @@
                   (incr j)))
             (let ((j 0))
               (while (< j size)
-                (.u8 (arena/load-u8 (+ payload j)))
+                (.u8 (genesis/load-u8 (+ payload j)))
                 (incr j)))))
         (set rest (cdr rest)))
-      (assert (= code-pointers-emitted (list-length arena/code-pointers))
+      (assert (= code-pointers-emitted (list-length genesis/code-pointers))
               "emit-genesis: a code pointer was not emitted")
       (label! 'heap-image-end))))
 
@@ -807,10 +807,10 @@
     (label 'read-only-space-end)    ; a forward label defined later
 
     ;; The genesis is emitted after the definitions are compiled: the
-    ;; string literals are allocated in the arena while compiling them.
-    ;; Without the arena, or for a shape whose runtime has no genesis,
-    ;; fall back to the zeroed seed. The bounds must exist before the
-    ;; definitions can reference them.
+    ;; string literals are allocated in the genesis while compiling them.
+    ;; Without the genesis builder, or for a shape whose runtime has no
+    ;; genesis, fall back to the zeroed seed. The bounds must exist before
+    ;; the definitions can reference them.
     (with-current-segment 'genesis
       (label! 'heap-image-start)
       (if-at-expand (not evolving?)

@@ -295,7 +295,7 @@
          (total-size (+ requested-size size-of-<header>))
          (result ()))
     ;; NOTE no (return): a return is a compiled goto, unavailable to the
-    ;; interpreted arena. the result variable drives both loops.
+    ;; interpreted genesis env. the result variable drives both loops.
     (while (not result)
       (while
         (let ()
@@ -375,9 +375,9 @@
   (set (oop-at gc/roots gc/root-count) ()))
 
 ;; The image carries the heap's trailing free chunk when IMAGE? is true:
-;; validate it and anchor the allocator there. Otherwise (the arena
-;; building the next image, the stage-0 seed, the LLVM global) stamp one
-;; free chunk over the whole image.
+;; validate it and anchor the allocator there. Otherwise (the genesis
+;; builder, the stage-0 seed, the LLVM global) stamp one free chunk over
+;; the whole image.
 (define-function gc/initialize (image?)
   (debug (platform/diag-print "gc/initialize is speaking\n"))
   (let* ((start	(address-of-location 'heap-image-start))

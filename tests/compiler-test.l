@@ -223,9 +223,9 @@
       (oop-at (address-of x) 0))
   42)
 
-;; The genesis holds the arena's objects only: <string> literals, their
-;; opaque <data> bodies, and <target-function> objects. These are the
-;; ids the target's constructors stamp into the headers.
+;; The genesis holds only the objects the builder creates: <string>
+;; literals, their opaque <data> bodies, and <target-function> objects.
+;; These are the ids the target's constructors stamp into the headers.
 (define-constant +genesis/data-type-id+		(<type>-slave-id <data>))
 (define-constant +genesis/string-type-id+	(<type>-slave-id <string>))
 (define-constant +genesis/target-function-type-id+
@@ -238,7 +238,7 @@
 ;; The heap image holds pointers that the assembler bakes (ET_EXEC) or
 ;; the loader relocates (c-obj, standalone). Walk its chunk chain up to
 ;; the free chunk the image ends with: every link must stay inside the
-;; image, and every chunk must have one of the types the arena emits.
+;; image, and every chunk must have one of the types the builder emits.
 ;; A zero first link means the image carries no genesis content (the
 ;; LLVM backend's heap is a zeroed global, stage-0 emits the seed).
 (define-test compile/genesis/1
@@ -267,7 +267,7 @@
              (< 0 count)
              (= chunk static-end)
              ;; the first chunk is the root vector: <data>, used and
-             ;; opaque, one word per root (the arena starts with 32)
+             ;; opaque, one word per root (the builder starts with 32)
              (= +genesis/data-type-id+ (oop-at first 3))
              (= 3 (oop-at first 2))
              (= (* 32 target/cell-size/bytes) (oop-at first 1))

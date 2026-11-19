@@ -4,8 +4,9 @@
 ;;;
 
 ;;; The caller loads gc.l and types.l; this file only defines the
-;;; constructors, so a caller can pick the type layer (e.g. the arena
-;;; inherits the target's from the slave env instead of reloading it).
+;;; constructors, so a caller can pick the type layer (e.g. the genesis
+;;; builder inherits the target's from the slave env instead of
+;;; reloading it).
 
 ;;;
 ;;; object instantiation
@@ -13,7 +14,7 @@
 
 ;; TODO introduce type kinds (a type-of-type) so that properties like
 ;; opacity can be annotated on the type itself; then make/opaque can be
-;; folded into make. the arena work may remove these call sites first.
+;; folded into make. the genesis work may remove these call sites first.
 (define-form make/opaque (type-name . inits)
   (let ((type (eval type-name)))
     `(gc/let* ((self (allocate-object/opaque/heap ,(<type>-slave-id type)

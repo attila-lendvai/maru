@@ -41,12 +41,12 @@
                      ,(and (not evolving?)
                            (not (= *compiler-backend* "llvm")))))
 
-;; Build and validate the host-side arena before the compiler starts.
+;; Build and validate the host-side genesis before the compiler starts.
 ;; Stage-0 still runs on the previous stage's binary, which predates
-;; the boxed-word arithmetic. The arena is loaded in both later stages
-;; so that its type registration is identical there.
+;; the boxed-word arithmetic. The genesis builder is loaded in both
+;; later stages so that its type registration is identical there.
 (unless evolving?
-  (load "source/compiler/arena.l"))
+  (load "source/compiler/genesis.l"))
 
 ;; The normalized target/arch values each backend can emit for. A new
 ;; arch in setup-target.l must be paired with the backends implementing

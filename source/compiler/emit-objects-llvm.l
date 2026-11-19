@@ -80,7 +80,7 @@
   (define-method compile-object <string> (-c-)
     ;; NOTE self here is a host string object, i.e. it's not according to the slave layout
     (when-at-expand (not evolving?)
-      (arena/string-literal self))
+      (genesis/string-literal self))
     (let ((elements	(emit-object/C-string self -c-))
           (object-label	(GLOBAL (unique-name "ostr")))
           (size		(compile-object (string-length self) -c-)))
