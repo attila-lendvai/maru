@@ -15,6 +15,53 @@ PREVIOUS_STAGE="maru.10"
 BUILD="build"
 HOST_DIR="$BUILD/$PREVIOUS_STAGE"
 
+# Only one build per tree at a time: the build artifacts, the forked
+# eval0 checkout and the generated grammars are shared mutable state.
+# The lock is a directory holding the owner's pid; a dead pid is
+# reclaimed. `./build.sh unlock` removes it by hand.
+LOCK="$BUILD/.build.lock"
+
+release_lock() {
+    rm -rf "$LOCK"
+}
+
+acquire_lock() {
+    mkdir -p "$BUILD"
+    while ! mkdir "$LOCK" 2>/dev/null; do
+        pid=$(cat "$LOCK/pid" 2>/dev/null || true)
+        # a holder may not have written its pid yet
+        if [ -z "$pid" ]; then
+            sleep 1
+            pid=$(cat "$LOCK/pid" 2>/dev/null || true)
+        fi
+        if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+            echo "build.sh: reclaiming a stale lock (${pid:-no pid})"
+            rm -rf "$LOCK"
+            continue
+        fi
+        echo "build.sh: waiting for the build lock (pid $pid)"
+        sleep 1
+    done
+    echo $$ > "$LOCK/pid"
+}
+
+case "${1:-}" in
+    unlock)
+        rm -rf "$LOCK"
+        echo "build.sh: lock released"
+        exit 0
+        ;;
+    # a REPL session keeps the tree open for as long as the user wants,
+    # so it cannot hold the lock
+    repl)
+        ;;
+    *)
+        acquire_lock
+        trap release_lock EXIT
+        trap 'release_lock; exit 130' INT TERM
+        ;;
+esac
+
 # For running foreign-arch target binaries under qemu-user
 # (binfmt_misc):
 #
@@ -73,4 +120,4 @@ ensure_host_binary
 
 echo "Calling build.l"
 
-exec "$HOST_DIR/eval" boot.l build.l "$@"
+"$HOST_DIR/eval" boot.l build.l "$@"
