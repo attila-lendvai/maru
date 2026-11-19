@@ -473,7 +473,16 @@
 (define-constant +code-segment-space+		0x00040000)
 
 (define-constant +ro-data-segment-address+	(+ +code-segment-address+	+code-segment-space+))
-(define-constant +ro-data-segment-space+	0x00020000)
+;; The standalone image keeps its dynamic linking tables in this
+;; segment, and .rela.dyn grows with every absolute cell in the image
+;; (the evaluator needs ~0x23000 today). The reserve is address space
+;; only: the LOAD maps its actual size, the gap to the next segment
+;; stays unmapped, and the file size is unchanged.
+;;
+;; It cannot grow much further as long as the arm backend materializes
+;; label addresses with ADR: that reaches +/-1MB, and the data, bss and
+;; genesis labels must stay within it from the code.
+(define-constant +ro-data-segment-space+	0x00040000)
 
 (define-constant +data-segment-address+		(+ +ro-data-segment-address+	+ro-data-segment-space+))
 (define-constant +data-segment-space+		0x00020000)
