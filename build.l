@@ -612,16 +612,24 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 ;;; Compile Maru
 ;;;
 
+;; An artifact without its input record cannot be trusted: the emission
+;; shapes write different output paths, so an eval1 left by a c-obj
+;; build has no eval1.vars for the standalone build to compare against.
+(define-function has-dependency-files? (abs-output-path)
+  (and (file-exists? (concat-string abs-output-path ".dep"))
+       (file-exists? (concat-string abs-output-path ".vars"))))
+
 (define-function run-maru-compiler (host-dir host-eval slave-dir backend
                                              platform source output-path evolving?)
 
   (when (let ((abs-output-path (concat-strings slave-dir "/" output-path)))
-          (needs-recompile? abs-output-path
-                            (concat-list
-                             (load-deps-for abs-output-path)
-                             ;; FIXME why do i need to add this here?
-                             (list source))
-                            (load-vars-for abs-output-path)))
+          (or (not (has-dependency-files? abs-output-path))
+              (needs-recompile? abs-output-path
+                                (concat-list
+                                 (load-deps-for abs-output-path)
+                                 ;; FIXME why do i need to add this here?
+                                 (list source))
+                                (load-vars-for abs-output-path))))
 
     (save-dep-vars output-path *input-variables-for-build*)
 
