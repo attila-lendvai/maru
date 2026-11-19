@@ -631,56 +631,69 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                                  (list source))
                                 (load-vars-for abs-output-path))))
 
-    (save-dep-vars output-path *input-variables-for-build*)
+    (let* ((abs-output-path	(concat-strings slave-dir "/" output-path))
+           (abs-part-path	(concat-strings abs-output-path ".part"))
+           (abs-part-dep-path	(concat-strings abs-part-path ".dep"))
+           (part-path		(concat-strings output-path ".part")))
+      ;; The compiler writes a scratch path: a failure must leave the
+      ;; previous artifact and its record untouched, instead of
+      ;; truncating them.
+      ($ "rm -f '"abs-part-path"' '"abs-part-dep-path"'")
 
-    (run-with-stage
-     host-dir host-eval
-     (list-remove
-      ()
-      (concat-lists
-       (list "-O" "-v")
-       (when profiler
-         (list "-p"))
-       ;; --define some globals
-       (apply
-        concat-lists
-        (map (lambda (el)
-               (list "--define"
-                     (symbol->string (first el))
-                     (or (second el) "")))
-             `((*host-directory*	,host-dir)
-               (*slave-directory*	,slave-dir)
-               (*compiler-backend*	,(<backend>-name backend))
-               (target/arch		,target/arch)
-               (target/vendor		,target/vendor)
-               (target/os		,target/os)
-               (target/abi		,target/abi)
-               (target/platform		,(<platform>-name platform))
-               (feature/profiler/build	,(to-string profiler))
-               (+ld.so-path+		,(effective-ld.so))
-               (elf-emission-type	,(elf-emission-type/effective platform))
-               )))
-       ;; files to load
-       `("source/bootstrapping/prepare.l"
-         ;; cwd: host dir
-         "boot.l"
-         ;; cwd: slave dir
-         ,(concat-string slave-dir "/source/bootstrapping/host-ready.l")
-         ;; env: host
-         ,(when evolving? "source/bootstrapping/host-extras.l")
-         "source/bootstrapping/early.l"
-         ;; env: slave
-         "boot.l"
-         ,(when evolving? "source/bootstrapping/slave-extras.l")
-         "source/bootstrapping/late.l"
-         ;; env: host
-         "source/platforms/load-platform.l"
-         ;; env: target
-         ,source
-         "source/platforms/run-compiler.l"
-         ,output-path
-         ))))
-    true))
+      (run-with-stage
+       host-dir host-eval
+       (list-remove
+        ()
+        (concat-lists
+         (list "-O" "-v")
+         (when profiler
+           (list "-p"))
+         ;; --define some globals
+         (apply
+          concat-lists
+          (map (lambda (el)
+                 (list "--define"
+                       (symbol->string (first el))
+                       (or (second el) "")))
+               `((*host-directory*	,host-dir)
+                 (*slave-directory*	,slave-dir)
+                 (*compiler-backend*	,(<backend>-name backend))
+                 (target/arch		,target/arch)
+                 (target/vendor		,target/vendor)
+                 (target/os		,target/os)
+                 (target/abi		,target/abi)
+                 (target/platform		,(<platform>-name platform))
+                 (feature/profiler/build	,(to-string profiler))
+                 (+ld.so-path+		,(effective-ld.so))
+                 (elf-emission-type	,(elf-emission-type/effective platform))
+                 )))
+         ;; files to load
+         `("source/bootstrapping/prepare.l"
+           ;; cwd: host dir
+           "boot.l"
+           ;; cwd: slave dir
+           ,(concat-string slave-dir "/source/bootstrapping/host-ready.l")
+           ;; env: host
+           ,(when evolving? "source/bootstrapping/host-extras.l")
+           "source/bootstrapping/early.l"
+           ;; env: slave
+           "boot.l"
+           ,(when evolving? "source/bootstrapping/slave-extras.l")
+           "source/bootstrapping/late.l"
+           ;; env: host
+           "source/platforms/load-platform.l"
+           ;; env: target
+           ,source
+           "source/platforms/run-compiler.l"
+           ,part-path
+           ))))
+
+      ($ "mv '"abs-part-path"' '"abs-output-path"'")
+      ($ "mv '"abs-part-dep-path"' '"abs-output-path".dep'")
+      ;; recorded last, so the record never describes a build that did
+      ;; not happen
+      (save-dep-vars output-path *input-variables-for-build*)
+      true)))
 
 (define-function %compile-maru (backend platform host-dir host-eval slave-dir
                                         input-file output-name evolving?)
@@ -778,7 +791,9 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
         (strip-binary slave-dir unstripped-path binary))
     (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
                                  input-file output-name evolving?)))
-      ($ "cd '"slave-dir"' && chmod +x " output)
+      ;; set the exec bit only when the published file lacks it, so a
+      ;; no-op run does not touch the artifact
+      ($ "cd '"slave-dir"' && test -x " output " || chmod +x " output)
       output)))
 
 (define-multimethod compile-maru ((<x86> backend) platform
