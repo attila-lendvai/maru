@@ -633,15 +633,16 @@
 ;; calls in %c-obj-emit-section-headers (the assert in
 ;; write-elf-to-stream/c-obj checks it). The section indices above
 ;; must follow the same order.
-;; The heap is named .ldata.heap so that the default linker script's
-;; large-data output section picks it up. That section follows .bss and
-;; is the last allocatable data section, so the heap lands outside
-;; [read-only-space-start, read-only-space-end) and runtime heap growth
-;; follows it. A script without .ldata would orphan it next to .data;
-;; gc/initialize's read-only assert catches that once the image lands.
+;; The heap is named .bss.heap so that the default linker script's .bss
+;; rule puts it into the .bss output section, right after our own .bss
+;; input, where read-only-space-end is emitted. The heap image therefore
+;; follows the image's read-only part, and runtime heap growth follows
+;; it. The x86-64 large-data sections are not available everywhere:
+;; aarch64's script has no .ldata output section, and would orphan the
+;; heap next to .data, i.e. before .bss.
 ;; The section content is emitted from the assembler's genesis segment.
 (define +c-obj/section-names+
-  '(".text" ".rodata" ".data" ".bss" ".ldata.heap"
+  '(".text" ".rodata" ".data" ".bss" ".bss.heap"
     ".rela.text" ".rela.data" ".rela.rodata" ".rela.heap"
     ".symtab" ".strtab" ".shstrtab"))
 
@@ -727,7 +728,7 @@
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          0 (second (%c-obj-layout-entry layout 'data)) (segment-length 'bss)
                          0 0 16 0)
-    (emit-section-header (name-offset ".ldata.heap")
+    (emit-section-header (name-offset ".bss.heap")
                          elf/SHT_PROGBITS
                          (+ elf/SHF_ALLOC elf/SHF_WRITE)
                          0 (second (%c-obj-layout-entry layout 'genesis)) (third (%c-obj-layout-entry layout 'genesis))
