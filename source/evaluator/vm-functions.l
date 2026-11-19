@@ -579,15 +579,20 @@
 (define-vm-function (u32->u64 ()) ((value _))
   (%u32->u64 value))
 
+;; NOTE the mask is computed by %U32-MASK instead of being written as
+;; the literal 0xffffffff: a 32-bit host reads that literal as -1, so
+;; the emitted code would differ from a 64-bit host's and break the
+;; bootstrap's fixed point. BITWISE-SHIFT expands against the target's
+;; cell size, so %U32-MASK is identical on every host.
 (define-vm-function (<u64>-lo ()) ((value _))
   (if-at-expand (single-cell-boxed-type? <u64>)
-      (box <u32> (bitwise-and (unbox <u64> value) 0xffffffff))
+      (box <u32> (bitwise-and (unbox <u64> value) (%u32-mask)))
     (box <u32> (oop-at value 0))))
 
 (define-vm-function (<u64>-hi ()) ((value _))
   (if-at-expand (single-cell-boxed-type? <u64>)
       (box <u32> (bitwise-and (arithmethic-shift-right (unbox <u64> value) 32)
-                              0xffffffff))
+                              (%u32-mask)))
     (box <u32> (oop-at value 1))))
 
 ;; (define-vm-function (copy-oops ()) (from to (wordcount <long>))
