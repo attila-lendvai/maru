@@ -184,27 +184,34 @@
     (debug-log output-path"\n  .vars dependencies: "vars)
     vars))
 
+;; Do the build variables recorded next to an artifact match this build?
+;; A variable that this build does not define at all is accepted (a CLI
+;; key may be gone); a defined one is compared by value, even when that
+;; value is false, so a build can switch back to a falsy value.
+(define-function %variables-match? (vars)
+  (let ((result true))
+    (while (and result
+                (let ((entry (pop vars)))
+                  (when entry
+                    (let ((var		(pop entry))
+                          (expected-value	(pop entry)))
+                      (when (and (defined? var *globals*)
+                                 (not (= (variable-value *globals* var)
+                                         expected-value)))
+                        (debug-log "variable mismatch: "var
+                                   ", expected "expected-value
+                                   ", actual "(variable-value *globals* var))
+                        (set result false))
+                      true)))))
+    result))
+
 (define-function needs-recompile? (output-path . rest)
   (let ((deps (pop rest))
         (vars (pop rest)))
     (when deps
       (set deps (ensure-list deps)))
     (debug-log "needs-recompile?" output-path deps vars)
-    (or (let ((result false))
-          (while (and (not result)
-                      (let ((entry (pop vars)))
-                        (when entry
-                          (let* ((var (pop entry))
-                                 (expected-value (pop entry))
-                                 ;; accept as good when var is missing from deps (?)
-                                 (actual-value (or (maybe-variable-value *globals* var)
-                                                   expected-value)))
-                            (unless (= actual-value
-                                       expected-value)
-                              (debug-log "yes, due to variable "var", expected "expected-value", actual "actual-value)
-                              (set result true))
-                            true)))))
-          result)
+    (or (not (%variables-match? vars))
         (when (not (file-exists? output-path))
           (debug-log "yes, output file is missing")
           true)
