@@ -74,8 +74,8 @@
   (if arena/target-64-bit?
       (if-at-expand (= 64 lower/cell-size/bits)
           (u64-at arena/block offset)
-        (make-u64 (u32-at arena/block offset)
-                  (u32-at arena/block (+ offset 4))))
+        (make-u64 (arena/load-u32 offset)
+                  (arena/load-u32 (+ offset 4))))
     (u32-at arena/block offset)))
 
 (define-function arena/write-cell (offset cell)
