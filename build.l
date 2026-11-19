@@ -772,29 +772,43 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
                            ())))
        (maru-C-files backend platform)))
 
+;; The last artifact of the c-obj path is not a compiler output with a
+;; record of its own, so a build in another emission shape can leave a
+;; binary at the same path that this one would keep. Such an artifact
+;; is stamped with the inputs it was built from; drop it when they no
+;; longer match.
+(define-function %final-artifact-stale? (abs-binary)
+  (let ((vars (load-vars-for abs-binary)))
+    (and vars (not (%variables-match? vars)))))
+
 (define-function %compile-maru/elf (backend platform host-dir host-eval
                                     slave-dir input-file output-name evolving?)
-  (if (= "c-obj" (elf-emission-type/effective platform))
-      ;; emits the relocatable object (the output name gains a .o
-      ;; suffix), links it with the platform's C support objects into
-      ;; an executable binary, which is then stripped.
-      (let* ((object (%compile-maru backend platform host-dir host-eval slave-dir
-                                    input-file
-                                    (concat-string output-name ".o")
-                                    evolving?))
-             (cflags (cflags-for backend platform))
-             (obj-files (%compile-c-objects backend platform cflags))
-             (unstripped-path (build-output backend platform
-                                            (concat-string output-name ".unstripped")))
-             (binary (build-output backend platform output-name)))
-        (compile-C-file cflags object unstripped-path obj-files)
-        (strip-binary slave-dir unstripped-path binary))
-    (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
-                                 input-file output-name evolving?)))
-      ;; set the exec bit only when the published file lacks it, so a
-      ;; no-op run does not touch the artifact
-      ($ "cd '"slave-dir"' && test -x " output " || chmod +x " output)
-      output)))
+  (let ((binary (build-output backend platform output-name)))
+    (when (%final-artifact-stale? (concat-strings slave-dir "/" binary))
+      ($ "cd '"slave-dir"' && rm -f '"binary"'"))
+
+    (if (= "c-obj" (elf-emission-type/effective platform))
+        ;; emits the relocatable object (the output name gains a .o
+        ;; suffix), links it with the platform's C support objects into
+        ;; an executable binary, which is then stripped.
+        (let* ((object (%compile-maru backend platform host-dir host-eval slave-dir
+                                      input-file
+                                      (concat-string output-name ".o")
+                                      evolving?))
+               (cflags (cflags-for backend platform))
+               (obj-files (%compile-c-objects backend platform cflags))
+               (unstripped-path (build-output backend platform
+                                              (concat-string output-name ".unstripped"))))
+          (compile-C-file cflags object unstripped-path obj-files)
+          (strip-binary slave-dir unstripped-path binary)
+          (save-dep-vars binary *input-variables-for-build*)
+          binary)
+      (let ((output (%compile-maru backend platform host-dir host-eval slave-dir
+                                   input-file output-name evolving?)))
+        ;; set the exec bit only when the published file lacks it, so a
+        ;; no-op run does not touch the artifact
+        ($ "cd '"slave-dir"' && test -x " output " || chmod +x " output)
+        output))))
 
 (define-multimethod compile-maru ((<x86> backend) platform
                                   host-dir host-eval
