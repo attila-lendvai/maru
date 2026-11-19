@@ -248,9 +248,14 @@
   (let ((result ()))
     (list-do var variables
       (push result (list var (variable-value *globals* var))))
-    (with-open-stream (stream (concat-string output-file ".vars") "w")
-      (dump-all  stream result)
-      (print-all stream "\n"))))
+    (let* ((path	(concat-string output-file ".vars"))
+           (part	(concat-string path ".part")))
+      (with-open-stream (stream part "w")
+        (dump-all  stream result)
+        (print-all stream "\n"))
+      ;; keep the recorded file, and its mtime, when nothing changed
+      ($ "cmp -s '"part"' '"path"' || mv '"part"' '"path"'")
+      ($ "rm -f '"part"'"))))
 
 ;;;
 ;;; backends and platforms
