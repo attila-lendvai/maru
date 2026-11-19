@@ -103,8 +103,19 @@ summary_file="${GITHUB_STEP_SUMMARY:-/dev/null}"
 printf '### CI matrix\n\n| Step | Result | Time |\n|:-----|:-------|-----:|\n' \
     >> "$summary_file"
 
+# step [--note <text>] <build.sh args...>
+#
+# The optional note documents state that the command line does not
+# show, e.g. a patched boot.l.
 step() {
+    local note=
+    if [ "${1:-}" = --note ]; then
+	note=$2
+	shift 2
+    fi
+
     local name="./build.sh $*"
+    if [ -n "$note" ]; then name="$name [$note]"; fi
     local start=$SECONDS
     local status
     local result=ok
@@ -177,8 +188,8 @@ native_x86_64() {
     # clobber the index behind the .git symlink.
     cp boot.l boot.l.orig
     sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
-    step bootstrap llvm linux
-    step bootstrap x86 linux
+    step --note 'boot.l: *safety*=3' bootstrap llvm linux
+    step --note 'boot.l: *safety*=3' bootstrap x86 linux
     mv boot.l.orig boot.l
 }
 
