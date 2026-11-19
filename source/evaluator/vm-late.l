@@ -102,6 +102,13 @@
       (or (= 16 (string-length lit-str))	(fatal "string-length broken for a literal <string>"))))
 
   (gc/initialize (if-at-expand (feature genesis) true false))
+  (if-at-expand (feature genesis)
+      (let ()
+        ;; the root vector is the first heap chunk, shipped in the image
+        (set gc/roots (+ (address-of-location 'heap-image-start)
+                         size-of-<header>))
+        (set gc/root-max (bytes-to-words (<header>-size (gc/header-of gc/roots)))))
+    (gc/grow-root-vector))
 
   (safety 4 (set gc/allocations-until-gc 1))
   (debug (platform/diag-print "gc initialized\n"))

@@ -263,11 +263,9 @@
 (arena/load-target-file "source/evaluator/gc.l")
 
 ;; No collection runs in the arena, so the root bookkeeping is inert.
-;; gc/let* still pushes and pops; address-of above returns 0. Nothing
-;; reads the root vector, so gc/initialize does not allocate it either.
+;; gc/let* still pushes and pops; address-of above returns 0.
 (define-in-heap 'gc/push-root		arena/noop-function)
 (define-in-heap 'gc/pop-root		arena/noop-function)
-(define-in-heap 'gc/grow-root-vector	arena/noop-function)
 
 (arena/load-target-file "source/evaluator/types.l")
 
@@ -314,9 +312,14 @@
 (arena/load-target-file "source/evaluator/constructors.l")
 
 ;; The arena starts as a real heap: gc/initialize stamps the initial
-;; chunk and builds the root vector. Everything compiled afterwards
+;; chunk, and the root vector is the first allocation in it, so the
+;; runtime can adopt it from the image. Everything compiled afterwards
 ;; allocates from it.
 (eval-in-heap '(gc/initialize false))
+(eval-in-heap '(gc/grow-root-vector))
+(assert (= (arena/cell->host (eval-in-heap 'gc/roots))
+           (+ arena/heap-start (heap-value size-of-<header>)))
+        "arena: the root vector is not the first chunk")
 
 ;;;
 ;;; string literals

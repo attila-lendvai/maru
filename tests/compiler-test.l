@@ -266,6 +266,11 @@
         (and ok
              (< 0 count)
              (= chunk static-end)
+             ;; the first chunk is the root vector: <data>, used and
+             ;; opaque, one word per root (the arena starts with 32)
+             (= +genesis/data-type-id+ (oop-at first 3))
+             (= 3 (oop-at first 2))
+             (= (* 32 target/cell-size/bytes) (oop-at first 1))
              ;; the trailing free chunk closes the ring and its payload
              ;; reaches heap-image-end
              (= first (oop-at static-end 0))

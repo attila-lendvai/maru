@@ -400,8 +400,7 @@
         (set (<header>-next  start) start)
         (set (<header>-size  start) (- (- end start) header-size))
         (set (<header>-flags start) 0)
-        (set (<header>-type  start) 0))))
-  (gc/grow-root-vector))
+        (set (<header>-type  start) 0)))))
 
 (define-form gc/protect (vars . prog)
   (let ((make-protectors
