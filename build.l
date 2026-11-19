@@ -908,10 +908,9 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
             ;; features without opening a new branch, or evolutionary
             ;; stage. Downside: delayed feedback when something breaks
             ;; the bootstrap when the host is the previous stage.
-            (let* ((output (run-program/shell "cd '"eval0-dir"' &&
+            (let* ((output (run-program/shell/stdout "cd '"eval0-dir"' &&
                            ./build.sh eval0-phase=false compile-maru/stage-0 "
-                                            eval0-backend" "eval0-platform
-                                            " | tail -2"))
+                                            eval0-backend" "eval0-platform))
                    ;; TODO read the path's from the fork's actual output
                    ;; (input (string-stream output))
                    ;; (results (read input))
