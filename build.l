@@ -577,8 +577,13 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
   (let ((grammar (concat-strings slave-dir "/source/c/cgrov.g"))
         (parser  (concat-strings slave-dir "/source/c/cgrov.g.l")))
     (when (needs-recompile? parser (list grammar))
-      (run-with-host/shell " -O boot.l source/parsing/compile-peg-grammar.l '"
-                           grammar "' >'"parser"'"))))
+      ;; the generator writes a scratch file, so a failed run cannot
+      ;; truncate the previous generation
+      (let ((part (concat-strings parser ".part")))
+        ($ "rm -f '"part"'")
+        (run-with-host/shell " -O boot.l source/parsing/compile-peg-grammar.l '"
+                             grammar "' >'"part"'")
+        ($ "mv '"part"' '"parser"'")))))
 
 (define-function compile-cgrov-file (file-path host-dir host-eval slave-dir evolving?)
   (assert (absolute-path? file-path))
@@ -605,7 +610,12 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
          "' boot.l source/c/compile-cgrov.l '" file-path "' >'" c-file "'")
 
       (compile-C-file cflags c-file exe-file ())
-      ($ exe-file" >"final-file)
+      ;; the generated code goes through a scratch file, so a failed run
+      ;; cannot truncate the previous generation
+      (let ((part (concat-strings final-file ".part")))
+        ($ "rm -f '"part"'")
+        ($ exe-file" >'"part"'")
+        ($ "mv '"part"' '"final-file"'"))
       ($ "rm "exe-file" "c-file))))
 
 ;;;
@@ -987,6 +997,16 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
   (let ((binary (compile-maru/stage-1 default-backend default-platform)))
     (run-program* binary argv (pop rest) (pop rest) (pop rest) (pop rest))))
 
+;; Like run-with-stage-1, but the stage writes its stdout to OUTPUT.
+;; It writes a scratch file that is moved into place on success, so a
+;; failed or interrupted run leaves the previous output untouched.
+(define-function run-with-stage-1-to-output (output argv)
+  (let ((part (concat-strings output ".part")))
+    ($ "rm -f '"part"'")
+    (run-with-stage-1 argv () () part)
+    ($ "mv '"part"' '"output"'")
+    output))
+
 (define-function repl args
   (let ((backend  (or (pop args) default-backend))
         (platform (or (pop args) default-platform)))
@@ -1007,10 +1027,8 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
                               "source/parsing/parser.l"
                               "source/parsing/peg-compile-forms.l")))
     (when (needs-recompile? output deps)
-      ;; TODO when this fails it leaves an empty file that must be deleted
-      ;; TODO convert to a /shell variant? that || rm's the file
-      (run-with-stage-1 (list "-O" "boot.l" input)
-                        () () output))
+      (run-with-stage-1-to-output output
+                                  (list "-O" "boot.l" input)))
 
     output))
 
@@ -1024,10 +1042,8 @@ ln -s '" host-dir "' '" eval0-dir "/build/maru.10'")
                               compiled-peg
                               "source/parsing/parser.l")))
     (when (needs-recompile? output deps)
-      ;; TODO when this fails it leaves an empty file that must be deleted
-      ;; TODO convert to a /shell variant? that || rm's the file
-      (run-with-stage-1 (list "-O" "boot.l" compiler input)
-                        () () output))
+      (run-with-stage-1-to-output output
+                                  (list "-O" "boot.l" compiler input)))
 
     output))
 
