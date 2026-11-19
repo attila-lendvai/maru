@@ -554,11 +554,15 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
     (let ((more-files-str
             (if more-files
                 (concat-strings-separated-by " " more-files)
-              "")))
+              ""))
+          ;; a killed compiler must not leave a truncated artifact
+          (part (concat-strings output ".part")))
+      ($ "rm -f '"part"'")
       ($ clang" "lcflags
          " --target="(target-triple)
          (C-cross-flags)
-         " -o '"output"' '"full-path"' "more-files-str)))
+         " -o '"part"' '"full-path"' "more-files-str)
+      ($ "mv '"part"' '"output"'")))
   output)
 
 ;; Cuts the final, stripped artifact from an unstripped binary (the
@@ -566,7 +570,11 @@ git branch --quiet --track "*previous-stage*" remotes/origin/"*previous-stage*)
 ;; unstripped binaries are not reproducible)
 (define-function strip-binary (slave-dir unstripped-path binary)
   (when (needs-recompile? binary (list unstripped-path))
-    ($ "cd '"slave-dir"' && "strip" -o '"binary"' '"unstripped-path"'")
+    ;; a killed strip must not leave a truncated artifact
+    (let ((part (concat-strings binary ".part")))
+      ($ "cd '"slave-dir"' && rm -f '"part"'")
+      ($ "cd '"slave-dir"' && "strip" -o '"part"' '"unstripped-path"'")
+      ($ "cd '"slave-dir"' && mv '"part"' '"binary"'"))
     ($ "cd '"slave-dir"' && chmod +x '"binary"'"))
   binary)
 
