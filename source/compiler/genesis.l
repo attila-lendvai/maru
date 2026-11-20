@@ -43,21 +43,22 @@
 ;;; raw byte access
 ;;;
 
-(define-function genesis/check-range (offset size)
+(define-function %genesis/assert-range (offset size)
   (unless (and (<= 0 offset) (<= (+ offset size) genesis/capacity))
     (error "genesis: access out of range: offset " offset ", size " size)))
 
 (define-function genesis/load-u8 (offset)
-  (genesis/check-range offset 1)
+  (%genesis/assert-range offset 1)
   (u8-at genesis/block offset))
 
 (define-function genesis/store-u8 (offset value)
-  (genesis/check-range offset 1)
-  (set-u8-at genesis/block offset (bitwise-and value 0xff))
+  (%genesis/assert-range offset 1)
+  (set (u8-at genesis/block offset)
+       (bitwise-and value 0xff))
   value)
 
 (define-function genesis/load-u32 (offset)
-  (genesis/check-range offset 4)
+  (%genesis/assert-range offset 4)
   (bitwise-or (u8-at genesis/block offset)
               (bitwise-shift (u8-at genesis/block (+ offset 1)) 8)
               (bitwise-shift (u8-at genesis/block (+ offset 2)) 16)
@@ -100,11 +101,11 @@
 ;; Addresses, indices and counts are small enough to fit the low half
 ;; of a two-cell <u64>.
 (define-function genesis/cell->host (cell)
-  (cond
-    ((is <long> cell) cell)
-    ((is <lower-cell> cell) (lower-cell->long cell))
-    ((is <u32> cell) (lower-cell->long (u32->u64 cell)))
-    ((is <u64> cell) (lower-cell->long (<u64>-lo cell)))
+  (typecase cell
+    (<long>		cell)
+    (<lower-cell>	(lower-cell->long cell))
+    (<u32>		(lower-cell->long (u32->u64 cell)))
+    (<u64>		(lower-cell->long (<u64>-lo cell)))
     (else
      (error "genesis/cell->host: unexpected value " cell))))
 
@@ -146,13 +147,13 @@
     (genesis/host-set-oop-at base index value)))
 
 (define-function genesis/address-of-location (name)
-  (cond
-    ((= name 'heap-image-start)		genesis/heap-start)
-    ((= name 'heap-image-end)		genesis/region-end)
-    ((= name 'read-only-space-start)	0)
-    ((= name 'read-only-space-end)	0)
-    ((= name 'static-space-start)	0)
-    ((= name 'static-space-end)		0)
+  (case name
+    (heap-image-start		genesis/heap-start)
+    (heap-image-end		genesis/region-end)
+    (read-only-space-start	0)
+    (read-only-space-end	0)
+    (static-space-start		0)
+    (static-space-end		0)
     (else
      (error "genesis: unknown location: " name))))
 
@@ -180,30 +181,24 @@
       (genesis/store-u8 (+ dst i) (genesis/load-u8 (+ src i)))
       (incr i))))
 
-;;;
-;;; peeking
-;;;
-
-(define-function genesis/peek-word (offset)
-  (let ((lo (genesis/load-u32 offset)))
+(define-function genesis/cell-at (offset cell-index)
+  (let* ((address	(+ offset (* cell-index genesis/cell-bytes)))
+         (lo		(genesis/load-u32 address)))
     (if genesis/target-64-bit?
-        (let ((hi (genesis/load-u32 (+ offset 4))))
+        (let ((hi (genesis/load-u32 (+ address 4))))
           (if-at-expand (= 64 lower/cell-size/bits)
               (+ lo (bitwise-shift hi 32))
             (if (= 0 hi)
                 lo
-              (error "genesis: peeked word exceeds a 32-bit host"))))
+              (error "genesis/cell-at: cell value exceeds a 32-bit host"))))
       lo)))
 
-(define-function genesis/peek-word-at (offset index)
-  (genesis/peek-word (+ offset (* index genesis/cell-bytes))))
-
-(define-function genesis/peek-cell (base index)
-  (genesis/peek-word-at (genesis/cell->host base) index))
-
 ;;;
-;;; the genesis env
+;;; The Genesis env
 ;;;
+;;; We load the memory-layout related part of the n+1 into the
+;;; *genesis-env* and evaluate it to construct the initial heap of the
+;;; n+1 (that we call genesis).
 
 (let ((genesis-env (environment *slave-env*)))
   (assert (= 0 (<env>-level genesis-env)))
@@ -349,26 +344,10 @@
 
 (define genesis/literal-counter 0)
 
-(define genesis/string-elements-slot
-  (record/slot-index (eval-in-genesis '<string>) 'elements))
-
-(define genesis/long-tag-width (eval-in-genesis '(<immediate-type>-tag-width <long>)))
-(define genesis/long-tag-value (eval-in-genesis '(<immediate-type>-tag-value <long>)))
-
-(assert (is <long> genesis/long-tag-width)
-        "genesis: <long> is not an immediate type")
-
-(define-function genesis/box-long (value)
-  (bitwise-or (bitwise-shift value genesis/long-tag-width)
-              genesis/long-tag-value))
-
-(eval-in-genesis
- '(define-function genesis/new-string (len)
-    (let ((s (string (+ len 1))))
-      (set (<string>-size s) (box <long> len))
-      s)))
-
-(define-record <genesis-literal> () (offset label source))
+(define-record <genesis-literal> ()
+  (offset
+   label
+   ))
 
 (define-function genesis/string-literal (str)
   (let* ((len		(string-length str))
@@ -376,17 +355,30 @@
                          (concat-strings "str."
                                          (integer->string
                                           (incr genesis/literal-counter)))))
-         (obj		(eval-in-genesis `(genesis/new-string ,len)))
+         (obj		(eval-in-genesis `(string/heap ,(+ len 1))))
+         ;; TODO drop the genesis/cell->host mapping, and offset
+         ;; entirely. but that requires the array accessors to
+         ;; understand <u32> and <u64> as index.
          (offset	(genesis/cell->host obj))
-         (elements	(genesis/peek-word-at offset genesis/string-elements-slot)))
+         (elements	(genesis/cell->host (eval-in-genesis `(<string>-elements ,obj)))))
+    ;; TODO if array.l were loaded...
+    ;; (for (i 0 len)
+    ;;   (let ((c (string-at str i)))
+    ;;     (eval-in-genesis
+    ;;      `(string-append ,obj ,c))))
+    ;; (eval-in-genesis `(set (string-at ,obj ,len) 0))
+
+    ;; copy the contents
     (for (i 0 len)
       (genesis/store-u8 (+ elements i) (string-at str i)))
-    (genesis/store-u8 (+ elements len) 0)
+    (genesis/store-u8 (+ elements len) 0) ; zero terminated: an optimization for C interop
+    (eval-in-genesis `(set (<string>-size ,obj) (box <long> ,len)))
+
     (genesis/register-label offset label)
+
     (make <genesis-literal>
-          (offset offset)
-          (label  label)
-          (source str))))
+      (offset offset)
+      (label  label))))
 
 ;;;
 ;;; function objects
@@ -432,7 +424,7 @@
         (count   0))
     (while (not done)
       (push headers header)
-      (let ((next (genesis/peek-word-at header 0)))
+      (let ((next (genesis/cell-at header 0)))
         (unless (and (< 0 next) (<= next genesis/capacity))
           (error "genesis scan: bad chunk link at " header ": " next))
         (set header next))
@@ -452,7 +444,7 @@
 ;; allocated chunk. When nothing was allocated it is the single free
 ;; chunk, i.e. the heap start.
 (define-function genesis/limit ()
-  (genesis/peek-word-at
+  (genesis/cell-at
    (genesis/cell->host (eval-in-genesis 'gc/allocation-cursor)) 0))
 
 ;; The image ships one free chunk: the genesis's trailing chunk, clipped

@@ -689,19 +689,19 @@
       (while rest
         (let* ((header	(car rest))
                (payload	(+ header header-size))
-               (size	(genesis/peek-word-at header 1))
-               (flags	(genesis/peek-word-at header 2))
+               (size	(genesis/cell-at header 1))
+               (flags	(genesis/cell-at header 2))
                (object-label (array-at labels (index payload))))
           (unless (= (current-laddress) (address header))
             (error "emit-genesis: chunk layout mismatch at " header))
           (unless (cdr rest)
             (label! 'static-space-end))
           ;; the chain itself is the source of truth for the ring
-          (heap-pointer (genesis/peek-word-at header 0))
+          (heap-pointer (genesis/cell-at header 0))
           ;; size, flags, type and the optional canary: raw words
           (let ((j 1))
             (while (< j (/ header-size cell-bytes))
-              (.cell (genesis/peek-word-at header j))
+              (.cell (genesis/cell-at header j))
               (incr j)))
           (when object-label
             (label! object-label))
@@ -709,7 +709,7 @@
               (let ((cells	(/ size cell-bytes))
                     (j		0))
                 (while (< j cells)
-                  (let* ((word	(genesis/peek-word-at payload j))
+                  (let* ((word	(genesis/cell-at payload j))
                          (code-label (array-at code-labels
                                                (index (+ payload
                                                          (* j cell-bytes))))))

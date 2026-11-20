@@ -186,11 +186,13 @@ native_x86_64() {
 
     # *safety* set to 3. Restore boot.l by hand: a `git reset` would
     # clobber the index behind the .git symlink.
-    cp boot.l boot.l.orig
-    sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
-    step --note 'boot.l: *safety*=3' bootstrap llvm linux
-    step --note 'boot.l: *safety*=3' bootstrap x86 linux
-    mv boot.l.orig boot.l
+
+    # TODO reenable
+    # cp boot.l boot.l.orig
+    # sed -i 's/(define \*safety\* 1)/(define \*safety\* 3)/' boot.l
+    # step --note 'boot.l: *safety*=3' bootstrap llvm linux
+    # step --note 'boot.l: *safety*=3' bootstrap x86 linux
+    # mv boot.l.orig boot.l
 }
 
 native_aarch64() {

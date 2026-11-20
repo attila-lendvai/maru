@@ -138,9 +138,6 @@
       (box <u64> lo)
     (%allocate-two-cell-word <u64> lo hi)))
 
-(define-function %u32-mask ()
-  (- (bitwise-shift 1 32) 1))
-
 (define-function %make-u32 (value)
   (box <u32> (bitwise-and value (%u32-mask))))
 

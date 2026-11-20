@@ -158,3 +158,37 @@
 (define-form put/head		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'head) ,val)	`(set (<pair>-head ,obj) ,val)))
 (define-form get/tail		(obj)		(if (< *safety* 2)		`(oop-at ,obj ,(record/slot-index <pair> 'tail))	`(<pair>-tail ,obj)))
 (define-form put/tail		(obj val)	(if (< *safety* 2)	    `(set-oop-at ,obj ,(record/slot-index <pair> 'tail) ,val)	`(set (<pair>-tail ,obj) ,val)))
+
+;; KLUDGE u32 mask written as 0xffffffff on a 32-bit host reads that
+;; literal as -1. this way it's identical on every host.
+(define-function %u32-mask ()
+  (- (bitwise-shift 1 32) 1))
+
+;; TODO these could work, but let's do this after the type cleanup.
+;; then we could eliminate a whole lot of genesis/cell->host
+;; conversions. when this land, then the DEFINE-VM-FUNCTION
+;; counterparts should just call these.
+
+;; (define-function <u64>-lo (value)
+;;   (if-at-expand (single-cell-boxed-type? <u64>)
+;;       (box <u32> (bitwise-and (unbox <u64> value) (%u32-mask)))
+;;     (box <u32> (oop-at value 0))))
+
+;; (define-function <u64>-hi (value)
+;;   (if-at-expand (single-cell-boxed-type? <u64>)
+;;       (box <u32> (bitwise-and (arithmethic-shift-right (unbox <u64> value) 32)
+;;                               (%u32-mask)))
+;;     (box <u32> (oop-at value 1))))
+
+;; (define-function unbox-integer (value)
+;;   (typecase value
+;;     (<long>	(unbox <long> value))
+;;     (<u32>	(unbox <u32> value))
+;;     (<u64>	(if-at-expand (single-cell-boxed-type? <u64>)
+;;                     (unbox <u64> value)
+;;                   (let ((hi (<u64>-hi value))
+;;                         (lo (<u64>-lo value)))
+;;                     (unless (and (zero? hi)
+;;                                  (< lo 0x7fffffff))
+;;                       (error "unbox-integer: a too large <u64> cannot be represented in this 32 bit host"))
+;;                     lo)))))

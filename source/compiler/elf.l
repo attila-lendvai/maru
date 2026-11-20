@@ -154,8 +154,6 @@
      (.asciiz self))))
 
 (define-method compile-object <string> (-c-)
-  (when-at-expand (not evolving?)
-    (genesis/string-literal self))
   (emit-object/C-string self -c-))
 
 (define-method compile-object <undefined> (-c-)
