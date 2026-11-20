@@ -102,11 +102,6 @@
     (when-at-expand (feature profiler)
       (profiler-counter (box <long> 0)))))
 
-(define-vm-function form (fn (sym () ()))
-  (make/heap <form>
-    (function	fn)
-    (symbol	sym)))
-
 (define-vm-function fixed (fn)
   (make/heap <fixed>
     (function fn)))

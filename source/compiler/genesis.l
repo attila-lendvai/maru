@@ -240,6 +240,17 @@
       (debug-print		,genesis/noop-form)
       (fatal			,(lambda args (error "genesis fatal: " args)))
       (pointer			,(lambda (value) value))
+      ;; KLUDGE if some file we load into genesis triggers a smart
+      ;; LOAD or REQUIRE of the slave env, then a later load somewhere
+      ;; else will not load it.
+      (load			,primitive/load)
+      (require			,primitive/load)
+      ,@(unless genesis/target-64-bit?
+          ;; EXPAND rewrites (set (u64-at ...)) to a call to SET-U64-AT
+          ;; only when the setter is defined, so a 32-bit host needs
+          ;; this stub.
+          `((u64-at		(lambda _ (error "genesis: u64-at called")))
+            (set-u64-at		(lambda _ (error "genesis: set-u64-at called")))))
       )
 
   (let ((name (first entry))
@@ -247,9 +258,16 @@
     (define-in-genesis name value)))
 
 (define-function genesis/load-target-file (path)
+  ;; TODO it should be the following, but eval is messed up
+  ;; when it comes to setting *globals*
+  ;; (eval-in-genesis
+  ;;  ;; using LOAD would register as a loaded file, and a later REQUIRE would not load it
+  ;;  `(primitive/load ,path))
+
   (let ((prev *globals*))
     (set *globals* *genesis-env*)
-    (load path)
+    ;; using LOAD would register as a loaded file, and a later REQUIRE would not load it
+    (primitive/load path)
     (set *globals* prev)))
 
 ;;; The header layout, the flags, gc/allocate and gc/initialize.
@@ -304,6 +322,8 @@
                  ,@body)))))
 
 (genesis/load-target-file "source/evaluator/constructors.l")
+(genesis/load-target-file "source/evaluator/arrays.l")
+(genesis/load-target-file "source/env-lower.l")
 
 ;; The genesis starts as a real heap: gc/initialize stamps the initial
 ;; chunk, and the root vector is the first allocation in it, so the

@@ -707,6 +707,29 @@
 (when-at-expand (and (feature memory-block)
                      (host-value (defined? 'posix/spawn-program *target-env*)))
 
+(define-function to-C-strings (obj offset)
+  (let ((lower-array (memory-block 4))
+        (i offset))
+    (typecase obj
+      (<undefined>) ; empty list
+      (<array>
+       (let ((limit (+ 1 (array-length obj))))
+         (while (< i limit)
+           (memory-block/ensure-size/cell lower-array i)
+           ;; NOTE: we can't cache the elements slot, because it's
+           ;; changing when the array grows.
+           (set (oop-at (<memory-block>-elements lower-array) i)
+                (string->C-string (array-at obj i)))
+           (incr i))))
+      (<pair>
+       (while (pair? obj)
+         (memory-block/ensure-size/cell lower-array i)
+         (set (oop-at (<memory-block>-elements lower-array) i)
+              (string->C-string (pop obj)))
+         (incr i)))
+      (else (error "to-C-strings: cannot handle passed obj of type "(type-of obj))))
+    lower-array))
+
 (define-vm-function spawn-program ((path <string>)
                                    argv envp
                                    (stdout-fd <long> -1) (stderr-fd <long> -1))

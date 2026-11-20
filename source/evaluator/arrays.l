@@ -151,29 +151,6 @@
 (define-function memory-block/ensure-size/cell (array cell-index)
   (memory-block/ensure-size array (* (+ cell-index 1) target/cell-size/bytes)))
 
-(define-function to-C-strings (obj offset)
-  (let ((lower-array (memory-block 4))
-        (i offset))
-    (typecase obj
-      (<undefined>) ; empty list
-      (<array>
-       (let ((limit (+ 1 (array-length obj))))
-         (while (< i limit)
-           (memory-block/ensure-size/cell lower-array i)
-           ;; NOTE: we can't cache the elements slot, because it's
-           ;; changing when the array grows.
-           (set (oop-at (<memory-block>-elements lower-array) i)
-                (string->C-string (array-at obj i)))
-           (incr i))))
-      (<pair>
-       (while (pair? obj)
-         (memory-block/ensure-size/cell lower-array i)
-         (set (oop-at (<memory-block>-elements lower-array) i)
-              (string->C-string (pop obj)))
-         (incr i)))
-      (else (error "to-C-strings: cannot handle passed obj of type "(type-of obj))))
-    lower-array))
-
 ) ; (feature memory-block)
 
 (define-vm-function string-insert-all ((str <string>) (idx <long>) (insertion <string>))
@@ -222,19 +199,3 @@
 ;; way `=` is compiled, but that would slow down every comparison.
 (define-function string= (a b)
   (= 0 (string-compare a b)))
-
-;; NOTE there's a variant of this in sequences.l, but it's not trivial to merge them.
-(define-function array-binary-search (array item comparator inserter)
-  (let ((lo 0)
-        (hi (- (array-length array) 1)))
-    (while (<= lo hi)
-      (let* ((mid	(/ (+ lo hi) 2))
-             (candidate	(array-at array mid))
-             (res	(comparator item candidate)))
-        (cond
-          ((< res 0)	(set hi (- mid 1)))
-          ((> res 0)	(set lo (+ mid 1)))
-          (else		(return candidate)))))
-    (if inserter
-        (inserter array lo item)
-      ())))

@@ -3,9 +3,18 @@
 ;;; The Maru VM, written in a dialect of Maru.
 ;;;
 
-(load "source/evaluator/gc.l")
-(load "source/evaluator/types.l")
-(load "source/evaluator/constructors.l")
+(require "source/evaluator/gc.l")
+(require "source/evaluator/types.l")
+(require "source/evaluator/constructors.l")
+(require "source/evaluator/arrays.l")
+(require "source/env-lower.l")
+
+;; TODO i have moved it here so that define-form keeps working in the
+;; genesis. but this belongs to constructors.l
+(define-vm-function form (fn (sym () ()))
+  (make/heap <form>
+    (function	fn)
+    (symbol	sym)))
 
 (when (feature backtrace)
   (require "source/ansiterm.l"))
@@ -61,8 +70,6 @@
         (cons (get/head head) new-tail))
     tail))
 
-(require "source/evaluator/arrays.l")
-
 ;; TODO these should be in platforms/platform-c-based.l, but they need
 ;; arrays.l and other stuff.
 (define-function %string->C-string (obj)
@@ -94,9 +101,25 @@
 ;;; env
 ;;; ----------------------------------------------------------------
 
+;; NOTE there's a variant of this in sequences.l, but it's not trivial to merge them.
+(define-function %array-binary-search (array item comparator inserter)
+  (let ((lo 0)
+        (hi (- (array-length array) 1)))
+    (while (<= lo hi)
+      (let* ((mid	(/ (+ lo hi) 2))
+             (candidate	(array-at array mid))
+             (res	(comparator item candidate)))
+        (cond
+          ((< res 0)	(set hi (- mid 1)))
+          ((> res 0)	(set lo (+ mid 1)))
+          (else		(return candidate)))))
+    (if inserter
+        (inserter array lo item)
+      ())))
+
 (define-vm-function string->symbol ((str <string>))
   ;; aka intern
-  (array-binary-search *symbols*
+  (%array-binary-search *symbols*
                        str
                        (lambda (str candidate) ; TODO there's no support yet for capturing str into the closure
                          (string-compare str (<symbol>-name candidate)))
@@ -114,8 +137,6 @@
     ((string? symbol)		symbol)
     ((symbol? symbol)		(<symbol>-name symbol))
     (else (error "symbol->string: illegal value: "symbol))))
-
-(require "source/env-lower.l")
 
 ;; TODO this is ready to be moved into env-lower.l, but then it redefines the host's defined?
 ;; and breaks something when it's loaded while not bootstrapping.
