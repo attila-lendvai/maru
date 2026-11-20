@@ -17,32 +17,6 @@
          (set __result (let () ,@body))))
      __result))
 
-;; TODO this would reverse the order
-;; (define-function copy-module-bindings (from to filter)
-;;   (let* ((from-env	(module-env from))
-;;          (to-env	(module-env to)))
-;;     (%env-do-reverse from-env
-;;       (let ((name	(<variable>-name -variable-))
-;;             (value	(<variable>-value -variable-)))
-;;         (when (or (not filter)
-;;                   (filter name value))
-;;           (environment-define to-env name value)))
-;;       ())))
-
-;; (define-function copy-module-bindings (from to filter)
-;;   (let* ((from-env	(module-env from))
-;;          (to-env	(module-env to))
-;;          (from-bindings	(<env>-bindings from-env))
-;;          (count		(array-length from-bindings)))
-;;     (for (i 0 count)
-;;       (let* ((var	(array-at from-bindings i))
-;;              (name	(<variable>-name var))
-;;              (value	(<variable>-value var)))
-;;         (when (or (not filter)
-;;                   (filter name value))
-;;           (environment-define to-env name value))))
-;;     ()))
-
 (define-function find-local-variable (env name)
   (safety 2 (assert (is <env> env) "find-local-variable: env is not an <env>: "env))
   (safety 2 (assert (symbol? name) "find-local-variable: name is not a <symbol>: "name))

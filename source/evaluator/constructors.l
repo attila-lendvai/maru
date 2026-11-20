@@ -1,7 +1,4 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
-;;;
-;;; The Maru VM, written in a dialect of Maru.
-;;;
 
 ;;; The caller loads gc.l and types.l; this file only defines the
 ;;; constructors, so a caller can pick the type layer (e.g. the genesis

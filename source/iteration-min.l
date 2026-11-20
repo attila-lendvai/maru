@@ -1,10 +1,10 @@
 ;;; -*- mode: lisp; coding: us-ascii -*-
 
 (define-form for (var-init-limit-step . body)
-  (let ((var       (car    var-init-limit-step)    )
-        (init      (cadr   var-init-limit-step)    )
-        (limit     (caddr  var-init-limit-step)    )
-        (step  (or (cadddr var-init-limit-step) 1)))
+  (let ((var       (first	var-init-limit-step)    )
+        (init      (second	var-init-limit-step)    )
+        (limit     (third	var-init-limit-step)    )
+        (step  (or (fourth	var-init-limit-step) 1)))
     `(let ((,var ,init)
            (_limit_ ,limit))
        (while (not (= ,var _limit_)) ; this should be using = because step may be both +/-

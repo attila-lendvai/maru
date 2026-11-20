@@ -197,8 +197,8 @@
 ;;; The Genesis env
 ;;;
 ;;; We load the memory-layout related part of the n+1 into the
-;;; *genesis-env* and evaluate it to construct the initial heap of the
-;;; n+1 (that we call genesis).
+;;; *genesis-env* and run it while constructing the initial heap of
+;;; the n+1 (which we call genesis).
 
 (let ((genesis-env (environment *slave-env*)))
   (assert (= 0 (<env>-level genesis-env)))
